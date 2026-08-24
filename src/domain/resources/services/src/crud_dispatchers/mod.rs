@@ -10,7 +10,7 @@
 mod declare_resource_crud_dispatcher;
 mod declare_resource_presentation_dispatcher;
 mod resource_crud_dispatcher_helpers;
-mod resource_crud_dispatcher_registry;
+mod resource_dispatcher_factory;
 
 pub use kamu_resources::{
     ApplyManifestApplicationDecision,
@@ -25,4 +25,4 @@ pub use kamu_resources::{
     UnsupportedResourceDescriptorError,
 };
 pub use resource_crud_dispatcher_helpers::*;
-pub use resource_crud_dispatcher_registry::*;
+pub use resource_dispatcher_factory::*;

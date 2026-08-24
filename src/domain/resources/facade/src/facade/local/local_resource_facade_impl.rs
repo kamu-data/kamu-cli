@@ -12,11 +12,7 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::*;
-use kamu_resources_services::{
-    ResourceExtensionSchemaResolver,
-    get_resource_crud_dispatcher,
-    get_resource_crud_dispatcher_for_trusted_schema,
-};
+use kamu_resources_services::{ResourceDispatcherFactory, ResourceExtensionSchemaResolver};
 
 use super::helpers::*;
 use crate::*;
@@ -26,7 +22,7 @@ use crate::*;
 #[dill::component(pub)]
 #[dill::interface(dyn ResourceFacade)]
 pub struct LocalResourceFacadeImpl {
-    catalog: dill::Catalog,
+    dispatcher_factory: Arc<ResourceDispatcherFactory>,
     resource_account_resolver: Arc<dyn ResourceAccountResolver>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     resource_extension_schema_resolver: Arc<ResourceExtensionSchemaResolver>,
@@ -459,10 +455,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
             if !ids_to_delete.is_empty() {
                 // Registered selector schemas must have a dispatcher.
-                let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
-                    &self.catalog,
-                    group.schema.as_str(),
-                )?;
+                let dispatcher = self
+                    .dispatcher_factory
+                    .crud_dispatcher_for_trusted_schema(group.schema.as_str())?;
                 dispatcher
                     .delete(ResourceCrudDispatcherDeleteRequest {
                         account_id: group.account.did.clone(),
@@ -519,14 +514,11 @@ impl LocalResourceFacadeImpl {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
 
-        for builder in self
-            .catalog
-            .builders_for::<dyn ResourcePresentationDispatcher>()
+        for dispatcher in self
+            .dispatcher_factory
+            .presentation_dispatchers()
+            .expect("Resource presentation dispatcher construction failed")
         {
-            let dispatcher = builder
-                .get(&self.catalog)
-                .expect("Resource presentation dispatcher construction failed");
-
             let schema = dispatcher.schema();
             let presentation = dispatcher.presentation();
 
@@ -703,11 +695,7 @@ impl LocalResourceFacadeImpl {
         let mut dispatchers: HashMap<TypeUri, Arc<dyn ResourcePresentationDispatcher>> =
             HashMap::new();
 
-        for builder in self
-            .catalog
-            .builders_for::<dyn ResourcePresentationDispatcher>()
-        {
-            let dispatcher = builder.get(&self.catalog).int_err()?;
+        for dispatcher in self.dispatcher_factory.presentation_dispatchers()? {
             dispatchers
                 .entry(dispatcher.schema().clone())
                 .or_insert(dispatcher);
@@ -1144,10 +1132,9 @@ impl LocalResourceFacadeImpl {
             .resolve_target_account(manifest.headers.account.as_ref())
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
-            &self.catalog,
-            manifest.schema.as_str(),
-        )?;
+        let dispatcher = self
+            .dispatcher_factory
+            .crud_dispatcher(manifest.schema.as_str())?;
 
         let canonical_labels = self
             .resource_extension_schema_resolver
@@ -1201,7 +1188,7 @@ impl LocalResourceFacadeImpl {
         spec_view: SpecViewOpts,
     ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
         if spec_view.revealed {
-            get_resource_spec_view_dispatcher_from_catalog(&self.catalog, schema)
+            self.dispatcher_factory.spec_view_dispatcher(schema)
         } else {
             None
         }

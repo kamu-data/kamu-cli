@@ -51,33 +51,16 @@ use kamu_resources::{
     ResourceSchemaProvider,
     ResourceSpecFromInput,
     TypeUri,
-    UnsupportedResourceDescriptorError,
 };
-use kamu_resources_services::get_resource_crud_dispatcher;
+use kamu_resources_services::ResourceDispatcherFactory;
 use secrecy::ExposeSecret;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, thiserror::Error)]
-enum GetDispatcherError {
-    #[error(transparent)]
-    Unsupported(#[from] UnsupportedResourceDescriptorError),
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetDispatcherError> for InternalError {
-    fn from(e: GetDispatcherError) -> Self {
-        e.int_err()
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::interface(dyn DatasetEnvVarMutationAdapter)]
 pub struct DatasetEnvVarMutationAdapterImpl {
-    catalog: dill::Catalog,
+    dispatcher_factory: Arc<ResourceDispatcherFactory>,
     dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
     account_service: Arc<dyn AccountService>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
@@ -167,13 +150,15 @@ impl DatasetEnvVarMutationAdapterImpl {
         ResourceName::new_unchecked(&format!("legacy-secrets-{}", dataset_id.as_multibase()))
     }
 
-    fn get_dispatcher<E>(&self, schema: &str) -> Result<Arc<dyn ResourceCrudDispatcher>, E>
-    where
-        E: From<InternalError>,
-    {
-        get_resource_crud_dispatcher::<GetDispatcherError>(&self.catalog, schema)
-            .map_err(InternalError::from)
-            .map_err(E::from)
+    fn get_dispatcher(
+        &self,
+        schema: &str,
+    ) -> Result<Arc<dyn ResourceCrudDispatcher>, InternalError> {
+        // Only the two built-in legacy schemas are ever passed here, so an
+        // unsupported schema is an internal wiring error, not a user error.
+        self.dispatcher_factory
+            .crud_dispatcher(schema)
+            .map_err(ErrorIntoInternal::int_err)
     }
 
     async fn apply_and_handle_rejection<E>(
@@ -242,7 +227,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             )
             .await?;
 
-        let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA_STR)?;
+        let dispatcher = self.get_dispatcher(VariableSetResource::SCHEMA_STR)?;
 
         self.apply_and_handle_rejection::<InternalError>(
             &dispatcher,
@@ -321,7 +306,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             )
             .await?;
 
-        let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA_STR)?;
+        let dispatcher = self.get_dispatcher(SecretSetResource::SCHEMA_STR)?;
 
         self.apply_and_handle_rejection::<InternalError>(
             &dispatcher,

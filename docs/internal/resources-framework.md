@@ -147,7 +147,7 @@ long-term goal. This page documents what exists now.
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by exact name or UID, optionally account- and type-scoped. A batch is `Vec<ResourceRef>`. |
 | **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
 | **SpecViewOpts** | Options controlling how sensitive spec fields render, `{ revealed: bool }` today. `revealed: false` (default) returns stored ciphertext as-is; `revealed: true` decrypts. A struct, not an enum, so future spec-view options can be added without growing every call site's argument list. No "redacted" mode today. |
-| **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
+| **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, resolved by schema metadata through `ResourceDispatcherFactory`. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
 | **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. registered `environment`, or free-form `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
 | **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Manifest input starts as ordered `Vec<(TypeRef, Value)>` so duplicate keys can be rejected before map construction; registered extension keys are canonicalized to schema URI and typed-value validated during facade apply preparation. Per RFC-018, labels are meant to be indexed/queryable and annotations not: **string-valued** labels are indexed via `resource_labels_projection` and selectable with `--label`/`-l`; non-string values are stored but not indexed, so they can never be matched by an equality filter. Annotations are never indexed. |
@@ -215,7 +215,7 @@ flowchart TD
     REMOTE["RemoteGraphqlResourceFacadeImpl<br/>(cynic GraphQL client)"]
 
     subgraph domain["Domain + services"]
-      REG["Dispatcher registry<br/>lookup by schema<br/>or selector metadata"]
+      REG["ResourceDispatcherFactory<br/>lookup by schema metadata"]
       DISP["ResourceCrudDispatcher&lt;R&gt;<br/>per-type"]
       UC["Use cases&lt;R&gt;<br/>apply / reconcile / get / list / delete"]
     end
@@ -573,30 +573,52 @@ The `--dry-run` path uses `plan`; a live apply uses `apply`. Use-case implementa
 by **`declare_*_use_case!`** macros so each type gets a fully-wired instance without boilerplate.
 
 **Dispatchers + registry.** Each type registers a `ResourceCrudDispatcher` via
-`declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by schema or selector
-metadata through `dill` — the registry key is `ResourceDispatcherMeta` (schema `&'static str` +
-selector name/aliases). There are **three** lookup entry points, differing only in how a missing
-dispatcher is reported
-([`crud_dispatchers/resource_crud_dispatcher_registry.rs`](/src/domain/resources/services/src/crud_dispatchers/resource_crud_dispatcher_registry.rs)):
+`declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by schema metadata
+through `dill` — the registry key is `ResourceDispatcherMeta` (schema `&'static str` + selector
+name/aliases). Services do **not** hold a `dill::Catalog` to do this: they inject
+**`ResourceDispatcherFactory`**, which encapsulates all catalog/builder interaction
+([`crud_dispatchers/resource_dispatcher_factory.rs`](/src/domain/resources/services/src/crud_dispatchers/resource_dispatcher_factory.rs)):
 
 ```rust
-// (1) By schema (from a parsed manifest `$schema`) — a miss is a user error.
-pub fn get_resource_crud_dispatcher<E>(target_catalog, schema: &str) -> Result<Arc<dyn …>, E>
-    where E: From<UnsupportedResourceDescriptorError> + From<InternalError>;
+pub struct ResourceDispatcherFactory { /* holds the catalog it was resolved from */ }
 
-// (2) By selector name/alias (from a CLI/GraphQL selector) — a miss is a user error.
-pub fn get_resource_crud_dispatcher_by_raw_selector<E>(target_catalog, raw_selector: &ResourceTypeSelectorRaw) -> Result<…, E>
-    where E: From<UnsupportedResourceSelectorError> + From<InternalError>;
+impl ResourceDispatcherFactory {
+    // (1) By schema (from a parsed manifest `$schema`) — a miss is a user error.
+    pub fn crud_dispatcher(&self, schema: &str)
+        -> Result<Arc<dyn ResourceCrudDispatcher>, GetResourceCrudDispatcherError>;
 
-// (3) By a schema already known valid (stored snapshot, or an already-resolved selector) —
-//     a miss is a data-integrity catastrophe, so it is an InternalError (→ 500), never a user error.
-pub fn get_resource_crud_dispatcher_for_trusted_schema(target_catalog, schema: &str)
-    -> Result<Arc<dyn …>, InternalError>;
+    // (2) By a schema already known valid (stored snapshot, or an already-resolved selector) —
+    //     a miss is a data-integrity catastrophe, so it is an InternalError (→ 500), never a user error.
+    pub fn crud_dispatcher_for_trusted_schema(&self, schema: &str)
+        -> Result<Arc<dyn ResourceCrudDispatcher>, InternalError>;
+
+    // (3) Spec view — absence is normal (types with no sensitive fields).
+    pub fn spec_view_dispatcher(&self, schema: &TypeUri)
+        -> Option<Arc<dyn ResourceSpecViewDispatcher>>;
+
+    // (4) Every registered presentation dispatcher (callers index by schema).
+    pub fn presentation_dispatchers(&self)
+        -> Result<Vec<Arc<dyn ResourcePresentationDispatcher>>, InternalError>;
+}
 ```
 
-Each finds exactly one dispatcher; zero → `NotFound`, more than one → `Duplicate`. The distinction
-between (1)/(2) (fresh, unvalidated input → user error) and (3) (schema the system itself produced →
-a miss means corrupt storage/registration, i.e. `InternalError`) is the point of having three.
+The CRUD lookups find exactly one dispatcher; zero → `NotFound`, more than one → `Duplicate`. The
+distinction between (1) (fresh, unvalidated input → user error) and (2) (schema the system itself
+produced → a miss means corrupt storage/registration, i.e. `InternalError`) is the point of having
+both.
+
+**Why a factory, and why it caches nothing.** Dispatchers are `Transient` and their dependencies
+(use cases, query services) are transaction-scoped, so a dispatcher must be constructed against the
+*current* catalog — caching one in a longer-lived scope would pin stale transaction-bound services.
+The factory is therefore `Transient` and injects the catalog **by value**, which is the only scope
+`dill` permits for that. This works because `dill` resolves builders against the catalog the
+resolution *started from*: a factory injected into a component built from a transaction-chained
+catalog carries that chained catalog, so the dispatchers it builds see the transaction.
+
+The one place that still passes a catalog explicitly is `ResourceLifecycleMessageConsumer`, which
+receives the per-message transaction catalog as a *method argument* — a component-held catalog would
+be the wrong one there, so it keeps using
+[`get_resource_lifecycle_dispatcher_from_catalog`](/src/domain/resources/domain/src/dispatchers/resource_lifecycle_event_dispatcher.rs).
 
 **Message handlers** (outbox consumers — see [§13](#13-data-flow-walkthroughs)):
 `ResourceLifecycleMessageConsumer` and `AccountLifecycleMessageConsumer`.
@@ -780,8 +802,8 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 **Implementations:**
 
 - **`LocalResourceFacadeImpl`** — resolves account → resolves selector name/alias to a
-  schema and UID/snapshot → looks up the per-type dispatcher via `get_resource_crud_dispatcher` →
-  calls it. Holds the `dill::Catalog`,
+  schema and UID/snapshot → looks up the per-type dispatcher via `ResourceDispatcherFactory` →
+  calls it. Holds a `ResourceDispatcherFactory`,
   a `ResourceAccountResolver`, `GenericResourceQueryService`, and
   `ResourceExtensionSchemaResolver`. For `plan_apply_manifest` / `apply_manifest`, the shared
   preparation step parses the manifest, resolves the account, resolves the CRUD dispatcher,
@@ -1087,7 +1109,7 @@ sequenceDiagram
     participant U as User / CLI
     participant D as ManifestDiscovery+Execution
     participant F as ResourceFacade (Local)
-    participant R as Dispatcher registry
+    participant R as ResourceDispatcherFactory
     participant X as Extension schema resolver
     participant UC as ApplyResourceUseCase<R>
     participant ST as Event store + repo
@@ -1096,7 +1118,7 @@ sequenceDiagram
     U->>D: apply -f manifest.yaml [--dry-run]
     D->>F: apply_manifest(ApplyManifestRequest) (or plan_apply_manifest)
     F->>F: resolve account, parse manifest ($schema, headers, spec)
-    F->>R: get_resource_crud_dispatcher(schema)
+    F->>R: crud_dispatcher(schema)
     R-->>F: ResourceCrudDispatcher<R>
     F->>X: canonicalize + validate labels/annotations
     X-->>F: canonical headers + warnings (or InvalidHeaders)
@@ -1484,7 +1506,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 5. **Test all three tiers** (see [§15](#15-tests)): a reconciler/service unit test, a facade contract
    case, and an E2E lifecycle test (apply → list → get → update → delete) plus a golden-view test.
 
-The registry then resolves your resource by schema or selector metadata, so the generic CRUD
+`ResourceDispatcherFactory` then resolves your resource by schema metadata, so the generic CRUD
 operations work without touching CLI or GraphQL code. **But "no changes" holds only for the generic
 path** — a complete type still needs its DI registration, presentation metadata (aliases + list
 columns), facade contract coverage, CLI golden-output test, `cynic`/schema updates if the remote
@@ -1554,7 +1576,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels, annotations, and status conditions. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_crud_dispatcher_registry.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |

@@ -13,7 +13,6 @@ use kamu_resources::{
     MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceLifecycleMessage,
-    get_resource_lifecycle_dispatcher_from_catalog,
 };
 use messaging_outbox::{
     InitialConsumerBoundary,
@@ -22,6 +21,8 @@ use messaging_outbox::{
     MessageConsumerT,
     MessageConsumptionMode,
 };
+
+use crate::ResourceDispatcherFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,7 +62,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
         match message {
             ResourceLifecycleMessage::Applied(applied_message) => {
                 let resource = &applied_message.resource;
-                let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
+                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
                     target_catalog,
                     &resource.schema,
                 )?;
@@ -70,7 +71,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
             }
             ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
                 let resource = &succeeded_message.resource;
-                let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
+                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
                     target_catalog,
                     &resource.schema,
                 )?;
@@ -79,7 +80,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
             }
             ResourceLifecycleMessage::ReconciliationFailed(failed_message) => {
                 let resource = &failed_message.resource;
-                let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
+                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
                     target_catalog,
                     &resource.schema,
                 )?;
@@ -93,8 +94,10 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
                 );
 
                 let first = &deleted_message.resources[0];
-                let dispatcher =
-                    get_resource_lifecycle_dispatcher_from_catalog(target_catalog, &first.schema)?;
+                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
+                    target_catalog,
+                    &first.schema,
+                )?;
 
                 for resource in &deleted_message.resources {
                     dispatcher.handle_deleted(resource).await?;

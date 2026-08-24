@@ -406,6 +406,16 @@ pub enum ApplyManifestError {
     Internal(#[from] InternalError),
 }
 
+impl From<kamu_resources_services::GetResourceCrudDispatcherError> for ApplyManifestError {
+    fn from(err: kamu_resources_services::GetResourceCrudDispatcherError) -> Self {
+        use kamu_resources_services::GetResourceCrudDispatcherError as E;
+        match err {
+            E::Unsupported(e) => Self::UnsupportedDescriptor(e),
+            E::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 impl From<ResourceHeadersValidationError> for ApplyManifestError {
     fn from(err: ResourceHeadersValidationError) -> Self {
         Self::InvalidHeaders(err.into())
