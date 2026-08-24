@@ -553,17 +553,16 @@ impl DatasetEntryRepository for MySqlDatasetEntryRepository {
                     delete_query = delete_query.bind(dataset_id);
                 }
 
-                delete_query
-                    .execute(&mut *connection_mut)
-                    .await
-                    .int_err()?;
+                delete_query.execute(&mut *connection_mut).await.int_err()?;
             }
 
             existing_dataset_ids
         };
 
-        let deletion_result =
-            DatasetEntriesDeletionResult::from_deleted_dataset_ids(dataset_ids, deleted_dataset_ids);
+        let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(
+            dataset_ids,
+            deleted_dataset_ids,
+        );
 
         if !deletion_result.deleted_dataset_ids.is_empty() {
             for listener in &self.removal_listeners {
