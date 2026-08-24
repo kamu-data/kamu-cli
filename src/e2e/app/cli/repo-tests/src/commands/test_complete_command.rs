@@ -74,7 +74,7 @@ pub async fn test_complete_resource_type(kamu: KamuCliPuppet) {
 pub async fn test_complete_resource_type_extra_targets(kamu: KamuCliPuppet) {
     let completions = kamu.complete("kamu list", 2).await;
 
-    for expected in ["datasets", "%", "variablesets"] {
+    for expected in ["dataset", "datasets", "%", "variablesets"] {
         assert!(
             completions.contains(&expected.to_string()),
             "missing {expected} in {completions:?}"

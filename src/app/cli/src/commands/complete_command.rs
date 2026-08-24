@@ -29,7 +29,7 @@ use super::{CLIError, Command};
 use crate::WorkspaceService;
 use crate::config::ConfigService;
 use crate::resource_context::{LOCAL_CONTEXT_NAME, ResourceContextRegistryService};
-use crate::resources::{ANY_SELECTOR, DATASETS_TARGET, ResourceTypeLookupService};
+use crate::resources::{ANY_SELECTOR, DATASET_TARGET, DATASETS_TARGET, ResourceTypeLookupService};
 
 #[dill::component]
 #[dill::interface(dyn Command)]
@@ -263,7 +263,7 @@ impl CompleteCommand {
                     PositionalKind::ContextName => self.complete_context_name(output, to_complete),
                     PositionalKind::ResourceType { with_extra_targets } => {
                         let extra_targets: &[&str] = if *with_extra_targets {
-                            &[DATASETS_TARGET, ANY_SELECTOR]
+                            &[DATASET_TARGET, DATASETS_TARGET, ANY_SELECTOR]
                         } else {
                             &[]
                         };
