@@ -436,6 +436,10 @@ pub async fn test_duplicate_github_account_email(catalog: &dill::Catalog) {
 
     let duplicate_email_account = Account {
         id: odf::AccountID::new_generated_ed25519().1,
+        // Distinct resource id: otherwise the struct-update below would copy it
+        // from `account` and trip the resource_id unique constraint first,
+        // masking the email duplicate this test is about.
+        resource_id: Account::generate_resource_id(),
         account_name: odf::AccountName::new_unchecked("petya"),
         provider_identity_key: "petya".to_string(),
         ..account
