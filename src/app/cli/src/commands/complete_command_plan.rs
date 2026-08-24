@@ -241,8 +241,9 @@ fn classify_positional(
         },
 
         // Commands taking an existing context name; `context add` takes a new
-        // one and is absent by construction.
-        (["context"] | ["context", "use" | "check" | "delete"], "name") => {
+        // one and is absent by construction. Each accepts a single name, so a
+        // filled slot means any further token is already invalid.
+        (["context"] | ["context", "use" | "check" | "delete"], "name") if first_slot => {
             PositionalKind::ContextName
         }
 
@@ -377,6 +378,16 @@ mod tests {
                 "no context-name completion for: {line}"
             );
         }
+    }
+
+    #[test]
+    fn context_name_completes_only_for_the_first_slot() {
+        // Each of these takes exactly one name, so a second token is already
+        // invalid and must not be completed.
+        assert!(!positionals("kamu context use prod", 4).contains(&PositionalKind::ContextName));
+        assert!(!positionals("kamu context check prod", 4).contains(&PositionalKind::ContextName));
+        assert!(!positionals("kamu context delete prod", 4).contains(&PositionalKind::ContextName));
+        assert!(!positionals("kamu context prod", 3).contains(&PositionalKind::ContextName));
     }
 
     #[test]
