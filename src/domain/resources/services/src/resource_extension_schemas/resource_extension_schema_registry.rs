@@ -122,10 +122,6 @@ impl ResourceExtensionSchemaRegistry {
         Ok(registry)
     }
 
-    pub fn registrations(&self) -> impl Iterator<Item = &Arc<ResourceExtensionSchemaRegistration>> {
-        self.by_uri.values()
-    }
-
     pub fn resolve(
         &self,
         kind: ResourceExtensionKind,
@@ -137,21 +133,6 @@ impl ResourceExtensionSchemaRegistry {
             TypeRef::Uri(uri) => self.resolve_uri(kind, uri, resource_schema).map(Some),
             TypeRef::Name(name) => Ok(self.resolve_name(kind, name, resource_schema)),
         }
-    }
-
-    pub fn resolve_for_trusted(
-        &self,
-        kind: ResourceExtensionKind,
-        key: &TypeRef,
-        resource_schema: &ResourceSchemaId,
-    ) -> Result<Arc<ResourceExtensionSchemaRegistration>, InternalError> {
-        self.resolve(kind, key, resource_schema)
-            .map_err(|err| InternalError::new(err.to_string()))?
-            .ok_or_else(|| {
-                InternalError::new(format!(
-                    "Trusted {kind:?} extension key '{key}' is not registered"
-                ))
-            })
     }
 
     fn parse_registration(

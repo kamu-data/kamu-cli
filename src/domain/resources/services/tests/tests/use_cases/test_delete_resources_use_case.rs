@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use kamu_resources::{
     DeleteResourcesError,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
@@ -103,9 +105,10 @@ async fn test_delete_resource_owned_by_other_account_fails() {
         .execute(account_handle_b.did, vec![id])
         .await;
 
-    assert!(
-        matches!(result, Err(DeleteResourcesError::Access(_))),
-        "expected Access error, got: {result:?}",
+    assert_matches!(
+        result,
+        Err(DeleteResourcesError::Access(_)),
+        "expected Access error, got: {result:?}"
     );
 
     // Resource must still exist after an unauthorized delete attempt

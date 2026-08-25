@@ -36,6 +36,12 @@ pub trait ResourceManifestExecutionService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
+pub enum ExecuteResourceManifestOutcome {
+    Accepted(ExecutedResourceManifestResult),
+    Rejected(ApplyManifestRejection),
+}
+
 // Fallible because canonicalizing the apply documents can fail; a failure is an
 // internal error rather than an apply outcome to display.
 impl TryFrom<ApplyManifestPlanningDecision> for ExecuteResourceManifestOutcome {
@@ -64,8 +70,6 @@ impl TryFrom<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcom
     fn try_from(decision: ApplyManifestApplicationDecision) -> Result<Self, Self::Error> {
         Ok(match decision {
             ApplyManifestApplicationDecision::Applied(result) => {
-                // Unlike before, a live apply carries the same canonical
-                // documents a dry run does, so both render the same diff.
                 let documents = result.documents()?;
                 let ApplyManifestResult {
                     resource,
@@ -84,14 +88,6 @@ impl TryFrom<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcom
             ApplyManifestApplicationDecision::Rejected(rejection) => Self::Rejected(rejection),
         })
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub enum ExecuteResourceManifestOutcome {
-    Accepted(ExecutedResourceManifestResult),
-    Rejected(ApplyManifestRejection),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

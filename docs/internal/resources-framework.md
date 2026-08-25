@@ -141,7 +141,7 @@ long-term goal. This page documents what exists now.
 | **Status** | Server-owned observed state (`ResourceStatus`: `phase`, optional `observedGeneration`/`reconciledAt`/`conditions`). `conditions` is a `TypeRef → JSON` map. `generation` lives in **headers**, not status. On a `Resource` (domain/GraphQL), `status` is always present — a resource with no reconciliation yet gets a synthesized `Pending` status with no conditions. The `Option` lives only in the persisted `ResourceSnapshot` row (`None` before the first write completes). |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed` (ODF RFC-018 `ResourcePhase`; see [§13 state machine](#lifecycle-state-machine)). |
-| **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Accepted`, `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
+| **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last one reconciliation processed. Absent or lower → reconcile. |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by exact name or UID, optionally account- and type-scoped. A batch is `Vec<ResourceRef>`. |
@@ -618,7 +618,7 @@ catalog carries that chained catalog, so the dispatchers it builds see the trans
 The one place that still passes a catalog explicitly is `ResourceLifecycleMessageConsumer`, which
 receives the per-message transaction catalog as a *method argument* — a component-held catalog would
 be the wrong one there, so it keeps using
-[`get_resource_lifecycle_dispatcher_from_catalog`](/src/domain/resources/domain/src/dispatchers/resource_lifecycle_event_dispatcher.rs).
+[`ResourceDispatcherFactory::lifecycle_dispatcher_in`](/src/domain/resources/services/src/crud_dispatchers/resource_dispatcher_factory.rs).
 
 **Message handlers** (outbox consumers — see [§13](#13-data-flow-walkthroughs)):
 `ResourceLifecycleMessageConsumer` and `AccountLifecycleMessageConsumer`.

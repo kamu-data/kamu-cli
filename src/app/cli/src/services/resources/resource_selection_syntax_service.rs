@@ -27,25 +27,6 @@ pub enum ExactResourceRef {
     ByName(ResourceName),
 }
 
-impl ExactResourceRef {
-    /// Builds the wire-level ref this spelling denotes, under `resource_type`.
-    pub fn to_resource_ref(&self, r#type: kamu_resources::TypeRef) -> kamu_resources::ResourceRef {
-        let (id, name) = match self {
-            Self::ById(id) => (Some(*id), None),
-            Self::ByName(name) => (None, Some(name.clone())),
-        };
-
-        kamu_resources::ResourceRef {
-            account: None,
-            r#type: Some(r#type),
-            id,
-            // Reserved in ODF; the facade rejects a populated one.
-            did: None,
-            name,
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]

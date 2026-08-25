@@ -91,13 +91,6 @@ impl ResourceContextRegistryService {
             })
     }
 
-    pub fn list_effective_contexts(&self) -> Vec<resource_context::ResourceContextRecord> {
-        self.list_effective_contexts_with_scope()
-            .into_iter()
-            .map(|item| item.context)
-            .collect()
-    }
-
     pub fn list_effective_contexts_with_scope(
         &self,
     ) -> Vec<resource_context::ScopedResourceContextRecord> {

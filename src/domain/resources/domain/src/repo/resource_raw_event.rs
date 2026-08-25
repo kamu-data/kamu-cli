@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
-use internal_error::InternalError;
 
 use crate::ResourceRawEventQuery;
 
@@ -23,11 +22,5 @@ pub struct ResourceRawEvent {
     pub event_type: String,
     pub payload: serde_json::Value,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type ResourceRawEventStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<ResourceRawEvent, InternalError>> + Send + 'a>,
->;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

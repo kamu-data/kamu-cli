@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::LazyLock;
 
 use chrono::Utc;
@@ -1670,7 +1671,7 @@ pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     second.id = repo.new_resource_id().await.unwrap();
 
     let result = repo.create_resource(&second).await;
-    assert!(matches!(result, Err(CreateResourceError::Duplicate(_))));
+    assert_matches!(result, Err(CreateResourceError::Duplicate(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1689,7 +1690,7 @@ pub async fn test_create_resource_duplicate_ignore_case_fails(catalog: &Catalog)
     second.id = repo.new_resource_id().await.unwrap();
 
     let result = repo.create_resource(&second).await;
-    assert!(matches!(result, Err(CreateResourceError::Duplicate(_))));
+    assert_matches!(result, Err(CreateResourceError::Duplicate(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1753,10 +1754,7 @@ pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
     let result = repo
         .update_resource(&snapshot, Some(EventID::new(99)))
         .await;
-    assert!(matches!(
-        result,
-        Err(UpdateResourceError::ConcurrentModification(_))
-    ));
+    assert_matches!(result, Err(UpdateResourceError::ConcurrentModification(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1796,10 +1794,7 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
 
     // Stale update using the old event id should fail
     let result = repo.update_resource(&v2, Some(event_id_v1)).await;
-    assert!(matches!(
-        result,
-        Err(UpdateResourceError::ConcurrentModification(_))
-    ));
+    assert_matches!(result, Err(UpdateResourceError::ConcurrentModification(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1940,10 +1935,7 @@ pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
         ])
         .await;
 
-    assert!(matches!(
-        result,
-        Err(UpdateResourceError::ConcurrentModification(_))
-    ));
+    assert_matches!(result, Err(UpdateResourceError::ConcurrentModification(_)));
 
     let found_first = repo
         .find_resource_snapshot_by_id(&first.id)

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -18,7 +19,6 @@ use kamu_resources::{
     ResourceConditionStatus,
     ResourcePersistenceService,
     ResourcePhase,
-    accepted_condition_type_ref,
     ready_condition_type_ref,
     reconciling_condition_type_ref,
 };
@@ -47,8 +47,9 @@ async fn test_reconcile_returns_error_for_non_applied_resource() {
     let id = harness.allocate_resource_id().await;
     let result = harness.reconcile_test_uc().execute(&id).await;
 
-    assert!(
-        matches!(result, Err(ReconcileResourceUseCaseError::LoadFailed(_))),
+    assert_matches!(
+        result,
+        Err(ReconcileResourceUseCaseError::LoadFailed(_)),
         "expected LoadFailed for a non-applied resource, got: {result:?}"
     );
 }
@@ -119,13 +120,6 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
         &ready_condition_type_ref(),
         ResourceConditionStatus::True,
         Some("Reconciled"),
-        None,
-    );
-    BaseResourceServiceHarness::assert_condition(
-        &status,
-        &accepted_condition_type_ref(),
-        ResourceConditionStatus::True,
-        None,
         None,
     );
     BaseResourceServiceHarness::assert_condition(
@@ -323,11 +317,9 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
         .finish_reconciliation_phase(resource_before_concurrent_update)
         .await;
 
-    assert!(
-        matches!(
-            result,
-            Err(ReconcileResourceUseCaseError::ConcurrentModification(_))
-        ),
+    assert_matches!(
+        result,
+        Err(ReconcileResourceUseCaseError::ConcurrentModification(_)),
         "expected ConcurrentModification error, got: {result:?}"
     );
 
@@ -361,8 +353,9 @@ async fn test_reconcile_after_delete_returns_ok_but_snapshot_is_gone() {
     );
 
     let result = harness.reconcile_test_uc().execute(&id).await;
-    assert!(
-        matches!(result, Err(ReconcileResourceUseCaseError::Lifecycle(_))),
+    assert_matches!(
+        result,
+        Err(ReconcileResourceUseCaseError::Lifecycle(_)),
         "expected Lifecycle(InvariantViolation) for a deleted resource, got: {result:?}"
     );
 }

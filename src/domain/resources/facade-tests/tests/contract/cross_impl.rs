@@ -508,21 +508,17 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         })
         .await
         .unwrap();
-    assert!(
-        matches!(
-            local_plan,
-            ApplyManifestPlanningDecision::Planned(ref p)
-            if p.outcome == ApplyResourceOutcome::Untouched
-        ),
-        "local: expected Planned(Untouched), got: {local_plan:?}"
+    assert_matches!(
+    local_plan,
+                ApplyManifestPlanningDecision::Planned(ref p)
+                if p.outcome == ApplyResourceOutcome::Untouched,
+    "local: expected Planned(Untouched), got: {local_plan:?}"
     );
-    assert!(
-        matches!(
-            remote_plan,
-            ApplyManifestPlanningDecision::Planned(ref p)
-            if p.outcome == ApplyResourceOutcome::Untouched
-        ),
-        "remote: expected Planned(Untouched), got: {remote_plan:?}"
+    assert_matches!(
+    remote_plan,
+                ApplyManifestPlanningDecision::Planned(ref p)
+                if p.outcome == ApplyResourceOutcome::Untouched,
+    "remote: expected Planned(Untouched), got: {remote_plan:?}"
     );
 
     // --- Rejection (business validation: empty variables) ---
@@ -547,30 +543,24 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
             manifest: reject_manifest.clone(),
         })
         .await;
-    assert!(
-        matches!(
-            local_reject,
-            Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
-                kamu_resources::ApplyManifestRejection {
-                    category:
-                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
+    assert_matches!(
+        local_reject,
+        Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
+            kamu_resources::ApplyManifestRejection {
+                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
         "local apply: expected Ok(Rejected(BusinessValidationFailed)), got: {local_reject:?}"
     );
-    assert!(
-        matches!(
-            remote_reject,
-            Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
-                kamu_resources::ApplyManifestRejection {
-                    category:
-                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
+    assert_matches!(
+        remote_reject,
+        Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
+            kamu_resources::ApplyManifestRejection {
+                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
         "remote apply: expected Ok(Rejected(BusinessValidationFailed)), got: {remote_reject:?}"
     );
 
@@ -586,30 +576,24 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
             manifest: reject_manifest,
         })
         .await;
-    assert!(
-        matches!(
-            local_plan_reject,
-            Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
-                kamu_resources::ApplyManifestRejection {
-                    category:
-                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
+    assert_matches!(
+        local_plan_reject,
+        Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
+            kamu_resources::ApplyManifestRejection {
+                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
         "local plan: expected Ok(Rejected(BusinessValidationFailed)), got: {local_plan_reject:?}"
     );
-    assert!(
-        matches!(
-            remote_plan_reject,
-            Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
-                kamu_resources::ApplyManifestRejection {
-                    category:
-                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
+    assert_matches!(
+        remote_plan_reject,
+        Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
+            kamu_resources::ApplyManifestRejection {
+                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
         "remote plan: expected Ok(Rejected(BusinessValidationFailed)), got: {remote_plan_reject:?}"
     );
 }

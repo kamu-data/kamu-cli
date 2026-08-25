@@ -172,12 +172,14 @@ pub async fn test_get_mixed_successes_problems(h: &impl FacadeContractHarness) {
         .map(|p| (p.request_index, &p.error))
         .collect();
 
-    assert!(
-        matches!(problem_by_index[&1], ResourceLookupProblem::NameNotFound(_)),
+    assert_matches!(
+        problem_by_index[&1],
+        ResourceLookupProblem::NameNotFound(_),
         "idx 1 must be NameNotFound"
     );
-    assert!(
-        matches!(problem_by_index[&3], ResourceLookupProblem::IDNotFound(_)),
+    assert_matches!(
+        problem_by_index[&3],
+        ResourceLookupProblem::IDNotFound(_),
         "idx 3 must be IDNotFound"
     );
 }
@@ -317,11 +319,9 @@ pub async fn test_get_wrong_schema(h: &impl FacadeContractHarness) {
         .unwrap();
 
     assert_batch_indexes(&response, &[], &[0]);
-    assert!(
-        matches!(
-            &response.problems[0].error,
-            ResourceLookupProblem::SchemaMismatch(_)
-        ),
+    assert_matches!(
+        &response.problems[0].error,
+        ResourceLookupProblem::SchemaMismatch(_),
         "expected SchemaMismatch problem, got: {:?}",
         response.problems[0].error
     );
@@ -718,12 +718,14 @@ pub async fn test_delete_mixed_successes_problems(h: &impl FacadeContractHarness
         .map(|p| (p.request_index, &p.error))
         .collect();
 
-    assert!(
-        matches!(problem_by_index[&1], ResourceLookupProblem::NameNotFound(_)),
+    assert_matches!(
+        problem_by_index[&1],
+        ResourceLookupProblem::NameNotFound(_),
         "idx 1 must be NameNotFound"
     );
-    assert!(
-        matches!(problem_by_index[&2], ResourceLookupProblem::IDNotFound(_)),
+    assert_matches!(
+        problem_by_index[&2],
+        ResourceLookupProblem::IDNotFound(_),
         "idx 2 must be IDNotFound"
     );
 }
@@ -792,11 +794,9 @@ pub async fn test_delete_duplicate_refs_is_deterministic(h: &impl FacadeContract
         assert_eq!(response.successes.len(), 1);
         assert_eq!(response.problems.len(), 1);
         assert_eq!(response.successes[0].item, id);
-        assert!(
-            matches!(
-                &response.problems[0].error,
-                ResourceLookupProblem::NameNotFound(_)
-            ),
+        assert_matches!(
+            &response.problems[0].error,
+            ResourceLookupProblem::NameNotFound(_),
             "second duplicate must be NameNotFound, got: {:?}",
             response.problems[0].error
         );
@@ -829,14 +829,16 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
     }];
 
     let gm = facade.get(selector.clone(), SpecViewOpts::ENCRYPTED).await;
-    assert!(
-        matches!(gm, Err(BatchResourceError::UnsupportedSelector(_))),
+    assert_matches!(
+        gm,
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "get: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
     );
 
     let gi = facade.get_handles(selector.clone()).await;
-    assert!(
-        matches!(gi, Err(BatchResourceError::UnsupportedSelector(_))),
+    assert_matches!(
+        gi,
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "get_handles: unsupported type must be a batch-level UnsupportedSelector, got: {gi:?}"
     );
 
@@ -847,14 +849,16 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
             SpecViewOpts::ENCRYPTED,
         )
         .await;
-    assert!(
-        matches!(rm, Err(BatchResourceError::UnsupportedSelector(_))),
+    assert_matches!(
+        rm,
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "render_manifests: unsupported type must be a batch-level UnsupportedSelector, got: {rm:?}"
     );
 
     let dm = facade.delete(selector.clone()).await;
-    assert!(
-        matches!(dm, Err(BatchResourceError::UnsupportedSelector(_))),
+    assert_matches!(
+        dm,
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "delete: unsupported type must be a batch-level UnsupportedSelector, got: {dm:?}"
     );
 }

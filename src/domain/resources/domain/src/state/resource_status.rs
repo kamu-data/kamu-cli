@@ -85,10 +85,6 @@ impl ResourceStatusExt for ResourceStatus {
 
         ResourceConditionValue::set_condition(
             &mut self.conditions.entries,
-            ResourceConditionValue::accepted_true(now),
-        );
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
             ResourceConditionValue::ready_true(now),
         );
         ResourceConditionValue::set_condition(
@@ -108,10 +104,6 @@ impl ResourceStatusExt for ResourceStatus {
         self.observed_generation = Some(observed_generation);
         self.reconciled_at = Some(now);
 
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
-            ResourceConditionValue::accepted_true(now),
-        );
         ResourceConditionValue::set_condition(
             &mut self.conditions.entries,
             ResourceConditionValue::ready_false(now, reason, message),

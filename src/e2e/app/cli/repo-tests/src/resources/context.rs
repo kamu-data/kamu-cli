@@ -203,17 +203,6 @@ impl ResourceCtx {
             .await;
     }
 
-    /// Apply a manifest passed via stdin, asserting success.
-    pub async fn apply_stdin(&self, manifest: &str, extra_args: &[&str]) {
-        let mut args = vec!["apply".to_string(), "--stdin".to_string()];
-        args.extend(extra_args.iter().map(ToString::to_string));
-
-        self.kamu()
-            .execute_with_input(args, manifest.to_string())
-            .await
-            .success();
-    }
-
     /// Write `content` to `<workspace>/<rel_path>`, creating parent directories
     /// as needed, and return the absolute path to the written file.
     ///

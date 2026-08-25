@@ -159,10 +159,6 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
 
 fn successful_conditions() -> serde_json::Value {
     serde_json::json!({
-        "https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted": {
-            "reason": "ValidationPassed",
-            "value": "True"
-        },
         "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready": {
             "reason": "Reconciled",
             "value": "True"

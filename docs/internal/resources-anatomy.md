@@ -173,7 +173,7 @@ The behaviorally-significant consequences of adopting these shapes:
   defensively because the downstream event-sourced projector is pure/sync and cannot resolve
   accounts.
 - **Built-in conditions** are Kamu extensions keyed by stable URIs under
-  `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Accepted,Ready,Reconciling}`; each value
+  `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Ready,Reconciling}`; each value
   carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
   meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
   `conditions` is optional (absent → `None`, not empty map): new resources have none, and a spec

@@ -294,8 +294,9 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
             manifest,
         })
         .await;
-    assert!(
-        matches!(apply_result, Err(ApplyManifestError::AccountResolution(_))),
+    assert_matches!(
+        apply_result,
+        Err(ApplyManifestError::AccountResolution(_)),
         "mismatched account must be rejected with AccountResolution, got: {apply_result:?}"
     );
 
@@ -355,12 +356,14 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
         })
         .await;
 
-    assert!(
-        matches!(by_name, Err(ListResourcesError::AccountResolution(_))),
+    assert_matches!(
+        by_name,
+        Err(ListResourcesError::AccountResolution(_)),
         "unknown account name must be rejected with AccountResolution, got: {by_name:?}"
     );
-    assert!(
-        matches!(by_id, Err(ListResourcesError::AccountResolution(_))),
+    assert_matches!(
+        by_id,
+        Err(ListResourcesError::AccountResolution(_)),
         "unknown account id must be rejected with AccountResolution, got: {by_id:?}"
     );
 }

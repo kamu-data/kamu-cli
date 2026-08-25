@@ -42,10 +42,6 @@ pub struct ResourceTypeSelectorInput {
 }
 
 impl ResourceTypeSelectorInput {
-    pub fn into_resource_type_selector(self) -> kamu_resources::ResourceTypeSelectorRaw {
-        self.selector.into()
-    }
-
     /// Reinterprets the authored selector as an ODF type reference.
     ///
     /// Lossless in practice: descriptors resolve canonical selectors, aliases,

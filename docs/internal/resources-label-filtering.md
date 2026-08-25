@@ -151,7 +151,7 @@ so adding support for them later is a backend-local change that touches no
 signature. The **capability boundary lives in the repository layer**, not the
 resolver: every backend calls the single shared helper `flatten_conjunction`, which
 walks `True`/`Eq`/`And` into a flat key/value pair list and returns
-`UnsupportedOperator` for `Not`/`Or`. That is mapped to
+`UnsupportedLabelFilterOperatorError` for `Not`/`Or`. That is mapped to
 `ResourceLabelFilterProblemCode::UnsupportedExpression` at the facade edge, so
 "what is supported" is defined in exactly one place. The duplicate-after-canonicalization
 check applies **per conjunction level** — two `Or` branches may legitimately test

@@ -16,7 +16,6 @@ pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str
 
 /// Short CRD-style type name used in `list`/`summary` output.
 pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";
-pub const SECRET_SET_SHORT_NAME: &str = "SecretSet";
 pub const DESCRIPTION_ANNOTATION_SCHEMA: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/annotations/Description";
 /// Canonical schema URI for the built-in `environment` label.

@@ -11,7 +11,6 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    RESOURCE_CONDITION_ACCEPTED_SCHEMA_URI,
     RESOURCE_CONDITION_READY_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILING_SCHEMA_URI,
     TypeRef,
@@ -57,34 +56,6 @@ impl ResourceConditionValue {
         };
 
         conditions.insert(condition_key, serde_json::to_value(condition).unwrap());
-    }
-
-    pub fn accepted_true(now: DateTime<Utc>) -> (TypeRef, Self) {
-        (
-            accepted_condition_type_ref(),
-            Self {
-                value: ResourceConditionStatus::True,
-                reason: "ValidationPassed".to_string(),
-                message: None,
-                last_transition_time: now,
-            },
-        )
-    }
-
-    pub fn accepted_false(
-        now: DateTime<Utc>,
-        reason: impl Into<String>,
-        message: impl Into<String>,
-    ) -> (TypeRef, Self) {
-        (
-            accepted_condition_type_ref(),
-            Self {
-                value: ResourceConditionStatus::False,
-                reason: reason.into(),
-                message: Some(message.into()),
-                last_transition_time: now,
-            },
-        )
     }
 
     pub fn ready_true(now: DateTime<Utc>) -> (TypeRef, Self) {
@@ -150,12 +121,6 @@ pub enum ResourceConditionStatus {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn accepted_condition_type_ref() -> TypeRef {
-    TypeRef::Uri(TypeUri::new_unchecked(
-        RESOURCE_CONDITION_ACCEPTED_SCHEMA_URI,
-    ))
-}
 
 pub fn ready_condition_type_ref() -> TypeRef {
     TypeRef::Uri(TypeUri::new_unchecked(RESOURCE_CONDITION_READY_SCHEMA_URI))

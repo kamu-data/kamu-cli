@@ -173,13 +173,11 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
         })
         .await
         .unwrap();
-    assert!(
-        matches!(
-            plan,
-            ApplyManifestPlanningDecision::Planned(ref p)
-            if p.outcome == kamu_resources::ApplyResourceOutcome::Untouched
-        ),
-        "re-planning rendered manifest must be Untouched, got: {plan:?}"
+    assert_matches!(
+    plan,
+                ApplyManifestPlanningDecision::Planned(ref p)
+                if p.outcome == kamu_resources::ApplyResourceOutcome::Untouched,
+    "re-planning rendered manifest must be Untouched, got: {plan:?}"
     );
 
     // Apply with the rendered manifest — must also be Untouched
@@ -190,13 +188,11 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
         })
         .await
         .unwrap();
-    assert!(
-        matches!(
-            apply,
-            ApplyManifestApplicationDecision::Applied(ref r)
-            if r.outcome == kamu_resources::ApplyResourceOutcome::Untouched
-        ),
-        "re-applying rendered manifest must be Untouched, got: {apply:?}"
+    assert_matches!(
+    apply,
+                ApplyManifestApplicationDecision::Applied(ref r)
+                if r.outcome == kamu_resources::ApplyResourceOutcome::Untouched,
+    "re-applying rendered manifest must be Untouched, got: {apply:?}"
     );
 }
 

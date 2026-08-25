@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetResource,
@@ -507,8 +509,9 @@ async fn test_delete_nonexistent_key_returns_not_found() {
         .await
         .unwrap_err();
 
-    assert!(
-        matches!(err, DeleteDatasetEnvVarError::NotFound(_)),
+    assert_matches!(
+        err,
+        DeleteDatasetEnvVarError::NotFound(_),
         "expected NotFound error, got: {err:?}"
     );
 }

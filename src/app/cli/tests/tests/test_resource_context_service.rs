@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::Arc;
 
 use dill::{CatalogBuilder, Component as _};
@@ -142,8 +143,8 @@ async fn test_resolver_explicit_context_wins_over_current() {
         .unwrap();
 
     let resolved = h.resolver("alice").resolve(Some("explicit")).unwrap();
-    assert!(
-        matches!(resolved, ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "explicit")
+    assert_matches!(
+    resolved, ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "explicit"
     );
 }
 
@@ -168,13 +169,13 @@ async fn test_resolver_uses_current_account_context() {
     let alice_resolved = h.resolver("alice").resolve(None).unwrap();
     let bob_resolved = h.resolver("bob").resolve(None).unwrap();
 
-    assert!(
-        matches!(alice_resolved, ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "alice-ctx"),
-        "Alice should resolve to alice-ctx"
+    assert_matches!(
+    alice_resolved, ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "alice-ctx",
+    "Alice should resolve to alice-ctx"
     );
-    assert!(
-        matches!(bob_resolved, ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "bob-ctx"),
-        "Bob should resolve to bob-ctx"
+    assert_matches!(
+    bob_resolved, ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "bob-ctx",
+    "Bob should resolve to bob-ctx"
     );
 }
 
@@ -244,12 +245,10 @@ async fn test_local_context_selection_is_account_specific() {
 
     // Bob resolves to his remote context; Alice's "local" selection did not affect
     // him
-    assert!(
-        matches!(
-            h.resolver("bob").resolve(None).unwrap(),
-            ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "remote"
-        ),
-        "Bob should resolve to 'remote', not LocalWorkspace"
+    assert_matches!(
+    h.resolver("bob").resolve(None).unwrap(),
+                ResolvedResourceContext::RemoteWorkspace { ref name, .. } if name == "remote",
+    "Bob should resolve to 'remote', not LocalWorkspace"
     );
 }
 

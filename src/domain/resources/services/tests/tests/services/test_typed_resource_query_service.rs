@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -70,8 +71,9 @@ async fn test_get_state_by_id_not_found() {
         .get_state_by_id(account_handle.did, &id)
         .await;
 
-    assert!(
-        matches!(result, Err(TypedResourceQueryError::NotFound(_))),
+    assert_matches!(
+        result,
+        Err(TypedResourceQueryError::NotFound(_)),
         "expected NotFound, got {result:?}"
     );
 }
@@ -91,8 +93,9 @@ async fn test_get_state_by_id_wrong_account() {
         .await;
 
     // Wrong account: implementation returns NotFound to avoid information leakage
-    assert!(
-        matches!(result, Err(TypedResourceQueryError::NotFound(_))),
+    assert_matches!(
+        result,
+        Err(TypedResourceQueryError::NotFound(_)),
         "expected NotFound for wrong account, got {result:?}"
     );
 }
@@ -118,8 +121,9 @@ async fn test_get_state_by_id_type_mismatch() {
     // snapshot with a different schema is invisible to this query → NotFound, not
     // TypeMismatch. TypeMismatch is covered by ensure_resource_id_matches_type
     // which uses load_snapshot_by_id (schema-agnostic lookup).
-    assert!(
-        matches!(result, Err(TypedResourceQueryError::NotFound(_))),
+    assert_matches!(
+        result,
+        Err(TypedResourceQueryError::NotFound(_)),
         "expected NotFound for wrong-schema snapshot (schema filter hides it), got {result:?}"
     );
 }
@@ -200,8 +204,9 @@ async fn test_ensure_id_matches_type_mismatch() {
         .ensure_resource_id_matches_type(&id)
         .await;
 
-    assert!(
-        matches!(result, Err(TypedResourceQueryError::TypeMismatch(_))),
+    assert_matches!(
+        result,
+        Err(TypedResourceQueryError::TypeMismatch(_)),
         "expected TypeMismatch, got {result:?}"
     );
 }

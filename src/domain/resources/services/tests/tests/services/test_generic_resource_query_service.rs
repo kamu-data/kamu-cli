@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use chrono::Utc;
 use kamu_resources::{
     FindOwnedResourceError,
@@ -98,8 +100,9 @@ async fn test_find_owned_snapshot_access_denied() {
         .find_owned_snapshot(&account_handle_b.did, TestResource::schema(), id)
         .await;
 
-    assert!(
-        matches!(result, Err(FindOwnedResourceError::Access(_))),
+    assert_matches!(
+        result,
+        Err(FindOwnedResourceError::Access(_)),
         "expected Access error, got {result:?}"
     );
 }

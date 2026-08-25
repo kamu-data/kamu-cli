@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use chrono::Utc;
 use dill::Catalog;
 use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
@@ -427,8 +429,9 @@ pub async fn test_concurrent_modification_rejected(catalog: &Catalog) {
             vec![make_raw_event(&query, "SpecUpdated", serde_json::json!({}))],
         )
         .await;
-    assert!(
-        matches!(result, Err(SaveEventsError::ConcurrentModification(_))),
+    assert_matches!(
+        result,
+        Err(SaveEventsError::ConcurrentModification(_)),
         "expected ConcurrentModification, got {result:?}"
     );
 
@@ -450,8 +453,9 @@ pub async fn test_concurrent_modification_rejected(catalog: &Catalog) {
             vec![make_raw_event(&query, "Deleted", serde_json::json!({}))],
         )
         .await;
-    assert!(
-        matches!(result, Err(SaveEventsError::ConcurrentModification(_))),
+    assert_matches!(
+        result,
+        Err(SaveEventsError::ConcurrentModification(_)),
         "expected ConcurrentModification on stale ID, got {result:?}"
     );
 }
@@ -614,8 +618,9 @@ pub async fn test_save_events_multi_rejects_concurrent_modification_atomically(c
         ])
         .await;
 
-    assert!(
-        matches!(result, Err(SaveEventsError::ConcurrentModification(_))),
+    assert_matches!(
+        result,
+        Err(SaveEventsError::ConcurrentModification(_)),
         "expected ConcurrentModification, got {result:?}"
     );
 
@@ -644,8 +649,9 @@ pub async fn test_save_events_multi_rejects_empty_item(catalog: &Catalog) {
         }])
         .await;
 
-    assert!(
-        matches!(result, Err(SaveEventsError::NothingToSave)),
+    assert_matches!(
+        result,
+        Err(SaveEventsError::NothingToSave),
         "expected NothingToSave, got {result:?}"
     );
 }

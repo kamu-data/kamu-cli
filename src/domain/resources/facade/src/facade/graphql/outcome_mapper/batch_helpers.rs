@@ -134,6 +134,8 @@ pub(crate) fn validate_batch_response_indexes<T, E>(
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use kamu_resources::ResourceID;
 
     use super::*;
@@ -157,8 +159,9 @@ mod tests {
     #[test]
     fn collect_batch_problems_negative_index_is_error() {
         let err = collect_batch_problems(vec![id_not_found_problem(-1)], 1, "test").unwrap_err();
-        assert!(
-            matches!(err, BatchResourceError::Internal(_)),
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
             "expected Internal error for negative problem index"
         );
     }
@@ -166,8 +169,9 @@ mod tests {
     #[test]
     fn collect_batch_problems_out_of_bounds_index_is_error() {
         let err = collect_batch_problems(vec![id_not_found_problem(5)], 1, "test").unwrap_err();
-        assert!(
-            matches!(err, BatchResourceError::Internal(_)),
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
             "expected Internal error for out-of-bounds problem index"
         );
     }
@@ -191,8 +195,9 @@ mod tests {
     #[test]
     fn collect_batch_successes_negative_index_is_error() {
         let err = collect(3, vec![(-1_i32, "x")]).unwrap_err();
-        assert!(
-            matches!(err, BatchResourceError::Internal(_)),
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
             "expected Internal error for negative index"
         );
     }
@@ -200,8 +205,9 @@ mod tests {
     #[test]
     fn collect_batch_successes_out_of_bounds_index_is_error() {
         let err = collect(2, vec![(5_i32, "x")]).unwrap_err();
-        assert!(
-            matches!(err, BatchResourceError::Internal(_)),
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
             "expected Internal error for out-of-bounds index"
         );
     }
@@ -209,8 +215,9 @@ mod tests {
     #[test]
     fn collect_batch_successes_duplicate_index_is_error() {
         let err = collect(3, vec![(1_i32, "a"), (1_i32, "b")]).unwrap_err();
-        assert!(
-            matches!(err, BatchResourceError::Internal(_)),
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
             "expected Internal error for duplicate index"
         );
     }
@@ -241,8 +248,9 @@ mod tests {
         let successes = vec![make_success(0)];
         let problems = vec![make_domain_problem(0)];
         let err = validate_batch_response_indexes(&successes, &problems, 2, "test").unwrap_err();
-        assert!(
-            matches!(err, BatchResourceError::Internal(_)),
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
             "expected Internal error when success and problem share an index"
         );
     }
@@ -252,8 +260,9 @@ mod tests {
         let successes: Vec<crate::BatchResourceSuccess<()>> = vec![];
         let problems = vec![make_domain_problem(0), make_domain_problem(0)];
         let err = validate_batch_response_indexes(&successes, &problems, 2, "test").unwrap_err();
-        assert!(
-            matches!(err, BatchResourceError::Internal(_)),
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
             "expected Internal error for duplicate problem index"
         );
     }

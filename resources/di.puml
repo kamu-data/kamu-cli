@@ -187,7 +187,6 @@ interface "Web3AuthEip4361NonceRepository" <<i>>
 interface "Web3AuthEip4361NonceService" <<i>>
 interface "WebhookDeliveryRepository" <<i>>
 interface "WebhookSubscriptionEventStore" <<i>>
-class "AcceptedConditionDispatcher"
 class "AccessTokenRegistryService"
 class "AccessTokenServiceImpl"
 class "AccountAuthorizationHelperImpl"
@@ -1135,7 +1134,6 @@ class "WsSmartTransferProtocolClient"
 "MessageConsumer" <|-- "ResourceLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "ResourceLifecycleMessageConsumer"
 "ResourceExtensionSchemaDispatcher" <|-- "DescriptionAnnotationDispatcher"
-"ResourceExtensionSchemaDispatcher" <|-- "AcceptedConditionDispatcher"
 "ResourceExtensionSchemaDispatcher" <|-- "ReadyConditionDispatcher"
 "ResourceExtensionSchemaDispatcher" <|-- "ReconcilingConditionDispatcher"
 "ResourceExtensionSchemaDispatcher" <|-- "LabelEnvironmentDispatcher"

@@ -15,7 +15,6 @@ use kamu_resources::{
     ApplyResourcePlanningDecision,
     ResourceConditionStatus,
     ResourcePhase,
-    accepted_condition_type_ref,
     ready_condition_type_ref,
     reconciling_condition_type_ref,
 };
@@ -76,13 +75,6 @@ async fn test_apply_end_to_end_create_and_retrieve() {
         &ready_condition_type_ref(),
         ResourceConditionStatus::True,
         Some("Reconciled"),
-        None,
-    );
-    BaseResourceServiceHarness::assert_condition(
-        &status,
-        &accepted_condition_type_ref(),
-        ResourceConditionStatus::True,
-        None,
         None,
     );
     BaseResourceServiceHarness::assert_condition(

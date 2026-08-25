@@ -337,13 +337,11 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
         })
         .await;
 
-    assert!(
-        matches!(
-            result,
-            Err(ApplyManifestError::ParseManifest(_)
-                | ApplyManifestError::InvalidSpec(_)
-                | ApplyManifestError::InvalidHeaders(_))
-        ),
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::ParseManifest(_)
+            | ApplyManifestError::InvalidSpec(_)
+            | ApplyManifestError::InvalidHeaders(_)),
         "schema-invalid manifest must fail with parse/spec/headers error, got: {result:?}"
     );
 
@@ -399,16 +397,14 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
             manifest: empty_vars.clone(),
         })
         .await;
-    assert!(
-        matches!(
-            plan_result,
-            Ok(ApplyManifestPlanningDecision::Rejected(
-                ApplyManifestRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
+    assert_matches!(
+        plan_result,
+        Ok(ApplyManifestPlanningDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
         "plan with empty variables must return Ok(Rejected(BusinessValidationFailed)), got: \
          {plan_result:?}"
     );
@@ -419,16 +415,14 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
             manifest: empty_vars,
         })
         .await;
-    assert!(
-        matches!(
-            apply_result,
-            Ok(ApplyManifestApplicationDecision::Rejected(
-                ApplyManifestRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
+    assert_matches!(
+        apply_result,
+        Ok(ApplyManifestApplicationDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
         "apply with empty variables must return Ok(Rejected(BusinessValidationFailed)), got: \
          {apply_result:?}"
     );
@@ -675,8 +669,9 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
         })
         .await;
 
-    assert!(
-        matches!(yaml_result, Err(ApplyManifestError::ParseManifest(_))),
+    assert_matches!(
+        yaml_result,
+        Err(ApplyManifestError::ParseManifest(_)),
         "YAML with duplicate label key must fail with ParseManifest, got: {yaml_result:?}"
     );
 
@@ -1083,8 +1078,9 @@ pub async fn test_apply_rejects_invalid_headers(h: &impl FacadeContractHarness) 
             manifest: empty_name_manifest.clone(),
         })
         .await;
-    assert!(
-        matches!(plan_result, Err(ApplyManifestError::InvalidHeaders(_))),
+    assert_matches!(
+        plan_result,
+        Err(ApplyManifestError::InvalidHeaders(_)),
         "plan with empty name must return Err(InvalidHeaders), got: {plan_result:?}"
     );
 
@@ -1094,8 +1090,9 @@ pub async fn test_apply_rejects_invalid_headers(h: &impl FacadeContractHarness) 
             manifest: empty_name_manifest,
         })
         .await;
-    assert!(
-        matches!(apply_result, Err(ApplyManifestError::InvalidHeaders(_))),
+    assert_matches!(
+        apply_result,
+        Err(ApplyManifestError::InvalidHeaders(_)),
         "apply with empty name must return Err(InvalidHeaders), got: {apply_result:?}"
     );
 }
@@ -1127,8 +1124,9 @@ pub async fn test_apply_rejects_grammatically_invalid_name(h: &impl FacadeContra
             manifest: invalid_name_manifest.clone(),
         })
         .await;
-    assert!(
-        matches!(plan_result, Err(ApplyManifestError::InvalidHeaders(_))),
+    assert_matches!(
+        plan_result,
+        Err(ApplyManifestError::InvalidHeaders(_)),
         "plan with grammatically invalid name must return Err(InvalidHeaders), got: \
          {plan_result:?}"
     );
@@ -1139,8 +1137,9 @@ pub async fn test_apply_rejects_grammatically_invalid_name(h: &impl FacadeContra
             manifest: invalid_name_manifest,
         })
         .await;
-    assert!(
-        matches!(apply_result, Err(ApplyManifestError::InvalidHeaders(_))),
+    assert_matches!(
+        apply_result,
+        Err(ApplyManifestError::InvalidHeaders(_)),
         "apply with grammatically invalid name must return Err(InvalidHeaders), got: \
          {apply_result:?}"
     );
@@ -1150,8 +1149,7 @@ pub async fn test_apply_rejects_grammatically_invalid_name(h: &impl FacadeContra
 
 // RF-143 / apply error taxonomy — InvalidSpec carries schema
 // Verifies that the remote facade reconstructs InvalidSpec with the correct
-// schema fields (previously both were empty strings on the
-// remote path due to the lossy ResourceApplyError shape).
+// schema fields.
 // Uses a spec where `variables` is a string instead of an object — this fails
 // JSON deserialization and therefore hits InvalidSpec, not
 // BusinessValidationFailed.

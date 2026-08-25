@@ -95,16 +95,13 @@ async fn test_plan_apply_rejects_semantically_invalid_spec() {
 
     let decision = harness.dispatcher().plan_apply(request).await.unwrap();
 
-    assert!(
-        matches!(
-            decision,
-            kamu_resources::ApplyManifestPlanningDecision::Rejected(
-                kamu_resources::ApplyManifestRejection {
-                    category:
-                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            )
+    assert_matches!(
+        decision,
+        kamu_resources::ApplyManifestPlanningDecision::Rejected(
+            kamu_resources::ApplyManifestRejection {
+                category: kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
         ),
         "expected Rejected(BusinessValidationFailed), got: {decision:?}"
     );

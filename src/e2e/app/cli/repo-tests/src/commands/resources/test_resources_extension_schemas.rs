@@ -10,16 +10,14 @@
 use crate::resources::{ResourceCtx, fixtures};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Scenario: extension-schema behavior via the real CLI/facade path (Phase 6)
+// Scenario: extension-schema behavior via the real CLI/facade path
 //
-// Locks in, end-to-end, the schema-driven label/annotation behavior already
-// implemented at the resolver/facade level (Phases 1-5) — canonicalization,
+// Locks in, end-to-end, the schema-driven label/annotation behavior
+// implemented at the resolver/facade level — canonicalization,
 // canonicalization-before-diffing, the "unknown URI is an error" rule,
 // schema-driven description length, and the free-form/structured warnings.
-// None of this depends on `LabelFilter`/`--selector`, so it does not need to
-// wait for the label-filtering phases. Wired (via
-// `kamu_cli_resource_e2e_test!`) to run against both the local and remote
-// contexts.
+// Wired (via `kamu_cli_resource_e2e_test!`) to run against both the local and
+// remote contexts.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Canonicalization, rejections, and warnings are independent checks over

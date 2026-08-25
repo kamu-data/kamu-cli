@@ -9,9 +9,6 @@
 
 use dill::CatalogBuilder;
 use kamu_resources::{
-    AcceptedCondition,
-    RESOURCE_CONDITION_ACCEPTED_SCHEMA_DOC,
-    RESOURCE_CONDITION_ACCEPTED_SCHEMA_URI,
     RESOURCE_CONDITION_READY_SCHEMA_DOC,
     RESOURCE_CONDITION_READY_SCHEMA_URI,
     RESOURCE_CONDITION_RECONCILING_SCHEMA_DOC,
@@ -35,15 +32,6 @@ const CONDITION_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 declare_resource_extension_schema_dispatcher!(
-    dispatcher = AcceptedConditionDispatcher,
-    value = AcceptedCondition,
-    schema_id = RESOURCE_CONDITION_ACCEPTED_SCHEMA_URI,
-    kind = ResourceExtensionKind::Condition,
-    document = RESOURCE_CONDITION_ACCEPTED_SCHEMA_DOC,
-    applications = CONDITION_APPLICATIONS
-);
-
-declare_resource_extension_schema_dispatcher!(
     dispatcher = ReadyConditionDispatcher,
     value = ReadyCondition,
     schema_id = RESOURCE_CONDITION_READY_SCHEMA_URI,
@@ -64,7 +52,6 @@ declare_resource_extension_schema_dispatcher!(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_built_in_condition_schema_dispatchers(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<AcceptedConditionDispatcher>();
     catalog_builder.add::<ReadyConditionDispatcher>();
     catalog_builder.add::<ReconcilingConditionDispatcher>();
 }

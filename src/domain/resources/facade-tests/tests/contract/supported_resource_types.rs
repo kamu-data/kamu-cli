@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use database_common::PaginationOpts;
 use kamu_configuration::{SecretSetResource, VariableSetResource};
 use kamu_resources::{
@@ -355,11 +357,9 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             manifest: bad_manifest,
         })
         .await;
-    assert!(
-        matches!(
-            apply_result,
-            Err(kamu_resources_facade::ApplyManifestError::UnsupportedDescriptor(_))
-        ),
+    assert_matches!(
+        apply_result,
+        Err(kamu_resources_facade::ApplyManifestError::UnsupportedDescriptor(_)),
         "apply_manifest: unsupported type must return UnsupportedDescriptor, got: {apply_result:?}"
     );
 

@@ -49,8 +49,7 @@ pub async fn test_resources_apply_diff_rendering(ctx: ResourceCtx) {
     .await;
 
     // ── 2. A re-apply of the same manifest renders no diff at all ────────────
-    // Byte-identical canonical documents are the reason this stays quiet, and
-    // it is the property that used to require timestamp normalization.
+    // Byte-identical canonical documents are the reason this stays quiet.
     ctx.assert_success_with_stdin(
         ["apply", "--stdin"],
         &baseline,
@@ -146,7 +145,6 @@ pub async fn test_resources_apply_diff_rendering(ctx: ResourceCtx) {
     .await;
 
     // ── 5. A live apply shows the diff too, not just a dry run ───────────────
-    // This is a behavior change: previously only `--dry-run` rendered changes.
     ctx.assert_success_with_stdin(
         ["apply", "--stdin"],
         &two_changes,

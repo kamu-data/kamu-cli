@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use chrono::{SubsecRound, Utc};
 use dill::Catalog;
 use kamu_configuration::{
@@ -258,11 +260,9 @@ pub async fn test_replace_entries_concurrent_modification(catalog: &Catalog) {
     let result = repo
         .replace_entries(&resource_id, 1, &[make_entry("KEY", b"other")])
         .await;
-    assert!(
-        matches!(
-            result,
-            Err(ReplaceProjectionEntriesError::ConcurrentModification(_))
-        ),
+    assert_matches!(
+        result,
+        Err(ReplaceProjectionEntriesError::ConcurrentModification(_)),
         "expected ConcurrentModification, got {result:?}"
     );
 }
