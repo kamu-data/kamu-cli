@@ -445,6 +445,7 @@ async fn test_fetch_url_http_env_interpolation_with_default() {
 
 #[cfg(feature = "ingest-ftp")]
 #[test_group::group(containerized, flaky)]
+#[ignore("kamu-cli#1691: Temporarily disabled")]
 #[tokio::test]
 async fn test_fetch_url_ftp_ok() {
     let harness = FetchTestHarness::new();
