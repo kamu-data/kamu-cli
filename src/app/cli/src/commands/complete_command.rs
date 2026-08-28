@@ -164,12 +164,12 @@ impl CompleteCommand {
             writeln!(output, "{LOCAL_CONTEXT_NAME}").unwrap();
         }
 
-        for ctx in self
+        for sc in self
             .resource_context_registry_service
-            .list_effective_contexts()
+            .list_effective_contexts_with_scope()
         {
-            if ctx.name.starts_with(prefix) {
-                writeln!(output, "{}", ctx.name).unwrap();
+            if sc.context.name.starts_with(prefix) {
+                writeln!(output, "{}", sc.context.name).unwrap();
             }
         }
     }
