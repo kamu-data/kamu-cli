@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+// Applies to the impls `nutype` generates, which an attribute on the type does not reach
+#![expect(
+    clippy::try_from_instead_of_from_str,
+    reason = "GraphQL scalar and row model conversions use the `TryFrom` derived by nutype"
+)]
+
 use std::sync::LazyLock;
 
 use regex::Regex;

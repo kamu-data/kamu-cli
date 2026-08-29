@@ -92,6 +92,10 @@ pub struct S3Context {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[expect(
+    clippy::result_large_err,
+    reason = "Methods return AWS SDK error types as is"
+)]
 #[common_macros::method_names_consts]
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;

@@ -36,6 +36,9 @@ publish = { workspace = true }
 [lints.clippy]
 uninlined_format_args = "allow"
 
+[lints.cargo]
+redundant_homepage = "allow"
+
 
 [dependencies]
 arrow = { version = "59", default-features = false }

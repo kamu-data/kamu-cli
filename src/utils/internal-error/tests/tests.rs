@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
-#![feature(never_type)]
 
 use std::assert_matches;
 use std::backtrace::Backtrace;

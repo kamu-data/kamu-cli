@@ -245,7 +245,7 @@ jobs:
       - name: Assert mold linker was used
         if: runner.os == 'Linux'
         run: |
-          binary=$(find target/ci/deps -maxdepth 1 -type f -executable | head -1)
+          binary="target/ci/kamu-cli"
           echo "Checking: $binary"
           readelf -p .comment "$binary"
           readelf -p .comment "$binary" | grep mold

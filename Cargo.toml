@@ -362,6 +362,8 @@ single_match_else = "allow"
 struct_excessive_bools = "allow"
 struct_field_names = "allow"
 too_many_lines = "allow"
+# async-graphql resolvers and derives are async by framework contract
+unused_async_trait_impl = "allow"
 unused_self = "allow"
 wildcard_imports = "allow"
 
@@ -372,6 +374,11 @@ wildcard_enum_match_arm = "warn"
 # clippy::cargo
 cargo = { level = "warn", priority = -1 }
 multiple_crate_versions = { level = "allow", priority = 1 }
+
+
+[workspace.lints.cargo]
+unused_workspace_dependencies = "allow"
+redundant_homepage = "allow"
 
 
 [profile.dev]
