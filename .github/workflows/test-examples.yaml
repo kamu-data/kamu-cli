@@ -34,7 +34,7 @@ jobs:
           # OR default to the current ref
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
       
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - uses: cargo-bins/cargo-binstall@main
 

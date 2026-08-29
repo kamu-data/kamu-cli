@@ -65,7 +65,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: ${{ matrix.target }}
           override: true
