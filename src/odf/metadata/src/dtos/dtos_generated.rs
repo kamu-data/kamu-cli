@@ -19,6 +19,7 @@ use std::path::PathBuf;
 
 use bitflags::bitflags;
 use chrono::{DateTime, Utc};
+use enum_variants::{impl_enum_variant, impl_enum_with_variants};
 use serde::{Deserialize, Serialize};
 use setty::types::{ByteSize, DurationString};
 
