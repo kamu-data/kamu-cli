@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::io::{ErrorKind, Write};
+use std::io::Write;
 
 use clap::CommandFactory as _;
 
@@ -41,27 +41,27 @@ impl CompletionsCommand {
         let mut cli = crate::cli::Cli::command();
         let bin_name = cli.get_name().to_owned();
 
-        // Note: the script is rendered into a buffer first, as
-        // `clap_complete::generate()` panics on writer errors. The fallible
-        // `Generator::try_generate()` would avoid this, but requires replicating
-        // `set_bin_name()` + `build()` by hand
-        let mut script = Vec::new();
         match self.shell {
-            clap_complete::Shell::Bash => script.extend_from_slice(BASH_COMPLETIONS.as_bytes()),
-            _ => clap_complete::generate(self.shell, &mut cli, bin_name, &mut script),
+            clap_complete::Shell::Bash => write!(output, "{BASH_COMPLETIONS}")?,
+            _ => clap_complete::generate(self.shell, &mut cli, bin_name, output),
         }
 
-        match output.write_all(&script) {
-            // Consumers may exit before reading all output, e.g. `source <(kamu completions bash)`
-            Err(err) if err.kind() == ErrorKind::BrokenPipe => Ok(()),
-            res => Ok(res?),
-        }
+        // Every generator ends in a newline today, so `Stdout`'s line buffer is empty
+        // by now - but its exit-time flush happens outside whichever writer we were
+        // handed, so flush through that writer rather than relying on it staying so
+        output.flush()?;
+
+        Ok(())
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for CompletionsCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        self.write_completions(&mut std::io::stdout())
+        // `source <(kamu completions bash)`, the invocation suggested by `--help`,
+        // stops reading before the script ends. Rust ignores SIGPIPE, so the write
+        // returns `BrokenPipe`, which both `write!` and `clap_complete::generate()`
+        // turn into a panic - `pipecheck` lets the signal terminate us instead
+        self.write_completions(&mut pipecheck::wrap(std::io::stdout()))
     }
 }
