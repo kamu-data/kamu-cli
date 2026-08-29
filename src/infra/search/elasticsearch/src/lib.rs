@@ -7,6 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+// TODO: Remove after `tracing` crate better supports the new trait solver
+// See: https://github.com/rust-lang/rust/issues/159228
+#![recursion_limit = "256"]
+
 #[cfg(feature = "testing")]
 pub mod es_client;
 #[cfg(not(feature = "testing"))]

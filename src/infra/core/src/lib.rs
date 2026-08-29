@@ -10,6 +10,9 @@
 #![feature(try_blocks)]
 #![feature(exit_status_error)]
 #![feature(error_generic_member_access)]
+// TODO: Remove after `tracing` crate better supports the new trait solver
+// See: https://github.com/rust-lang/rust/issues/159228
+#![recursion_limit = "256"]
 
 // Re-exports
 pub use kamu_core as domain;
