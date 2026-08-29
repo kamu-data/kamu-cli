@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::*;
 use kamu_task_system::{TaskID, TaskOutcome};
 
 use crate::*;
