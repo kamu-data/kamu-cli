@@ -13,6 +13,12 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Container runtime: SELinux presence detection no longer spawns the `command` shell built-in, which is not an
+  executable and thus always failed with `NotFound` - as a result SELinux was never detected and a
+  `Error detecting SELinux presence` warning was logged on every container start (#1692)
+
 ## [0.266.1] - 2026-08-19
 ### Fixed
 - Login, OAuth: login error if system (local) username matches GitHub username (#1684)
