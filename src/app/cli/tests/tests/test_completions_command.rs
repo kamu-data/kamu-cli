@@ -56,19 +56,13 @@ fn test_writes_completions() {
 }
 
 #[test_log::test]
-fn test_broken_pipe_is_ignored() {
-    // Note: every shell other than Bash is rendered by `clap_complete::generate()`,
-    // which panics on writer errors, so this also pins the decision to render the
-    // script into a buffer first
-    for shell in clap_complete::Shell::value_variants() {
-        completions_command(*shell)
-            .write_completions(&mut FailingWriter(ErrorKind::BrokenPipe))
-            .unwrap();
-    }
-}
-
-#[test_log::test]
-fn test_other_write_errors_are_propagated() {
+fn test_write_errors_are_propagated() {
+    // Note: only Bash is covered here. Every other shell is rendered by
+    // `clap_complete::generate()`, which panics rather than returning writer
+    // errors, and its fallible `try_generate()` is no escape either - `Fish`
+    // still panics internally (`clap_complete-4.6.9` `fish.rs:277`). Broken
+    // pipes are handled a level up, by the `pipecheck` writer `run()` passes in
+    // - see the test below
     let res = completions_command(clap_complete::Shell::Bash)
         .write_completions(&mut FailingWriter(ErrorKind::PermissionDenied));
 
@@ -77,6 +71,47 @@ fn test_other_write_errors_are_propagated() {
         Err(CLIError::Failure { source, .. })
             if source.downcast_ref::<Error>().map(Error::kind) == Some(ErrorKind::PermissionDenied)
     );
+}
+
+// A broken pipe takes the whole process down, so unlike the cases above it can
+// only be observed from the outside
+#[cfg(unix)]
+#[test_log::test]
+fn test_broken_pipe_terminates_by_sigpipe() {
+    use std::os::unix::process::ExitStatusExt as _;
+
+    // Run outside any `.kamu` that happens to sit above the checkout
+    let workdir = tempfile::tempdir().unwrap();
+
+    for shell in clap_complete::Shell::value_variants() {
+        let (reader, writer) = std::io::pipe().unwrap();
+
+        // Closing the read end before spawning makes the very first write fail, so the
+        // test does not depend on the child being scheduled before or after this point
+        drop(reader);
+
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_kamu-cli"))
+            .args(["completions", &shell.to_string()])
+            .current_dir(workdir.path())
+            .stdout(writer)
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap()
+            .wait_with_output()
+            .unwrap();
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !stderr.contains("panicked") && !stderr.contains("has crashed"),
+            "{shell}: {stderr}"
+        );
+        assert_eq!(
+            output.status.signal(),
+            Some(libc::SIGPIPE),
+            "{shell}: {:?}, stderr: {stderr}",
+            output.status
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
