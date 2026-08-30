@@ -190,6 +190,9 @@ impl CompleteCommand {
                             writeln!(output, "{}", pval.get_name()).int_err()?;
                         }
                     }
+                    // This path returns early, so it needs the same flush as the tail
+                    output.flush().int_err()?;
+
                     return Ok(());
                 }
             }
@@ -230,6 +233,10 @@ impl CompleteCommand {
             }
         }
 
+        // `Stdout`'s exit-time flush happens outside whichever writer we were handed,
+        // so a pipe breaking on the last buffered chunk would otherwise go unnoticed
+        output.flush().int_err()?;
+
         Ok(())
     }
 }
@@ -237,6 +244,11 @@ impl CompleteCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for CompleteCommand {
     async fn run(&self) -> Result<(), CLIError> {
-        self.complete(&mut std::io::stdout()).await
+        // The completion script calls this on every Tab press and reads it through a
+        // command substitution, so the consumer can go away mid-write. Rust ignores
+        // SIGPIPE, so the write fails with `BrokenPipe` instead, which surfaced here
+        // as an "Internal error - report this problem" - `pipecheck` lets the signal
+        // terminate us instead, as it already does for `kamu completions` (#1068)
+        self.complete(&mut pipecheck::wrap(std::io::stdout())).await
     }
 }
