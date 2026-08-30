@@ -15,9 +15,8 @@ Recommendation: for ease of reading, use the following format:
 
 ## [Unreleased]
 ### Fixed
-- Container runtime: SELinux presence detection no longer spawns the `command` shell built-in, which is not an
-  executable and thus always failed with `NotFound` - as a result SELinux was never detected and a
-  `Error detecting SELinux presence` warning was logged on every container start (#1692)
+- SELinux presence detection if fixed and no longer spams warnings (#1692)
+- CLI: `kamu completions` no longer panics when the output pipe is closed early, e.g. `source <(kamu completions bash)` (#1068)
 
 ## [0.266.1] - 2026-08-19
 ### Fixed

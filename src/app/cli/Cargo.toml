@@ -245,6 +245,7 @@ hex = { version = "0.4", default-features = false, features = [] }
 indoc = "2"
 itertools = "0.14"
 libc = "0.2" # Signal names
+pipecheck = "0.2" # Unix-style broken pipe handling for stdout
 regex = "1"
 secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
