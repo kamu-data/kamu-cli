@@ -17,7 +17,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 - SELinux presence detection if fixed and no longer spams warnings (#1692)
 - CLI: `kamu completions` no longer panics when the output pipe is closed early, e.g. `source <(kamu completions bash)` (#1068)
-- CLI: `kamu complete` no longer reports an internal error when the output pipe is closed early (#1068)
+- CLI: `kamu complete` no longer reports an internal error when the output pipe is closed early, and propagates other output errors instead of panicking (#1068)
 
 ## [0.266.1] - 2026-08-19
 ### Fixed
