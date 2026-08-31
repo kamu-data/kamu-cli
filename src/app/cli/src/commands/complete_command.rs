@@ -283,7 +283,7 @@ impl CompleteCommand {
                     PositionalKind::Path => self.complete_path(output, to_complete)?,
                     PositionalKind::Repository => self.complete_repository(output, to_complete)?,
                     PositionalKind::ContextName => {
-                        self.complete_context_name(output, to_complete)?
+                        self.complete_context_name(output, to_complete)?;
                     }
                     PositionalKind::ResourceType { with_extra_targets } => {
                         let extra_targets: &[&str] = if *with_extra_targets {
