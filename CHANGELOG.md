@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-# [Unreleased]
+## [Unreleased]
 ### Added
 - **Resources Framework** - a new declarative, Kubernetes-inspired subsystem for managing server-side
   objects from manifests, implementing [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md).
@@ -69,6 +69,9 @@ Recommendation: for ease of reading, use the following format:
   the command did not register the GraphQL dataloaders that the HTTP handler attaches
 - Generated dataset names now respect the `DatasetName` length limit
 - Container runtime no longer leaks containers that are killed before they finish starting - `run --rm` does not reap those, so they accumulated in `Created` state until the runtime could no longer start new ones
+- SELinux presence detection if fixed and no longer spams warnings (#1692)
+- CLI: `kamu completions` no longer panics when the output pipe is closed early, e.g. `source <(kamu completions bash)` (#1068)
+- CLI: `kamu complete` no longer reports an internal error when the output pipe is closed early, and propagates other output errors instead of panicking (#1068)
 
 ## [0.266.1] - 2026-08-19
 ### Fixed
