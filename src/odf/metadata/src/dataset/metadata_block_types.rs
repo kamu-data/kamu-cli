@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use enum_variants::*;
 use multiformats::Multihash;
 
 use super::*;

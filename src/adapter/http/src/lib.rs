@@ -8,6 +8,9 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
+// TODO: Remove after `axum` crate better supports the new trait solver
+// See: https://github.com/rust-lang/rust/issues/159228
+#![recursion_limit = "256"]
 
 mod http_server_dataset_router;
 pub use http_server_dataset_router::*;

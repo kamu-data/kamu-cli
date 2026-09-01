@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
       - name: cargo fmt --check
@@ -68,12 +68,12 @@ jobs:
           repository: kamu-data/kamu-cli
           path: kamu-cli
       - name: Copy rust-toolchain file
-        run: cp kamu-cli/rust-toolchain ./rust-toolchain
+        run: cp kamu-cli/rust-toolchain.toml ./rust-toolchain.toml
       - uses: actions/checkout@v5
         with:
           repository: open-data-fabric/open-data-fabric
           path: open-data-fabric
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt
       # We use nix flake to install flatc, protoc and other tools needed for codegen
@@ -94,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall cargo-deny -y
       - run: cargo deny check --hide-inclusion-graph
@@ -208,7 +208,7 @@ jobs:
           sudo apt-get install -y mold
           echo 'RUSTFLAGS=-C linker=clang -C link-arg=-fuse-ld=mold' >> $GITHUB_ENV
 
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
 
       - uses: swatinem/rust-cache@v2
         with:
