@@ -1,0 +1,197 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use chrono::Utc;
+use dill::CatalogBuilder;
+use internal_error::InternalError;
+use kamu_resources::{
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ReconcileResourceUseCase,
+    ReconcileResourceUseCaseError,
+    ResourceHeaders,
+    ResourceHeadersExt,
+    ResourceID,
+    ResourceLifecycleMessage,
+    ResourceLifecycleMessageOutcome,
+    ResourceSchemaProvider,
+    ResourceSnapshot,
+};
+use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
+use mockall::mock;
+use odf::metadata::resource::TypeUri;
+
+use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher, make_id};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Mock
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Not using automock, because it's a generic trait
+mock! {
+    pub TestResourceReconcileUseCase {}
+
+    #[async_trait::async_trait]
+    impl ReconcileResourceUseCase<TestResource> for TestResourceReconcileUseCase {
+        async fn execute(
+            &self,
+            id: &ResourceID,
+        ) -> Result<(), ReconcileResourceUseCaseError<TestResource>>;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_applied_message_triggers_reconciliation() {
+    // Applied message → ResourceLifecycleMessageConsumer → handle_applied →
+    // ReconcileResourceUseCase::execute.  Verified via mock expectations.
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new(
+        ResourceLifecycleConsumerHarness::expect_execute_once(id),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::applied(
+            Utc::now(),
+            ResourceLifecycleMessageOutcome::Created,
+            ResourceLifecycleConsumerHarness::make_snapshot(id),
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_deleted_message_is_no_op_for_reconciler() {
+    // Deleted message → handle_deleted, which is a no-op in the generated
+    // reconcile dispatcher.  Verified: reconcile use case is never called.
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new(
+        ResourceLifecycleConsumerHarness::expect_no_execute(),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::deleted(
+            Utc::now(),
+            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_applied_message_with_unregistered_schema_returns_error() {
+    // Applied message for an unknown schema: dispatcher lookup fails because no
+    // lifecycle dispatcher is registered for "UnknownSchema".
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new(
+        ResourceLifecycleConsumerHarness::expect_no_execute(),
+    );
+
+    let result = harness
+        .consume_message(&ResourceLifecycleMessage::applied(
+            Utc::now(),
+            ResourceLifecycleMessageOutcome::Created,
+            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(
+                id,
+                &TypeUri::new_unchecked("UnknownSchema"),
+            ),
+        ))
+        .await;
+
+    assert!(
+        result.is_err(),
+        "consumer must return an error for an unregistered resource schema"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ResourceLifecycleConsumerHarness {
+    catalog: dill::Catalog,
+}
+
+impl ResourceLifecycleConsumerHarness {
+    fn expect_execute_once(id: ResourceID) -> MockTestResourceReconcileUseCase {
+        let mut mock = MockTestResourceReconcileUseCase::new();
+        mock.expect_execute()
+            .once()
+            .withf(move |id_| *id_ == id)
+            .returning(|_| Ok(()));
+        mock
+    }
+
+    fn expect_no_execute() -> MockTestResourceReconcileUseCase {
+        let mut mock = MockTestResourceReconcileUseCase::new();
+        mock.expect_execute().never();
+        mock
+    }
+
+    fn new(mock_reconcile_uc: MockTestResourceReconcileUseCase) -> Self {
+        let mut b = CatalogBuilder::new();
+
+        OutboxProvider::Immediate {
+            force_immediate: true,
+        }
+        .embed_into_catalog(&mut b);
+
+        b.add_value(mock_reconcile_uc)
+            .bind::<dyn ReconcileResourceUseCase<TestResource>, MockTestResourceReconcileUseCase>();
+
+        b.add::<TestResourceResourceLifecycleDispatcher>();
+        b.add::<kamu_resources_services::ResourceLifecycleMessageConsumer>();
+
+        register_message_dispatcher::<ResourceLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+        );
+
+        let catalog = b.build();
+        Self { catalog }
+    }
+
+    async fn consume_message(
+        &self,
+        message: &ResourceLifecycleMessage,
+    ) -> Result<(), InternalError> {
+        self.catalog
+            .get_one::<dyn MessageConsumerT<ResourceLifecycleMessage>>()
+            .unwrap()
+            .consume_message(&self.catalog, message)
+            .await
+    }
+
+    fn make_snapshot(id: ResourceID) -> ResourceSnapshot {
+        Self::make_snapshot_with_schema(id, TestResource::schema())
+    }
+
+    fn make_snapshot_with_schema(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
+        let account_handle = odf::AccountHandle::new_test("test-oowner");
+
+        ResourceSnapshot {
+            id,
+            schema: schema.clone(),
+            headers: ResourceHeaders::simple(Utc::now(), id, account_handle, "res"),
+            spec: serde_json::json!({ "value": "x" }),
+            status: None,
+            last_event_id: None,
+        }
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

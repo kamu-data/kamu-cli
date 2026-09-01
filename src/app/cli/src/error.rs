@@ -11,11 +11,25 @@ use std::backtrace::Backtrace;
 use std::fmt::Display;
 use std::path::PathBuf;
 
+use graphql_http::GraphqlHttpRequestError;
 use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
-use kamu_datasets::DeleteDatasetError;
+use kamu_datasets::{
+    DeleteDatasetError,
+    DeleteDatasetPlanEvaluationError,
+    DeleteDatasetPlanningError,
+};
+use kamu_resources_facade::{
+    ApplyManifestError,
+    BatchResourceError,
+    GetResourceError,
+    ListResourcesError,
+    ListSupportedResourceTypesError,
+    ResourceLookupProblem,
+    ResourcesSummaryError,
+};
 use odf::utils::data::format::WriterError;
 use thiserror::Error;
 
@@ -190,10 +204,26 @@ impl From<GetAliasesError> for CLIError {
 impl From<DeleteDatasetError> for CLIError {
     fn from(v: DeleteDatasetError) -> Self {
         match v {
-            e @ (DeleteDatasetError::NotFound(_)
-            | DeleteDatasetError::DanglingReference(_)
-            | DeleteDatasetError::Access(_)) => Self::failure(e),
             e @ DeleteDatasetError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<DeleteDatasetPlanningError> for CLIError {
+    fn from(v: DeleteDatasetPlanningError) -> Self {
+        match v {
+            e @ DeleteDatasetPlanningError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<DeleteDatasetPlanEvaluationError> for CLIError {
+    fn from(v: DeleteDatasetPlanEvaluationError) -> Self {
+        match v {
+            e @ (DeleteDatasetPlanEvaluationError::NotFound(_)
+            | DeleteDatasetPlanEvaluationError::DanglingReference(_)
+            | DeleteDatasetPlanEvaluationError::Access(_)) => Self::failure(e),
+            e @ DeleteDatasetPlanEvaluationError::Internal(_) => Self::critical(e),
         }
     }
 }
@@ -216,6 +246,95 @@ impl From<odf::IterBlocksError> for CLIError {
 impl From<InternalError> for CLIError {
     fn from(e: InternalError) -> Self {
         Self::critical(e)
+    }
+}
+
+impl From<GraphqlHttpRequestError> for CLIError {
+    fn from(e: GraphqlHttpRequestError) -> Self {
+        match e {
+            GraphqlHttpRequestError::Transport { .. }
+            | GraphqlHttpRequestError::HttpStatus { .. }
+            | GraphqlHttpRequestError::Graphql { .. } => Self::failure(e),
+            GraphqlHttpRequestError::Internal(e) => Self::critical(e),
+        }
+    }
+}
+
+impl From<ResourcesSummaryError> for CLIError {
+    fn from(e: ResourcesSummaryError) -> Self {
+        use ResourcesSummaryError as E;
+        match e {
+            e @ (E::AccountResolution(_) | E::AccountAccess(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<ListSupportedResourceTypesError> for CLIError {
+    fn from(e: ListSupportedResourceTypesError) -> Self {
+        match e {
+            ListSupportedResourceTypesError::RemoteRequest(err) => Self::from(err),
+            ListSupportedResourceTypesError::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<ListResourcesError> for CLIError {
+    fn from(e: ListResourcesError) -> Self {
+        use ListResourcesError as E;
+
+        match e {
+            e @ (E::UnsupportedSelector(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
+            | E::InvalidLabelFilter(_)
+            | E::UnrepresentableScope(_)
+            | E::UnsupportedSelectorField(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<BatchResourceError> for CLIError {
+    fn from(e: BatchResourceError) -> Self {
+        use BatchResourceError as E;
+
+        match e {
+            e @ (E::UnsupportedSelector(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
+            | E::InvalidLabelFilter(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
+    }
+}
+
+impl From<GetResourceError> for CLIError {
+    fn from(e: GetResourceError) -> Self {
+        let GetResourceError::LookupProblem(problem) = e;
+        Self::failure(ResourceLookupCliError::from(problem))
+    }
+}
+
+impl From<ApplyManifestError> for CLIError {
+    fn from(e: ApplyManifestError) -> Self {
+        use ApplyManifestError as E;
+        match e {
+            e @ (E::ParseManifest(_)
+            | E::UnsupportedDescriptor(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
+            | E::InvalidHeaders(_)
+            | E::InvalidSpec(_)
+            | E::IDNotFound(_)
+            | E::TypeMismatch(_)
+            | E::ConcurrentModification(_)) => Self::failure(e),
+            E::RemoteRequest(err) => Self::from(err),
+            E::Internal(err) => Self::critical(err),
+        }
     }
 }
 
@@ -280,6 +399,81 @@ pub struct MultiTenantRefUnexpectedError {
 #[derive(Debug, Error)]
 #[error("Command interpretation failed")]
 pub struct CommandInterpretationFailed;
+
+#[derive(Debug, Error)]
+pub enum ResourceLookupCliError {
+    #[error("Resource with id {0} was not found")]
+    IDNotFound(kamu_resources::ResourceID),
+
+    #[error("Resource '{name}' of type '{resource_type}' was not found")]
+    NameNotFound { resource_type: String, name: String },
+
+    /// The `%/<name>` form: an exact name searched across every type. No single
+    /// type can be named in the message, because every one was tried.
+    #[error("Resource '{name}' was not found in any resource type")]
+    AnyTypeNameNotFound { name: kamu_resources::ResourceName },
+
+    /// The `%/<name>` form again, but the name exists in several types. A
+    /// reference names exactly one resource, so the caller has to disambiguate
+    /// rather than the CLI picking a winner.
+    #[error("Resource '{name}' is ambiguous: it exists in types {}. Specify a type to disambiguate", type_names.join(", "))]
+    AmbiguousType {
+        name: kamu_resources::ResourceName,
+        type_names: Vec<String>,
+    },
+
+    #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
+    SchemaMismatch {
+        id: kamu_resources::ResourceID,
+        expected_schema: String,
+        actual_schema: String,
+    },
+
+    /// Unreachable from the CLI, which always spells exactly one of the two,
+    /// but representable on the wire.
+    #[error("Resource reference specified neither an id nor a name")]
+    EmptyRef,
+
+    /// Also unreachable from the CLI for the same reason: a reference naming
+    /// both an id and a name asserts they agree, and only the wire can spell
+    /// that pair.
+    #[error("Resource {id} is named '{actual_name}', not '{expected_name}'")]
+    NameMismatch {
+        id: kamu_resources::ResourceID,
+        expected_name: String,
+        actual_name: String,
+    },
+}
+
+impl From<ResourceLookupProblem> for ResourceLookupCliError {
+    fn from(problem: ResourceLookupProblem) -> Self {
+        match problem {
+            ResourceLookupProblem::IDNotFound(err) => Self::IDNotFound(err.0),
+            ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
+                resource_type: err.type_name.to_string(),
+                name: err.name.to_string(),
+            },
+            ResourceLookupProblem::AnyTypeNameNotFound(err) => {
+                Self::AnyTypeNameNotFound { name: err.name }
+            }
+            ResourceLookupProblem::AmbiguousType(err) => Self::AmbiguousType {
+                name: err.name,
+                type_names: err.type_names.iter().map(ToString::to_string).collect(),
+            },
+            ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
+                id: err.id,
+                expected_schema: err.expected_schema.to_string(),
+                actual_schema: err.actual_schema.to_string(),
+            },
+            ResourceLookupProblem::NameMismatch(err) => Self::NameMismatch {
+                id: err.id,
+                expected_name: err.expected_name.to_string(),
+                actual_name: err.actual_name.to_string(),
+            },
+            ResourceLookupProblem::EmptyRef => Self::EmptyRef,
+        }
+    }
+}
 
 #[derive(Debug, Error)]
 #[error(

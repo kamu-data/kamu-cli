@@ -143,3 +143,18 @@ fn test_creates_the_correct_reason_with_context() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_extracts_root_source_message() {
+    let error = C {
+        source: B {
+            source: IntegerParsingError {}.into(),
+        }
+        .into(),
+    }
+    .int_err();
+
+    assert_eq!(root_source_message(&error), "Input value is not an integer");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,55 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use kamu_resources_facade::{RemoteGraphqlResourceFacadeImpl, ResourceFacade};
+
+use crate::CLIError;
+use crate::odf_server::AccessTokenRegistryService;
+use crate::resource_context::{ResolvedResourceContext, ResourceContextResolver};
+use crate::resources::ResourceFacadeFactory;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component(pub)]
+#[dill::interface(dyn ResourceFacadeFactory)]
+pub struct ResourceFacadeFactoryImpl {
+    local_resource_facade: Arc<dyn ResourceFacade>,
+    resource_context_resolver: Arc<ResourceContextResolver>,
+    access_token_registry_service: Arc<AccessTokenRegistryService>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl ResourceFacadeFactory for ResourceFacadeFactoryImpl {
+    fn get_resource_facade(
+        &self,
+        explicit_context_name: Option<&str>,
+    ) -> Result<Arc<dyn ResourceFacade>, CLIError> {
+        match self
+            .resource_context_resolver
+            .resolve(explicit_context_name)?
+        {
+            ResolvedResourceContext::LocalWorkspace => Ok(self.local_resource_facade.clone()),
+            ResolvedResourceContext::RemoteWorkspace { backend_url, .. } => {
+                let maybe_access_token = self
+                    .access_token_registry_service
+                    .find_access_token_by_backend_url(&backend_url);
+
+                Ok(Arc::new(RemoteGraphqlResourceFacadeImpl::new(
+                    &backend_url,
+                    maybe_access_token,
+                )))
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

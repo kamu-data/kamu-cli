@@ -18,6 +18,7 @@ use kamu_accounts::{
     AccountConfig,
     AccountLifecycleMessage,
     AccountProvider,
+    AccountResourceIdSource,
     AccountService,
     AccountType,
     CreateAccountError,
@@ -162,12 +163,28 @@ impl CreateAccountUseCaseImpl {
 
 #[async_trait::async_trait]
 impl CreateAccountUseCase for CreateAccountUseCaseImpl {
-    async fn execute(&self, account_config: &AccountConfig) -> Result<Account, CreateAccountError> {
+    async fn execute(
+        &self,
+        account_config: &AccountConfig,
+        resource_id_source: AccountResourceIdSource,
+    ) -> Result<Account, CreateAccountError> {
         let (maybe_account_key, account_id) =
             self.get_or_generate_account_key_and_id(account_config);
 
         let new_account = Account {
             id: account_id,
+            // Predefined/config-driven accounts must resolve to the same
+            // resource id across restarts and re-registration (the CLI derives
+            // the same id for its pre-workspace subject), so they seed
+            // deterministically from the name. Accounts created at runtime --
+            // e.g. via OAuth/Web3 login, where the name may have been
+            // auto-renamed on collision -- get a fresh random id instead.
+            resource_id: match resource_id_source {
+                AccountResourceIdSource::SeededFromName => {
+                    Account::seed_resource_id_from_name(account_config.account_name.as_str())
+                }
+                AccountResourceIdSource::Generated => Account::generate_resource_id(),
+            },
             account_name: account_config.account_name.clone(),
             email: account_config.email.clone(),
             display_name: account_config.get_display_name(),
@@ -222,6 +239,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         let new_account = Account {
             id: account_id,
+            resource_id: Account::generate_resource_id(),
             account_name: account_name.clone(),
             email,
             display_name: account_name.to_string(),

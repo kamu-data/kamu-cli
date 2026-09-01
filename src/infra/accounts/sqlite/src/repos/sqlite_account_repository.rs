@@ -9,7 +9,12 @@
 
 use std::num::NonZeroUsize;
 
-use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    sql_like_escape_literal,
+    sqlite_generate_placeholders_list,
+};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
@@ -63,6 +68,7 @@ impl AccountRepository for SqliteAccountRepository {
 
         let account_id_stack = account.id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let resource_id = account.resource_id.as_ref();
         let account_name = account.account_name.as_str();
         let email = account.email.as_ref().to_ascii_lowercase();
         let avatar_url_as_str = account.avatar_url.as_ref().map(Url::as_str);
@@ -71,10 +77,11 @@ impl AccountRepository for SqliteAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO accounts (id, resource_id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
             account_id_str,
+            resource_id,
             account_name,
             email,
             account.display_name,
@@ -228,6 +235,7 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id!: _",
                 account_name,
                 email,
                 display_name,
@@ -269,6 +277,7 @@ impl AccountRepository for SqliteAccountRepository {
         let mut query_builder = sqlx::QueryBuilder::<_>::new(
             r#"
             SELECT id,
+                   resource_id,
                    account_name,
                    email,
                    display_name,
@@ -312,6 +321,7 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id!: _",
                 account_name,
                 email,
                 display_name,
@@ -474,6 +484,7 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             )
             SELECT id,
+                   resource_id,
                    account_name,
                    email,
                    display_name,
@@ -513,9 +524,11 @@ impl AccountRepository for SqliteAccountRepository {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
+            let name_pattern = sql_like_escape_literal(name_pattern);
             let query_str = format!(
                 r#"
                 SELECT id,
+                       resource_id,
                        account_name,
                        email,
                        display_name,
@@ -525,8 +538,8 @@ impl AccountRepository for SqliteAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                WHERE (account_name LIKE '%'||$1||'%' COLLATE nocase
-                    OR display_name LIKE '%'||$1||'%' COLLATE nocase)
+                WHERE (account_name LIKE '%'||$1||'%' ESCAPE '\' COLLATE nocase
+                    OR display_name LIKE '%'||$1||'%' ESCAPE '\' COLLATE nocase)
                   AND id NOT IN ({})
                 ORDER BY account_name
                 LIMIT $2 OFFSET $3
@@ -625,6 +638,7 @@ impl ExpensiveAccountRepository for SqliteAccountRepository {
                 AccountRowModel,
                 r#"
                 SELECT id            AS "id: _",
+                       resource_id   AS "resource_id!: _",
                        account_name,
                        email,
                        display_name,

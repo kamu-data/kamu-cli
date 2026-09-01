@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT COUNT(*) as \"count!: i64\"\n            FROM resources\n            WHERE account_id = $1\n              AND resource_schema = $2\n              AND deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "97ebea6ea9548123a83bd012738024822d9909597cee84193d4d3382c576cbfa"
+}

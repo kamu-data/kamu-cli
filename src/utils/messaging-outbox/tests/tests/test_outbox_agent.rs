@@ -26,6 +26,8 @@ const TEST_PRODUCER_B: &str = "TEST-PRODUCER-B";
 const TEST_PRODUCER_C: &str = "TEST-PRODUCER-C";
 const TEST_PRODUCER_D: &str = "TEST-PRODUCER-D";
 const TEST_PRODUCER_E: &str = "TEST-PRODUCER-E";
+const TEST_PRODUCER_F: &str = "TEST-PRODUCER-F";
+const TEST_PRODUCER_G: &str = "TEST-PRODUCER-G";
 
 const TEST_CONSUMER_A: &str = "TestMessageConsumerA";
 const TEST_CONSUMER_A1: &str = "TestMessageConsumerA1";
@@ -35,21 +37,141 @@ const TEST_CONSUMER_C2: &str = "TestMessageConsumerC2";
 const TEST_CONSUMER_D_OK: &str = "TestMessageConsumerDOk";
 const TEST_CONSUMER_D_FAILING: &str = "TestMessageConsumerDFailing";
 const TEST_CONSUMER_E_FAILING: &str = "TestMessageConsumerEFailing";
+const TEST_CONSUMER_F_SELF_MANAGED: &str = "TestMessageConsumerFSelfManaged";
+const TEST_CONSUMER_G_SELF_MANAGED_FAILING: &str = "TestMessageConsumerGSelfManagedFailing";
 
 test_message_type!(A);
 test_message_type!(B);
 test_message_type!(C);
 test_message_type!(D);
 test_message_type!(E);
+test_message_type!(F);
+test_message_type!(G);
 
-test_message_consumer!(A, A, TEST_PRODUCER_A, Transactional, All);
-test_message_consumer!(A, A1, TEST_PRODUCER_A, Transactional, Latest);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional, All);
-test_message_consumer!(C, C1, TEST_PRODUCER_C, Transactional, All);
-test_message_consumer!(C, C2, TEST_PRODUCER_C, Transactional, All);
-test_message_consumer!(D, DOk, TEST_PRODUCER_D, Transactional, All);
-test_message_failing_consumer!(D, DFailing, TEST_PRODUCER_D, Transactional, All);
-test_message_failing_consumer!(E, EFailing, TEST_PRODUCER_E, Transactional, All);
+test_message_consumer!(A, A, TEST_PRODUCER_A, TransactionalWrapped, All);
+test_message_consumer!(A, A1, TEST_PRODUCER_A, TransactionalWrapped, Latest);
+test_message_consumer!(B, B, TEST_PRODUCER_B, TransactionalWrapped, All);
+test_message_consumer!(C, C1, TEST_PRODUCER_C, TransactionalWrapped, All);
+test_message_consumer!(C, C2, TEST_PRODUCER_C, TransactionalWrapped, All);
+test_message_consumer!(D, DOk, TEST_PRODUCER_D, TransactionalWrapped, All);
+test_message_failing_consumer!(D, DFailing, TEST_PRODUCER_D, TransactionalWrapped, All);
+test_message_failing_consumer!(E, EFailing, TEST_PRODUCER_E, TransactionalWrapped, All);
+test_message_consumer!(
+    F,
+    FSelfManaged,
+    TEST_PRODUCER_F,
+    TransactionalSelfManaged,
+    All
+);
+test_message_failing_consumer!(
+    G,
+    GSelfManagedFailing,
+    TEST_PRODUCER_G,
+    TransactionalSelfManaged,
+    All
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct FailOnceOnMarkConsumedOutboxMessageBridge {
+    inner: InMemoryOutboxMessageBridge,
+    fail_next_mark_consumed: Mutex<bool>,
+}
+
+impl FailOnceOnMarkConsumedOutboxMessageBridge {
+    fn new(fail_next_mark_consumed: bool) -> Self {
+        Self {
+            inner: InMemoryOutboxMessageBridge::new(),
+            fail_next_mark_consumed: Mutex::new(fail_next_mark_consumed),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl OutboxMessageBridge for FailOnceOnMarkConsumedOutboxMessageBridge {
+    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
+        self.inner.wakeup_detector()
+    }
+
+    async fn push_message(
+        &self,
+        transaction_catalog: &Catalog,
+        message: NewOutboxMessage,
+    ) -> Result<(), InternalError> {
+        self.inner.push_message(transaction_catalog, message).await
+    }
+
+    async fn get_unprocessed_messages(
+        &self,
+        transaction_catalog: &Catalog,
+        above_boundaries_by_producer: Vec<(String, OutboxMessageBoundary)>,
+        batch_size: usize,
+    ) -> Result<Vec<OutboxMessage>, InternalError> {
+        self.inner
+            .get_unprocessed_messages(
+                transaction_catalog,
+                above_boundaries_by_producer,
+                batch_size,
+            )
+            .await
+    }
+
+    async fn get_messages_by_producer(
+        &self,
+        transaction_catalog: &Catalog,
+        producer_name: &str,
+        above_boundary: OutboxMessageBoundary,
+        batch_size: usize,
+    ) -> Result<Vec<OutboxMessage>, InternalError> {
+        self.inner
+            .get_messages_by_producer(
+                transaction_catalog,
+                producer_name,
+                above_boundary,
+                batch_size,
+            )
+            .await
+    }
+
+    async fn get_latest_message_boundaries_by_producer(
+        &self,
+        transaction_catalog: &Catalog,
+    ) -> Result<Vec<(String, OutboxMessageBoundary)>, InternalError> {
+        self.inner
+            .get_latest_message_boundaries_by_producer(transaction_catalog)
+            .await
+    }
+
+    async fn list_consumption_boundaries(
+        &self,
+        transaction_catalog: &Catalog,
+    ) -> Result<Vec<OutboxMessageConsumptionBoundary>, InternalError> {
+        self.inner
+            .list_consumption_boundaries(transaction_catalog)
+            .await
+    }
+
+    async fn mark_consumed(
+        &self,
+        transaction_catalog: &Catalog,
+        producer_name: &str,
+        consumer_name: &str,
+        boundary: OutboxMessageBoundary,
+    ) -> Result<(), InternalError> {
+        {
+            let mut fail_next_mark_consumed = self.fail_next_mark_consumed.lock().unwrap();
+            if boundary.message_id > OutboxMessageID::new(0)
+                && std::mem::take(&mut *fail_next_mark_consumed)
+            {
+                return Err(InternalError::new("Synthetic mark_consumed failure"));
+            }
+        }
+
+        self.inner
+            .mark_consumed(transaction_catalog, producer_name, consumer_name, boundary)
+            .await
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -729,6 +851,167 @@ async fn test_all_consumers_failing_interrupts_and_stops_retries_until_restart()
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_self_managed_consumer_advances_boundary_after_success() {
+    let harness = SelfManagedOutboxAgentHarness::new(false);
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    harness
+        .outbox
+        .post_message(
+            TEST_PRODUCER_F,
+            TestMessageF {
+                body: "f-1".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    let consumer = harness
+        .catalog
+        .get_one::<TestMessageConsumerFSelfManaged>()
+        .unwrap();
+    assert_eq!(
+        consumer.get_messages(),
+        vec![TestMessageF {
+            body: "f-1".to_string(),
+        }]
+    );
+
+    harness
+        .assert_boundary_message_id(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1)
+        .await;
+    harness.check_metric_processed(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1);
+    harness.check_metric_failed(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 0);
+    harness.check_metric_pending(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1);
+
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+    harness.check_metric_pending(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_self_managed_consumer_is_paused_when_handler_fails() {
+    let harness = SelfManagedOutboxAgentHarness::new(false);
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    harness
+        .outbox
+        .post_message(
+            TEST_PRODUCER_G,
+            TestMessageG {
+                body: "g-1".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    let consumer = harness
+        .catalog
+        .get_one::<TestMessageConsumerGSelfManagedFailing>()
+        .unwrap();
+    assert_eq!(consumer.attempts(), 1);
+
+    harness
+        .assert_boundary_message_id(TEST_PRODUCER_G, TEST_CONSUMER_G_SELF_MANAGED_FAILING, 0)
+        .await;
+    harness.check_metric_processed(TEST_PRODUCER_G, TEST_CONSUMER_G_SELF_MANAGED_FAILING, 0);
+    harness.check_metric_failed(TEST_PRODUCER_G, TEST_CONSUMER_G_SELF_MANAGED_FAILING, 1);
+    harness.check_metric_pending(TEST_PRODUCER_G, TEST_CONSUMER_G_SELF_MANAGED_FAILING, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_self_managed_consumer_is_paused_after_boundary_shift_failure() {
+    let harness = SelfManagedOutboxAgentHarness::new(true);
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    harness
+        .outbox
+        .post_message(
+            TEST_PRODUCER_F,
+            TestMessageF {
+                body: "f-1".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    let consumer = harness
+        .catalog
+        .get_one::<TestMessageConsumerFSelfManaged>()
+        .unwrap();
+    assert_eq!(
+        consumer.get_messages(),
+        vec![TestMessageF {
+            body: "f-1".to_string(),
+        }]
+    );
+    harness
+        .assert_boundary_message_id(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 0)
+        .await;
+    harness.check_metric_processed(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 0);
+    harness.check_metric_failed(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1);
+    harness.check_metric_pending(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1);
+
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+
+    assert_eq!(
+        consumer.get_messages(),
+        vec![TestMessageF {
+            body: "f-1".to_string(),
+        },]
+    );
+    harness
+        .assert_boundary_message_id(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 0)
+        .await;
+    harness.check_metric_processed(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 0);
+    harness.check_metric_failed(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1);
+    harness.check_metric_pending(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1);
+
+    harness
+        .outbox_agent
+        .run_single_iteration_only()
+        .await
+        .unwrap();
+    harness.check_metric_pending(TEST_PRODUCER_F, TEST_CONSUMER_F_SELF_MANAGED, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_run_while_has_tasks_drains_backlog_with_small_batch_size() {
     let harness = OutboxAgentFailureHarness::new(2);
     harness.outbox_agent.run_initialization().await.unwrap();
@@ -991,6 +1274,43 @@ impl OutboxAgentHarness {
     fn check_metrics_messages_processed_total(&self, expected: &[(&str, &str, u64)]) {
         for (producer, consumer, expected_value) in expected {
             self.check_metric_processed(producer, consumer, *expected_value);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseOutboxAgentHarness, base_harness)]
+struct SelfManagedOutboxAgentHarness {
+    base_harness: BaseOutboxAgentHarness,
+}
+
+impl SelfManagedOutboxAgentHarness {
+    fn new(fail_next_mark_consumed: bool) -> Self {
+        let mut b = CatalogBuilder::new();
+
+        b.add::<OutboxAgentMetrics>();
+        b.add_value(FailOnceOnMarkConsumedOutboxMessageBridge::new(
+            fail_next_mark_consumed,
+        ))
+        .bind::<dyn OutboxMessageBridge, FailOnceOnMarkConsumedOutboxMessageBridge>();
+        b.add::<OutboxTransactionalImpl>();
+        b.bind::<dyn Outbox, OutboxTransactionalImpl>();
+        b.add::<SystemTimeSourceDefault>();
+        b.add::<OutboxAgentImpl>();
+        b.add_value(OutboxAgentConfig::local_default());
+        b.add::<TestMessageConsumerFSelfManaged>();
+        b.add::<TestMessageConsumerGSelfManagedFailing>();
+
+        register_message_dispatcher::<TestMessageF>(&mut b, TEST_PRODUCER_F);
+        register_message_dispatcher::<TestMessageG>(&mut b, TEST_PRODUCER_G);
+
+        NoOpDatabasePlugin::init_database_components(&mut b);
+
+        let catalog = b.build();
+
+        Self {
+            base_harness: BaseOutboxAgentHarness::from_catalog(catalog),
         }
     }
 }

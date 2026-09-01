@@ -107,6 +107,18 @@ kamu-datasets-mysql = { workspace = true }
 kamu-datasets-postgres = { workspace = true }
 kamu-datasets-sqlite = { workspace = true }
 
+kamu-resources = { workspace = true }
+kamu-resources-services = { workspace = true }
+kamu-resources-facade = { workspace = true }
+kamu-configuration-services = { workspace = true }
+kamu-configuration-inmem = { workspace = true }
+kamu-configuration-postgres = { workspace = true }
+kamu-configuration-sqlite = { workspace = true }
+kamu-storage-services = { workspace = true }
+kamu-resources-inmem = { workspace = true }
+kamu-resources-postgres = { workspace = true }
+kamu-resources-sqlite = { workspace = true }
+
 messaging-outbox = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-messaging-outbox-postgres = { workspace = true }
@@ -169,6 +181,7 @@ humansize = "2"                                                   # Human readab
 indicatif = "0.18"                                                # Progress bars and spinners
 minus = { version = "5", features = ["static_output", "search"] }
 num-format = "0.4"                                                # Human-readable number formatting
+similar = "3"                                                     # Text diffing (apply manifest diffs)
 prettytable-rs = "0.10"                                           # ASCII table formatting
 read_input = "0.8"                                                # Basic user input
 webbrowser = "1"                                                  # For opening URLs in default system browser
@@ -214,6 +227,7 @@ setty = { version = "1.0", features = [
     "gen-markdown",
 ] }
 serde = { version = "1", features = ["derive"] }
+serde_with = { version = "3", default-features = false }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 
 # Tracing / logging / telemetry / metrics
@@ -259,7 +273,9 @@ tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
 tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
+uuid = { version = "1", default-features = false }
 whoami = "1.6"
+winnow = { version = "1", default-features = false, features = ["std"] }
 strum = { version = "0.28", features = ["derive"] }
 
 
@@ -272,6 +288,7 @@ kamu = { workspace = true, features = ["testing"] }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
+kamu-resources-facade = { workspace = true, features = ["testing"] }
 
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }

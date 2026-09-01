@@ -1337,7 +1337,7 @@ fn test_serde_resource_canonical() {
         r#"
         $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
         headers:
-          id: aa-12345
+          id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
           name: my-secret
           account:
             id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
@@ -1389,7 +1389,7 @@ fn test_serde_resource_canonical() {
         Resource {
             schema: SecretSet::schema().clone(),
             headers: ResourceHeaders {
-                id: "aa-12345".parse().unwrap(),
+                id: "7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
                 account: AccountHandle {
                     id: "c27331ce-ce88-4ff9-8c5a-4ce8107cc03f".parse().unwrap(),
@@ -1472,7 +1472,7 @@ fn test_serde_resource_canonical() {
             r#"
             $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
             headers:
-              id: aa-12345
+              id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
               name: my-secret
               account:
                 id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
@@ -1495,6 +1495,170 @@ fn test_serde_resource_canonical() {
             "#
         )
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_account_ref() {
+    let resource_id = ResourceID::new(uuid::Uuid::new_v4());
+    let did = AccountID::new_generated_ed25519().1;
+
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({ "did": did.to_string() }))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: Some(did.clone()),
+            name: None,
+        }
+    );
+
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({ "name": "alice" }))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }
+    );
+
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(
+            json!({ "id": resource_id.to_string(), "did": did.to_string(), "name": "alice" })
+        )
+        .unwrap()
+        .into_dto()
+        .unwrap(),
+        AccountRef {
+            id: Some(resource_id),
+            did: Some(did.clone()),
+            name: Some("alice".parse().unwrap()),
+        }
+    );
+
+    // All fields are optional: an empty object is valid and resolves to an
+    // unspecified reference (resolution failure, if any, happens downstream).
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({}))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: None,
+            name: None,
+        }
+    );
+
+    let both = AccountRef {
+        id: Some(resource_id),
+        did: Some(did),
+        name: Some("alice".parse().unwrap()),
+    };
+    let round_tripped: AccountRef =
+        serde_json::to_value(serde::auth::AccountRef::from(both.clone()))
+            .and_then(serde_json::from_value::<serde::auth::AccountRef>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+    assert_eq!(round_tripped, both);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `struct-or-string` routes a bare string through `FromStr`, so the short form
+// is only reachable in YAML if that impl is real — a stub would panic rather
+// than fail to compile.
+#[test]
+fn test_serde_resource_selector_short_form() {
+    let selector: ResourceSelector = serde_yaml::from_str::<
+        serde::StructOrString<serde::resource::ResourceSelector>,
+    >("SecretSet:alice/app-%")
+    .unwrap()
+    .0
+    .into_dto()
+    .unwrap();
+
+    assert_eq!(
+        selector.r#type.as_ref().map(TypeRef::as_str),
+        Some("SecretSet")
+    );
+    assert_eq!(selector.name.as_deref(), Some("app-%"));
+    assert_matches!(
+        selector.account,
+        Some(AccountRef { name: Some(ref n), .. }) if n.as_str() == "alice"
+    );
+
+    // A malformed short form must be a deserialization error, never a panic.
+    assert_matches!(
+        serde_yaml::from_str::<serde::StructOrString<serde::resource::ResourceSelector>>(
+            "not a selector"
+        ),
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Proxy conversions are hand-written (`rust.dtoType`) rather than generated, so
+// every field is asserted individually: a dropped one is silently discarded
+// instead of failing to compile.
+#[test]
+fn test_serde_resource_selector() {
+    let selector = ResourceSelector {
+        account: Some(AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }),
+        id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        did: None,
+        r#type: Some(TypeName::new_unchecked("SecretSet").into()),
+        name: Some("app-%".to_string()),
+        labels: Some(LabelFilter {
+            entries: [("environment".to_string(), json!("production"))]
+                .into_iter()
+                .collect(),
+        }),
+    };
+
+    let round_tripped: ResourceSelector =
+        serde_json::to_value(serde::resource::ResourceSelector::from(selector.clone()))
+            .and_then(serde_json::from_value::<serde::resource::ResourceSelector>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+
+    assert_eq!(round_tripped, selector);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `type` became optional when ODF adopted the type-less selector. A selector
+// that names no type must round-trip as `None` rather than failing the
+// now-absent required-field check.
+#[test]
+fn test_serde_resource_selector_without_type() {
+    let selector = ResourceSelector {
+        name: Some("app-%".to_string()),
+        ..Default::default()
+    };
+
+    let round_tripped: ResourceSelector =
+        serde_json::to_value(serde::resource::ResourceSelector::from(selector.clone()))
+            .and_then(serde_json::from_value::<serde::resource::ResourceSelector>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+
+    assert_eq!(round_tripped, selector);
+    assert!(round_tripped.r#type.is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

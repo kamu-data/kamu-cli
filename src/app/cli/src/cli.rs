@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use clap::{ArgAction, Parser};
@@ -96,11 +97,14 @@ pub enum PasswordHashingMode {
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     Add(Add),
+    Apply(Apply),
     Complete(Complete),
     Completions(Completions),
     Config(Config),
+    Context(Context),
     Delete(Delete),
     Export(Export),
+    Get(Get),
     Ingest(Ingest),
     Init(Init),
     Inspect(Inspect),
@@ -117,6 +121,7 @@ pub enum Command {
     Repo(Repo),
     Search(Search),
     Sql(Sql),
+    Summary(Summary),
     System(System),
     Tail(Tail),
     Ui(Ui),
@@ -126,10 +131,162 @@ pub enum Command {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Create or update resources from manifest files
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Applies one or more resource manifests to the active resource context.
+
+If the active context is `local`, manifests are applied to the current
+workspace. If the active context points to a remote server, manifests are
+applied through the remote GraphQL API.
+
+Use `--dry-run` to preview the accepted changes without applying them.
+
+By default, a multi-manifest batch is applied atomically: if any manifest is
+rejected or fails, the entire batch is rolled back, including manifests
+earlier in the batch that would otherwise have succeeded. Use
+`--continue-on-error` to instead apply each manifest independently, so that
+earlier successes are kept even if a later manifest fails.
+
+**Examples:**
+
+Apply a single manifest:
+
+    kamu apply my-resource.yaml
+
+Preview changes without applying them:
+
+    kamu apply my-resource.yaml --dry-run
+
+Apply all manifests in a directory recursively:
+
+    kamu apply manifests/ --recursive
+
+Apply multiple files in the given order:
+
+    kamu apply a.yaml b.json
+
+Apply a manifest from standard input:
+
+    cat my-resource.yaml | kamu apply --stdin
+
+Force JSON parsing regardless of file extension:
+
+    kamu apply generated.resource --format json
+"#)]
+pub struct Apply {
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Manifest file or directory path(s)
+    #[arg(value_name = "PATH")]
+    pub manifest: Vec<PathBuf>,
+
+    /// Preview the accepted changes without applying them
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Parse all selected files using the specified manifest format
+    #[arg(long, value_name = "FMT", value_enum)]
+    pub format: Option<ResourceManifestFormat>,
+
+    /// Recursively scan directories for manifests
+    #[arg(long, short = 'r')]
+    pub recursive: bool,
+
+    /// Read manifest from standard input
+    #[arg(long)]
+    pub stdin: bool,
+
+    /// Apply each manifest independently instead of the batch as a single
+    /// all-or-nothing transaction, so earlier successes survive a later
+    /// manifest's rejection or failure
+    #[arg(long)]
+    pub continue_on_error: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ResourceManifestFormat {
+    Json,
+    Yaml,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum GetOutputFormat {
+    Json,
+    Name,
+    Yaml,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Show resource summary for the active context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Shows resource counts by type and reconciliation phase for the active context.
+
+If the active context is `local`, commands target the current workspace. If the
+active context points to a remote server, commands target that remote GraphQL
+API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+Show summary from the active context:
+
+    kamu summary
+
+Show summary from a specific context:
+
+    kamu summary --context prod
+
+Show summary in YAML:
+
+    kamu summary -o yaml
+"#)]
+pub struct Summary {
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Format to display the results in
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<SummaryOutputFormat>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum SummaryOutputFormat {
+    Table,
+    Json,
+    Yaml,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, clap::Args)]
+pub struct ResourceContextArgs {
+    /// Override the current resource context for this invocation
+    #[arg(long, short = 'c', value_name = "CONTEXT_NAME")]
+    pub context: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl Cli {
     pub fn tabular_output_format(&self) -> Option<OutputFormat> {
         match &self.command {
             Command::List(c) => c.output_format,
+            Command::Context(c) => match &c.subcommand {
+                Some(ContextSubCommand::List(sc)) => sc.output_format,
+                Some(ContextSubCommand::ApiResources(sc)) => sc.output_format,
+                _ => None,
+            },
             Command::Repo(c) => match &c.subcommand {
                 RepoSubCommand::Alias(sc) => match &sc.subcommand {
                     RepoAliasSubCommand::List(ssc) => ssc.output_format,
@@ -144,6 +301,272 @@ impl Cli {
             _ => None,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Manage resource contexts
+#[derive(Debug, clap::Args)]
+#[command(visible_alias = "ctx")]
+#[command(after_help = r#"
+Contexts determine which workspace future resource commands will target.
+
+When running inside a workspace, an implicit local context named `local` is
+available automatically whenever no current context is selected. You can still
+select `local` explicitly. Remote contexts can be registered either in the
+workspace or in the user home scope.
+
+**Examples:**
+
+Show current context:
+
+    kamu context
+
+List configured contexts:
+
+    kamu context ls
+
+Check a remote context:
+
+    kamu context check demo
+
+Refresh cached status for all remote contexts:
+
+    kamu context check --all
+
+Switch to a context:
+
+    kamu context prod
+
+Switch back to the local workspace context:
+
+    kamu context local
+
+Register a workspace-scoped remote context:
+
+    kamu context add prod --url https://api.kamu.dev
+
+Register a user-scoped remote context:
+
+    kamu context add prod --url https://api.kamu.dev --user
+
+List supported resource types in the active context:
+
+    kamu ctx api-resources
+
+List supported resource types from a specific context:
+
+    kamu ctx api-resources --context prod
+"#)]
+#[command(args_conflicts_with_subcommands = true)]
+pub struct Context {
+    #[command(subcommand)]
+    pub subcommand: Option<ContextSubCommand>,
+
+    /// Context name to switch to
+    #[arg()]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, clap::Subcommand)]
+pub enum ContextSubCommand {
+    Add(ContextAdd),
+    #[command(visible_alias = "ls")]
+    List(ContextList),
+    #[command(visible_alias = "rm")]
+    Delete(ContextDelete),
+    Check(ContextCheck),
+    ApiResources(ContextApiResources),
+    Use(ContextUse),
+}
+
+/// List supported resource types in the active context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Lists resource types supported by the active context.
+
+If the active context is `local`, this targets the current workspace. If the
+active context points to a remote server, this targets that remote GraphQL API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+List supported resource types in the active context:
+
+    kamu ctx api-resources
+
+List supported resource types from a specific context:
+
+    kamu ctx api-resources --context prod
+
+List supported resource types in JSON:
+
+    kamu ctx api-resources -o json
+"#)]
+pub struct ContextApiResources {
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Format to display the results in
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<OutputFormat>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Register a new remote resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Registers a remote workspace context under a local name.
+
+By default the context is stored in the current workspace. Use `--user` to
+store it in the user home scope instead.
+
+The name `local` is reserved for the implicit workspace context and cannot be
+registered explicitly.
+
+**Examples:**
+
+Add a workspace-scoped remote context:
+
+    kamu context add prod --url https://example.com
+
+Add a user-scoped remote context:
+
+    kamu context add prod --url https://example.com --user
+"#)]
+pub struct ContextAdd {
+    /// Store context in the user home folder rather than in the workspace
+    #[arg(long)]
+    pub user: bool,
+
+    /// Backend URL of the remote workspace
+    #[arg(long, value_name = "URL")]
+    pub url: parsers::UrlHttps,
+
+    /// Context name
+    #[arg()]
+    pub new_name: String,
+}
+
+/// List configured resource contexts
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Lists effective resource contexts configured in the workspace and user scopes.
+
+When running inside a workspace, the implicit `local` context is also included.
+
+**Examples:**
+
+List contexts:
+
+    kamu context ls
+
+List contexts in JSON:
+
+    kamu context ls -o json
+"#)]
+pub struct ContextList {
+    /// Format to display the results in
+    #[arg(long, short = 'o', value_name = "FMT", value_enum)]
+    pub output_format: Option<OutputFormat>,
+}
+
+/// Delete a remote resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Deletes a previously registered remote context from the selected scope.
+
+By default deletion happens in the current workspace. Use `--user` to delete a
+user-scoped context instead. Use `--all` to delete all remote contexts from
+the selected scope.
+
+The name `local` is reserved and cannot be deleted.
+
+**Examples:**
+
+Delete a workspace-scoped context:
+
+    kamu context delete prod
+
+Delete a user-scoped context:
+
+    kamu context delete prod --user
+
+Delete all workspace-scoped remote contexts:
+
+    kamu context rm --all
+"#)]
+pub struct ContextDelete {
+    /// Delete context from the user home folder rather than in the workspace
+    #[arg(long)]
+    pub user: bool,
+
+    /// Delete all remote contexts in the selected scope
+    #[arg(long)]
+    pub all: bool,
+
+    /// Context name
+    #[arg()]
+    pub name: Option<String>,
+}
+
+/// Check connectivity and authorization for a remote resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Checks backend reachability and access token validity for a context.
+
+If no context name is provided, the effective current context is checked.
+Use `--all` to refresh cached status for all configured remote contexts.
+
+**Examples:**
+
+Check a named context:
+
+    kamu context check demo
+
+Check the current context:
+
+    kamu context check
+
+Check all remote contexts:
+
+    kamu context check --all
+"#)]
+pub struct ContextCheck {
+    /// Check all effective remote contexts
+    #[arg(long)]
+    pub all: bool,
+
+    /// Context name
+    #[arg()]
+    pub name: Option<String>,
+}
+
+/// Switch the current resource context
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Switches the current resource context to the specified named remote context.
+
+This is the explicit form of `kamu context <name>`.
+
+The special name `local` refers to the current workspace when one is available.
+
+**Examples:**
+
+Switch to a context:
+
+    kamu context use prod
+
+Switch to the local workspace context:
+
+    kamu context use local
+"#)]
+pub struct ContextUse {
+    /// Context name
+    #[arg()]
+    pub name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -370,28 +793,93 @@ pub struct ConfigSet {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Delete a dataset
+/// Delete datasets or resources
 #[derive(Debug, clap::Args)]
 #[command(visible_alias = "rm")]
 #[command(after_help = r#"
-This command deletes the dataset from your workspace, including both metadata and the raw data.
-
-Take great care when deleting root datasets. If you have not pushed your local changes to a repository - the data will be lost.
-
-Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but it will disrupt downstream consumers.
+This command deletes datasets using the legacy dataset path by default, or
+resources when a resource target is specified explicitly.
 
 **Examples:**
 
-Delete a local dataset:
+Delete a local dataset using the legacy default:
 
     kamu delete my.dataset
 
-Delete local datasets matching pattern:
+Delete datasets explicitly:
+
+    kamu delete datasets my.dataset
+
+Delete a dataset using the dataset pseudo-type selector:
+
+    kamu delete dataset/my.dataset
+
+Delete local datasets matching a pattern:
 
     kamu delete my.dataset.%
+
+Delete a single resource:
+
+    kamu delete storages warehouse
+
+Delete same-type resources by name pattern:
+
+    kamu delete vs app-%
+
+Delete all resources of a type:
+
+    kamu delete storages --all
+
+Delete all resources across types:
+
+    kamu delete '%/%'
+
+Delete resources using slash selectors:
+
+    kamu delete vs/my-vars ss/my-secrets
+
+Delete the same exact name across every resource type:
+
+    kamu delete % db-creds
+
+Delete resources matching a name pattern across every resource type:
+
+    kamu delete %/db-%
+
+Delete all resources of a type using a slash selector:
+
+    kamu delete 'storages/%'
+
+Delete a dataset and a resource in one command:
+
+    kamu delete dataset/my.dataset vs/my-vars
+
+Force dataset interpretation when a dataset account collides with a resource prefix:
+
+    kamu delete datasets vs/my.dataset
+
+Preview deletion:
+
+    kamu delete dataset/my.dataset vs/my-vars --dry-run
+
+Narrow a deletion to resources carrying a label:
+
+    kamu delete variablesets --all -l environment=stale --dry-run
 "#)]
 pub struct Delete {
-    /// Delete all datasets in the workspace
+    /// Target to delete: `datasets`, `%` (all resource types), or a resource
+    /// selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`,
+    /// or `st`
+    pub target: Option<String>,
+
+    /// Dataset selector(s) in dataset mode, or a single resource selector in
+    /// resource mode
+    pub args: Vec<String>,
+
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Delete all matched datasets or all resources in the selected scope
     #[arg(long, short = 'a')]
     pub all: bool,
 
@@ -399,9 +887,22 @@ pub struct Delete {
     #[arg(long, short = 'r')]
     pub recursive: bool,
 
-    /// Local dataset reference(s)
-    #[arg(value_parser = parsers::dataset_ref_pattern)]
-    pub dataset: Vec<odf::DatasetRefPattern>,
+    /// Do not ask for confirmation
+    #[arg(long, short = 'f')]
+    pub force: bool,
+
+    /// Exit successfully when a selected resource does not exist
+    #[arg(long)]
+    pub ignore_not_found: bool,
+
+    /// Preview the resolved resource deletions without deleting anything
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Narrow the selection to resources carrying all of the given labels,
+    /// as `key=value` pairs (repeatable, or comma-separated)
+    #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
+    pub label_selectors: Vec<String>,
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -436,6 +937,120 @@ pub struct Export {
     /// of records may be slightly different.
     #[arg(long)]
     pub records_per_file: Option<usize>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Returns manifest representation of a resource
+#[derive(Debug, clap::Args)]
+#[command(after_help = r#"
+Returns the current state of one or more resources as YAML or JSON.
+
+Only real resource types supported by the active context are accepted.
+Datasets are intentionally not supported by this command.
+
+By default this command returns the full resource view, including status.
+Use `--spec` to return the apply-compatible spec manifest instead.
+
+When multiple selectors are provided, the output is wrapped in an `items` list.
+
+**Examples:**
+
+Get a variable set manifest in YAML:
+
+    kamu get variablesets my-vars
+
+Get the same resource in JSON:
+
+    kamu get vs my-vars -o json
+
+Get the apply-compatible spec manifest:
+
+    kamu get vs my-vars --spec
+
+Get multiple resources of the same type:
+
+    kamu get variablesets vars-a vars-b
+
+Get same-type resources by name pattern:
+
+    kamu get vs app-%
+
+Get multiple resources by slash-separated ref form:
+
+    kamu get vs/vars-a ss/db-creds
+
+Get the same exact name across every resource type:
+
+    kamu get % db-creds
+
+Get resources matching a name pattern across every resource type:
+
+    kamu get %/db-%
+
+Get every resource of every type:
+
+    kamu get '%/%'
+
+Get a resource by UUID:
+
+    kamu get variablesets 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+Read a resource from a remote context:
+
+    kamu get storages warehouse --context prod
+
+Ignore missing resources:
+
+    kamu get secretsets missing-a missing-b --ignore-not-found
+
+Narrow matched resources to those carrying a label:
+
+    kamu get 'variablesets/%' -l environment=production
+"#)]
+pub struct Get {
+    /// Resource selector(s): `type name...` or `type/name...`
+    #[arg(num_args = 1..)]
+    pub args: Vec<String>,
+
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
+    /// Serialization format of the returned object
+    #[arg(long, short = 'o', value_name = "FMT", value_enum, default_value_t = GetOutputFormat::Yaml)]
+    pub output_format: GetOutputFormat,
+
+    /// Return an apply-compatible spec manifest instead of the full resource
+    /// view
+    #[arg(long)]
+    pub spec: bool,
+
+    /// Show actual secret values in the output (decrypts encrypted fields).
+    /// Cannot be used with `-o name`.
+    #[arg(long)]
+    pub revealed: bool,
+
+    /// Exit successfully when the resource does not exist
+    #[arg(long)]
+    pub ignore_not_found: bool,
+
+    /// Maximum number of resources resolved by expanding selectors
+    #[arg(
+        long,
+        value_name = "N",
+        default_value = "100",
+        conflicts_with = "unbounded"
+    )]
+    pub max_results: NonZeroUsize,
+
+    /// Disable the limit for expanding selectors
+    #[arg(long)]
+    pub unbounded: bool,
+
+    /// Narrow the selection to resources carrying all of the given labels,
+    /// as `key=value` pairs (repeatable, or comma-separated)
+    #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
+    pub label_selectors: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -625,7 +1240,7 @@ pub struct InspectSchema {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// List all datasets in the workspace
+/// List datasets or resources
 #[derive(Debug, clap::Args)]
 #[command(visible_alias = "ls")]
 #[command(after_help = r#"
@@ -635,15 +1250,66 @@ To see a human-friendly list of datasets in your workspace:
 
     kamu list
 
+To list datasets explicitly:
+
+    kamu list datasets
+
+To list all resources across all types:
+
+    kamu list '%'
+
+To list variable sets:
+
+    kamu list variablesets
+
+To list variable sets whose name matches a pattern:
+
+    kamu list 'vs/my-%'
+
+To list one resource by name or ID:
+
+    kamu list 'vs/my-vars'
+    kamu list 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+To list several resource types at once:
+
+    kamu list 'vs/app-%' 'ss/app-%'
+
+To list storages from a specific context:
+
+    kamu list storages --context prod
+
 To see more details:
 
     kamu list -w
+
+To list only resources carrying a label:
+
+    kamu list variablesets -l environment=production
+
+To require several labels at once:
+
+    kamu list variablesets -l environment=production,tier=backend
+
+To get a machine-readable list of all resources:
+
+    kamu list '%' -o csv
 
 To get a machine-readable list of datasets:
 
     kamu list -o csv
 "#)]
 pub struct List {
+    /// Targets to list: `datasets`, `%` (all resource types), a resource
+    /// selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`,
+    /// or `st`, optionally narrowed as `type/name`, `type/pattern-%` or
+    /// `type/<id>`. Several resource selectors may be given at once.
+    #[arg(num_args = 0..)]
+    pub targets: Vec<String>,
+
+    #[command(flatten)]
+    pub resource_context: ResourceContextArgs,
+
     /// Format to display the results in
     #[arg(long, short = 'o', value_name = "FMT", value_enum)]
     pub output_format: Option<OutputFormat>,
@@ -652,6 +1318,14 @@ pub struct List {
     #[arg(long, short = 'w', action = ArgAction::Count)]
     pub wide: u8,
 
+    /// Maximum number of results to list
+    #[arg(long, value_name = "N", conflicts_with = "unbounded")]
+    pub max_results: Option<NonZeroUsize>,
+
+    /// Disable the result limit
+    #[arg(long)]
+    pub unbounded: bool,
+
     /// List accessible datasets of the specified account
     #[arg(long, hide = true)]
     pub target_account: Option<String>,
@@ -659,6 +1333,11 @@ pub struct List {
     /// List accessible datasets of all accounts
     #[arg(long, hide = true)]
     pub all_accounts: bool,
+
+    /// Narrow the listing to resources carrying all of the given labels,
+    /// as `key=value` pairs (repeatable, or comma-separated)
+    #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
+    pub label_selectors: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -829,7 +1508,7 @@ pub struct New {
 
     /// Name of the new dataset
     #[arg(value_parser = parsers::dataset_name)]
-    pub name: odf::DatasetName,
+    pub dataset_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -917,7 +1596,7 @@ pub struct Pull {
     pub fetch_uncacheable: bool,
 
     /// Local name of a dataset to use when syncing from a repository
-    #[arg(long, value_name = "NAME", value_parser = parsers::dataset_name)]
+    #[arg(long, value_name = "DATASET_NAME", value_parser = parsers::dataset_name)]
     pub r#as: Option<odf::DatasetName>,
 
     /// Don't automatically add a remote push alias for this destination
@@ -1030,7 +1709,7 @@ pub struct Rename {
 
     /// The new name to give it
     #[arg(index = 2, value_parser = parsers::dataset_name)]
-    pub name: odf::DatasetName,
+    pub new_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1104,7 +1783,7 @@ For ODF-compatible smart repositories use:
 pub struct RepoAdd {
     /// Local alias of the repository
     #[arg(index = 1, value_parser = parsers::repo_name)]
-    pub name: odf::RepoName,
+    pub repo_name: odf::RepoName,
 
     /// URL of the repository
     #[arg(index = 2)]

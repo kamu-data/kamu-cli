@@ -1,0 +1,74 @@
+[package]
+name = "kamu-configuration-services"
+description = "Service implementations of managed configuration resources"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+testing = ["dep:kamu-configuration-inmem", "dep:kamu-datasets-inmem", "dep:kamu-resources-inmem", "dep:oop", "kamu-resources-services/testing"]
+
+
+[dependencies]
+crypto-utils = { workspace = true }
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
+event-sourcing = { workspace = true }
+internal-error = { workspace = true }
+messaging-outbox = { workspace = true }
+time-source = { workspace = true }
+kamu-accounts = { workspace = true }
+kamu-configuration = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-resources = { workspace = true }
+kamu-resources-services = { workspace = true }
+odf = { workspace = true }
+
+# Used only by `src/testing/`, which is a library module gated behind the
+# `testing` feature -- so these cannot be dev-dependencies.
+kamu-configuration-inmem = { workspace = true, optional = true }
+kamu-datasets-inmem = { workspace = true, optional = true }
+kamu-resources-inmem = { workspace = true, optional = true }
+
+async-trait = { version = "0.1", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+dill = { version = "0.15", default-features = false }
+paste = { version = "1", default-features = false }
+secrecy = { version = "0.10", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+tracing = { version = "0.1", default-features = false }
+uuid = { version = "1", default-features = false, features = ["v4"] }
+oop = { version = "0.0.2", optional = true }
+
+
+[dev-dependencies]
+kamu-accounts-services = { workspace = true }
+kamu-configuration-services = { workspace = true, features = ["testing"] }
+kamu-datasets = { workspace = true, features = ["testing"] }
+odf = { workspace = true, features = ["testing"] }
+
+hex = { version = "0.4", default-features = false, features = ["std"] }
+oop = "0.0.2"
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false }

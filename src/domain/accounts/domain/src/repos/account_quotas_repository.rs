@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use event_sourcing::{
     Aggregate,
     ConcurrentModificationError,
@@ -131,5 +132,7 @@ pub struct AccountQuotaEventRow {
     pub quota_type: String,
     pub event_type: String,
     pub event_payload: serde_json::Value,
-    pub event_time: chrono::DateTime<chrono::Utc>,
+    pub event_time: DateTime<Utc>,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

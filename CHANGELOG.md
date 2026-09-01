@@ -14,7 +14,61 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- **Resources Framework** - a new declarative, Kubernetes-inspired subsystem for managing server-side
+  objects from manifests, implementing [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md).
+  A manifest declares desired state (`$schema` + `headers` + `spec`); the server owns identity,
+  timestamps, `generation` and status, then asynchronously reconciles the resource toward that state
+  (`Pending` -> `Reconciling` -> `Ready`/`Failed`). This is the foundation for infrastructure-as-code
+  workflows in Kamu, and the mechanism that configuration and future object types are built on.
+- New CLI verbs for working with resources:
+  - `kamu apply` - apply manifests from files, directories, or `--stdin`, in YAML or JSON.
+    Renders a structured diff of what changed; re-applying an unchanged manifest reports
+    `Unchanged` instead of a spurious update. Supports `--dry-run` to preview, and
+    `--continue-on-error` to apply each manifest independently instead of as one transaction
+  - `kamu get` - read one or many resources; `--revealed` opts in to sensitive values
+  - `kamu summary` - per-type counts and reconciliation phase breakdown
+  - `kamu list` and `kamu delete` now operate on resources in addition to datasets
+- Flexible ways to address resources, shared by all of the above:
+  - By type and name (`kamu get vs my-vars` or `kamu get vs/my-vars`), by ID, by bare UUID with no
+    type, or by `%` wildcard to span every type
+  - Short type aliases (`vs`, `ss`, `st`) alongside canonical names (`VariableSet`, `SecretSet`)
+  - Label filtering with `-l/--label`, pushed down into the database rather than filtered in memory
+- `kamu ctx` command group for named remote contexts - `add`, `use`, `list`, `delete`, `check`, and
+  `api-resources`. The same commands run unchanged against a local workspace or a remote node, so
+  resources can be managed remotely without a separate toolchain
+- Full GraphQL API for resources: queries (`bySelectors`, `byRefs`, `handlesBySelectors`,
+  `handlesByRefs`, `summary`, `renderManifests`, `supportedResourceTypes`) and mutations
+  (`applyManifest`, `applyManifests`, `delete`). Batch applies run as a single transaction by
+  default, so a rejected item rolls back its predecessors
+- Extensible labels and annotations: resource types register schemas that canonicalize short names
+  to stable URIs, validate values, and reject unknown URIs. Unknown short names are preserved as
+  free-form with a warning
+- Server-side validation and linting of manifests, with warnings for specs that are legal and
+  storable but probably not what the author intended (a credential in a plaintext `VariableSet`,
+  names that differ only by case, values with suspicious whitespace or unexpanded interpolation)
+- Storage backends for Postgres, SQLite, and in-memory, with event-sourced history, soft-delete,
+  optimistic concurrency, and strict per-account isolation
+### Changed
+- **Dataset environment variables and secrets are now resources.** The new `VariableSet` and
+  `SecretSet` types replace the previous per-dataset env-var mechanism:
+  - Existing `dataset_env_vars` rows are migrated automatically into managed `VariableSet` /
+    `SecretSet` resources - no user action is required, and the previous GraphQL env-var API keeps
+    working against the migrated data
+  - Secrets are converted to an encrypted canonical form before the first durable write, and are
+    never returned in plaintext unless explicitly requested
+  - A dataset resolves its variables and secrets through resource labels, so one set can now serve
+    several datasets instead of being copied per dataset
+- A third resource type, `Storage`, ships as a prototype to validate the framework against a
+  non-configuration object. Its shape and CLI surface are real, but it is not yet wired to actual
+  storage provisioning
 ### Fixed
+- `kamu pull` now expands dataset environment variables - `${{ env.KEY }}` was silently left
+  unexpanded on a local pull, while the same dataset ingested correctly as a server flow
+- `kamu system api-server gql-query` no longer panics on any query that reaches a dataset resolver -
+  the command did not register the GraphQL dataloaders that the HTTP handler attaches
+- Generated dataset names now respect the `DatasetName` length limit
+- Container runtime no longer leaks containers that are killed before they finish starting - `run --rm` does not reap those, so they accumulated in `Created` state until the runtime could no longer start new ones
 - SELinux presence detection if fixed and no longer spams warnings (#1692)
 - CLI: `kamu completions` no longer panics when the output pipe is closed early, e.g. `source <(kamu completions bash)` (#1068)
 - CLI: `kamu complete` no longer reports an internal error when the output pipe is closed early, and propagates other output errors instead of panicking (#1068)

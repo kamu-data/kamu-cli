@@ -45,21 +45,29 @@ members = [
     "src/domain/accounts/domain",
     "src/domain/auth-rebac/domain",
     "src/domain/auth-web3/domain",
-    "src/domain/signing/domain",
+    "src/domain/configuration/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
+    "src/domain/resources/domain",
     "src/domain/search/domain",
+    "src/domain/signing/domain",
+    "src/domain/storage/domain",
     "src/domain/task-system/domain",
     "src/domain/webhooks/domain",
     # Domain service layer
     "src/domain/accounts/services",
     "src/domain/auth-rebac/services",
     "src/domain/auth-web3/services",
-    "src/domain/signing/services",
+    "src/domain/configuration/services",
     "src/domain/datasets/services",
     "src/domain/flow-system/services",
+    "src/domain/resources/facade",
+    "src/domain/resources/facade-tests",
+    "src/domain/resources/services",
     "src/domain/search/services",
+    "src/domain/signing/services",
+    "src/domain/storage/services",
     "src/domain/task-system/services",
     "src/domain/webhooks/services",
     # Infra
@@ -82,6 +90,16 @@ members = [
     "src/infra/datasets/mysql",
     "src/infra/datasets/postgres",
     "src/infra/datasets/sqlite",
+    ## Resources
+    "src/infra/resources/repo-tests",
+    "src/infra/resources/inmem",
+    "src/infra/resources/postgres",
+    "src/infra/resources/sqlite",
+    ## Configuration
+    "src/infra/configuration/repo-tests",
+    "src/infra/configuration/inmem",
+    "src/infra/configuration/postgres",
+    "src/infra/configuration/sqlite",
     ## Search
     "src/infra/search/openai",
     "src/infra/search/elasticsearch",
@@ -179,11 +197,14 @@ tracing-perfetto = { version = "0.266.1", path = "src/utils/tracing-perfetto", d
 kamu-accounts = { version = "0.266.1", path = "src/domain/accounts/domain", default-features = false }
 kamu-auth-rebac = { version = "0.266.1", path = "src/domain/auth-rebac/domain", default-features = false }
 kamu-auth-web3 = { version = "0.266.1", path = "src/domain/auth-web3/domain", default-features = false }
-kamu-signing = { version = "0.266.1", path = "src/domain/signing/domain", default-features = false }
+kamu-configuration = { version = "0.266.1", path = "src/domain/configuration/domain", default-features = false }
 kamu-core = { version = "0.266.1", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.266.1", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.266.1", path = "src/domain/flow-system/domain", default-features = false }
+kamu-resources = { version = "0.266.1", path = "src/domain/resources/domain", default-features = false }
 kamu-search = { version = "0.266.1", path = "src/domain/search/domain", default-features = false }
+kamu-signing = { version = "0.266.1", path = "src/domain/signing/domain", default-features = false }
+kamu-storage = { version = "0.266.1", path = "src/domain/storage/domain", default-features = false }
 kamu-task-system = { version = "0.266.1", path = "src/domain/task-system/domain", default-features = false }
 kamu-webhooks = { version = "0.266.1", path = "src/domain/webhooks/domain", default-features = false }
 
@@ -203,13 +224,18 @@ odf-storage-s3 = { version = "0.266.1", path = "src/odf/storage-s3", default-fea
 kamu-accounts-services = { version = "0.266.1", path = "src/domain/accounts/services", default-features = false }
 kamu-auth-rebac-services = { version = "0.266.1", path = "src/domain/auth-rebac/services", default-features = false }
 kamu-auth-web3-services = { version = "0.266.1", path = "src/domain/auth-web3/services", default-features = false }
-kamu-signing-services = { version = "0.266.1", path = "src/domain/signing/services", default-features = false }
+kamu-configuration-services = { version = "0.266.1", path = "src/domain/configuration/services", default-features = false }
 kamu-datasets-services = { version = "0.266.1", path = "src/domain/datasets/services", default-features = false, features = [
     "lfs",
     "s3",
 ] }
 kamu-flow-system-services = { version = "0.266.1", path = "src/domain/flow-system/services", default-features = false }
+kamu-resources-facade = { version = "0.266.1", path = "src/domain/resources/facade", default-features = false }
+kamu-resources-facade-tests = { version = "0.266.1", path = "src/domain/resources/facade-tests", default-features = false }
+kamu-resources-services = { version = "0.266.1", path = "src/domain/resources/services", default-features = false }
 kamu-search-services = { version = "0.266.1", path = "src/domain/search/services", default-features = false }
+kamu-signing-services = { version = "0.266.1", path = "src/domain/signing/services", default-features = false }
+kamu-storage-services = { version = "0.266.1", path = "src/domain/storage/services", default-features = false }
 kamu-task-system-services = { version = "0.266.1", path = "src/domain/task-system/services", default-features = false }
 kamu-webhooks-services = { version = "0.266.1", path = "src/domain/webhooks/services", default-features = false }
 
@@ -267,6 +293,16 @@ kamu-auth-web3-inmem = { version = "0.266.1", path = "src/infra/auth-web3/inmem"
 kamu-auth-web3-postgres = { version = "0.266.1", path = "src/infra/auth-web3/postgres", default-features = false }
 kamu-auth-web3-repo-tests = { version = "0.266.1", path = "src/infra/auth-web3/repo-tests", default-features = false }
 kamu-auth-web3-sqlite = { version = "0.266.1", path = "src/infra/auth-web3/sqlite", default-features = false }
+## Resources
+kamu-resources-inmem = { version = "0.266.1", path = "src/infra/resources/inmem", default-features = false }
+kamu-resources-postgres = { version = "0.266.1", path = "src/infra/resources/postgres", default-features = false }
+kamu-resources-sqlite = { version = "0.266.1", path = "src/infra/resources/sqlite", default-features = false }
+kamu-resources-repo-tests = { version = "0.266.1", path = "src/infra/resources/repo-tests", default-features = false }
+## Configuration
+kamu-configuration-inmem = { version = "0.266.1", path = "src/infra/configuration/inmem", default-features = false }
+kamu-configuration-postgres = { version = "0.266.1", path = "src/infra/configuration/postgres", default-features = false }
+kamu-configuration-sqlite = { version = "0.266.1", path = "src/infra/configuration/sqlite", default-features = false }
+kamu-configuration-repo-tests = { version = "0.266.1", path = "src/infra/configuration/repo-tests", default-features = false }
 
 # Adapters
 kamu-adapter-auth-oso-rebac = { version = "0.266.1", path = "src/adapter/auth-oso-rebac", default-features = false }

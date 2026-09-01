@@ -10,29 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::{MessageDispatcher, MessageSubscription, OutboxMessage, OutboxMessageBoundary};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) struct OutboxRoutesStaticInfo {
-    pub(crate) message_dispatchers_by_producers: HashMap<String, Arc<dyn MessageDispatcher>>,
-    pub(crate) all_durable_messaging_routes: Vec<MessageSubscription>,
-    pub(crate) consumers_by_producers: HashMap<String, Vec<String>>,
-}
-
-impl OutboxRoutesStaticInfo {
-    pub(crate) fn new(
-        message_dispatchers_by_producers: HashMap<String, Arc<dyn MessageDispatcher>>,
-        all_durable_messaging_routes: Vec<MessageSubscription>,
-        consumers_by_producers: HashMap<String, Vec<String>>,
-    ) -> Self {
-        Self {
-            message_dispatchers_by_producers,
-            all_durable_messaging_routes,
-            consumers_by_producers,
-        }
-    }
-}
+use crate::{OutboxMessage, OutboxMessageBoundary};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

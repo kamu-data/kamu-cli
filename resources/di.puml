@@ -23,6 +23,7 @@ interface "AccountRepository" <<i>>
 interface "AccountService" <<i>>
 interface "AppendDatasetMetadataBatchUseCase" <<i>>
 interface "ApplyAccountDatasetRelationsUseCase" <<i>>
+interface "ApplyResourceUseCase" <<i>>
 interface "AuthenticationProvider" <<i>>
 interface "AuthenticationService" <<i>>
 interface "BackgroundAgent" <<i>>
@@ -43,7 +44,8 @@ interface "DatasetEntryRemovalListener" <<i>>
 interface "DatasetEntryRepository" <<i>>
 interface "DatasetEntryService" <<i>>
 interface "DatasetEntryWriter" <<i>>
-interface "DatasetEnvVarRepository" <<i>>
+interface "DatasetEnvVarMutationAdapter" <<i>>
+interface "DatasetEnvVarResolver" <<i>>
 interface "DatasetEnvVarService" <<i>>
 interface "DatasetFactory" <<i>>
 interface "DatasetIncrementQueryService" <<i>>
@@ -58,9 +60,11 @@ interface "DatasetStatisticsRepository" <<i>>
 interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
+interface "DeleteAccountResourcesUseCase" <<i>>
 interface "DeleteAccountUseCase" <<i>>
 interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
 interface "DeleteDatasetUseCase" <<i>>
+interface "DeleteResourcesUseCase" <<i>>
 interface "DependencyGraphService" <<i>>
 interface "DidGenerator" <<i>>
 interface "DidSecretKeyRepository" <<i>>
@@ -79,11 +83,13 @@ interface "FlowProcessStateQuery" <<i>>
 interface "FlowProcessStateRepository" <<i>>
 interface "FlowSystemEventBridge" <<i>>
 interface "FlowTriggerEventStore" <<i>>
+interface "GenericResourceQueryService" <<i>>
 interface "GetDatasetDownstreamDependenciesUseCase" <<i>>
 interface "GetDatasetSchemaUseCase" <<i>>
 interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
 interface "InitOnStartup" <<i>>
 interface "JwtTokenIssuer" <<i>>
+interface "ListAllResourcesUseCase" <<i>>
 interface "MessageConsumer" <<i>>
 interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
@@ -112,6 +118,8 @@ interface "QueryService" <<i>>
 interface "RebacDatasetRegistryFacade" <<i>>
 interface "RebacRepository" <<i>>
 interface "RebacService" <<i>>
+interface "ReconcileResourceUseCase" <<i>>
+interface "Reconciler" <<i>>
 interface "RemoteAliasResolver" <<i>>
 interface "RemoteAliasesRegistry" <<i>>
 interface "RemoteRepositoryRegistry" <<i>>
@@ -120,11 +128,35 @@ interface "RenameDatasetUseCase" <<i>>
 interface "ResetDatasetUseCase" <<i>>
 interface "ResetExecutor" <<i>>
 interface "ResetPlanner" <<i>>
+interface "ResourceAccountResolver" <<i>>
+interface "ResourceAggregateLoader" <<i>>
+interface "ResourceContextStore" <<i>>
+interface "ResourceCrudDispatcher" <<i>>
+interface "ResourceExtensionSchemaDispatcher" <<i>>
+interface "ResourceFacade" <<i>>
+interface "ResourceFacadeFactory" <<i>>
+interface "ResourceLabelProjectionRepository" <<i>>
+interface "ResourceLifecycleEventDispatcher" <<i>>
 interface "ResourceLoader" <<i>>
+interface "ResourceManifestDiscoveryService" <<i>>
+interface "ResourceManifestExecutionService" <<i>>
+interface "ResourcePersistenceService" <<i>>
+interface "ResourcePresentationDispatcher" <<i>>
+interface "ResourceRawEventStore" <<i>>
+interface "ResourceRepository" <<i>>
+interface "ResourceSelectionResolutionService" <<i>>
+interface "ResourceSelectionSyntaxService" <<i>>
+interface "ResourceSelectorResolutionService" <<i>>
+interface "ResourceSpecSanitizer" <<i>>
+interface "ResourceSpecViewDispatcher" <<i>>
+interface "ResourceSummaryService" <<i>>
+interface "ResourceTypeLookupService" <<i>>
 interface "SchemaService" <<i>>
 interface "SearchEntitySchemaProvider" <<i>>
 interface "SearchService" <<i>>
 interface "SearchServiceRemote" <<i>>
+interface "SecretSetEventStore" <<i>>
+interface "SecretSetProjectionRepository" <<i>>
 interface "SessionAuth" <<i>>
 interface "SessionManager" <<i>>
 interface "SetDatasetRebacPropertiesUseCase" <<i>>
@@ -133,16 +165,20 @@ interface "SetWatermarkPlanner" <<i>>
 interface "SetWatermarkUseCase" <<i>>
 interface "SignEip712UseCase" <<i>>
 interface "SmartTransferProtocolClient" <<i>>
+interface "StorageEventStore" <<i>>
 interface "SyncService" <<i>>
 interface "SystemTimeSource" <<i>>
 interface "TaskEventStore" <<i>>
 interface "TransformElaborationService" <<i>>
 interface "TransformExecutor" <<i>>
 interface "TransformRequestPlanner" <<i>>
+interface "TypedResourceQueryService" <<i>>
 interface "UnsetDatasetAccountsRelationsUseCase" <<i>>
 interface "UpdateAccountUseCase" <<i>>
 interface "UpdateCollectionEntriesUseCase" <<i>>
 interface "UpdateVersionedFileUseCase" <<i>>
+interface "VariableSetEventStore" <<i>>
+interface "VariableSetProjectionRepository" <<i>>
 interface "VerificationService" <<i>>
 interface "VerifyDatasetUseCase" <<i>>
 interface "ViewCollectionEntriesUseCase" <<i>>
@@ -154,6 +190,7 @@ interface "WebhookSubscriptionEventStore" <<i>>
 class "AccessTokenRegistryService"
 class "AccessTokenServiceImpl"
 class "AccountAuthorizationHelperImpl"
+class "AccountLifecycleMessageConsumer"
 class "AccountProperties" <<singleton>>
 class "AccountQuotaCheckerStorageImpl"
 class "AccountQuotaServiceImpl"
@@ -166,12 +203,14 @@ class "AuthConfig" <<singleton>>
 class "AuthenticationServiceImpl"
 class "BuildInfo" <<singleton>>
 class "CLIAccessTokenStore"
+class "CLIResourceContextStore"
 class "CacheDir" <<singleton>>
 class "CommitDatasetEventUseCaseImpl"
 class "CompactDatasetUseCaseImpl"
 class "CompactionExecutorImpl"
 class "CompactionPlannerImpl"
 class "ConfigService"
+class "ConfigurationResourceLifecycleMessageConsumer"
 class "ConfirmDeleteService"
 class "ContainerRuntime"
 class "ContainerRuntimeConfig" <<singleton>>
@@ -180,6 +219,7 @@ class "CreateDatasetFromSnapshotUseCaseImpl"
 class "CreateDatasetUseCaseHelper"
 class "CreateDatasetUseCaseImpl"
 class "CurrentAccountSubject" <<singleton>>
+class "CurrentContextStateService"
 class "DataFormatRegistryImpl"
 class "DatabaseConnectionSettings" <<singleton>>
 class "DatabaseNoPasswordProvider"
@@ -190,8 +230,9 @@ class "DatasetBlockIndexer"
 class "DatasetBlockUpdateHandler"
 class "DatasetEntryIndexer"
 class "DatasetEntryServiceImpl"
+class "DatasetEnvVarMutationAdapterImpl"
+class "DatasetEnvVarResolverImpl"
 class "DatasetEnvVarServiceNull"
-class "DatasetEnvVarsConfig" <<singleton>>
 class "DatasetFactoryImpl"
 class "DatasetIncrementQueryServiceImpl"
 class "DatasetKeyValueServiceSysEnv"
@@ -206,12 +247,14 @@ class "DatasetStatisticsIndexer"
 class "DatasetStatisticsServiceImpl"
 class "DatasetStatisticsUpdateHandler"
 class "DatasetStorageUnitLocalFs"
+class "DeleteAccountResourcesUsecaseImpl"
 class "DeleteAccountUseCaseImpl"
 class "DeleteDatasetRebacPropertiesUseCaseImpl"
 class "DeleteDatasetUseCaseImpl"
 class "DependencyGraphImmediateListener"
 class "DependencyGraphIndexer"
 class "DependencyGraphServiceImpl" <<singleton>>
+class "DescriptionAnnotationDispatcher"
 class "DidGeneratorDefault"
 class "DidSecretEncryptionConfig" <<singleton>>
 class "DidSecretService"
@@ -235,6 +278,7 @@ class "FlightSqlServiceFactory"
 class "FlowAgentConfig" <<singleton>>
 class "FlowSystemEventAgentConfig" <<singleton>>
 class "GcService"
+class "GenericResourceQueryServiceImpl"
 class "GetDatasetDownstreamDependenciesUseCaseImpl"
 class "GetDatasetSchemaUseCaseImpl"
 class "GetDatasetUpstreamDependenciesUseCaseImpl"
@@ -249,8 +293,13 @@ class "JupyterConfig" <<singleton>>
 class "JwtAuthenticationConfig" <<singleton>>
 class "KamuAuthOso"
 class "KamuFlightSqlService"
+class "LabelEnvironmentDispatcher"
+class "LabelLegacyConfigTargetDatasetDispatcher"
+class "ListAllResourcesUseCaseImpl"
+class "LocalResourceFacadeImpl"
 class "LoginPasswordAuthProvider"
 class "LoginService"
+class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
 class "MessageDispatcherT" <<singleton>>
@@ -295,10 +344,12 @@ class "PushRequestPlannerImpl"
 class "QueryDatasetDataUseCaseImpl"
 class "QueryServiceImpl"
 class "QuotaDefaultsConfig" <<singleton>>
+class "ReadyConditionDispatcher"
 class "RebacDatasetLifecycleMessageConsumer"
 class "RebacDatasetRegistryFacadeImpl"
 class "RebacIndexer"
 class "RebacServiceImpl"
+class "ReconcilingConditionDispatcher"
 class "Registry" <<singleton>>
 class "RemoteAliasResolverImpl"
 class "RemoteAliasesRegistryImpl"
@@ -309,11 +360,42 @@ class "RenameDatasetUseCaseImpl"
 class "ResetDatasetUseCaseImpl"
 class "ResetExecutorImpl"
 class "ResetPlannerImpl"
+class "ResourceAccountResolverImpl"
+class "ResourceContextRegistryService"
+class "ResourceContextReporter"
+class "ResourceContextResolver"
+class "ResourceContextTestService"
+class "ResourceDispatcherFactory"
+class "ResourceExtensionSchemaRegistry" <<singleton>>
+class "ResourceExtensionSchemaResolver"
+class "ResourceFacadeFactoryImpl"
+class "ResourceLifecycleMessageConsumer"
 class "ResourceLoaderImpl"
+class "ResourceManifestDiscoveryServiceImpl"
+class "ResourceManifestExecutionServiceImpl"
+class "ResourceSelectionResolutionServiceImpl"
+class "ResourceSelectionSyntaxServiceImpl"
+class "ResourceSelectorResolutionServiceImpl"
+class "ResourceSummaryServiceImpl"
+class "ResourceTypeLookupServiceImpl"
 class "RunInfoDir" <<singleton>>
 class "SchemaServiceImpl"
 class "SearchIndexerConfig" <<singleton>>
 class "SearchServiceRemoteImpl"
+class "SecretSetApplyResourceUseCaseImpl"
+class "SecretSetDeleteResourcesUseCaseImpl"
+class "SecretSetEventStoreBridge"
+class "SecretSetReconcileResourceUseCaseImpl"
+class "SecretSetReconcilerImpl"
+class "SecretSetResourceAggregateLoaderImpl"
+class "SecretSetResourceCrudDispatcher"
+class "SecretSetResourceLifecycleDispatcher"
+class "SecretSetResourcePersistenceServiceImpl"
+class "SecretSetResourcePresentationDispatcher"
+class "SecretSetSpecSanitizer"
+class "SecretSetSpecViewDispatcher"
+class "SecretSetTypedResourceQueryServiceImpl"
+class "SecretsEncryptionConfig" <<singleton>>
 class "SessionAuthAnonymous"
 class "SessionAuthConfig" <<singleton>>
 class "SessionCachingConfig" <<singleton>>
@@ -336,7 +418,6 @@ class "SqliteAccountRepository"
 class "SqliteDatasetDataBlockRepository"
 class "SqliteDatasetDependencyRepository"
 class "SqliteDatasetEntryRepository"
-class "SqliteDatasetEnvVarRepository"
 class "SqliteDatasetKeyBlockRepository"
 class "SqliteDatasetReferenceRepository"
 class "SqliteDatasetStatisticsRepository"
@@ -352,11 +433,27 @@ class "SqliteOAuthDeviceCodeRepository"
 class "SqliteOutboxMessageBridge" <<agnostic>>
 class "SqlitePlugin"
 class "SqliteRebacRepository"
+class "SqliteResourceLabelProjectionRepository"
+class "SqliteResourceRawEventStore"
+class "SqliteResourceRepository"
+class "SqliteSecretSetProjectionRepository"
 class "SqliteTaskEventStore"
 class "SqliteTransactionManager"
+class "SqliteVariableSetProjectionRepository"
 class "SqliteWeb3AuthEip4361NonceRepository"
 class "SqliteWebhookDeliveryRepository"
 class "SqliteWebhookSubscriptionEventStore"
+class "StorageApplyResourceUseCaseImpl"
+class "StorageDeleteResourcesUseCaseImpl"
+class "StorageEventStoreBridge"
+class "StorageReconcileResourceUseCaseImpl"
+class "StorageReconcilerImpl"
+class "StorageResourceAggregateLoaderImpl"
+class "StorageResourceCrudDispatcher"
+class "StorageResourceLifecycleDispatcher"
+class "StorageResourcePersistenceServiceImpl"
+class "StorageResourcePresentationDispatcher"
+class "StorageTypedResourceQueryServiceImpl"
 class "SyncRequestBuilder"
 class "SyncServiceImpl"
 class "SystemTimeSourceDefault" <<agnostic>>
@@ -371,6 +468,17 @@ class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
 class "UpdateVersionedFileUseCaseImpl"
+class "VariableSetApplyResourceUseCaseImpl"
+class "VariableSetDeleteResourcesUseCaseImpl"
+class "VariableSetEventStoreBridge"
+class "VariableSetReconcileResourceUseCaseImpl"
+class "VariableSetReconcilerImpl"
+class "VariableSetResourceAggregateLoaderImpl"
+class "VariableSetResourceCrudDispatcher"
+class "VariableSetResourceLifecycleDispatcher"
+class "VariableSetResourcePersistenceServiceImpl"
+class "VariableSetResourcePresentationDispatcher"
+class "VariableSetTypedResourceQueryServiceImpl"
 class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
 class "ViewCollectionEntriesUseCaseImpl"
@@ -689,8 +797,141 @@ class "WsSmartTransferProtocolClient"
 "AccessTokenStore" <|-- "CLIAccessTokenStore"
 "CLIAccessTokenStore"  --> "WorkspaceLayout"
 "LoginService"  --> "SystemTimeSource"
+"CurrentContextStateService"  --> "ResourceContextStore"
+"CurrentContextStateService"  --> "CurrentAccountSubject"
+"ResourceContextStore" <|-- "CLIResourceContextStore"
+"CLIResourceContextStore"  --> "WorkspaceLayout"
+"ResourceContextRegistryService"  --> "ResourceContextStore"
+"ResourceContextRegistryService"  --> "CurrentAccountSubject"
+"ResourceContextReporter"  --> "ResourceContextRegistryService"
+"ResourceContextResolver"  --> "CurrentContextStateService"
+"ResourceContextResolver"  --> "ResourceContextRegistryService"
+"ResourceContextResolver"  --> "WorkspaceService"
+"ResourceContextTestService"  --> "SystemTimeSource"
+"ResourceContextTestService"  --> "AccessTokenRegistryService"
+"ResourceContextTestService"  --> "ResourceContextRegistryService"
+"ResourceContextTestService"  --> "ResourceContextResolver"
+"ResourceFacadeFactory" <|-- "ResourceFacadeFactoryImpl"
+"ResourceFacadeFactoryImpl"  --> "ResourceFacade"
+"ResourceFacadeFactoryImpl"  --> "AccessTokenRegistryService"
+"ResourceFacadeFactoryImpl"  --> "ResourceContextResolver"
+"ResourceManifestDiscoveryService" <|-- "ResourceManifestDiscoveryServiceImpl"
+"ResourceManifestExecutionService" <|-- "ResourceManifestExecutionServiceImpl"
+"ResourceSelectionResolutionService" <|-- "ResourceSelectionResolutionServiceImpl"
+"ResourceSelectionSyntaxService" <|-- "ResourceSelectionSyntaxServiceImpl"
+"ResourceSelectionSyntaxServiceImpl"  --> "ResourceSelectorResolutionService"
+"ResourceSelectionSyntaxServiceImpl"  --> "ResourceTypeLookupService"
+"ResourceSelectorResolutionService" <|-- "ResourceSelectorResolutionServiceImpl"
+"ResourceSummaryService" <|-- "ResourceSummaryServiceImpl"
+"ResourceSummaryServiceImpl"  --> "ResourceFacade"
+"ResourceSummaryServiceImpl"  --> "CurrentAccountSubject"
+"ResourceSummaryServiceImpl"  --> "AccessTokenRegistryService"
+"ResourceSummaryServiceImpl"  --> "ResourceContextResolver"
+"ResourceTypeLookupService" <|-- "ResourceTypeLookupServiceImpl"
+"ResourceTypeLookupServiceImpl"  --> "ResourceFacadeFactory"
 "WorkspaceService"  --> "bool"
 "WorkspaceService"  --> "WorkspaceLayout"
+"DatasetEnvVarMutationAdapter" <|-- "DatasetEnvVarMutationAdapterImpl"
+"DatasetEnvVarMutationAdapterImpl"  --> "AccountService"
+"DatasetEnvVarMutationAdapterImpl"  --> "SecretSetProjectionRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "VariableSetProjectionRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "DatasetEntryRepository"
+"DatasetEnvVarMutationAdapterImpl"  --> "GenericResourceQueryService"
+"DatasetEnvVarMutationAdapterImpl"  --> "SecretsEncryptionConfig"
+"DatasetEnvVarMutationAdapterImpl"  --> "ResourceDispatcherFactory"
+"DatasetEnvVarResolver" <|-- "DatasetEnvVarResolverImpl"
+"DatasetEnvVarResolverImpl"  --> "SecretSetProjectionRepository"
+"DatasetEnvVarResolverImpl"  --> "VariableSetProjectionRepository"
+"DatasetEnvVarResolverImpl"  --> "DatasetEntryRepository"
+"DatasetEnvVarResolverImpl"  --> "ResourceRepository"
+"MessageConsumer" <|-- "ConfigurationResourceLifecycleMessageConsumer"
+"MessageConsumerT" <|-- "ConfigurationResourceLifecycleMessageConsumer"
+"Reconciler" <|-- "SecretSetReconcilerImpl"
+"SecretSetReconcilerImpl"  --> "SecretSetProjectionRepository"
+"SecretSetReconcilerImpl"  --> "SystemTimeSource"
+"SecretSetReconcilerImpl"  --> "SecretsEncryptionConfig"
+"Reconciler" <|-- "VariableSetReconcilerImpl"
+"VariableSetReconcilerImpl"  --> "VariableSetProjectionRepository"
+"VariableSetReconcilerImpl"  --> "SystemTimeSource"
+"ResourceCrudDispatcher" <|-- "SecretSetResourceCrudDispatcher"
+"SecretSetResourceCrudDispatcher"  --> "GenericResourceQueryService"
+"SecretSetResourceCrudDispatcher"  --> "ApplyResourceUseCase"
+"SecretSetResourceCrudDispatcher"  --> "DeleteResourcesUseCase"
+"ResourcePresentationDispatcher" <|-- "SecretSetResourcePresentationDispatcher"
+"ResourceSpecViewDispatcher" <|-- "SecretSetSpecViewDispatcher"
+"SecretSetSpecViewDispatcher"  --> "SecretsEncryptionConfig"
+"ResourceCrudDispatcher" <|-- "VariableSetResourceCrudDispatcher"
+"VariableSetResourceCrudDispatcher"  --> "GenericResourceQueryService"
+"VariableSetResourceCrudDispatcher"  --> "ApplyResourceUseCase"
+"VariableSetResourceCrudDispatcher"  --> "DeleteResourcesUseCase"
+"ResourcePresentationDispatcher" <|-- "VariableSetResourcePresentationDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "LabelLegacyConfigTargetDatasetDispatcher"
+"ApplyResourceUseCase" <|-- "SecretSetApplyResourceUseCaseImpl"
+"SecretSetApplyResourceUseCaseImpl"  --> "GenericResourceQueryService"
+"SecretSetApplyResourceUseCaseImpl"  --> "ResourceAggregateLoader"
+"SecretSetApplyResourceUseCaseImpl"  --> "ResourcePersistenceService"
+"SecretSetApplyResourceUseCaseImpl"  --> "TypedResourceQueryService"
+"SecretSetApplyResourceUseCaseImpl" "?" --> "ResourceSpecSanitizer"
+"SecretSetApplyResourceUseCaseImpl"  --> "Outbox"
+"SecretSetApplyResourceUseCaseImpl"  --> "SystemTimeSource"
+"DeleteResourcesUseCase" <|-- "SecretSetDeleteResourcesUseCaseImpl"
+"SecretSetDeleteResourcesUseCaseImpl"  --> "GenericResourceQueryService"
+"SecretSetDeleteResourcesUseCaseImpl"  --> "ResourceAggregateLoader"
+"SecretSetDeleteResourcesUseCaseImpl"  --> "ResourcePersistenceService"
+"SecretSetDeleteResourcesUseCaseImpl"  --> "Outbox"
+"SecretSetDeleteResourcesUseCaseImpl"  --> "SystemTimeSource"
+"SecretSetEventStore" <|-- "SecretSetEventStoreBridge"
+"SecretSetEventStoreBridge"  --> "ResourceRawEventStore"
+"ReconcileResourceUseCase" <|-- "SecretSetReconcileResourceUseCaseImpl"
+"SecretSetReconcileResourceUseCaseImpl"  --> "Catalog"
+"SecretSetReconcileResourceUseCaseImpl"  --> "SystemTimeSource"
+"ResourceAggregateLoader" <|-- "SecretSetResourceAggregateLoaderImpl"
+"SecretSetResourceAggregateLoaderImpl"  --> "SecretSetEventStore"
+"ResourceLifecycleEventDispatcher" <|-- "SecretSetResourceLifecycleDispatcher"
+"SecretSetResourceLifecycleDispatcher"  --> "ReconcileResourceUseCase"
+"ResourcePersistenceService" <|-- "SecretSetResourcePersistenceServiceImpl"
+"SecretSetResourcePersistenceServiceImpl"  --> "SecretSetEventStore"
+"SecretSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
+"SecretSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
+"SecretSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
+"TypedResourceQueryService" <|-- "SecretSetTypedResourceQueryServiceImpl"
+"SecretSetTypedResourceQueryServiceImpl"  --> "ResourceRepository"
+"ApplyResourceUseCase" <|-- "VariableSetApplyResourceUseCaseImpl"
+"VariableSetApplyResourceUseCaseImpl"  --> "GenericResourceQueryService"
+"VariableSetApplyResourceUseCaseImpl"  --> "ResourceAggregateLoader"
+"VariableSetApplyResourceUseCaseImpl"  --> "ResourcePersistenceService"
+"VariableSetApplyResourceUseCaseImpl"  --> "TypedResourceQueryService"
+"VariableSetApplyResourceUseCaseImpl" "?" --> "ResourceSpecSanitizer"
+"VariableSetApplyResourceUseCaseImpl"  --> "Outbox"
+"VariableSetApplyResourceUseCaseImpl"  --> "SystemTimeSource"
+"DeleteResourcesUseCase" <|-- "VariableSetDeleteResourcesUseCaseImpl"
+"VariableSetDeleteResourcesUseCaseImpl"  --> "GenericResourceQueryService"
+"VariableSetDeleteResourcesUseCaseImpl"  --> "ResourceAggregateLoader"
+"VariableSetDeleteResourcesUseCaseImpl"  --> "ResourcePersistenceService"
+"VariableSetDeleteResourcesUseCaseImpl"  --> "Outbox"
+"VariableSetDeleteResourcesUseCaseImpl"  --> "SystemTimeSource"
+"VariableSetEventStore" <|-- "VariableSetEventStoreBridge"
+"VariableSetEventStoreBridge"  --> "ResourceRawEventStore"
+"ReconcileResourceUseCase" <|-- "VariableSetReconcileResourceUseCaseImpl"
+"VariableSetReconcileResourceUseCaseImpl"  --> "Catalog"
+"VariableSetReconcileResourceUseCaseImpl"  --> "SystemTimeSource"
+"ResourceAggregateLoader" <|-- "VariableSetResourceAggregateLoaderImpl"
+"VariableSetResourceAggregateLoaderImpl"  --> "VariableSetEventStore"
+"ResourceLifecycleEventDispatcher" <|-- "VariableSetResourceLifecycleDispatcher"
+"VariableSetResourceLifecycleDispatcher"  --> "ReconcileResourceUseCase"
+"ResourcePersistenceService" <|-- "VariableSetResourcePersistenceServiceImpl"
+"VariableSetResourcePersistenceServiceImpl"  --> "VariableSetEventStore"
+"VariableSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
+"VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
+"VariableSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
+"TypedResourceQueryService" <|-- "VariableSetTypedResourceQueryServiceImpl"
+"VariableSetTypedResourceQueryServiceImpl"  --> "ResourceRepository"
+"ResourceSpecSanitizer" <|-- "SecretSetSpecSanitizer"
+"SecretSetSpecSanitizer"  --> "SecretsEncryptionConfig"
+"SecretSetProjectionRepository" <|-- "SqliteSecretSetProjectionRepository"
+"SqliteSecretSetProjectionRepository"  --> "TransactionRefT"
+"VariableSetProjectionRepository" <|-- "SqliteVariableSetProjectionRepository"
+"SqliteVariableSetProjectionRepository"  --> "TransactionRefT"
 "DidGenerator" <|-- "DidGeneratorDefault"
 "SearchEntitySchemaProvider" <|-- "DatasetSearchSchemaProvider"
 "DatasetSearchSchemaProvider"  --> "Catalog"
@@ -813,7 +1054,7 @@ class "WsSmartTransferProtocolClient"
 "CreateDatasetUseCaseImpl"  --> "CurrentAccountSubject"
 "CreateDatasetUseCaseImpl"  --> "CreateDatasetUseCaseHelper"
 "DeleteDatasetUseCase" <|-- "DeleteDatasetUseCaseImpl"
-"DeleteDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"DeleteDatasetUseCaseImpl"  --> "DatasetActionAuthorizer"
 "DeleteDatasetUseCaseImpl"  --> "DatasetRegistry"
 "DeleteDatasetUseCaseImpl"  --> "DependencyGraphService"
 "DeleteDatasetUseCaseImpl"  --> "DatasetEntryWriter"
@@ -856,8 +1097,6 @@ class "WsSmartTransferProtocolClient"
 "DatasetEntryRepository" <|-- "SqliteDatasetEntryRepository"
 "SqliteDatasetEntryRepository"  --> "TransactionRefT"
 "SqliteDatasetEntryRepository" "*" --> "DatasetEntryRemovalListener"
-"DatasetEnvVarRepository" <|-- "SqliteDatasetEnvVarRepository"
-"SqliteDatasetEnvVarRepository"  --> "TransactionRefT"
 "DatasetKeyBlockRepository" <|-- "SqliteDatasetKeyBlockRepository"
 "SqliteDatasetKeyBlockRepository"  --> "TransactionRefT"
 "DatasetReferenceRepository" <|-- "SqliteDatasetReferenceRepository"
@@ -879,6 +1118,40 @@ class "WsSmartTransferProtocolClient"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
 "OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
 "SqliteOutboxMessageBridge"  --> "Pool"
+"ResourceFacade" <|-- "LocalResourceFacadeImpl"
+"LocalResourceFacadeImpl"  --> "GenericResourceQueryService"
+"LocalResourceFacadeImpl"  --> "ResourceAccountResolver"
+"LocalResourceFacadeImpl"  --> "ResourceDispatcherFactory"
+"LocalResourceFacadeImpl"  --> "ResourceExtensionSchemaResolver"
+"ResourceAccountResolver" <|-- "ResourceAccountResolverImpl"
+"ResourceAccountResolverImpl"  --> "AccountService"
+"ResourceAccountResolverImpl"  --> "RebacService"
+"ResourceAccountResolverImpl"  --> "CurrentAccountSubject"
+"ResourceDispatcherFactory"  --> "Catalog"
+"MessageConsumer" <|-- "AccountLifecycleMessageConsumer"
+"MessageConsumerT" <|-- "AccountLifecycleMessageConsumer"
+"AccountLifecycleMessageConsumer"  --> "DeleteAccountResourcesUseCase"
+"MessageConsumer" <|-- "ResourceLifecycleMessageConsumer"
+"MessageConsumerT" <|-- "ResourceLifecycleMessageConsumer"
+"ResourceExtensionSchemaDispatcher" <|-- "DescriptionAnnotationDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "ReadyConditionDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "ReconcilingConditionDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "LabelEnvironmentDispatcher"
+"ResourceExtensionSchemaResolver"  --> "ResourceExtensionSchemaRegistry"
+"ResourceExtensionSchemaRegistry"  --> "Catalog"
+"GenericResourceQueryService" <|-- "GenericResourceQueryServiceImpl"
+"GenericResourceQueryServiceImpl"  --> "ResourceRepository"
+"DeleteAccountResourcesUseCase" <|-- "DeleteAccountResourcesUsecaseImpl"
+"DeleteAccountResourcesUsecaseImpl"  --> "GenericResourceQueryService"
+"DeleteAccountResourcesUsecaseImpl"  --> "ResourceDispatcherFactory"
+"ListAllResourcesUseCase" <|-- "ListAllResourcesUseCaseImpl"
+"ListAllResourcesUseCaseImpl"  --> "GenericResourceQueryService"
+"ResourceLabelProjectionRepository" <|-- "SqliteResourceLabelProjectionRepository"
+"SqliteResourceLabelProjectionRepository"  --> "TransactionRefT"
+"ResourceRawEventStore" <|-- "SqliteResourceRawEventStore"
+"SqliteResourceRawEventStore"  --> "TransactionRefT"
+"ResourceRepository" <|-- "SqliteResourceRepository"
+"SqliteResourceRepository"  --> "TransactionRefT"
 "EmbeddingsCacheRepository" <|-- "SqliteEmbeddingsCacheRepository"
 "SqliteEmbeddingsCacheRepository"  --> "TransactionRefT"
 "EmbeddingsEncoder" <|-- "DummyEmbeddingsEncoder"
@@ -898,6 +1171,42 @@ class "WsSmartTransferProtocolClient"
 "SignEip712UseCaseImpl"  --> "CurrentAccountSubject"
 "SignEip712UseCaseImpl"  --> "DidSecretEncryptionConfig"
 "SignEip712UseCaseImpl"  --> "IdentityConfig"
+"Reconciler" <|-- "StorageReconcilerImpl"
+"ResourceCrudDispatcher" <|-- "StorageResourceCrudDispatcher"
+"StorageResourceCrudDispatcher"  --> "GenericResourceQueryService"
+"StorageResourceCrudDispatcher"  --> "ApplyResourceUseCase"
+"StorageResourceCrudDispatcher"  --> "DeleteResourcesUseCase"
+"ResourcePresentationDispatcher" <|-- "StorageResourcePresentationDispatcher"
+"ApplyResourceUseCase" <|-- "StorageApplyResourceUseCaseImpl"
+"StorageApplyResourceUseCaseImpl"  --> "GenericResourceQueryService"
+"StorageApplyResourceUseCaseImpl"  --> "ResourceAggregateLoader"
+"StorageApplyResourceUseCaseImpl"  --> "ResourcePersistenceService"
+"StorageApplyResourceUseCaseImpl"  --> "TypedResourceQueryService"
+"StorageApplyResourceUseCaseImpl" "?" --> "ResourceSpecSanitizer"
+"StorageApplyResourceUseCaseImpl"  --> "Outbox"
+"StorageApplyResourceUseCaseImpl"  --> "SystemTimeSource"
+"DeleteResourcesUseCase" <|-- "StorageDeleteResourcesUseCaseImpl"
+"StorageDeleteResourcesUseCaseImpl"  --> "GenericResourceQueryService"
+"StorageDeleteResourcesUseCaseImpl"  --> "ResourceAggregateLoader"
+"StorageDeleteResourcesUseCaseImpl"  --> "ResourcePersistenceService"
+"StorageDeleteResourcesUseCaseImpl"  --> "Outbox"
+"StorageDeleteResourcesUseCaseImpl"  --> "SystemTimeSource"
+"StorageEventStore" <|-- "StorageEventStoreBridge"
+"StorageEventStoreBridge"  --> "ResourceRawEventStore"
+"ReconcileResourceUseCase" <|-- "StorageReconcileResourceUseCaseImpl"
+"StorageReconcileResourceUseCaseImpl"  --> "Catalog"
+"StorageReconcileResourceUseCaseImpl"  --> "SystemTimeSource"
+"ResourceAggregateLoader" <|-- "StorageResourceAggregateLoaderImpl"
+"StorageResourceAggregateLoaderImpl"  --> "StorageEventStore"
+"ResourceLifecycleEventDispatcher" <|-- "StorageResourceLifecycleDispatcher"
+"StorageResourceLifecycleDispatcher"  --> "ReconcileResourceUseCase"
+"ResourcePersistenceService" <|-- "StorageResourcePersistenceServiceImpl"
+"StorageResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
+"StorageResourcePersistenceServiceImpl"  --> "ResourceRepository"
+"StorageResourcePersistenceServiceImpl"  --> "StorageEventStore"
+"StorageResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
+"TypedResourceQueryService" <|-- "StorageTypedResourceQueryServiceImpl"
+"StorageTypedResourceQueryServiceImpl"  --> "ResourceRepository"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"

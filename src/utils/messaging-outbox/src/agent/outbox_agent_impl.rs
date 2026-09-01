@@ -88,14 +88,23 @@ impl OutboxAgentImpl {
         catalog: &Catalog,
         message_dispatchers: Vec<Arc<dyn MessageDispatcher>>,
     ) -> OutboxRoutesStaticInfo {
-        let all_durable_messaging_routes =
-            enumerate_messaging_routes(catalog, MessageDeliveryMechanism::Transactional);
+        let consumer_metadata_by_consumer_name = consumer_metadata_by_consumer_name(catalog);
+
+        let all_durable_messaging_routes: Vec<_> = [
+            MessageConsumptionMode::TransactionalWrapped,
+            MessageConsumptionMode::TransactionalSelfManaged,
+        ]
+        .into_iter()
+        .flat_map(|consumption_mode| enumerate_messaging_routes(catalog, consumption_mode))
+        .collect();
+
         let consumers_by_producers = group_consumers_by_producers(&all_durable_messaging_routes);
         let message_dispatchers_by_producers =
             group_message_dispatchers_by_producer(&message_dispatchers);
 
         OutboxRoutesStaticInfo::new(
             message_dispatchers_by_producers,
+            consumer_metadata_by_consumer_name,
             all_durable_messaging_routes,
             consumers_by_producers,
         )
@@ -149,8 +158,6 @@ impl OutboxAgentImpl {
 
     #[transactional_method]
     async fn init_consumption_records(&self) -> Result<(), InternalError> {
-        let base_catalog = self.catalog.upgrade();
-
         let outbox_message_bridge = transaction_catalog
             .get_one::<dyn OutboxMessageBridge>()
             .unwrap();
@@ -188,17 +195,11 @@ impl OutboxAgentImpl {
                     // If consumer is not yet registered, and InitialConsumerBoundary is Latest,
                     // we set the last consumed message ID to the latest produced message ID
                     // otherwise, we set it to 0
-                    let last_consumed_boundary = if let Some(consumer_metadata) =
-                        particular_consumer_metadata_for(&base_catalog, consumer_name)
-                        && consumer_metadata.initial_consumer_boundary
-                            == InitialConsumerBoundary::Latest
-                        && let Some(latest_produced_message_boundary) =
-                            latest_produced_message_boundary_maybe
-                    {
-                        latest_produced_message_boundary
-                    } else {
-                        OutboxMessageBoundary::default()
-                    };
+                    let last_consumed_boundary =
+                        self.routes_static_info.initial_consumption_boundary(
+                            consumer_name,
+                            latest_produced_message_boundary_maybe,
+                        );
 
                     // Create a new consumption boundary
                     outbox_message_bridge

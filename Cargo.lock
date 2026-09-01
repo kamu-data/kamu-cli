@@ -110,6 +110,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "aliasable"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "250f629c0161ad8107cf89319e990051fae62832fd343083bea452d93e2205fd"
+
+[[package]]
 name = "alloc-no-stdlib"
 version = "2.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -758,7 +764,7 @@ dependencies = [
  "alloy-transport",
  "futures",
  "http 1.5.0",
- "rustls 0.23.43",
+ "rustls",
  "serde_json",
  "tokio",
  "tokio-tungstenite 0.28.0",
@@ -2090,23 +2096,17 @@ dependencies = [
  "aws-smithy-async",
  "aws-smithy-runtime-api",
  "aws-smithy-types",
- "h2 0.3.27",
- "h2 0.4.16",
- "http 0.2.12",
+ "h2",
  "http 1.5.0",
- "http-body 0.4.6",
- "hyper 0.14.32",
- "hyper 1.11.0",
- "hyper-rustls 0.24.2",
- "hyper-rustls 0.27.9",
+ "hyper",
+ "hyper-rustls",
  "hyper-util",
  "pin-project-lite",
- "rustls 0.21.12",
- "rustls 0.23.43",
+ "rustls",
  "rustls-native-certs",
  "rustls-pki-types",
  "tokio",
- "tokio-rustls 0.26.4",
+ "tokio-rustls",
  "tower",
  "tracing",
 ]
@@ -2277,7 +2277,7 @@ dependencies = [
  "http 1.5.0",
  "http-body 1.1.0",
  "http-body-util",
- "hyper 1.11.0",
+ "hyper",
  "hyper-util",
  "itoa",
  "matchit",
@@ -2412,6 +2412,12 @@ name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
+
+[[package]]
+name = "beef"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a8241f3ebb85c056b509d4327ad0358fbbba6ffb340bf388f26350aeda225b1"
 
 [[package]]
 name = "bigdecimal"
@@ -3024,7 +3030,7 @@ dependencies = [
  "anstream",
  "anstyle",
  "clap_lex",
- "strsim",
+ "strsim 0.11.1",
 ]
 
 [[package]]
@@ -3565,6 +3571,8 @@ version = "0.266.1"
 dependencies = [
  "aes-gcm",
  "argon2",
+ "base64",
+ "hex",
  "internal-error",
  "password-hash",
  "thiserror 2.0.20",
@@ -3622,7 +3630,7 @@ dependencies = [
  "openssl-probe 0.1.6",
  "openssl-sys",
  "schannel",
- "socket2 0.6.5",
+ "socket2",
  "windows-sys 0.61.2",
 ]
 
@@ -3675,6 +3683,59 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
 
 [[package]]
+name = "cynic"
+version = "3.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6260314e64d59ff1a962d465573ac6775fbf4624aa67613e220eb61f4a3d9a5c"
+dependencies = [
+ "cynic-proc-macros",
+ "ref-cast",
+ "serde",
+ "static_assertions",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "cynic-codegen"
+version = "3.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04e68e191fc65c3b8a5b467368ef8e3d5f610ef770df664d5cca51de573c3010"
+dependencies = [
+ "cynic-parser",
+ "darling 0.20.11",
+ "once_cell",
+ "ouroboros",
+ "proc-macro2",
+ "quote",
+ "strsim 0.10.0",
+ "syn 2.0.119",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "cynic-parser"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7793e157a59a0bd2142a5723860aeaef3aa459feae1467b597351e5f58251904"
+dependencies = [
+ "indexmap 2.14.0",
+ "lalrpop-util 0.22.2",
+ "logos",
+]
+
+[[package]]
+name = "cynic-proc-macros"
+version = "3.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ca74b7363c9c675b6539aaf151c695cac83d3e7abc80dfbfbfdbfef27e4ec20"
+dependencies = [
+ "cynic-codegen",
+ "darling 0.20.11",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "darling"
 version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3704,7 +3765,7 @@ dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
- "strsim",
+ "strsim 0.11.1",
  "syn 2.0.119",
 ]
 
@@ -3718,7 +3779,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "strsim",
+ "strsim 0.11.1",
  "syn 2.0.119",
 ]
 
@@ -4354,7 +4415,7 @@ dependencies = [
  "chrono",
  "datafusion",
  "http 1.5.0",
- "hyper 1.11.0",
+ "hyper",
  "odata-params",
  "quick-xml 0.40.1",
  "regex",
@@ -5665,8 +5726,16 @@ version = "0.266.1"
 dependencies = [
  "async-graphql",
  "axum",
+ "cynic",
  "http 1.5.0",
+ "internal-error",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
  "tower",
+ "tracing",
+ "url",
 ]
 
 [[package]]
@@ -5725,25 +5794,6 @@ dependencies = [
  "ff",
  "rand_core 0.6.4",
  "subtle",
-]
-
-[[package]]
-name = "h2"
-version = "0.3.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0beca50380b1fc32983fc1cb4587bfa4bb9e78fc259aad4a0032d2080309222d"
-dependencies = [
- "bytes",
- "fnv",
- "futures-core",
- "futures-sink",
- "futures-util",
- "http 0.2.12",
- "indexmap 2.14.0",
- "slab",
- "tokio",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]
@@ -6223,30 +6273,6 @@ dependencies = [
 
 [[package]]
 name = "hyper"
-version = "0.14.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41dfc780fdec9373c01bae43289ea34c972e40ee3c9f6b3c8801a35f35586ce7"
-dependencies = [
- "bytes",
- "futures-channel",
- "futures-core",
- "futures-util",
- "h2 0.3.27",
- "http 0.2.12",
- "http-body 0.4.6",
- "httparse",
- "httpdate",
- "itoa",
- "pin-project-lite",
- "socket2 0.5.10",
- "tokio",
- "tower-service",
- "tracing",
- "want",
-]
-
-[[package]]
-name = "hyper"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d22053281f852e11534f5198498373cbb59295120a20771d90f7ed1897490a72"
@@ -6255,7 +6281,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-core",
- "h2 0.4.16",
+ "h2",
  "http 1.5.0",
  "http-body 1.1.0",
  "httparse",
@@ -6269,32 +6295,17 @@ dependencies = [
 
 [[package]]
 name = "hyper-rustls"
-version = "0.24.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec3efd23720e2049821a693cbc7e65ea87c72f1c58ff2f9522ff332b1491e590"
-dependencies = [
- "futures-util",
- "http 0.2.12",
- "hyper 0.14.32",
- "log",
- "rustls 0.21.12",
- "tokio",
- "tokio-rustls 0.24.1",
-]
-
-[[package]]
-name = "hyper-rustls"
 version = "0.27.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33ca68d021ef39cf6463ab54c1d0f5daf03377b70561305bb89a8f83aab66e0f"
 dependencies = [
  "http 1.5.0",
- "hyper 1.11.0",
+ "hyper",
  "hyper-util",
- "rustls 0.23.43",
+ "rustls",
  "rustls-native-certs",
  "tokio",
- "tokio-rustls 0.26.4",
+ "tokio-rustls",
  "tower-service",
  "webpki-roots 1.0.9",
 ]
@@ -6305,7 +6316,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b90d566bffbce6a75bd8b09a05aa8c2cb1fabb6cb348f8840c9e4c90a0d83b0"
 dependencies = [
- "hyper 1.11.0",
+ "hyper",
  "hyper-util",
  "pin-project-lite",
  "tokio",
@@ -6324,12 +6335,12 @@ dependencies = [
  "futures-util",
  "http 1.5.0",
  "http-body 1.1.0",
- "hyper 1.11.0",
+ "hyper",
  "ipnet",
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.5",
+ "socket2",
  "tokio",
  "tower-service",
  "tracing",
@@ -6647,7 +6658,7 @@ version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d40460c0ce33d6ce4b0630ad68ff63d6661961c48b6dba35e5a4d81cfb48222"
 dependencies = [
- "socket2 0.6.5",
+ "socket2",
  "widestring",
  "windows-registry",
  "windows-result",
@@ -7629,6 +7640,9 @@ dependencies = [
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
  "kamu-auth-web3",
+ "kamu-configuration",
+ "kamu-configuration-inmem",
+ "kamu-configuration-services",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -7636,6 +7650,10 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-resources",
+ "kamu-resources-facade",
+ "kamu-resources-inmem",
+ "kamu-resources-services",
  "kamu-search",
  "kamu-task-system",
  "kamu-task-system-inmem",
@@ -8099,6 +8117,10 @@ dependencies = [
  "kamu-auth-web3-services",
  "kamu-auth-web3-sqlite",
  "kamu-cli-puppet",
+ "kamu-configuration-inmem",
+ "kamu-configuration-postgres",
+ "kamu-configuration-services",
+ "kamu-configuration-sqlite",
  "kamu-datafusion-cli",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -8114,6 +8136,12 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-resources",
+ "kamu-resources-facade",
+ "kamu-resources-inmem",
+ "kamu-resources-postgres",
+ "kamu-resources-services",
+ "kamu-resources-sqlite",
  "kamu-search",
  "kamu-search-cache-inmem",
  "kamu-search-cache-postgres",
@@ -8123,6 +8151,7 @@ dependencies = [
  "kamu-search-services",
  "kamu-signing",
  "kamu-signing-services",
+ "kamu-storage-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-postgres",
@@ -8152,14 +8181,16 @@ dependencies = [
  "reqwest",
  "rumqttc",
  "rust-embed",
- "rustls 0.23.43",
+ "rustls",
  "secrecy",
  "serde",
  "serde_json",
+ "serde_with",
  "serde_yaml_ng",
  "server-console",
  "setty",
  "shlex 1.3.0",
+ "similar",
  "sqlx",
  "strum 0.28.0",
  "tempfile",
@@ -8183,9 +8214,11 @@ dependencies = [
  "url",
  "urlencoding",
  "utoipa-axum",
+ "uuid",
  "vergen-gitcl",
  "webbrowser",
  "whoami",
+ "winnow 1.0.4",
 ]
 
 [[package]]
@@ -8284,6 +8317,7 @@ dependencies = [
  "regex",
  "reqwest",
  "serde_json",
+ "serde_yaml_ng",
  "tempfile",
  "test-utils",
  "tokio",
@@ -8320,6 +8354,142 @@ dependencies = [
  "tempfile",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "kamu-configuration"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "crypto-utils",
+ "event-sourcing",
+ "hex",
+ "internal-error",
+ "kamu-resources",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.20",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-inmem"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-accounts-inmem",
+ "kamu-configuration",
+ "kamu-configuration-repo-tests",
+ "kamu-resources",
+ "kamu-resources-inmem",
+ "opendatafabric",
+ "test-group",
+ "test-log",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-postgres"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-configuration",
+ "kamu-configuration-repo-tests",
+ "kamu-resources",
+ "kamu-resources-postgres",
+ "multiformats",
+ "opendatafabric",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-repo-tests"
+version = "0.266.1"
+dependencies = [
+ "chrono",
+ "dill",
+ "kamu-configuration",
+ "kamu-resources",
+ "opendatafabric",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-services"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "base64",
+ "chrono",
+ "crypto-utils",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "hex",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-accounts-services",
+ "kamu-configuration",
+ "kamu-configuration-inmem",
+ "kamu-configuration-services",
+ "kamu-datasets",
+ "kamu-datasets-inmem",
+ "kamu-resources",
+ "kamu-resources-inmem",
+ "kamu-resources-services",
+ "messaging-outbox",
+ "oop",
+ "opendatafabric",
+ "paste",
+ "pretty_assertions",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "test-log",
+ "thiserror 2.0.20",
+ "time-source",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-configuration-sqlite"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "internal-error",
+ "kamu-configuration",
+ "kamu-configuration-repo-tests",
+ "kamu-resources",
+ "kamu-resources-sqlite",
+ "opendatafabric",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "uuid",
 ]
 
 [[package]]
@@ -8906,6 +9076,229 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-resources"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "dill",
+ "enum-variants",
+ "event-sourcing",
+ "internal-error",
+ "messaging-outbox",
+ "mockall",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sqlx",
+ "strum 0.28.0",
+ "thiserror 2.0.20",
+ "tokio-stream",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-facade"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "cynic",
+ "cynic-codegen",
+ "database-common",
+ "dill",
+ "event-sourcing",
+ "graphql-http",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-resources",
+ "kamu-resources-services",
+ "mockall",
+ "opendatafabric",
+ "paste",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "strum 0.28.0",
+ "thiserror 2.0.20",
+ "url",
+]
+
+[[package]]
+name = "kamu-resources-facade-tests"
+version = "0.266.1"
+dependencies = [
+ "async-graphql",
+ "async-graphql-axum",
+ "async-trait",
+ "axum",
+ "database-common",
+ "dill",
+ "indoc 2.0.7",
+ "init-on-startup",
+ "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
+ "kamu-adapter-graphql",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-services",
+ "kamu-configuration",
+ "kamu-configuration-inmem",
+ "kamu-configuration-services",
+ "kamu-datasets",
+ "kamu-messaging-outbox-inmem",
+ "kamu-resources",
+ "kamu-resources-facade",
+ "kamu-resources-inmem",
+ "kamu-resources-services",
+ "messaging-outbox",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde_json",
+ "serde_yaml_ng",
+ "strum 0.28.0",
+ "test-log",
+ "time-source",
+ "tokio",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-inmem"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "futures",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-resources",
+ "kamu-resources-repo-tests",
+ "opendatafabric",
+ "test-group",
+ "test-log",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-postgres"
+version = "0.266.1"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "futures",
+ "internal-error",
+ "kamu-accounts-postgres",
+ "kamu-resources",
+ "kamu-resources-repo-tests",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-repo-tests"
+version = "0.266.1"
+dependencies = [
+ "chrono",
+ "database-common",
+ "dill",
+ "email-utils",
+ "event-sourcing",
+ "futures",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-resources",
+ "opendatafabric",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-services"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "email-utils",
+ "enum-variants",
+ "event-sourcing",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-messaging-outbox-inmem",
+ "kamu-resources",
+ "kamu-resources-inmem",
+ "kamu-resources-services",
+ "messaging-outbox",
+ "mockall",
+ "oop",
+ "opendatafabric",
+ "paste",
+ "pretty_assertions",
+ "serde",
+ "serde_json",
+ "test-log",
+ "thiserror 2.0.20",
+ "time-source",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-resources-sqlite"
+version = "0.266.1"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "futures",
+ "internal-error",
+ "kamu-accounts-sqlite",
+ "kamu-resources",
+ "kamu-resources-repo-tests",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-search"
 version = "0.266.1"
 dependencies = [
@@ -9110,6 +9503,45 @@ dependencies = [
  "test-log",
  "time-source",
  "tokio",
+]
+
+[[package]]
+name = "kamu-storage"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "event-sourcing",
+ "internal-error",
+ "kamu-configuration",
+ "kamu-resources",
+ "serde",
+ "strum 0.28.0",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "kamu-storage-services"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "event-sourcing",
+ "internal-error",
+ "kamu-resources",
+ "kamu-resources-services",
+ "kamu-storage",
+ "messaging-outbox",
+ "opendatafabric",
+ "paste",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time-source",
+ "tracing",
 ]
 
 [[package]]
@@ -9472,7 +9904,7 @@ dependencies = [
  "ena",
  "is-terminal",
  "itertools 0.10.5",
- "lalrpop-util",
+ "lalrpop-util 0.19.12",
  "petgraph 0.6.5",
  "regex",
  "regex-syntax 0.6.29",
@@ -9487,6 +9919,15 @@ name = "lalrpop-util"
 version = "0.19.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3c48237b9604c5a4702de6b824e02006c3214327564636aef27c1028a8fa0ed"
+
+[[package]]
+name = "lalrpop-util"
+version = "0.22.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5baa5e9ff84f1aefd264e6869907646538a52147a755d494517a8007fb48733"
+dependencies = [
+ "rustversion",
+]
 
 [[package]]
 name = "langtag"
@@ -9762,6 +10203,39 @@ name = "log"
 version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
+
+[[package]]
+name = "logos"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7251356ef8cb7aec833ddf598c6cb24d17b689d20b993f9d11a3d764e34e6458"
+dependencies = [
+ "logos-derive",
+]
+
+[[package]]
+name = "logos-codegen"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59f80069600c0d66734f5ff52cc42f2dabd6b29d205f333d61fd7832e9e9963f"
+dependencies = [
+ "beef",
+ "fnv",
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "regex-syntax 0.8.11",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "logos-derive"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24fb722b06a9dc12adb0963ed585f19fc61dc5413e6a9be9422ef92c091e731d"
+dependencies = [
+ "logos-codegen",
+]
 
 [[package]]
 name = "lru"
@@ -10456,7 +10930,7 @@ dependencies = [
  "http 1.5.0",
  "http-body-util",
  "humantime",
- "hyper 1.11.0",
+ "hyper",
  "itertools 0.14.0",
  "md-5 0.10.6",
  "parking_lot",
@@ -10711,6 +11185,7 @@ dependencies = [
  "tonic-prost",
  "url",
  "utoipa",
+ "uuid",
 ]
 
 [[package]]
@@ -10967,6 +11442,30 @@ checksum = "a2f5236d7c60cce1bcd76146bcbc4b2a5fb1234894fb84b1ec751863e8399e9c"
 dependencies = [
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "ouroboros"
+version = "0.18.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e0f050db9c44b97a94723127e6be766ac5c340c48f2c4bb3ffa11713744be59"
+dependencies = [
+ "aliasable",
+ "ouroboros_macro",
+ "static_assertions",
+]
+
+[[package]]
+name = "ouroboros_macro"
+version = "0.18.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c7028bdd3d43083f6d8d4d5187680d0d3560d54df4cc9d752005268b41e64d0"
+dependencies = [
+ "heck 0.4.1",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -11472,7 +11971,7 @@ dependencies = [
  "indoc 1.0.9",
  "js-sys",
  "lalrpop",
- "lalrpop-util",
+ "lalrpop-util 0.19.12",
  "serde",
  "serde_derive",
  "strum_macros 0.24.3",
@@ -11748,6 +12247,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro2-diagnostics"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af066a9c399a26e020ada66a034357a868728e72cd426f3adcd35f80d88d88c8"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+ "version_check",
+ "yansi",
+]
+
+[[package]]
 name = "prometheus"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11910,8 +12422,8 @@ dependencies = [
  "quinn-proto",
  "quinn-udp",
  "rustc-hash",
- "rustls 0.23.43",
- "socket2 0.6.5",
+ "rustls",
+ "socket2",
  "thiserror 2.0.20",
  "tokio",
  "tracing",
@@ -11931,7 +12443,7 @@ dependencies = [
  "rand_pcg",
  "ring",
  "rustc-hash",
- "rustls 0.23.43",
+ "rustls",
  "rustls-pki-types",
  "slab",
  "thiserror 2.0.20",
@@ -11949,7 +12461,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.5",
+ "socket2",
  "tracing",
  "windows-sys 0.61.2",
 ]
@@ -12330,12 +12842,12 @@ dependencies = [
  "futures-channel",
  "futures-core",
  "futures-util",
- "h2 0.4.16",
+ "h2",
  "http 1.5.0",
  "http-body 1.1.0",
  "http-body-util",
- "hyper 1.11.0",
- "hyper-rustls 0.27.9",
+ "hyper",
+ "hyper-rustls",
  "hyper-util",
  "js-sys",
  "log",
@@ -12343,7 +12855,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "quinn",
- "rustls 0.23.43",
+ "rustls",
  "rustls-native-certs",
  "rustls-pki-types",
  "serde",
@@ -12351,7 +12863,7 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper",
  "tokio",
- "tokio-rustls 0.26.4",
+ "tokio-rustls",
  "tokio-util",
  "tower",
  "tower-http",
@@ -12618,7 +13130,7 @@ dependencies = [
  "rustls-webpki 0.102.8",
  "thiserror 2.0.20",
  "tokio",
- "tokio-rustls 0.26.4",
+ "tokio-rustls",
  "tokio-stream",
  "tokio-util",
 ]
@@ -12706,18 +13218,6 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.21.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f56a14d1f48b391359b22f731fd4bd7e43c97f3c50eee276f3aa09c94784d3e"
-dependencies = [
- "log",
- "ring",
- "rustls-webpki 0.101.7",
- "sct",
-]
-
-[[package]]
-name = "rustls"
 version = "0.23.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
@@ -12761,16 +13261,6 @@ checksum = "2f4925028c7eb5d1fcdaf196971378ed9d2c1c4efc7dc5d011256f76c99c0a96"
 dependencies = [
  "web-time",
  "zeroize",
-]
-
-[[package]]
-name = "rustls-webpki"
-version = "0.101.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b6275d1ee7a1cd780b64aca7726599a1dbc893b1e64144529e55c3c2f745765"
-dependencies = [
- "ring",
- "untrusted",
 ]
 
 [[package]]
@@ -12924,16 +13414,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "sct"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da046153aa2352493d6cb7da4b6e5c0c057d8a1d0a9aa8560baffdd945acd414"
-dependencies = [
- "ring",
- "untrusted",
-]
 
 [[package]]
 name = "sec1"
@@ -13455,6 +13935,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
+name = "similar"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f66ca1f7aca2474dc10c942eb22feffc897735f54cd1db90138c2fddb490987"
+dependencies = [
+ "bstr",
+]
+
+[[package]]
 name = "simple_asn1"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13528,16 +14017,6 @@ name = "snap"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "199905e6153d6405f9728fe44daace35f8f837bbf830bb6e85fbd5828709a886"
-
-[[package]]
-name = "socket2"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e22376abed350d73dd1cd119b57ffccad95b4e585a7cda43e286245ce23c0678"
-dependencies = [
- "libc",
- "windows-sys 0.52.0",
-]
 
 [[package]]
 name = "socket2"
@@ -13633,7 +14112,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "percent-encoding",
- "rustls 0.23.43",
+ "rustls",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -14040,6 +14519,12 @@ dependencies = [
  "unicode-normalization",
  "unicode-properties",
 ]
+
+[[package]]
+name = "strsim"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "strsim"
@@ -14505,7 +14990,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2 0.6.5",
+ "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",
 ]
@@ -14534,21 +15019,11 @@ dependencies = [
 
 [[package]]
 name = "tokio-rustls"
-version = "0.24.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c28327cf380ac148141087fbfb9de9d7bd4e84ab5d2c28fbc911d753de8a7081"
-dependencies = [
- "rustls 0.21.12",
- "tokio",
-]
-
-[[package]]
-name = "tokio-rustls"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
 dependencies = [
- "rustls 0.23.43",
+ "rustls",
  "tokio",
 ]
 
@@ -14572,10 +15047,10 @@ checksum = "d25a406cddcc431a75d3d9afc6a7c0f7428d4891dd973e4d54c56b46127bf857"
 dependencies = [
  "futures-util",
  "log",
- "rustls 0.23.43",
+ "rustls",
  "rustls-pki-types",
  "tokio",
- "tokio-rustls 0.26.4",
+ "tokio-rustls",
  "tungstenite 0.28.0",
  "webpki-roots 0.26.11",
 ]
@@ -14588,10 +15063,10 @@ checksum = "8f72a05e828585856dacd553fba484c242c46e391fb0e58917c942ee9202915c"
 dependencies = [
  "futures-util",
  "log",
- "rustls 0.23.43",
+ "rustls",
  "rustls-pki-types",
  "tokio",
- "tokio-rustls 0.26.4",
+ "tokio-rustls",
  "tungstenite 0.29.0",
  "webpki-roots 0.26.11",
 ]
@@ -14664,16 +15139,16 @@ dependencies = [
  "axum",
  "base64",
  "bytes",
- "h2 0.4.16",
+ "h2",
  "http 1.5.0",
  "http-body 1.1.0",
  "http-body-util",
- "hyper 1.11.0",
+ "hyper",
  "hyper-timeout",
  "hyper-util",
  "percent-encoding",
  "pin-project",
- "socket2 0.6.5",
+ "socket2",
  "sync_wrapper",
  "tokio",
  "tokio-stream",
@@ -14925,7 +15400,7 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.9.5",
- "rustls 0.23.43",
+ "rustls",
  "rustls-pki-types",
  "sha1 0.10.7",
  "thiserror 2.0.20",
@@ -14944,7 +15419,7 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.9.5",
- "rustls 0.23.43",
+ "rustls",
  "rustls-pki-types",
  "sha1 0.10.7",
  "thiserror 2.0.20",

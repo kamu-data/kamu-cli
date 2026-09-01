@@ -26,6 +26,8 @@ internal-error = { workspace = true }
 
 aes-gcm = { version = "0.10.3" }
 argon2 = { version = "0.5" }
+base64 = { version = "0.22", default-features = false, features = ["std"] }
+hex = { version = "0.4", default-features = false, features = ["std"] }
 password-hash = { version = "0.5", default-features = false }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false }

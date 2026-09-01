@@ -1,0 +1,359 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::assert_matches;
+use std::sync::Arc;
+
+use chrono::Utc;
+use dill::CatalogBuilder;
+use kamu_resources::{
+    DeclarativeResource,
+    ReconcilableResource,
+    ResourceAggregateLoader,
+    ResourceID,
+    ResourceLabelProjectionRepository,
+    ResourcePersistenceError,
+    ResourcePersistenceService,
+    ResourceRawEventQuery,
+    ResourceSchemaProvider,
+    ResourceSnapshot,
+};
+use kamu_resources_services::testing::BaseResourceServiceHarness;
+
+use crate::tests::utils::{
+    TestResource,
+    TestResourceReconciler,
+    TestResourceSpec,
+    make_fresh_aggregate,
+    register_test_resource_resource_service_layer,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_resource_persists_snapshot_and_events() {
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    let loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    assert_eq!(*loaded.id(), id);
+    assert_eq!(loaded.spec().value, "res-a");
+    assert_eq!(loaded.headers().name.as_str(), "res-a");
+
+    let snapshot = harness.find_snapshot(&id).await;
+    assert_eq!(snapshot.id, id);
+    assert_eq!(snapshot.headers.name.as_str(), "res-a");
+    pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
+    assert!(
+        snapshot.last_event_id.is_some(),
+        "snapshot must record last event id"
+    );
+    assert_eq!(snapshot.last_event_id, loaded.last_stored_event_id());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_resource_populates_label_projection() {
+    let harness = ResourcePersistenceServiceHarness::new();
+
+    let headers = kamu_resources::ResourceHeadersInputExt::try_new(
+        Some(odf::metadata::auth::AccountRef {
+            id: Some(harness.account_handle.id),
+            did: Some(harness.account_handle.did.clone()),
+            name: Some(harness.account_handle.name.clone()),
+        }),
+        "res-a",
+        vec![
+            ("env".parse().unwrap(), serde_json::json!("prod")),
+            // Structured values are not indexed.
+            (
+                "coordinates".parse().unwrap(),
+                serde_json::json!({"lat": 1}),
+            ),
+        ],
+        vec![],
+    )
+    .unwrap();
+
+    let id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let mut agg = crate::tests::utils::TestResource::try_create(
+        Utc::now(),
+        id,
+        headers,
+        TestResourceSpec {
+            value: "res-a".to_string(),
+        },
+    )
+    .unwrap();
+
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    assert_eq!(
+        harness.label_projection_entries(&id).await,
+        vec![("env".to_string(), "prod".to_string())]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_save_resource_resyncs_label_projection() {
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    assert_eq!(harness.label_projection_entries(&id).await, vec![]);
+
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
+        Some(odf::metadata::auth::AccountRef {
+            id: Some(harness.account_handle.id),
+            did: Some(harness.account_handle.did.clone()),
+            name: Some(harness.account_handle.name.clone()),
+        }),
+        "res-a",
+        vec![("env".parse().unwrap(), serde_json::json!("staging"))],
+        vec![],
+    )
+    .unwrap();
+    loaded.try_update_headers(Utc::now(), new_headers).unwrap();
+    harness.persistence_svc().save(&mut loaded).await.unwrap();
+
+    assert_eq!(
+        harness.label_projection_entries(&id).await,
+        vec![("env".to_string(), "staging".to_string())]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_duplicate_id_returns_error() {
+    let harness = ResourcePersistenceServiceHarness::new();
+
+    let (_, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    // Same account + schema + name but a fresh UID — repository duplicate check
+    // fires
+    let (_, mut agg2) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    let result = harness.persistence_svc().create(&mut agg2).await;
+
+    assert_matches!(result, Err(ResourcePersistenceError::Duplicate(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_save_resource_updates_snapshot() {
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    loaded
+        .try_update_spec(
+            Utc::now(),
+            TestResourceSpec {
+                value: "updated".to_string(),
+            },
+        )
+        .unwrap();
+    harness.persistence_svc().save(&mut loaded).await.unwrap();
+
+    let reloaded = harness.aggregate_loader().load(&id).await.unwrap();
+    assert_eq!(reloaded.spec().value, "updated");
+
+    let snapshot = harness.find_snapshot(&id).await;
+    pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "updated" }));
+    assert_eq!(snapshot.last_event_id, reloaded.last_stored_event_id());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_delete_resource_marks_deleted() {
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    let now = Utc::now();
+    harness
+        .persistence_svc()
+        .delete(&mut loaded, now)
+        .await
+        .unwrap();
+
+    let reloaded = harness.aggregate_loader().load(&id).await.unwrap();
+    assert!(
+        reloaded.headers().deleted_at.is_some(),
+        "expected deleted_at to be set after deletion"
+    );
+
+    // Deleted snapshots are hidden from live lookups — finding None is correct
+    assert!(
+        harness.snapshot_not_found(&id).await,
+        "deleted resource must not appear in live snapshot lookup"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_delete_many_resources_batch() {
+    let harness = ResourcePersistenceServiceHarness::new();
+
+    let (id_a, mut agg_a) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    let (id_b, mut agg_b) = make_fresh_aggregate(harness.account_handle.clone(), "res-b");
+    let (id_c, mut agg_c) = make_fresh_aggregate(harness.account_handle.clone(), "res-c");
+
+    harness.persistence_svc().create(&mut agg_a).await.unwrap();
+    harness.persistence_svc().create(&mut agg_b).await.unwrap();
+    harness.persistence_svc().create(&mut agg_c).await.unwrap();
+
+    let loaded_a = harness.aggregate_loader().load(&id_a).await.unwrap();
+    let loaded_b = harness.aggregate_loader().load(&id_b).await.unwrap();
+    let loaded_c = harness.aggregate_loader().load(&id_c).await.unwrap();
+
+    let now = Utc::now();
+    harness
+        .persistence_svc()
+        .delete_many(&mut [loaded_a, loaded_b, loaded_c], now)
+        .await
+        .unwrap();
+
+    for id in [&id_a, &id_b, &id_c] {
+        let reloaded = harness.aggregate_loader().load(id).await.unwrap();
+        assert!(
+            reloaded.headers().deleted_at.is_some(),
+            "expected deleted_at set in aggregate for {id:?}"
+        );
+
+        // Deleted snapshots are hidden from live lookups — finding None is correct
+        assert!(
+            harness.snapshot_not_found(id).await,
+            "deleted resource must not appear in live snapshot lookup for {id:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_concurrent_modification_detected() {
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    // Load the same aggregate into two independent instances
+    let mut agg_1 = harness.aggregate_loader().load(&id).await.unwrap();
+    let mut agg_2 = harness.aggregate_loader().load(&id).await.unwrap();
+
+    let now = Utc::now();
+
+    // Save agg_1 first — this advances the event cursor in the store
+    agg_1
+        .try_update_spec(
+            now,
+            TestResourceSpec {
+                value: "from-agg-1".to_string(),
+            },
+        )
+        .unwrap();
+    harness.persistence_svc().save(&mut agg_1).await.unwrap();
+
+    // agg_2 still carries the old last_stored_event_id — save must fail
+    agg_2
+        .try_update_spec(
+            now,
+            TestResourceSpec {
+                value: "from-agg-2".to_string(),
+            },
+        )
+        .unwrap();
+    let result = harness.persistence_svc().save(&mut agg_2).await;
+
+    assert_matches!(
+        result,
+        Err(ResourcePersistenceError::ConcurrentModification(_))
+    );
+}
+
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseResourceServiceHarness, base)]
+struct ResourcePersistenceServiceHarness {
+    base: BaseResourceServiceHarness,
+    catalog: dill::Catalog,
+    account_handle: odf::AccountHandle,
+}
+
+impl ResourcePersistenceServiceHarness {
+    fn new() -> Self {
+        let base = BaseResourceServiceHarness::new();
+
+        let mut b = CatalogBuilder::new_chained(base.catalog());
+        register_test_resource_resource_service_layer(&mut b);
+        b.add::<TestResourceReconciler>();
+
+        Self {
+            base,
+            catalog: b.build(),
+            account_handle: odf::AccountHandle::new_test("test"),
+        }
+    }
+
+    fn persistence_svc(&self) -> Arc<dyn ResourcePersistenceService<TestResource>> {
+        self.catalog.get_one().unwrap()
+    }
+
+    fn aggregate_loader(&self) -> Arc<dyn ResourceAggregateLoader<TestResource>> {
+        self.catalog.get_one().unwrap()
+    }
+
+    async fn find_snapshot(&self, id: &ResourceID) -> ResourceSnapshot {
+        self.resource_repo()
+            .find_resource_snapshot(&ResourceRawEventQuery {
+                schema: TestResource::schema().clone(),
+                id: *id,
+            })
+            .await
+            .unwrap()
+            .expect("snapshot must exist")
+    }
+
+    async fn snapshot_not_found(&self, id: &ResourceID) -> bool {
+        self.resource_repo()
+            .find_resource_snapshot(&ResourceRawEventQuery {
+                schema: TestResource::schema().clone(),
+                id: *id,
+            })
+            .await
+            .unwrap()
+            .is_none()
+    }
+
+    async fn label_projection_entries(&self, id: &ResourceID) -> Vec<(String, String)> {
+        self.catalog
+            .get_one::<dyn ResourceLabelProjectionRepository>()
+            .unwrap()
+            .find_entries(id)
+            .await
+            .unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

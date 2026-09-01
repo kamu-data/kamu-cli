@@ -1,0 +1,54 @@
+[package]
+name = "kamu-configuration"
+description = "Domain model of managed configuration resources"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+sqlx = ["dep:sqlx"]
+
+
+[dependencies]
+crypto-utils = { workspace = true }
+event-sourcing = { workspace = true }
+internal-error = { workspace = true }
+kamu-resources = { workspace = true }
+odf = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+hex = { version = "0.4", default-features = false, features = ["std"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+uuid = { version = "1", default-features = false, features = ["v4"] }
+
+# Optional
+sqlx = { optional = true, version = "0.8", default-features = false, features = [
+    "macros",
+] }
+
+
+[dev-dependencies]
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+] }
+serde_json = { version = "1", default-features = false }

@@ -1,0 +1,316 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use chrono::{DateTime, Utc};
+use event_sourcing::{EventID, SaveError};
+use internal_error::ErrorIntoInternal;
+
+use crate::domain::{
+    CreateResourceError,
+    DeclarativeResource,
+    InvariantViolationOf,
+    ReconcilableEventSourcedResource,
+    ResourceLabelProjectionRepository,
+    ResourcePersistenceError,
+    ResourceRepository,
+    ResourceSchemaProvider,
+    ResourceSnapshot,
+    ResourceSnapshotUpdate,
+    UpdateResourceError,
+    string_label_entries,
+};
+use crate::{ResourceDurableStateValidator, ResourceExtensionSchemaRegistry};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ResourcePersistenceServiceHelper<'a, R>
+where
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+{
+    resource_repository: &'a dyn ResourceRepository,
+    label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
+    event_store: &'a R::Store,
+    extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
+}
+
+impl<'a, R> ResourcePersistenceServiceHelper<'a, R>
+where
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
+    R::Spec: serde::Serialize,
+{
+    pub fn new(
+        resource_repository: &'a dyn ResourceRepository,
+        label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
+        event_store: &'a R::Store,
+        extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
+    ) -> Self {
+        Self {
+            resource_repository,
+            label_projection_repository,
+            event_store,
+            extension_schema_registry,
+        }
+    }
+
+    pub async fn create(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
+        let snapshot = resource.make_resource_snapshot()?;
+        self.validate_snapshot(&snapshot)?;
+
+        match self.resource_repository.create_resource(&snapshot).await {
+            Ok(()) => {}
+            Err(CreateResourceError::Duplicate(err)) => {
+                return Err(ResourcePersistenceError::Duplicate(err));
+            }
+            Err(CreateResourceError::Internal(err)) => {
+                return Err(ResourcePersistenceError::Internal(err));
+            }
+        }
+
+        match resource.aggregate_mut().save(self.event_store).await {
+            Ok(()) => {}
+            Err(SaveError::ConcurrentModification(err)) => {
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
+            }
+            Err(err) => {
+                return Err(ResourcePersistenceError::Internal(err.int_err()));
+            }
+        }
+
+        self.sync_snapshot(resource, None).await
+    }
+
+    pub async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
+        let expected_last_event_id = resource.aggregate().last_stored_event_id();
+        let snapshot = resource.make_resource_snapshot()?;
+        self.validate_snapshot(&snapshot)?;
+
+        match resource.aggregate_mut().save(self.event_store).await {
+            Ok(()) => {}
+            Err(SaveError::ConcurrentModification(err)) => {
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
+            }
+            Err(err) => {
+                return Err(ResourcePersistenceError::Internal(err.int_err()));
+            }
+        }
+
+        self.sync_snapshot(resource, expected_last_event_id).await
+    }
+
+    fn validate_snapshot(
+        &self,
+        snapshot: &ResourceSnapshot,
+    ) -> Result<(), ResourcePersistenceError> {
+        ResourceDurableStateValidator::new(self.extension_schema_registry)
+            .validate_snapshot(snapshot)
+            .map_err(ResourcePersistenceError::InvalidDurableState)
+    }
+}
+
+impl<R> ResourcePersistenceServiceHelper<'_, R>
+where
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R::LifecycleError:
+        InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
+    R::Spec: serde::Serialize,
+{
+    pub async fn delete(
+        &self,
+        resource: &mut R,
+        now: DateTime<Utc>,
+    ) -> Result<(), ResourcePersistenceError> {
+        self.delete_many(std::slice::from_mut(resource), now).await
+    }
+
+    pub async fn delete_many(
+        &self,
+        resources: &mut [R],
+        now: DateTime<Utc>,
+    ) -> Result<(), ResourcePersistenceError> {
+        for resource in resources.iter_mut() {
+            Self::mark_deleted(resource, now)?;
+        }
+
+        let expected_last_event_ids = resources
+            .iter()
+            .map(|resource| resource.aggregate().last_stored_event_id())
+            .collect::<Vec<_>>();
+
+        match event_sourcing::Aggregate::save_multi(resources, self.event_store).await {
+            Ok(()) => {}
+            Err(SaveError::ConcurrentModification(err)) => {
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
+            }
+            Err(err) => {
+                return Err(ResourcePersistenceError::Internal(err.int_err()));
+            }
+        }
+
+        self.sync_snapshots(resources, expected_last_event_ids)
+            .await
+    }
+
+    fn mark_deleted(resource: &mut R, now: DateTime<Utc>) -> Result<(), ResourcePersistenceError> {
+        let tombstone_name =
+            kamu_resources::ResourceName::new_unchecked(&format!("deleted-{}", resource.id()));
+
+        resource.try_delete(now, tombstone_name).map_err(|err| {
+            ResourcePersistenceError::Internal(
+                format!("{err}")
+                    .int_err()
+                    .with_context(format!("Failed to delete resource {}", resource.id())),
+            )
+        })
+    }
+}
+
+impl<R> ResourcePersistenceServiceHelper<'_, R>
+where
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
+    R::Spec: serde::Serialize,
+{
+    async fn sync_snapshot(
+        &self,
+        resource: &R,
+        expected_last_event_id: Option<EventID>,
+    ) -> Result<(), ResourcePersistenceError> {
+        self.sync_snapshots(std::slice::from_ref(resource), vec![expected_last_event_id])
+            .await
+    }
+
+    async fn sync_snapshots(
+        &self,
+        resources: &[R],
+        expected_last_event_ids: Vec<Option<EventID>>,
+    ) -> Result<(), ResourcePersistenceError> {
+        let updates = resources
+            .iter()
+            .zip(expected_last_event_ids)
+            .map(|(resource, expected_last_event_id)| {
+                Ok(ResourceSnapshotUpdate {
+                    snapshot: resource.make_resource_snapshot()?,
+                    expected_last_event_id,
+                })
+            })
+            .collect::<Result<Vec<_>, ResourcePersistenceError>>()?;
+
+        match self.resource_repository.update_resources(&updates).await {
+            Ok(()) => {}
+            Err(UpdateResourceError::ConcurrentModification(err)) => {
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
+            }
+            Err(UpdateResourceError::Duplicate(err)) => {
+                return Err(ResourcePersistenceError::Internal(
+                    format!("{err}").int_err().with_context(
+                        "Unexpected duplicate resource state while syncing resources",
+                    ),
+                ));
+            }
+            Err(err) => return Err(ResourcePersistenceError::Internal(err.int_err())),
+        }
+
+        for update in &updates {
+            self.label_projection_repository
+                .replace_entries(
+                    &update.snapshot.id,
+                    &string_label_entries(&update.snapshot.headers.labels),
+                )
+                .await
+                .map_err(ResourcePersistenceError::Internal)?;
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[macro_export]
+macro_rules! declare_resource_persistence_service {
+    (
+        service = $service:ident,
+        resource = $resource:ty,
+        store = $store:path
+    ) => {
+        #[dill::component]
+        #[dill::interface(dyn kamu_resources::ResourcePersistenceService<$resource>)]
+        pub struct $service {
+            resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
+            label_projection_repository:
+                std::sync::Arc<dyn kamu_resources::ResourceLabelProjectionRepository>,
+            event_store: std::sync::Arc<dyn $store>,
+            extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
+        }
+
+        #[async_trait::async_trait]
+        impl kamu_resources::ResourcePersistenceService<$resource> for $service {
+            async fn create(
+                &self,
+                resource: &mut $resource,
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
+                    self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
+                    self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
+                );
+
+                helper.create(resource).await
+            }
+
+            async fn save(
+                &self,
+                resource: &mut $resource,
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
+                    self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
+                    self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
+                );
+
+                helper.save(resource).await
+            }
+
+            async fn delete(
+                &self,
+                resource: &mut $resource,
+                now: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
+                    self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
+                    self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
+                );
+
+                helper.delete(resource, now).await
+            }
+
+            async fn delete_many(
+                &self,
+                resources: &mut [$resource],
+                now: chrono::DateTime<chrono::Utc>,
+            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
+                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
+                    self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
+                    self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
+                );
+
+                helper.delete_many(resources, now).await
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

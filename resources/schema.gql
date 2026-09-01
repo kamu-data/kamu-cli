@@ -198,6 +198,26 @@ type AccountFlowsMut {
 	triggers: AccountFlowTriggersMut!
 }
 
+"""
+Link to an account.
+
+Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
+"""
+type AccountHandle {
+	"""
+	ID of the account resource.
+	"""
+	id: ResourceID!
+	"""
+	DID of the account.
+	"""
+	did: AccountID!
+	"""
+	Name of the account.
+	"""
+	name: AccountName!
+}
+
 scalar AccountID
 
 input AccountLookupFilter {
@@ -279,6 +299,12 @@ type AccountQuotasUsageStorage {
 	Total bytes limit for this account.
 	"""
 	limitTotalBytes: Int!
+}
+
+input AccountRefInput {
+	id: ResourceID
+	did: AccountID
+	name: AccountName
 }
 
 enum AccountType {
@@ -479,6 +505,11 @@ type AdminSearchMut {
 	resetSearchIndices(entityNames: [SearchEntityName!]): String!
 }
 
+input ApplyManifestInput {
+	manifest: String!
+	format: ResourceManifestFormat!
+}
+
 type ApplyRolesMatrixResult {
 	message: String!
 }
@@ -566,6 +597,47 @@ type AuthWeb3Mut {
 Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
+
+type BatchResourceHandleSuccess {
+	requestIndex: Int!
+	handle: ResourceHandle!
+}
+
+union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
+
+type BatchResourceHandlesResult {
+	handles: [BatchResourceHandleSuccess!]!
+	problems: [BatchResourceProblem!]!
+}
+
+type BatchResourceManifestSuccess {
+	requestIndex: Int!
+	manifest: ResourceRenderManifestResult!
+}
+
+union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
+
+type BatchResourceManifestsResult {
+	manifests: [BatchResourceManifestSuccess!]!
+	problems: [BatchResourceProblem!]!
+}
+
+type BatchResourceProblem {
+	requestIndex: Int!
+	problem: ResourceLookupProblem!
+}
+
+type BatchResourceSuccess {
+	requestIndex: Int!
+	resource: Resource!
+}
+
+union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
+
+type BatchResourcesResult {
+	resources: [BatchResourceSuccess!]!
+	problems: [BatchResourceProblem!]!
+}
 
 type BlockRef {
 	name: String!
@@ -1283,16 +1355,14 @@ type DatasetEndpoints {
 	odata: OdataProtocolDesc!
 }
 
-scalar DatasetEnvVarID
-
 type DatasetEnvVars {
-	exposedValue(datasetEnvVarId: DatasetEnvVarID!): String!
+	exposedValue(datasetEnvVarKey: String!): String!
 	listEnvVariables(page: Int, perPage: Int): ViewDatasetEnvVarConnection!
 }
 
 type DatasetEnvVarsMut {
 	upsertEnvVariable(key: String!, value: String!, isSecret: Boolean!): UpsertDatasetEnvVarResult!
-	deleteEnvVariable(id: DatasetEnvVarID!): DeleteDatasetEnvVarResult!
+	deleteEnvVariable(key: String!): DeleteDatasetEnvVarResult!
 }
 
 type DatasetEnvVarsPermissions {
@@ -1806,12 +1876,12 @@ interface DeleteDatasetEnvVarResult {
 }
 
 type DeleteDatasetEnvVarResultNotFound implements DeleteDatasetEnvVarResult {
-	envVarId: DatasetEnvVarID!
+	envVarKey: String!
 	message: String!
 }
 
 type DeleteDatasetEnvVarResultSuccess implements DeleteDatasetEnvVarResult {
-	envVarId: DatasetEnvVarID!
+	envVarKey: String!
 	message: String!
 }
 
@@ -1845,6 +1915,8 @@ type DependencyDatasetResultNotAccessible implements DependencyDatasetResult {
 }
 
 scalar DeviceCode
+
+scalar Did
 
 """
 Wallet address in did:pkh format.
@@ -3215,6 +3287,10 @@ type Mutation {
 	"""
 	collaboration: CollaborationMut!
 	"""
+	Resource-related functionality group
+	"""
+	resources: ResourcesMut!
+	"""
 	Admin-related functionality group
 	"""
 	admin: AdminMut!
@@ -3401,6 +3477,10 @@ type Query {
 	Search-related functionality group
 	"""
 	search: Search!
+	"""
+	Resource-related functionality group
+	"""
+	resources: Resources!
 	"""
 	Querying and data manipulations
 	"""
@@ -3742,6 +3822,606 @@ type RequestHeader {
 	value: String!
 }
 
+"""
+Top-level container for canonical representation of a resource that
+specifies the type and version of the resource, carries identity, ownership,
+and status information.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/Resource
+"""
+type Resource {
+	"""
+	Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
+	"""
+	schema: TypeUri!
+	"""
+	Container for identity and ownership information of a resource.
+	"""
+	headers: ResourceHeaders!
+	"""
+	Specifies the desired state of a resource.
+	"""
+	spec: JSON!
+	"""
+	Resource lifecycle and reconciliation information.
+	"""
+	status: ResourceStatus!
+}
+
+"""
+The account selector supplied for this operation could not be resolved to a
+concrete account (empty selector, unknown id/name, or a selector whose
+fields disagree with each other). This is an input-validation problem, not
+an authorization outcome — a caller denied access to another account's
+resources gets a top-level GraphQL error, never this type.
+"""
+type ResourceAccountResolutionProblem {
+	code: ResourceAccountResolutionProblemCode!
+	message: String!
+}
+
+enum ResourceAccountResolutionProblemCode {
+	EMPTY_SELECTOR
+	ACCOUNT_NOT_FOUND_BY_ID
+	ACCOUNT_NOT_FOUND_BY_NAME
+	SELECTOR_MISMATCH
+}
+
+"""
+A type-less reference whose name matched in several types. A reference names
+exactly one resource, so this is an addressing failure rather than a
+multi-match — the caller must say which type they meant.
+"""
+type ResourceAmbiguousTypeProblem {
+	name: ResourceName!
+	typeNames: [TypeName!]!
+	message: String!
+}
+
+scalar ResourceAnnotations
+
+"""
+A type-less reference whose name matched nothing in any type. Distinct from
+`ResourceNameNotFoundProblem`, which can name the single type it searched.
+"""
+type ResourceAnyTypeNameNotFoundProblem {
+	name: ResourceName!
+	message: String!
+}
+
+type ResourceApplyManifestItemResult {
+	requestIndex: Int!
+	outcome: ResourceApplyOutcome!
+}
+
+type ResourceApplyManifestsResult {
+	items: [ResourceApplyManifestItemResult!]!
+}
+
+enum ResourceApplyOperation {
+	CREATED
+	UPDATED
+	UNTOUCHED
+}
+
+union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceAccountResolutionProblem | ResourceInvalidHeaderProblem | ResourceInvalidSpecProblem
+
+"""
+The manifest text could not be parsed (malformed JSON/YAML).
+"""
+type ResourceApplyParseManifestProblem {
+	message: String!
+}
+
+type ResourceApplyRejection {
+	category: ResourceApplyRejectionCategory!
+	message: String!
+}
+
+enum ResourceApplyRejectionCategory {
+	IMMUTABLE_FIELD_CHANGED
+	BUSINESS_VALIDATION_FAILED
+	REFERENCED_OBJECT_MISSING
+	LIFECYCLE_RULE_CONFLICT
+}
+
+"""
+An accepted apply, reported as the canonical manifest on each side rather
+than a pre-computed change list: clients decide how to diff and display it.
+"""
+type ResourceApplySuccess {
+	operation: ResourceApplyOperation!
+	resource: Resource!
+	"""
+	Canonical manifest before the apply. Null **iff** the resource is being
+	created.
+	"""
+	before: JSON
+	"""
+	Canonical manifest the apply produced (or would produce). Always present
+	on an accepted apply.
+	"""
+	after: JSON!
+	warnings: [ResourceApplyWarning!]!
+}
+
+type ResourceApplyWarning {
+	code: String!
+	path: String
+	message: String!
+}
+
+scalar ResourceConditions
+
+type ResourceConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ResourceSummary!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [ResourceEdge!]!
+}
+
+union ResourceDeleteOutcome = ResourceDeleteResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
+
+type ResourceDeleteResult {
+	resources: [ResourceDeleteSuccess!]!
+	problems: [BatchResourceProblem!]!
+}
+
+type ResourceDeleteSuccess {
+	requestIndex: Int!
+	resourceId: ResourceID!
+}
+
+type ResourceEdge {
+	node: ResourceSummary!
+}
+
+"""
+A reference that named neither an id nor a name.
+"""
+type ResourceEmptyRefProblem {
+	message: String!
+}
+
+type ResourceHandle {
+	id: ResourceID!
+	type: TypeUri!
+	did: Did
+	name: ResourceName!
+	account: AccountHandle!
+}
+
+type ResourceHandleConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ResourceHandle!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [ResourceHandleEdge!]!
+}
+
+type ResourceHandleEdge {
+	node: ResourceHandle!
+}
+
+union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
+
+enum ResourceHeaderValidationProblemCode {
+	EMPTY_NAME
+	NAME_TOO_LONG
+	INVALID_NAME
+	TOO_MANY_LABELS
+	DUPLICATE_LABEL_KEY
+	TOO_MANY_ANNOTATIONS
+	DUPLICATE_ANNOTATION_KEY
+	RESOURCE_EXTENSION_SCHEMA
+}
+
+"""
+Container for identity and ownership information of a resource.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
+"""
+type ResourceHeaders {
+	"""
+	Unique identifier of a resource within entire ODF node. Automatically
+	assigned upon resource creation.
+	"""
+	id: ResourceID!
+	"""
+	Symbolic name of a resource that identifies it within a scope of an
+	onwing account.
+	"""
+	name: ResourceName!
+	"""
+	Link to the account that owns the resource.
+	"""
+	account: AccountHandle!
+	"""
+	Map of string keys and values that can be used to organize, categorize,
+	and query resources.
+	"""
+	labels: ResourceLabels!
+	"""
+	Annotations is a key value map stored with a resource that may be set by
+	external tools to store and retrieve arbitrary metadata. Unlike labels,
+	annotations are not indexed and cannot be queried by.
+	"""
+	annotations: ResourceAnnotations!
+	"""
+	A sequential number that changes every time the resource header and spec
+	are updated. Does not increment on status changes, thus signifying
+	changes to the desired state. Populated by the system. Starts with `1`.
+	"""
+	generation: Uint64!
+	"""
+	Time when the resource was first applied and assigned an identity.
+	"""
+	createdAt: DateTime!
+	"""
+	Time when the resource was last updated, including header, spec, and
+	status updates.
+	"""
+	updatedAt: DateTime!
+	"""
+	Time when the resource was deleted.
+	"""
+	deletedAt: DateTime
+}
+
+scalar ResourceID
+
+type ResourceIDNotFoundProblem {
+	id: ResourceID!
+	message: String!
+}
+
+"""
+A header field value (e.g. name, label key) failed validation.
+"""
+type ResourceInvalidHeaderProblem {
+	code: ResourceHeaderValidationProblemCode!
+	message: String!
+}
+
+"""
+A selector's `labels` could not be resolved into a matchable filter.
+"""
+type ResourceInvalidLabelFilterProblem {
+	code: ResourceLabelFilterProblemCode!
+	message: String!
+}
+
+"""
+The `spec` field failed domain validation.
+"""
+type ResourceInvalidSpecProblem {
+	schema: TypeUri!
+	message: String!
+}
+
+"""
+One authored `key = value` label predicate.
+"""
+input ResourceLabelFilterEntryInput {
+	key: String!
+	value: JSON!
+}
+
+"""
+Selects resources by label predicates.
+A list preserves duplicate keys for validation.
+"""
+input ResourceLabelFilterInput {
+	entries: [ResourceLabelFilterEntryInput!]!
+}
+
+enum ResourceLabelFilterProblemCode {
+	INVALID_KEY
+	RESOURCE_EXTENSION_SCHEMA
+	NON_STRING_VALUE
+	DUPLICATE_AFTER_CANONICALIZATION
+	UNSUPPORTED_EXPRESSION
+}
+
+scalar ResourceLabels
+
+enum ResourceListColumnDataType {
+	STRING
+	U_INT_64
+	BOOL
+}
+
+type ResourceListColumnDescriptor {
+	key: String!
+	header: String!
+	dataType: ResourceListColumnDataType!
+	visibility: ResourceListColumnVisibility!
+}
+
+type ResourceListColumnValueView {
+	key: String!
+	stringValue: String
+	uint64Value: Uint64
+	boolValue: Boolean
+}
+
+enum ResourceListColumnVisibility {
+	DEFAULT
+	WIDE_ONLY
+}
+
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
+
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceAnyTypeNameNotFoundProblem | ResourceAmbiguousTypeProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem
+
+enum ResourceManifestFormat {
+	JSON
+	YAML
+}
+
+scalar ResourceName
+
+"""
+A reference supplied both an `id` and a `name` that name different
+resources. The pair is a consistency assertion, so the mismatch fails the
+entry rather than letting the `id` silently win.
+"""
+type ResourceNameMismatchProblem {
+	id: ResourceID!
+	expectedName: ResourceName!
+	actualName: ResourceName!
+	message: String!
+}
+
+type ResourceNameNotFoundProblem {
+	typeName: TypeName!
+	name: ResourceName!
+	message: String!
+}
+
+"""
+Represents the lifecycle stage of a resource.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourcePhase
+"""
+enum ResourcePhase {
+	PENDING
+	RECONCILING
+	READY
+	FAILED
+}
+
+type ResourcePhaseCounts {
+	pending: Uint64!
+	reconciling: Uint64!
+	ready: Uint64!
+	failed: Uint64!
+}
+
+"""
+Reference to exactly one resource, mirroring the ODF `ResourceRef`.
+
+Not a `oneOf`: ODF allows `id` and `name` together as a consistency
+assertion, so both are accepted and at least one is required. Validation
+happens at conversion rather than in the schema, which cannot express
+"at least one of".
+"""
+input ResourceRefInput {
+	account: AccountRefInput
+	"""
+	Canonical selector (`variablesets`), alias (`vs`), ODF type name
+	(`VariableSet`), or full schema URI — all resolve to the same type.
+	
+	`null` spans every type: the resource is looked up across all of them.
+	Since a ref names exactly one resource, a name matching in several types
+	is an ambiguity error rather than a multi-match.
+	"""
+	type: ResourceTypeSelectorInput
+	id: ResourceID
+	"""
+	Exact name. Never a pattern; use a selector for pattern matching.
+	"""
+	name: ResourceName
+}
+
+type ResourceRenderManifestResult {
+	manifest: String!
+	format: ResourceManifestFormat!
+}
+
+type ResourceSchemaMismatchProblem {
+	id: ResourceID!
+	expectedSchema: TypeUri!
+	actualSchema: TypeUri!
+	message: String!
+}
+
+"""
+Matches zero or many resources, mirroring the ODF `ResourceSelector`.
+
+Several selectors in one call act as a logical OR, which is what lets a
+single call span resource types. Every field is optional: a selector with no
+`type` spans every type, and one narrowing by nothing matches all of them.
+"""
+input ResourceSelectorInput {
+	"""
+	The account this selector spans. Defaults to the call-level `account`
+	when unset, so one call can span several accounts — subject to the
+	caller being authorized for each; any denial fails the whole call.
+	"""
+	account: AccountRefInput
+	"""
+	Canonical selector (`variablesets`), alias (`vs`), ODF type name
+	(`VariableSet`), or full schema URI. `null` spans every type.
+	"""
+	type: ResourceTypeSelectorInput
+	id: ResourceID
+	"""
+	Name pattern in SQL `LIKE` format, per the ODF schema. Only `%` acts as
+	a wildcard — `_` is escaped to a literal underscore. A pattern with no
+	`%` matches that name exactly.
+	"""
+	name: String
+	"""
+	Labels this selector requires, all of which must be present. Applies to
+	this selector alone, so one call may filter differently per type.
+	Values must be strings — only string-valued labels are indexed.
+	"""
+	labels: ResourceLabelFilterInput
+}
+
+scalar ResourceSelectorName
+
+"""
+Resource lifecycle and reconciliation information.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
+"""
+type ResourceStatus {
+	"""
+	Represents the lifecycle stage of a resource.
+	"""
+	phase: ResourcePhase!
+	"""
+	Resource generation that was last processed by the main resource
+	controller.
+	"""
+	observedGeneration: Uint64
+	"""
+	Time when the controller last reconciled the desired resource state as
+	defined in `observedGeneration`.
+	"""
+	reconciledAt: DateTime
+	"""
+	Detailed conditions describing the state of the resource that are added
+	by controllers.
+	"""
+	conditions: ResourceConditions!
+}
+
+type ResourceStatusSummary {
+	phase: ResourcePhase
+	observedGeneration: Uint64
+	ready: Boolean
+}
+
+type ResourceSummary {
+	id: ResourceID!
+	schema: TypeUri!
+	name: ResourceName!
+	description: String
+	generation: Uint64!
+	createdAt: DateTime!
+	updatedAt: DateTime!
+	status: ResourceStatusSummary
+	listValues: [ResourceListColumnValueView!]!
+}
+
+type ResourceTypeCountSummary {
+	schema: TypeUri!
+	typeName: TypeName!
+	totalCount: Uint64!
+	phaseCounts: ResourcePhaseCounts!
+}
+
+type ResourceTypeDescriptor {
+	canonicalSelector: ResourceSelectorName!
+	selectorAliases: [ResourceSelectorName!]!
+	schema: TypeUri!
+	listColumns: [ResourceListColumnDescriptor!]!
+}
+
+input ResourceTypeSelectorInput {
+	selector: ResourceTypeSelectorRaw!
+}
+
+scalar ResourceTypeSelectorRaw
+
+"""
+A resource type was addressed by its canonical schema URI, but no descriptor
+is registered for it. This is reachable *only* on the apply-manifest path,
+where the `$schema` URI comes straight from the user's manifest; selector
+lookups surface [`ResourceUnsupportedSelectorProblem`] instead, so this
+field never carries a short selector masquerading as a URI.
+"""
+type ResourceUnsupportedDescriptorProblem {
+	schema: TypeUri!
+	message: String!
+}
+
+"""
+A resource type was addressed by a short selector (main name or alias, e.g.
+`vs`), but no descriptor matches it. The `selector` is the raw user-supplied
+string — never a schema URI (the public API selects resource types by
+selector).
+"""
+type ResourceUnsupportedSelectorProblem {
+	selector: ResourceTypeSelectorRaw!
+	message: String!
+}
+
+type Resources {
+	"""
+	Returns resource types supported by the current server
+	"""
+	supportedResourceTypes: [ResourceTypeDescriptor!]!
+	"""
+	Returns a summary-oriented dashboard for the current or specified
+	subject
+	"""
+	summary(account: AccountRefInput): ResourcesSummaryOutcome!
+	"""
+	Returns resources by refs
+	"""
+	byRefs(resourceRefs: [ResourceRefInput!]!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourcesOutcome!
+	"""
+	Returns resource handles by refs
+	"""
+	handlesByRefs(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
+	"""
+	Returns resources matching the given selectors, which act as a logical
+	OR and may span several resource types and accounts
+	"""
+	bySelectors(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceListOutcome!
+	"""
+	Returns resource handles matching the given selectors
+	"""
+	handlesBySelectors(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
+	"""
+	Renders canonical manifest representations from stored resources
+	"""
+	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourceManifestsOutcome!
+}
+
+type ResourcesMut {
+	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
+	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
+	delete(resourceRefs: [ResourceRefInput!]!): ResourceDeleteOutcome!
+}
+
+type ResourcesSummary {
+	resourceCounts: [ResourceTypeCountSummary!]!
+}
+
+union ResourcesSummaryOutcome = ResourcesSummary | ResourceAccountResolutionProblem
+
 type RestProtocolDesc {
 	tailUrl: String!
 	queryUrl: String!
@@ -3814,6 +4494,24 @@ type Search {
 enum SearchEntityName {
 	DATASETS
 	ACCOUNTS
+}
+
+"""
+Selects resources to search, for both `search` and `searchHandles` — only
+the response shape differs.
+
+Omitting `selectors` spans every type, which is what the retired `listAll`
+field did implicitly. Passing an empty list matches nothing — an explicit
+"no selectors" is a narrowing to zero, not a widening to everything.
+
+Label filtering lives on each selector's `labels`, so one call may filter
+differently per type. There is deliberately no call-level `labelFilter`: one
+uniform filter is the special case where every selector carries the same
+labels, and selectors being OR'd makes that exactly equivalent.
+"""
+input SearchResourcesInput {
+	selectors: [ResourceSelectorInput!]
+	account: AccountRefInput
 }
 
 union SearchResult = Dataset
@@ -4128,6 +4826,19 @@ type SourceState {
 }
 
 """
+Options controlling how a resource's spec is rendered. A struct rather than
+a bare `revealed: bool` argument, so future spec-view options can be added
+here without growing the resolver's argument list.
+"""
+input SpecViewOptsInput {
+	"""
+	Show actual (decrypted) secret values instead of ciphertext
+	placeholders.
+	"""
+	revealed: Boolean! = false
+}
+
+"""
 Defines a query in a multi-step SQL transformation.
 
 Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SqlQueryStep
@@ -4352,6 +5063,10 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
 	message: String!
 }
+
+scalar TypeName
+
+scalar TypeUri
 
 scalar URL
 
@@ -4643,10 +5358,6 @@ type ViewAccessToken {
 }
 
 type ViewDatasetEnvVar {
-	"""
-	Unique identifier of the dataset environment variable
-	"""
-	id: DatasetEnvVarID!
 	"""
 	Key of the dataset environment variable
 	"""

@@ -11,10 +11,11 @@ use chrono::{DateTime, Utc};
 use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use sqlx::MySqlConnection;
+use sqlx::{MySqlConnection, Row};
 use uuid::Uuid;
 
 use crate::domain::*;
+use crate::repos::MySqlAccountRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -206,35 +207,36 @@ impl AccessTokenRepository for MySqlAccessTokenRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let maybe_account_row = sqlx::query_as!(
-            AccountWithTokenRowModel,
+        let maybe_account_row = sqlx::query(
             r#"
               SELECT
-                  at.token_hash as "token_hash: _",
-                  a.id as "id: _",
+                  a.id,
                   a.account_name,
                   a.email,
                   a.display_name,
-                  a.account_type as "account_type: AccountType",
+                  a.account_type,
                   a.avatar_url,
                   a.registered_at,
                   a.provider,
-                  a.provider_identity_key
+                  a.provider_identity_key,
+                  a.resource_id,
+                  at.token_hash
               FROM access_tokens at
               INNER JOIN accounts a ON a.id = account_id
               WHERE at.id = ? AND revoked_at IS null
               "#,
-            token_id.to_string()
         )
+        .bind(token_id.to_string())
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
-            if token_hash != account_row.token_hash.as_slice() {
+            let stored_token_hash: Vec<u8> = account_row.get(10);
+            if token_hash != stored_token_hash.as_slice() {
                 return Err(FindAccountByTokenError::InvalidTokenHash);
             }
-            Ok(account_row.into())
+            Ok(MySqlAccountRepository::map_account_row(&account_row))
         } else {
             Err(FindAccountByTokenError::NotFound(
                 AccessTokenNotFoundError {

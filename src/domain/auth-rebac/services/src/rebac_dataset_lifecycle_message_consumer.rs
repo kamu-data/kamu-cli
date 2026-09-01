@@ -28,7 +28,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageDeliveryMechanism,
+    MessageConsumptionMode,
 };
 
 use crate::DefaultDatasetProperties;
@@ -43,7 +43,7 @@ use crate::DefaultDatasetProperties;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Immediate,
+    consumption_mode: MessageConsumptionMode::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct RebacDatasetLifecycleMessageConsumer {

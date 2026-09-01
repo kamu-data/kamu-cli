@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use dill::Catalog;
 use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
@@ -597,12 +598,12 @@ pub async fn test_rollup_from_csv_filtered_by_last_attempt_between(catalog: &Cat
 
     // Test with a time window that should match records #2 (07:40) and #11 (07:58)
     // Between 07:30 and 08:00
-    let start = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:30:00Z")
+    let start = DateTime::parse_from_rfc3339("2025-09-08T07:30:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
-    let end = chrono::DateTime::parse_from_rfc3339("2025-09-08T08:00:00Z")
+        .with_timezone(&Utc);
+    let end = DateTime::parse_from_rfc3339("2025-09-08T08:00:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
+        .with_timezone(&Utc);
 
     let rollup = flow_process_state_query
         .rollup(FlowProcessListFilter::all().with_last_attempt_between(start, end))
@@ -629,9 +630,9 @@ pub async fn test_rollup_from_csv_filtered_by_last_failure_since(catalog: &Catal
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
     // Test filtering by failures since 07:45
-    let since = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:45:00Z")
+    let since = DateTime::parse_from_rfc3339("2025-09-08T07:45:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
+        .with_timezone(&Utc);
 
     let rollup = flow_process_state_query
         .rollup(FlowProcessListFilter::all().with_last_failure_since(since))
@@ -654,9 +655,9 @@ pub async fn test_rollup_from_csv_filtered_by_next_planned_before(catalog: &Cata
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
     // Test filtering by next_planned_at before 10:00
-    let before = chrono::DateTime::parse_from_rfc3339("2025-09-08T10:00:00Z")
+    let before = DateTime::parse_from_rfc3339("2025-09-08T10:00:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
+        .with_timezone(&Utc);
 
     let rollup = flow_process_state_query
         .rollup(FlowProcessListFilter::all().with_next_planned_before(before))
@@ -679,9 +680,9 @@ pub async fn test_rollup_from_csv_filtered_by_next_planned_after(catalog: &Catal
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
     // Test filtering by next_planned_at after 11:30
-    let after = chrono::DateTime::parse_from_rfc3339("2025-09-08T11:30:00Z")
+    let after = DateTime::parse_from_rfc3339("2025-09-08T11:30:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
+        .with_timezone(&Utc);
 
     let rollup = flow_process_state_query
         .rollup(FlowProcessListFilter::all().with_next_planned_after(after))
@@ -737,12 +738,12 @@ pub async fn test_rollup_from_csv_combined_time_filters(catalog: &Catalog) {
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
     // Combine time-based filters: last_failure_since and next_planned_before
-    let since = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:40:00Z")
+    let since = DateTime::parse_from_rfc3339("2025-09-08T07:40:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
-    let before = chrono::DateTime::parse_from_rfc3339("2025-09-08T11:00:00Z")
+        .with_timezone(&Utc);
+    let before = DateTime::parse_from_rfc3339("2025-09-08T11:00:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
+        .with_timezone(&Utc);
 
     let rollup = flow_process_state_query
         .rollup(
@@ -769,9 +770,9 @@ pub async fn test_rollup_from_csv_combined_failures_and_time(catalog: &Catalog) 
     let flow_process_state_query = catalog.get_one::<dyn FlowProcessStateQuery>().unwrap();
 
     // Combine min_consecutive_failures with time filter
-    let since = chrono::DateTime::parse_from_rfc3339("2025-09-08T07:50:00Z")
+    let since = DateTime::parse_from_rfc3339("2025-09-08T07:50:00Z")
         .unwrap()
-        .with_timezone(&chrono::Utc);
+        .with_timezone(&Utc);
 
     let rollup = flow_process_state_query
         .rollup(

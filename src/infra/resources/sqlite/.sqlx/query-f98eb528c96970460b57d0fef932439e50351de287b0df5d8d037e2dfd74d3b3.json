@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    event_id,\n                    resource_id as \"id: _\",\n                    resource_schema as \"schema!\",\n                    event_time as \"event_time: DateTime<Utc>\",\n                    event_type,\n                    event_payload as \"payload: serde_json::Value\"\n                FROM resource_events\n                WHERE ($1 IS NULL OR event_id > $1)\n                  AND ($2 IS NULL OR event_id <= $2)\n                ORDER BY event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "id: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "schema!",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "event_time: DateTime<Utc>",
+        "ordinal": 3,
+        "type_info": "Null"
+      },
+      {
+        "name": "event_type",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "payload: serde_json::Value",
+        "ordinal": 5,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f98eb528c96970460b57d0fef932439e50351de287b0df5d8d037e2dfd74d3b3"
+}

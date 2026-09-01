@@ -29,7 +29,7 @@ use messaging_outbox::*;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct WebhookDatasetRemovalHandler {

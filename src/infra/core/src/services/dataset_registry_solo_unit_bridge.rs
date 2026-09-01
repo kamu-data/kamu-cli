@@ -10,6 +10,7 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
+use database_common::{PaginationOpts, collect_stream_page};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{CurrentAccountSubject, DEFAULT_ACCOUNT_NAME_STR};
 use kamu_core::TenancyConfig;
@@ -54,7 +55,7 @@ impl DatasetRegistrySoloUnitBridge {
                             panic!("Anonymous account misused, use multi-tenant alias");
                         }
                         CurrentAccountSubject::Logged(l) => odf::DatasetAlias::new(
-                            Some(l.account_name.clone()),
+                            Some(l.account_handle.name.clone()),
                             alias.dataset_name.clone(),
                         ),
                     }
@@ -173,6 +174,13 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
         })
     }
 
+    async fn all_dataset_handles_paged(
+        &self,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        collect_stream_page(self.all_dataset_handles(), pagination).await
+    }
+
     fn all_dataset_handles_by_owner_name(
         &self,
         owner_name: &odf::AccountName,
@@ -197,6 +205,18 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
         })
     }
 
+    async fn all_dataset_handles_by_owner_name_paged(
+        &self,
+        owner_name: &odf::AccountName,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        collect_stream_page(
+            self.all_dataset_handles_by_owner_name(owner_name),
+            pagination,
+        )
+        .await
+    }
+
     fn all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
@@ -219,7 +239,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
                             panic!("Logged subject only");
                         }
                         CurrentAccountSubject::Logged(l) => {
-                            if l.account_id == owner_id {
+                            if l.account_handle.did == owner_id {
                                 Some(dataset_handle)
                             } else {
                                 None
@@ -233,6 +253,14 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
                 }
             }
         })
+    }
+
+    async fn all_dataset_handles_by_owner_id_paged(
+        &self,
+        owner_id: &odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        collect_stream_page(self.all_dataset_handles_by_owner_id(owner_id), pagination).await
     }
 
     async fn resolve_multiple_dataset_handles_by_ids(

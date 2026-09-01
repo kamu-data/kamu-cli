@@ -1,0 +1,68 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use cynic::QueryBuilder;
+
+use crate::ResourcesSummaryRequest;
+use crate::facade::graphql::cynic_api::fragments::{
+    ResourceAccountResolutionProblem,
+    ResourcesSummary,
+};
+use crate::facade::graphql::cynic_api::inputs::AccountRefInput;
+use crate::facade::graphql::cynic_api::schema;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "Query", variables = "SummaryVariables")]
+pub(crate) struct SummaryQuery {
+    pub resources: SummaryResources,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "Resources", variables = "SummaryVariables")]
+pub(crate) struct SummaryResources {
+    #[arguments(account: $account)]
+    pub summary: ResourcesSummaryOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourcesSummaryOutcome {
+    ResourcesSummary(ResourcesSummary),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryVariables, Debug, Clone)]
+pub(crate) struct SummaryVariables {
+    pub account: Option<AccountRefInput>,
+}
+
+impl SummaryVariables {
+    pub(crate) fn new(request: &ResourcesSummaryRequest) -> Self {
+        Self {
+            account: request.account.as_ref().map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn build_operation(
+    variables: SummaryVariables,
+) -> cynic::Operation<SummaryQuery, SummaryVariables> {
+    SummaryQuery::build(variables)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,8 +13,8 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::pin::Pin;
 
-use futures::Stream;
-use internal_error::InternalError;
+use futures::{Stream, TryStream, TryStreamExt};
+use internal_error::{InternalError, ResultIntoInternal as _};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,11 +32,107 @@ impl PaginationOpts {
         }
     }
 
+    pub fn from_max_results(max_results: usize) -> Self {
+        Self {
+            offset: 0,
+            limit: max_results,
+        }
+    }
+
     pub fn safe_limit(&self, total: usize) -> usize {
         let rest = total.saturating_sub(self.offset);
 
         self.limit.min(rest)
     }
+
+    /// Converts to GraphQL `page`/`perPage` parameters (zero-based page index).
+    ///
+    /// The GraphQL API uses page-based pagination, while internally we use
+    /// offset/limit. Since the server computes `offset = page * perPage`, only
+    /// page-aligned offsets can be represented. `PaginationOpts` values passed
+    /// here always originate from [`Self::from_page`], so this invariant holds
+    /// by construction.
+    ///
+    /// `limit == 0` is treated as "first page with default page size".
+    pub fn as_page_params(&self, default_page_size: usize) -> Result<(i32, i32), InternalError> {
+        let per_page = if self.limit == 0 {
+            default_page_size
+        } else {
+            self.limit
+        };
+
+        debug_assert!(
+            self.offset.is_multiple_of(per_page),
+            "GraphQL pagination requires a page-aligned offset (offset={}, per_page={per_page})",
+            self.offset,
+        );
+
+        let page = self.offset / per_page;
+
+        Ok((
+            i32::try_from(page).int_err()?,
+            i32::try_from(per_page).int_err()?,
+        ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn collect_all_pages<T, E, F, Fut>(
+    page_size: usize,
+    mut fetch_page: F,
+) -> Result<Vec<T>, E>
+where
+    F: FnMut(PaginationOpts) -> Fut,
+    Fut: Future<Output = Result<Vec<T>, E>>,
+{
+    let mut page = 0;
+    let mut items = Vec::new();
+
+    loop {
+        let page_items = fetch_page(PaginationOpts::from_page(page, page_size)).await?;
+        let fetched = page_items.len();
+        items.extend(page_items);
+
+        if fetched < page_size {
+            break;
+        }
+
+        page += 1;
+    }
+
+    Ok(items)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn collect_stream_page<S, T, E>(
+    mut stream: S,
+    pagination: PaginationOpts,
+) -> Result<Vec<T>, E>
+where
+    S: TryStream<Ok = T, Error = E> + Unpin,
+{
+    if pagination.limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut items = Vec::with_capacity(pagination.limit);
+    let mut skipped = 0usize;
+
+    while let Some(item) = stream.try_next().await? {
+        if skipped < pagination.offset {
+            skipped += 1;
+            continue;
+        }
+
+        items.push(item);
+        if items.len() >= pagination.limit {
+            break;
+        }
+    }
+
+    Ok(items)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,385 @@
+-- Backfill: promote legacy dataset_env_vars rows into managed VariableSet / SecretSet
+-- resources so the new DatasetEnvVarResolver can serve them through the
+-- `legacy-config-target-dataset` label.
+--
+-- SQLite variant – uses lower(hex(randomblob(N))) for UUID generation and
+-- json_object / json_group_object for JSON construction.
+--
+-- The migration is idempotent: `INSERT OR IGNORE` guards every INSERT (the
+-- Postgres variant uses `ON CONFLICT DO NOTHING` for the same purpose).
+
+/* ------------------------------ */
+/* VariableSet resources          */
+/* ------------------------------ */
+
+INSERT OR IGNORE INTO resources (
+    resource_id,
+    account_id,
+    resource_schema,
+    resource_name,
+    labels,
+    annotations,
+    spec,
+    status,
+    generation,
+    created_at,
+    updated_at,
+    deleted_at,
+    last_event_id
+)
+SELECT
+    lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        lower(hex(randomblob(6)))                                               AS resource_id,
+    de.owner_id                                                                 AS account_id,
+    'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet' AS resource_schema,                                                          
+    'legacy-vars-' || substr(dev.dataset_id, 9)                                 AS resource_name,
+    json_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
+    '{}'                                                                        AS annotations,
+    json_object(
+        'variables',
+        (
+            SELECT json_group_object(d2.key, json_object('value', CAST(d2.value AS TEXT)))
+            FROM dataset_env_vars d2
+            WHERE d2.dataset_id = dev.dataset_id
+              AND d2.secret_nonce IS NULL
+        )
+    )                                                                           AS spec,
+    json_object(
+        'phase', 'Ready',
+        'observedGeneration', 1,
+        'reconciledAt', MIN(dev.created_at),
+        'conditions', json_object(
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
+            json_object(
+                'status', 'True',
+                'reason', 'ValidationPassed',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
+            json_object(
+                'status', 'True',
+                'reason', 'Reconciled',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
+            json_object(
+                'status', 'False',
+                'reason', 'Idle',
+                'lastTransitionTime', MIN(dev.created_at)
+            )
+        )
+    )                                                                           AS status,
+    1                                                                           AS generation,
+    MIN(dev.created_at)                                                         AS created_at,
+    MIN(dev.created_at)                                                         AS updated_at,
+    NULL                                                                        AS deleted_at,
+    NULL                                                                        AS last_event_id
+FROM dataset_env_vars dev
+JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
+WHERE dev.secret_nonce IS NULL
+GROUP BY dev.dataset_id, de.owner_id;
+
+/* ------------------------------ */
+
+INSERT OR IGNORE INTO config_variable_set_entries (
+    entry_id,
+    resource_id,
+    resource_generation,
+    account_id,
+    variable_key,
+    value,
+    created_at,
+    updated_at
+)
+SELECT
+    lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        lower(hex(randomblob(6)))                                               AS entry_id,
+    r.resource_id,
+    1                                                                           AS resource_generation,
+    de.owner_id                                                                 AS account_id,
+    dev.key                                                                     AS variable_key,
+    CAST(dev.value AS TEXT)                                                     AS value,
+    dev.created_at,
+    dev.created_at                                                              AS updated_at
+FROM dataset_env_vars dev
+JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
+JOIN resources r
+    ON r.account_id = de.owner_id
+   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
+   AND r.resource_name = 'legacy-vars-' || substr(dev.dataset_id, 9)
+WHERE dev.secret_nonce IS NULL;
+
+/* ------------------------------ */
+/* SecretSet resources            */
+/* ------------------------------ */
+
+INSERT OR IGNORE INTO resources (
+    resource_id,
+    account_id,
+    resource_schema,
+    resource_name,
+    labels,
+    annotations,
+    spec,
+    status,
+    generation,
+    created_at,
+    updated_at,
+    deleted_at,
+    last_event_id
+)
+SELECT
+    lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        lower(hex(randomblob(6)))                                               AS resource_id,
+    de.owner_id                                                                 AS account_id,
+    'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet' AS resource_schema,                                                          
+    'legacy-secrets-' || substr(dev.dataset_id, 9)                              AS resource_name,
+    json_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
+    '{}'                                                                        AS annotations,
+    json_object(
+        'secrets',
+        (
+            -- Emit the legacy secret in the RFC-18 shape using the read-only
+            -- `aes256gcm` encoding: hex(nonce ‖ ciphertext). SQL cannot produce a
+            -- JWE token, so the node reads this legacy form and re-materializes on
+            -- the next apply. See SecretExt::decrypt_plaintext_bytes.
+            SELECT json_group_object(
+                d2.key,
+                json_object(
+                    'value', lower(hex(d2.secret_nonce || d2.value)),
+                    'contentEncoding', 'aes256gcm'
+                )
+            )
+            FROM dataset_env_vars d2
+            WHERE d2.dataset_id = dev.dataset_id
+              AND d2.secret_nonce IS NOT NULL
+        )
+    )                                                                           AS spec,
+    json_object(
+        'phase', 'Ready',
+        'observedGeneration', 1,
+        'reconciledAt', MIN(dev.created_at),
+        'conditions', json_object(
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
+            json_object(
+                'status', 'True',
+                'reason', 'ValidationPassed',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
+            json_object(
+                'status', 'True',
+                'reason', 'Reconciled',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
+            json_object(
+                'status', 'False',
+                'reason', 'Idle',
+                'lastTransitionTime', MIN(dev.created_at)
+            )
+        )
+    )                                                                           AS status,
+    1                                                                           AS generation,
+    MIN(dev.created_at)                                                         AS created_at,
+    MIN(dev.created_at)                                                         AS updated_at,
+    NULL                                                                        AS deleted_at,
+    NULL                                                                        AS last_event_id
+FROM dataset_env_vars dev
+JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
+WHERE dev.secret_nonce IS NOT NULL
+GROUP BY dev.dataset_id, de.owner_id;
+
+/* ------------------------------ */
+
+INSERT OR IGNORE INTO config_secret_set_entries (
+    entry_id,
+    resource_id,
+    resource_generation,
+    account_id,
+    secret_key,
+    value,
+    secret_nonce,
+    created_at,
+    updated_at
+)
+SELECT
+    lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2))) || '-4' ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) ||
+        substr(lower(hex(randomblob(2))),2) || '-' ||
+        lower(hex(randomblob(6)))                                               AS entry_id,
+    r.resource_id,
+    1                                                                           AS resource_generation,
+    de.owner_id                                                                 AS account_id,
+    dev.key                                                                     AS secret_key,
+    dev.value,
+    dev.secret_nonce,
+    dev.created_at,
+    dev.created_at                                                              AS updated_at
+FROM dataset_env_vars dev
+JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
+JOIN resources r
+    ON r.account_id = de.owner_id
+   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
+   AND r.resource_name = 'legacy-secrets-' || substr(dev.dataset_id, 9)
+WHERE dev.secret_nonce IS NOT NULL;
+
+/* ------------------------------ */
+/* Resource events: VariableSet   */
+/* ------------------------------ */
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
+    r.resource_id,
+    r.resource_schema,
+    r.created_at,
+    'Created',
+    -- `AccountRef` is an object, not a bare DID. A string here deserializes
+    -- into a ref carrying only `did`, and applying a manifest over such a
+    -- resource then fails to load it. Mirror what the runtime writes:
+    -- id (account resource UUID), did and name.
+    '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
+        || '","headers":{"account":' || json_object(
+                 'id',   acc.resource_id,
+                 'did',  acc.id,
+                 'name', acc.account_name)
+        || ',"name":"' || r.resource_name
+        || '","labels":' || r.labels || ',"annotations":{}},"spec":' || r.spec || '}}'
+FROM resources r
+JOIN accounts acc ON acc.id = r.account_id
+WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
+  AND r.resource_name LIKE 'legacy-vars-%'
+  AND r.last_event_id IS NULL;
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
+    r.resource_id,
+    r.resource_schema,
+    r.created_at,
+    'ReconciliationStarted',
+    json_object(
+        'ReconciliationStarted', json_object(
+            'event_time', r.created_at,
+            'id',        r.resource_id,
+            'generation', 1
+        )
+    )
+FROM resources r
+WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
+  AND r.resource_name LIKE 'legacy-vars-%'
+  AND r.last_event_id IS NULL;
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
+    r.resource_id,
+    r.resource_schema,
+    r.created_at,
+    'ReconciliationSucceeded',
+    '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
+        || '","generation":1,"success":{}}}'
+FROM resources r
+WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
+  AND r.resource_name LIKE 'legacy-vars-%'
+  AND r.last_event_id IS NULL;
+
+UPDATE resources
+SET last_event_id = (
+    SELECT MAX(e.event_id)
+    FROM resource_events e
+    WHERE e.resource_id   = resources.resource_id
+      AND e.resource_schema  = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
+      AND e.event_type     = 'ReconciliationSucceeded'
+)
+WHERE resource_schema  = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
+  AND resource_name  LIKE 'legacy-vars-%'
+  AND last_event_id  IS NULL;
+
+/* ------------------------------ */
+/* Resource events: SecretSet     */
+/* ------------------------------ */
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
+    r.resource_id,
+    r.resource_schema,
+    r.created_at,
+    'Created',
+    -- See the VariableSet block above: `account` must be an AccountRef object.
+    '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
+        || '","headers":{"account":' || json_object(
+                 'id',   acc.resource_id,
+                 'did',  acc.id,
+                 'name', acc.account_name)
+        || ',"name":"' || r.resource_name
+        || '","labels":' || r.labels || ',"annotations":{}},"spec":' || r.spec || '}}'
+FROM resources r
+JOIN accounts acc ON acc.id = r.account_id
+WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
+  AND r.resource_name LIKE 'legacy-secrets-%'
+  AND r.last_event_id IS NULL;
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
+    r.resource_id,
+    r.resource_schema,
+    r.created_at,
+    'ReconciliationStarted',
+    json_object(
+        'ReconciliationStarted', json_object(
+            'event_time', r.created_at,
+            'id',        r.resource_id,
+            'generation', 1
+        )
+    )
+FROM resources r
+WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
+  AND r.resource_name LIKE 'legacy-secrets-%'
+  AND r.last_event_id IS NULL;
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
+    r.resource_id,
+    r.resource_schema,
+    r.created_at,
+    'ReconciliationSucceeded',
+    '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
+        || '","generation":1,"success":{}}}'
+FROM resources r
+WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
+  AND r.resource_name LIKE 'legacy-secrets-%'
+  AND r.last_event_id IS NULL;
+
+UPDATE resources
+SET last_event_id = (
+    SELECT MAX(e.event_id)
+    FROM resource_events e
+    WHERE e.resource_id   = resources.resource_id
+      AND e.resource_schema  = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
+      AND e.event_type     = 'ReconciliationSucceeded'
+)
+WHERE resource_schema  = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
+  AND resource_name  LIKE 'legacy-secrets-%'
+  AND last_event_id  IS NULL;
+
+/* ------------------------------ */
+
+/* Drop legacy table — all data has been promoted to resources above */
+DROP TABLE dataset_env_vars;
+
+/* ------------------------------ */

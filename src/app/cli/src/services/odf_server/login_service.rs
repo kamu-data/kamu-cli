@@ -46,6 +46,15 @@ impl LoginService {
     // We do not use this value, but we are required to pass it.
     const DEVICE_FLOW_DEFAULT_CLIENT_ID_PARAM: (&'static str, &'static str) = ("client_id", "kamu");
 
+    pub async fn resolve_odf_server_backend_url(
+        &self,
+        odf_server_url: &Url,
+    ) -> Result<Url, InternalError> {
+        let client = reqwest::Client::new();
+
+        self.odf_server_backend_url(&client, odf_server_url).await
+    }
+
     pub async fn login_interactive(
         &self,
         odf_server_frontend_url: &Url,
@@ -292,17 +301,24 @@ impl LoginService {
             api_server_http_url: Url,
         }
 
-        match response.status() {
+        let status = response.status();
+
+        match status {
             http::StatusCode::OK => Ok(response
                 .json::<Response>()
                 .await
                 .int_err()?
                 .api_server_http_url),
-            unexpected_status => panic!(
-                "Unexpected runtime-config status code: {}, details: {}",
-                unexpected_status.as_u16(),
-                response.text().await.unwrap()
-            ),
+            http::StatusCode::NOT_FOUND => Ok(odf_server_frontend_url.clone()),
+            unexpected_status => {
+                let details = response.text().await.int_err()?;
+
+                Err(InternalError::new(format!(
+                    "Failed to discover backend URL from '{odf_server_frontend_url}': status {}: \
+                     {details}",
+                    unexpected_status.as_u16(),
+                )))
+            }
         }
     }
 

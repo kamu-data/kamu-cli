@@ -20,7 +20,7 @@ use kamu_task_system::*;
 pub async fn test_event_store_empty(catalog: &Catalog) {
     let event_store = catalog.get_one::<dyn TaskEventStore>().unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(0, num_events);
 
     let events: Vec<_> = event_store
@@ -34,10 +34,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     let tasks: Vec<_> = event_store
         .get_tasks_by_dataset(
             &odf::DatasetID::new_seeded_ed25519(b"foo"),
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
+            PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await
@@ -95,7 +92,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(3, num_events);
 
     let events: Vec<_> = event_store
@@ -108,13 +105,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&events[..], [event_1.into(), event_3.into()]);
 
     let tasks: Vec<_> = event_store
-        .get_tasks_by_dataset(
-            &dataset_id,
-            PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
-        )
+        .get_tasks_by_dataset(&dataset_id, PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -286,7 +277,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(3, num_events);
 
     event_store
@@ -302,7 +293,7 @@ pub async fn test_event_store_get_events_by_tasks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(6, num_events);
 
     let events: Vec<_> = event_store
@@ -388,7 +379,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(1, num_events);
 
     event_store
@@ -396,7 +387,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(2, num_events);
 
     event_store
@@ -404,7 +395,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(3, num_events);
 
     event_store
@@ -412,7 +403,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
     assert_eq!(4, num_events);
 
     let num_foo_tasks = event_store
@@ -428,13 +419,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(2, num_bar_tasks);
 
     let task_ids: Vec<_> = event_store
-        .get_tasks_by_dataset(
-            &dataset_id_foo,
-            PaginationOpts {
-                limit: 5,
-                offset: 0,
-            },
-        )
+        .get_tasks_by_dataset(&dataset_id_foo, PaginationOpts::from_max_results(5))
         .try_collect()
         .await
         .unwrap();
@@ -442,13 +427,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(&task_ids[..], [task_id_1_2, task_id_1_1]); // Reverse order
 
     let task_ids: Vec<_> = event_store
-        .get_tasks_by_dataset(
-            &dataset_id_bar,
-            PaginationOpts {
-                limit: 5,
-                offset: 0,
-            },
-        )
+        .get_tasks_by_dataset(&dataset_id_bar, PaginationOpts::from_max_results(5))
         .try_collect()
         .await
         .unwrap();
@@ -456,13 +435,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(&task_ids[..], [task_id_2_2, task_id_2_1]); // Reverse order
 
     let task_ids: Vec<_> = event_store
-        .get_tasks_by_dataset(
-            &dataset_id_foo,
-            PaginationOpts {
-                limit: 1,
-                offset: 0,
-            },
-        )
+        .get_tasks_by_dataset(&dataset_id_foo, PaginationOpts::from_max_results(1))
         .try_collect()
         .await
         .unwrap();
@@ -470,13 +443,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(&task_ids[..], [task_id_1_2]);
 
     let task_ids: Vec<_> = event_store
-        .get_tasks_by_dataset(
-            &dataset_id_foo,
-            PaginationOpts {
-                limit: 1,
-                offset: 1,
-            },
-        )
+        .get_tasks_by_dataset(&dataset_id_foo, PaginationOpts::from_page(1, 1))
         .try_collect()
         .await
         .unwrap();
@@ -484,13 +451,7 @@ pub async fn test_event_store_get_dataset_tasks(catalog: &Catalog) {
     assert_eq!(&task_ids[..], [task_id_1_1]);
 
     let task_ids: Vec<_> = event_store
-        .get_tasks_by_dataset(
-            &dataset_id_foo,
-            PaginationOpts {
-                limit: 1,
-                offset: 2,
-            },
-        )
+        .get_tasks_by_dataset(&dataset_id_foo, PaginationOpts::from_page(2, 1))
         .try_collect()
         .await
         .unwrap();
@@ -760,10 +721,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert_eq!(running_count, 0);
 
     let running_task_ids: Vec<_> = event_store
-        .get_running_tasks(PaginationOpts {
-            limit: 100,
-            offset: 0,
-        })
+        .get_running_tasks(PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -803,10 +761,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert_eq!(running_count, 0);
 
     let running_task_ids: Vec<_> = event_store
-        .get_running_tasks(PaginationOpts {
-            limit: 100,
-            offset: 0,
-        })
+        .get_running_tasks(PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -848,10 +803,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert_eq!(running_count, 2);
 
     let running_task_ids: Vec<_> = event_store
-        .get_running_tasks(PaginationOpts {
-            limit: 100,
-            offset: 0,
-        })
+        .get_running_tasks(PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -860,10 +812,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     // Query the same state with pagination args
 
     let running_task_ids: Vec<_> = event_store
-        .get_running_tasks(PaginationOpts {
-            limit: 1,
-            offset: 0,
-        })
+        .get_running_tasks(PaginationOpts::from_max_results(1))
         .try_collect()
         .await
         .unwrap();
@@ -912,10 +861,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert_eq!(running_count, 1);
 
     let running_task_ids: Vec<_> = event_store
-        .get_running_tasks(PaginationOpts {
-            limit: 100,
-            offset: 0,
-        })
+        .get_running_tasks(PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -943,10 +889,7 @@ pub async fn test_event_store_get_running_tasks(catalog: &Catalog) {
     assert_eq!(running_count, 0);
 
     let running_task_ids: Vec<_> = event_store
-        .get_running_tasks(PaginationOpts {
-            limit: 100,
-            offset: 0,
-        })
+        .get_running_tasks(PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();

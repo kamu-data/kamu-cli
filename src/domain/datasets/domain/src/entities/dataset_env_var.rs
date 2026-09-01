@@ -8,20 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
-use internal_error::ErrorIntoInternal;
+use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor, SecretCryptor};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use secrecy::{ExposeSecret, SecretString};
-use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
+pub const SAMPLE_SECRETS_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DatasetEnvVar {
-    pub id: Uuid,
     pub key: String,
     pub value: Vec<u8>,
     pub secret_nonce: Option<Vec<u8>>,
@@ -37,7 +35,6 @@ impl DatasetEnvVar {
         dataset_id: &odf::DatasetID,
         encryption_key: &str,
     ) -> Result<Self, EncryptionError> {
-        let dataset_env_var_id = Uuid::new_v4();
         let mut secret_nonce: Option<Vec<u8>> = None;
         let final_value: Vec<u8>;
 
@@ -53,7 +50,6 @@ impl DatasetEnvVar {
         }
 
         Ok(DatasetEnvVar {
-            id: dataset_env_var_id,
             value: final_value,
             secret_nonce,
             key: dataset_env_var_key.to_string(),
@@ -104,31 +100,6 @@ impl DatasetEnvVar {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg(feature = "sqlx")]
-#[derive(Debug, Clone, sqlx::FromRow, PartialEq, Eq)]
-pub struct DatasetEnvVarRowModel {
-    pub id: Uuid,
-    pub key: String,
-    pub value: Vec<u8>,
-    pub secret_nonce: Option<Vec<u8>>,
-    pub created_at: DateTime<Utc>,
-    pub dataset_id: odf::DatasetID,
-}
-
-#[cfg(feature = "sqlx")]
-impl From<DatasetEnvVarRowModel> for DatasetEnvVar {
-    fn from(value: DatasetEnvVarRowModel) -> Self {
-        DatasetEnvVar {
-            id: value.id,
-            key: value.key,
-            value: value.value,
-            secret_nonce: value.secret_nonce,
-            created_at: value.created_at,
-            dataset_id: value.dataset_id,
-        }
-    }
-}
-
 pub enum DatasetEnvVarValue {
     Secret(SecretString),
     Regular(String),
@@ -154,12 +125,12 @@ impl DatasetEnvVarValue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(setty::Config, setty::Default)]
-pub struct DatasetEnvVarsConfig {
+pub struct SecretsEncryptionConfig {
     #[config(default = false)]
     pub enabled: bool,
 
-    /// Represents the encryption key for the dataset env vars. This field is
-    /// required if `enabled` is `true` or `None`.
+    /// Represents the encryption key for secrets. This field is required if
+    /// `enabled` is `true` or `None`.
     ///
     /// The encryption key must be a 32-character alphanumeric string, which
     /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
@@ -172,11 +143,11 @@ pub struct DatasetEnvVarsConfig {
     pub encryption_key: Option<String>,
 }
 
-impl DatasetEnvVarsConfig {
+impl SecretsEncryptionConfig {
     pub fn sample() -> Self {
         Self {
             enabled: true,
-            encryption_key: Some(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY.to_string()),
+            encryption_key: Some(SAMPLE_SECRETS_ENCRYPTION_KEY.to_string()),
         }
     }
 
@@ -185,6 +156,24 @@ impl DatasetEnvVarsConfig {
             return true;
         }
         false
+    }
+
+    /// Build a [`SecretCryptor`] from the configured encryption key.
+    ///
+    /// Used by `SecretSet` secret handling (sanitizer, reveal, reconciler) to
+    /// produce/consume `contentEncoding: "jwe"` values and to decrypt the
+    /// legacy `contentEncoding: "aes256gcm"` form emitted by the env-var
+    /// backfill migrations, and to encrypt/decrypt the read-side projection's
+    /// own raw-AES storage. Surfaces a missing key as an `InternalError`
+    /// instead of an `Option::unwrap()` panic.
+    pub fn new_secret_cryptor(&self) -> Result<SecretCryptor, InternalError> {
+        let Some(encryption_key) = self.encryption_key.as_ref() else {
+            return InternalError::bail(
+                "Secrets encryption key is not configured; set `secretsEncryption.encryptionKey`",
+            );
+        };
+
+        SecretCryptor::try_new(encryption_key).int_err()
     }
 }
 
@@ -195,7 +184,7 @@ mod tests {
     use chrono::Utc;
     use secrecy::SecretString;
 
-    use crate::{DatasetEnvVar, SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY};
+    use crate::{DatasetEnvVar, SAMPLE_SECRETS_ENCRYPTION_KEY};
 
     #[test]
     fn test_secret_env_var_generation() {
@@ -205,12 +194,12 @@ mod tests {
             Utc::now(),
             &crate::DatasetEnvVarValue::Secret(SecretString::from(secret_value.to_string())),
             &odf::DatasetID::new_seeded_ed25519(b"foo"),
-            SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
+            SAMPLE_SECRETS_ENCRYPTION_KEY,
         )
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_decrypted_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_decrypted_value(SAMPLE_SECRETS_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(secret_value, original_value.as_str());
     }
@@ -223,13 +212,15 @@ mod tests {
             Utc::now(),
             &crate::DatasetEnvVarValue::Regular(value.to_string()),
             &odf::DatasetID::new_seeded_ed25519(b"foo"),
-            SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
+            SAMPLE_SECRETS_ENCRYPTION_KEY,
         )
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_decrypted_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_decrypted_value(SAMPLE_SECRETS_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(value, original_value.as_str());
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

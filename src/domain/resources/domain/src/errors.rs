@@ -1,0 +1,189 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use event_sourcing::{LoadError, Projection};
+
+use crate::{
+    ParseResourceSchemaError,
+    ResourceExtensionKind,
+    ResourceExtensionValueError,
+    ResourceID,
+    ResourceName,
+    ResourceSnapshot,
+    TypeName,
+    TypeRef,
+    TypeUri,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Resource with the specified identity failed to load. Reason: {0}")]
+pub struct ResourceLoadError<S: Projection>(pub LoadError<S>);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
+#[error("Resource with id {0} was not found")]
+pub struct ResourceIDNotFoundError(pub ResourceID);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("Resource '{name}' of type '{type_name}' was not found")]
+pub struct ResourceNameNotFoundError {
+    pub type_name: TypeName,
+    pub name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A type-less reference whose name matched nothing in any registered type.
+///
+/// Distinct from [`ResourceNameNotFoundError`] because no single type can be
+/// named in the message — every one was searched.
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("Resource '{name}' was not found in any resource type")]
+pub struct ResourceAnyTypeNameNotFoundError {
+    pub name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A type-less reference whose name matched in more than one type.
+///
+/// A reference names exactly one resource, so this is an addressing failure
+/// rather than a multi-match: the caller must say which type they meant. A
+/// type-less *selector* has no equivalent — several matches are its expected
+/// outcome.
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error(
+    "Resource '{name}' is ambiguous: it exists in types {}. Specify a type to disambiguate",
+    type_names.iter().map(TypeName::to_string).collect::<Vec<_>>().join(", ")
+)]
+pub struct ResourceAmbiguousTypeError {
+    pub name: ResourceName,
+    pub type_names: Vec<TypeName>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("Invalid spec for resource {schema}: {message}")]
+pub struct ResourceInvalidSpecError {
+    pub schema: TypeUri,
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Resource '{id}' of type '{resource_type}' is not owned by the specified account")]
+pub struct ResourceNotOwnedByAccountError {
+    pub id: ResourceID,
+    pub resource_type: &'static TypeUri,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Resource id {id} refers to {actual_schema}, expected {expected_schema}")]
+pub struct ResourceTypeMismatchError {
+    pub id: ResourceID,
+    pub expected_schema: TypeUri,
+    pub actual_schema: TypeUri,
+}
+
+impl ResourceTypeMismatchError {
+    pub fn new(id: ResourceID, expected_schema: TypeUri, actual_schema: TypeUri) -> Self {
+        Self {
+            id,
+            expected_schema,
+            actual_schema,
+        }
+    }
+
+    pub fn from_expected_and_actual(
+        id: ResourceID,
+        expected: &TypeUri,
+        actual: &ResourceSnapshot,
+    ) -> Self {
+        Self::new(id, expected.clone(), actual.schema.clone())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+pub enum ResourceDurableStateValidationError {
+    #[error(transparent)]
+    InvalidResourceSchema(#[from] ParseResourceSchemaError),
+
+    #[error("{kind:?} extension '{key}' must be stored under its canonical URI")]
+    NonCanonicalExtensionKey {
+        kind: ResourceExtensionKind,
+        key: TypeRef,
+    },
+
+    #[error(transparent)]
+    ExtensionResolution(#[from] ResourceExtensionResolutionError),
+
+    #[error("{kind:?} extension '{key}' value is invalid: {error}")]
+    InvalidExtensionValue {
+        kind: ResourceExtensionKind,
+        key: TypeRef,
+        error: ResourceExtensionValueError,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum ResourceExtensionResolutionError {
+    #[error("unknown {kind:?} extension URI '{uri}'")]
+    UnknownUri {
+        kind: ResourceExtensionKind,
+        uri: TypeUri,
+    },
+
+    #[error(
+        "extension URI '{uri}' is registered as {actual_kind:?}, but was used as {expected_kind:?}"
+    )]
+    KindMismatch {
+        uri: TypeUri,
+        expected_kind: ResourceExtensionKind,
+        actual_kind: ResourceExtensionKind,
+    },
+
+    #[error("extension URI '{uri}' is not applicable to resource schema '{resource_schema}'")]
+    Inapplicable {
+        uri: TypeUri,
+        resource_schema: TypeUri,
+    },
+
+    #[error("{kind:?} extension '{authored_key}' value is invalid: {reason}")]
+    InvalidValue {
+        kind: ResourceExtensionKind,
+        authored_key: TypeRef,
+        canonical_uri: TypeUri,
+        reason: String,
+    },
+
+    #[error(
+        "{kind:?} extension keys {authored_keys:?} resolve to duplicate canonical key \
+         '{canonical_key}'"
+    )]
+    DuplicateAfterCanonicalization {
+        kind: ResourceExtensionKind,
+        canonical_key: TypeRef,
+        authored_keys: Vec<TypeRef>,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

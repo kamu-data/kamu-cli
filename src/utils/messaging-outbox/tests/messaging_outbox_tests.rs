@@ -29,7 +29,7 @@ macro_rules! test_message_type {
 }
 
 macro_rules! test_message_consumer {
-    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident, $delivery: ident, $initial_consumer_boundary: ident) => {
+    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident, $consumption_mode: ident, $initial_consumer_boundary: ident) => {
         paste::paste! {
             struct [<"TestMessageConsumer" $message_consumer_suffix>] {
                 state: Arc<Mutex<[<"State" $message_consumer_suffix>]>>,
@@ -54,7 +54,7 @@ macro_rules! test_message_consumer {
             #[meta(MessageConsumerMeta {
                 consumer_name: concat!("TestMessageConsumer", stringify!($message_consumer_suffix)),
                 feeding_producers: &[$producer_name],
-                delivery: MessageDeliveryMechanism::$delivery,
+                consumption_mode: MessageConsumptionMode::$consumption_mode,
                 initial_consumer_boundary: InitialConsumerBoundary::$initial_consumer_boundary,
 
             })]
@@ -91,7 +91,7 @@ macro_rules! test_message_consumer {
 }
 
 macro_rules! test_message_failing_consumer {
-    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident, $delivery: ident, $initial_consumer_boundary: ident) => {
+    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident, $consumption_mode: ident, $initial_consumer_boundary: ident) => {
         paste::paste! {
             #[derive(Default)]
             struct [<"State" $message_consumer_suffix>] {
@@ -109,7 +109,7 @@ macro_rules! test_message_failing_consumer {
             #[meta(MessageConsumerMeta {
                 consumer_name: concat!("TestMessageConsumer", stringify!($message_consumer_suffix)),
                 feeding_producers: &[$producer_name],
-                delivery: MessageDeliveryMechanism::$delivery,
+                consumption_mode: MessageConsumptionMode::$consumption_mode,
                 initial_consumer_boundary: InitialConsumerBoundary::$initial_consumer_boundary,
             })]
             impl [<"TestMessageConsumer" $message_consumer_suffix>] {

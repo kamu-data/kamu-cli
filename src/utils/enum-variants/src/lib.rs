@@ -56,6 +56,29 @@ macro_rules! impl_enum_with_variants {
             }
         }
     };
+    ($typ:ident < $($generics:ident),+ >) => {
+        impl<$($generics),+> EnumWithVariants<$typ<$($generics),+>> for $typ<$($generics),+> {
+            #[inline]
+            fn is_variant<V: VariantOf<Self>>(&self) -> bool {
+                V::is_variant(self)
+            }
+
+            #[inline]
+            fn into_variant<V: VariantOf<Self>>(self) -> Option<V> {
+                V::into_variant(self)
+            }
+
+            #[inline]
+            fn as_variant<V: VariantOf<Self>>(&self) -> Option<&V> {
+                V::as_variant(self)
+            }
+
+            #[inline]
+            fn as_variant_mut<V: VariantOf<Self>>(&mut self) -> Option<&mut V> {
+                V::as_variant_mut(self)
+            }
+        }
+    };
 }
 
 // TODO: Make a derive macro
@@ -96,6 +119,102 @@ macro_rules! impl_enum_variant {
 
             #[inline]
             fn as_variant_mut(e: &mut $enum_type) -> Option<&mut Self> {
+                match e {
+                    $enum_type::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+        }
+    };
+    (
+        $enum_type:ident < $($enum_generics:ident),+ > :: $variant:ident (
+            $variant_type:ident < $($variant_generics:ident),+ >
+        )
+    ) => {
+        impl<$($enum_generics),+> Into<$enum_type<$($enum_generics),+>>
+            for $variant_type<$($variant_generics),+>
+        {
+            #[inline]
+            fn into(self) -> $enum_type<$($enum_generics),+> {
+                $enum_type::$variant(self)
+            }
+        }
+
+        impl<$($enum_generics),+> VariantOf<$enum_type<$($enum_generics),+>>
+            for $variant_type<$($variant_generics),+>
+        {
+            #[inline]
+            fn is_variant(e: &$enum_type<$($enum_generics),+>) -> bool {
+                match e {
+                    $enum_type::$variant(_) => true,
+                    _ => false,
+                }
+            }
+
+            #[inline]
+            fn into_variant(e: $enum_type<$($enum_generics),+>) -> Option<Self> {
+                match e {
+                    $enum_type::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            #[inline]
+            fn as_variant(e: &$enum_type<$($enum_generics),+>) -> Option<&Self> {
+                match e {
+                    $enum_type::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            #[inline]
+            fn as_variant_mut(e: &mut $enum_type<$($enum_generics),+>) -> Option<&mut Self> {
+                match e {
+                    $enum_type::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+        }
+    };
+    (
+        $enum_type:ident < $($enum_generics:ident),+ > :: $variant:ident (
+            $variant_type:ident
+        )
+    ) => {
+        impl<$($enum_generics),+> Into<$enum_type<$($enum_generics),+>> for $variant_type {
+            #[inline]
+            fn into(self) -> $enum_type<$($enum_generics),+> {
+                $enum_type::$variant(self)
+            }
+        }
+
+        impl<$($enum_generics),+> VariantOf<$enum_type<$($enum_generics),+>> for $variant_type {
+            #[inline]
+            fn is_variant(e: &$enum_type<$($enum_generics),+>) -> bool {
+                match e {
+                    $enum_type::$variant(_) => true,
+                    _ => false,
+                }
+            }
+
+            #[inline]
+            fn into_variant(e: $enum_type<$($enum_generics),+>) -> Option<Self> {
+                match e {
+                    $enum_type::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            #[inline]
+            fn as_variant(e: &$enum_type<$($enum_generics),+>) -> Option<&Self> {
+                match e {
+                    $enum_type::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            #[inline]
+            fn as_variant_mut(e: &mut $enum_type<$($enum_generics),+>) -> Option<&mut Self> {
                 match e {
                     $enum_type::$variant(v) => Some(v),
                     _ => None,

@@ -1,0 +1,27 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use crate::*;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn register_dependencies(catalog_builder: &mut dill::CatalogBuilder) {
+    catalog_builder.add::<ResourceDispatcherFactory>();
+    catalog_builder.add::<GenericResourceQueryServiceImpl>();
+    catalog_builder.add::<DeleteAccountResourcesUsecaseImpl>();
+    catalog_builder.add::<ListAllResourcesUseCaseImpl>();
+    catalog_builder.add::<ResourceExtensionSchemaRegistry>();
+    catalog_builder.add::<ResourceExtensionSchemaResolver>();
+    catalog_builder.add::<crate::message_handlers::AccountLifecycleMessageConsumer>();
+    catalog_builder.add::<crate::message_handlers::ResourceLifecycleMessageConsumer>();
+
+    register_built_in_extension_schema_dispatchers(catalog_builder);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

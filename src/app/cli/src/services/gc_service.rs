@@ -70,7 +70,7 @@ impl GcService {
             for res in self.workspace_layout.cache_dir.read_dir().int_err()? {
                 let entry = res.int_err()?;
                 let mtime: DateTime<Utc> =
-                    chrono::DateTime::from(entry.metadata().int_err()?.modified().int_err()?);
+                    DateTime::from(entry.metadata().int_err()?.modified().int_err()?);
 
                 if (now - mtime) > EVICTION_THRESHOLD {
                     if entry.path().is_dir() {

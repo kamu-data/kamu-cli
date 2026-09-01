@@ -9,6 +9,8 @@
 
 mod dataset_action_authorizer;
 mod dataset_entry_service;
+mod dataset_env_var_mutation_adapter;
+mod dataset_env_var_resolver;
 mod dataset_env_var_service;
 mod dataset_increment_query_service;
 mod dataset_key_value_service;
@@ -19,6 +21,8 @@ mod dependency_graph_service;
 
 pub use dataset_action_authorizer::*;
 pub use dataset_entry_service::*;
+pub use dataset_env_var_mutation_adapter::*;
+pub use dataset_env_var_resolver::*;
 pub use dataset_env_var_service::*;
 pub use dataset_increment_query_service::*;
 pub use dataset_key_value_service::*;

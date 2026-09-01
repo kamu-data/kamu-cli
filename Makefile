@@ -8,9 +8,11 @@ POSTGRES_CRATES := \
 	./src/infra/accounts/postgres \
 	./src/infra/auth-rebac/postgres \
 	./src/infra/auth-web3/postgres \
+	./src/infra/configuration/postgres \
 	./src/infra/datasets/postgres \
 	./src/infra/flow-system/postgres \
 	./src/infra/messaging-outbox/postgres \
+	./src/infra/resources/postgres \
 	./src/infra/search/cache-postgres \
 	./src/infra/task-system/postgres \
 	./src/infra/webhooks/postgres
@@ -25,9 +27,11 @@ SQLITE_CRATES := \
 	./src/infra/accounts/sqlite \
 	./src/infra/auth-rebac/sqlite \
 	./src/infra/auth-web3/sqlite \
+	./src/infra/configuration/sqlite \
 	./src/infra/datasets/sqlite \
 	./src/infra/flow-system/sqlite \
 	./src/infra/messaging-outbox/sqlite \
+	./src/infra/resources/sqlite \
 	./src/infra/search/cache-sqlite \
 	./src/infra/task-system/sqlite \
 	./src/infra/webhooks/sqlite
@@ -581,6 +585,15 @@ release-major:
 .PHONY: resources
 resources:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::resourcegen::)'
+
+
+.PHONY: codegen-cli-reference
+codegen-cli-reference:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(generate_reference_markdown)'
+
+.PHONY: codegen-graphql-schema
+codegen-graphql-schema:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(update_graphql_schema)'
 
 
 ###############################################################################

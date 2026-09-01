@@ -13,22 +13,24 @@ use crate::formats::*;
 // ResourceID
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type))]
+#[cfg_attr(feature = "sqlx", sqlx(transparent))]
 #[derive(
-    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+    Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
-pub struct ResourceID(String); // TODO: Replace with UUID
+pub struct ResourceID(uuid::Uuid);
 
 impl ResourceID {
-    pub fn new(uid: String) -> Self {
+    pub fn new(uid: uuid::Uuid) -> Self {
         Self(uid)
     }
 
     pub fn as_bytes(&self) -> &[u8] {
-        todo!()
+        self.0.as_bytes()
     }
 
-    pub fn from_bytes(_bytes: &[u8]) -> Result<Self, multiformats::DeserializeError<Self>> {
-        todo!()
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, multiformats::DeserializeError<Self>> {
+        Self::try_from(bytes)
     }
 }
 
@@ -39,15 +41,19 @@ impl std::str::FromStr for ResourceID {
     type Err = ::multiformats::ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self::new(s.into()))
+        Ok(Self::new(
+            uuid::Uuid::parse_str(s).map_err(|e| Self::Err::new_from("invalid UUID", e))?,
+        ))
     }
 }
 
 impl TryFrom<&[u8]> for ResourceID {
     type Error = multiformats::DeserializeError<Self>;
 
-    fn try_from(_value: &[u8]) -> Result<Self, Self::Error> {
-        todo!()
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self::new(uuid::Uuid::from_slice(value).map_err(
+            multiformats::DeserializeError::<Self>::new_from,
+        )?))
     }
 }
 
@@ -56,6 +62,14 @@ impl TryFrom<&[u8]> for ResourceID {
 impl std::fmt::Display for ResourceID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl AsRef<uuid::Uuid> for ResourceID {
+    fn as_ref(&self) -> &uuid::Uuid {
+        &self.0
     }
 }
 

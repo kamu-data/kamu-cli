@@ -12,14 +12,17 @@ To regenerate this schema from existing code, use the following command:
 **Subcommands:**
 
 * `add` — Add a new dataset or modify an existing one
+* `apply` — Create or update resources from manifest files
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
-* `delete [rm]` — Delete a dataset
+* `context [ctx]` — Manage resource contexts
+* `delete [rm]` — Delete datasets or resources
 * `export` — Exports a dataset
+* `get` — Returns manifest representation of a resource
 * `ingest` — Adds data to the root dataset according to its push source configuration
 * `init` — Initialize an empty workspace in the current directory
 * `inspect` — Group of commands for exploring dataset metadata
-* `list [ls]` — List all datasets in the workspace
+* `list [ls]` — List datasets or resources
 * `log` — Shows dataset metadata history
 * `login` — Authenticates with a remote ODF server interactively
 * `logout` — Logs out from a remote Kamu server
@@ -32,6 +35,7 @@ To regenerate this schema from existing code, use the following command:
 * `repo` — Manage set of tracked repositories
 * `search` — Searches for datasets in the registered repositories
 * `sql` — Executes an SQL query or drops you into an SQL shell
+* `summary` — Show resource summary for the active context
 * `system` — Command group for system-level functionality
 * `tail` — Displays a sample of most recent records in a dataset
 * `ui` — Opens web interface
@@ -97,6 +101,71 @@ Add a dataset from manifest hosted externally (e.g. on GihHub):
     kamu add https://raw.githubusercontent.com/kamu-data/kamu-contrib/master/ca.bankofcanada/ca.bankofcanada.exchange-rates.daily.yaml
 
 To add dataset from a repository see `kamu pull` command.
+
+
+
+
+## `kamu apply`
+
+Create or update resources from manifest files
+
+**Usage:** `kamu apply [OPTIONS] [PATH]...`
+
+**Arguments:**
+
+* `<PATH>` — Manifest file or directory path(s)
+
+**Options:**
+
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
+* `--dry-run` — Preview the accepted changes without applying them
+* `--format <FMT>` — Parse all selected files using the specified manifest format
+
+  Possible values: `json`, `yaml`
+
+* `-r`, `--recursive` — Recursively scan directories for manifests
+* `--stdin` — Read manifest from standard input
+* `--continue-on-error` — Apply each manifest independently instead of the batch as a single all-or-nothing transaction, so earlier successes survive a later manifest's rejection or failure
+
+Applies one or more resource manifests to the active resource context.
+
+If the active context is `local`, manifests are applied to the current
+workspace. If the active context points to a remote server, manifests are
+applied through the remote GraphQL API.
+
+Use `--dry-run` to preview the accepted changes without applying them.
+
+By default, a multi-manifest batch is applied atomically: if any manifest is
+rejected or fails, the entire batch is rolled back, including manifests
+earlier in the batch that would otherwise have succeeded. Use
+`--continue-on-error` to instead apply each manifest independently, so that
+earlier successes are kept even if a later manifest fails.
+
+**Examples:**
+
+Apply a single manifest:
+
+    kamu apply my-resource.yaml
+
+Preview changes without applying them:
+
+    kamu apply my-resource.yaml --dry-run
+
+Apply all manifests in a directory recursively:
+
+    kamu apply manifests/ --recursive
+
+Apply multiple files in the given order:
+
+    kamu apply a.yaml b.json
+
+Apply a manifest from standard input:
+
+    cat my-resource.yaml | kamu apply --stdin
+
+Force JSON parsing regardless of file extension:
+
+    kamu apply generated.resource --format json
 
 
 
@@ -280,36 +349,404 @@ Set or unset configuration value
 
 
 
-## `kamu delete`
+## `kamu context`
 
-Delete a dataset
+Manage resource contexts
 
-**Usage:** `kamu delete [OPTIONS] [DATASET]...`
+**Usage:** `kamu context [NAME]
+       context <COMMAND>`
+
+**Subcommands:**
+
+* `add` — Register a new remote resource context
+* `list [ls]` — List configured resource contexts
+* `delete [rm]` — Delete a remote resource context
+* `check` — Check connectivity and authorization for a remote resource context
+* `api-resources` — List supported resource types in the active context
+* `use` — Switch the current resource context
 
 **Arguments:**
 
-* `<DATASET>` — Local dataset reference(s)
+* `<NAME>` — Context name to switch to
 
-**Options:**
+Contexts determine which workspace future resource commands will target.
 
-* `-a`, `--all` — Delete all datasets in the workspace
-* `-r`, `--recursive` — Also delete all transitive dependencies of specified datasets
-
-This command deletes the dataset from your workspace, including both metadata and the raw data.
-
-Take great care when deleting root datasets. If you have not pushed your local changes to a repository - the data will be lost.
-
-Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but it will disrupt downstream consumers.
+When running inside a workspace, an implicit local context named `local` is
+available automatically whenever no current context is selected. You can still
+select `local` explicitly. Remote contexts can be registered either in the
+workspace or in the user home scope.
 
 **Examples:**
 
-Delete a local dataset:
+Show current context:
+
+    kamu context
+
+List configured contexts:
+
+    kamu context ls
+
+Check a remote context:
+
+    kamu context check demo
+
+Refresh cached status for all remote contexts:
+
+    kamu context check --all
+
+Switch to a context:
+
+    kamu context prod
+
+Switch back to the local workspace context:
+
+    kamu context local
+
+Register a workspace-scoped remote context:
+
+    kamu context add prod --url https://api.kamu.dev
+
+Register a user-scoped remote context:
+
+    kamu context add prod --url https://api.kamu.dev --user
+
+List supported resource types in the active context:
+
+    kamu ctx api-resources
+
+List supported resource types from a specific context:
+
+    kamu ctx api-resources --context prod
+
+
+
+
+## `kamu context add`
+
+Register a new remote resource context
+
+**Usage:** `kamu context add [OPTIONS] --url <URL> <NEW_NAME>`
+
+**Arguments:**
+
+* `<NEW_NAME>` — Context name
+
+**Options:**
+
+* `--user` — Store context in the user home folder rather than in the workspace
+* `--url <URL>` — Backend URL of the remote workspace
+
+Registers a remote workspace context under a local name.
+
+By default the context is stored in the current workspace. Use `--user` to
+store it in the user home scope instead.
+
+The name `local` is reserved for the implicit workspace context and cannot be
+registered explicitly.
+
+**Examples:**
+
+Add a workspace-scoped remote context:
+
+    kamu context add prod --url https://example.com
+
+Add a user-scoped remote context:
+
+    kamu context add prod --url https://example.com --user
+
+
+
+
+## `kamu context list`
+
+List configured resource contexts
+
+**Usage:** `kamu context list [OPTIONS]`
+
+**Options:**
+
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+  - `parquet`:
+    Parquet columnar storage. Only available when exporting to file(s)
+
+
+Lists effective resource contexts configured in the workspace and user scopes.
+
+When running inside a workspace, the implicit `local` context is also included.
+
+**Examples:**
+
+List contexts:
+
+    kamu context ls
+
+List contexts in JSON:
+
+    kamu context ls -o json
+
+
+
+
+## `kamu context delete`
+
+Delete a remote resource context
+
+**Usage:** `kamu context delete [OPTIONS] [NAME]`
+
+**Arguments:**
+
+* `<NAME>` — Context name
+
+**Options:**
+
+* `--user` — Delete context from the user home folder rather than in the workspace
+* `--all` — Delete all remote contexts in the selected scope
+
+Deletes a previously registered remote context from the selected scope.
+
+By default deletion happens in the current workspace. Use `--user` to delete a
+user-scoped context instead. Use `--all` to delete all remote contexts from
+the selected scope.
+
+The name `local` is reserved and cannot be deleted.
+
+**Examples:**
+
+Delete a workspace-scoped context:
+
+    kamu context delete prod
+
+Delete a user-scoped context:
+
+    kamu context delete prod --user
+
+Delete all workspace-scoped remote contexts:
+
+    kamu context rm --all
+
+
+
+
+## `kamu context check`
+
+Check connectivity and authorization for a remote resource context
+
+**Usage:** `kamu context check [OPTIONS] [NAME]`
+
+**Arguments:**
+
+* `<NAME>` — Context name
+
+**Options:**
+
+* `--all` — Check all effective remote contexts
+
+Checks backend reachability and access token validity for a context.
+
+If no context name is provided, the effective current context is checked.
+Use `--all` to refresh cached status for all configured remote contexts.
+
+**Examples:**
+
+Check a named context:
+
+    kamu context check demo
+
+Check the current context:
+
+    kamu context check
+
+Check all remote contexts:
+
+    kamu context check --all
+
+
+
+
+## `kamu context api-resources`
+
+List supported resource types in the active context
+
+**Usage:** `kamu context api-resources [OPTIONS]`
+
+**Options:**
+
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values:
+  - `csv`:
+    Comma-separated values
+  - `json`:
+    Array of Structures format
+  - `ndjson`:
+    One Json object per line - easily splittable format
+  - `json-soa`:
+    Structure of arrays - more compact and efficient format for encoding entire dataframe
+  - `json-aoa`:
+    Array of arrays - compact and efficient and preserves column order
+  - `table`:
+    A pretty human-readable table
+  - `parquet`:
+    Parquet columnar storage. Only available when exporting to file(s)
+
+
+Lists resource types supported by the active context.
+
+If the active context is `local`, this targets the current workspace. If the
+active context points to a remote server, this targets that remote GraphQL API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+List supported resource types in the active context:
+
+    kamu ctx api-resources
+
+List supported resource types from a specific context:
+
+    kamu ctx api-resources --context prod
+
+List supported resource types in JSON:
+
+    kamu ctx api-resources -o json
+
+
+
+
+## `kamu context use`
+
+Switch the current resource context
+
+**Usage:** `kamu context use <NAME>`
+
+**Arguments:**
+
+* `<NAME>` — Context name
+
+Switches the current resource context to the specified named remote context.
+
+This is the explicit form of `kamu context <name>`.
+
+The special name `local` refers to the current workspace when one is available.
+
+**Examples:**
+
+Switch to a context:
+
+    kamu context use prod
+
+Switch to the local workspace context:
+
+    kamu context use local
+
+
+
+
+## `kamu delete`
+
+Delete datasets or resources
+
+**Usage:** `kamu delete [OPTIONS] [TARGET] [ARGS]...`
+
+**Arguments:**
+
+* `<TARGET>` — Target to delete: `datasets`, `%` (all resource types), or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<ARGS>` — Dataset selector(s) in dataset mode, or a single resource selector in resource mode
+
+**Options:**
+
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
+* `-a`, `--all` — Delete all matched datasets or all resources in the selected scope
+* `-r`, `--recursive` — Also delete all transitive dependencies of specified datasets
+* `-f`, `--force` — Do not ask for confirmation
+* `--ignore-not-found` — Exit successfully when a selected resource does not exist
+* `--dry-run` — Preview the resolved resource deletions without deleting anything
+* `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
+
+This command deletes datasets using the legacy dataset path by default, or
+resources when a resource target is specified explicitly.
+
+**Examples:**
+
+Delete a local dataset using the legacy default:
 
     kamu delete my.dataset
 
-Delete local datasets matching pattern:
+Delete datasets explicitly:
+
+    kamu delete datasets my.dataset
+
+Delete a dataset using the dataset pseudo-type selector:
+
+    kamu delete dataset/my.dataset
+
+Delete local datasets matching a pattern:
 
     kamu delete my.dataset.%
+
+Delete a single resource:
+
+    kamu delete storages warehouse
+
+Delete same-type resources by name pattern:
+
+    kamu delete vs app-%
+
+Delete all resources of a type:
+
+    kamu delete storages --all
+
+Delete all resources across types:
+
+    kamu delete '%/%'
+
+Delete resources using slash selectors:
+
+    kamu delete vs/my-vars ss/my-secrets
+
+Delete the same exact name across every resource type:
+
+    kamu delete % db-creds
+
+Delete resources matching a name pattern across every resource type:
+
+    kamu delete %/db-%
+
+Delete all resources of a type using a slash selector:
+
+    kamu delete 'storages/%'
+
+Delete a dataset and a resource in one command:
+
+    kamu delete dataset/my.dataset vs/my-vars
+
+Force dataset interpretation when a dataset account collides with a resource prefix:
+
+    kamu delete datasets vs/my.dataset
+
+Preview deletion:
+
+    kamu delete dataset/my.dataset vs/my-vars --dry-run
+
+Narrow a deletion to resources carrying a label:
+
+    kamu delete variablesets --all -l environment=stale --dry-run
 
 
 
@@ -339,6 +776,101 @@ In all other cases a path is considered as a directory. Examples:
  - `export/dataset.csv/` is a directory path
  - `export/dataset/` is a directory path
  - `export/dataset` is a directory path
+
+
+
+
+## `kamu get`
+
+Returns manifest representation of a resource
+
+**Usage:** `kamu get [OPTIONS] [ARGS]...`
+
+**Arguments:**
+
+* `<ARGS>` — Resource selector(s): `type name...` or `type/name...`
+
+**Options:**
+
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
+* `-o`, `--output-format <FMT>` — Serialization format of the returned object
+
+  Default value: `yaml`
+
+  Possible values: `json`, `name`, `yaml`
+
+* `--spec` — Return an apply-compatible spec manifest instead of the full resource view
+* `--revealed` — Show actual secret values in the output (decrypts encrypted fields). Cannot be used with `-o name`
+* `--ignore-not-found` — Exit successfully when the resource does not exist
+* `--max-results <N>` — Maximum number of resources resolved by expanding selectors
+
+  Default value: `100`
+* `--unbounded` — Disable the limit for expanding selectors
+* `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
+
+Returns the current state of one or more resources as YAML or JSON.
+
+Only real resource types supported by the active context are accepted.
+Datasets are intentionally not supported by this command.
+
+By default this command returns the full resource view, including status.
+Use `--spec` to return the apply-compatible spec manifest instead.
+
+When multiple selectors are provided, the output is wrapped in an `items` list.
+
+**Examples:**
+
+Get a variable set manifest in YAML:
+
+    kamu get variablesets my-vars
+
+Get the same resource in JSON:
+
+    kamu get vs my-vars -o json
+
+Get the apply-compatible spec manifest:
+
+    kamu get vs my-vars --spec
+
+Get multiple resources of the same type:
+
+    kamu get variablesets vars-a vars-b
+
+Get same-type resources by name pattern:
+
+    kamu get vs app-%
+
+Get multiple resources by slash-separated ref form:
+
+    kamu get vs/vars-a ss/db-creds
+
+Get the same exact name across every resource type:
+
+    kamu get % db-creds
+
+Get resources matching a name pattern across every resource type:
+
+    kamu get %/db-%
+
+Get every resource of every type:
+
+    kamu get '%/%'
+
+Get a resource by UUID:
+
+    kamu get variablesets 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+Read a resource from a remote context:
+
+    kamu get storages warehouse --context prod
+
+Ignore missing resources:
+
+    kamu get secretsets missing-a missing-b --ignore-not-found
+
+Narrow matched resources to those carrying a label:
+
+    kamu get 'variablesets/%' -l environment=production
 
 
 
@@ -508,12 +1040,17 @@ Show physical schema of the underlying Parquet files:
 
 ## `kamu list`
 
-List all datasets in the workspace
+List datasets or resources
 
-**Usage:** `kamu list [OPTIONS]`
+**Usage:** `kamu list [OPTIONS] [TARGETS]...`
+
+**Arguments:**
+
+* `<TARGETS>` — Targets to list: `datasets`, `%` (all resource types), a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`, optionally narrowed as `type/name`, `type/pattern-%` or `type/<id>`. Several resource selectors may be given at once
 
 **Options:**
 
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values:
@@ -533,6 +1070,9 @@ List all datasets in the workspace
     Parquet columnar storage. Only available when exporting to file(s)
 
 * `-w`, `--wide` — Show more details (repeat for more)
+* `--max-results <N>` — Maximum number of results to list
+* `--unbounded` — Disable the result limit
+* `-l`, `--label <LABEL_SELECTOR>` — Narrow the listing to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
 
 **Examples:**
 
@@ -540,9 +1080,50 @@ To see a human-friendly list of datasets in your workspace:
 
     kamu list
 
+To list datasets explicitly:
+
+    kamu list datasets
+
+To list all resources across all types:
+
+    kamu list '%'
+
+To list variable sets:
+
+    kamu list variablesets
+
+To list variable sets whose name matches a pattern:
+
+    kamu list 'vs/my-%'
+
+To list one resource by name or ID:
+
+    kamu list 'vs/my-vars'
+    kamu list 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+To list several resource types at once:
+
+    kamu list 'vs/app-%' 'ss/app-%'
+
+To list storages from a specific context:
+
+    kamu list storages --context prod
+
 To see more details:
 
     kamu list -w
+
+To list only resources carrying a label:
+
+    kamu list variablesets -l environment=production
+
+To require several labels at once:
+
+    kamu list variablesets -l environment=production,tier=backend
+
+To get a machine-readable list of all resources:
+
+    kamu list '%' -o csv
 
 To get a machine-readable list of datasets:
 
@@ -673,11 +1254,11 @@ Logs out from a remote Kamu server
 
 Creates a new dataset manifest from a template
 
-**Usage:** `kamu new [OPTIONS] <NAME>`
+**Usage:** `kamu new [OPTIONS] <DATASET_NAME>`
 
 **Arguments:**
 
-* `<NAME>` — Name of the new dataset
+* `<DATASET_NAME>` — Name of the new dataset
 
 **Options:**
 
@@ -733,7 +1314,7 @@ Pull new data into the datasets
 * `-a`, `--all` — Pull all datasets in the workspace
 * `-r`, `--recursive` — Also pull all transitive dependencies of specified datasets
 * `--fetch-uncacheable` — Pull latest data from uncacheable data sources
-* `--as <NAME>` — Local name of a dataset to use when syncing from a repository
+* `--as <DATASET_NAME>` — Local name of a dataset to use when syncing from a repository
 * `--no-alias` — Don't automatically add a remote push alias for this destination
 * `--set-watermark <TIME>` — Injects a manual watermark into the dataset to signify that no data is expected to arrive with event time that precedes it
 * `-f`, `--force` — Overwrite local version with remote, even if revisions have diverged
@@ -839,12 +1420,12 @@ Add dataset to local IPFS node and update IPNS entry to the new CID:
 
 Rename a dataset
 
-**Usage:** `kamu rename <DATASET> <NAME>`
+**Usage:** `kamu rename <DATASET> <NEW_NAME>`
 
 **Arguments:**
 
 * `<DATASET>` — Dataset reference
-* `<NAME>` — The new name to give it
+* `<NEW_NAME>` — The new name to give it
 
 Use this command to rename a dataset in your local workspace. Renaming is safe in terms of downstream derivative datasets as they use stable dataset IDs to define their inputs.
 
@@ -908,11 +1489,11 @@ Add S3 bucket as a repository:
 
 Adds a repository
 
-**Usage:** `kamu repo add <NAME> <URL>`
+**Usage:** `kamu repo add <REPO_NAME> <URL>`
 
 **Arguments:**
 
-* `<NAME>` — Local alias of the repository
+* `<REPO_NAME>` — Local alias of the repository
 * `<URL>` — URL of the repository
 
 For local file system repositories use the following URL formats:
@@ -1239,6 +1820,45 @@ To run with Spark engine:
 By default Spark runs with JDBC protocol, to instead run with Livy HTTP gateway:
 
     kamu sql server --engine spark --livy
+
+
+
+
+## `kamu summary`
+
+Show resource summary for the active context
+
+**Usage:** `kamu summary [OPTIONS]`
+
+**Options:**
+
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
+* `-o`, `--output-format <FMT>` — Format to display the results in
+
+  Possible values: `table`, `json`, `yaml`
+
+
+Shows resource counts by type and reconciliation phase for the active context.
+
+If the active context is `local`, commands target the current workspace. If the
+active context points to a remote server, commands target that remote GraphQL
+API.
+
+Use `--context` to override the current context for this invocation only.
+
+**Examples:**
+
+Show summary from the active context:
+
+    kamu summary
+
+Show summary from a specific context:
+
+    kamu summary --context prod
+
+Show summary in YAML:
+
+    kamu summary -o yaml
 
 
 

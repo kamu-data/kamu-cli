@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                resource_schema,\n                COUNT(*) as \"total_count!: i64\",\n                SUM(\n                    CASE WHEN json_extract(status, '$.phase') = 'Reconciling' THEN 1 ELSE 0 END\n                ) as \"reconciling_count!: i64\",\n                SUM(\n                    CASE WHEN json_extract(status, '$.phase') = 'Ready' THEN 1 ELSE 0 END\n                ) as \"ready_count!: i64\",\n                SUM(\n                    CASE WHEN json_extract(status, '$.phase') = 'Failed' THEN 1 ELSE 0 END\n                ) as \"failed_count!: i64\",\n                SUM(\n                    CASE\n                        WHEN COALESCE(json_extract(status, '$.phase'), 'Pending') = 'Pending'\n                        THEN 1\n                        ELSE 0\n                    END\n                ) as \"pending_count!: i64\"\n            FROM resources\n            WHERE account_id = $1\n              AND deleted_at IS NULL\n            GROUP BY resource_schema\n            ORDER BY resource_schema ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "resource_schema",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "total_count!: i64",
+        "ordinal": 1,
+        "type_info": "Null"
+      },
+      {
+        "name": "reconciling_count!: i64",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "ready_count!: i64",
+        "ordinal": 3,
+        "type_info": "Null"
+      },
+      {
+        "name": "failed_count!: i64",
+        "ordinal": 4,
+        "type_info": "Null"
+      },
+      {
+        "name": "pending_count!: i64",
+        "ordinal": 5,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "32ebfa28100d07c70bc410f613cdeed2f6f08c4098179ee63cc82f021b473715"
+}

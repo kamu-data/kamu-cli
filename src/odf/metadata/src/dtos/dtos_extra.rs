@@ -36,6 +36,21 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourcePhase
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Display for resource::ResourcePhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Pending => "Pending",
+            Self::Reconciling => "Reconciling",
+            Self::Ready => "Ready",
+            Self::Failed => "Failed",
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceHeaders
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,7 +70,11 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
         Self {
             id: Some(id),
             name,
-            account: Some(account.into()),
+            account: Some(auth::AccountRef {
+                id: Some(account.id),
+                did: Some(account.did),
+                name: Some(account.name),
+            }),
             labels: Some(labels),
             annotations: Some(annotations),
         }
@@ -184,6 +203,19 @@ impl From<auth::AccountRef> for resource::ResourceRef {
 impl From<auth::AccountHandle> for resource::ResourceRef {
     fn from(value: auth::AccountHandle) -> Self {
         auth::AccountRef::from(value).into()
+    }
+}
+
+impl auth::AccountHandle {
+    pub fn new_test(account_name_str: &str) -> Self {
+        Self {
+            id: crate::resource::ResourceID::new(uuid::Uuid::new_v5(
+                &uuid::Uuid::NAMESPACE_URL,
+                account_name_str.as_bytes(),
+            )),
+            did: AccountID::new_seeded_ed25519(account_name_str.as_bytes()),
+            name: AccountName::new_unchecked(account_name_str),
+        }
     }
 }
 

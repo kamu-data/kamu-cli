@@ -62,8 +62,8 @@ impl InMemoryFlowTriggerEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
-    async fn len(&self) -> Result<usize, InternalError> {
-        self.inner.len().await
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
+        self.inner.total_events_stored().await
     }
 
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowTriggerEvent> {

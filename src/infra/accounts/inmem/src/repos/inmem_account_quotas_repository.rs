@@ -63,8 +63,8 @@ impl EventStore<AccountQuotaState> for InMemoryAccountQuotaEventStore {
             .await
     }
 
-    async fn len(&self) -> Result<usize, InternalError> {
-        self.inner.len().await
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
+        self.inner.total_events_stored().await
     }
 }
 

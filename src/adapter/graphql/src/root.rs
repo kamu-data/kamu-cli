@@ -64,6 +64,11 @@ impl Query {
         Search
     }
 
+    /// Resource-related functionality group
+    async fn resources(&self) -> Resources {
+        Resources
+    }
+
     /// Querying and data manipulations
     async fn data(&self) -> DataQueries {
         DataQueries
@@ -109,6 +114,11 @@ impl Mutation {
     /// Allows setting permissions for multiple datasets in batch mode
     async fn collaboration(&self) -> CollaborationMut {
         CollaborationMut
+    }
+
+    /// Resource-related functionality group
+    async fn resources(&self) -> ResourcesMut {
+        ResourcesMut
     }
 
     /// Admin-related functionality group

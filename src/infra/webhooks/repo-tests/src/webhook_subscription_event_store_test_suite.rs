@@ -21,7 +21,7 @@ pub async fn test_no_events_initially(catalog: &dill::Catalog) {
         .get_one::<dyn WebhookSubscriptionEventStore>()
         .unwrap();
 
-    let len = event_store.len().await.unwrap();
+    let len = event_store.total_events_stored().await.unwrap();
     assert_eq!(len, 0);
 
     let non_existent_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
@@ -88,7 +88,7 @@ pub async fn test_store_single_aggregate(catalog: &dill::Catalog) {
 
     subscription.save(event_store.as_ref()).await.unwrap();
 
-    let len = event_store.len().await.unwrap();
+    let len = event_store.total_events_stored().await.unwrap();
     assert_eq!(len, 4);
 
     let res = event_store
@@ -203,7 +203,7 @@ pub async fn test_store_multiple_aggregates(catalog: &dill::Catalog) {
     subscription_3.pause().unwrap();
     subscription_3.save(event_store.as_ref()).await.unwrap();
 
-    let len = event_store.len().await.unwrap();
+    let len = event_store.total_events_stored().await.unwrap();
     assert_eq!(len, 9);
 
     let events_1 = event_store

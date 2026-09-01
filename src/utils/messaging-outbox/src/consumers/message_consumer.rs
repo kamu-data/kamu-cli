@@ -34,18 +34,25 @@ pub trait MessageConsumerT<TMessage: 'static + Message>: MessageConsumer {
 pub struct MessageConsumerMeta {
     pub consumer_name: &'static str,
     pub feeding_producers: &'static [&'static str],
-    pub delivery: MessageDeliveryMechanism,
+    pub consumption_mode: MessageConsumptionMode,
     pub initial_consumer_boundary: InitialConsumerBoundary,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum MessageDeliveryMechanism {
-    Transactional,
+pub enum MessageConsumptionMode {
     /// Mechanism for logical separation within a domain. Please refrain from
     /// using for cross-domain interaction.
     Immediate,
+    TransactionalWrapped,
+    TransactionalSelfManaged,
+}
+
+impl MessageConsumptionMode {
+    pub fn is_immediate(self) -> bool {
+        self == Self::Immediate
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

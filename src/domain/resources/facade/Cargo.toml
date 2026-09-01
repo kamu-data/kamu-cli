@@ -1,0 +1,60 @@
+[package]
+name = "kamu-resources-facade"
+description = "API-facing facade for managed resource manifests"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[features]
+default = []
+testing = ["dep:mockall"]
+
+
+[dependencies]
+database-common = { workspace = true }
+event-sourcing = { workspace = true }
+graphql-http = { workspace = true }
+internal-error = { workspace = true }
+kamu-accounts = { workspace = true }
+kamu-auth-rebac = { workspace = true }
+kamu-resources = { workspace = true }
+kamu-resources-services = { workspace = true }
+odf = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
+cynic = { version = "3", default-features = false }
+dill = { version = "0.15", default-features = false }
+paste = { version = "1", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", default-features = false }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+strum = { version = "0.28", default-features = false, features = ["derive"] }
+url = { version = "2", default-features = false }
+
+mockall = { optional = true, version = "0.14", default-features = false }
+
+
+[build-dependencies]
+cynic-codegen = { version = "3", default-features = false }
+
+
+[dev-dependencies]
+pretty_assertions = { version = "1" }

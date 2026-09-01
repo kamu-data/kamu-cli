@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT r.resource_id as \"id: uuid::Uuid\"\n            FROM resources r\n            JOIN resource_labels_projection rl ON rl.resource_id = r.resource_id\n            WHERE r.account_id = $1\n              AND r.resource_schema = $2\n              AND rl.label_key = $3\n              AND rl.label_value = $4\n              AND r.deleted_at IS NULL\n            ORDER BY r.created_at ASC, r.resource_id ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: uuid::Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "038e3851994e34b49146ae8ef1ac115fcda9857f740d4167ba9fc59f5e859bce"
+}

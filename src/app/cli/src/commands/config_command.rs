@@ -104,7 +104,7 @@ impl Command for ConfigSetCommand {
 
             eprintln!(
                 "{} {} {} {} {}",
-                console::style("Removed").green().bold(),
+                console::style("Deleted").green().bold(),
                 self.path,
                 console::style("from").green().bold(),
                 format!("{scope:?}").to_lowercase(),

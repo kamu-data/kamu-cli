@@ -57,6 +57,8 @@ use crate::{
     get_app_database_config,
     move_initial_database_to_workspace,
     odf_server,
+    resource_context,
+    resources,
     spawn_password_refreshing_job,
 };
 
@@ -544,6 +546,11 @@ pub fn configure_base_catalog(
         },
     );
 
+    kamu_resources_facade::register_dependencies(&mut b);
+    kamu_resources_services::register_dependencies(&mut b);
+    kamu_configuration_services::register_dependencies(&mut b);
+    kamu_storage_services::register_dependencies(&mut b);
+
     kamu_auth_rebac_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
 
     b.add::<DatabaseTransactionRunner>();
@@ -613,6 +620,11 @@ pub fn configure_base_catalog(
         kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
     );
 
+    register_message_dispatcher::<kamu_resources::ResourceLifecycleMessage>(
+        &mut b,
+        kamu_resources::MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    );
+
     b
 }
 
@@ -631,6 +643,9 @@ pub fn configure_cli_catalog(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
     b.add::<ConfirmDeleteService>();
+
+    resource_context::register_dependencies(&mut b);
+    resources::register_dependencies(&mut b);
 
     b
 }
@@ -856,27 +871,27 @@ pub fn register_config_in_catalog(
     ));
     //
 
-    // Dataset env vars configuration
-    catalog_builder.add_value(config.dataset_env_vars.clone());
+    // Secrets encryption configuration
+    catalog_builder.add_value(config.secrets_encryption.clone());
 
-    match &config.dataset_env_vars.encryption_key {
+    match &config.secrets_encryption.encryption_key {
         None => {
-            if config.dataset_env_vars.enabled {
-                panic!("Dataset env vars encryption key is required");
+            if config.secrets_encryption.enabled {
+                panic!("Secrets encryption key is required");
             } else {
-                warn!("Dataset env vars configuration is missing. Feature will be disabled");
+                warn!("Secrets encryption configuration is missing. Feature will be disabled");
             }
             catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
         Some(encryption_key) => {
-            if config.dataset_env_vars.enabled {
+            if config.secrets_encryption.enabled {
                 assert!(
                     AesGcmEncryptor::try_new(encryption_key).is_ok(),
-                    "Invalid dataset env var encryption key",
+                    "Invalid secrets encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
-                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarCompatServiceImpl>();
             } else {
                 warn!("Dataset env vars feature will be disabled");
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();

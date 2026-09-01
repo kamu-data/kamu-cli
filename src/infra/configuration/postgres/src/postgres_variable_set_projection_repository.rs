@@ -1,0 +1,302 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use database_common::TransactionRefT;
+use dill::{component, interface};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_configuration::{
+    ReplaceProjectionEntriesError,
+    VariableSetEntry,
+    VariableSetProjectionRepository,
+};
+use kamu_resources::ResourceID;
+use multiformats::stack_string::StackString;
+use odf::metadata::AsStackString;
+
+#[component]
+#[interface(dyn VariableSetProjectionRepository)]
+pub struct PostgresVariableSetProjectionRepository {
+    transaction: TransactionRefT<sqlx::Postgres>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository {
+    async fn find_entry(
+        &self,
+        resource_id: &ResourceID,
+        resource_generation: u64,
+        key: &str,
+    ) -> Result<Option<VariableSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
+
+        let row = sqlx::query_as!(
+            VariableSetEntry,
+            r#"
+            SELECT
+                entry_id as "entry_id: uuid::Uuid",
+                account_id as "account_id: odf::AccountID",
+                variable_key as key,
+                value,
+                created_at,
+                updated_at
+            FROM config_variable_set_entries
+            WHERE resource_id = $1
+              AND resource_generation = $2
+              AND variable_key = $3
+            "#,
+            resource_id,
+            resource_generation,
+            key,
+        )
+        .fetch_optional(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(row)
+    }
+
+    async fn get_entries(
+        &self,
+        resource_id: &ResourceID,
+        resource_generation: u64,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
+
+        let rows = sqlx::query_as!(
+            VariableSetEntry,
+            r#"
+            SELECT
+                entry_id as "entry_id: uuid::Uuid",
+                account_id as "account_id: odf::AccountID",
+                variable_key as key,
+                value,
+                created_at,
+                updated_at
+            FROM config_variable_set_entries
+            WHERE resource_id = $1
+              AND resource_generation = $2
+            ORDER BY variable_key
+            "#,
+            resource_id,
+            resource_generation,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn get_latest_entries(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
+
+        let rows = sqlx::query_as!(
+            VariableSetEntry,
+            r#"
+            SELECT
+                e.entry_id as "entry_id: uuid::Uuid",
+                e.account_id as "account_id: odf::AccountID",
+                e.variable_key as key,
+                e.value,
+                e.created_at,
+                e.updated_at
+            FROM config_variable_set_entries e
+            JOIN resources r ON r.resource_id = e.resource_id
+                AND r.generation = e.resource_generation
+                AND r.deleted_at IS NULL
+            WHERE e.resource_id = $1
+            ORDER BY e.variable_key
+            "#,
+            resource_id,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+
+    async fn get_latest_entries_before_generation(
+        &self,
+        resource_id: &ResourceID,
+        resource_generation: u64,
+    ) -> Result<Vec<VariableSetEntry>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
+
+        let rows = sqlx::query_as!(
+            VariableSetEntry,
+            r#"
+            SELECT
+                entry_id as "entry_id: uuid::Uuid",
+                account_id as "account_id: odf::AccountID",
+                variable_key as key,
+                value,
+                created_at,
+                updated_at
+            FROM config_variable_set_entries
+            WHERE resource_id = $1
+              AND resource_generation = (
+                  SELECT MAX(resource_generation)
+                  FROM config_variable_set_entries
+                  WHERE resource_id = $1
+                    AND resource_generation < $2
+              )
+            ORDER BY variable_key
+            "#,
+            resource_id,
+            resource_generation,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows)
+    }
+    async fn replace_entries(
+        &self,
+        resource_id: &ResourceID,
+        resource_generation: u64,
+        entries: &[VariableSetEntry],
+    ) -> Result<(), ReplaceProjectionEntriesError> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
+
+        let entry_ids: Vec<_> = entries.iter().map(|e| e.entry_id).collect();
+        let account_ids: Vec<_> = entries
+            .iter()
+            .map(|e| e.account_id.as_stack_string())
+            .collect();
+        let account_ids_strs = account_ids
+            .iter()
+            .map(StackString::as_str)
+            .collect::<Vec<_>>();
+        let keys: Vec<_> = entries.iter().map(|e| e.key.as_str()).collect();
+        let values: Vec<_> = entries.iter().map(|e| e.value.as_str()).collect();
+        let created_ats: Vec<_> = entries.iter().map(|e| e.created_at).collect();
+        let updated_ats: Vec<_> = entries.iter().map(|e| e.updated_at).collect();
+
+        let insert_result = sqlx::query!(
+            r#"
+            INSERT INTO config_variable_set_entries (
+                entry_id,
+                resource_id,
+                resource_generation,
+                account_id,
+                variable_key,
+                value,
+                created_at,
+                updated_at
+            )
+            SELECT e.entry_id, $1, $2, e.account_id, e.variable_key, e.value, e.created_at, e.updated_at
+            FROM UNNEST($3::uuid[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::timestamptz[])
+                AS e(entry_id, account_id, variable_key, value, created_at, updated_at)
+            "#,
+            resource_id,
+            resource_generation,
+            &entry_ids,
+            &account_ids_strs as &[&str],
+            &keys as &[&str],
+            &values as &[&str],
+            &created_ats,
+            &updated_ats,
+        )
+        .execute(&mut *connection_mut)
+        .await;
+
+        match insert_result {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(ReplaceProjectionEntriesError::concurrent_modification());
+            }
+            Err(e) => return Err(e.int_err().into()),
+        }
+
+        Ok(())
+    }
+
+    async fn cleanup_entries_before_generation(
+        &self,
+        resource_id: &ResourceID,
+        resource_generation: u64,
+    ) -> Result<(), InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_generation = i64::try_from(resource_generation).unwrap();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
+
+        sqlx::query!(
+            r#"
+            DELETE FROM config_variable_set_entries
+            WHERE resource_id = $1
+              AND resource_generation < $2
+            "#,
+            resource_id,
+            resource_generation,
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+
+    async fn delete_all_entries(&self, resource_ids: &[ResourceID]) -> Result<(), InternalError> {
+        if resource_ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let ids: Vec<uuid::Uuid> = resource_ids.iter().map(|id| *id.as_ref()).collect();
+
+        sqlx::query!(
+            r#"
+            DELETE FROM config_variable_set_entries
+                WHERE resource_id = ANY($1::uuid[])
+            "#,
+            &ids,
+        )
+        .execute(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

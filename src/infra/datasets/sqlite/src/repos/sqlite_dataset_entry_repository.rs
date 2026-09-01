@@ -465,38 +465,78 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
-        {
+        let deletion_result = self
+            .delete_dataset_entries(&[Cow::Borrowed(dataset_id)])
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetEntriesError::Internal(e) => DeleteEntryDatasetError::Internal(e),
+            })?;
+
+        if deletion_result.deleted_dataset_ids.is_empty() {
+            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+        }
+
+        Ok(())
+    }
+
+    async fn delete_dataset_entries<'a>(
+        &self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<DatasetEntriesDeletionResult, DeleteDatasetEntriesError> {
+        if dataset_ids.is_empty() {
+            return Ok(DatasetEntriesDeletionResult::default());
+        }
+
+        let deleted_dataset_ids = {
             let mut tr = self.transaction.lock().await;
 
             let connection_mut = tr.connection_mut().await?;
 
-            let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-            let dataset_id_as_str = stack_dataset_id.as_str();
-            let delete_result = sqlx::query!(
+            let mut query_builder = sqlx::QueryBuilder::<_>::new(
                 r#"
                 DELETE
                 FROM dataset_entries
-                WHERE dataset_id = $1
+                WHERE dataset_id IN (
                 "#,
-                dataset_id_as_str,
-            )
-            .execute(&mut *connection_mut)
-            .await
-            .int_err()?;
+            );
+            let mut separated = query_builder.separated(", ");
+            for dataset_id in dataset_ids {
+                separated.push_bind(dataset_id.to_string());
+            }
+            separated.push_unseparated(") RETURNING dataset_id");
 
-            if delete_result.rows_affected() == 0 {
-                return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+            let deleted_dataset_id_rows = query_builder
+                .build()
+                .fetch_all(&mut *connection_mut)
+                .await
+                .int_err()?;
+
+            deleted_dataset_id_rows
+                .into_iter()
+                .map(|row| {
+                    use sqlx::Row;
+
+                    let dataset_id = row.try_get::<String, _>("dataset_id").int_err()?;
+                    odf::DatasetID::from_did_str(&dataset_id).int_err()
+                })
+                .collect::<Result<Vec<_>, _>>()?
+        };
+
+        let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(
+            dataset_ids,
+            deleted_dataset_ids,
+        );
+
+        if !deletion_result.deleted_dataset_ids.is_empty() {
+            for listener in &self.removal_listeners {
+                listener
+                    .on_dataset_entries_removed(&deletion_result.deleted_dataset_ids)
+                    .await
+                    .int_err()?;
             }
         }
 
-        for listener in &self.removal_listeners {
-            listener
-                .on_dataset_entry_removed(dataset_id)
-                .await
-                .int_err()?;
-        }
-
-        Ok(())
+        Ok(deletion_result)
     }
 }
 

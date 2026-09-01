@@ -1,0 +1,235 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[macro_export]
+macro_rules! declare_apply_resource_use_case {
+    (
+        use_case = $use_case:ident,
+        resource = $resource:ty
+    ) => {
+        #[dill::component]
+        #[dill::interface(dyn kamu_resources::ApplyResourceUseCase<$resource>)]
+        pub struct $use_case {
+            generic_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
+            typed_resource_query_service:
+                std::sync::Arc<dyn kamu_resources::TypedResourceQueryService<$resource>>,
+            resource_aggregate_loader:
+                std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
+            resource_persistence_service:
+                std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+            resource_spec_sanitizer:
+                Option<std::sync::Arc<dyn kamu_resources::ResourceSpecSanitizer<$resource>>>,
+            outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
+            time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
+        }
+
+        impl $use_case {
+            /// `headers.account` must already be a resolved by
+            /// the time it reaches `plan`/`apply` — resolving an id/name selector is
+            /// the caller's responsibility (via the facade's
+            /// `ResourceAccountResolver`, or by threading an already-known handle, as
+            /// `DatasetEnvVarMutationAdapterImpl` does). This is enforced here rather
+            /// than silently trusted, since the event-sourced projector downstream is
+            /// pure/sync and cannot resolve accounts itself.
+            fn ensure_params_account_resolved(
+                params: &kamu_resources::ApplyResourceParams<$resource>,
+            ) -> Result<(), kamu_resources::ApplyResourceUseCaseError<$resource>> {
+                match &params.headers.account {
+                    Some(odf::metadata::auth::AccountRef {
+                        id: Some(_),
+                        did: Some(_),
+                        name: Some(_),
+                    }) => Ok(()),
+                    other => Err(kamu_resources::ApplyResourceUseCaseError::Internal(
+                        internal_error::InternalError::new(format!(
+                            "resource headers must carry a resolved account handle \
+                             by the time it reaches the apply use case, got: {other:?}"
+                        )),
+                    )),
+                }
+            }
+
+            /// Runs the optional sanitizer and surfaces sanitizer-level
+            /// business rejections before planning.
+            async fn sanitize_params(
+                &self,
+                params: kamu_resources::ApplyResourceParams<$resource>,
+            ) -> Result<
+                kamu_resources::SanitizeParamsOutcome<$resource>,
+                kamu_resources::ApplyResourceUseCaseError<$resource>,
+            > {
+                // If no sanitizer is provided, return the original params
+                let Some(sanitizer) = &self.resource_spec_sanitizer else {
+                    return Ok(kamu_resources::SanitizeParamsOutcome::Sanitized(params));
+                };
+
+                // Find the resource UID if not provided
+                let maybe_resource_id = match params.id {
+                    Some(id) => Some(id),
+                    None => {
+                        let account_id = params
+                            .headers
+                            .account
+                            .as_ref()
+                            .and_then(|a| a.did.as_ref())
+                            .expect("resource headers account must be resolved by this point");
+
+                        self.generic_resource_query_service
+                            .find_resource_id_by_name(
+                                account_id,
+                                <$resource as kamu_resources::ResourceSchemaProvider>::schema(),
+                                &params.headers.name,
+                            )
+                            .await
+                            .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?
+                    }
+                };
+
+                // Load the current spec if the resource exists to provide it to the sanitizer for comparison
+                let current_spec = if let Some(id) = maybe_resource_id {
+                    self.typed_resource_query_service
+                        .ensure_resource_id_matches_type(&id)
+                        .await
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::from)?;
+
+                    let resource = self
+                        .resource_aggregate_loader
+                        .load(&id)
+                        .await
+                        .map_err(kamu_resources::ResourceLoadError)
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::LoadFailed)?;
+
+                    Some(
+                        <$resource as kamu_resources::DeclarativeResource>::spec(&resource)
+                            .clone(),
+                    )
+                } else {
+                    None
+                };
+
+                // Sanitize the new spec using the current spec for comparison
+                let outcome = sanitizer
+                    .sanitize_new_spec(params.spec, current_spec.as_ref())
+                    .await
+                    .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?;
+
+                let spec = match outcome {
+                    kamu_resources::SanitizeSpecOutcome::Sanitized(spec) => spec,
+                    kamu_resources::SanitizeSpecOutcome::Rejected(rejection) => {
+                        return Ok(kamu_resources::SanitizeParamsOutcome::Rejected(rejection));
+                    }
+                };
+
+                Ok(kamu_resources::SanitizeParamsOutcome::Sanitized(
+                    kamu_resources::ApplyResourceParams { spec, ..params },
+                ))
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl kamu_resources::ApplyResourceUseCase<$resource> for $use_case
+        where
+            $resource: kamu_resources::ReconcilableEventSourcedResource
+                + kamu_resources::ResourceSchemaProvider,
+            <$resource as kamu_resources::DeclarativeResource>::Spec:
+                serde::Serialize + PartialEq + Clone + kamu_resources::ResourceSpecFromInput<
+                    <$resource as kamu_resources::DeclarativeResource>::SpecInput,
+                >,
+            <$resource as kamu_resources::DeclarativeResource>::SpecInput:
+                serde::Serialize + Clone + kamu_resources::ResourceValidateSpec + kamu_resources::ResourceLinterSpec,
+            <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
+                kamu_resources::IntoApplyResourceRejection
+                    + kamu_resources::InvariantViolationOf<
+                        <$resource as kamu_resources::DeclarativeResource>::ResourceState,
+                    >
+                    + From<kamu_resources::ResourceHeadersValidationError>
+                    + From<
+                        <<$resource as kamu_resources::DeclarativeResource>::SpecInput as kamu_resources::ResourceValidateSpec>::ValidationError,
+                    >,
+        {
+            async fn plan(
+                &self,
+                params: kamu_resources::ApplyResourceParams<$resource>,
+            ) -> Result<
+                kamu_resources::ApplyResourcePlanningDecision<$resource>,
+                kamu_resources::ApplyResourceUseCaseError<$resource>,
+            > {
+                Self::ensure_params_account_resolved(&params)?;
+                let params = match self.sanitize_params(params).await? {
+                    kamu_resources::SanitizeParamsOutcome::Sanitized(params) => params,
+                    kamu_resources::SanitizeParamsOutcome::Rejected(rejection) => {
+                        return Ok(kamu_resources::ApplyResourcePlanningDecision::Rejected(
+                            rejection,
+                        ));
+                    }
+                };
+
+                let planner = $crate::ApplyResourcePlanner::<$resource>::new(
+                    self.generic_resource_query_service.as_ref(),
+                    self.typed_resource_query_service.as_ref(),
+                    self.resource_aggregate_loader.as_ref(),
+                    self.time_source.as_ref(),
+                );
+
+                planner.plan(params).await
+            }
+
+            async fn apply(
+                &self,
+                params: kamu_resources::ApplyResourceParams<$resource>,
+            ) -> Result<
+                kamu_resources::ApplyResourceApplicationDecision<$resource>,
+                kamu_resources::ApplyResourceUseCaseError<$resource>,
+            > {
+                Self::ensure_params_account_resolved(&params)?;
+                let params = match self.sanitize_params(params).await? {
+                    kamu_resources::SanitizeParamsOutcome::Sanitized(params) => params,
+                    kamu_resources::SanitizeParamsOutcome::Rejected(rejection) => {
+                        return Ok(kamu_resources::ApplyResourceApplicationDecision::Rejected(
+                            rejection,
+                        ));
+                    }
+                };
+
+                let planner = $crate::ApplyResourcePlanner::<$resource>::new(
+                    self.generic_resource_query_service.as_ref(),
+                    self.typed_resource_query_service.as_ref(),
+                    self.resource_aggregate_loader.as_ref(),
+                    self.time_source.as_ref(),
+                );
+                let plan = planner.plan_internal(params).await?;
+
+                let plan = match plan {
+                    $crate::PlannedApplyResourceDecision::Planned(plan) => plan,
+                    $crate::PlannedApplyResourceDecision::Rejected(rejection) => {
+                        return Ok(kamu_resources::ApplyResourceApplicationDecision::Rejected(
+                            rejection,
+                        ));
+                    }
+                };
+
+                let executor = $crate::ApplyResourcePlanExecutor::<$resource>::new(
+                    self.generic_resource_query_service.as_ref(),
+                    self.typed_resource_query_service.as_ref(),
+                    self.resource_aggregate_loader.as_ref(),
+                    self.resource_persistence_service.as_ref(),
+                    self.outbox.as_ref(),
+                    self.time_source.as_ref(),
+                );
+
+                executor.execute(plan).await
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

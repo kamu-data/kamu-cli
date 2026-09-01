@@ -51,7 +51,7 @@ impl<'a> DatasetCollaborationMut<'a> {
             .execute(kamu_auth_rebac::AccountDatasetRelationOperation {
                 account_id: Cow::Owned(account_id.into()),
                 operation: kamu_auth_rebac::DatasetRoleOperation::Set(role.into()),
-                dataset_id: Cow::Borrowed(&self.dataset_request_state.dataset_handle().id),
+                dataset_id: Cow::Borrowed(self.dataset_request_state.dataset_id()),
             })
             .await
             .int_err()?;
@@ -79,7 +79,7 @@ impl<'a> DatasetCollaborationMut<'a> {
 
         unset_dataset_accounts_relations_uc
             .execute(
-                &self.dataset_request_state.dataset_handle().id,
+                self.dataset_request_state.dataset_id(),
                 &odf_account_ids_refs[..],
             )
             .await
