@@ -34,13 +34,14 @@ use crate::resources::{ANY_SELECTOR, DATASET_TARGET, DATASETS_TARGET, ResourceTy
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct CompleteCommand {
+    config_service: Arc<ConfigService>,
+    workspace_service: Arc<WorkspaceService>,
+
     dataset_registry: Option<Arc<dyn DatasetRegistry>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
-    config_service: Arc<ConfigService>,
-    resource_type_lookup_service: Arc<dyn ResourceTypeLookupService>,
-    resource_context_registry_service: Arc<ResourceContextRegistryService>,
-    workspace_service: Arc<WorkspaceService>,
+    resource_type_lookup_service: Option<Arc<dyn ResourceTypeLookupService>>,
+    resource_context_registry_service: Option<Arc<ResourceContextRegistryService>>,
 
     #[dill::component(explicit)]
     input: String,
@@ -150,12 +151,15 @@ impl CompleteCommand {
             return Ok(());
         }
 
+        let Some(resource_type_lookup_service) = &self.resource_type_lookup_service else {
+            return Ok(());
+        };
+
         // Pinned to the local context so completion never blocks on the
         // network: a remote one would issue a GraphQL round-trip per TAB
         // press. `None` would instead follow the active context, which may
         // itself be remote.
-        if let Ok(descriptors) = self
-            .resource_type_lookup_service
+        if let Ok(descriptors) = resource_type_lookup_service
             .list_supported_resource_types(Some(LOCAL_CONTEXT_NAME))
             .await
         {
@@ -182,10 +186,12 @@ impl CompleteCommand {
             writeln!(output, "{LOCAL_CONTEXT_NAME}").int_err()?;
         }
 
-        for sc in self
-            .resource_context_registry_service
-            .list_effective_contexts_with_scope()
-        {
+        let Some(resource_context_registry_service) = &self.resource_context_registry_service
+        else {
+            return Ok(());
+        };
+
+        for sc in resource_context_registry_service.list_effective_contexts_with_scope() {
             if sc.context.name.starts_with(prefix) {
                 writeln!(output, "{}", sc.context.name).int_err()?;
             }
