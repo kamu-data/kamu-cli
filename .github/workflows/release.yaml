@@ -68,7 +68,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: ${{ matrix.target }}
-          override: true
+          cache: false
 
       - uses: cargo-bins/cargo-binstall@main
 

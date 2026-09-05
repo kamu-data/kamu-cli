@@ -39,25 +39,19 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-      - name: cargo fmt --check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --check
+          cache: true
+          cache-workspace-crates: true
+          cache-on-failure: true
+      - name: rustfmt
+        run: cargo fmt --check
       - name: Lint dividing lines
-        run: |
-          cargo test -p kamu-repo-tools -- dividing_lines
+        run: cargo test -p kamu-repo-tools -- dividing_lines
       - name: Lint license headers
-        run: |
-          cargo test -p kamu-repo-tools -- license_header
+        run: cargo test -p kamu-repo-tools -- license_header
       - name: Lint OpenAPI spec
-        run: |
-          make lint-openapi
+        run: make lint-openapi
       - name: clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   lint_codegen:
     name: Lint / Codegen
@@ -95,6 +89,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall cargo-deny -y
       - run: cargo deny check --hide-inclusion-graph
@@ -209,11 +205,10 @@ jobs:
           echo 'RUSTFLAGS=-C linker=clang -C link-arg=-fuse-ld=mold' >> $GITHUB_ENV
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-
-      - uses: swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
+          cache: true
           cache-workspace-crates: true
+          cache-on-failure: true
 
       - uses: cargo-bins/cargo-binstall@main
 
