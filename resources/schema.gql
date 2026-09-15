@@ -3867,27 +3867,7 @@ enum ResourceAccountResolutionProblemCode {
 	SELECTOR_MISMATCH
 }
 
-"""
-A type-less reference whose name matched in several types. A reference names
-exactly one resource, so this is an addressing failure rather than a
-multi-match — the caller must say which type they meant.
-"""
-type ResourceAmbiguousTypeProblem {
-	name: ResourceName!
-	typeNames: [TypeName!]!
-	message: String!
-}
-
 scalar ResourceAnnotations
-
-"""
-A type-less reference whose name matched nothing in any type. Distinct from
-`ResourceNameNotFoundProblem`, which can name the single type it searched.
-"""
-type ResourceAnyTypeNameNotFoundProblem {
-	name: ResourceName!
-	message: String!
-}
 
 type ResourceApplyManifestItemResult {
 	requestIndex: Int!
@@ -4169,7 +4149,7 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
 
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceAnyTypeNameNotFoundProblem | ResourceAmbiguousTypeProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem | ResourceUntypedNameProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4218,10 +4198,18 @@ type ResourcePhaseCounts {
 """
 Reference to exactly one resource, mirroring the ODF `ResourceRef`.
 
+A resource is addressed either by `id`, or by `type` **and** `name` — ODF's
+uniqueness key is `(account, type, name)`, and resources of different types
+may share a name under one account, so a name alone does not identify
+anything (RFC-018 § References).
+
 Not a `oneOf`: ODF allows `id` and `name` together as a consistency
-assertion, so both are accepted and at least one is required. Validation
-happens at conversion rather than in the schema, which cannot express
-"at least one of".
+assertion, so both are accepted. Validation happens at conversion rather
+than in the schema, which cannot express "at least one of".
+
+To match resources *without* knowing their type, use a selector
+(`bySelectors`): selectors ask which resources match and may span every
+type, while a ref names exactly one.
 """
 input ResourceRefInput {
 	account: AccountRefInput
@@ -4229,9 +4217,9 @@ input ResourceRefInput {
 	Canonical selector (`variablesets`), alias (`vs`), ODF type name
 	(`VariableSet`), or full schema URI — all resolve to the same type.
 	
-	`null` spans every type: the resource is looked up across all of them.
-	Since a ref names exactly one resource, a name matching in several types
-	is an ambiguity error rather than a multi-match.
+	Required when addressing by `name`, since a name is unique only within
+	one type. May be omitted only when `id` is given, which identifies a
+	resource on its own.
 	"""
 	type: ResourceTypeSelectorInput
 	id: ResourceID
@@ -4374,6 +4362,14 @@ selector).
 """
 type ResourceUnsupportedSelectorProblem {
 	selector: ResourceTypeSelectorRaw!
+	message: String!
+}
+
+"""
+A reference addressing by `name` without a `type`. A name is unique only
+within one type, so the reference identifies nothing as posed.
+"""
+type ResourceUntypedNameProblem {
 	message: String!
 }
 

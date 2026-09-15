@@ -13,8 +13,6 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
-    ResourceAmbiguousTypeError,
-    ResourceAnyTypeNameNotFoundError,
     ResourceExtensionResolutionError,
     ResourceHeadersValidationError,
     ResourceID,
@@ -245,17 +243,6 @@ pub enum ResourceLookupProblem {
     #[error(transparent)]
     NameNotFound(#[from] ResourceNameNotFoundError),
 
-    /// A type-less ref whose name matched nothing in any registered type. Its
-    /// own variant rather than a `NameNotFound`, which would have to name a
-    /// single type that was never searched in isolation.
-    #[error(transparent)]
-    AnyTypeNameNotFound(#[from] ResourceAnyTypeNameNotFoundError),
-
-    /// A type-less ref whose name matched in several types. A ref names exactly
-    /// one resource, so this is an addressing failure, not a multi-match.
-    #[error(transparent)]
-    AmbiguousType(#[from] ResourceAmbiguousTypeError),
-
     #[error(transparent)]
     SchemaMismatch(#[from] ResourceSchemaMismatchError),
 
@@ -269,6 +256,17 @@ pub enum ResourceLookupProblem {
     /// a `NameNotFound`, which would wrongly claim a lookup was attempted.
     #[error("Resource reference must specify at least one of `id` or `name`")]
     EmptyRef,
+
+    /// A reference addressing by `name` without saying of which type. ODF's
+    /// uniqueness key is `(account, type, name)`, so a bare name identifies
+    /// nothing (RFC-018 § References). Distinct from `EmptyRef`, which claims
+    /// nothing was named at all, and from `NameNotFound`, which would wrongly
+    /// imply a lookup was attempted — the request is unanswerable as posed.
+    #[error(
+        "Resource reference by `name` must also specify a `type`: a name alone is not unique \
+         across resource types"
+    )]
+    UntypedName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -50,19 +50,39 @@ pub enum UnsupportedSelectorFieldError {
 
     #[error("Resource reference must specify at least one of `id` or `name`")]
     EmptyRef,
+
+    /// A name alone does not identify a resource: ODF's uniqueness key is
+    /// `(account, type, name)`, and resources of *different* types may share
+    /// one name under the same account.
+    #[error(
+        "Resource reference by `name` must also specify a `type`: a name alone is not unique \
+         across resource types"
+    )]
+    UntypedName,
 }
 
-/// Rejects a ref the facade cannot resolve: one carrying a `did`, or one
-/// naming nothing at all.
+/// Rejects a ref the facade cannot resolve: one carrying a `did`, one naming
+/// nothing at all, or one naming a resource without saying of which type.
 ///
-/// A type-less ref is *not* rejected — it resolves across every registered
-/// type, the same way a type-less selector does.
+/// Per ODF RFC-018 § References a resource is referenced by ID, by DID, or by
+/// *type, name and the optional owning account* — a name never stands alone.
+/// § Identity gives the reason: `(Account, ResourceType, ResourceName)` is the
+/// uniqueness key, so a type-less named ref would resolve uniquely only by
+/// accident of what happens to be stored, and would start failing the moment a
+/// second type reused the name.
+///
+/// An `id` is self-identifying, so a ref carrying one needs no type. Contrast a
+/// type-less *`ResourceSelector`*, which stays legal: a selector asks which
+/// resources match and may span every type, while a ref names exactly one.
 pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldError> {
     if value.did.is_some() {
         return Err(UnsupportedSelectorFieldError::Did);
     }
     if value.id.is_none() && value.name.is_none() {
         return Err(UnsupportedSelectorFieldError::EmptyRef);
+    }
+    if value.id.is_none() && value.r#type.is_none() {
+        return Err(UnsupportedSelectorFieldError::UntypedName);
     }
     Ok(())
 }
@@ -992,6 +1012,10 @@ mod tests {
         kamu_resources::TypeName::new_unchecked(s).into()
     }
 
+    fn an_id() -> kamu_resources::ResourceID {
+        "6767a4ee-d74d-436e-84f9-709407869a26".parse().unwrap()
+    }
+
     fn a_ref(name: Option<ResourceName>) -> ResourceRef {
         ResourceRef {
             account: None,
@@ -1032,12 +1056,42 @@ mod tests {
         assert_matches!(validate_ref(&a_ref(Some(name("my-secrets")))), Ok(()));
     }
 
-    // A type-less ref is resolved by searching every type, so it is accepted
-    // here rather than rejected the way a `did` is.
+    // A name alone is not an identifying key: ODF's uniqueness key is
+    // `(account, type, name)`, and two types may hold the same name under one
+    // account, so the ref must say which type it means (RFC-018 § References).
     #[test]
-    fn test_ref_without_a_type_is_accepted() {
+    fn test_ref_naming_without_a_type_is_rejected() {
         let resource_ref = ResourceRef {
             r#type: None,
+            ..a_ref(Some(name("my-secrets")))
+        };
+
+        assert_matches!(
+            validate_ref(&resource_ref),
+            Err(UnsupportedSelectorFieldError::UntypedName)
+        );
+    }
+
+    // An id identifies a resource on its own, so a type-less ref carrying one
+    // stays valid — the constraint is on addressing *by name*.
+    #[test]
+    fn test_ref_by_id_without_a_type_is_accepted() {
+        let resource_ref = ResourceRef {
+            r#type: None,
+            id: Some(an_id()),
+            ..a_ref(None)
+        };
+
+        assert_matches!(validate_ref(&resource_ref), Ok(()));
+    }
+
+    // An id makes the ref self-identifying; the name rides along as the
+    // consistency assertion ODF allows, so no type is required.
+    #[test]
+    fn test_ref_by_id_and_name_without_a_type_is_accepted() {
+        let resource_ref = ResourceRef {
+            r#type: None,
+            id: Some(an_id()),
             ..a_ref(Some(name("my-secrets")))
         };
 

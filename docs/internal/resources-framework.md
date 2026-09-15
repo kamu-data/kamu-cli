@@ -144,7 +144,7 @@ long-term goal. This page documents what exists now.
 | **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last one reconciliation processed. Absent or lower → reconcile. |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
-| **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by exact name or UID, optionally account- and type-scoped. A batch is `Vec<ResourceRef>`. |
+| **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by UID or by exact name **plus type** — a name alone is not unique across types — optionally account-scoped. A batch is `Vec<ResourceRef>`. |
 | **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
 | **SpecViewOpts** | Options controlling how sensitive spec fields render, `{ revealed: bool }` today. `revealed: false` (default) returns stored ciphertext as-is; `revealed: true` decrypts. A struct, not an enum, so future spec-view options can be added without growing every call site's argument list. No "redacted" mode today. |
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, resolved by schema metadata through `ResourceDispatcherFactory`. |
@@ -730,9 +730,13 @@ pub enum   ResourceManifestFormat { Json, Yaml }
 pub struct SpecViewOpts { pub revealed: bool /* default: false */ }
 ```
 
-Every field of both types is optional, so one selector can span every type and
-account. Several selectors act as a logical **OR**; an empty list matches
-nothing.
+Every field of both types is optional *structurally*, so one selector can span
+every type and account. Several selectors act as a logical **OR**; an empty list
+matches nothing. For a **ref** the optionality is narrower than the struct
+suggests: `validate_ref` requires an `id`, or a `name` together with its `type`
+(see [§10](#10-facade-kamu-resources-facade)) — the constraint is semantic
+and ODF cannot express it in JSON Schema, which is why the fields stay
+`Option`.
 
 Field order follows ODF (`account, id, did, type, name`), which the generated serde proxy and
 flatbuffers table also follow.
@@ -755,18 +759,26 @@ and each carries the originating `request_index` values so results merge back in
 ordering.
 
 The stage also fixes where a failure lands. An unresolvable account or an **unknown named** type
-fails the *whole* call — both are addressing errors in the request. A **type-less** ref is
-different: resolving it is a lookup against stored data, so a miss or an ambiguity is that one
-ref's per-item problem, returned alongside the groups.
+fails the *whole* call — both are addressing errors in the request. A name that resolves to nothing
+is different: that is a lookup against stored data, so it is that one ref's per-item problem,
+returned alongside the groups.
 
-A type-less `ResourceRef` (`type: None`) is resolved by searching every registered type. Because
-all three pipelines share this front half, they inherit that resolution together rather than one at
-a time.
-Because a ref names *exactly one* resource, a name matching in several types is an **ambiguity**
-error (`AmbiguousType`, RF-172), not a multi-match: picking a winner would make `kamu get <name>`
-silently resolve to whichever type sorted first. A name matching in none is `AnyTypeNameNotFound`
-(RF-171). Contrast a type-less *selector*, for which several matches are the expected outcome —
-that asymmetry is the whole ref/selector distinction.
+**A ref by name must carry its type.** ODF's uniqueness key is `(account, type, name)`, and
+resources of *different* types may share a name under one account, so a bare name is not an
+identifying key — it would resolve uniquely only by accident of what happens to be stored, and
+would start failing the moment a second type reused the name. RFC-018 § References says the same
+from the other side: a resource is referenced by ID, by DID, or by *type, name and the optional
+owning account* — name never stands alone. `validate_ref` therefore rejects `type: None` together
+with a `name` (`UnsupportedSelectorFieldError::UntypedName`), and `resolve_ref_schema` does no
+cross-type name search: a type-less ref must carry an `id`, which is self-identifying and whose
+stored row already records its schema.
+
+This is the **search vs. pointing** line, and it is the whole ref/selector distinction. A
+*selector* asks which resources match: zero or many are valid answers, and a type-less selector
+legitimately spans every type (RFC-018 § Selectors). A *ref* names exactly one resource, so it must
+be unambiguous by construction rather than by luck. Note this is a constraint on *addressing*, not
+on searching across types — see the CLI's `%/<name>`, which keeps working precisely because it is a
+search (§ 12).
 
 A `ResourceRef` may carry **both** an `id` and a `name`. ODF treats the pair as a *consistency
 assertion* rather than two lookups: the `id` is the authoritative half the lookup uses, and the
@@ -844,6 +856,15 @@ query takes `[ResourceRefInput!]!` — there are no single-ref variants, matchin
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
 `apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
 `plan_apply_manifest`, otherwise `apply_manifest`.
+
+**Per-item lookup problems.** The ref-keyed queries and `delete` report per-entry failures through
+the `ResourceLookupProblem` union: `ResourceIDNotFoundProblem`, `ResourceNameNotFoundProblem`,
+`ResourceSchemaMismatchProblem`, `ResourceNameMismatchProblem`, `ResourceEmptyRefProblem` and
+`ResourceUntypedNameProblem`. The last marks a ref that addressed by `name` without a `type`
+([§10](#10-facade-kamu-resources-facade)); it is kept distinct from `EmptyRef` so a caller who did
+supply a name is not told they supplied none. Over GraphQL such a ref is normally rejected earlier,
+by the adapter's `validate_ref`, so the variant is what an *in-process* caller sees — the local
+facade enforces the same rule rather than trusting the adapter to have done it.
 
 **Outcome-union pattern.** *Domain/application outcomes* are modeled as unions: a resolver returns a
 union of `Success` + typed `Problem` variants (account resolution, unsupported descriptor, validation
@@ -1604,6 +1625,12 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   are pinned apart by unit tests and by `test_resources_get_selectors` E2E on both backends.
   Note the canonical selector in these messages is the ODF type name (`VariableSet`); `variablesets`
   and `vs` are aliases.
+- **`%/<name>` is a *search*, which is why it still works.** A `ResourceRef` by name must carry its
+  type (§ 10), so it is fair to ask why `kamu get %/my-vars` does not. Because the CLI never builds
+  a type-less ref for it: `process_any_type_exact_ref_item` issues a
+  `ResourceSelector::any_type_name_pattern` search across types, then resolves each match to a
+  concrete typed target. Selectors may span types; refs may not. A future reader tempted to
+  "fix" the inconsistency should change neither — they are the two halves of the same rule.
 - **Extension-schema dispatch is also by schema URI.** Built-in extension dispatchers are registered
   for `description`, `environment`, and the three status conditions. Registry construction is an
   explicit catalog-assembly step and fails on duplicate extension schema IDs, invalid `https://`

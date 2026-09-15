@@ -126,7 +126,7 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
         .unwrap();
     assert_matches!(
         assert_single_batch_problem(get_result),
-        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
+        ResourceLookupProblem::NameNotFound(_),
         "resource must not exist after planning"
     );
 }
@@ -174,7 +174,7 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
         .unwrap();
     assert_matches!(
         assert_single_batch_problem(get_result),
-        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
+        ResourceLookupProblem::NameNotFound(_),
         "resource must not exist after planning"
     );
 }
@@ -359,7 +359,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
         .unwrap();
     assert_matches!(
         assert_single_batch_problem(get),
-        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
+        ResourceLookupProblem::NameNotFound(_),
         "resource must not exist after schema-invalid plan"
     );
 }
@@ -441,7 +441,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
         .unwrap();
     assert_matches!(
         assert_single_batch_problem(get),
-        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
+        ResourceLookupProblem::NameNotFound(_),
         "resource must not exist after rejected apply"
     );
 }

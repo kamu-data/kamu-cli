@@ -11,6 +11,7 @@ use kamu_configuration::VariableSetResource;
 use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
 use kamu_resources_facade::{
     BatchResourceError,
+    BatchResourceResponse,
     ResourceLookupProblem,
     ResourceManifestFormat,
     SpecViewOpts,
@@ -1133,139 +1134,57 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
 
 // RF-171
 contract_test!(
-    type_less_ref_resolves_across_types,
-    super::test_type_less_ref_resolves_across_types
+    type_less_named_ref_is_refused,
+    super::test_type_less_named_ref_is_refused
 );
 
-/// A ref that names no type resolves by searching every registered type.
+/// A ref that names a resource but no type is refused, on every batch path.
 ///
-/// ODF made `type` optional on `ResourceRef`, so a caller may address a
-/// resource by name alone. Resolution happens in the batch pipelines' shared
-/// front half, which is why all three paths are asserted: a fix applied to one
-/// of them and not the others would leave the paths disagreeing about an
-/// identical ref.
+/// ODF leaves `type` optional on `ResourceRef` structurally, but RFC-018
+/// § References allows only ID, DID, or *type, name and the optional owning
+/// account* — a name never stands alone, because `(account, type, name)` is the
+/// uniqueness key and two types may hold the same name under one account.
+/// Resolving such a ref by scanning every type (as this once did) would succeed
+/// only by accident of what happens to be stored, and would start failing the
+/// moment a second type reused the name.
 ///
-/// A miss is asserted alongside the hit, since a type-less ref that resolves
-/// nothing must be a per-item problem rather than a whole-batch failure.
-pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHarness) {
+/// All four paths are asserted because refusal lives in the batch pipelines'
+/// shared front half: a fix applied to one and not the others would leave them
+/// disagreeing about an identical ref.
+pub async fn test_type_less_named_ref_is_refused(h: &impl FacadeContractHarness) {
     create_variable_set(h, TestAccount::Alice, "typeless-vars").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Index 0 names a resource that exists in exactly one type; index 1 names
-    // nothing at all.
-    let refs = || {
-        vec![
-            ResourceRef {
-                account: None,
-                r#type: None,
-                id: None,
-                did: None,
-                name: Some("typeless-vars".parse().unwrap()),
-            },
-            ResourceRef {
-                account: None,
-                r#type: None,
-                id: None,
-                did: None,
-                name: Some("typeless-absent".parse().unwrap()),
-            },
-        ]
-    };
-
-    let response = facade
-        .get(refs(), SpecViewOpts::ENCRYPTED)
-        .await
-        .expect("a type-less ref must resolve without naming a type");
-    assert_batch_indexes(&response, &[0], &[1]);
-
-    let handles = facade
-        .get_handles(refs())
-        .await
-        .expect("get_handles must resolve a type-less ref");
-    assert_batch_indexes(&handles, &[0], &[1]);
-
-    let manifests = facade
-        .render_manifests(
-            refs(),
-            ResourceManifestFormat::Json,
-            SpecViewOpts::ENCRYPTED,
-        )
-        .await
-        .expect("render_manifests must resolve a type-less ref");
-    assert_batch_indexes(&manifests, &[0], &[1]);
-
-    // The write path last, since it consumes the fixture.
-    let deleted = facade
-        .delete(refs())
-        .await
-        .expect("delete must resolve a type-less ref");
-    assert_batch_indexes(&deleted, &[0], &[1]);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-172
-contract_test!(
-    type_less_ref_matching_several_types_is_ambiguous,
-    super::test_type_less_ref_matching_several_types_is_ambiguous
-);
-
-/// A type-less ref whose name exists in several types is an addressing error.
-///
-/// A `ResourceRef` names *exactly one* resource, so matching in two types is
-/// not a multi-match to be returned — it is a question the caller has to
-/// answer. Picking a winner would make `kamu get <name>` silently resolve to
-/// whichever type happened to sort first.
-///
-/// Contrast a type-less `ResourceSelector`, for which several matches are the
-/// expected outcome; that asymmetry is the whole ref/selector distinction.
-pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
-    h: &impl FacadeContractHarness,
-) {
-    // The same name in two different types.
-    create_variable_set(h, TestAccount::Alice, "ambiguous-name").await;
-    apply_manifest_and_get_id(
-        h,
-        TestAccount::Alice,
-        secret_set_manifest_json("ambiguous-name", None, &[("TOKEN", "t")]),
-    )
-    .await;
-
-    let facade = h.facade_for(TestAccount::Alice);
-
+    // The name exists — under a type. Only the missing type makes it
+    // unresolvable, so a pass here cannot be a plain not-found.
     let refs = || {
         vec![ResourceRef {
             account: None,
             r#type: None,
             id: None,
             did: None,
-            name: Some("ambiguous-name".parse().unwrap()),
+            name: Some("typeless-vars".parse().unwrap()),
         }]
     };
 
-    let response = facade
-        .get(refs(), SpecViewOpts::ENCRYPTED)
-        .await
-        .expect("an ambiguous ref is a per-item problem, not a batch failure");
-    assert_batch_indexes(&response, &[], &[0]);
+    assert_type_less_ref_refused(facade.get(refs(), SpecViewOpts::ENCRYPTED).await, "get");
+    assert_type_less_ref_refused(facade.get_handles(refs()).await, "get_handles");
+    assert_type_less_ref_refused(
+        facade
+            .render_manifests(
+                refs(),
+                ResourceManifestFormat::Json,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await,
+        "render_manifests",
+    );
+    assert_type_less_ref_refused(facade.delete(refs()).await, "delete");
 
-    let handles = facade
-        .get_handles(refs())
-        .await
-        .expect("get_handles must report the ambiguity per item");
-    assert_batch_indexes(&handles, &[], &[0]);
-
-    // The one that would otherwise delete an arbitrary one of the two.
-    let deleted = facade
-        .delete(refs())
-        .await
-        .expect("delete must report the ambiguity per item");
-    assert_batch_indexes(&deleted, &[], &[0]);
-
-    // Naming the type disambiguates, and both resources must still exist —
-    // the ambiguous delete above must not have removed either.
-    let disambiguated = facade
+    // The refusal must not have deleted anything: naming the type still
+    // resolves the resource the ref failed to address.
+    let survivor = facade
         .get_handles(vec![ResourceRef {
             account: None,
             r#type: Some(
@@ -1276,11 +1195,43 @@ pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
             ),
             id: None,
             did: None,
-            name: Some("ambiguous-name".parse().unwrap()),
+            name: Some("typeless-vars".parse().unwrap()),
         }])
         .await
         .expect("naming the type must resolve what the type-less ref could not");
-    assert_batch_indexes(&disambiguated, &[0], &[]);
+    assert_batch_indexes(&survivor, &[0], &[]);
+}
+
+/// Both implementations must refuse, but they refuse in different places: the
+/// local facade per item in `resolve_ref_schema`, the remote one server-side in
+/// the GraphQL adapter's `validate_ref`. Accept either shape, and pin the
+/// reason so a generic failure cannot pass for the rule being enforced.
+fn assert_type_less_ref_refused<T: std::fmt::Debug>(
+    result: Result<BatchResourceResponse<T, ResourceLookupProblem>, BatchResourceError>,
+    api: &str,
+) {
+    match result {
+        Ok(response) => {
+            assert_batch_indexes(&response, &[], &[0]);
+            assert_matches!(
+                &response.problems[0].error,
+                ResourceLookupProblem::UntypedName,
+                "{api}: a named ref without a type must be refused as UntypedName"
+            );
+        }
+        Err(e) => {
+            assert_matches!(
+                e,
+                BatchResourceError::RemoteRequest(_),
+                "{api}: remote must refuse the ref rather than resolve it"
+            );
+            let message = e.to_string();
+            assert!(
+                message.contains("must also specify a `type`"),
+                "{api}: refusal must name the missing type as the reason, got: {message}"
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -244,19 +244,27 @@ impl SearchResourcesInput {
 
 /// Reference to exactly one resource, mirroring the ODF `ResourceRef`.
 ///
+/// A resource is addressed either by `id`, or by `type` **and** `name` — ODF's
+/// uniqueness key is `(account, type, name)`, and resources of different types
+/// may share a name under one account, so a name alone does not identify
+/// anything (RFC-018 § References).
+///
 /// Not a `oneOf`: ODF allows `id` and `name` together as a consistency
-/// assertion, so both are accepted and at least one is required. Validation
-/// happens at conversion rather than in the schema, which cannot express
-/// "at least one of".
+/// assertion, so both are accepted. Validation happens at conversion rather
+/// than in the schema, which cannot express "at least one of".
+///
+/// To match resources *without* knowing their type, use a selector
+/// (`bySelectors`): selectors ask which resources match and may span every
+/// type, while a ref names exactly one.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceRefInput {
     pub account: Option<AccountRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI — all resolve to the same type.
     ///
-    /// `null` spans every type: the resource is looked up across all of them.
-    /// Since a ref names exactly one resource, a name matching in several types
-    /// is an ambiguity error rather than a multi-match.
+    /// Required when addressing by `name`, since a name is unique only within
+    /// one type. May be omitted only when `id` is given, which identifies a
+    /// resource on its own.
     pub r#type: Option<ResourceTypeSelectorInput>,
     pub id: Option<ResourceID<'static>>,
     /// Exact name. Never a pattern; use a selector for pattern matching.
@@ -437,24 +445,6 @@ pub struct ResourceNameMismatchProblem {
     pub message: String,
 }
 
-/// A type-less reference whose name matched nothing in any type. Distinct from
-/// `ResourceNameNotFoundProblem`, which can name the single type it searched.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceAnyTypeNameNotFoundProblem {
-    pub name: ResourceName<'static>,
-    pub message: String,
-}
-
-/// A type-less reference whose name matched in several types. A reference names
-/// exactly one resource, so this is an addressing failure rather than a
-/// multi-match — the caller must say which type they meant.
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceAmbiguousTypeProblem {
-    pub name: ResourceName<'static>,
-    pub type_names: Vec<TypeName<'static>>,
-    pub message: String,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A reference that named neither an id nor a name.
@@ -463,15 +453,21 @@ pub struct ResourceEmptyRefProblem {
     pub message: String,
 }
 
+/// A reference addressing by `name` without a `type`. A name is unique only
+/// within one type, so the reference identifies nothing as posed.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceUntypedNameProblem {
+    pub message: String,
+}
+
 #[derive(Union, Debug, Clone)]
 pub enum ResourceLookupProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
-    AnyTypeNameNotFound(ResourceAnyTypeNameNotFoundProblem),
-    AmbiguousType(ResourceAmbiguousTypeProblem),
     SchemaMismatch(ResourceSchemaMismatchProblem),
     NameMismatch(ResourceNameMismatchProblem),
     EmptyRef(ResourceEmptyRefProblem),
+    UntypedName(ResourceUntypedNameProblem),
 }
 
 impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblem {
@@ -487,20 +483,6 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                 name: e.name.clone().into(),
                 message: e.to_string(),
             }),
-            P::AnyTypeNameNotFound(e) => {
-                Self::AnyTypeNameNotFound(ResourceAnyTypeNameNotFoundProblem {
-                    name: e.name.clone().into(),
-                    message: e.to_string(),
-                })
-            }
-            P::AmbiguousType(e) => {
-                let message = e.to_string();
-                Self::AmbiguousType(ResourceAmbiguousTypeProblem {
-                    name: e.name.clone().into(),
-                    type_names: e.type_names.iter().cloned().map(Into::into).collect(),
-                    message,
-                })
-            }
             P::SchemaMismatch(e) => {
                 let message = e.to_string();
                 Self::SchemaMismatch(ResourceSchemaMismatchProblem {
@@ -521,6 +503,9 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
             }
             P::EmptyRef => Self::EmptyRef(ResourceEmptyRefProblem {
                 message: P::EmptyRef.to_string(),
+            }),
+            P::UntypedName => Self::UntypedName(ResourceUntypedNameProblem {
+                message: P::UntypedName.to_string(),
             }),
         }
     }

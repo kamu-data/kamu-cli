@@ -151,25 +151,12 @@ pub(crate) struct ResourceNameMismatchProblem {
     pub actual_name: kamu_resources::ResourceName,
 }
 
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceAnyTypeNameNotFoundProblem {
-    pub name: kamu_resources::ResourceName,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceAmbiguousTypeProblem {
-    pub name: kamu_resources::ResourceName,
-    pub type_names: Vec<kamu_resources::TypeName>,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceLookupProblem {
     ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceAnyTypeNameNotFoundProblem(ResourceAnyTypeNameNotFoundProblem),
-    ResourceAmbiguousTypeProblem(ResourceAmbiguousTypeProblem),
     ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
     ResourceNameMismatchProblem(ResourceNameMismatchProblem),
     #[cynic(fallback)]

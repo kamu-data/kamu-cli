@@ -410,17 +410,13 @@ pub enum ResourceLookupCliError {
 
     /// The `%/<name>` form: an exact name searched across every type. No single
     /// type can be named in the message, because every one was tried.
+    ///
+    /// Raised by the CLI's own selection-resolution path, which resolves
+    /// `%/<name>` as a *search* over types. It never arrives from a facade
+    /// lookup: a `ResourceRef` must carry its type, so the facade has no
+    /// type-less name lookup to miss.
     #[error("Resource '{name}' was not found in any resource type")]
     AnyTypeNameNotFound { name: kamu_resources::ResourceName },
-
-    /// The `%/<name>` form again, but the name exists in several types. A
-    /// reference names exactly one resource, so the caller has to disambiguate
-    /// rather than the CLI picking a winner.
-    #[error("Resource '{name}' is ambiguous: it exists in types {}. Specify a type to disambiguate", type_names.join(", "))]
-    AmbiguousType {
-        name: kamu_resources::ResourceName,
-        type_names: Vec<String>,
-    },
 
     #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
     SchemaMismatch {
@@ -433,6 +429,15 @@ pub enum ResourceLookupCliError {
     /// but representable on the wire.
     #[error("Resource reference specified neither an id nor a name")]
     EmptyRef,
+
+    /// Unreachable from the CLI too: every CLI construction site either names a
+    /// concrete type or resolves `%/<name>` as a search before building a ref.
+    /// Representable on the wire, where a caller can spell a bare name.
+    #[error(
+        "Resource reference specified a name without a type; a name is unique only within one \
+         resource type"
+    )]
+    UntypedName,
 
     /// Also unreachable from the CLI for the same reason: a reference naming
     /// both an id and a name asserts they agree, and only the wire can spell
@@ -453,13 +458,6 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
                 resource_type: err.type_name.to_string(),
                 name: err.name.to_string(),
             },
-            ResourceLookupProblem::AnyTypeNameNotFound(err) => {
-                Self::AnyTypeNameNotFound { name: err.name }
-            }
-            ResourceLookupProblem::AmbiguousType(err) => Self::AmbiguousType {
-                name: err.name,
-                type_names: err.type_names.iter().map(ToString::to_string).collect(),
-            },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
                 id: err.id,
                 expected_schema: err.expected_schema.to_string(),
@@ -471,6 +469,7 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
                 actual_name: err.actual_name.to_string(),
             },
             ResourceLookupProblem::EmptyRef => Self::EmptyRef,
+            ResourceLookupProblem::UntypedName => Self::UntypedName,
         }
     }
 }

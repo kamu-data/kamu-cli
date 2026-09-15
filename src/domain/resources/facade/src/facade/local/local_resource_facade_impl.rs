@@ -542,83 +542,54 @@ impl LocalResourceFacadeImpl {
         descriptors
     }
 
-    /// Resolves the one schema a ref addresses, searching every registered type
-    /// when the ref names none.
+    /// Resolves the one schema a ref addresses.
     ///
-    /// A [`ResourceRef`] names *exactly one* resource, so a type-less ref that
-    /// matches in several types is ambiguous rather than a multi-match: it is
-    /// reported as [`ResourceLookupProblem::AmbiguousType`] instead of picking
-    /// a winner. Contrast a type-less `ResourceSelector`, for which several
-    /// matches are the expected outcome.
+    /// A ref either names its type or carries an `id`. Addressing by name
+    /// *without* a type is refused, because ODF's uniqueness key is
+    /// `(account, type, name)` and a bare name may belong to several types at
+    /// once (RFC-018 § References). So there is no cross-type name search here:
+    /// a ref names exactly one resource, and the caller must supply enough of
+    /// the key to say which.
+    ///
+    /// The refusal is enforced *here* as well as in the GraphQL adapter's
+    /// `validate_ref`: an in-process caller reaches this facade without passing
+    /// through that adapter, and the remote facade would have the ref rejected
+    /// server-side. Checking in both keeps the two implementations answering
+    /// identically, which the contract suite pins.
     async fn resolve_ref_schema(
         &self,
         descriptors: &[ResourceTypeDescriptor],
         account_id: &odf::AccountID,
         resource_ref: &ResourceRef,
     ) -> Result<Result<TypeUri, ResourceLookupProblem>, BatchResourceError> {
-        let Some(r#type) = resource_ref.r#type.as_ref() else {
-            return self
-                .search_ref_schema(descriptors, account_id, resource_ref)
-                .await;
-        };
-
-        Ok(Ok(resolve_schema_in_descriptors::<BatchResourceError>(
-            descriptors,
-            r#type,
-        )?))
-    }
-
-    /// Finds which registered type holds the resource a type-less ref names.
-    async fn search_ref_schema(
-        &self,
-        descriptors: &[ResourceTypeDescriptor],
-        account_id: &odf::AccountID,
-        resource_ref: &ResourceRef,
-    ) -> Result<Result<TypeUri, ResourceLookupProblem>, BatchResourceError> {
-        // An id is globally unique, so the stored row already carries the
-        // schema — no per-type search needed.
-        if let Some(id) = resource_ref.id {
-            let rows = self
-                .generic_resource_query_service
-                .find_resource_handles_by_ids(account_id, &[id])
-                .await?;
-
-            return Ok(match rows.into_iter().next() {
-                Some(row) => Ok(TypeUri::new_unchecked(row.schema)),
-                None => Err(id_not_found(id)),
-            });
+        if let Some(r#type) = resource_ref.r#type.as_ref() {
+            return Ok(Ok(resolve_schema_in_descriptors::<BatchResourceError>(
+                descriptors,
+                r#type,
+            )?));
         }
 
-        let Some(name) = resource_ref.name.as_ref() else {
-            return Ok(Err(ResourceLookupProblem::EmptyRef));
+        // No type given, so the ref must carry an id. An id is globally unique
+        // and the stored row already records its schema — one lookup, no scan.
+        let Some(id) = resource_ref.id else {
+            // Distinguish "named nothing" from "named a resource but no type":
+            // reporting the latter as `EmptyRef` would tell a caller who did
+            // supply a name that they supplied none.
+            return Ok(Err(if resource_ref.name.is_some() {
+                ResourceLookupProblem::UntypedName
+            } else {
+                ResourceLookupProblem::EmptyRef
+            }));
         };
 
-        let mut matched = Vec::new();
-        for descriptor in descriptors {
-            if self
-                .generic_resource_query_service
-                .find_resource_id_by_name(account_id, &descriptor.schema, name)
-                .await?
-                .is_some()
-            {
-                matched.push(descriptor.schema.clone());
-            }
-        }
+        let rows = self
+            .generic_resource_query_service
+            .find_resource_handles_by_ids(account_id, &[id])
+            .await?;
 
-        Ok(match matched.len() {
-            1 => Ok(matched.into_iter().next().unwrap()),
-            0 => Err(ResourceLookupProblem::AnyTypeNameNotFound(
-                ResourceAnyTypeNameNotFoundError { name: name.clone() },
-            )),
-            _ => Err(ResourceLookupProblem::AmbiguousType(
-                ResourceAmbiguousTypeError {
-                    name: name.clone(),
-                    type_names: matched
-                        .iter()
-                        .map(resource_type_name)
-                        .collect::<Result<Vec<_>, _>>()?,
-                },
-            )),
+        Ok(match rows.into_iter().next() {
+            Some(row) => Ok(TypeUri::new_unchecked(row.schema)),
+            None => Err(id_not_found(id)),
         })
     }
 

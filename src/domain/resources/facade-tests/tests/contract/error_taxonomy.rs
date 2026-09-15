@@ -244,6 +244,96 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// A ref addressing by `name` without a `type` is refused rather than resolved.
+//
+// ODF's uniqueness key is `(account, type, name)` and two types may hold the
+// same name under one account, so a bare name identifies nothing (RFC-018
+// § References). This used to be answered by scanning every registered type and
+// reporting an ambiguity when more than one matched; the scan is gone, and the
+// request is now refused as unanswerable as posed.
+//
+// Pinned as a *contract* test because the two implementations refuse in
+// different places — the local facade in `resolve_ref_schema`, the remote one
+// server-side in the GraphQL adapter's `validate_ref` — and both must refuse.
+// The failure must also stay distinguishable from `EmptyRef`: a caller who
+// supplied a name must not be told they supplied none.
+/// The remote facade has the ref rejected server-side, so it comes back as a
+/// request error. Pin the reason so a transport failure cannot pass for a rule
+/// being enforced.
+fn assert_remote_refusal(error: &BatchResourceError, api: &str) {
+    assert_matches!(
+        error,
+        BatchResourceError::RemoteRequest(_),
+        "{api}: remote must refuse the ref rather than resolve it"
+    );
+
+    let message = error.to_string();
+    assert!(
+        message.contains("must also specify a `type`"),
+        "{api}: refusal must name the missing type as the reason, got: {message}"
+    );
+}
+
+contract_test!(untyped_name_ref_is_refused, super::test_untyped_name_ref_is_refused);
+
+pub async fn test_untyped_name_ref_is_refused(h: &impl FacadeContractHarness) {
+    // Seed the name under a real type, so a miss cannot be mistaken for the
+    // resource simply not existing: the name resolves fine *with* a type.
+    create_variable_set(h, TestAccount::Alice, "untyped-ref-target").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let untyped = ResourceRef {
+        account: None,
+        r#type: None,
+        id: None,
+        did: None,
+        name: Some("untyped-ref-target".parse().unwrap()),
+    };
+
+    // --- get ---
+    match facade
+        .get(vec![untyped.clone()], SpecViewOpts::ENCRYPTED)
+        .await
+    {
+        // Local: refused per item, and specifically not as `EmptyRef`.
+        Ok(response) => assert_matches!(
+            assert_single_batch_problem(response),
+            ResourceLookupProblem::UntypedName,
+            "get: a named ref without a type must be refused as UntypedName"
+        ),
+        // Remote: refused server-side by the GraphQL adapter's `validate_ref`,
+        // so it surfaces as a request error rather than a per-item problem.
+        // Assert the reason, not just the variant: a generic transport failure
+        // would satisfy the shape while proving nothing about the rule.
+        Err(e) => assert_remote_refusal(&e, "get"),
+    }
+
+    // --- get_handles: the same ref must not resolve through a second entry
+    // point, which is what a per-pipeline check would let slip.
+    match facade.get_handles(vec![untyped.clone()]).await {
+        Ok(response) => assert_matches!(
+            assert_single_batch_problem(response),
+            ResourceLookupProblem::UntypedName,
+            "get_handles: a named ref without a type must be refused as UntypedName"
+        ),
+        Err(e) => assert_remote_refusal(&e, "get_handles"),
+    }
+
+    // --- the same name *with* its type still resolves, so the refusal is
+    // about the missing type and not about the resource being absent.
+    let typed = facade
+        .get_handles(vec![by_name("untyped-ref-target")])
+        .await
+        .unwrap();
+    assert_eq!(
+        typed.successes.len(),
+        1,
+        "the same name must still resolve when the type is supplied: {typed:#?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-141: batch lookup problem taxonomy mirrors the single-resource taxonomy.
 contract_test!(batch_lookup_taxonomy, super::test_batch_lookup_taxonomy);
 

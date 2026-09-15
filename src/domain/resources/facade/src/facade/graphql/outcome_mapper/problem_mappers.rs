@@ -29,8 +29,6 @@ pub(crate) fn map_batch_lookup_problem(
     match problem {
         P::ResourceIDNotFoundProblem(p) => Ok(map_id_not_found(p)),
         P::ResourceNameNotFoundProblem(p) => Ok(map_name_not_found(p)),
-        P::ResourceAnyTypeNameNotFoundProblem(p) => Ok(map_any_type_name_not_found(p)),
-        P::ResourceAmbiguousTypeProblem(p) => Ok(map_ambiguous_type(p)),
         P::ResourceSchemaMismatchProblem(p) => Ok(map_schema_mismatch(p)),
         P::ResourceNameMismatchProblem(p) => Ok(map_name_mismatch(p)),
         P::Unknown => Err(BatchResourceError::Internal(InternalError::new(
@@ -124,27 +122,6 @@ pub(crate) fn map_name_mismatch(
         id: p.id,
         expected_name: p.expected_name,
         actual_name: p.actual_name,
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_any_type_name_not_found(
-    p: cynic_api::fragments::ResourceAnyTypeNameNotFoundProblem,
-) -> ResourceLookupProblem {
-    ResourceLookupProblem::AnyTypeNameNotFound(domain::ResourceAnyTypeNameNotFoundError {
-        name: p.name,
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_ambiguous_type(
-    p: cynic_api::fragments::ResourceAmbiguousTypeProblem,
-) -> ResourceLookupProblem {
-    ResourceLookupProblem::AmbiguousType(domain::ResourceAmbiguousTypeError {
-        name: p.name,
-        type_names: p.type_names,
     })
 }
 

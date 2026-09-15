@@ -138,7 +138,7 @@ async fn assert_absent(h: &impl FacadeContractHarness, name: &str) {
 
     assert_matches!(
         assert_single_batch_problem(result),
-        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
+        ResourceLookupProblem::NameNotFound(_),
         "resource '{name}' must not exist"
     );
 }
