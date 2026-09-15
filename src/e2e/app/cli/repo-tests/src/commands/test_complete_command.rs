@@ -46,9 +46,18 @@ pub async fn test_complete_dataset_name(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Every accepted spelling is offered: canonical schema name and aliases.
+/// Every accepted spelling is offered: canonical schema name, aliases, and the
+/// `%` all-types token. The `datasets` pseudo-targets are not `get` targets, so
+/// they must stay absent.
 pub async fn test_complete_resource_type(kamu: KamuCliPuppet) {
     let completions = kamu.complete("kamu get", 2).await;
+
+    for unexpected in ["dataset", "datasets"] {
+        assert!(
+            !completions.contains(&unexpected.to_string()),
+            "`get` must not offer {unexpected} in {completions:?}"
+        );
+    }
 
     for expected in [
         "VariableSet",
@@ -60,6 +69,7 @@ pub async fn test_complete_resource_type(kamu: KamuCliPuppet) {
         "Storage",
         "storages",
         "st",
+        "%",
     ] {
         assert!(
             completions.contains(&expected.to_string()),

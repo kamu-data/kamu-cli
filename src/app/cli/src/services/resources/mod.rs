@@ -20,7 +20,6 @@ mod resource_type_lookup_service;
 use dill::CatalogBuilder;
 pub use r#impl::{
     ANY_SELECTOR,
-    BareTypePolicy,
     DATASET_TARGET,
     DATASETS_TARGET,
     ResourceLabelSelectorParser,

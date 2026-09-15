@@ -20,7 +20,6 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ANY_SELECTOR,
-    BareTypePolicy,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceSelectionResolutionService,
@@ -540,9 +539,7 @@ impl<'a> DeleteRequestResolver<'a> {
                 continue;
             }
 
-            let Ok(selector) =
-                ResourceSelectionScanner::scan_selector_arg(&arg, BareTypePolicy::Allow)
-            else {
+            let Ok(selector) = ResourceSelectionScanner::scan_selector_arg(&arg) else {
                 // Malformed args stay on the resource path so the selector
                 // grammar reports them with a caret, rather than being silently
                 // reinterpreted as a dataset name here.

@@ -291,13 +291,18 @@ impl CompleteCommand {
                     PositionalKind::ContextName => {
                         self.complete_context_name(output, to_complete)?;
                     }
-                    PositionalKind::ResourceType { with_extra_targets } => {
-                        let extra_targets: &[&str] = if *with_extra_targets {
-                            &[DATASET_TARGET, DATASETS_TARGET, ANY_SELECTOR]
-                        } else {
-                            &[]
-                        };
-                        self.complete_resource_type(output, to_complete, extra_targets)
+                    PositionalKind::ResourceType {
+                        with_any_selector,
+                        with_dataset_targets,
+                    } => {
+                        let mut extra_targets: Vec<&str> = Vec::new();
+                        if *with_dataset_targets {
+                            extra_targets.extend([DATASET_TARGET, DATASETS_TARGET]);
+                        }
+                        if *with_any_selector {
+                            extra_targets.push(ANY_SELECTOR);
+                        }
+                        self.complete_resource_type(output, to_complete, &extra_targets)
                             .await?;
                     }
                 },

@@ -257,11 +257,9 @@ pub enum ResourceLookupProblem {
     #[error("Resource reference must specify at least one of `id` or `name`")]
     EmptyRef,
 
-    /// A reference addressing by `name` without saying of which type. ODF's
-    /// uniqueness key is `(account, type, name)`, so a bare name identifies
-    /// nothing (RFC-018 § References). Distinct from `EmptyRef`, which claims
-    /// nothing was named at all, and from `NameNotFound`, which would wrongly
-    /// imply a lookup was attempted — the request is unanswerable as posed.
+    /// A reference addressing by `name` without saying of which type, which
+    /// identifies nothing (RFC-018 § References). Distinct from `EmptyRef`
+    /// (nothing named at all) and `NameNotFound` (a lookup was attempted).
     #[error(
         "Resource reference by `name` must also specify a `type`: a name alone is not unique \
          across resource types"

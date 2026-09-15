@@ -150,6 +150,36 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
         "delete % --all --dry-run",
     );
 
+    // A bare type carries the same meaning without the flag: `delete %` is
+    // `delete %/%`. Previewed only — section 8 reuses this fixture state.
+    let bare_any_type = ctx.stderr(["delete", "%", "--dry-run"]).await;
+    assert_output_contains_all(
+        &bare_any_type,
+        &[
+            "Deleted (dry-run): VariableSet/app-vars",
+            "Deleted (dry-run): VariableSet/temp-vars",
+            "Deleted (dry-run): SecretSet/app-secrets",
+            "Deleted (dry-run): SecretSet/temp-secrets",
+            "Summary 4 item(s): 4 deleted (dry-run), 0 ignored, 0 failed",
+        ],
+        "delete % --dry-run",
+    );
+
+    // The alias widens the name half to `%`, never the type half.
+    let bare_type = ctx.stderr(["delete", "vs", "--dry-run"]).await;
+    assert_output_contains_all(
+        &bare_type,
+        &[
+            "Deleted (dry-run): VariableSet/app-vars",
+            "Deleted (dry-run): VariableSet/temp-vars",
+            "Summary 2 item(s): 2 deleted (dry-run), 0 ignored, 0 failed",
+        ],
+        "delete vs --dry-run",
+    );
+
+    ctx.assert_resource_present("vs", app_vars).await;
+    ctx.assert_resource_present("ss", app_secrets).await;
+
     // -- 8. Cross-type all deletes everything ---------------------------------
     let all_delete = ctx.stderr(["delete", "%/%", "--force"]).await;
     assert_output_contains_all(

@@ -984,10 +984,10 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 
 | Aspect | `apply` | `get` | `list` | `delete` |
 | --- | --- | --- | --- | --- |
-| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | one or more `type[/name]` targets, or `%` | selector(s) |
-| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs/%`, `%/my-vars` | `kamu list vs`, `vs/my-%`, `vs/<id>`, `<id>`, `%`, `%/app-%`, `vs/a-% ss/b-%` | `vs my-vars`, `vs/my%`, `vs/%` |
+| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s), or a bare `type` | one or more `type[/name]` targets, or `%` | selector(s), or a bare `type` |
+| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs`, `vs/%`, `%`, `%/my-vars` | `kamu list vs`, `vs/my-%`, `vs/<id>`, `<id>`, `%`, `%/app-%`, `vs/a-% ss/b-%` | `vs my-vars`, `vs/my%`, `vs`, `vs/%` |
 | `%` name patterns | n/a | **yes** | **yes** (`vs/my-%`); an exact name is a degenerate pattern, a `UUIDv4` is matched as an ID | **yes** |
-| `%` type wildcards | n/a | **only bare `%`** (= all types); `%set`/`s%` rejected | **only bare `%`**; cannot be combined with narrower selectors | **only bare `%`**; `%set`/`s%` rejected |
+| `%` type wildcards | n/a | **only bare `%`** (= all types, same as `%/%`); `%set`/`s%` rejected | **only bare `%`**; cannot be combined with narrower selectors | **only bare `%`** (= `%/%`); `%set`/`s%` rejected |
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
 | Output modes | summary + canonical diff (dry-run *and* live apply)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
@@ -997,9 +997,9 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
 > The `get` vs `list` boundary is *bounded selection* vs *paginated enumeration* — not the presence
-> of name patterns, which both support. Keep `get` from growing into a second `list`, and keep
-> `list` from adopting what makes `get` a selection command: the bare same-type form
-> (`list vs a b` stays rejected), erroring when a selection overflows `--max-results` (`list`
+> of name patterns, nor of a bare `type`, which both support. Keep `get` from growing into a second
+> `list`, and keep `list` from adopting what makes `get` a selection command: the bare same-type
+> form (`list vs a b` stays rejected), erroring when a selection overflows `--max-results` (`list`
 > truncates), and erroring when nothing matches (`list` prints an empty table).
 
 > **Column shape follows request arity, never results.** One named type renders that type's own
@@ -1010,7 +1010,7 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 
 **`list` has its own, smaller grammar**, but it shares the *lexer*. It does not invoke
 `ResourceSelectionSyntaxParser` (which imposes the same-type/ref-form arg shapes); it splits each
-target with `ResourceSelectionScanner::scan_selector_arg` in
+target directly with `ResourceSelectionScanner::scan_selector_arg` in
 [`list_command.rs`](/src/app/cli/src/commands/list_command.rs). Accepted: `datasets` (alone), one or
 more `type[/name]` targets, bare `%` or `%/pattern`, and a bare `UUIDv4` spanning every type. The
 name half is classified by the same `UUIDv4` rule the other commands use (shared as
@@ -1018,13 +1018,19 @@ name half is classified by the same `UUIDv4` rule the other commands use (shared
 mixing `datasets` with resource types, `datasets/<name>`, combining `%` with narrower selectors,
 more than one `/` in a target, and the bare same-type form (`list vs a b`) that belongs to `get`.
 
-**The one grammar difference is a named parameter, not a duplicated splitter.** `BareTypePolicy`
-decides whether a bare `type` carrying no `/` is legal: `list vs` enumerates the type
-(`Allow`), while `get vs` / `delete vs` are usage errors directing the user to `vs/%` (`Reject`).
-Everything else about splitting a `type[/name]` argument — rejecting empty halves and a second `/`,
-and where the caret points — is decided once, in the scanner. Both sides of the divergence are
-pinned by tests at the unit and E2E levels, because unifying them would silently change one
-command's contract: loosening `get` would widen `delete`'s blast radius.
+**A bare `type` means `type/%` in every command.** `list vs`, `get vs` and `delete vs` all select
+every resource of that type, and a bare `%` is likewise `%/%`. The scanner splits a `type[/name]`
+argument one way for everybody — rejecting empty halves and a second `/`, and deciding where the
+caret points — and a bare type simply scans with no name half; each command's *parser* then fills
+in the `%`. For `get`/`delete` that happens in `ResourceSelectionSyntaxParser::parse`, and only
+for a **lone** slash-free argument, so `get vs ss` stays a name lookup for `ss` rather than two
+bare types.
+
+`delete` follows the same rule rather than holding a stricter one of its own: `%` is already a
+legal type token there (`delete % db-creds`, `delete %/%`), so refusing only the bare spelling
+would buy no safety while making the shortest form of a common request an error. The blast radius
+is bounded by the confirmation prompt and `--force` instead. The symmetry is pinned from both
+sides in `test_resources_list_selectors.rs`.
 
 **Selector grammar — accepted forms** (parsed by `ResourceSelectionSyntaxParser`,
 [`resource_selection_syntax_parser.rs`](/src/app/cli/src/services/resources/impl/resource_selection_syntax_parser.rs)):
@@ -1061,15 +1067,12 @@ half is validated later, when `ResourceSelectionSyntaxServiceImpl::classify_type
   ("Cannot mix positional `type name` and slash `type/name` syntax"), with no exceptions.
 - `kamu get vs/foo/extra` — the slash form must contain **exactly one** `/` (rejected: "Invalid
   resource reference").
-- `kamu get vs` — a bare type with **no selector** is rejected ("Expected `type/name`"); use
-  `kamu get vs %` / `kamu get vs/%`, or `kamu list vs`, to enumerate the type.
-- `kamu get %` / `kamu delete %` — a bare `%` is a *single plain arg*, so it hits the same rule and is
-  rejected. The all-resources spelling is `%/%`. (`kamu delete %` is still routed to the resource path
-  rather than the dataset one, so the user gets this selector error instead of a dataset glob that
-  would match every dataset — see `DeleteRequestResolver::resolve`.)
 
-(`kamu get %/%` *is* accepted, bounded by `--max-results`/`--unbounded`; prefer `kamu list %` for
-unbounded enumeration — a guidance boundary, not a parser rejection.)
+(`kamu get %/%` — and its bare spelling `kamu get %` — *is* accepted, bounded by
+`--max-results`/`--unbounded`; prefer `kamu list %` for unbounded enumeration — a guidance
+boundary, not a parser rejection. `kamu delete %` is routed to the resource path rather than the
+dataset one, so it means every *resource*, never a dataset glob — see
+`DeleteRequestResolver::resolve`.)
 
 **Both CLI grammars use the same scanner/parser split.** A `winnow` scanner turns the input into
 `Spanned` tokens carrying byte offsets, a parser consumes those tokens, and failures render through

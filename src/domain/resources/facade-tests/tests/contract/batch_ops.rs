@@ -1140,13 +1140,10 @@ contract_test!(
 
 /// A ref that names a resource but no type is refused, on every batch path.
 ///
-/// ODF leaves `type` optional on `ResourceRef` structurally, but RFC-018
-/// § References allows only ID, DID, or *type, name and the optional owning
-/// account* — a name never stands alone, because `(account, type, name)` is the
-/// uniqueness key and two types may hold the same name under one account.
-/// Resolving such a ref by scanning every type (as this once did) would succeed
-/// only by accident of what happens to be stored, and would start failing the
-/// moment a second type reused the name.
+/// ODF leaves `type` optional structurally, but RFC-018 § References allows
+/// only ID, DID, or *type, name and the optional owning account*: `(account,
+/// type, name)` is the uniqueness key, so resolving a bare name by scanning
+/// every type would succeed only by accident of what happens to be stored.
 ///
 /// All four paths are asserted because refusal lives in the batch pipelines'
 /// shared front half: a fix applied to one and not the others would leave them

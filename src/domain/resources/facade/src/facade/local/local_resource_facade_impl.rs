@@ -551,11 +551,9 @@ impl LocalResourceFacadeImpl {
     /// a ref names exactly one resource, and the caller must supply enough of
     /// the key to say which.
     ///
-    /// The refusal is enforced *here* as well as in the GraphQL adapter's
-    /// `validate_ref`: an in-process caller reaches this facade without passing
-    /// through that adapter, and the remote facade would have the ref rejected
-    /// server-side. Checking in both keeps the two implementations answering
-    /// identically, which the contract suite pins.
+    /// Enforced here as well as in the GraphQL adapter's `validate_ref`: an
+    /// in-process caller never passes through that adapter, and both
+    /// implementations must answer identically.
     async fn resolve_ref_schema(
         &self,
         descriptors: &[ResourceTypeDescriptor],

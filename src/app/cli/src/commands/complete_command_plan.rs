@@ -34,7 +34,12 @@ pub enum PositionalKind {
     Dataset,
     Path,
     Repository,
-    ResourceType { with_extra_targets: bool },
+    /// Two flags, not one: `get` accepts the `%` all-types token but not the
+    /// `datasets` pseudo-targets, which only `list`/`delete` take.
+    ResourceType {
+        with_any_selector: bool,
+        with_dataset_targets: bool,
+    },
     ContextName,
 }
 
@@ -231,13 +236,17 @@ fn classify_positional(
         // `get`/`delete` take a selector only in the first slot; every `list`
         // slot is one.
         (["delete"], "target") if first_slot => PositionalKind::ResourceType {
-            with_extra_targets: true,
+            with_any_selector: true,
+            with_dataset_targets: true,
         },
         (["list"], "targets") => PositionalKind::ResourceType {
-            with_extra_targets: true,
+            with_any_selector: true,
+            with_dataset_targets: true,
         },
+        // `get` takes `%` but never the dataset pseudo-targets.
         (["get"], "args") if first_slot => PositionalKind::ResourceType {
-            with_extra_targets: false,
+            with_any_selector: true,
+            with_dataset_targets: false,
         },
 
         // Commands taking an existing context name; `context add` takes a new
@@ -295,10 +304,12 @@ mod tests {
     }
 
     const RESOURCE_TYPE_WITH_EXTRAS: PositionalKind = PositionalKind::ResourceType {
-        with_extra_targets: true,
+        with_any_selector: true,
+        with_dataset_targets: true,
     };
     const RESOURCE_TYPE_BARE: PositionalKind = PositionalKind::ResourceType {
-        with_extra_targets: false,
+        with_any_selector: true,
+        with_dataset_targets: false,
     };
 
     #[test]

@@ -128,7 +128,9 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     // Only `%` alone is accepted in the type position: matching type names by
     // pattern is hard to read back and dangerous on `delete`.
 
-    for type_wildcard in ["s%/db-creds", "%sets/db-creds", "s%/%"] {
+    // A bare `s%` expands to `s%/%` via the bare-type alias, so it reaches type
+    // resolution and is rejected there like every other spelling.
+    for type_wildcard in ["s%/db-creds", "%sets/db-creds", "s%/%", "s%"] {
         ctx.assert_failure(["get", type_wildcard], Some(&["Unsupported get target"]))
             .await;
     }
@@ -152,12 +154,14 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
 
     // ── 9. Broad forms select every resource ──────────────────────────────────
     //
-    // `%/%` is the all-resources form; `% %` is the equivalent positional
-    // spelling. Both are bounded by `--max-results` unless `--unbounded`.
+    // `%/%` is the all-resources form, `% %` its positional spelling, and a
+    // bare `%` aliases to `%/%`. All bounded by `--max-results` unless
+    // `--unbounded`.
 
     for form in [
         vec!["get", "%/%", "--unbounded"],
         vec!["get", "%", "%", "--unbounded"],
+        vec!["get", "%", "--unbounded"],
     ] {
         let idents = ctx.get_idents(form.clone()).await;
         assert_eq!(
@@ -172,6 +176,30 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
             form.join(" ")
         );
     }
+
+    // ── 9a. A bare type is aliased to `type/%` ────────────────────────────────
+    //
+    // `get vs` means `get vs/%`, matching `list vs`. Every accepted spelling
+    // of the type is pinned, canonical included.
+    //
+    // The alias keys off argument shape: only a lone slash-free arg means this,
+    // so `get vs ss` stays a name lookup for `ss` (section 11).
+
+    for bare in ["vs", "VariableSet", "variablesets"] {
+        let idents = ctx.get_idents(["get", bare, "--unbounded"]).await;
+        assert_eq!(
+            idents,
+            [vs("app-vars"), vs("db-creds")],
+            "`get {bare}` should select every VariableSet, as `get {bare}/%` does"
+        );
+    }
+
+    // The aliased form and the explicit one are the same selection.
+    assert_eq!(
+        ctx.get_idents(["get", "ss", "--unbounded"]).await,
+        ctx.get_idents(["get", "ss/%", "--unbounded"]).await,
+        "`get ss` must match `get ss/%`"
+    );
 
     // ── 10. `all` is an ordinary name ─────────────────────────────────────────
     //
@@ -228,23 +256,6 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     // could regress to a bare message without any unit test noticing.
     //
     // Regexes match in output order, so the input line precedes the caret line.
-
-    // A bare type is rejected here — `get` requires a name half. The message
-    // names the fix, since this is the most common way to reach it.
-    //
-    // The caret line is anchored with `^…$` so its indentation is part of the
-    // assertion: an unanchored regex would still match if the column drifted.
-    ctx.assert_failure(
-        ["get", "vs"],
-        Some(&[
-            r"Invalid resource reference:",
-            r"(?m)^  vs$",
-            r"(?m)^    \^$",
-            r"expected `/` after the resource type",
-            r"write `vs/%` to select every one",
-        ]),
-    )
-    .await;
 
     // A second `/` makes the argument ambiguous; the caret sits on it, not at
     // the end of the input.

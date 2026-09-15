@@ -145,12 +145,14 @@ pub async fn test_resources_list_selectors(ctx: ResourceCtx) {
         ctx.assert_failure(args.clone(), None).await;
     }
 
-    // -- 10. A bare type is legal here, and only here --------------------------
+    // -- 10. A bare type means `type/%` in every command ------------------------
     //
-    // `list` and `get`/`delete` share one selector scanner but supply opposite
-    // acceptance policies for a bare `type`. This is the only difference between
-    // the two grammars, so it is pinned from both sides: unifying them would
-    // silently change one command's contract.
+    // `list`, `get` and `delete` agree on a bare `type`: it selects every
+    // resource of that type. Pinned from both sides, since the grammars share
+    // one scanner but reach this through separate parsers.
+    //
+    // What still separates them is section 9's bare same-type form
+    // (`list vs app-vars`), which remains `get`'s alone.
 
     // `list vs` enumerates the type — the same rows as the explicit `vs/%`.
     assert_eq!(
@@ -159,12 +161,20 @@ pub async fn test_resources_list_selectors(ctx: ResourceCtx) {
         "`list vs` must enumerate the type, exactly as `list vs/%` does"
     );
 
-    // The same argument is a usage error for `get`, which requires a name half.
-    ctx.assert_failure(
-        ["get", "vs"],
-        Some(&[r"expected `/` after the resource type"]),
-    )
-    .await;
+    // Both helpers sort, so names compare directly across the two commands'
+    // differing output shapes.
+    let get_names: Vec<String> = ctx
+        .get_idents(["get", "vs", "--unbounded"])
+        .await
+        .into_iter()
+        .map(|(_schema, name)| name)
+        .collect();
+
+    assert_eq!(
+        ctx.list_names("vs").await,
+        get_names,
+        "`get vs` must select the same resources `list vs` enumerates"
+    );
 
     // -- 11. Malformed selectors report the offending column -------------------
     //

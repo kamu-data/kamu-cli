@@ -30,7 +30,6 @@ pub use resource_ref_classifier::is_resource_id;
 pub use resource_selection_resolution_service_impl::*;
 pub use resource_selection_scanner::{
     ANY_SELECTOR,
-    BareTypePolicy,
     DATASET_TARGET,
     DATASETS_TARGET,
     ResourceSelectionScanner,

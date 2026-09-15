@@ -20,7 +20,6 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ANY_SELECTOR,
-    BareTypePolicy,
     DATASETS_TARGET,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
@@ -164,19 +163,17 @@ impl ListCommand {
     /// target falls back to itself and is rejected later by
     /// [`Self::split_target`].
     fn type_half(target: &str) -> &str {
-        ResourceSelectionScanner::scan_selector_arg(target, BareTypePolicy::Allow)
+        ResourceSelectionScanner::scan_selector_arg(target)
             .map_or(target, |selector| selector.type_half)
     }
 
     /// Splits `type[/name]`, classifying the name half as an ID or a pattern.
     ///
-    /// Unlike `get`/`delete`, a bare `type` is legal here and means "enumerate
-    /// this type".
+    /// A bare `type` means "enumerate this type", the same `type/%` selection
+    /// `get`/`delete` reach through their own parser.
     fn split_target(target: &str) -> Result<(&str, Option<ResourceQuery>), CLIError> {
-        let selector = ResourceSelectionScanner::scan_selector_arg(target, BareTypePolicy::Allow)
-            .map_err(|err| {
-            usage_error_at("resource selector", target, err.offset, &err.message)
-        })?;
+        let selector = ResourceSelectionScanner::scan_selector_arg(target)
+            .map_err(|err| usage_error_at("resource selector", target, err.offset, &err.message))?;
 
         Ok((selector.type_half, selector.name_half.map(Self::name_query)))
     }

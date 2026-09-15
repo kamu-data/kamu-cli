@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::resource_selection_scanner::{BareTypePolicy, ResourceSelectionScanner};
+use super::resource_selection_scanner::{ANY_SELECTOR, ResourceSelectionScanner, SelectorArg};
 use super::selector_error::usage_error_at;
 use crate::CLIError;
 
@@ -70,11 +70,11 @@ impl ResourceSelectionSyntaxParser {
                     });
                 }
 
-                // A lone plain arg is a bare type, which this grammar rejects.
-                // Reporting it through the scanner keeps the caret and the
-                // wording identical to every other bare-type rejection.
-                return Err(Self::parse_ref_arg(&args[0])
-                    .expect_err("a slash-free arg cannot satisfy `BareTypePolicy::Reject`"));
+                // A lone bare type is `type/%`. Keyed off argument shape, so
+                // `vs ss` stays a name lookup rather than two bare types.
+                return Ok(ParsedSyntax::RefForm {
+                    pairs: vec![Self::parse_bare_type_arg(&args[0])?],
+                });
             }
             let type_str = args[0].as_str();
             let selector_inputs = args[1..].iter().map(String::as_str).collect();
@@ -89,15 +89,34 @@ impl ResourceSelectionSyntaxParser {
         super::resource_ref_classifier::is_resource_id(arg)
     }
 
+    /// Splits a `type/name` argument. Only reached for args carrying a `/`, so
+    /// the scanner always yields a name half.
     fn parse_ref_arg(arg: &str) -> Result<(&str, &str), CLIError> {
-        let selector = ResourceSelectionScanner::scan_selector_arg(arg, BareTypePolicy::Reject)
-            .map_err(|err| usage_error_at("resource reference", arg, err.offset, &err.message))?;
+        let selector = Self::scan_arg(arg)?;
 
         let name_half = selector
             .name_half
-            .expect("`BareTypePolicy::Reject` guarantees a name half");
+            .expect("an arg containing `/` always scans with a name half");
 
         Ok((selector.type_half, name_half))
+    }
+
+    /// Expands a lone bare `type` into its `type/%` pair. The type half is
+    /// validated later, when types are resolved.
+    fn parse_bare_type_arg(arg: &str) -> Result<(&str, &str), CLIError> {
+        let selector = Self::scan_arg(arg)?;
+
+        debug_assert!(
+            selector.name_half.is_none(),
+            "a slash-free arg cannot scan with a name half"
+        );
+
+        Ok((selector.type_half, ANY_SELECTOR))
+    }
+
+    fn scan_arg(arg: &str) -> Result<SelectorArg<'_>, CLIError> {
+        ResourceSelectionScanner::scan_selector_arg(arg)
+            .map_err(|err| usage_error_at("resource reference", arg, err.offset, &err.message))
     }
 }
 
@@ -178,12 +197,38 @@ mod tests {
         );
     }
 
-    // A bare `%` is a single plain arg, so it hits the same-type minimum-arg
-    // rule. The all-resources form is `%/%`.
+    // A lone bare type is aliased to its `type/%` form, matching `list`.
+
     #[test]
-    fn test_parse_syntax_bare_any_selector_is_error() {
+    fn test_parse_syntax_bare_any_selector_is_all_resources() {
         let a = args(&["%"]);
-        assert_matches!(ResourceSelectionSyntaxParser::parse(&a), Err(_));
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("%", "%")]
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_bare_canonical_type_is_all_of_that_type() {
+        let a = args(&["VariableSet"]);
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("VariableSet", "%")]
+        );
+    }
+
+    // The alias keys off argument shape, not content: a second arg makes the
+    // first a type and the rest names.
+    #[test]
+    fn test_parse_syntax_two_bare_types_stay_a_name_lookup() {
+        let a = args(&["vs", "ss"]);
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Ok(ParsedSyntax::SameType {
+                type_str: "vs",
+                selector_inputs,
+            }) if selector_inputs == vec!["ss"]
+        );
     }
 
     #[test]
@@ -270,9 +315,12 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_single_no_slash_is_error() {
+    fn test_parse_syntax_single_no_slash_is_all_of_that_type() {
         let a = args(&["vs"]);
-        assert_matches!(ResourceSelectionSyntaxParser::parse(&a), Err(_));
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "%")]
+        );
     }
 
     #[test]
@@ -286,11 +334,16 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_bare_non_v4_uuid_is_error() {
-        // A nil (all-zero) UUID is syntactically valid but not version 4, so it
-        // must not be treated as a resolvable resource ID.
+    fn test_parse_syntax_bare_non_v4_uuid_is_not_an_id() {
+        // A nil (all-zero) UUID is syntactically valid but not version 4, so
+        // it must never be treated as a resolvable resource ID: it falls
+        // through to the bare-type alias, which type resolution then rejects.
         let a = args(&["00000000-0000-0000-0000-000000000000"]);
-        assert_matches!(ResourceSelectionSyntaxParser::parse(&a), Err(_));
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Ok(ParsedSyntax::RefForm { pairs })
+                if pairs == vec![("00000000-0000-0000-0000-000000000000", "%")]
+        );
     }
 
     #[test]

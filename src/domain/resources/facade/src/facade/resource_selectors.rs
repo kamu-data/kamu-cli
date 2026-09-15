@@ -65,11 +65,9 @@ pub enum UnsupportedSelectorFieldError {
 /// nothing at all, or one naming a resource without saying of which type.
 ///
 /// Per ODF RFC-018 § References a resource is referenced by ID, by DID, or by
-/// *type, name and the optional owning account* — a name never stands alone.
-/// § Identity gives the reason: `(Account, ResourceType, ResourceName)` is the
-/// uniqueness key, so a type-less named ref would resolve uniquely only by
-/// accident of what happens to be stored, and would start failing the moment a
-/// second type reused the name.
+/// *type, name and the optional owning account* — a name never stands alone,
+/// because `(Account, ResourceType, ResourceName)` is the uniqueness key
+/// (§ Identity).
 ///
 /// An `id` is self-identifying, so a ref carrying one needs no type. Contrast a
 /// type-less *`ResourceSelector`*, which stays legal: a selector asks which

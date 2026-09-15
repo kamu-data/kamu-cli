@@ -244,19 +244,6 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// A ref addressing by `name` without a `type` is refused rather than resolved.
-//
-// ODF's uniqueness key is `(account, type, name)` and two types may hold the
-// same name under one account, so a bare name identifies nothing (RFC-018
-// § References). This used to be answered by scanning every registered type and
-// reporting an ambiguity when more than one matched; the scan is gone, and the
-// request is now refused as unanswerable as posed.
-//
-// Pinned as a *contract* test because the two implementations refuse in
-// different places — the local facade in `resolve_ref_schema`, the remote one
-// server-side in the GraphQL adapter's `validate_ref` — and both must refuse.
-// The failure must also stay distinguishable from `EmptyRef`: a caller who
-// supplied a name must not be told they supplied none.
 /// The remote facade has the ref rejected server-side, so it comes back as a
 /// request error. Pin the reason so a transport failure cannot pass for a rule
 /// being enforced.
@@ -274,8 +261,19 @@ fn assert_remote_refusal(error: &BatchResourceError, api: &str) {
     );
 }
 
-contract_test!(untyped_name_ref_is_refused, super::test_untyped_name_ref_is_refused);
+contract_test!(
+    untyped_name_ref_is_refused,
+    super::test_untyped_name_ref_is_refused
+);
 
+/// A ref addressing by `name` without a `type` is refused rather than resolved:
+/// `(account, type, name)` is ODF's uniqueness key and two types may hold one
+/// name under the same account, so a bare name identifies nothing (RFC-018
+/// § References).
+///
+/// A *contract* test because the two implementations refuse in different places
+/// — the local facade in `resolve_ref_schema`, the remote one server-side in
+/// `validate_ref` — and both must refuse, distinguishably from `EmptyRef`.
 pub async fn test_untyped_name_ref_is_refused(h: &impl FacadeContractHarness) {
     // Seed the name under a real type, so a miss cannot be mistaken for the
     // resource simply not existing: the name resolves fine *with* a type.

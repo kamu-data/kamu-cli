@@ -70,20 +70,6 @@ pub struct ScanError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Whether a bare `type` with no `/` is a legal argument.
-///
-/// The only difference between the `list` grammar and the `get`/`delete` one:
-/// `list vs` enumerates the type, while `get vs` is a usage error directing the
-/// user to `vs/%`. Broadening `get` would widen the blast radius of `delete`,
-/// so the two stay apart deliberately.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BareTypePolicy {
-    Allow,
-    Reject,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// A single selector argument, split but not interpreted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectorArg<'a> {
@@ -107,11 +93,9 @@ impl ResourceSelectionScanner {
     /// Splits one `type[/name]` argument into its halves.
     ///
     /// Purely lexical: a `%`-carrying type half scans happily here and is
-    /// accepted or rejected later, when types are resolved.
-    pub fn scan_selector_arg(
-        input: &str,
-        bare_type_policy: BareTypePolicy,
-    ) -> Result<SelectorArg<'_>, ScanError> {
+    /// accepted or rejected later, when types are resolved. A bare `type`
+    /// scans with no name half; each command's parser assigns its meaning.
+    pub fn scan_selector_arg(input: &str) -> Result<SelectorArg<'_>, ScanError> {
         let tokens = Self::scan(input)?;
 
         let mut words = Vec::new();
@@ -140,18 +124,6 @@ impl ResourceSelectionScanner {
                     message: "expected a resource type".to_owned(),
                 });
             };
-
-            if bare_type_policy == BareTypePolicy::Reject {
-                let type_text = &input[type_half.start..type_half.end];
-
-                return Err(ScanError {
-                    offset: type_half.end,
-                    message: format!(
-                        "expected `{TYPE_NAME_SEPARATOR}` after the resource type — write \
-                         `{type_text}{TYPE_NAME_SEPARATOR}{ANY_SELECTOR}` to select every one"
-                    ),
-                });
-            }
 
             return Ok(SelectorArg {
                 type_half: &input[type_half.start..type_half.end],
@@ -242,8 +214,7 @@ mod tests {
     }
 
     fn split(input: &str) -> SelectorArg<'_> {
-        ResourceSelectionScanner::scan_selector_arg(input, BareTypePolicy::Allow)
-            .expect("input should split")
+        ResourceSelectionScanner::scan_selector_arg(input).expect("input should split")
     }
 
     // Tokenization
@@ -308,13 +279,13 @@ mod tests {
         );
     }
 
-    // The two acceptance policies are the only difference between the `list`
-    // grammar and the `get`/`delete` one, so they are pinned as a pair.
+    // One acceptance rule for every command: a bare type is lexically fine
+    // everywhere, and each parser assigns its meaning.
 
     #[test]
-    fn a_bare_type_is_accepted_under_the_allow_policy() {
+    fn a_bare_type_is_accepted() {
         assert_matches!(
-            ResourceSelectionScanner::scan_selector_arg("vs", BareTypePolicy::Allow),
+            ResourceSelectionScanner::scan_selector_arg("vs"),
             Ok(SelectorArg {
                 type_half: "vs",
                 name_half: None,
@@ -323,39 +294,29 @@ mod tests {
     }
 
     #[test]
-    fn a_bare_type_is_rejected_under_the_reject_policy() {
-        let error = ResourceSelectionScanner::scan_selector_arg("vs", BareTypePolicy::Reject)
-            .expect_err("should be rejected");
-
-        // The caret points just past the type, where the `/` should have been.
-        assert_eq!(error.offset, 2);
-    }
-
-    #[test]
-    fn a_ref_form_argument_is_accepted_under_either_policy() {
-        for policy in [BareTypePolicy::Allow, BareTypePolicy::Reject] {
-            assert_matches!(
-                ResourceSelectionScanner::scan_selector_arg("vs/my-vars", policy),
-                Ok(_),
-                "expected `vs/my-vars` to be accepted under {policy:?}"
-            );
-        }
+    fn a_ref_form_argument_is_accepted() {
+        assert_matches!(
+            ResourceSelectionScanner::scan_selector_arg("vs/my-vars"),
+            Ok(SelectorArg {
+                type_half: "vs",
+                name_half: Some("my-vars"),
+            })
+        );
     }
 
     // Rejected input
 
     #[test]
     fn rejects_a_second_separator_at_its_own_offset() {
-        let error =
-            ResourceSelectionScanner::scan_selector_arg("vs/foo/extra", BareTypePolicy::Allow)
-                .expect_err("should be rejected");
+        let error = ResourceSelectionScanner::scan_selector_arg("vs/foo/extra")
+            .expect_err("should be rejected");
 
         assert_eq!(error.offset, 6);
     }
 
     #[test]
     fn rejects_a_missing_type_half() {
-        let error = ResourceSelectionScanner::scan_selector_arg("/my-vars", BareTypePolicy::Allow)
+        let error = ResourceSelectionScanner::scan_selector_arg("/my-vars")
             .expect_err("should be rejected");
 
         assert_eq!(error.offset, 0);
@@ -363,18 +324,15 @@ mod tests {
 
     #[test]
     fn rejects_a_missing_name_half() {
-        let error = ResourceSelectionScanner::scan_selector_arg("vs/", BareTypePolicy::Allow)
-            .expect_err("should be rejected");
+        let error =
+            ResourceSelectionScanner::scan_selector_arg("vs/").expect_err("should be rejected");
 
         assert_eq!(error.offset, 3);
     }
 
     #[test]
     fn rejects_an_empty_argument() {
-        assert_matches!(
-            ResourceSelectionScanner::scan_selector_arg("", BareTypePolicy::Allow),
-            Err(_)
-        );
+        assert_matches!(ResourceSelectionScanner::scan_selector_arg(""), Err(_));
     }
 }
 
