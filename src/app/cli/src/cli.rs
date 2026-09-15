@@ -350,6 +350,10 @@ Register a user-scoped remote context:
 
     kamu context add prod --url https://api.kamu.dev --user
 
+Register a remote context non-interactively with an existing token:
+
+    kamu context add prod --url https://api.kamu.dev --access-token <token>
+
 List supported resource types in the active context:
 
     kamu ctx api-resources
@@ -426,15 +430,37 @@ store it in the user home scope instead.
 The name `local` is reserved for the implicit workspace context and cannot be
 registered explicitly.
 
+If no access token is stored for the given URL, the interactive browser login
+flow is started automatically, provided the session is an interactive terminal.
+In non-interactive sessions (CI, scripts) the context is only registered and a
+warning is printed. Use the credential arguments below to authenticate
+non-interactively, or `--no-login` to skip authentication entirely.
+
 **Examples:**
 
-Add a workspace-scoped remote context:
+Add a workspace-scoped remote context, logging in interactively if needed:
 
     kamu context add prod --url https://example.com
 
 Add a user-scoped remote context:
 
     kamu context add prod --url https://example.com --user
+
+Add a context using an existing access token:
+
+    kamu context add prod --url https://example.com --access-token <token>
+
+Add a context with non-interactive password login:
+
+    kamu context add prod --url https://example.com --password-login alice --password s3cret
+
+Add a context with non-interactive OAuth login:
+
+    kamu context add prod --url https://example.com --oauth-provider github --oauth-token <token>
+
+Register a context without authenticating:
+
+    kamu context add prod --url https://example.com --no-login
 "#)]
 pub struct ContextAdd {
     /// Store context in the user home folder rather than in the workspace
@@ -444,6 +470,56 @@ pub struct ContextAdd {
     /// Backend URL of the remote workspace
     #[arg(long, value_name = "URL")]
     pub url: parsers::UrlHttps,
+
+    /// Provide an existing access token instead of logging in
+    #[arg(
+        long,
+        value_name = "TOKEN",
+        conflicts_with_all = ["no_login", "password_login", "oauth_provider"],
+    )]
+    pub access_token: Option<String>,
+
+    /// User name for non-interactive password login
+    #[arg(
+        long,
+        value_name = "LOGIN",
+        requires = "password",
+        conflicts_with_all = ["no_login", "oauth_provider"],
+    )]
+    pub password_login: Option<String>,
+
+    /// Password for non-interactive password login
+    #[arg(long, value_name = "PASSWORD", requires = "password_login")]
+    pub password: Option<String>,
+
+    /// Name of the OAuth provider for non-interactive login, i.e. 'github'
+    #[arg(
+        long,
+        value_name = "PROVIDER",
+        requires = "oauth_token",
+        conflicts_with = "no_login"
+    )]
+    pub oauth_provider: Option<String>,
+
+    /// OAuth provider access token
+    #[arg(long, value_name = "TOKEN", requires = "oauth_provider")]
+    pub oauth_token: Option<String>,
+
+    /// Do not attempt to log in, only register the context
+    #[arg(long)]
+    pub no_login: bool,
+
+    /// Repository name which will be used to store in repositories list
+    #[arg(long, value_parser = parsers::repo_name)]
+    pub repo_name: Option<odf::RepoName>,
+
+    /// Don't automatically add a remote repository for this host
+    #[arg(long)]
+    pub skip_add_repo: bool,
+
+    /// Use a predefined ODF backend URL (for E2E testing only)
+    #[arg(long, hide = true)]
+    pub predefined_odf_backend_url: Option<parsers::UrlHttps>,
 
     /// Context name
     #[arg()]

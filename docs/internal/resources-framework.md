@@ -974,6 +974,18 @@ implementation files carry `_resource(s)_` names:
 `check` / `use` / `delete`, and `kamu context api-resources` (list supported resource types for a
 context).
 
+`kamu context add` also **authenticates**, so registering a usable remote context is one command
+rather than two. When no valid token is stored for the URL it starts the interactive browser login —
+but only in an interactive terminal, so CI and scripts never block on a browser; there it falls back
+to registering the context and warning. `--access-token`, `--password-login`/`--password` and
+`--oauth-provider`/`--oauth-token` authenticate non-interactively regardless of TTY, and `--no-login`
+skips authentication entirely. The login itself is not reimplemented: `kamu login`,
+`kamu login oauth|password` and `kamu context add` all go through one seam,
+[`odf_server::LoginFlowService`](/src/app/cli/src/services/odf_server/login_flow_service.rs), which
+owns token lookup, validation, expiry-driven re-login and repository registration. Note the context
+record stores the *resolved backend* URL while the login is keyed on the URL **as typed** — the same
+frontend/backend split `kamu login` has always had.
+
 **CLI-side services** ([`app/cli/src/services/resources/`](/src/app/cli/src/services/resources),
 implementations under `impl/`):
 

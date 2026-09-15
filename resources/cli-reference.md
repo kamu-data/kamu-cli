@@ -410,6 +410,10 @@ Register a user-scoped remote context:
 
     kamu context add prod --url https://api.kamu.dev --user
 
+Register a remote context non-interactively with an existing token:
+
+    kamu context add prod --url https://api.kamu.dev --access-token <token>
+
 List supported resource types in the active context:
 
     kamu ctx api-resources
@@ -435,6 +439,14 @@ Register a new remote resource context
 
 * `--user` — Store context in the user home folder rather than in the workspace
 * `--url <URL>` — Backend URL of the remote workspace
+* `--access-token <TOKEN>` — Provide an existing access token instead of logging in
+* `--password-login <LOGIN>` — User name for non-interactive password login
+* `--password <PASSWORD>` — Password for non-interactive password login
+* `--oauth-provider <PROVIDER>` — Name of the OAuth provider for non-interactive login, i.e. 'github'
+* `--oauth-token <TOKEN>` — OAuth provider access token
+* `--no-login` — Do not attempt to log in, only register the context
+* `--repo-name <REPO_NAME>` — Repository name which will be used to store in repositories list
+* `--skip-add-repo` — Don't automatically add a remote repository for this host
 
 Registers a remote workspace context under a local name.
 
@@ -444,15 +456,37 @@ store it in the user home scope instead.
 The name `local` is reserved for the implicit workspace context and cannot be
 registered explicitly.
 
+If no access token is stored for the given URL, the interactive browser login
+flow is started automatically, provided the session is an interactive terminal.
+In non-interactive sessions (CI, scripts) the context is only registered and a
+warning is printed. Use the credential arguments below to authenticate
+non-interactively, or `--no-login` to skip authentication entirely.
+
 **Examples:**
 
-Add a workspace-scoped remote context:
+Add a workspace-scoped remote context, logging in interactively if needed:
 
     kamu context add prod --url https://example.com
 
 Add a user-scoped remote context:
 
     kamu context add prod --url https://example.com --user
+
+Add a context using an existing access token:
+
+    kamu context add prod --url https://example.com --access-token <token>
+
+Add a context with non-interactive password login:
+
+    kamu context add prod --url https://example.com --password-login alice --password s3cret
+
+Add a context with non-interactive OAuth login:
+
+    kamu context add prod --url https://example.com --oauth-provider github --oauth-token <token>
+
+Register a context without authenticating:
+
+    kamu context add prod --url https://example.com --no-login
 
 
 

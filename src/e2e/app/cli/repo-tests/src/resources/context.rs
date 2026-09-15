@@ -49,10 +49,10 @@ impl ResourceCtx {
     /// Default remote context name used by [`ResourceCtx::remote_from_server`].
     pub const DEFAULT_REMOTE_CONTEXT: &'static str = "prod";
 
-    /// Build a remote context from a running API server, encapsulating the
-    /// login dance: obtain an e2e token, create a fresh multi-tenant CLI
-    /// workspace, authenticate it against the server, register the server as a
-    /// named resource context, and switch the active context to it.
+    /// Build a remote context from a running API server: obtain an e2e token,
+    /// create a fresh multi-tenant CLI workspace, register the server as a
+    /// named resource context (authenticating in the same command), and switch
+    /// the active context to it.
     ///
     /// Mirrors the combined CLI↔server pattern in
     /// `crate::test_smart_transfer_protocol`.
@@ -71,19 +71,17 @@ impl ResourceCtx {
 
         let kamu = KamuCliPuppet::new_workspace_tmp_multi_tenant().await;
 
-        // Store the odf-server token for this backend so the context can reuse it.
         kamu.execute([
-            "login",
+            "context",
+            "add",
+            context_name,
+            "--url",
             server_url.as_str(),
             "--access-token",
             token.as_str(),
         ])
         .await
         .success();
-
-        kamu.execute(["context", "add", context_name, "--url", server_url.as_str()])
-            .await
-            .success();
 
         // Make the remote context active so plain commands target it.
         kamu.execute(["context", "use", context_name])

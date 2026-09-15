@@ -62,6 +62,24 @@ impl AccessTokenRegistryService {
         }
     }
 
+    /// `None` when the record holds no token for the current account, so a
+    /// lookup keeps scanning instead of stopping at a URL match that cannot
+    /// serve this account.
+    fn token_find_report(
+        &self,
+        server_record: &ServerAccessTokensRecord,
+        scope: AccessTokenStoreScope,
+    ) -> Option<AccessTokenFindReport> {
+        server_record
+            .token_for_account(self.account_name())
+            .map(|ac| AccessTokenFindReport {
+                backend_url: server_record.backend_url.clone(),
+                frontend_url: server_record.frontend_url.clone(),
+                access_token: ac.clone(),
+                scope,
+            })
+    }
+
     pub fn find_by_frontend_or_backend_url(
         &self,
         odf_server_url: &Url,
@@ -73,28 +91,30 @@ impl AccessTokenRegistryService {
             return None;
         }
 
-        for registry_ptr in [&self.workspace_registry, &self.user_registry] {
+        for (scope, registry_ptr) in [
+            (AccessTokenStoreScope::Workspace, &self.workspace_registry),
+            (AccessTokenStoreScope::User, &self.user_registry),
+        ] {
             let registry = registry_ptr
                 .lock()
                 .expect("Could not lock access tokens registry");
-            let server_record_maybe = registry.iter().find(|c| {
-                if Self::same_server_url(&c.backend_url, odf_server_url) {
-                    true
-                } else {
-                    match &c.frontend_url {
-                        Some(frontend_url) => Self::same_server_url(frontend_url, odf_server_url),
-                        _ => false,
+            let report_maybe = registry
+                .iter()
+                .filter(|c| {
+                    if Self::same_server_url(&c.backend_url, odf_server_url) {
+                        true
+                    } else {
+                        match &c.frontend_url {
+                            Some(frontend_url) => {
+                                Self::same_server_url(frontend_url, odf_server_url)
+                            }
+                            _ => false,
+                        }
                     }
-                }
-            });
-            if let Some(server_record) = server_record_maybe {
-                return server_record
-                    .token_for_account(self.account_name())
-                    .map(|ac| AccessTokenFindReport {
-                        backend_url: server_record.backend_url.clone(),
-                        frontend_url: server_record.frontend_url.clone(),
-                        access_token: ac.clone(),
-                    });
+                })
+                .find_map(|server_record| self.token_find_report(server_record, scope));
+            if report_maybe.is_some() {
+                return report_maybe;
             }
         }
         None
@@ -111,23 +131,25 @@ impl AccessTokenRegistryService {
             return None;
         }
 
-        for registry_ptr in [&self.workspace_registry, &self.user_registry] {
+        for (scope, registry_ptr) in [
+            (AccessTokenStoreScope::Workspace, &self.workspace_registry),
+            (AccessTokenStoreScope::User, &self.user_registry),
+        ] {
             let registry = registry_ptr
                 .lock()
                 .expect("Could not lock access tokens registry");
 
-            let server_record_maybe = registry.iter().find(|c| match &c.frontend_url {
-                Some(frontend_url) => Self::same_server_url(frontend_url, odf_server_frontend_url),
-                _ => false,
-            });
-            if let Some(server_record) = server_record_maybe {
-                return server_record
-                    .token_for_account(self.account_name())
-                    .map(|ac| AccessTokenFindReport {
-                        backend_url: server_record.backend_url.clone(),
-                        frontend_url: server_record.frontend_url.clone(),
-                        access_token: ac.clone(),
-                    });
+            let report_maybe = registry
+                .iter()
+                .filter(|c| match &c.frontend_url {
+                    Some(frontend_url) => {
+                        Self::same_server_url(frontend_url, odf_server_frontend_url)
+                    }
+                    _ => false,
+                })
+                .find_map(|server_record| self.token_find_report(server_record, scope));
+            if report_maybe.is_some() {
+                return report_maybe;
             }
         }
         None
@@ -144,22 +166,20 @@ impl AccessTokenRegistryService {
             return None;
         }
 
-        for registry_ptr in [&self.workspace_registry, &self.user_registry] {
+        for (scope, registry_ptr) in [
+            (AccessTokenStoreScope::Workspace, &self.workspace_registry),
+            (AccessTokenStoreScope::User, &self.user_registry),
+        ] {
             let registry = registry_ptr
                 .lock()
                 .expect("Could not lock access tokens registry");
 
-            if let Some(token_map) = registry
+            let report_maybe = registry
                 .iter()
-                .find(|c| Self::same_server_url(&c.backend_url, odf_server_backend_url))
-            {
-                return token_map.token_for_account(self.account_name()).map(|ac| {
-                    AccessTokenFindReport {
-                        backend_url: token_map.backend_url.clone(),
-                        frontend_url: token_map.frontend_url.clone(),
-                        access_token: ac.clone(),
-                    }
-                });
+                .filter(|c| Self::same_server_url(&c.backend_url, odf_server_backend_url))
+                .find_map(|server_record| self.token_find_report(server_record, scope));
+            if report_maybe.is_some() {
+                return report_maybe;
             }
         }
         None
@@ -265,13 +285,21 @@ impl AccessTokenRegistryService {
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(token_map) = registry.iter_mut().find(|c| {
+        if let Some(position) = registry.iter().position(|c| {
             Self::same_server_url(&c.backend_url, odf_server_url)
                 || c.frontend_url
                     .as_ref()
                     .is_some_and(|frontend_url| Self::same_server_url(frontend_url, odf_server_url))
-        }) && token_map.drop_account_token(account_name).is_some()
+        }) && registry[position]
+            .drop_account_token(account_name)
+            .is_some()
         {
+            // A record with no tokens left would still match on URL and mask a
+            // token for the same server in another scope
+            if !registry[position].has_tokens() {
+                registry.remove(position);
+            }
+
             self.storage
                 .write_access_tokens_registry(scope, &registry)?;
             return Ok(true);

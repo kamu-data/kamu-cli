@@ -26,6 +26,18 @@ pub enum ResourceContextStoreScope {
     User,
 }
 
+/// Contexts and access tokens live in two independent on-disk stores, so the
+/// scopes are separate types — but `context add` spans both and needs to carry
+/// the user's choice across.
+impl From<ResourceContextStoreScope> for crate::odf_server::AccessTokenStoreScope {
+    fn from(value: ResourceContextStoreScope) -> Self {
+        match value {
+            ResourceContextStoreScope::Workspace => Self::Workspace,
+            ResourceContextStoreScope::User => Self::User,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

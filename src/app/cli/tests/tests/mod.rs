@@ -13,6 +13,7 @@ mod test_completions_command;
 mod test_config;
 mod test_di_graph;
 mod test_generate_cli_markdown;
+mod test_login_flow_service;
 mod test_new_dataset_command;
 mod test_output;
 mod test_resource_context_service;

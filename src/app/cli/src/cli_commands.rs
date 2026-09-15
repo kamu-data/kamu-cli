@@ -94,18 +94,41 @@ pub fn get_command(
         },
 
         cli::Command::Context(c) => match c.subcommand {
-            Some(cli::ContextSubCommand::Add(sc)) => Box::new(
-                ContextAddCommand::builder(
-                    sc.new_name,
-                    sc.url.into(),
-                    if sc.user {
-                        resource_context::ResourceContextStoreScope::User
-                    } else {
-                        resource_context::ResourceContextStoreScope::Workspace
-                    },
+            Some(cli::ContextSubCommand::Add(sc)) => {
+                // Clap's `requires` guarantees each credential pair arrives whole
+                let login_method = if let Some(access_token) = sc.access_token {
+                    Some(odf_server::LoginMethod::ExistingToken { access_token })
+                } else if let (Some(login), Some(password)) = (sc.password_login, sc.password) {
+                    Some(odf_server::LoginMethod::Password { login, password })
+                } else if let (Some(provider), Some(access_token)) =
+                    (sc.oauth_provider, sc.oauth_token)
+                {
+                    Some(odf_server::LoginMethod::OAuth {
+                        provider,
+                        access_token,
+                    })
+                } else {
+                    None
+                };
+
+                Box::new(
+                    ContextAddCommand::builder(
+                        sc.new_name,
+                        sc.url.into(),
+                        if sc.user {
+                            resource_context::ResourceContextStoreScope::User
+                        } else {
+                            resource_context::ResourceContextStoreScope::Workspace
+                        },
+                        login_method,
+                        sc.no_login,
+                        sc.repo_name,
+                        sc.skip_add_repo,
+                        sc.predefined_odf_backend_url.map(Into::into),
+                    )
+                    .cast(),
                 )
-                .cast(),
-            ),
+            }
             Some(cli::ContextSubCommand::List(_)) => Box::new(ContextListCommand::builder().cast()),
             Some(cli::ContextSubCommand::Delete(sc)) => Box::new(
                 ContextDeleteCommand::builder(
@@ -258,10 +281,10 @@ pub fn get_command(
                         odf_server::AccessTokenStoreScope::Workspace
                     },
                     sc.server.map(Into::into),
-                    LoginSilentMode::OAuth(LoginSilentModeOAuth {
+                    odf_server::LoginMethod::OAuth {
                         provider: sc.provider,
                         access_token: sc.access_token,
-                    }),
+                    },
                     c.repo_name,
                     c.skip_add_repo,
                 )
@@ -275,10 +298,10 @@ pub fn get_command(
                         odf_server::AccessTokenStoreScope::Workspace
                     },
                     sc.server.map(Into::into),
-                    LoginSilentMode::Password(LoginSilentModePassword {
+                    odf_server::LoginMethod::Password {
                         login: sc.login,
                         password: sc.password,
-                    }),
+                    },
                     c.repo_name,
                     c.skip_add_repo,
                 )
@@ -622,11 +645,17 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         cli::Command::Complete(_)
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
-        | cli::Command::Context(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)
         | cli::Command::Summary(_)
         | cli::Command::Version(_) => false,
+
+        // `context add` may store a workspace-scoped access token, which needs
+        // a workspace to write into — mirroring the `Login` rule below
+        cli::Command::Context(c) => match &c.subcommand {
+            Some(cli::ContextSubCommand::Add(sc)) => !sc.user,
+            _ => false,
+        },
 
         cli::Command::System(s) => match &s.subcommand {
             cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {

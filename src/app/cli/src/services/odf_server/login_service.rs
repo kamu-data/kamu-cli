@@ -272,11 +272,15 @@ impl LoginService {
                     odf_server_backend_url: odf_server_backend_url.clone(),
                 }))
             }
-            unexpected_status => panic!(
-                "Unexpected validation status code: {}, details: {}",
-                unexpected_status.as_u16(),
-                response.text().await.unwrap()
-            ),
+            unexpected_status => {
+                let details = response.text().await.unwrap_or_default();
+                Err(ValidateAccessTokenError::Internal(InternalError::new(
+                    ValidateAccessTokenUnexpectedStatusError {
+                        status_code: unexpected_status.as_u16(),
+                        details,
+                    },
+                )))
+            }
         }
     }
 
@@ -458,6 +462,13 @@ pub struct ExpiredTokenError {
 #[error("Access token for '{odf_server_backend_url}' ODF server are invalid.")]
 pub struct InvalidTokenError {
     odf_server_backend_url: Url,
+}
+
+#[derive(Debug, Error)]
+#[error("Unexpected validation status code: {status_code}, details: {details}")]
+pub struct ValidateAccessTokenUnexpectedStatusError {
+    status_code: u16,
+    details: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
