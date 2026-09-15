@@ -410,10 +410,8 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-142: account-resolution errors surface as typed `AccountResolution`
-// outcomes from every account-accepting API — not as internal errors. This test
-// is specifically designed to catch GraphQL schema gaps like the single-delete
-// case where `ResourceAccountResolutionProblem` was missing from
-// `ResourceDeleteOutcome`.
+// outcomes from every account-accepting API. A gap on one outcome union would
+// demote them there to an internal error.
 contract_test!(
     account_resolution_taxonomy,
     super::test_account_resolution_taxonomy
@@ -615,9 +613,6 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Empty variables map deserializes correctly but fails
-    // VariableSetSpec::validate() inside the lifecycle; both plan and apply
-    // return Ok(Rejected(BusinessValidationFailed)).
     let empty_vars_manifest = serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "tax-biz-invalid"},

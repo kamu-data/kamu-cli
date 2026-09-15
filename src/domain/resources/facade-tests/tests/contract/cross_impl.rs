@@ -13,14 +13,9 @@
 //! transport (local or remote) and read back through the other, proving that
 //! both facades operate against the same backing store.
 //!
-//! Each test uses `local_facade_for` for the local path and `facade_for` for
-//! the remote path.  When run against `LocalFacadeHarness` both methods return
-//! the same local facade, so the tests reduce to same-store round-trips
-//! (harmless and already covered elsewhere).  The meaningful assertion fires
-//! when the `contract_test!` macro runs the same function against
-//! `RemoteGraphqlFacadeHarness`, where `facade_for` returns the remote GraphQL
-//! facade and `local_facade_for` returns the underlying
-//! `LocalResourceFacadeImpl` that shares the same in-memory store.
+//! Under `LocalFacadeHarness` both facade accessors return the same facade, so
+//! these degenerate to same-store round-trips; they only bite under
+//! `RemoteGraphqlFacadeHarness`, where the two transports share one store.
 
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
@@ -92,12 +87,6 @@ pub async fn test_same_supported_types(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-151: local-created resource is readable remotely.
-//
-// Creates a resource through the *local* facade and reads it back through the
-// *remote* facade.  For the local harness both facades are local, so this
-// reduces to a same-store round-trip (already covered elsewhere).  The
-// interesting case is the remote harness run, where the two facades use
-// different transports but share the same in-memory store.
 contract_test!(
     local_created_readable_remotely,
     super::test_local_created_readable_remotely
@@ -187,9 +176,6 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-153: local and remote produce equivalent rendered manifests.
-//
-// Creates through the local facade then renders via both facades in JSON and
-// YAML, asserting that the parsed values are semantically equal.
 contract_test!(
     render_manifest_equivalence,
     super::test_render_manifest_equivalence
@@ -272,10 +258,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-154
-// Runs representative mixed batch calls and verifies that both local and remote
-// produce equivalent normalized batch responses (same successes/problems by
-// index and lookup problem variant).
+// RF-154: local and remote produce equivalent batch responses.
 contract_test!(batch_equivalence, super::test_batch_equivalence);
 
 pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
@@ -428,11 +411,8 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
 
 // RF-155: local and remote produce equivalent apply decisions.
 //
-// Runs create → update → untouched → plan → rejection through *both* the local
-// and remote facades and directly compares decision variants at each step.
-// Separate resource names are used for the local and remote sequences to avoid
-// name collisions in the shared backing store (both facades write to the same
-// in-memory store in the remote harness).
+// The two sequences use distinct names: both facades write the same store, so
+// shared names would collide.
 contract_test!(apply_equivalence, super::test_apply_equivalence);
 
 pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
@@ -522,9 +502,6 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
     );
 
     // --- Rejection (business validation: empty variables) ---
-    // Empty variables deserializes correctly but fails VariableSetSpec::validate()
-    // inside the lifecycle, so both apply and plan return
-    // Ok(Rejected(BusinessValidationFailed)).
     let reject_manifest = serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "cross-apply-eq-rejected"},

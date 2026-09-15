@@ -187,7 +187,6 @@ contract_test!(plan_update, super::test_plan_update);
 pub async fn test_plan_update(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Create first
     facade
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
@@ -196,7 +195,6 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
 
-    // Plan an update with changed spec
     let decision = facade
         .plan_apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
@@ -381,9 +379,6 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Empty variables map deserializes correctly but fails
-    // VariableSetSpec::validate() inside the lifecycle; the facade surfaces
-    // this as Ok(Rejected(BusinessValidationFailed)).
     let empty_vars = serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "biz-invalid-vars"},
@@ -534,7 +529,6 @@ contract_test!(apply_update, super::test_apply_update);
 pub async fn test_apply_update(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Create
     let create_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1")]);
     let create_decision = facade
         .apply_manifest(ApplyManifestRequest {
@@ -546,7 +540,6 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
     let created = assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
     let original_id = created.headers.id;
 
-    // Update spec
     let update_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1"), ("B", "2")]);
     let update_decision = facade
         .apply_manifest(ApplyManifestRequest {
@@ -557,7 +550,6 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
         .unwrap();
     let updated = assert_applied_outcome(&update_decision, ApplyResourceOutcome::Updated);
 
-    // id preserved
     assert_eq!(
         updated.headers.id, original_id,
         "id must be preserved on update"
@@ -571,7 +563,6 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
         "updated_at must not be earlier after update"
     );
 
-    // Verify via get
     let fetched = assert_single_batch_success(
         facade
             .get(
@@ -597,7 +588,6 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let manifest = variable_set_manifest_json("idem-vars", None, &[("X", "42")]);
 
-    // First apply
     let first_decision = facade
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
@@ -609,7 +599,6 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
     let id: kamu_resources::ResourceID = first.headers.id;
     let generation = first.headers.generation;
 
-    // Second apply with identical manifest
     let second_decision = facade
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
@@ -708,10 +697,8 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-026A (extension): an invalid label/annotation key is now rejected at
-// manifest-parse time (via `TypeRef`'s own `FromStr`), not by
-// `ResourceHeadersInput` validation — confirms this is a compile-time-style
-// rejection (`ParseManifest`), not a semantic `InvalidHeaders` problem.
+// RF-026A: an invalid label/annotation key is rejected by `TypeRef::FromStr`
+// while parsing, so it surfaces as `ParseManifest`, not `InvalidHeaders`.
 contract_test!(
     apply_rejects_invalid_header_key,
     super::test_apply_rejects_invalid_header_key
@@ -1161,8 +1148,6 @@ contract_test!(
 pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    // `variables` is a string, not an object — fails serde deserialization →
-    // InvalidSpec
     let malformed_spec = serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "spec-schema-check"},
@@ -1191,13 +1176,9 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-143 note: ImmutableFieldChanged, ReferencedObjectMissing, and
-// LifecycleRuleConflict rejection categories are defined in the schema but not
-// naturally triggerable through the current resource types (VariableSet,
-// SecretSet). BusinessValidationFailed is now triggerable via empty variables
-// (or empty secrets) — see apply_rejects_business_invalid_spec above. The
-// remaining three are deferred until a resource type is added that can trigger
-// them.
+// RF-143: ImmutableFieldChanged, ReferencedObjectMissing and
+// LifecycleRuleConflict are not triggerable by VariableSet/SecretSet, so they
+// stay deferred until a resource type can trigger them.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

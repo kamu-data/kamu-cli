@@ -92,6 +92,10 @@ impl ResourceLabelFilterInput {
     }
 }
 
+/// Reference to an account, mirroring the ODF `auth/v1alpha1/AccountRef`.
+///
+/// Resolves by `did` if given, else by `name`; any other field present is then
+/// checked for agreement, so a mismatch is reported rather than ignored.
 #[derive(InputObject, Debug, Clone, Default)]
 pub struct AccountRefInput {
     pub id: Option<ResourceID<'static>>,
@@ -153,6 +157,10 @@ pub struct ResourceSelectorInput {
     /// The account this selector spans. Defaults to the call-level `account`
     /// when unset, so one call can span several accounts — subject to the
     /// caller being authorized for each; any denial fails the whole call.
+    ///
+    /// ODF specifies this field for selectors embedded in a manifest (RFC-018
+    /// § Selectors), which have no call to inherit an account from; using it as
+    /// a per-selector override within a query extends beyond that.
     pub account: Option<AccountRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI. `null` spans every type.
@@ -210,9 +218,10 @@ pub(crate) fn any_resource_selector() -> kamu_resources::ResourceSelector {
 /// Selects resources to search, for both `search` and `searchHandles` — only
 /// the response shape differs.
 ///
-/// Omitting `selectors` spans every type, which is what the retired `listAll`
-/// field did implicitly. Passing an empty list matches nothing — an explicit
-/// "no selectors" is a narrowing to zero, not a widening to everything.
+/// ODF specifies no search-request type: `account` is the analogue of RFC-018's
+/// REST `?account=` (§ REST API strategy), but accepting a *list* of OR'd
+/// selectors extends beyond it, where a listing names one type via the path. It
+/// buys one call spanning several types and accounts.
 ///
 /// Label filtering lives on each selector's `labels`, so one call may filter
 /// differently per type. There is deliberately no call-level `labelFilter`: one
@@ -220,7 +229,14 @@ pub(crate) fn any_resource_selector() -> kamu_resources::ResourceSelector {
 /// labels, and selectors being OR'd makes that exactly equivalent.
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourcesInput {
+    /// Several selectors act as a logical OR, while the fields within one are a
+    /// conjunction. Omitted spans every type; an empty list matches nothing — a
+    /// narrowing to zero, not a widening to everything.
     pub selectors: Option<Vec<ResourceSelectorInput>>,
+    /// The account selectors fall back to when they name none — a default, not
+    /// an additional filter, and the only way to span every type under another
+    /// account, since a type-less selector may not carry one. Unset on both
+    /// resolves to the calling subject's own.
     pub account: Option<AccountRefInput>,
 }
 

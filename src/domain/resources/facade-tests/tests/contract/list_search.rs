@@ -282,6 +282,116 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-180
+contract_test!(
+    call_level_account_defaults_per_selector,
+    super::test_call_level_account_defaults_per_selector
+);
+
+/// The call-level `account` is the **default** for selectors naming none, not
+/// an extra filter AND-ed with them.
+///
+/// The harness has no admin account, so naming another account always denies;
+/// that denial is what proves the field is read at all, since a caller naming
+/// its *own* account cannot tell "honoured" from "dropped" — both resolve to
+/// the caller. RF-105 covers the per-selector side of authorization.
+pub async fn test_call_level_account_defaults_per_selector(h: &impl FacadeContractHarness) {
+    create_variable_set(h, TestAccount::Alice, "default-alice").await;
+    create_variable_set(h, TestAccount::Bob, "default-bob").await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let alice = kamu_resources::ResourceAccountRef {
+        id: None,
+        did: None,
+        name: Some(h.account_name(TestAccount::Alice)),
+    };
+
+    let search_handles = async |selectors, account| {
+        facade
+            .search_handles(SearchResourcesRequest {
+                selectors,
+                account,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await
+            .map(|response| sorted_handle_names(response.items))
+    };
+
+    let variable_sets = || {
+        vec![ResourceSelector::of_type(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        )]
+    };
+
+    // Naming the caller's own account explicitly matches leaving it unset: the
+    // field is applied as the default rather than dropped.
+    assert_eq!(
+        search_handles(variable_sets(), Some(alice.clone()))
+            .await
+            .expect("naming the caller's own account must be allowed"),
+        search_handles(variable_sets(), None)
+            .await
+            .expect("an unset account defaults to the caller"),
+    );
+
+    // Naming an account the caller may not read is denied, which is what shows
+    // the field is resolved at all: the assertion above cannot tell "honoured"
+    // from "dropped", since the caller *is* the account it names.
+    assert_matches!(
+        search_handles(
+            variable_sets(),
+            Some(kamu_resources::ResourceAccountRef {
+                id: None,
+                did: None,
+                name: Some(h.account_name(TestAccount::Bob)),
+            }),
+        )
+        .await,
+        Err(_),
+        "a call-level account must not be ignored"
+    );
+
+    // A selector naming its own account wins over the call-level default, so
+    // the two are an override rather than a conjunction — were they AND-ed, a
+    // selector naming Bob under a call naming Alice could only match nothing.
+    let bobs_selector = ResourceSelector {
+        account: Some(kamu_resources::ResourceAccountRef {
+            id: None,
+            did: None,
+            name: Some(h.account_name(TestAccount::Bob)),
+        }),
+        ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+    };
+    assert_matches!(
+        search_handles(vec![bobs_selector], Some(alice.clone())).await,
+        Err(_),
+        "the selector's own account must be resolved, not the call-level one"
+    );
+
+    // The call-level field is the only way to scope an all-types listing to an
+    // account: `AnyType` carries no per-row account, so the per-selector
+    // spelling of this same request is rejected (RF-106).
+    let all_types = search_handles(vec![ResourceSelector::default()], Some(alice.clone()))
+        .await
+        .expect("an all-types listing may name an account at call level");
+    assert_eq!(all_types, vec!["default-alice"]);
+
+    assert_matches!(
+        search_handles(
+            vec![ResourceSelector {
+                account: Some(alice),
+                ..ResourceSelector::default()
+            }],
+            None,
+        )
+        .await,
+        Err(_),
+        "the same request spelled per selector is unrepresentable"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-106
 contract_test!(
     any_type_selector_scope_limits,
@@ -289,11 +399,10 @@ contract_test!(
 );
 
 /// The two `AnyType` limits of `ResourceScope`, which carries a single query
-/// rather than a per-type list. Both became reachable when listing started
-/// taking selectors, and both disappear once every row carries its own type.
+/// rather than a per-type list.
 ///
 /// Asserted on the message rather than the variant: remote surfaces these as
-/// transport-level GraphQL errors, and they are temporary.
+/// transport-level GraphQL errors.
 pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 

@@ -456,7 +456,6 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                 "rendered manifest must not be empty"
             );
 
-            // Parse and check schema are present
             let parsed: serde_json::Value = match format {
                 kamu_resources_facade::ResourceManifestFormat::Json => {
                     serde_json::from_str(&s.item.manifest).expect("must be valid JSON")
@@ -734,11 +733,8 @@ pub async fn test_delete_mixed_successes_problems(h: &impl FacadeContractHarness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-060
-// delete with duplicate refs: document the current behavior.
-// The contract is that both occurrences succeed if the resource is resolved
-// before deletion (pre-resolution deduplication), OR the first succeeds and
-// the second returns NameNotFound.  We assert whichever branch fires and verify
-// it is identical for local and remote.
+// Either dedup branch is acceptable; the invariant is that local and remote
+// pick the same one and no request index is lost.
 contract_test!(
     delete_duplicate_refs_is_deterministic,
     super::test_delete_duplicate_refs_is_deterministic
@@ -786,12 +782,10 @@ pub async fn test_delete_duplicate_refs_is_deterministic(h: &impl FacadeContract
     assert_eq!(total, 2, "all request indexes must be accounted for");
 
     if response.successes.len() == 2 {
-        // Contract A: both succeed, same UID
         for s in &response.successes {
             assert_eq!(s.item, id, "duplicate delete success must refer to same id");
         }
     } else {
-        // Contract B: first succeeds, second fails
         assert_eq!(response.successes.len(), 1);
         assert_eq!(response.problems.len(), 1);
         assert_eq!(response.successes[0].item, id);
