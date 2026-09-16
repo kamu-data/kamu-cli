@@ -154,7 +154,7 @@ pub(crate) fn into_resource_refs(
 /// `type` spans every type, and one narrowing by nothing matches all of them.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceSelectorInput {
-    /// The account this selector spans. Defaults to the call-level `account`
+    /// The account this selector spans. Defaults to the calling subject's own
     /// when unset, so one call can span several accounts — subject to the
     /// caller being authorized for each; any denial fails the whole call.
     ///
@@ -218,26 +218,16 @@ pub(crate) fn any_resource_selector() -> kamu_resources::ResourceSelector {
 /// Selects resources to search, for both `search` and `searchHandles` — only
 /// the response shape differs.
 ///
-/// ODF specifies no search-request type: `account` is the analogue of RFC-018's
-/// REST `?account=` (§ REST API strategy), but accepting a *list* of OR'd
-/// selectors extends beyond it, where a listing names one type via the path. It
-/// buys one call spanning several types and accounts.
-///
-/// Label filtering lives on each selector's `labels`, so one call may filter
-/// differently per type. There is deliberately no call-level `labelFilter`: one
-/// uniform filter is the special case where every selector carries the same
-/// labels, and selectors being OR'd makes that exactly equivalent.
+/// Every narrowing lives on the selectors, accounts included: there is no
+/// call-level `account` or `labelFilter`. A uniform filter is the special case
+/// where every selector carries the same one, and selectors being OR'd makes
+/// that exactly equivalent.
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourcesInput {
     /// Several selectors act as a logical OR, while the fields within one are a
     /// conjunction. Omitted spans every type; an empty list matches nothing — a
     /// narrowing to zero, not a widening to everything.
     pub selectors: Option<Vec<ResourceSelectorInput>>,
-    /// The account selectors fall back to when they name none — a default, not
-    /// an additional filter, and the only way to span every type under another
-    /// account, since a type-less selector may not carry one. Unset on both
-    /// resolves to the calling subject's own.
-    pub account: Option<AccountRefInput>,
 }
 
 impl SearchResourcesInput {
@@ -250,7 +240,6 @@ impl SearchResourcesInput {
                 Some(selectors) => into_resource_selectors(selectors)?,
                 None => vec![any_resource_selector()],
             },
-            account: self.account.map(AccountRefInput::into_manifest_account),
             pagination,
         })
     }

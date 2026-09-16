@@ -319,7 +319,6 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -341,18 +340,22 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
 
     let by_name = facade
         .search(SearchResourcesRequest {
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
-            account: Some(unknown_account_by_name()),
+            selectors: vec![ResourceSelector {
+                account: Some(unknown_account_by_name()),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
+    // Type-less, so the account rides on an `AnyType` scope rather than a
+    // per-type row.
     let by_id = facade
         .search(SearchResourcesRequest {
-            account: Some(unknown_account_by_id()),
             pagination: PaginationOpts::from_max_results(1000),
-            selectors: vec![ResourceSelector::default()],
+            selectors: vec![ResourceSelector {
+                account: Some(unknown_account_by_id()),
+                ..ResourceSelector::default()
+            }],
         })
         .await;
 
@@ -438,7 +441,6 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -449,7 +451,6 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -470,7 +471,6 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "acct-%".to_string(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -482,7 +482,6 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "acct-%".to_string(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -501,7 +500,6 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .search_handles(SearchResourcesRequest {
             // A default selector narrows by nothing, so it spans every type.
             selectors: vec![ResourceSelector::default()],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -509,7 +507,6 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .items;
     let bob_all = bob
         .search(SearchResourcesRequest {
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],
         })

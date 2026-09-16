@@ -20,7 +20,6 @@ use kamu_resources::{
     ResourceHandleRow,
     ResourceHeaders,
     ResourceID,
-    ResourceIDStream,
     ResourceLabelPair,
     ResourceName,
     ResourcePhaseCounts,
@@ -870,46 +869,6 @@ impl ResourceRepository for PostgresResourceRepository {
             .collect())
     }
 
-    fn list_resource_ids(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_> {
-        let resource_schema = schema.as_str().to_owned();
-
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-            let connection_mut = tr.connection_mut().await?;
-
-            let account_id_stack = account_id.as_stack_string();
-            let limit = i64::try_from(pagination.limit).int_err()?;
-            let offset = i64::try_from(pagination.offset).int_err()?;
-
-            let mut query_stream = sqlx::query!(
-                r#"
-                SELECT resource_id as "id: uuid::Uuid"
-                FROM resources
-                WHERE account_id = $1
-                  AND resource_schema = $2
-                  AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
-                LIMIT $3 OFFSET $4
-                "#,
-                account_id_stack.as_str(),
-                resource_schema,
-                limit,
-                offset,
-            )
-            .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
-
-            while let Some(row) = query_stream.try_next().await? {
-                yield Ok(ResourceID::new(row.id));
-            }
-        })
-    }
-
     fn list_resource_snapshots(
         &self,
         account_id: &odf::AccountID,
@@ -1036,34 +995,6 @@ impl ResourceRepository for PostgresResourceRepository {
         })
     }
 
-    async fn count_resources(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-    ) -> Result<usize, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let account_id_stack = account_id.as_stack_string();
-
-        let count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as "count!"
-            FROM resources
-            WHERE account_id = $1
-              AND resource_schema = $2
-              AND deleted_at IS NULL
-            "#,
-            account_id_stack.as_str(),
-            schema.as_str(),
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(usize::try_from(count).unwrap())
-    }
-
     async fn summarize_resources(
         &self,
         account_id: odf::AccountID,
@@ -1147,7 +1078,7 @@ struct FlatScope {
     /// Per row: exact IDs joined by [`Self::LIST_SEPARATOR`], or `NULL`.
     exact_ids: Vec<Option<String>>,
     /// Per row: the account that row spans — its own if it named one, else the
-    /// call-level default. Never `NULL`, so the predicate needs no `IS NULL`
+    /// default. Never `NULL`, so the predicate needs no `IS NULL`
     /// branch.
     account_ids: Vec<String>,
     /// Which scope row each label pair belongs to, 1-based to match
@@ -1176,10 +1107,21 @@ impl FlatScope {
         };
 
         match scope {
-            // `AnyType` carries no per-row account, so the one row takes the
-            // call-level default.
-            ResourceScope::AnyType(query, label_pairs) => {
-                flat.push_row(query.as_ref(), default_account_id.to_string(), label_pairs);
+            // `AnyType` spans one account: its own when named, the default
+            // otherwise.
+            ResourceScope::AnyType {
+                query,
+                account_id,
+                label_pairs,
+            } => {
+                flat.push_row(
+                    query.as_ref(),
+                    account_id
+                        .as_ref()
+                        .unwrap_or(default_account_id)
+                        .to_string(),
+                    label_pairs,
+                );
             }
             ResourceScope::Types(types) => {
                 let mut schemas = Vec::with_capacity(types.len());

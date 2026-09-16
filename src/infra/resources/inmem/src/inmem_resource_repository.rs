@@ -21,7 +21,6 @@ use kamu_resources::{
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceID,
-    ResourceIDStream,
     ResourceLabelPair,
     ResourceName,
     ResourcePhase,
@@ -526,43 +525,6 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(self.resolve_snapshots(snapshots).await)
     }
 
-    fn list_resource_ids(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_> {
-        let mut resource_ids_page: Vec<_> = {
-            let guard = self.state.lock().unwrap();
-            guard
-                .snapshots_by_id
-                .values()
-                .filter(|snapshot| {
-                    snapshot.headers.account.did == account_id
-                        && snapshot.schema == *schema
-                        && snapshot.headers.deleted_at.is_none()
-                })
-                .cloned()
-                .collect()
-        };
-
-        resource_ids_page.sort_by(|lhs, rhs| {
-            rhs.headers
-                .updated_at
-                .cmp(&lhs.headers.updated_at)
-                .then_with(|| rhs.id.cmp(&lhs.id))
-        });
-
-        let resource_ids_page: Vec<_> = resource_ids_page
-            .into_iter()
-            .skip(pagination.offset)
-            .take(pagination.limit)
-            .map(|snapshot| Ok(snapshot.id))
-            .collect();
-
-        Box::pin(futures::stream::iter(resource_ids_page))
-    }
-
     fn list_resource_snapshots(
         &self,
         account_id: &odf::AccountID,
@@ -604,24 +566,6 @@ impl ResourceRepository for InMemoryResourceRepository {
         });
 
         Box::pin(stream)
-    }
-
-    async fn count_resources(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-    ) -> Result<usize, InternalError> {
-        let guard = self.state.lock().unwrap();
-
-        Ok(guard
-            .snapshots_by_id
-            .values()
-            .filter(|snapshot| {
-                snapshot.headers.account.did == account_id
-                    && snapshot.schema == *schema
-                    && snapshot.headers.deleted_at.is_none()
-            })
-            .count())
     }
 
     async fn summarize_resources(
@@ -680,7 +624,7 @@ fn snapshot_matches_query(snapshot: &ResourceSnapshot, query: &ResourceQuery) ->
 /// matches — each type carries its own query, so the checks cannot be split.
 /// Mirrors the SQL backends: the account is matched *inside* the scope, per
 /// row, so a row naming its own account is checked against that one and every
-/// other row against the call-level default.
+/// other row against the default.
 /// Mirrors the SQL backends: the label pairs are evaluated *inside* each scope
 /// row, so rows carrying different pairs filter independently and the whole is
 /// still a disjunction over rows.
@@ -690,8 +634,12 @@ fn snapshot_matches_scope(
     default_account_id: &odf::AccountID,
 ) -> bool {
     match scope {
-        ResourceScope::AnyType(query, label_pairs) => {
-            snapshot.headers.account.did == *default_account_id
+        ResourceScope::AnyType {
+            query,
+            account_id,
+            label_pairs,
+        } => {
+            snapshot.headers.account.did == *account_id.as_ref().unwrap_or(default_account_id)
                 && query
                     .as_ref()
                     .is_none_or(|query| snapshot_matches_query(snapshot, query))

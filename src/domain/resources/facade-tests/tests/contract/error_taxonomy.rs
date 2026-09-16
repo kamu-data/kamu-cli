@@ -527,10 +527,10 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     // --- search ---
     let result = facade
         .search(SearchResourcesRequest {
-            account: Some(unknown_account.clone()),
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
+            selectors: vec![ResourceSelector {
+                account: Some(unknown_account.clone()),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             pagination: PaginationOpts::from_max_results(1),
         })
         .await;
@@ -542,10 +542,12 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- search_handles ---
     let result = facade
-        .search(SearchResourcesRequest {
-            account: Some(unknown_account.clone()),
+        .search_handles(SearchResourcesRequest {
             pagination: PaginationOpts::from_max_results(1),
-            selectors: vec![ResourceSelector::default()],
+            selectors: vec![ResourceSelector {
+                account: Some(unknown_account.clone()),
+                ..ResourceSelector::default()
+            }],
         })
         .await;
     assert_matches!(

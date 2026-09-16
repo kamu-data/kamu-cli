@@ -15,7 +15,6 @@ use thiserror::Error;
 
 use crate::{
     ResourceID,
-    ResourceIDStream,
     ResourceName,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
@@ -149,13 +148,6 @@ pub trait ResourceRepository: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
-    fn list_resource_ids(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_>;
-
     /// Spans the schemas named by `scope`, each with its own query and label
     /// pairs.
     fn list_resource_snapshots(
@@ -164,12 +156,6 @@ pub trait ResourceRepository: Send + Sync {
         scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
-
-    async fn count_resources(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-    ) -> Result<usize, InternalError>;
 
     async fn summarize_resources(
         &self,
@@ -217,8 +203,8 @@ impl ResourceQuery {
 pub struct ResourceTypeQuery {
     pub schema: TypeUri,
     pub query: Option<ResourceQuery>,
-    /// Which account this row spans. `None` means the call-level account, which
-    /// the scoped reads take as a scalar argument and use as the default.
+    /// Which account this row spans. `None` means the default account, which
+    /// the scoped reads take as a scalar argument.
     ///
     /// Set only when a caller names an account per selector. Rows naming
     /// different accounts cannot merge, so the coalescer groups by
@@ -235,7 +221,7 @@ pub struct ResourceTypeQuery {
 }
 
 impl ResourceTypeQuery {
-    /// The account this row applies to, falling back to the call-level one.
+    /// The account this row applies to, falling back to the default one.
     pub fn effective_account_id<'a>(&'a self, default: &'a odf::AccountID) -> &'a odf::AccountID {
         self.account_id.as_ref().unwrap_or(default)
     }
@@ -253,7 +239,13 @@ impl ResourceTypeQuery {
 pub enum ResourceScope {
     /// Every registered resource type, optionally narrowed by one query and one
     /// set of label pairs, both applying uniformly.
-    AnyType(Option<ResourceQuery>, Vec<ResourceLabelPair>),
+    AnyType {
+        query: Option<ResourceQuery>,
+        /// Which account this scope spans. `None` means the authenticated
+        /// subject's own.
+        account_id: Option<odf::AccountID>,
+        label_pairs: Vec<ResourceLabelPair>,
+    },
     /// Non-empty by construction: use `AnyType` instead of an empty list.
     Types(Vec<ResourceTypeQuery>),
 }
@@ -268,13 +260,18 @@ impl ResourceScope {
         Self::Types(types)
     }
 
-    /// Every type, unnarrowed and unfiltered.
+    /// Every type, unnarrowed and unfiltered, under the authenticated subject's
+    /// own account.
     pub fn any_type() -> Self {
-        Self::AnyType(None, Vec::new())
+        Self::AnyType {
+            query: None,
+            account_id: None,
+            label_pairs: Vec::new(),
+        }
     }
 
     /// The common single-type case, with or without a query, spanning the
-    /// call-level account and carrying no label filter.
+    /// default account and carrying no label filter.
     pub fn one_type(schema: TypeUri, query: Option<ResourceQuery>) -> Self {
         Self::Types(vec![ResourceTypeQuery {
             schema,
@@ -287,7 +284,11 @@ impl ResourceScope {
     /// Every type, narrowed by one query applying to all of them and carrying
     /// no label filter.
     pub fn any_type_with_query(query: ResourceQuery) -> Self {
-        Self::AnyType(Some(query), Vec::new())
+        Self::AnyType {
+            query: Some(query),
+            account_id: None,
+            label_pairs: Vec::new(),
+        }
     }
 
     /// Whether no resource can possibly match, so callers can skip the query
@@ -298,7 +299,7 @@ impl ResourceScope {
     /// `ExactNames`/`ExactIds` list does.
     pub fn is_vacuous(&self) -> bool {
         match self {
-            Self::AnyType(query, _) => query.as_ref().is_some_and(ResourceQuery::is_vacuous),
+            Self::AnyType { query, .. } => query.as_ref().is_some_and(ResourceQuery::is_vacuous),
             Self::Types(types) => types
                 .iter()
                 .all(|entry| entry.query.as_ref().is_some_and(ResourceQuery::is_vacuous)),

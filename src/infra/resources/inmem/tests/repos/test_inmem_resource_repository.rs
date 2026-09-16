@@ -210,14 +210,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = resource_repo_suite::test_list_resource_ids_with_pagination,
-    harness = InMemoryResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
     fixture = resource_repo_suite::test_list_resource_snapshots_by_scope,
     harness = InMemoryResourceRepositoryHarness
 );
@@ -235,14 +227,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = inmem,
     fixture = resource_repo_suite::test_list_all_resource_snapshots,
-    harness = InMemoryResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
-    fixture = resource_repo_suite::test_count_resources,
     harness = InMemoryResourceRepositoryHarness
 );
 

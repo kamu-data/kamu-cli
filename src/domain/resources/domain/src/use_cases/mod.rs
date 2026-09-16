@@ -10,13 +10,11 @@
 mod apply_resource_use_case;
 mod delete_account_resources_use_case;
 mod delete_resources_use_case;
-mod list_all_resources_use_case;
 mod reconcile_resource_use_case;
 mod resource_spec_sanitizer;
 
 pub use apply_resource_use_case::*;
 pub use delete_account_resources_use_case::*;
 pub use delete_resources_use_case::*;
-pub use list_all_resources_use_case::*;
 pub use reconcile_resource_use_case::*;
 pub use resource_spec_sanitizer::*;

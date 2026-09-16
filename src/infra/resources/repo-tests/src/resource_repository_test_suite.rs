@@ -83,23 +83,6 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
     let account_name = odf::AccountName::new_unchecked("test-account");
     let account_id = odf::AccountID::new_seeded_ed25519(account_name.as_bytes());
 
-    let count = repo
-        .count_resources(account_id.clone(), &TEST_KIND)
-        .await
-        .unwrap();
-    assert_eq!(0, count);
-
-    let ids: Vec<_> = repo
-        .list_resource_ids(
-            account_id.clone(),
-            &TEST_KIND,
-            PaginationOpts::from_max_results(100),
-        )
-        .try_collect()
-        .await
-        .unwrap();
-    assert!(ids.is_empty());
-
     let snapshots: Vec<_> = repo
         .list_resource_snapshots(
             &account_id,
@@ -762,10 +745,11 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            &ResourceScope::AnyType(
-                Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma])),
-                vec![],
-            ),
+            &ResourceScope::AnyType {
+                query: Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma])),
+                account_id: None,
+                label_pairs: vec![],
+            },
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -783,10 +767,11 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            &ResourceScope::AnyType(
-                Some(ResourceQuery::ExactIds(vec![ids.other_account])),
-                vec![],
-            ),
+            &ResourceScope::AnyType {
+                query: Some(ResourceQuery::ExactIds(vec![ids.other_account])),
+                account_id: None,
+                label_pairs: vec![],
+            },
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -796,10 +781,11 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            &ResourceScope::AnyType(
-                Some(ResourceQuery::NamePattern("app-%".to_string())),
-                vec![],
-            ),
+            &ResourceScope::AnyType {
+                query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                account_id: None,
+                label_pairs: vec![],
+            },
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -815,10 +801,11 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            &ResourceScope::AnyType(
-                Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma])),
-                vec![],
-            ),
+            &ResourceScope::AnyType {
+                query: Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma])),
+                account_id: None,
+                label_pairs: vec![],
+            },
         )
         .await
         .unwrap();
@@ -1328,7 +1315,11 @@ pub async fn test_search_resource_handles_any_type_labels(catalog: &Catalog) {
         .await;
     }
 
-    let scope = ResourceScope::AnyType(None, label_pairs_of(&[("environment", "prod")]));
+    let scope = ResourceScope::AnyType {
+        query: None,
+        account_id: None,
+        label_pairs: label_pairs_of(&[("environment", "prod")]),
+    };
 
     let rows = repo
         .search_resource_handles(
@@ -1507,7 +1498,7 @@ struct SeededSearchHandleIds {
 }
 
 /// Per-row account: a scope row may name its own account, and rows that do not
-/// fall back to the call-level scalar.
+/// fall back to the default scalar.
 ///
 /// This is the *only* safety net for the `SQLite` backend, whose scope
 /// predicate is built with a runtime `QueryBuilder` and so is not compile-time
@@ -1546,7 +1537,7 @@ pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
         vec!["app-other-account"]
     );
 
-    // A row with no account falls back to the call-level one.
+    // A row with no account falls back to the default one.
     assert_eq!(
         search(ResourceScope::Types(vec![ResourceTypeQuery {
             schema: TEST_KIND.clone(),
@@ -1591,6 +1582,37 @@ pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
         .await,
         Vec::<String>::new(),
         "`app-alpha` belongs to the caller, so a row naming another account must not see it"
+    );
+
+    // `AnyType` carries an account too, spanning every schema under it rather
+    // than the caller's own. Its own branch of the scope predicate, so the
+    // `Types` rows above do not cover it.
+    assert_eq!(
+        search(ResourceScope::AnyType {
+            query: None,
+            account_id: Some(other_account_handle.did.clone()),
+            label_pairs: vec![],
+        })
+        .await,
+        vec!["app-other-account"]
+    );
+
+    // ...and falls back to the default scalar when it names none. Spans every
+    // schema, unlike the `TEST_KIND`-filtered rows above.
+    assert_eq!(
+        search(ResourceScope::AnyType {
+            query: None,
+            account_id: None,
+            label_pairs: vec![],
+        })
+        .await,
+        vec![
+            "app-alpha",
+            "app-beta",
+            "app-delta",
+            "app-gamma",
+            "db-alpha"
+        ]
     );
 
     // `count_search_resource_handles` shares the scope predicate with
@@ -1956,51 +1978,6 @@ pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
-    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-
-    let account_handle = odf::AccountHandle::new_test("test-account");
-
-    for i in 1..=5_u32 {
-        let mut snapshot =
-            make_test_snapshot(&account_handle, &TEST_KIND, &format!("resource-{i}"));
-        snapshot.id = repo.new_resource_id().await.unwrap();
-        repo.create_resource(&snapshot).await.unwrap();
-    }
-
-    let first_page: Vec<_> = repo
-        .list_resource_ids(
-            account_handle.did.clone(),
-            &TEST_KIND,
-            PaginationOpts::from_max_results(3),
-        )
-        .try_collect()
-        .await
-        .unwrap();
-    assert_eq!(first_page.len(), 3);
-
-    let second_page: Vec<_> = repo
-        .list_resource_ids(
-            account_handle.did.clone(),
-            &TEST_KIND,
-            PaginationOpts::from_page(1, 3),
-        )
-        .try_collect()
-        .await
-        .unwrap();
-    assert_eq!(second_page.len(), 2);
-
-    // Ensure no overlap
-    let all_ids: std::collections::HashSet<_> = first_page
-        .iter()
-        .chain(second_page.iter())
-        .copied()
-        .collect();
-    assert_eq!(all_ids.len(), 5);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_list_resource_snapshots_by_scope(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
@@ -2345,33 +2322,6 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_count_resources(catalog: &Catalog) {
-    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-
-    let account_handle = odf::AccountHandle::new_test("test-account");
-
-    for i in 1..=3_u32 {
-        let mut snapshot =
-            make_test_snapshot(&account_handle, &TEST_KIND, &format!("resource-{i}"));
-        snapshot.id = repo.new_resource_id().await.unwrap();
-        repo.create_resource(&snapshot).await.unwrap();
-    }
-
-    let count = repo
-        .count_resources(account_handle.did.clone(), &TEST_KIND)
-        .await
-        .unwrap();
-    assert_eq!(3, count);
-
-    let count_other = repo
-        .count_resources(account_handle.did, &OTHER_KIND)
-        .await
-        .unwrap();
-    assert_eq!(0, count_other);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_summarize_resources(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
@@ -2504,23 +2454,6 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(by_name.is_none());
-
-    let count = repo
-        .count_resources(account_handle.did.clone(), &TEST_KIND)
-        .await
-        .unwrap();
-    assert_eq!(0, count);
-
-    let ids: Vec<_> = repo
-        .list_resource_ids(
-            account_handle.did,
-            &TEST_KIND,
-            PaginationOpts::from_max_results(100),
-        )
-        .try_collect()
-        .await
-        .unwrap();
-    assert!(ids.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

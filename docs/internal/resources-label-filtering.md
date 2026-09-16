@@ -97,9 +97,10 @@ single row. Two consequences worth remembering:
   shared repository suite — the only safety net for SQLite, whose scope predicate
   is not compile-time checked.
 
-  `ResourceScope::AnyType` carries no per-row account, so a type-less selector
-  naming one is rejected (`UnrepresentableScopeError::AnyTypeWithAccount`)
-  rather than silently scoped to the caller.
+  `ResourceScope::AnyType` carries one account for the whole scope, so a
+  type-less selector may name one — that is how an all-types listing is scoped
+  to an account. Two type-less selectors naming *different* accounts cannot both
+  be expressed and are rejected.
 
 Resolution happens in the local facade, strictly before dispatch, through the same
 `ResourceExtensionSchemaResolver` used by manifest apply (`ResourceExtensionKind::Label`).

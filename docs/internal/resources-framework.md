@@ -908,17 +908,17 @@ A selector with no `type` spans every type.
 benefit of the ODF-shaped API. Naming an account you are not allowed to read denies the **whole**
 call rather than dropping that selector (RF-105).
 
-**Where this diverges from ODF.** RFC-018 specifies no search-request type at all, so
-`SearchResourcesInput` is ours. Only its call-level `account` follows the spec directly, as the
-analogue of the REST `?account=` argument (§ REST API strategy); it is the **default** for selectors
-naming none, and a selector's own `account` overrides it for that selector alone, with both unset
-resolving to the caller. Accepting a *list* of OR'd selectors, each independently account-scoped, is
-a deliberate extension: RFC-018 names one type per listing call, in the path
-(`/<context>/<version>/<type>`), and specifies `ResourceSelector.account` for selectors embedded in a
-manifest (§ Selectors), which have no call to inherit one from. The extension buys cross-type and
-cross-account listing in a single call; `AnyTypeWithAccount` is its seam, since `ResourceScope::AnyType`
-carries no per-row account. Per-row mechanics are in
+**Accounts live on the selectors, at one level only.** There is no call-level `account`:
+`SearchResourcesInput` carries nothing but `selectors`, and a selector naming no account resolves to
+the calling subject's own. A type-less selector may name one, which is how an all-types listing is
+scoped to an account. Per-row mechanics are in
 [resources-label-filtering.md](resources-label-filtering.md).
+
+RFC-018 specifies no search-request type at all, so `SearchResourcesInput` is ours; accepting a
+*list* of OR'd selectors is a deliberate extension, since the RFC names one type per listing call in
+the path (`/<context>/<version>/<type>`) and scopes it with a single `?account=` argument
+(§ REST API strategy). Keeping the account on the selector rather than beside the list follows ODF's
+own `ResourceSelector` (§ Selectors), and means a request is read one way wherever it appears.
 
 `labels` is honoured per selector, so one call can filter differently per type — the third headline
 benefit of the ODF-shaped API, and the reason the repository's label pairs moved inside the per-row
@@ -928,8 +928,8 @@ rejected rather than ignored, so a caller learns their request was not what they
 The wire is scalar where the repository is list-carrying: a batch of N ids arrives as N selectors and
 `coalesce_selectors` folds them into one row. Two type-less selectors that narrow differently, or a
 type-less selector mixed with typed ones, cannot be expressed as per-type rows and surface as
-`UnrepresentableScopeError` (RF-106) — a limit of `ResourceScope::AnyType` carrying a single query,
-which disappears once every row carries its own type.
+`UnrepresentableScopeError` (RF-106) — a limit of `ResourceScope::AnyType` carrying a single query
+and a single account, which disappears once every row carries its own type.
 
 Entries are a **list, not a map**, so a key repeated by the caller reaches the server intact and is
 reported as a duplicate rather than one spelling silently winning — a map would collapse it in the

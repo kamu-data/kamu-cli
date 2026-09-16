@@ -215,14 +215,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = resource_repo_suite::test_list_resource_ids_with_pagination,
-    harness = PostgresResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
     fixture = resource_repo_suite::test_list_resource_snapshots_by_scope,
     harness = PostgresResourceRepositoryHarness
 );
@@ -240,14 +232,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = postgres,
     fixture = resource_repo_suite::test_list_all_resource_snapshots,
-    harness = PostgresResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = postgres,
-    fixture = resource_repo_suite::test_count_resources,
     harness = PostgresResourceRepositoryHarness
 );
 

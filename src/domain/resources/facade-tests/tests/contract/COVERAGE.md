@@ -95,7 +95,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-103 | search_any_type.rs | Active | search empty account returns empty result |  |
 | RF-104 | search_any_type.rs | Active | search narrowed by selectors: type subset + per-selector pattern | Pins per-selector type/pattern pairing, so a cross-wired selector list fails |
 | RF-105 | list_search.rs | Active | Per-selector `account` is authorized, and denial fails the whole call | Denial leaks nothing about the named account; one denied selector fails the call. Covers both `search_handles` and `search` |
-| RF-106 | list_search.rs | Active | Type-less selector scope limits (`UnrepresentableScopeError`) | `AnyType` limits: mixed with typed selectors, multiple query modes, and naming an account. Asserted on message, not variant |
+| RF-106 | list_search.rs | Active | Type-less selector scope limits (`UnrepresentableScopeError`) | `AnyType` limits: mixed with typed selectors, multiple query modes, and two type-less selectors naming different accounts. Asserted on message, not variant |
 | RF-107 | list_search.rs | Active | Typed list columns are rendered, across several types in one search | The schema-specific columns `kamu list` shows (`variables`, `secrets`), rendered across several types in one search |
 | RF-108 | batch_ops.rs | Active | One batch spans several types, and one account spelled several ways | Asserts positional indexes, so a fan-out that lost ordering fails |
 | RF-110 | summary.rs | Active | Summary for empty account |  |
@@ -147,4 +147,4 @@ Each RF scenario from the original plan is listed with its status.
 | RF-177 | list_search.rs | Active | A non-string label value on *one* selector fails the whole call | Only top-level string-valued labels are indexed, so such a predicate is unsatisfiable by construction. Pins the blast radius as the whole call |
 | RF-178 | apply_manifest_batch.rs | Active | Batch rollback reconstructs AccountResolution as typed error | Covers remote `extensions.batch` decode taxonomy, like RF-163/164 |
 | RF-179 | error_taxonomy.rs | Active | A name-without-type ref is refused, and distinguishably from `EmptyRef` | RF-171 pins the refusal; this pins its taxonomy, distinguishing it from `EmptyRef` and `NameNotFound` |
-| RF-180 | list_search.rs | Active | Call-level `account` is the default for selectors naming none | RF-105 covers the per-selector side. Also pins that an all-types listing may name an account only at call level, since `AnyType` carries no per-row account (rejection half: RF-106) |
+| RF-180 | list_search.rs | Active | A type-less selector may name an account, spanning every type under it | The only spelling for an all-types listing scoped to one account, there being no call-level `account`. RF-105 covers a typed selector's account |

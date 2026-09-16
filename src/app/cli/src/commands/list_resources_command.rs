@@ -283,7 +283,6 @@ impl ListResourcesCommand {
                 .resource_facade
                 .search(kamu_resources_facade::SearchResourcesRequest {
                     selectors: selectors.to_vec(),
-                    account: None,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
                 .await?;
@@ -294,7 +293,6 @@ impl ListResourcesCommand {
                     .resource_facade
                     .search(kamu_resources_facade::SearchResourcesRequest {
                         selectors: selectors.to_vec(),
-                        account: None,
                         pagination,
                     })
                     .await?;

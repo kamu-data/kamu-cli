@@ -106,7 +106,6 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts {
                 limit: 1000,
                 offset: 0,

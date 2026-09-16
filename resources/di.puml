@@ -89,7 +89,6 @@ interface "GetDatasetSchemaUseCase" <<i>>
 interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
 interface "InitOnStartup" <<i>>
 interface "JwtTokenIssuer" <<i>>
-interface "ListAllResourcesUseCase" <<i>>
 interface "MessageConsumer" <<i>>
 interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
@@ -295,7 +294,6 @@ class "KamuAuthOso"
 class "KamuFlightSqlService"
 class "LabelEnvironmentDispatcher"
 class "LabelLegacyConfigTargetDatasetDispatcher"
-class "ListAllResourcesUseCaseImpl"
 class "LocalResourceFacadeImpl"
 class "LoginFlowService"
 class "LoginPasswordAuthProvider"
@@ -1150,8 +1148,6 @@ class "WsSmartTransferProtocolClient"
 "DeleteAccountResourcesUseCase" <|-- "DeleteAccountResourcesUsecaseImpl"
 "DeleteAccountResourcesUsecaseImpl"  --> "GenericResourceQueryService"
 "DeleteAccountResourcesUsecaseImpl"  --> "ResourceDispatcherFactory"
-"ListAllResourcesUseCase" <|-- "ListAllResourcesUseCaseImpl"
-"ListAllResourcesUseCaseImpl"  --> "GenericResourceQueryService"
 "ResourceLabelProjectionRepository" <|-- "SqliteResourceLabelProjectionRepository"
 "SqliteResourceLabelProjectionRepository"  --> "TransactionRefT"
 "ResourceRawEventStore" <|-- "SqliteResourceRawEventStore"

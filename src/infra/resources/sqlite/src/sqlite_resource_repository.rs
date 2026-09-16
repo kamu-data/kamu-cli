@@ -28,7 +28,6 @@ use kamu_resources::{
     ResourceHandleRow,
     ResourceHeaders,
     ResourceID,
-    ResourceIDStream,
     ResourceLabelPair,
     ResourceName,
     ResourcePhaseCounts,
@@ -720,47 +719,6 @@ impl ResourceRepository for SqliteResourceRepository {
             .collect())
     }
 
-    fn list_resource_ids(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
-    ) -> ResourceIDStream<'_> {
-        let resource_schema = schema.as_str().to_owned();
-
-        Box::pin(async_stream::stream! {
-            let mut tr = self.transaction.lock().await;
-            let connection_mut = tr.connection_mut().await?;
-
-            let account_id_stack = account_id.as_stack_string();
-            let account_id_str = account_id_stack.as_str();
-            let limit = i64::try_from(pagination.limit).int_err()?;
-            let offset = i64::try_from(pagination.offset).int_err()?;
-
-            let mut query_stream = sqlx::query!(
-                r#"
-                SELECT resource_id as "id: uuid::Uuid"
-                FROM resources
-                WHERE account_id = $1
-                  AND resource_schema = $2
-                  AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
-                LIMIT $3 OFFSET $4
-                "#,
-                account_id_str,
-                resource_schema,
-                limit,
-                offset,
-            )
-            .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
-
-            while let Some(row) = query_stream.try_next().await? {
-                yield Ok(ResourceID::new(row.id));
-            }
-        })
-    }
-
     fn list_resource_snapshots(
         &self,
         account_id: &odf::AccountID,
@@ -821,36 +779,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 yield Ok(row.into_snapshot());
             }
         })
-    }
-
-    async fn count_resources(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-    ) -> Result<usize, InternalError> {
-        let mut tr = self.transaction.lock().await;
-        let connection_mut = tr.connection_mut().await?;
-
-        let account_id_stack = account_id.as_stack_string();
-        let account_id_str = account_id_stack.as_str();
-        let schema = schema.as_str();
-
-        let count = sqlx::query_scalar!(
-            r#"
-            SELECT COUNT(*) as "count!: i64"
-            FROM resources
-            WHERE account_id = $1
-              AND resource_schema = $2
-              AND deleted_at IS NULL
-            "#,
-            account_id_str,
-            schema,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(usize::try_from(count).unwrap())
     }
 
     async fn summarize_resources(
@@ -980,8 +908,8 @@ fn push_query_predicate(
 ///
 /// The account lives inside each OR-group rather than as one outer
 /// `r.account_id = ?`, because a row may name its own account; rows that do not
-/// use `default_account_id`. `AnyType` carries no per-row account, so it keeps
-/// the single outer term.
+/// use `default_account_id`. `AnyType` spans one account, so it keeps the
+/// single outer term.
 fn push_scope_predicate(
     query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
     scope: &ResourceScope,
@@ -994,9 +922,16 @@ fn push_scope_predicate(
     };
 
     match scope {
-        ResourceScope::AnyType(query, label_pairs) => {
+        ResourceScope::AnyType {
+            query,
+            account_id,
+            label_pairs,
+        } => {
             query_builder.push(" AND ");
-            push_account(query_builder, default_account_id);
+            push_account(
+                query_builder,
+                account_id.as_ref().unwrap_or(default_account_id),
+            );
             if let Some(query) = query {
                 query_builder.push(" AND ");
                 push_query_predicate(query_builder, query);

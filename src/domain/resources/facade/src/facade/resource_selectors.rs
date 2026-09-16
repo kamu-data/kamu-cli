@@ -147,7 +147,7 @@ pub struct ResolvedSelector {
     pub name: Option<ResourceName>,
     /// SQL `LIKE` pattern, from a [`ResourceSelector`].
     pub name_pattern: Option<String>,
-    /// `None` means the call-level account. Two selectors differing only by
+    /// `None` means the default account. Two selectors differing only by
     /// account must **not** merge, so this is part of the grouping key.
     pub account_id: Option<odf::AccountID>,
     /// Resolved label pairs this selector requires. Like `account_id`, two
@@ -242,60 +242,67 @@ pub fn coalesce_selectors(
         .collect::<Vec<_>>();
 
     if !any_type_keys.is_empty() {
-        // Checked before anything else: an unnarrowed, account-less, unlabelled
-        // type-less selector matches every resource under the call-level
-        // account, so it subsumes every other selector rather than conflicting
-        // with them. Those three conditions describe the *subsuming* selector;
-        // the peers it swallows are constrained only by account, below.
+        // An unnarrowed, unlabelled type-less selector subsumes its peers, but
+        // only those naming the same account: `AnyType` spans one account, so
+        // swallowing a group naming another would answer an authorized
+        // cross-account request with the subsuming selector's resources.
         //
-        // Only selectors that *also* use the call-level account are subsumed.
-        // `AnyType` carries no per-row account, so it cannot stand in for a
-        // group naming a different one — swallowing such a group would drop an
-        // authorized request for another account's resources and answer with
-        // the caller's own instead.
-        //
-        // Labels do *not* bind the same way. The subsuming selector is itself
-        // unlabelled, so it already matches every row a labelled peer could
-        // match — a label filter only ever narrows. Absorbing the peer widens
-        // the result to exactly what the bare selector asked for, which is what
-        // the caller wrote. Requiring the peers to be unlabelled instead would
-        // reject `% vs/x -l env=prod`, a request with an obvious answer.
-        let unnarrowed_sort_key = (None, None, Vec::new());
-        let unnarrowed_default_account = groups
-            .get(&unnarrowed_sort_key)
-            .is_some_and(|group| group.unnarrowed);
-        if unnarrowed_default_account && order.iter().all(|(_, account_id, _)| account_id.is_none())
+        // Labels do not bind that way. The subsuming selector is unlabelled, so
+        // it already matches every row a labelled peer could — absorbing one
+        // widens to exactly what the caller wrote. Requiring unlabelled peers
+        // would reject `% vs/x -l env=prod`, a request with an obvious answer.
+        let subsuming_account = any_type_keys
+            .iter()
+            .find(|(_, _, label_pairs)| label_pairs.is_empty())
+            .map(|(_, account_id, _)| account_id.clone())
+            .filter(|account_id| {
+                let sort_key = (
+                    None,
+                    account_id.as_ref().map(ToString::to_string),
+                    Vec::new(),
+                );
+                groups.get(&sort_key).is_some_and(|group| group.unnarrowed)
+            });
+        if let Some(account_id) = subsuming_account
+            && order
+                .iter()
+                .all(|(_, peer_account_id, _)| *peer_account_id == account_id)
         {
-            return Ok(Some(ResourceScope::AnyType(None, Vec::new())));
+            return Ok(Some(ResourceScope::AnyType {
+                query: None,
+                account_id,
+                label_pairs: Vec::new(),
+            }));
         }
 
         // A type-less selector already spans every type, so pairing it with any
-        // other group cannot be expressed as per-type rows.
+        // other group cannot be expressed as per-type rows. Two type-less
+        // selectors differing only by account land here too: `AnyType` carries
+        // one account, so it cannot express both.
         if order.len() > 1 {
             return Err(UnrepresentableScopeError::AnyTypeMixedWithTypedSelectors);
         }
 
         let (_, account_id, label_pairs) = &any_type_keys[0];
 
-        // `AnyType` carries no per-row account, so one naming its own account
-        // cannot be represented.
-        if account_id.is_some() {
-            return Err(UnrepresentableScopeError::AnyTypeWithAccount);
-        }
-
+        let account_id = account_id.clone();
         let label_pairs = label_pairs.clone();
         let sort_key = (
             None,
-            None,
+            account_id.as_ref().map(ToString::to_string),
             label_pairs
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.clone()))
                 .collect::<Vec<_>>(),
         );
 
-        return groups[&sort_key]
-            .single_any_type_query()
-            .map(|query| Some(ResourceScope::AnyType(query, label_pairs)));
+        return groups[&sort_key].single_any_type_query().map(|query| {
+            Some(ResourceScope::AnyType {
+                query,
+                account_id,
+                label_pairs,
+            })
+        });
     }
 
     let mut type_queries = Vec::new();
@@ -326,7 +333,7 @@ pub fn coalesce_selectors(
 /// Every `AnyType*` variant is a limit of [`ResourceScope::AnyType`] carrying
 /// exactly one query, one account and one label set for the whole scope, rather
 /// than a per-type list. They disappear once `AnyType` gives each row its own
-/// type, account and labels.
+/// type and labels.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum UnrepresentableScopeError {
     #[error(
@@ -334,14 +341,6 @@ pub enum UnrepresentableScopeError {
          already spans every type"
     )]
     AnyTypeMixedWithTypedSelectors,
-
-    /// `ResourceScope::AnyType` carries no per-row account, so a type-less
-    /// selector cannot name one.
-    #[error(
-        "A type-less selector cannot name an account, because it spans every type under the \
-         call-level account"
-    )]
-    AnyTypeWithAccount,
 
     #[error(
         "A type-less selector may narrow by only one of `id`, `name`, or `name` pattern at a time"
@@ -746,7 +745,14 @@ mod tests {
     fn test_type_less_unnarrowed_selector_is_any_type() {
         let scope = coalesce(vec![any_type()]);
 
-        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
+        assert_eq!(
+            scope,
+            Some(ResourceScope::AnyType {
+                query: None,
+                account_id: None,
+                label_pairs: Vec::new(),
+            })
+        );
     }
 
     #[test]
@@ -758,10 +764,11 @@ mod tests {
 
         assert_eq!(
             scope,
-            Some(ResourceScope::AnyType(
-                Some(ResourceQuery::ExactNames(vec![name("a")])),
-                Vec::new()
-            ))
+            Some(ResourceScope::AnyType {
+                query: Some(ResourceQuery::ExactNames(vec![name("a")])),
+                account_id: None,
+                label_pairs: Vec::new(),
+            })
         );
     }
 
@@ -873,7 +880,11 @@ mod tests {
 
         assert_eq!(
             scope,
-            Some(ResourceScope::AnyType(None, vec![label("env", "prod")]))
+            Some(ResourceScope::AnyType {
+                query: None,
+                account_id: None,
+                label_pairs: vec![label("env", "prod")],
+            })
         );
     }
 
@@ -892,7 +903,14 @@ mod tests {
             },
         ]);
 
-        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
+        assert_eq!(
+            scope,
+            Some(ResourceScope::AnyType {
+                query: None,
+                account_id: None,
+                label_pairs: Vec::new(),
+            })
+        );
     }
 
     // …and the labelled peer must not survive as a separate row either: the
@@ -911,7 +929,14 @@ mod tests {
             },
         ]);
 
-        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
+        assert_eq!(
+            scope,
+            Some(ResourceScope::AnyType {
+                query: None,
+                account_id: None,
+                label_pairs: Vec::new(),
+            })
+        );
     }
 
     // Subsumption is a *widening*, so it may only happen when the type-less
@@ -941,12 +966,19 @@ mod tests {
     fn test_unnarrowed_any_type_subsumes_typed_selectors() {
         let scope = coalesce(vec![by_pattern(SCHEMA_A, "app-%"), any_type()]);
 
-        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
+        assert_eq!(
+            scope,
+            Some(ResourceScope::AnyType {
+                query: None,
+                account_id: None,
+                label_pairs: Vec::new(),
+            })
+        );
     }
 
-    // ...but only over the call-level account. `AnyType` restricts every row to
-    // that one account, so subsuming a selector that names a *different* one
-    // would answer an authorized cross-account request with the caller's own
+    // ...but only over its own account. `AnyType` restricts every row to one
+    // account, so subsuming a selector that names a *different* one would
+    // answer an authorized cross-account request with the caller's own
     // resources — a silent drop, not a narrowing the caller can see.
     #[test]
     fn test_unnarrowed_any_type_does_not_subsume_another_account() {
@@ -956,6 +988,93 @@ mod tests {
                 ..by_pattern(SCHEMA_A, "app-%")
             },
             any_type(),
+        ]);
+
+        assert_matches!(
+            result,
+            Err(UnrepresentableScopeError::AnyTypeMixedWithTypedSelectors)
+        );
+    }
+
+    // A type-less selector naming an account spans every type under it — the
+    // request RFC-018 expresses as `?account=` with no type in the path.
+    #[test]
+    fn test_type_less_selector_may_name_an_account() {
+        let bob = odf::AccountID::new_seeded_ed25519(b"bob");
+        let scope = coalesce(vec![ResolvedSelector {
+            account_id: Some(bob.clone()),
+            ..any_type()
+        }]);
+
+        assert_eq!(
+            scope,
+            Some(ResourceScope::AnyType {
+                query: None,
+                account_id: Some(bob),
+                label_pairs: Vec::new(),
+            })
+        );
+    }
+
+    // Subsumption follows the account across: a bare selector naming one
+    // swallows typed peers naming that same account, and the resulting scope
+    // stays bound to it rather than falling back to the caller's own.
+    #[test]
+    fn test_any_type_subsumes_typed_peers_sharing_its_account() {
+        let bob = odf::AccountID::new_seeded_ed25519(b"bob");
+        let scope = coalesce(vec![
+            ResolvedSelector {
+                account_id: Some(bob.clone()),
+                ..by_pattern(SCHEMA_A, "app-%")
+            },
+            ResolvedSelector {
+                account_id: Some(bob.clone()),
+                ..any_type()
+            },
+        ]);
+
+        assert_eq!(
+            scope,
+            Some(ResourceScope::AnyType {
+                query: None,
+                account_id: Some(bob),
+                label_pairs: Vec::new(),
+            })
+        );
+    }
+
+    // The converse of the test above: a bare selector on the caller's own
+    // account must not swallow a peer naming another, and a bare selector
+    // naming an account must not swallow an account-less peer.
+    #[test]
+    fn test_any_type_does_not_subsume_peers_of_a_different_account() {
+        let bob = odf::AccountID::new_seeded_ed25519(b"bob");
+
+        assert_matches!(
+            coalesce_selectors(vec![
+                by_pattern(SCHEMA_A, "app-%"),
+                ResolvedSelector {
+                    account_id: Some(bob.clone()),
+                    ..any_type()
+                },
+            ]),
+            Err(UnrepresentableScopeError::AnyTypeMixedWithTypedSelectors)
+        );
+    }
+
+    // `AnyType` carries one account, so two type-less selectors naming
+    // different ones cannot both be expressed.
+    #[test]
+    fn test_two_type_less_selectors_naming_different_accounts_are_rejected() {
+        let result = coalesce_selectors(vec![
+            ResolvedSelector {
+                account_id: Some(odf::AccountID::new_seeded_ed25519(b"bob")),
+                ..any_type()
+            },
+            ResolvedSelector {
+                account_id: Some(odf::AccountID::new_seeded_ed25519(b"carol")),
+                ..any_type()
+            },
         ]);
 
         assert_matches!(

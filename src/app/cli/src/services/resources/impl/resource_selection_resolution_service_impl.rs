@@ -334,7 +334,6 @@ impl ResourceSelectionResolutionServiceImpl {
                             ),
                             label_filter,
                         ),
-                        account: None,
                         pagination: PaginationOpts {
                             limit: by_id.len(),
                             offset: 0,
@@ -385,7 +384,6 @@ impl ResourceSelectionResolutionServiceImpl {
                                     .collect(),
                                 Some(label_filter),
                             ),
-                            account: None,
                             pagination: PaginationOpts {
                                 limit: by_name.len(),
                                 offset: 0,
@@ -471,7 +469,6 @@ impl ResourceSelectionResolutionServiceImpl {
                     kamu_resources::ResourceSelector::any_type_ids(ids.clone()),
                     label_filter,
                 ),
-                account: None,
                 pagination: PaginationOpts {
                     limit: ids.len(),
                     offset: 0,
@@ -566,7 +563,6 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![kamu_resources::ResourceSelector::default()],
                                 request_label_filter.as_ref(),
                             ),
-                            account: None,
                             pagination,
                         })
                         .await?;
@@ -635,7 +631,6 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
-                            account: None,
                             pagination,
                         })
                         .await?;
@@ -685,7 +680,6 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
-                            account: None,
                             pagination,
                         })
                         .await
@@ -762,7 +756,6 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![request_selector],
                                 request_label_filter.as_ref(),
                             ),
-                            account: None,
                             pagination,
                         })
                         .await
@@ -820,7 +813,6 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
-                            account: None,
                             pagination,
                         })
                         .await

@@ -212,14 +212,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_list_resource_ids_with_pagination,
-    harness = SqliteResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
     fixture = resource_repo_suite::test_list_resource_snapshots_by_scope,
     harness = SqliteResourceRepositoryHarness
 );
@@ -237,14 +229,6 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = resource_repo_suite::test_list_all_resource_snapshots,
-    harness = SqliteResourceRepositoryHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
-    fixture = resource_repo_suite::test_count_resources,
     harness = SqliteResourceRepositoryHarness
 );
 

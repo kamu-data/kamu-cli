@@ -60,7 +60,6 @@ pub async fn test_search_narrowed_by_query(h: &impl FacadeContractHarness) {
         let mut summaries = facade
             .search(SearchResourcesRequest {
                 selectors,
-                account: None,
                 pagination: PaginationOpts::from_max_results(1000),
             })
             .await
@@ -154,7 +153,6 @@ pub async fn test_search_handles_honours_selectors(h: &impl FacadeContractHarnes
         let mut handles = facade
             .search_handles(SearchResourcesRequest {
                 selectors,
-                account: None,
                 pagination: PaginationOpts::from_max_results(1000),
             })
             .await
@@ -222,7 +220,6 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
                 )])),
                 ..bobs_selector.clone()
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -241,7 +238,6 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
                 ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
                 bobs_selector.clone(),
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -255,7 +251,6 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
     let denied = facade
         .search(SearchResourcesRequest {
             selectors: vec![bobs_selector],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -272,7 +267,6 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -284,109 +278,63 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
 
 // RF-180
 contract_test!(
-    call_level_account_defaults_per_selector,
-    super::test_call_level_account_defaults_per_selector
+    type_less_selector_may_name_an_account,
+    super::test_type_less_selector_may_name_an_account
 );
 
-/// The call-level `account` is the **default** for selectors naming none, not
-/// an extra filter AND-ed with them.
+/// A type-less selector may name an account, spanning every type under it.
 ///
-/// The harness has no admin account, so naming another account always denies;
-/// that denial is what proves the field is read at all, since a caller naming
-/// its *own* account cannot tell "honoured" from "dropped" — both resolve to
-/// the caller. RF-105 covers the per-selector side of authorization.
-pub async fn test_call_level_account_defaults_per_selector(h: &impl FacadeContractHarness) {
+/// This is the only spelling — there is no call-level `account` — so it is what
+/// an all-types listing scoped to one account has to go through. RF-105 covers
+/// authorization of a *typed* selector's account.
+pub async fn test_type_less_selector_may_name_an_account(h: &impl FacadeContractHarness) {
     create_variable_set(h, TestAccount::Alice, "default-alice").await;
     create_variable_set(h, TestAccount::Bob, "default-bob").await;
 
     let facade = h.facade_for(TestAccount::Alice);
-    let alice = kamu_resources::ResourceAccountRef {
+    let account_ref = |account| kamu_resources::ResourceAccountRef {
         id: None,
         did: None,
-        name: Some(h.account_name(TestAccount::Alice)),
+        name: Some(h.account_name(account)),
     };
 
-    let search_handles = async |selectors, account| {
+    let search_handles = async |selectors| {
         facade
             .search_handles(SearchResourcesRequest {
                 selectors,
-                account,
                 pagination: PaginationOpts::from_max_results(1000),
             })
             .await
             .map(|response| sorted_handle_names(response.items))
     };
 
-    let variable_sets = || {
-        vec![ResourceSelector::of_type(
-            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        )]
-    };
-
-    // Naming the caller's own account explicitly matches leaving it unset: the
-    // field is applied as the default rather than dropped.
+    // Naming the caller's own account spans every type under it, matching what
+    // an account-less type-less selector returns.
+    let named = search_handles(vec![ResourceSelector {
+        account: Some(account_ref(TestAccount::Alice)),
+        ..ResourceSelector::default()
+    }])
+    .await
+    .expect("a type-less selector may name an account");
+    assert_eq!(named, vec!["default-alice"]);
     assert_eq!(
-        search_handles(variable_sets(), Some(alice.clone()))
-            .await
-            .expect("naming the caller's own account must be allowed"),
-        search_handles(variable_sets(), None)
+        named,
+        search_handles(vec![ResourceSelector::default()])
             .await
             .expect("an unset account defaults to the caller"),
     );
 
-    // Naming an account the caller may not read is denied, which is what shows
-    // the field is resolved at all: the assertion above cannot tell "honoured"
-    // from "dropped", since the caller *is* the account it names.
+    // The account is resolved rather than dropped: naming one the caller may
+    // not read denies the whole call. The assertion above cannot show that, the
+    // caller being the account it names.
     assert_matches!(
-        search_handles(
-            variable_sets(),
-            Some(kamu_resources::ResourceAccountRef {
-                id: None,
-                did: None,
-                name: Some(h.account_name(TestAccount::Bob)),
-            }),
-        )
+        search_handles(vec![ResourceSelector {
+            account: Some(account_ref(TestAccount::Bob)),
+            ..ResourceSelector::default()
+        }])
         .await,
         Err(_),
-        "a call-level account must not be ignored"
-    );
-
-    // A selector naming its own account wins over the call-level default, so
-    // the two are an override rather than a conjunction — were they AND-ed, a
-    // selector naming Bob under a call naming Alice could only match nothing.
-    let bobs_selector = ResourceSelector {
-        account: Some(kamu_resources::ResourceAccountRef {
-            id: None,
-            did: None,
-            name: Some(h.account_name(TestAccount::Bob)),
-        }),
-        ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
-    };
-    assert_matches!(
-        search_handles(vec![bobs_selector], Some(alice.clone())).await,
-        Err(_),
-        "the selector's own account must be resolved, not the call-level one"
-    );
-
-    // The call-level field is the only way to scope an all-types listing to an
-    // account: `AnyType` carries no per-row account, so the per-selector
-    // spelling of this same request is rejected (RF-106).
-    let all_types = search_handles(vec![ResourceSelector::default()], Some(alice.clone()))
-        .await
-        .expect("an all-types listing may name an account at call level");
-    assert_eq!(all_types, vec!["default-alice"]);
-
-    assert_matches!(
-        search_handles(
-            vec![ResourceSelector {
-                account: Some(alice),
-                ..ResourceSelector::default()
-            }],
-            None,
-        )
-        .await,
-        Err(_),
-        "the same request spelled per selector is unrepresentable"
+        "a type-less selector's account must not be ignored"
     );
 }
 
@@ -398,8 +346,8 @@ contract_test!(
     super::test_any_type_selector_scope_limits
 );
 
-/// The two `AnyType` limits of `ResourceScope`, which carries a single query
-/// rather than a per-type list.
+/// The `AnyType` limits of `ResourceScope`, which carries a single query and a
+/// single account rather than a per-type list.
 ///
 /// Asserted on the message rather than the variant: remote surfaces these as
 /// transport-level GraphQL errors.
@@ -410,7 +358,6 @@ pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness)
         facade
             .search_handles(SearchResourcesRequest {
                 selectors,
-                account: None,
                 pagination: PaginationOpts::from_max_results(1000),
             })
             .await
@@ -442,24 +389,25 @@ pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness)
         "unexpected error: {err:?}"
     );
 
-    // `AnyType` carries no per-row account, so a type-less selector naming one
-    // is rejected rather than silently scoped to the caller.
-    //
-    // Named as the *caller's own* account deliberately: authorization runs
-    // before coalescing, so naming another account would be denied there and
-    // this representability limit would never be reached.
-    let err = search(vec![ResourceSelector {
-        account: Some(kamu_resources::ResourceAccountRef {
-            id: None,
-            did: None,
-            name: Some(h.account_name(TestAccount::Alice)),
-        }),
-        ..ResourceSelector::any_type_name_pattern("account-%")
-    }])
+    // `AnyType` carries one account, so two type-less selectors naming
+    // different ones cannot both be expressed. One side names the caller's own
+    // deliberately: authorization runs first, so a second real account would be
+    // denied before this limit is reached.
+    let err = search(vec![
+        ResourceSelector {
+            account: Some(kamu_resources::ResourceAccountRef {
+                id: None,
+                did: None,
+                name: Some(h.account_name(TestAccount::Alice)),
+            }),
+            ..ResourceSelector::any_type_name_pattern("account-%")
+        },
+        ResourceSelector::any_type_name_pattern("account-%"),
+    ])
     .await
-    .expect_err("a type-less selector cannot name an account");
+    .expect_err("two type-less selectors cannot name different accounts");
     assert!(
-        err.to_string().contains("cannot name an account"),
+        err.to_string().contains("cannot be combined with typed"),
         "unexpected error: {err:?}"
     );
 
@@ -490,7 +438,6 @@ pub async fn test_search_summaries_for_account(h: &impl FacadeContractHarness) {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None, // default = alice
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -543,7 +490,6 @@ pub async fn test_search_handles_for_account(h: &impl FacadeContractHarness) {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -587,7 +533,6 @@ pub async fn test_search_supports_pagination_limit(h: &impl FacadeContractHarnes
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_page(0, 2),
         })
         .await
@@ -621,7 +566,6 @@ pub async fn test_search_supports_pagination_offset(h: &impl FacadeContractHarne
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_page(0, 2),
         })
         .await
@@ -632,7 +576,6 @@ pub async fn test_search_supports_pagination_offset(h: &impl FacadeContractHarne
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -669,7 +612,6 @@ pub async fn test_search_handles_pagination_mirrors_search(h: &impl FacadeContra
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -680,7 +622,6 @@ pub async fn test_search_handles_pagination_mirrors_search(h: &impl FacadeContra
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -713,7 +654,6 @@ pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarn
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -724,7 +664,6 @@ pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarn
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -752,7 +691,6 @@ pub async fn test_search_unsupported_kind_returns_error(h: &impl FacadeContractH
             selectors: vec![ResourceSelector::of_type(
                 unsupported_selector.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -761,7 +699,6 @@ pub async fn test_search_unsupported_kind_returns_error(h: &impl FacadeContractH
             selectors: vec![ResourceSelector::of_type(
                 unsupported_selector.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -805,7 +742,6 @@ pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
                     "search-exact-beta",
                 ),
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -842,7 +778,6 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
                     "search-missing-absent",
                 ),
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -881,7 +816,6 @@ pub async fn test_search_by_exact_ids(h: &impl FacadeContractHarness) {
                 &VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 [alpha_id, beta_id],
             ),
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -918,7 +852,6 @@ pub async fn test_search_exact_ids_ignores_missing(h: &impl FacadeContractHarnes
                 &VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 [present_id, missing_id],
             ),
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -956,7 +889,6 @@ pub async fn test_search_exact_ids_account_scoping(h: &impl FacadeContractHarnes
                 &VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 [bob_id],
             ),
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -983,7 +915,6 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "search-pattern-%".to_string(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1036,7 +967,6 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
                     "multi-type-%",
                 ),
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1100,7 +1030,6 @@ pub async fn test_search_any_type(h: &impl FacadeContractHarness) {
     let response = facade
         .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::any_type_name_pattern("any-type-%")],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1148,7 +1077,6 @@ pub async fn test_search_empty_exact_names_returns_no_matches(h: &impl FacadeCon
     let response = facade
         .search_handles(SearchResourcesRequest {
             selectors: Vec::new(),
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1178,7 +1106,6 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "search-page-%".to_string(),
             )],
-            account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -1206,7 +1133,6 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "search-scope-%".to_string(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1218,7 +1144,6 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "search-scope-%".to_string(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1268,7 +1193,6 @@ pub async fn test_search_filter_by_canonical_label_uri(h: &impl FacadeContractHa
                 )])),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1330,7 +1254,6 @@ pub async fn test_search_filter_differs_per_selector(h: &impl FacadeContractHarn
                     ..ResourceSelector::name_pattern(variable_set(), "per-sel-beta-%")
                 },
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1387,7 +1310,6 @@ pub async fn test_search_filter_one_selector_unfiltered(h: &impl FacadeContractH
                 // No labels: both of these must come back.
                 ResourceSelector::name_pattern(variable_set(), "mixed-beta-%"),
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1445,7 +1367,6 @@ pub async fn test_search_filter_non_string_value_fails_whole_call(h: &impl Facad
                     ..ResourceSelector::of_type(variable_set())
                 },
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1481,7 +1402,6 @@ pub async fn test_search_filter_by_short_label_name(h: &impl FacadeContractHarne
                 labels: Some(label_filter(&[("environment", "prod")])),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1523,7 +1443,6 @@ pub async fn test_search_filter_by_free_form_label(h: &impl FacadeContractHarnes
                 labels: Some(label_filter(&[("team", "data")])),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1550,7 +1469,6 @@ pub async fn test_search_filter_invalid_key_is_rejected(h: &impl FacadeContractH
                 labels: Some(label_filter(&[("not a valid key=", "x")])),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1581,7 +1499,6 @@ pub async fn test_search_filter_unknown_uri_is_rejected(h: &impl FacadeContractH
                 )])),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1617,7 +1534,6 @@ pub async fn test_search_filter_non_string_value_is_rejected(h: &impl FacadeCont
                 }),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1650,7 +1566,6 @@ pub async fn test_search_filter_duplicate_after_canonicalization_is_rejected(
                 ])),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1686,7 +1601,6 @@ pub async fn test_search_filter_not_operator_is_rejected(h: &impl FacadeContract
                 }),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1722,7 +1636,6 @@ pub async fn test_search_filter_or_operator_is_rejected(h: &impl FacadeContractH
                 }),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1758,7 +1671,6 @@ pub async fn test_search_filter_malformed_not_operator_is_rejected(h: &impl Faca
                 }),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -1807,7 +1719,6 @@ pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContra
                     "search-filter-%".to_string(),
                 )
             }],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1859,7 +1770,6 @@ pub async fn test_search_renders_typed_columns_across_types(h: &impl FacadeContr
                 ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
                 ResourceSelector::of_type(SECRET_SET_CANONICAL_SELECTOR.parse().unwrap()),
             ],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1919,7 +1829,6 @@ pub async fn test_selector_field_the_facade_cannot_resolve_is_rejected(
         facade
             .search_handles(SearchResourcesRequest {
                 selectors: vec![did_only.clone()],
-                account: None,
                 pagination: PaginationOpts::from_max_results(1000),
             })
             .await,
@@ -1931,7 +1840,6 @@ pub async fn test_selector_field_the_facade_cannot_resolve_is_rejected(
         facade
             .search(SearchResourcesRequest {
                 selectors: vec![did_only],
-                account: None,
                 pagination: PaginationOpts::from_max_results(1000),
             })
             .await,

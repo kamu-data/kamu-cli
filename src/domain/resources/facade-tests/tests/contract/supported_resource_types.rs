@@ -131,7 +131,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -149,7 +148,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -187,7 +185,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     let short_name_summaries = facade
         .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type("vs".parse().unwrap())],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -206,7 +203,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     let type_name_summaries = facade
         .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type("VariableSet".parse().unwrap())],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -226,7 +222,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             selectors: vec![ResourceSelector::of_type(
                 "NoSuchResourceTypeXYZ".parse().unwrap(),
             )],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -318,7 +313,6 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     let list_result = facade
         .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -335,7 +329,6 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     let li_result = facade
         .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
-            account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;

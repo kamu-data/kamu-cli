@@ -15,7 +15,6 @@ pub fn register_dependencies(catalog_builder: &mut dill::CatalogBuilder) {
     catalog_builder.add::<ResourceDispatcherFactory>();
     catalog_builder.add::<GenericResourceQueryServiceImpl>();
     catalog_builder.add::<DeleteAccountResourcesUsecaseImpl>();
-    catalog_builder.add::<ListAllResourcesUseCaseImpl>();
     catalog_builder.add::<ResourceExtensionSchemaRegistry>();
     catalog_builder.add::<ResourceExtensionSchemaResolver>();
     catalog_builder.add::<crate::message_handlers::AccountLifecycleMessageConsumer>();
