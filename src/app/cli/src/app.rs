@@ -838,7 +838,17 @@ pub fn register_config_in_catalog(
             ))
             .set_properties(vec![AccountPropertyName::IsAdmin]);
 
-            accounts_config.predefined.push(mt_account);
+            // The implicit OS-user account is a fallback, not an override: a
+            // config entry of the same name is authoritative, and appending a
+            // second one collides on `idx_accounts_name`, aborting the shared
+            // registration transaction and with it startup.
+            if !accounts_config
+                .predefined
+                .iter()
+                .any(|account| account.account_name == mt_account.account_name)
+            {
+                accounts_config.predefined.push(mt_account);
+            }
 
             if is_e2e_testing {
                 let e2e_user_config = AccountConfig::test_config_from_name(
