@@ -33,7 +33,11 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
 
     register_configuration_label_schema_dispatchers(catalog_builder);
 
+    // Two resolvers on purpose: ingest reads the reconciled projection, the
+    // UI-facing GraphQL path reads the accepted spec so it is read-your-writes
+    // consistent. See `docs/internal/resources-framework.md` (Read path).
     catalog_builder.add::<DatasetEnvVarResolverImpl>();
+    catalog_builder.add::<DatasetEnvVarSpecResolverImpl>();
     catalog_builder.add::<DatasetEnvVarMutationAdapterImpl>();
 }
 

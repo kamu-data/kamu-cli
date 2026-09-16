@@ -877,6 +877,274 @@ async fn test_delete_non_existent_dataset_env_var() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Read-after-write: the UI re-reads immediately after every mutation, so these
+// must hold before reconciliation has run.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_unreconciled_variable_is_listed_immediately() {
+    let harness = DatasetEnvVarsHarness::new_unreconciled().await;
+    let created_dataset = harness.create_dataset().await;
+
+    harness
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "foo_value",
+            false,
+        ))
+        .await;
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "listEnvVariables": {
+                            "totalCount": 1,
+                            "nodes": [{
+                                "key": "foo",
+                                "value": "foo_value",
+                                "isSecret": false,
+                            }]
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_unreconciled_variable_edit_is_visible_immediately() {
+    let harness = DatasetEnvVarsHarness::new_unreconciled().await;
+    let created_dataset = harness.create_dataset().await;
+
+    for value in ["first_value", "second_value"] {
+        harness
+            .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+                &created_dataset.dataset_handle.id,
+                "foo",
+                value,
+                false,
+            ))
+            .await;
+    }
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "listEnvVariables": {
+                            "totalCount": 1,
+                            "nodes": [{
+                                "key": "foo",
+                                "value": "second_value",
+                                "isSecret": false,
+                            }]
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_unreconciled_secret_exposed_value_is_readable_immediately() {
+    let harness = DatasetEnvVarsHarness::new_unreconciled().await;
+    let created_dataset = harness.create_dataset().await;
+
+    harness
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "foo_secret_value",
+            true,
+        ))
+        .await;
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_var_exposed_value(
+            &created_dataset.dataset_handle.id,
+            "foo",
+        ))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "exposedValue": "foo_secret_value"
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Upsert is a read-modify-write over the whole set, so a pre-reconcile read
+/// would rebuild the spec without `foo` and silently retract it — data loss,
+/// not just a stale display.
+#[test_log::test(tokio::test)]
+async fn test_unreconciled_second_secret_does_not_drop_the_first() {
+    let harness = DatasetEnvVarsHarness::new_unreconciled().await;
+    let created_dataset = harness.create_dataset().await;
+
+    for key in ["foo", "bar"] {
+        harness
+            .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+                &created_dataset.dataset_handle.id,
+                key,
+                "secret_value",
+                true,
+            ))
+            .await;
+    }
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "listEnvVariables": {
+                            "totalCount": 2,
+                            "nodes": [
+                                { "key": "bar", "value": null, "isSecret": true },
+                                { "key": "foo", "value": null, "isSecret": true },
+                            ]
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Delete decides whether the key exists at all, and against the projection
+/// that answer is `NotFound` for a key the spec plainly holds.
+#[test_log::test(tokio::test)]
+async fn test_unreconciled_variable_can_be_deleted_immediately() {
+    let harness = DatasetEnvVarsHarness::new_unreconciled().await;
+    let created_dataset = harness.create_dataset().await;
+
+    harness
+        .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+            "foo_value",
+            false,
+        ))
+        .await;
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::delete_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+        ))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "deleteEnvVariable": {
+                            "message": "Success"
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The same, for a secret: `delete_secret` rebuilds the remaining spec, and a
+/// projection-sourced rebuild would delete the entire set rather than one key.
+#[test_log::test(tokio::test)]
+async fn test_unreconciled_secret_delete_keeps_sibling_secrets() {
+    let harness = DatasetEnvVarsHarness::new_unreconciled().await;
+    let created_dataset = harness.create_dataset().await;
+
+    for key in ["foo", "bar"] {
+        harness
+            .execute_authorized_query(DatasetEnvVarsHarness::upsert_dataset_env(
+                &created_dataset.dataset_handle.id,
+                key,
+                "secret_value",
+                true,
+            ))
+            .await;
+    }
+
+    harness
+        .execute_authorized_query(DatasetEnvVarsHarness::delete_dataset_env(
+            &created_dataset.dataset_handle.id,
+            "foo",
+        ))
+        .await;
+
+    let res = harness
+        .execute_authorized_query(DatasetEnvVarsHarness::get_dataset_env_vars(
+            &created_dataset.dataset_handle.id,
+        ))
+        .await;
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "envVars": {
+                        "listEnvVariables": {
+                            "totalCount": 1,
+                            "nodes": [
+                                { "key": "bar", "value": null, "isSecret": true },
+                            ]
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLResourceHarness, base_gql_resource_harness)]
 struct DatasetEnvVarsHarness {
@@ -886,12 +1154,25 @@ struct DatasetEnvVarsHarness {
 
 impl DatasetEnvVarsHarness {
     async fn new() -> Self {
-        let base_gql_resource_harness = BaseGQLResourceHarness::new_with_config(
-            TenancyConfig::SingleTenant,
-            OutboxProvider::Immediate {
-                force_immediate: true,
-            },
-        );
+        Self::new_with_outbox(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .await
+    }
+
+    /// A harness where reconciliation never runs: [`OutboxProvider::Dummy`]
+    /// swallows `Applied`, so the projections stay empty.
+    ///
+    /// This holds open the window every client briefly reads in. The default
+    /// [`Self::new`] reconciles inline, which production never does, so only
+    /// this variant can catch a read-after-write regression.
+    async fn new_unreconciled() -> Self {
+        Self::new_with_outbox(OutboxProvider::Dummy).await
+    }
+
+    async fn new_with_outbox(outbox_provider: OutboxProvider) -> Self {
+        let base_gql_resource_harness =
+            BaseGQLResourceHarness::new_with_config(TenancyConfig::SingleTenant, outbox_provider);
 
         let catalog_dataset_env_vars = {
             let mut b = dill::CatalogBuilder::new_chained(&base_gql_resource_harness.catalog_base);

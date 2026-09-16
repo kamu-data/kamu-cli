@@ -43,3 +43,32 @@ pub trait DatasetEnvVarResolver: Send + Sync {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The same contract as [`DatasetEnvVarResolver`], resolved from the accepted
+/// resource **specs** rather than the reconciled read-side projections.
+///
+/// Reconciliation is asynchronous, so a caller that re-reads right after its
+/// own mutation — as the UI does — would see pre-edit state through the
+/// projection. Ingest has no such race and resolves [`DatasetEnvVarResolver`]
+/// instead. Kept a separate trait so the source is chosen explicitly per call
+/// site rather than by registration order.
+///
+/// Precedence, owner scoping and secret shadowing match the other resolver
+/// exactly; only the source differs.
+#[async_trait::async_trait]
+pub trait DatasetEnvVarSpecResolver: Send + Sync {
+    /// See [`DatasetEnvVarResolver::resolve_effective_env_vars`].
+    async fn resolve_effective_env_vars(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<HashMap<String, DatasetEnvVar>, InternalError>;
+
+    /// See [`DatasetEnvVarResolver::get_env_var_by_entry_key`].
+    async fn get_env_var_by_entry_key(
+        &self,
+        dataset_id: &odf::DatasetID,
+        entry_key: &str,
+    ) -> Result<DatasetEnvVar, GetDatasetEnvVarError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

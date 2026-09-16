@@ -1423,8 +1423,28 @@ Three things about it are easy to get wrong:
   name stays free-form (with the usual warning) while the full URI is a hard `Inapplicable`
   rejection — the standard registered-extension asymmetry.
 
-**Read path.** [`DatasetEnvVarResolverImpl`](/src/domain/configuration/services/src/dataset_env_var_resolver.rs)
-resolves a dataset's effective env vars by calling
+**Read path — two resolvers, one per audience.** The same lookup is served from two different
+sources, because the two callers want different things:
+
+| Caller | Trait / impl | Source | Why |
+| --- | --- | --- | --- |
+| Ingest / transform | `DatasetEnvVarResolver` → [`DatasetEnvVarResolverImpl`](/src/domain/configuration/services/src/dataset_env_var_resolver.rs) | reconciled **projection** | Wants reconciled state; is not racing its own writes. |
+| UI / GraphQL | `DatasetEnvVarSpecResolver` → [`DatasetEnvVarSpecResolverImpl`](/src/domain/configuration/services/src/dataset_env_var_spec_resolver.rs) | accepted **spec** | Needs *read-your-writes* consistency. |
+
+The split exists because reconciliation is asynchronous ([How reconciliation is
+scheduled](#how-reconciliation-is-scheduled)): `apply` commits the spec and returns, but the
+projection is only written after `Applied` travels the outbox and the two-phase reconcile commits.
+The web UI re-reads with a no-cache refetch the moment its edit dialog closes, so a
+projection-sourced read there loses the race deterministically — a new variable looks like it was
+never added, and an edited value looks like it reverted. They are separate traits rather than two
+bindings of one trait so the choice of source is explicit at each call site instead of depending on
+registration order.
+
+Everything else is identical between them — owner scoping, ordering, secrets-shadow-variables — and
+the rest of this section applies to both. `DatasetEnvVarService` (the legacy GraphQL facade) resolves
+only the spec-backed one; ingest resolves only the projection-backed one.
+
+Both resolve a dataset's effective env vars by calling
 `ResourceRepository::find_resource_ids_by_schema_and_label` once per kind, filtering on the
 canonical URI and the dataset DID, **scoped to the dataset's owner**. Ownership scoping is a
 security boundary: nothing validates the label value on write, so any account may stamp any dataset
@@ -1444,6 +1464,13 @@ stamps the label on the resources it auto-manages. Note that it still *finds* th
 their well-known name (`legacy-vars-<did>` / `legacy-secrets-<did>`), not by the label: the legacy
 read-modify-write path owns exactly one resource per dataset per kind, whereas the label may
 legitimately match several user-authored sets that this path must not touch.
+
+*It reads the stored spec, never the projection.* Upsert and delete both rebuild the whole set and
+apply it back, so here a pre-reconcile read is not merely stale but **destructive**: it would
+silently retract every entry added since the last reconcile — adding a second secret moments after
+the first would drop the first. Secrets are recoverable from the spec (the sanitizer encrypts before
+the first durable write), so that path decrypts via `SecretExt::decrypt_plaintext_bytes` rather than
+reading the projection's raw-AES columns.
 
 **Deletion path.** [`ConfigurationDatasetLifecycleMessageConsumer`](/src/domain/configuration/services/src/message_handlers/configuration_dataset_lifecycle_message_consumer.rs)
 consumes `DatasetLifecycleMessage::Deleted` (producer `MESSAGE_PRODUCER_KAMU_DATASET_SERVICE`,

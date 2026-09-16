@@ -12,6 +12,7 @@ pub mod testing;
 
 mod dataset_env_var_mutation_adapter;
 mod dataset_env_var_resolver;
+mod dataset_env_var_spec_resolver;
 mod dependencies;
 mod message_handlers;
 mod reconcilers;
@@ -22,6 +23,7 @@ pub mod sanitizers;
 
 pub use dataset_env_var_mutation_adapter::*;
 pub use dataset_env_var_resolver::*;
+pub use dataset_env_var_spec_resolver::*;
 pub use dependencies::*;
 pub use message_handlers::*;
 pub use reconcilers::*;

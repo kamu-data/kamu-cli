@@ -16,6 +16,7 @@ pub use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_datasets::{
     DatasetEnvVarMutationAdapter,
     DatasetEnvVarResolver,
+    DatasetEnvVarSpecResolver,
     UpsertDatasetEnvVarStatus,
 };
 
@@ -47,7 +48,13 @@ impl DatasetEnvVarServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
+    /// The projection-backed resolver, as ingest resolves it.
     pub fn resolver(&self) -> Arc<dyn DatasetEnvVarResolver> {
+        self.catalog.get_one().unwrap()
+    }
+
+    /// The spec-backed resolver, as the UI-facing GraphQL path resolves it.
+    pub fn spec_resolver(&self) -> Arc<dyn DatasetEnvVarSpecResolver> {
         self.catalog.get_one().unwrap()
     }
 

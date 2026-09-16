@@ -16,8 +16,8 @@ use kamu_datasets::{
     DatasetEnvVar,
     DatasetEnvVarListing,
     DatasetEnvVarMutationAdapter,
-    DatasetEnvVarResolver,
     DatasetEnvVarService,
+    DatasetEnvVarSpecResolver,
     DatasetEnvVarUpsertResult,
     DatasetEnvVarValue,
     DeleteDatasetEnvVarError,
@@ -28,8 +28,11 @@ use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Backs the legacy env-var GraphQL API, which serves a UI that re-reads
+/// immediately after every mutation — hence [`DatasetEnvVarSpecResolver`]
+/// rather than the projection-backed resolver ingest uses.
 pub struct DatasetEnvVarCompatServiceImpl {
-    resolver: Arc<dyn DatasetEnvVarResolver>,
+    resolver: Arc<dyn DatasetEnvVarSpecResolver>,
     mutation_adapter: Arc<dyn DatasetEnvVarMutationAdapter>,
     secrets_encryption_key: Option<SecretString>,
 }
@@ -41,7 +44,7 @@ pub struct DatasetEnvVarCompatServiceImpl {
 impl DatasetEnvVarCompatServiceImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
-        resolver: Arc<dyn DatasetEnvVarResolver>,
+        resolver: Arc<dyn DatasetEnvVarSpecResolver>,
         mutation_adapter: Arc<dyn DatasetEnvVarMutationAdapter>,
         secrets_encryption_config: Arc<SecretsEncryptionConfig>,
     ) -> Self {

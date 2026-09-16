@@ -47,6 +47,7 @@ interface "DatasetEntryWriter" <<i>>
 interface "DatasetEnvVarMutationAdapter" <<i>>
 interface "DatasetEnvVarResolver" <<i>>
 interface "DatasetEnvVarService" <<i>>
+interface "DatasetEnvVarSpecResolver" <<i>>
 interface "DatasetFactory" <<i>>
 interface "DatasetIncrementQueryService" <<i>>
 interface "DatasetKeyBlockRepository" <<i>>
@@ -233,6 +234,7 @@ class "DatasetEntryServiceImpl"
 class "DatasetEnvVarMutationAdapterImpl"
 class "DatasetEnvVarResolverImpl"
 class "DatasetEnvVarServiceNull"
+class "DatasetEnvVarSpecResolverImpl"
 class "DatasetFactoryImpl"
 class "DatasetIncrementQueryServiceImpl"
 class "DatasetKeyValueServiceSysEnv"
@@ -838,8 +840,6 @@ class "WsSmartTransferProtocolClient"
 "WorkspaceService"  --> "WorkspaceLayout"
 "DatasetEnvVarMutationAdapter" <|-- "DatasetEnvVarMutationAdapterImpl"
 "DatasetEnvVarMutationAdapterImpl"  --> "AccountService"
-"DatasetEnvVarMutationAdapterImpl"  --> "SecretSetProjectionRepository"
-"DatasetEnvVarMutationAdapterImpl"  --> "VariableSetProjectionRepository"
 "DatasetEnvVarMutationAdapterImpl"  --> "DatasetEntryRepository"
 "DatasetEnvVarMutationAdapterImpl"  --> "GenericResourceQueryService"
 "DatasetEnvVarMutationAdapterImpl"  --> "SecretsEncryptionConfig"
@@ -849,6 +849,11 @@ class "WsSmartTransferProtocolClient"
 "DatasetEnvVarResolverImpl"  --> "VariableSetProjectionRepository"
 "DatasetEnvVarResolverImpl"  --> "DatasetEntryRepository"
 "DatasetEnvVarResolverImpl"  --> "ResourceRepository"
+"DatasetEnvVarSpecResolver" <|-- "DatasetEnvVarSpecResolverImpl"
+"DatasetEnvVarSpecResolverImpl"  --> "DatasetEntryRepository"
+"DatasetEnvVarSpecResolverImpl"  --> "ResourceRepository"
+"DatasetEnvVarSpecResolverImpl"  --> "GenericResourceQueryService"
+"DatasetEnvVarSpecResolverImpl"  --> "SecretsEncryptionConfig"
 "MessageConsumer" <|-- "ConfigurationDatasetLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "ConfigurationDatasetLifecycleMessageConsumer"
 "MessageConsumer" <|-- "ConfigurationResourceLifecycleMessageConsumer"

@@ -17,11 +17,11 @@ use kamu_accounts::AccountService;
 use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     Secret,
-    SecretSetProjectionRepository,
+    SecretExt,
     SecretSetResource,
+    SecretSetSpec,
     SecretSetSpecInput,
     Variable,
-    VariableSetProjectionRepository,
     VariableSetResource,
     VariableSetSpec,
     VariableSetSpecInput,
@@ -65,8 +65,6 @@ pub struct DatasetEnvVarMutationAdapterImpl {
     dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
     account_service: Arc<dyn AccountService>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
-    variable_set_projection_repo: Arc<dyn VariableSetProjectionRepository>,
-    secret_set_projection_repo: Arc<dyn SecretSetProjectionRepository>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
 }
 
@@ -521,12 +519,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             return Ok(None);
         };
 
-        let entries = self
-            .secret_set_projection_repo
-            .get_latest_entries(&resource_id)
-            .await?;
+        let spec = self.load_secret_spec(&resource_id).await?;
 
-        if entries.iter().any(|e| e.key == key) {
+        if spec.secrets.entries.contains_key(key) {
             return Ok(Some((resource_id, key.to_string())));
         }
 
@@ -550,12 +545,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             return Ok(None);
         };
 
-        let entries = self
-            .variable_set_projection_repo
-            .get_latest_entries(&resource_id)
-            .await?;
+        let spec = self.load_variable_spec(&resource_id).await?;
 
-        if entries.iter().any(|e| e.key == key) {
+        if spec.variables.entries.contains_key(key) {
             return Ok(Some((resource_id, key.to_string())));
         }
 
@@ -654,29 +646,52 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok((Some(id), secrets))
     }
 
+    async fn load_variable_spec(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<odf::metadata::config::VariableSetSpec, InternalError> {
+        let snapshot = self
+            .generic_resource_query_service
+            .get_snapshot_by_id(resource_id)
+            .await?
+            .ok_or_else(|| format!("VariableSet {resource_id} missing snapshot").int_err())?;
+
+        let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
+        Ok(spec.into_dto())
+    }
+
+    async fn load_secret_spec(
+        &self,
+        resource_id: &ResourceID,
+    ) -> Result<odf::metadata::config::SecretSetSpec, InternalError> {
+        let snapshot = self
+            .generic_resource_query_service
+            .get_snapshot_by_id(resource_id)
+            .await?
+            .ok_or_else(|| format!("SecretSet {resource_id} missing snapshot").int_err())?;
+
+        let spec: SecretSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
+        Ok(spec.into_dto())
+    }
+
+    /// The set's secrets as plaintext, from the stored spec.
+    ///
+    /// Not the projection: this feeds read-modify-write applies, so a
+    /// pre-reconcile read would rebuild the spec without any secret added since
+    /// and silently retract it.
     async fn decrypt_secret_entries(
         &self,
         resource_id: &ResourceID,
     ) -> Result<BTreeMap<String, String>, InternalError> {
-        let encryption_key = self
-            .secrets_encryption_config
-            .encryption_key
-            .as_deref()
-            .unwrap_or("");
-        let encryptor = AesGcmEncryptor::try_new(encryption_key).int_err()?;
+        let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
 
-        let entries = self
-            .secret_set_projection_repo
-            .get_latest_entries(resource_id)
-            .await?;
+        let spec = self.load_secret_spec(resource_id).await?;
 
         let mut decrypted = BTreeMap::new();
-        for entry in entries {
-            let plaintext = encryptor
-                .decrypt_bytes(&entry.value, &entry.secret_nonce)
-                .int_err()?;
+        for (key, secret) in spec.secrets.entries {
+            let plaintext = secret.decrypt_plaintext_bytes(&cryptor)?;
             let plaintext = String::from_utf8(plaintext).int_err()?;
-            decrypted.insert(entry.key, plaintext);
+            decrypted.insert(key, plaintext);
         }
         Ok(decrypted)
     }
