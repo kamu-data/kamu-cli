@@ -407,7 +407,7 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 `src/infra/resources/` (`postgres`, `sqlite`, `inmem`), all implementing the domain
 `ResourceRepository` + raw event-store traits and sharing the cross-backend test suite in
 `src/infra/resources/repo-tests/`. Schema is defined by
-[`migrations/postgres/20260323155948_resources.sql`](/migrations/postgres/20260323155948_resources.sql)
+[`migrations/postgres/20260815100000_resources.sql`](/migrations/postgres/20260815100000_resources.sql)
 (SQLite mirror alongside).
 
 **Two tables:**
@@ -449,7 +449,7 @@ methods filter `WHERE deleted_at IS NULL`, so tombstones are invisible to normal
 
 **Migration / backfill.** Schema changes are ordinary SQLx migrations under `migrations/{postgres,sqlite}`.
 There is a precedent for data backfill into resources —
-`20260513120000_backfill_env_var_resources.sql` migrates legacy dataset env-vars into `VariableSet`
+`20260815130000_backfill_env_var_resources.sql` migrates legacy dataset env-vars into `VariableSet`
 resources; new types that supersede existing data should follow that pattern (additive migration +
 backfill, never rewriting the event log in place).
 
