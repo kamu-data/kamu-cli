@@ -196,7 +196,8 @@ The behaviorally-significant consequences of adopting these shapes:
   are preserved, with a warning; unknown full URIs are strict and are rejected. Registration is not
   limited to the resources domain: `kamu-configuration` registers
   [`legacy-config-target-dataset`](resources-framework.md#legacy-dataset-association--the-legacy-config-target-dataset-label),
-  scoped so it canonicalizes on `VariableSet`/`SecretSet` and is rejected elsewhere.
+  scoped so it canonicalizes on `VariableSet`/`SecretSet` and is rejected elsewhere. That label is
+  also retracted when its dataset is deleted, so the association never outlives its target.
 - **Resource warning codes live with `ResourceWarning`.** Core resource-header warnings are defined in
   [`values/resource_warning.rs`](/src/domain/resources/domain/src/values/resource_warning.rs): missing
   description, non-indexable labels, and free-form label/annotation warnings. Configuration-specific

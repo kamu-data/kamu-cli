@@ -106,6 +106,20 @@ pub trait ResourceRepository: Send + Sync {
         label_value: &str,
     ) -> Result<Vec<ResourceID>, InternalError>;
 
+    /// Cleanup counterpart of [`Self::find_resource_ids_by_schema_and_label`],
+    /// spanning every account. Retracting a pointer to a deleted entity grants
+    /// no access, so the scoped variant's privilege boundary does not apply.
+    ///
+    /// Account-free out of necessity, not preference: dataset deletion removes
+    /// the `dataset_entries` row before posting its message, leaving the owner
+    /// unresolvable by the time the cleanup consumer runs.
+    async fn find_resource_ids_by_schema_and_label_any_account(
+        &self,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Result<Vec<ResourceID>, InternalError>;
+
     /// Label filtering rides on `scope`: each row carries the pairs it must
     /// satisfy, so one call may filter differently per type.
     async fn search_resource_handles(

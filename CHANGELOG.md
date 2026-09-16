@@ -59,6 +59,9 @@ Recommendation: for ease of reading, use the following format:
     never returned in plaintext unless explicitly requested
   - A dataset resolves its variables and secrets through resource labels, so one set can now serve
     several datasets instead of being copied per dataset
+  - Deleting a dataset cleans up after itself: the auto-managed sets created for it are removed, and
+    the now-dangling association is retracted from any other set that pointed at it, so no resource
+    is left referring to a dataset that no longer exists
 - A third resource type, `Storage`, ships as a prototype to validate the framework against a
   non-configuration object. Its shape and CLI surface are real, but it is not yet wired to actual
   storage provisioning

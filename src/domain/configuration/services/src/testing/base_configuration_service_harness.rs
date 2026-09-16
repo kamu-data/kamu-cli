@@ -165,6 +165,128 @@ impl BaseConfigurationServiceHarness {
         .await
     }
 
+    /// Seeds a labelled `VariableSet` through the real apply path, so it gets
+    /// an event-sourced aggregate. Required by tests that mutate the result;
+    /// [`Self::seed_variable_set_targeting`] only writes a snapshot.
+    pub async fn apply_variable_set_targeting(
+        &self,
+        account: &odf::AccountHandle,
+        dataset_id: &odf::DatasetID,
+        name: &str,
+        variables: impl IntoIterator<Item = (&'static str, &'static str)>,
+        extra_labels: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> ResourceID {
+        let spec = kamu_configuration::VariableSetSpecInput::new(
+            odf::metadata::config::VariableSetSpecInput {
+                variables: odf::metadata::config::Variables {
+                    entries: variables
+                        .into_iter()
+                        .map(|(name, value)| {
+                            (
+                                name.to_string(),
+                                kamu_configuration::Variable {
+                                    value: value.to_string(),
+                                },
+                            )
+                        })
+                        .collect(),
+                },
+            },
+        );
+
+        let decision = self
+            .apply_variable_use_case()
+            .apply(kamu_resources::ApplyResourceParams {
+                id: None,
+                headers: Self::make_targeting_headers_input(
+                    account,
+                    dataset_id,
+                    name,
+                    extra_labels,
+                ),
+                spec,
+            })
+            .await
+            .unwrap();
+
+        decision.expect_applied().id
+    }
+
+    /// [`Self::apply_variable_set_targeting`] for secrets, which arrive as
+    /// plaintext and are sanitized to `jwe` like any normally-authored set.
+    pub async fn apply_secret_set_targeting(
+        &self,
+        account: &odf::AccountHandle,
+        dataset_id: &odf::DatasetID,
+        name: &str,
+        secrets: impl IntoIterator<Item = (&'static str, &'static str)>,
+        extra_labels: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> ResourceID {
+        let spec = kamu_configuration::SecretSetSpecInput::new(
+            odf::metadata::config::SecretSetSpecInput {
+                secrets: odf::metadata::config::Secrets {
+                    entries: secrets
+                        .into_iter()
+                        .map(|(name, value)| {
+                            (
+                                name.to_string(),
+                                odf::metadata::config::Secret {
+                                    value: value.to_string(),
+                                    content_encoding: None,
+                                },
+                            )
+                        })
+                        .collect(),
+                },
+            },
+        );
+
+        let decision = self
+            .apply_secret_use_case()
+            .apply(kamu_resources::ApplyResourceParams {
+                id: None,
+                headers: Self::make_targeting_headers_input(
+                    account,
+                    dataset_id,
+                    name,
+                    extra_labels,
+                ),
+                spec,
+            })
+            .await
+            .unwrap();
+
+        decision.expect_applied().id
+    }
+
+    fn make_targeting_headers_input(
+        account: &odf::AccountHandle,
+        dataset_id: &odf::DatasetID,
+        name: &str,
+        extra_labels: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> kamu_resources::ResourceHeadersInput {
+        let mut headers = BaseResourceServiceHarness::make_headers_input(account.clone(), name);
+
+        let mut entries: std::collections::BTreeMap<_, _> = [(
+            RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI
+                .parse()
+                .unwrap(),
+            serde_json::Value::String(dataset_id.as_did_str().to_string()),
+        )]
+        .into_iter()
+        .collect();
+
+        for (key, value) in extra_labels {
+            entries.insert(
+                key.parse().unwrap(),
+                serde_json::Value::String(value.to_string()),
+            );
+        }
+
+        headers.labels = Some(kamu_resources::ResourceLabels { entries });
+        headers
+    }
+
     /// Creates a resource carrying the `legacy-config-target-dataset` label,
     /// writing both the snapshot and its label projection row the way
     /// `sync_snapshots` does in production.

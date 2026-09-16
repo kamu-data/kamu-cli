@@ -139,6 +139,51 @@ async fn test_save_resource_resyncs_label_projection() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_delete_resource_clears_label_projection() {
+    // Stale rows are only invisible today because every query filters
+    // `deleted_at IS NULL`; they would become wrong without that join.
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
+        Some(odf::metadata::auth::AccountRef {
+            id: Some(harness.account_handle.id),
+            did: Some(harness.account_handle.did.clone()),
+            name: Some(harness.account_handle.name.clone()),
+        }),
+        "res-a",
+        vec![("env".parse().unwrap(), serde_json::json!("staging"))],
+        vec![],
+    )
+    .unwrap();
+    loaded.try_update_headers(Utc::now(), new_headers).unwrap();
+    harness.persistence_svc().save(&mut loaded).await.unwrap();
+
+    assert_eq!(
+        harness.label_projection_entries(&id).await,
+        vec![("env".to_string(), "staging".to_string())],
+        "precondition: the label is projected while the resource is live"
+    );
+
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    harness
+        .persistence_svc()
+        .delete(&mut loaded, Utc::now())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        harness.label_projection_entries(&id).await,
+        Vec::<(String, String)>::new(),
+        "deleting the resource must clear its projection rows"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_create_duplicate_id_returns_error() {
     let harness = ResourcePersistenceServiceHarness::new();
 

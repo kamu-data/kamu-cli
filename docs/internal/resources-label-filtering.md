@@ -167,6 +167,17 @@ resource_id)`) mirroring the top-level **string-valued** entries of
 are not indexed. The `_projection` suffix signals it carries no independent
 state of its own — every row is derived from `resources.labels`.
 
+The covering index leads with `(label_key, label_value)` rather than `resource_id`
+because it serves **two** shapes. The account-scoped
+`find_resource_ids_by_schema_and_label` (the env-var read path) uses it as a prefix
+and filters `resources.account_id` after the join; the account-free
+`find_resource_ids_by_schema_and_label_any_account` (the dataset-deletion cleanup
+sweep — see
+[the legacy target-dataset label](resources-framework.md#legacy-dataset-association--the-legacy-config-target-dataset-label))
+uses it directly. The cleanup variant *must* be account-free: the `dataset_entries`
+row is hard-deleted before the lifecycle message is posted, so the owning account is
+no longer resolvable by the time the consumer runs.
+
 It is maintained by a dedicated sibling trait, `ResourceLabelProjectionRepository`
 (`domain/src/repo/resource_label_projection_repository.rs`:
 `replace_entries(resource_id, &[(String,String)])` /
@@ -176,7 +187,13 @@ It is maintained by a dedicated sibling trait, `ResourceLabelProjectionRepositor
 `create`/`save`/`delete(_many)` — immediately after
 `resource_repository.update_resources(...)` succeeds, with both repositories
 resolved from the same transactional DI scope so the snapshot write and the
-projection write commit or roll back together. This keeps `ResourceRepository`
+projection write commit or roll back together. A snapshot that arrives already
+tombstoned (`headers.deleted_at.is_some()`) has its entries **cleared** rather than
+rewritten, keyed off the snapshot rather than the call site since `sync_snapshots`
+is shared by all three paths. Live queries all join `resources` with
+`deleted_at IS NULL`, so stale rows were invisible rather than wrong — but they
+cost index space for nothing and would become wrong for any query that read the
+projection without that join. This keeps `ResourceRepository`
 scoped to `resources`/`resource_events` and gives the projection's read side room
 to grow into real filtered queries (Phase 9) without touching `ResourceRepository`'s
 surface. Implemented per backend (`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,

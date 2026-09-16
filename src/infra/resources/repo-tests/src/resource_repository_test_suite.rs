@@ -2864,3 +2864,152 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_other_accounts(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_find_resource_ids_by_schema_and_label_any_account_spans_accounts(
+    catalog: &Catalog,
+) {
+    // The defining property of the account-free variant: it reaches across
+    // accounts, in global `created_at` order rather than grouped by owner.
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let now = Utc::now();
+
+    let first = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &odf::AccountHandle::new_test("account-one"),
+        &TEST_KIND,
+        "owned-by-one",
+        now,
+        &[("environment", "prod")],
+    )
+    .await;
+    let second = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &odf::AccountHandle::new_test("account-two"),
+        &TEST_KIND,
+        "owned-by-two",
+        now + chrono::Duration::hours(1),
+        &[("environment", "prod")],
+    )
+    .await;
+
+    let ids = repo
+        .find_resource_ids_by_schema_and_label_any_account(&TEST_KIND, "environment", "prod")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        ids,
+        vec![first, second],
+        "both accounts' resources must match, ordered by `created_at` across the account boundary"
+    );
+
+    // The scoped variant must be unaffected by the new one's existence.
+    let scoped = repo
+        .find_resource_ids_by_schema_and_label(
+            &odf::AccountHandle::new_test("account-one").did,
+            &TEST_KIND,
+            "environment",
+            "prod",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        scoped,
+        vec![first],
+        "the account-scoped variant must still see only its own account"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_find_resource_ids_by_schema_and_label_any_account_discriminates(
+    catalog: &Catalog,
+) {
+    // Reaching across accounts must not weaken the other three filters the
+    // scoped variant enforces: liveness, schema, and the exact label pair.
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let account_one = odf::AccountHandle::new_test("account-one");
+    let account_two = odf::AccountHandle::new_test("account-two");
+    let now = Utc::now();
+
+    let wanted = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_one,
+        &TEST_KIND,
+        "wanted",
+        now,
+        &[("environment", "prod")],
+    )
+    .await;
+
+    // Wrong label value
+    seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_two,
+        &TEST_KIND,
+        "wrong-value",
+        now + chrono::Duration::hours(1),
+        &[("environment", "staging")],
+    )
+    .await;
+
+    // Wrong label key
+    seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_two,
+        &TEST_KIND,
+        "wrong-key",
+        now + chrono::Duration::hours(2),
+        &[("team", "prod")],
+    )
+    .await;
+
+    // Right label, but soft-deleted
+    let doomed = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_two,
+        &TEST_KIND,
+        "doomed",
+        now + chrono::Duration::hours(3),
+        &[("environment", "prod")],
+    )
+    .await;
+
+    let mut snapshot = repo
+        .find_resource_snapshot_by_id(&doomed)
+        .await
+        .unwrap()
+        .unwrap();
+    snapshot.headers.deleted_at = Some(Utc::now());
+    repo.update_resource(&snapshot, snapshot.last_event_id)
+        .await
+        .unwrap();
+
+    let ids = repo
+        .find_resource_ids_by_schema_and_label_any_account(&TEST_KIND, "environment", "prod")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        ids,
+        vec![wanted],
+        "spanning accounts must not relax the liveness or label-pair filters"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

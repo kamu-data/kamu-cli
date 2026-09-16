@@ -59,6 +59,13 @@ pub trait ResourceHeadersExt {
     fn simple(now: DateTime<Utc>, id: ResourceID, account: auth::AccountHandle, name: &str)
     -> Self;
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self;
+    /// Inverse of [`Self::from_input`] for read-modify-write edits. Drops the
+    /// server-owned fields and pins `id`, so the apply targets this resource
+    /// rather than resolving by name.
+    fn into_input(self) -> ResourceHeadersInput;
+
+    /// [`Self::into_input`] for callers that still need their headers after.
+    fn to_input(&self) -> ResourceHeadersInput;
     fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool;
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput);
 }
@@ -109,6 +116,24 @@ impl ResourceHeadersExt for ResourceHeaders {
             updated_at: now,
             deleted_at: None,
         }
+    }
+
+    fn into_input(self) -> ResourceHeadersInput {
+        ResourceHeadersInput {
+            id: Some(self.id),
+            account: Some(auth::AccountRef {
+                id: Some(self.account.id),
+                did: Some(self.account.did),
+                name: Some(self.account.name),
+            }),
+            name: self.name,
+            labels: Some(self.labels),
+            annotations: Some(self.annotations),
+        }
+    }
+
+    fn to_input(&self) -> ResourceHeadersInput {
+        self.clone().into_input()
     }
 
     fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool {

@@ -16,6 +16,7 @@ mod test_resources_context_add_login;
 mod test_resources_context_management;
 mod test_resources_context_override;
 mod test_resources_dataset_compat;
+mod test_resources_dataset_deletion_cleanup;
 mod test_resources_delete;
 mod test_resources_dry_run;
 mod test_resources_extension_schemas;

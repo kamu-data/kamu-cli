@@ -1281,6 +1281,9 @@ flowchart LR
 
     ACC[["AccountLifecycleMessage::Deleted"]] --> OB2[("Outbox")]
     OB2 --> ACCH["AccountLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_ACCOUNT_LIFECYCLE_HANDLER)<br/>→ DeleteAccountResourcesUseCase (cascade delete)"]
+
+    DS[["DatasetLifecycleMessage::Deleted"]] --> OB3[("Outbox")]
+    OB3 --> DSH["configuration crate:<br/>ConfigurationDatasetLifecycleMessageConsumer<br/>→ retracts legacy-config-target-dataset"]
 ```
 
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `ReconciliationSucceeded` /
@@ -1291,6 +1294,13 @@ flowchart LR
 - **Account cascade** — when an account is deleted, `AccountLifecycleMessage::Deleted` is consumed by
   `AccountLifecycleMessageConsumer` (`MESSAGE_CONSUMER_KAMU_RESOURCE_ACCOUNT_LIFECYCLE_HANDLER`),
   which invokes `DeleteAccountResourcesUseCase` to remove all of that account's resources.
+- **Dataset cleanup** — when a dataset is deleted, `DatasetLifecycleMessage::Deleted` is consumed by
+  the configuration crate's `ConfigurationDatasetLifecycleMessageConsumer`, which deletes the
+  auto-managed `legacy-vars-*` / `legacy-secrets-*` sets and strips the now-dangling
+  `legacy-config-target-dataset` label from everything else carrying it. Unlike the account cascade,
+  the deleted entity is *not* the ownership scope — and the `dataset_entries` row is already gone —
+  so the sweep is keyed on the dataset DID across all accounts. See
+  [the legacy target-dataset label](#legacy-dataset-association--the-legacy-config-target-dataset-label).
 
 ### How reconciliation is scheduled
 
@@ -1435,12 +1445,57 @@ their well-known name (`legacy-vars-<did>` / `legacy-secrets-<did>`), not by the
 read-modify-write path owns exactly one resource per dataset per kind, whereas the label may
 legitimately match several user-authored sets that this path must not touch.
 
-**Dataset deletion leaves the label behind, deliberately.** There is no consumer that strips the
-label when a dataset is deleted. The label is inert once the dataset is gone — nothing resolves env
-vars for a nonexistent dataset — and the resource remains a legitimate user-owned top-level
-resource that the user may still want. The bindings system did have such a consumer, but it was
-also strictly worse: neither Postgres nor SQLite had an FK on `dataset_id`, so a lost lifecycle
-message already orphaned binding rows.
+**Deletion path.** [`ConfigurationDatasetLifecycleMessageConsumer`](/src/domain/configuration/services/src/message_handlers/configuration_dataset_lifecycle_message_consumer.rs)
+consumes `DatasetLifecycleMessage::Deleted` (producer `MESSAGE_PRODUCER_KAMU_DATASET_SERVICE`,
+`TransactionalWrapped`) and retracts the association. The label is the only thing tying a config
+resource to its dataset, so leaving it behind leaves a dead link: an orphaned
+`legacy-vars-<multibase>` resource under a name that means nothing without its dataset, plus
+dangling labels on user-authored sets.
+
+*Two treatments, decided by name.* A resource named **exactly** the well-known name for *this*
+dataset (`legacy-vars-<multibase>` / `legacy-secrets-<multibase>`, via the same
+`DatasetEnvVarMutationAdapterImpl` helpers the write path uses) is auto-managed — the backfill
+migration or the mutation adapter created it and the dataset was its entire reason to exist — so it
+is deleted. Anything else carrying the label is user-authored and stays a legitimate top-level
+resource, so only the dangling label is stripped. The comparison is against the full derived name,
+never a `legacy-vars-` prefix: a resource named after *some other* dataset must be stripped, not
+deleted.
+
+*The sweep is account-free, and that is a requirement rather than a convenience.*
+`DeleteDatasetUseCaseImpl::execute_plan` hard-deletes the `dataset_entries` row **before** posting
+the message, and `DatasetLifecycleMessageDeleted` carries only `dataset_id` — so by the time any
+consumer runs, the owning account is no longer resolvable from the dataset at all. Selection is
+therefore done entirely by the globally-unique dataset DID, through
+`ResourceRepository::find_resource_ids_by_schema_and_label_any_account`. This does **not** weaken
+the read path's ownership scoping: there, `account_id` is a privilege boundary that stops a stranger
+injecting variables into your ingest; here, retracting a pointer to an entity that no longer exists
+grants nobody access to anything, and a dead link must not survive merely because it lives in
+someone else's namespace.
+
+*Authority.* The consumer runs below the facade, which is where authorization lives, so it resolves
+dispatchers from the message-scoped catalog and never touches `CurrentAccountSubject` — there is no
+system principal in this codebase and none is needed. The `account_id` it passes to
+`ResourceCrudDispatcherDeleteRequest` is an ownership **scope**, read back off each selected
+resource's own snapshot, not an actor claim: the use case feeds it to `find_owned_snapshots`, which
+hard-errors on ids owned by anyone else. Nothing in `ResourceEventDeleted` or
+`ResourceLifecycleMessageDeleted` records an actor, so there is no attribution to distort.
+
+*Stripping is a full apply* — get the current definition, remove the label, apply it back, the
+resource contract working as intended. Behaviourally it is a headers-only change: `try_update_spec`
+short-circuits on an unchanged spec and `HeadersUpdated` neither bumps `generation` nor marks the
+resource pending, so no reconciliation is scheduled. The one exception is a `SecretSet` whose stored
+spec is still the backfill migration's read-only `aes256gcm` form, which `SecretSetSpecSanitizer`
+upgrades to `jwe` on the way through — a real spec change that does bump the generation. It cannot
+reach the auto-managed sets (those are deleted, not stripped), and a normally-authored set is always
+already `jwe`.
+
+*Projection GC is inherited, not repeated.* Deleting posts `ResourceLifecycleMessage::Deleted`,
+which `ConfigurationResourceLifecycleMessageConsumer` already handles by dropping the read-side
+entries.
+
+The bindings system had an equivalent consumer before the label replaced it, but it was strictly
+worse: neither Postgres nor SQLite had an FK on `dataset_id`, so a lost lifecycle message already
+orphaned binding rows.
 
 ### Secret handling invariant
 

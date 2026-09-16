@@ -45,6 +45,7 @@ use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
+    ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceID,
     ResourceName,
@@ -378,17 +379,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 .await
                 .int_err()?;
         } else {
-            let headers = ResourceHeadersInput {
-                id: Some(snapshot.headers.id),
-                account: Some(odf::metadata::auth::AccountRef {
-                    id: Some(snapshot.headers.account.id),
-                    did: Some(snapshot.headers.account.did),
-                    name: Some(snapshot.headers.account.name),
-                }),
-                name: snapshot.headers.name,
-                labels: Some(snapshot.headers.labels),
-                annotations: Some(snapshot.headers.annotations),
-            };
+            let headers = snapshot.headers.into_input();
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
@@ -454,17 +445,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                         .collect(),
                 },
             });
-            let headers = ResourceHeadersInput {
-                id: Some(snapshot.headers.id),
-                account: Some(odf::metadata::auth::AccountRef {
-                    id: Some(snapshot.headers.account.id),
-                    did: Some(snapshot.headers.account.did),
-                    name: Some(snapshot.headers.account.name),
-                }),
-                name: snapshot.headers.name,
-                labels: Some(snapshot.headers.labels),
-                annotations: Some(snapshot.headers.annotations),
-            };
+            let headers = snapshot.headers.into_input();
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {

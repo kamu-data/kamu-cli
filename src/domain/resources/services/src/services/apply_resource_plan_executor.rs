@@ -26,7 +26,7 @@ use crate::domain::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
-    ResourceHeadersInput,
+    ResourceHeadersExt,
     ResourceHeadersValidationError,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
@@ -151,17 +151,7 @@ where
     ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
         let headers = plan.resource.headers();
 
-        let headers_input = ResourceHeadersInput {
-            id: Some(headers.id),
-            account: Some(odf::metadata::auth::AccountRef {
-                id: Some(headers.account.id),
-                did: Some(headers.account.did.clone()),
-                name: Some(headers.account.name.clone()),
-            }),
-            name: headers.name.clone(),
-            labels: Some(headers.labels.clone()),
-            annotations: Some(headers.annotations.clone()),
-        };
+        let headers_input = headers.to_input();
 
         let planner = ApplyResourcePlanner::<R>::new(
             self.generic_resource_query_service,

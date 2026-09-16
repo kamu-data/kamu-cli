@@ -20,6 +20,10 @@ pub type ResourceHeadersInput = odf::metadata::resource::ResourceHeadersInput;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceHeadersInputExt {
+    /// Removes a label, if present. Spares read-modify-write callers an
+    /// `Option` dance, since `into_input` always populates `labels`.
+    fn remove_label(&mut self, key: &TypeRef);
+
     fn try_new(
         account: Option<auth::AccountRef>,
         name: &str,
@@ -31,6 +35,12 @@ pub trait ResourceHeadersInputExt {
 }
 
 impl ResourceHeadersInputExt for ResourceHeadersInput {
+    fn remove_label(&mut self, key: &TypeRef) {
+        if let Some(labels) = self.labels.as_mut() {
+            labels.entries.remove(key);
+        }
+    }
+
     fn try_new(
         account: Option<auth::AccountRef>,
         name: &str,

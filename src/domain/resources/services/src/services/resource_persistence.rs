@@ -218,11 +218,16 @@ where
         }
 
         for update in &updates {
+            // Tombstones keep no live projection rows. Keyed off the snapshot,
+            // not the call site, since create / save / delete share this path.
+            let entries = if update.snapshot.headers.deleted_at.is_some() {
+                Vec::new()
+            } else {
+                string_label_entries(&update.snapshot.headers.labels)
+            };
+
             self.label_projection_repository
-                .replace_entries(
-                    &update.snapshot.id,
-                    &string_label_entries(&update.snapshot.headers.labels),
-                )
+                .replace_entries(&update.snapshot.id, &entries)
                 .await
                 .map_err(ResourcePersistenceError::Internal)?;
         }
