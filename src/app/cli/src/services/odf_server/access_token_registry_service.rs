@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
-use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use odf::metadata::serde::yaml::legacy::Manifest;
@@ -32,8 +31,9 @@ pub struct AccessTokenRegistryService {
     user_registry: Mutex<OdfServerAccessTokenRegistry>,
 }
 
-#[component(pub)]
-#[interface(dyn odf::dataset::OdfServerAccessTokenResolver)]
+#[dill::component(pub)]
+#[dill::scope(dill::scopes::Singleton)]
+#[dill::interface(dyn odf::dataset::OdfServerAccessTokenResolver)]
 impl AccessTokenRegistryService {
     pub fn new(
         storage: Arc<dyn AccessTokenStore>,
@@ -377,8 +377,8 @@ pub struct CLIAccessTokenStore {
     workspace_token_store_path: PathBuf,
 }
 
-#[component(pub)]
-#[interface(dyn AccessTokenStore)]
+#[dill::component(pub)]
+#[dill::interface(dyn AccessTokenStore)]
 impl CLIAccessTokenStore {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         // TODO: Respect `XDG_CONFIG_HOME` when working with configs
