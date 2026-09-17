@@ -57,21 +57,15 @@ SELECT
         'observedGeneration', 1,
         'reconciledAt', MIN(dev.created_at),
         'conditions', jsonb_build_object(
-            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
-            jsonb_build_object(
-                'status', 'True',
-                'reason', 'ValidationPassed',
-                'lastTransitionTime', MIN(dev.created_at)
-            ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
             jsonb_build_object(
-                'status', 'True',
+                'value', 'True',
                 'reason', 'Reconciled',
                 'lastTransitionTime', MIN(dev.created_at)
             ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
             jsonb_build_object(
-                'status', 'False',
+                'value', 'False',
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )
@@ -171,21 +165,15 @@ SELECT
         'observedGeneration', 1,
         'reconciledAt', MIN(dev.created_at),
         'conditions', jsonb_build_object(
-            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
-            jsonb_build_object(
-                'status', 'True',
-                'reason', 'ValidationPassed',
-                'lastTransitionTime', MIN(dev.created_at)
-            ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
             jsonb_build_object(
-                'status', 'True',
+                'value', 'True',
                 'reason', 'Reconciled',
                 'lastTransitionTime', MIN(dev.created_at)
             ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
             jsonb_build_object(
-                'status', 'False',
+                'value', 'False',
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )

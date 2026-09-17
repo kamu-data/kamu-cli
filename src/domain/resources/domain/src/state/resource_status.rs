@@ -123,11 +123,22 @@ impl ResourceStatusExt for ResourceStatus {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn ready_condition(status: &ResourceStatus) -> Option<ResourceConditionValue> {
-    status
-        .conditions
-        .entries
-        .get(&ready_condition_type_ref())
-        .and_then(|value| serde_json::from_value(value.clone()).ok())
+    let condition_key = ready_condition_type_ref();
+
+    let value = status.conditions.entries.get(&condition_key)?;
+
+    match serde_json::from_value(value.clone()) {
+        Ok(value) => Some(value),
+        Err(error) => {
+            tracing::warn!(
+                %condition_key,
+                %value,
+                %error,
+                "Failed to parse condition value - ignoring",
+            );
+            None
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

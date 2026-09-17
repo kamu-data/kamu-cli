@@ -55,21 +55,15 @@ SELECT
         'observedGeneration', 1,
         'reconciledAt', MIN(dev.created_at),
         'conditions', json_object(
-            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
-            json_object(
-                'status', 'True',
-                'reason', 'ValidationPassed',
-                'lastTransitionTime', MIN(dev.created_at)
-            ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
             json_object(
-                'status', 'True',
+                'value', 'True',
                 'reason', 'Reconciled',
                 'lastTransitionTime', MIN(dev.created_at)
             ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
             json_object(
-                'status', 'False',
+                'value', 'False',
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )
@@ -175,21 +169,15 @@ SELECT
         'observedGeneration', 1,
         'reconciledAt', MIN(dev.created_at),
         'conditions', json_object(
-            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
-            json_object(
-                'status', 'True',
-                'reason', 'ValidationPassed',
-                'lastTransitionTime', MIN(dev.created_at)
-            ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
             json_object(
-                'status', 'True',
+                'value', 'True',
                 'reason', 'Reconciled',
                 'lastTransitionTime', MIN(dev.created_at)
             ),
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
             json_object(
-                'status', 'False',
+                'value', 'False',
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )

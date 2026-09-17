@@ -36,20 +36,27 @@ impl ResourceConditionValue {
         (condition_key, new_condition): (TypeRef, ResourceConditionValue),
     ) {
         let condition = if let Some(existing_value) = conditions.get(&condition_key) {
-            if let Ok(existing) =
-                serde_json::from_value::<ResourceConditionValue>(existing_value.clone())
-            {
-                let status_changed = existing.value != new_condition.value;
-                ResourceConditionValue {
-                    last_transition_time: if status_changed {
-                        new_condition.last_transition_time
-                    } else {
-                        existing.last_transition_time
-                    },
-                    ..new_condition
+            match serde_json::from_value::<ResourceConditionValue>(existing_value.clone()) {
+                Ok(existing) => {
+                    let status_changed = existing.value != new_condition.value;
+                    ResourceConditionValue {
+                        last_transition_time: if status_changed {
+                            new_condition.last_transition_time
+                        } else {
+                            existing.last_transition_time
+                        },
+                        ..new_condition
+                    }
                 }
-            } else {
-                new_condition
+                Err(error) => {
+                    tracing::warn!(
+                        %condition_key,
+                        value = %existing_value,
+                        %error,
+                        "Failed to parse condition value - ignoring",
+                    );
+                    new_condition
+                }
             }
         } else {
             new_condition
