@@ -42,14 +42,7 @@ pub async fn test_dataset_page_recent_activity(catalog: &Catalog) {
 
     // Test first page (limit=3, offset=0)
     let first_page = flow_process_state_query
-        .list_processes(
-            filter,
-            ordering,
-            Some(PaginationOpts {
-                limit: 3,
-                offset: 0,
-            }),
-        )
+        .list_processes(filter, ordering, Some(PaginationOpts::from_max_results(3)))
         .await
         .unwrap();
 
@@ -93,14 +86,7 @@ pub async fn test_dataset_page_recent_activity(catalog: &Catalog) {
     let scope_query2 = FlowScopeDataset::query_for_single_dataset(&dataset_id);
     let filter2 = FlowProcessListFilter::for_scope(scope_query2);
     let second_page = flow_process_state_query
-        .list_processes(
-            filter2,
-            ordering,
-            Some(PaginationOpts {
-                limit: 3,
-                offset: 3,
-            }),
-        )
+        .list_processes(filter2, ordering, Some(PaginationOpts::from_page(1, 3)))
         .await
         .unwrap();
 
@@ -140,14 +126,7 @@ pub async fn test_account_dashboard_triage(catalog: &Catalog) {
 
     // Test first page only (limit=5, offset=0)
     let triage_page = flow_process_state_query
-        .list_processes(
-            filter,
-            ordering,
-            Some(PaginationOpts {
-                limit: 5,
-                offset: 0,
-            }),
-        )
+        .list_processes(filter, ordering, Some(PaginationOpts::from_max_results(5)))
         .await
         .unwrap();
 
@@ -264,14 +243,7 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
 
     // Test first page (limit=5, offset=0)
     let first_page = flow_process_state_query
-        .list_processes(
-            filter,
-            ordering,
-            Some(PaginationOpts {
-                limit: 5,
-                offset: 0,
-            }),
-        )
+        .list_processes(filter, ordering, Some(PaginationOpts::from_max_results(5)))
         .await
         .unwrap();
 
@@ -279,7 +251,7 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     assert_eq!(first_page.processes.len(), 5);
 
     #[rustfmt::skip]
-    // From CSV data, INGEST and EXECUTE_TRANSFORM processes with next_planned_at  (ASC order): 
+    // From CSV data, INGEST and EXECUTE_TRANSFORM processes with next_planned_at  (ASC order):
     // Row 11: INGEST zeta/metrics (2025-09-08T08:30:00Z)
     // Row 1: INGEST acme/orders (2025-09-08T09:00:00Z)
     // Row 17: INGEST beta/catalog (2025-09-08T09:30:00Z)
@@ -358,14 +330,7 @@ pub async fn test_account_dashboard_upcoming_updates(catalog: &Catalog) {
     let filter2 = FlowProcessListFilter::all()
         .for_flow_types(&[FLOW_TYPE_DATASET_INGEST, FLOW_TYPE_DATASET_TRANSFORM]);
     let second_page = flow_process_state_query
-        .list_processes(
-            filter2,
-            ordering,
-            Some(PaginationOpts {
-                limit: 5,
-                offset: 5,
-            }),
-        )
+        .list_processes(filter2, ordering, Some(PaginationOpts::from_page(1, 5)))
         .await
         .unwrap();
 

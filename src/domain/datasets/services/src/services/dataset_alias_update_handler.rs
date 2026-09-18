@@ -34,7 +34,7 @@ use messaging_outbox::*;
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
     // Only write aliases after reference transaction succeeds!
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetAliasUpdateHandler {

@@ -215,6 +215,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                 SELECT
                     at.token_hash,
                     a.id as "id: _",
+                    a.resource_id as "resource_id: _",
                     a.account_name,
                     a.email,
                     a.display_name,

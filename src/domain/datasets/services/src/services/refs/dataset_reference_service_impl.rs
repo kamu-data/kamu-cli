@@ -26,7 +26,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageDeliveryMechanism,
+    MessageConsumptionMode,
     Outbox,
     OutboxExt,
 };
@@ -43,7 +43,7 @@ use time_source::SystemTimeSource;
     feeding_producers: &[
         MESSAGE_CONSUMER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetReferenceServiceImpl {

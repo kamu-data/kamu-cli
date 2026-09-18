@@ -55,6 +55,7 @@ like = { version = "0.3", default-features = false }
 sha3 = "0.10"
 ssi-caips = { version = "0.3", default-features = false, features = ["eip"] }
 url = "2"
+uuid = { version = "1", default-features = false, features = ["v4", "v5"] }
 
 # Crypto
 ed25519-dalek = { version = "2", default-features = false, features = [

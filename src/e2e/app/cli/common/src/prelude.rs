@@ -10,6 +10,7 @@
 // Re-exports
 pub use kamu_cli_e2e_common_macros::{
     kamu_cli_execute_command_e2e_test,
+    kamu_cli_resource_e2e_test,
     kamu_cli_run_api_server_e2e_test,
 };
 

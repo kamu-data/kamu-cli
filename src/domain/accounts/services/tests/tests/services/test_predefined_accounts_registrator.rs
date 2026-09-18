@@ -475,6 +475,7 @@ async fn test_mt_users_change_own_config_data() {
         {
             let Account {
                 id: old_id,
+                resource_id: _,
                 account_name: old_name,
                 email: _unused_old_email,
                 display_name: old_display_name,
@@ -486,6 +487,7 @@ async fn test_mt_users_change_own_config_data() {
             } = &first_run_alice_account;
             let Account {
                 id: new_id,
+                resource_id: _,
                 account_name: new_name,
                 email: _unused_new_email,
                 display_name: new_display_name,
@@ -560,6 +562,7 @@ async fn test_mt_users_change_own_config_data() {
         {
             let Account {
                 id: old_id,
+                resource_id: _,
                 account_name: old_name,
                 email: old_email,
                 display_name: _unused_old_display_name,
@@ -571,6 +574,7 @@ async fn test_mt_users_change_own_config_data() {
             } = &second_run_bob_account;
             let Account {
                 id: new_id,
+                resource_id: _,
                 account_name: new_name,
                 email: new_email,
                 display_name: _unused_new_display_name,
@@ -655,6 +659,7 @@ async fn test_mt_users_change_own_config_data() {
         {
             let Account {
                 id: old_id,
+                resource_id: _,
                 account_name: _unused_old_name,
                 email: old_email,
                 display_name: old_display_name,
@@ -666,6 +671,7 @@ async fn test_mt_users_change_own_config_data() {
             } = &third_run_carol_account;
             let Account {
                 id: new_id,
+                resource_id: _,
                 account_name: _unused_new_name,
                 email: new_email,
                 display_name: new_display_name,

@@ -7,7 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRefT, mysql_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    mysql_generate_placeholders_list,
+    sql_like_escape_literal,
+};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::Row;
@@ -53,7 +58,7 @@ impl MySqlAccountRepository {
         AccountErrorDuplicate { account_field }
     }
 
-    fn map_account_row(account_row: &MySqlRow) -> Account {
+    pub(crate) fn map_account_row(account_row: &MySqlRow) -> Account {
         // Reason for this method: SQLX Mysql Enum decode error
         //                         https://github.com/launchbadge/sqlx/issues/1379
         Account {
@@ -68,6 +73,9 @@ impl MySqlAccountRepository {
             registered_at: account_row.get(6),
             provider: account_row.get(7),
             provider_identity_key: account_row.get(8),
+            // `resource_id` is appended as the last selected column (index 9) so
+            // the earlier positional indices stay stable.
+            resource_id: account_row.get::<&str, _>(9).parse().unwrap(),
         }
     }
 }
@@ -81,10 +89,11 @@ impl AccountRepository for MySqlAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO accounts (id, resource_id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
             account.id.to_string(),
+            account.resource_id.to_string(),
             account.account_name.as_str(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
@@ -220,30 +229,29 @@ impl AccountRepository for MySqlAccountRepository {
 
         let account_id_stack = account_id.as_stack_string();
 
-        let maybe_account_row = sqlx::query_as!(
-            AccountRowModel,
+        let maybe_account_row = sqlx::query(
             r#"
-            SELECT
-                id as "id: _",
-                account_name,
-                email,
-                display_name,
-                account_type as "account_type: AccountType",
-                avatar_url,
-                registered_at,
-                provider,
-                provider_identity_key
+            SELECT id,
+                   account_name,
+                   email,
+                   display_name,
+                   account_type,
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key,
+                   resource_id
             FROM accounts
             WHERE id = ?
             "#,
-            account_id_stack.as_str()
         )
+        .bind(account_id_stack.as_str())
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
-            Ok(account_row.into())
+            Ok(Self::map_account_row(&account_row))
         } else {
             Err(GetAccountByIdError::NotFound(AccountNotFoundByIdError {
                 account_id: account_id.clone(),
@@ -273,7 +281,8 @@ impl AccountRepository for MySqlAccountRepository {
                    avatar_url,
                    registered_at,
                    provider,
-                   provider_identity_key
+                   provider_identity_key,
+                   resource_id
             FROM accounts
             WHERE id IN
             "#,
@@ -302,30 +311,29 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let maybe_account_row = sqlx::query_as!(
-            AccountRowModel,
+        let maybe_account_row = sqlx::query(
             r#"
-            SELECT
-                id as "id: _",
-                account_name,
-                email,
-                display_name,
-                account_type as "account_type: AccountType",
-                avatar_url,
-                registered_at,
-                provider,
-                provider_identity_key
+            SELECT id,
+                   account_name,
+                   email,
+                   display_name,
+                   account_type,
+                   avatar_url,
+                   registered_at,
+                   provider,
+                   provider_identity_key,
+                   resource_id
             FROM accounts
             WHERE lower(account_name) = lower(?)
             "#,
-            account_name.as_str()
         )
+        .bind(account_name.as_str())
         .fetch_optional(connection_mut)
         .await
         .int_err()?;
 
         if let Some(account_row) = maybe_account_row {
-            Ok(account_row.into())
+            Ok(Self::map_account_row(&account_row))
         } else {
             Err(GetAccountByNameError::NotFound(
                 AccountNotFoundByNameError {
@@ -357,7 +365,8 @@ impl AccountRepository for MySqlAccountRepository {
                    avatar_url,
                    registered_at,
                    provider,
-                   provider_identity_key
+                   provider_identity_key,
+                   resource_id
             FROM accounts
             WHERE lower(account_name) IN
             "#,
@@ -498,6 +507,7 @@ impl AccountRepository for MySqlAccountRepository {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
+            let name_pattern = sql_like_escape_literal(name_pattern);
             let query_str = format!(
                 r#"
                 SELECT id,
@@ -508,10 +518,11 @@ impl AccountRepository for MySqlAccountRepository {
                        avatar_url,
                        registered_at,
                        provider,
-                       provider_identity_key
+                       provider_identity_key,
+                       resource_id
                 FROM accounts
-                WHERE (account_name LIKE CONCAT('%',?,'%')
-                    OR display_name LIKE CONCAT('%',?,'%'))
+                WHERE (account_name LIKE CONCAT('%',?,'%') ESCAPE '\\'
+                    OR display_name LIKE CONCAT('%',?,'%') ESCAPE '\\')
                   AND id NOT IN ({})
                 ORDER BY account_name
                 LIMIT ? OFFSET ?
@@ -523,8 +534,8 @@ impl AccountRepository for MySqlAccountRepository {
             // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
             let mut query = sqlx::query(&query_str)
                 // NOTE: it's intentionally twice
-                .bind(name_pattern)
-                .bind(name_pattern);
+                .bind(&name_pattern)
+                .bind(&name_pattern);
 
             for excluded_account_id in filters.exclude_accounts_by_ids {
                 query = query.bind(excluded_account_id.to_string());
@@ -608,32 +619,32 @@ impl ExpensiveAccountRepository for MySqlAccountRepository {
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
-            let mut query_stream = sqlx::query_as!(
-                AccountRowModel,
+            let mut query_stream = sqlx::query(
                 r#"
-                SELECT id            AS "id: _",
+                SELECT id,
                        account_name,
                        email,
                        display_name,
-                       account_type  AS "account_type: AccountType",
+                       account_type,
                        avatar_url,
-                       registered_at AS "registered_at: _",
+                       registered_at,
                        provider,
-                       provider_identity_key
+                       provider_identity_key,
+                       resource_id
                 FROM accounts
                 ORDER BY registered_at
                 LIMIT ? OFFSET ?
-                "#,
-                limit,
-                offset,
+                "#
             )
+            .bind(limit)
+            .bind(offset)
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
 
             use futures::TryStreamExt;
 
             while let Some(entry) = query_stream.try_next().await? {
-                yield Ok(entry.into());
+                yield Ok(Self::map_account_row(&entry));
             }
         })
     }

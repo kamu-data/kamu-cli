@@ -140,6 +140,7 @@ async fn test_execute_matrix() {
         // 1. Admin has access to all datasets / accounts
         (
             CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(ADMIN),
                 admin_account_id(),
                 odf::AccountName::new_unchecked(ADMIN),
             ),
@@ -220,6 +221,7 @@ async fn test_execute_matrix() {
         // 2. Molecule has access to own/project datasets / accounts
         (
             CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(MOLECULE),
                 molecule_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE),
             ),
@@ -300,6 +302,7 @@ async fn test_execute_matrix() {
         // 3. Molecule.dev has access to own/project datasets / accounts
         (
             CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(MOLECULE_DEV),
                 molecule_dev_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE_DEV),
             ),
@@ -379,7 +382,11 @@ async fn test_execute_matrix() {
         ),
         // 4. User has access to their own datasets / accounts
         (
-            CurrentAccountSubject::logged(user_account_id(), odf::AccountName::new_unchecked(USER)),
+            CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(USER),
+                user_account_id(),
+                odf::AccountName::new_unchecked(USER),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)

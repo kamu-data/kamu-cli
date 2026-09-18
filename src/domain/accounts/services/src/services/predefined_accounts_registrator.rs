@@ -228,7 +228,7 @@ impl PredefinedAccountsRegistrator {
     ) -> Result<odf::AccountID, InternalError> {
         let created = self
             .create_account_use_case
-            .execute(account_config)
+            .execute(account_config, AccountResourceIdSource::SeededFromName)
             .await
             .int_err()?;
 
@@ -243,6 +243,9 @@ impl PredefinedAccountsRegistrator {
     ) -> Result<(), InternalError> {
         let updated_account = Account {
             id: resolved_account_id.clone(),
+            // Preserve the stable account-resource id of the existing account
+            // rather than minting a fresh one on every re-registration.
+            resource_id: original_account.resource_id,
             account_name: account_config.account_name.clone(),
             email: account_config.email.clone(),
             display_name: account_config.get_display_name(),

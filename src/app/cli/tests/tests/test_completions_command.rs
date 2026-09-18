@@ -9,10 +9,8 @@
 
 use std::assert_matches;
 use std::io::{Error, ErrorKind, Write};
-use std::sync::Arc;
 
 use clap::ValueEnum as _;
-use dill::TypedBuilder;
 use kamu_cli::CLIError;
 use kamu_cli::commands::*;
 
@@ -30,12 +28,6 @@ impl Write for FailingWriter {
     }
 }
 
-fn completions_command(shell: clap_complete::Shell) -> Arc<CompletionsCommand> {
-    CompletionsCommand::builder(shell)
-        .get(&dill::Catalog::builder().build())
-        .unwrap()
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test]
@@ -46,7 +38,7 @@ fn test_writes_completions() {
         (clap_complete::Shell::Fish, "complete -c kamu"),
     ] {
         let mut output = Vec::new();
-        completions_command(shell)
+        CompletionsCommand::new(shell)
             .write_completions(&mut output)
             .unwrap();
 
@@ -63,7 +55,7 @@ fn test_write_errors_are_propagated() {
     // still panics internally (`clap_complete-4.6.9` `fish.rs:277`). Broken
     // pipes are handled a level up, by the `pipecheck` writer `run()` passes in
     // - see the test below
-    let res = completions_command(clap_complete::Shell::Bash)
+    let res = CompletionsCommand::new(clap_complete::Shell::Bash)
         .write_completions(&mut FailingWriter(ErrorKind::PermissionDenied));
 
     assert_matches!(

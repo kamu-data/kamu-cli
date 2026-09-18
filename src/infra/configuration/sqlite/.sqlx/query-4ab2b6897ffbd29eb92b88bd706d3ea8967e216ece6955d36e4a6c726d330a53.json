@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                e.entry_id as \"entry_id: Uuid\",\n                e.account_id as \"account_id: odf::AccountID\",\n                e.secret_key as key,\n                e.value as \"value: _\",\n                e.secret_nonce as \"secret_nonce: _\",\n                e.created_at as \"created_at: DateTime<Utc>\",\n                e.updated_at as \"updated_at: DateTime<Utc>\"\n            FROM config_secret_set_entries e\n            JOIN resources r ON r.resource_id = e.resource_id\n                AND r.generation = e.resource_generation\n                AND r.deleted_at IS NULL\n            WHERE e.resource_id = $1\n            ORDER BY e.secret_key\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "entry_id: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_id: odf::AccountID",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "key",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "value: _",
+        "ordinal": 3,
+        "type_info": "Blob"
+      },
+      {
+        "name": "secret_nonce: _",
+        "ordinal": 4,
+        "type_info": "Blob"
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 5,
+        "type_info": "Null"
+      },
+      {
+        "name": "updated_at: DateTime<Utc>",
+        "ordinal": 6,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4ab2b6897ffbd29eb92b88bd706d3ea8967e216ece6955d36e4a6c726d330a53"
+}

@@ -132,7 +132,7 @@ impl SignEip712UseCaseImpl {
         }
 
         Ok(Self::has_access_by_account_name(
-            &logged_account.account_name,
+            &logged_account.account_handle.name,
             &account.account_name,
         ))
     }

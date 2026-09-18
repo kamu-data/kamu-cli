@@ -11,10 +11,10 @@ use std::assert_matches;
 use std::io::{ErrorKind, Write};
 use std::sync::Arc;
 
-use dill::TypedBuilder;
+use dill::Component;
 use kamu_cli::commands::*;
 use kamu_cli::config::ConfigService;
-use kamu_cli::{CLIError, WorkspaceLayout};
+use kamu_cli::{CLIError, WorkspaceLayout, WorkspaceService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,12 +32,13 @@ impl Write for FailingWriter {
 
 fn complete_command(input: &str, current: usize) -> Arc<CompleteCommand> {
     let catalog = dill::Catalog::builder()
-        .add_value(ConfigService::new(&WorkspaceLayout::new(".")))
+        .add_value(WorkspaceLayout::new("."))
+        .add::<ConfigService>()
+        .add_builder(WorkspaceService::builder().with_multi_tenant(false))
+        .add_builder(CompleteCommand::builder(input.to_string(), current))
         .build();
 
-    CompleteCommand::builder(input.to_owned(), current)
-        .get(&catalog)
-        .unwrap()
+    catalog.get_one().unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

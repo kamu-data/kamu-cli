@@ -31,7 +31,7 @@ use messaging_outbox::prelude::*;
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
     ],
     // NOTE: To clean up database rows in a single transaction, process the message immediately
-    delivery: MessageDeliveryMechanism::Immediate,
+    consumption_mode: MessageConsumptionMode::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DidSecretService {

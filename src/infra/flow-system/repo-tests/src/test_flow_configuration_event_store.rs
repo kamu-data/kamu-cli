@@ -20,7 +20,7 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
         .get_one::<dyn FlowConfigurationEventStore>()
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
 
     assert_eq!(0, num_events);
 
@@ -95,7 +95,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
 
     assert_eq!(2, num_events);
 
@@ -116,7 +116,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
 
     assert_eq!(3, num_events);
 
@@ -139,7 +139,7 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
         .await
         .unwrap();
 
-    let num_events = event_store.len().await.unwrap();
+    let num_events = event_store.total_events_stored().await.unwrap();
 
     assert_eq!(4, num_events);
 

@@ -153,7 +153,7 @@ pub async fn test_config_reset_key(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["config", "set", "--scope", "workspace", "engine.networkNs"],
         None,
-        Some(["Removed engine.networkNs from workspace scope"]),
+        Some(["Deleted engine.networkNs from workspace scope"]),
     )
     .await;
 

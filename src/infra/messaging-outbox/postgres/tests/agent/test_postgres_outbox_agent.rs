@@ -54,7 +54,7 @@ struct TestMessageConsumerTxOrder {
 #[dill::meta(MessageConsumerMeta {
     consumer_name: TEST_CONSUMER_TX_ORDER,
     feeding_producers: &[TEST_PRODUCER_TX_ORDER],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::All,
 })]
 impl TestMessageConsumerTxOrder {

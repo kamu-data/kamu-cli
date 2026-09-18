@@ -17,7 +17,7 @@ use messaging_outbox::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageDeliveryMechanism,
+    MessageConsumptionMode,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ pub(crate) struct FlowTriggerTestListener {
 #[meta(MessageConsumerMeta {
     consumer_name: "FlowTriggerTestListener",
     feeding_producers: &[MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE],
-    delivery: MessageDeliveryMechanism::Immediate,
+    consumption_mode: MessageConsumptionMode::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 impl FlowTriggerTestListener {

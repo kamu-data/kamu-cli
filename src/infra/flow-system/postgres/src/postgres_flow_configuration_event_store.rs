@@ -157,7 +157,7 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn len(&self) -> Result<usize, InternalError> {
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 

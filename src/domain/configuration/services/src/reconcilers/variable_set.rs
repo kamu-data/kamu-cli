@@ -1,0 +1,127 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use kamu_configuration::{
+    ReplaceProjectionEntriesError,
+    VariableSetEntry,
+    VariableSetProjectionRepository,
+    VariableSetReconcileError,
+    VariableSetReconcileSuccess,
+    VariableSetResource,
+};
+use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceID};
+use time_source::SystemTimeSource;
+use uuid::Uuid;
+
+use crate::PreviousConfigurationEntry;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn Reconciler<VariableSetResource>)]
+pub struct VariableSetReconcilerImpl {
+    variable_set_projection_repository: Arc<dyn VariableSetProjectionRepository>,
+    time_source: Arc<dyn SystemTimeSource>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
+    async fn reconcile(
+        &self,
+        resource: &VariableSetResource,
+    ) -> Result<
+        <VariableSetResource as ReconcilableResource>::ReconcileSuccess,
+        <VariableSetResource as ReconcilableResource>::ReconcileError,
+    > {
+        let now = self.time_source.now();
+        let resource_id = *resource.id();
+        let resource_generation = resource.headers().generation;
+        let account_id = &resource.headers().account.did;
+
+        let previous_entries_by_key = self
+            .load_previous_entries_by_key(&resource_id, resource_generation)
+            .await?;
+
+        let entries: Vec<_> = resource
+            .spec()
+            .variables
+            .entries
+            .iter()
+            .map(|(key, variable)| {
+                let (entry_id, created_at) = previous_entries_by_key
+                    .get(key)
+                    .map(|entry| (entry.entry_id, entry.created_at))
+                    .unwrap_or_else(|| (Uuid::new_v4(), now));
+
+                VariableSetEntry {
+                    entry_id,
+                    account_id: account_id.clone(),
+                    key: key.clone(),
+                    value: variable.value.clone(),
+                    created_at,
+                    updated_at: now,
+                }
+            })
+            .collect();
+
+        self.variable_set_projection_repository
+            .replace_entries(&resource_id, resource_generation, &entries)
+            .await
+            .map_err(|e| match e {
+                ReplaceProjectionEntriesError::ConcurrentModification(err) => {
+                    VariableSetReconcileError::ConcurrentModification(err)
+                }
+                ReplaceProjectionEntriesError::Internal(err) => {
+                    VariableSetReconcileError::Internal(err)
+                }
+            })?;
+
+        Ok(VariableSetReconcileSuccess {})
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl VariableSetReconcilerImpl {
+    async fn load_previous_entries_by_key(
+        &self,
+        resource_id: &ResourceID,
+        resource_generation: u64,
+    ) -> Result<HashMap<String, PreviousConfigurationEntry>, VariableSetReconcileError> {
+        if resource_generation == 0 {
+            return Ok(HashMap::new());
+        }
+
+        let entries = self
+            .variable_set_projection_repository
+            .get_latest_entries_before_generation(resource_id, resource_generation)
+            .await
+            .map_err(VariableSetReconcileError::Internal)?;
+
+        Ok(entries
+            .into_iter()
+            .map(|entry| {
+                (
+                    entry.key,
+                    PreviousConfigurationEntry {
+                        entry_id: entry.entry_id,
+                        created_at: entry.created_at,
+                    },
+                )
+            })
+            .collect())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

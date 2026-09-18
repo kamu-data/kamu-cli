@@ -95,6 +95,7 @@ pub(crate) fn make_server_account(tenancy_config: TenancyConfig) -> Account {
     match tenancy_config {
         TenancyConfig::MultiTenant => Account {
             id: odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
+            resource_id: Account::seed_resource_id_from_name(SERVER_ACCOUNT_NAME),
             account_name: odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
             account_type: AccountType::User,
             display_name: SERVER_ACCOUNT_NAME.to_string(),
@@ -117,6 +118,7 @@ pub(crate) fn create_cli_user_catalog(
     let current_account_subject = match tenancy_config {
         TenancyConfig::SingleTenant => CurrentAccountSubject::new_test(),
         TenancyConfig::MultiTenant => CurrentAccountSubject::logged(
+            kamu_accounts::Account::seed_resource_id_from_name(SERVER_ACCOUNT_NAME),
             odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
             odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
         ),

@@ -152,7 +152,7 @@ impl<'a> DatasetMetadata<'a> {
             from_catalog_n!(ctx, dyn GetDatasetUpstreamDependenciesUseCase);
 
         let upstream_dependencies = get_dataset_upstream_dependencies_use_case
-            .execute(&self.readable_state.dataset_handle().id)
+            .execute(self.readable_state.dataset_id())
             .await
             .int_err()?
             .into_iter()
@@ -181,7 +181,7 @@ impl<'a> DatasetMetadata<'a> {
             from_catalog_n!(ctx, dyn GetDatasetDownstreamDependenciesUseCase);
 
         let downstream_dependencies = get_dataset_downstream_dependencies_use_case
-            .execute(&self.readable_state.dataset_handle().id)
+            .execute(self.readable_state.dataset_id())
             .await
             .int_err()?
             .into_iter()
@@ -328,10 +328,10 @@ impl<'a> DatasetMetadata<'a> {
         event_types: Vec<MetadataEventType>,
         head: Option<Multihash<'_>>,
     ) -> Result<Vec<MetadataBlockExtended>> {
-        let account = Account::from_dataset_alias(ctx, &self.readable_state.dataset_handle().alias)
+        let account = Account::from_dataset_alias(ctx, self.readable_state.dataset_alias())
             .await?
             .expect("Account must exist");
-        let dataset_kind = self.readable_state.dataset_handle().kind;
+        let dataset_kind = self.readable_state.dataset_kind();
 
         let mut attachments_visitor = event_types
             .contains(&MetadataEventType::SetAttachments)

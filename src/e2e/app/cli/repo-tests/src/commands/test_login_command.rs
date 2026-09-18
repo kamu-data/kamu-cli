@@ -48,6 +48,16 @@ pub async fn test_login_logout_oauth_mt(kamu_node_api_client: KamuApiServerClien
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_login_silent_argument_errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_login_silent_argument_errors_st(kamu: KamuCliPuppet) {
+    test_login_silent_argument_errors(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_login_add_repo
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -583,6 +593,43 @@ async fn test_login_interactive_device_code_expired(
             "Error: Did not obtain access token. Reason: Device authorization expired after 10 \
              seconds",
         ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Argument-level failures of the non-interactive login, both of which are
+/// raised *before* any network call so they need no server.
+async fn test_login_silent_argument_errors(kamu: KamuCliPuppet) {
+    // Only GitHub is supported, and it is rejected up front
+    kamu.assert_failure_command_execution(
+        [
+            "login",
+            "oauth",
+            "gitlab",
+            "dummy-token",
+            "http://example.com",
+        ],
+        None,
+        Some(["Error: Only 'github' provider is supported at the moment"]),
+    )
+    .await;
+
+    // The repo name is derived from the host before the login round-trip, so a
+    // hostless URL fails on the host rather than on a refused connection
+    kamu.assert_failure_command_execution(
+        [
+            "login",
+            "password",
+            "user",
+            "password",
+            "file:///tmp/nowhere",
+        ],
+        None,
+        Some(["Error: Server URL does not contain the host part: file:///tmp/nowhere"]),
     )
     .await;
 }

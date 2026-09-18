@@ -1,0 +1,37 @@
+{
+  "$schema": "https://opendatafabric.org/schemas/metaschemas/v1alpha1/ResourceCondition",
+  "$id": "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready",
+  "title": "Ready Resource Condition",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "Value": {
+      "type": "string",
+      "enum": [
+        "True",
+        "False",
+        "Unknown"
+      ]
+    }
+  },
+  "required": [
+    "value",
+    "reason",
+    "lastTransitionTime"
+  ],
+  "properties": {
+    "value": {
+      "$ref": "#/$defs/Value"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "lastTransitionTime": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

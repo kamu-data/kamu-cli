@@ -13,7 +13,7 @@ use std::sync::Arc;
 use internal_error::InternalError;
 
 use super::{OutboxImmediateImpl, OutboxTransactionalImpl};
-use crate::{MessageConsumer, MessageConsumerMeta, MessageDeliveryMechanism, Outbox};
+use crate::{MessageConsumer, MessageConsumerMeta, MessageConsumptionMode, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,12 +60,13 @@ impl OutboxDispatchingImpl {
             );
             for metadata in all_metadata {
                 for producer_name in metadata.feeding_producers {
-                    match metadata.delivery {
-                        MessageDeliveryMechanism::Transactional => {
-                            transactional_producers.insert((*producer_name).to_string());
-                        }
-                        MessageDeliveryMechanism::Immediate => {
+                    match metadata.consumption_mode {
+                        MessageConsumptionMode::Immediate => {
                             immediate_producers.insert((*producer_name).to_string());
+                        }
+                        MessageConsumptionMode::TransactionalWrapped
+                        | MessageConsumptionMode::TransactionalSelfManaged => {
+                            transactional_producers.insert((*producer_name).to_string());
                         }
                     }
                 }

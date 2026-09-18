@@ -76,6 +76,12 @@ impl TypeRef {
     }
 }
 
+impl AsRef<str> for TypeRef {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 impl From<TypeUri> for TypeRef {
     fn from(value: TypeUri) -> Self {
         Self::Uri(value)

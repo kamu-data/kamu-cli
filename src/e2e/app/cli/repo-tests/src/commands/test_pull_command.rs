@@ -83,6 +83,14 @@ pub async fn test_pull_env_var_template_default_value_missing_values_mt(kamu: Ka
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_env_var_from_labelled_variable_set
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_env_var_from_labelled_variable_set_st(kamu: KamuCliPuppet) {
+    test_pull_env_var_from_labelled_variable_set(kamu).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_pull_set_watermark
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -174,6 +182,63 @@ async fn test_pull_env_var_template_default_value_missing_values(kamu: KamuCliPu
         ]),
     )
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// A `VariableSet` labelled for the dataset supplies `env.data_dir` to a local
+// `kamu pull`. Without the per-dataset resolution in `PullDatasetUseCaseImpl`
+// the ingest map is empty and this fails exactly like
+// `test_pull_env_var_template_default_value_missing_values` above -- the same
+// dataset ingests fine through the server task path, which resolved env vars
+// while the CLI did not.
+async fn test_pull_env_var_from_labelled_variable_set(kamu: KamuCliPuppet) {
+    kamu.assert_success_command_execution_with_input(
+        ["add", "--stdin"],
+        DATASET_SNAPSHOT_STR,
+        None,
+        Some(["Added: test.pull-from-file", r#"Added 1 dataset\(s\)"#]),
+    )
+    .await;
+
+    let data_path = kamu.workspace_path().join("data.csv");
+    std::fs::write(&data_path, DATASET_INGEST_DATA).unwrap();
+
+    // The label value must be the dataset's DID, so read it back after `add`.
+    // It is the only dataset in this workspace.
+    let datasets = kamu.list_datasets().await;
+    pretty_assertions::assert_eq!(1, datasets.len(), "expected exactly one dataset");
+    let dataset_id = datasets.into_iter().next().unwrap().id;
+
+    let variable_set = indoc::formatdoc!(
+        r#"
+        $schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSet
+        headers:
+          name: pull-vars
+          labels:
+            legacy-config-target-dataset: {dataset_id}
+        spec:
+          variables:
+            data_dir: {data_dir}
+        "#,
+        data_dir = kamu.workspace_path().display(),
+    );
+
+    kamu.assert_success_command_execution_with_input(
+        ["apply", "--stdin"],
+        variable_set,
+        None,
+        Some([r#"Created: STDIN -> VariableSet/pull-vars"#]),
+    )
+    .await;
+
+    // No `--env`: the value can only come from the labelled VariableSet.
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-from-file"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

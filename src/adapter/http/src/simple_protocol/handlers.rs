@@ -345,7 +345,7 @@ pub async fn dataset_push_ws_upgrade_handler(
                             unreachable!()
                         };
                         if let Some(ref_account_name) = dataset_ref.account_name()
-                            && ref_account_name != &acc.account_name
+                            && ref_account_name != &acc.account_handle.name
                         {
                             return Err(ApiError::new_forbidden());
                         }

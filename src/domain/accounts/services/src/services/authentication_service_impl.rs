@@ -304,7 +304,7 @@ impl AuthenticationServiceImpl {
         };
 
         self.create_account_use_case
-            .execute(&new_account_config)
+            .execute(&new_account_config, AccountResourceIdSource::Generated)
             .await
     }
 }

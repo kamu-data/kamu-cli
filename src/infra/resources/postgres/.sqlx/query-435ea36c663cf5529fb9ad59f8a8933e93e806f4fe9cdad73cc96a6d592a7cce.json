@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT label_key, label_value\n            FROM resource_labels_projection\n            WHERE resource_id = $1\n            ORDER BY label_key\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "label_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "label_value",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "435ea36c663cf5529fb9ad59f8a8933e93e806f4fe9cdad73cc96a6d592a7cce"
+}

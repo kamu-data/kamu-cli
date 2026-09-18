@@ -45,12 +45,9 @@ impl<'a> DatasetFlowRuns<'a> {
 
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_get_flow, skip_all, fields(%flow_id))]
     pub async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
-        if let Some(error) = check_if_flow_belongs_to_dataset(
-            ctx,
-            flow_id,
-            &self.dataset_request_state.dataset_handle().id,
-        )
-        .await?
+        if let Some(error) =
+            check_if_flow_belongs_to_dataset(ctx, flow_id, self.dataset_request_state.dataset_id())
+                .await?
         {
             return Ok(match error {
                 FlowInDatasetError::NotFound(e) => GetFlowResult::NotFound(e),

@@ -30,9 +30,9 @@ test_message_type!(B);
 test_message_type!(C);
 
 test_message_consumer!(A, A, TEST_PRODUCER_A, Immediate, All);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional, All);
+test_message_consumer!(B, B, TEST_PRODUCER_B, TransactionalWrapped, All);
 test_message_consumer!(C, CB, TEST_PRODUCER_C, Immediate, All);
-test_message_consumer!(C, CD, TEST_PRODUCER_C, Transactional, All);
+test_message_consumer!(C, CD, TEST_PRODUCER_C, TransactionalWrapped, All);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

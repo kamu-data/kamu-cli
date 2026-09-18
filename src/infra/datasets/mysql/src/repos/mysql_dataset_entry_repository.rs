@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT, mysql_generate_placeholders_list};
 use internal_error::*;
 use kamu_datasets::*;
 
@@ -489,6 +489,91 @@ impl DatasetEntryRepository for MySqlDatasetEntryRepository {
         }
 
         Ok(())
+    }
+
+    async fn delete_dataset_entries<'a>(
+        &self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<DatasetEntriesDeletionResult, DeleteDatasetEntriesError> {
+        if dataset_ids.is_empty() {
+            return Ok(DatasetEntriesDeletionResult::default());
+        }
+
+        let deleted_dataset_ids = {
+            let mut tr = self.transaction.lock().await;
+
+            let connection_mut = tr.connection_mut().await?;
+
+            let dataset_ids_search = dataset_ids
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>();
+
+            let placeholders = mysql_generate_placeholders_list(dataset_ids_search.len());
+
+            // NOTE: MySQL has no DELETE ... RETURNING, so resolve the surviving
+            //       rows first, then delete them in the same transaction.
+            let select_query_str = format!(
+                r#"
+                SELECT dataset_id
+                FROM dataset_entries
+                WHERE dataset_id IN ({placeholders})
+                "#
+            );
+
+            let mut select_query = sqlx::query(&select_query_str);
+            for dataset_id in &dataset_ids_search {
+                select_query = select_query.bind(dataset_id);
+            }
+
+            let existing_dataset_id_rows = select_query
+                .fetch_all(&mut *connection_mut)
+                .await
+                .int_err()?;
+
+            let existing_dataset_ids = existing_dataset_id_rows
+                .into_iter()
+                .map(|row| {
+                    let dataset_id: String = sqlx::Row::get(&row, 0);
+                    odf::DatasetID::from_did_str(&dataset_id).int_err()
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            if !existing_dataset_ids.is_empty() {
+                let delete_query_str = format!(
+                    r#"
+                    DELETE
+                    FROM dataset_entries
+                    WHERE dataset_id IN ({placeholders})
+                    "#
+                );
+
+                let mut delete_query = sqlx::query(&delete_query_str);
+                for dataset_id in &dataset_ids_search {
+                    delete_query = delete_query.bind(dataset_id);
+                }
+
+                delete_query.execute(&mut *connection_mut).await.int_err()?;
+            }
+
+            existing_dataset_ids
+        };
+
+        let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(
+            dataset_ids,
+            deleted_dataset_ids,
+        );
+
+        if !deletion_result.deleted_dataset_ids.is_empty() {
+            for listener in &self.removal_listeners {
+                listener
+                    .on_dataset_entries_removed(&deletion_result.deleted_dataset_ids)
+                    .await
+                    .int_err()?;
+            }
+        }
+
+        Ok(deletion_result)
     }
 }
 

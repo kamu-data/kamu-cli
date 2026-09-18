@@ -2867,16 +2867,17 @@ pub const ENUM_MIN_RESOURCE_PHASE: i32 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_RESOURCE_PHASE: i32 = 3;
+pub const ENUM_MAX_RESOURCE_PHASE: i32 = 4;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_RESOURCE_PHASE: [ResourcePhase; 4] = [
+pub const ENUM_VALUES_RESOURCE_PHASE: [ResourcePhase; 5] = [
     ResourcePhase::Pending,
     ResourcePhase::Reconciling,
     ResourcePhase::Ready,
+    ResourcePhase::Degraded,
     ResourcePhase::Failed,
 ];
 
@@ -2889,18 +2890,25 @@ impl ResourcePhase {
     pub const Pending: Self = Self(0);
     pub const Reconciling: Self = Self(1);
     pub const Ready: Self = Self(2);
-    pub const Failed: Self = Self(3);
+    pub const Degraded: Self = Self(3);
+    pub const Failed: Self = Self(4);
 
     pub const ENUM_MIN: i32 = 0;
-    pub const ENUM_MAX: i32 = 3;
-    pub const ENUM_VALUES: &'static [Self] =
-        &[Self::Pending, Self::Reconciling, Self::Ready, Self::Failed];
+    pub const ENUM_MAX: i32 = 4;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::Pending,
+        Self::Reconciling,
+        Self::Ready,
+        Self::Degraded,
+        Self::Failed,
+    ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
         match self {
             Self::Pending => Some("Pending"),
             Self::Reconciling => Some("Reconciling"),
             Self::Ready => Some("Ready"),
+            Self::Degraded => Some("Degraded"),
             Self::Failed => Some("Failed"),
             _ => None,
         }
@@ -35264,8 +35272,10 @@ impl<'a> flatbuffers::Follow<'a> for ResourceStatus<'a> {
 impl<'a> ResourceStatus<'a> {
     pub const VT_PHASE: flatbuffers::VOffsetT = 4;
     pub const VT_OBSERVED_GENERATION: flatbuffers::VOffsetT = 6;
-    pub const VT_RECONCILED_AT: flatbuffers::VOffsetT = 8;
-    pub const VT_CONDITIONS: flatbuffers::VOffsetT = 10;
+    pub const VT_OBSERVED_AT: flatbuffers::VOffsetT = 8;
+    pub const VT_RECONCILED_GENERATION: flatbuffers::VOffsetT = 10;
+    pub const VT_RECONCILED_AT: flatbuffers::VOffsetT = 12;
+    pub const VT_CONDITIONS: flatbuffers::VOffsetT = 14;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -35277,6 +35287,9 @@ impl<'a> ResourceStatus<'a> {
         args: &'args ResourceStatusArgs<'args>,
     ) -> flatbuffers::WIPOffset<ResourceStatus<'bldr>> {
         let mut builder = ResourceStatusBuilder::new(_fbb);
+        if let Some(x) = args.reconciled_generation {
+            builder.add_reconciled_generation(x);
+        }
         if let Some(x) = args.observed_generation {
             builder.add_observed_generation(x);
         }
@@ -35285,6 +35298,9 @@ impl<'a> ResourceStatus<'a> {
         }
         if let Some(x) = args.reconciled_at {
             builder.add_reconciled_at(x);
+        }
+        if let Some(x) = args.observed_at {
+            builder.add_observed_at(x);
         }
         builder.add_phase(args.phase);
         builder.finish()
@@ -35309,6 +35325,26 @@ impl<'a> ResourceStatus<'a> {
         unsafe {
             self._tab
                 .get::<u64>(ResourceStatus::VT_OBSERVED_GENERATION, None)
+        }
+    }
+    #[inline]
+    pub fn observed_at(&self) -> Option<&'a Timestamp> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<Timestamp>(ResourceStatus::VT_OBSERVED_AT, None)
+        }
+    }
+    #[inline]
+    pub fn reconciled_generation(&self) -> Option<u64> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u64>(ResourceStatus::VT_RECONCILED_GENERATION, None)
         }
     }
     #[inline]
@@ -35346,6 +35382,12 @@ impl flatbuffers::Verifiable for ResourceStatus<'_> {
         v.visit_table(pos)?
             .visit_field::<ResourcePhase>("phase", Self::VT_PHASE, false)?
             .visit_field::<u64>("observed_generation", Self::VT_OBSERVED_GENERATION, false)?
+            .visit_field::<Timestamp>("observed_at", Self::VT_OBSERVED_AT, false)?
+            .visit_field::<u64>(
+                "reconciled_generation",
+                Self::VT_RECONCILED_GENERATION,
+                false,
+            )?
             .visit_field::<Timestamp>("reconciled_at", Self::VT_RECONCILED_AT, false)?
             .visit_field::<flatbuffers::ForwardsUOffset<ResourceConditions>>(
                 "conditions",
@@ -35359,6 +35401,8 @@ impl flatbuffers::Verifiable for ResourceStatus<'_> {
 pub struct ResourceStatusArgs<'a> {
     pub phase: ResourcePhase,
     pub observed_generation: Option<u64>,
+    pub observed_at: Option<&'a Timestamp>,
+    pub reconciled_generation: Option<u64>,
     pub reconciled_at: Option<&'a Timestamp>,
     pub conditions: Option<flatbuffers::WIPOffset<ResourceConditions<'a>>>,
 }
@@ -35368,6 +35412,8 @@ impl<'a> Default for ResourceStatusArgs<'a> {
         ResourceStatusArgs {
             phase: ResourcePhase::Pending,
             observed_generation: None,
+            observed_at: None,
+            reconciled_generation: None,
             reconciled_at: None,
             conditions: None,
         }
@@ -35391,6 +35437,18 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ResourceStatusBuilder<'a, 'b, A
     pub fn add_observed_generation(&mut self, observed_generation: u64) {
         self.fbb_
             .push_slot_always::<u64>(ResourceStatus::VT_OBSERVED_GENERATION, observed_generation);
+    }
+    #[inline]
+    pub fn add_observed_at(&mut self, observed_at: &Timestamp) {
+        self.fbb_
+            .push_slot_always::<&Timestamp>(ResourceStatus::VT_OBSERVED_AT, observed_at);
+    }
+    #[inline]
+    pub fn add_reconciled_generation(&mut self, reconciled_generation: u64) {
+        self.fbb_.push_slot_always::<u64>(
+            ResourceStatus::VT_RECONCILED_GENERATION,
+            reconciled_generation,
+        );
     }
     #[inline]
     pub fn add_reconciled_at(&mut self, reconciled_at: &Timestamp) {
@@ -35427,6 +35485,8 @@ impl core::fmt::Debug for ResourceStatus<'_> {
         let mut ds = f.debug_struct("ResourceStatus");
         ds.field("phase", &self.phase());
         ds.field("observed_generation", &self.observed_generation());
+        ds.field("observed_at", &self.observed_at());
+        ds.field("reconciled_generation", &self.reconciled_generation());
         ds.field("reconciled_at", &self.reconciled_at());
         ds.field("conditions", &self.conditions());
         ds.finish()

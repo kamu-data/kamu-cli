@@ -234,6 +234,26 @@ To run tests for a specific crate, e.g. `opendatafabric` use:
 cargo nextest run -p opendatafabric
 ```
 
+#### Troubleshooting: instant failures in unrelated containerized tests
+
+If a full test run reports a handful of failures that:
+* take near-zero time (e.g. `FAIL [ 0.003s]`),
+* differ from run to run, and
+* pass when executed on their own,
+
+then the container runtime is likely out of capacity rather than the tests being
+broken. Containers that are killed before they finish starting are left behind in
+`Created` state (`run --rm` only reaps containers that actually started), and they
+accumulate across runs until no new container can start.
+
+Check for leftovers and clear them:
+```sh
+podman ps -a --format '{{.Status}}' | awk '{print $1}' | sort | uniq -c
+podman rm $(podman ps -aq --filter status=created)
+```
+This removes only never-started containers, leaving running database/Elasticsearch
+containers untouched. Use `docker` in place of `podman` if that is your runtime.
+
 
 ### Build Speed Tweaks (Optional)
 

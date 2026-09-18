@@ -163,6 +163,18 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
+            pub async fn save_multi(
+                aggregates: &mut [Self],
+                event_store: &#store_type,
+            ) -> Result<(), SaveError> {
+                ::event_sourcing::Aggregate::<#proj_type, #store_type>::save_multi(
+                    aggregates,
+                    event_store,
+                )
+                .await
+            }
+
+            #[inline]
             pub fn apply<Event>(
                 &mut self,
                 event: Event,
@@ -176,6 +188,11 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             #[inline]
             pub fn has_updates(&self) -> bool {
                 self.0.has_updates()
+            }
+
+            #[inline]
+            pub fn revert(&mut self) {
+                self.0.revert()
             }
 
             #[inline]
@@ -199,9 +216,24 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
         }
 
-        impl Into<#proj_type> for #type_name {
-            fn into(self) -> #proj_type {
-                self.0.into_state()
+        impl ::event_sourcing::AggregateAccess for #type_name {
+            type Projection = #proj_type;
+            type Store = #store_type;
+
+            fn aggregate(&self) -> &::event_sourcing::Aggregate<Self::Projection, Self::Store> {
+                &self.0
+            }
+
+            fn aggregate_mut(
+                &mut self,
+            ) -> &mut ::event_sourcing::Aggregate<Self::Projection, Self::Store> {
+                &mut self.0
+            }
+        }
+
+        impl From<#type_name> for #proj_type {
+            fn from(value: #type_name) -> #proj_type {
+                value.0.into_state()
             }
         }
     }

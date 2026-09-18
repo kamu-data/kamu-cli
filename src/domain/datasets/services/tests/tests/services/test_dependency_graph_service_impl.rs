@@ -290,13 +290,21 @@ async fn test_service_dataset_deleted() {
         .catalog
         .get_one::<dyn DeleteDatasetUseCase>()
         .unwrap();
-    delete_dataset
-        .execute_via_ref(
+    let dataset_handle = harness
+        .dataset_registry
+        .resolve_dataset_handle_by_ref(
             &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo-bar-foo-baz"))
                 .as_local_ref(),
         )
         .await
         .unwrap();
+    let delete_plan = delete_dataset
+        .plan_delete(vec![dataset_handle], false)
+        .await
+        .unwrap()
+        .into_executable_plan(false)
+        .unwrap();
+    delete_dataset.execute_plan(delete_plan).await.unwrap();
 
     assert_eq!(
         harness.dataset_dependencies_report("foo-bar").await,

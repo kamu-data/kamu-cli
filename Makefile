@@ -8,9 +8,11 @@ POSTGRES_CRATES := \
 	./src/infra/accounts/postgres \
 	./src/infra/auth-rebac/postgres \
 	./src/infra/auth-web3/postgres \
+	./src/infra/configuration/postgres \
 	./src/infra/datasets/postgres \
 	./src/infra/flow-system/postgres \
 	./src/infra/messaging-outbox/postgres \
+	./src/infra/resources/postgres \
 	./src/infra/search/cache-postgres \
 	./src/infra/task-system/postgres \
 	./src/infra/webhooks/postgres
@@ -25,9 +27,11 @@ SQLITE_CRATES := \
 	./src/infra/accounts/sqlite \
 	./src/infra/auth-rebac/sqlite \
 	./src/infra/auth-web3/sqlite \
+	./src/infra/configuration/sqlite \
 	./src/infra/datasets/sqlite \
 	./src/infra/flow-system/sqlite \
 	./src/infra/messaging-outbox/sqlite \
+	./src/infra/resources/sqlite \
 	./src/infra/search/cache-sqlite \
 	./src/infra/task-system/sqlite \
 	./src/infra/webhooks/sqlite
@@ -583,6 +587,15 @@ resources:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::resourcegen::)'
 
 
+.PHONY: resources-cli-reference
+resources-cli-reference:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(generate_reference_markdown)'
+
+.PHONY: resources-graphql-schema
+resources-graphql-schema:
+	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-adapter-graphql -E 'test(update_graphql_schema)'
+
+
 ###############################################################################
 # Codegen
 ###############################################################################
@@ -678,4 +691,8 @@ codegen: codegen-odf-dtos \
 # Executes codegen action in a nix flake environment that contains necessary tools like `flatc` and `protoc`
 .PHONY: codegen-nix
 codegen-nix:
-	nix develop .config -c make codegen
+	nix develop ./images/nix-dev -c make codegen
+
+.PHONY: nix
+nix:
+	nix develop ./images/nix-dev

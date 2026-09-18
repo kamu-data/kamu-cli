@@ -129,7 +129,7 @@ pub(crate) fn ensure_authenticated_account(
     let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
 
     match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(l) => Ok(l.account_id.clone()),
+        CurrentAccountSubject::Logged(l) => Ok(l.account_handle.did.clone()),
         CurrentAccountSubject::Anonymous(reason) => Err(match reason {
             AnonymousAccountReason::AuthenticationExpired => AnonymousAccessError {
                 reason: "Authentication token expired",

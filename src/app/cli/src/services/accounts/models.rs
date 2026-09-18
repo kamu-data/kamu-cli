@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_accounts::{AccountService, CurrentAccountSubject};
+use kamu_accounts::{Account, AccountService, CurrentAccountSubject};
 use thiserror::Error;
 
 use crate::WorkspaceStatus;
@@ -80,6 +80,7 @@ impl CurrentAccountIndication {
             WorkspaceStatus::NoWorkspace | WorkspaceStatus::AboutToBeCreated(_) => {
                 // NOTE: At this stage, real accounts do not exist yet.
                 let dummy_subject = CurrentAccountSubject::logged(
+                    Account::seed_resource_id_from_name(self.account_name.as_str()),
                     odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
                     self.account_name.clone(),
                 );
@@ -94,7 +95,7 @@ impl CurrentAccountIndication {
                     });
                 };
 
-                let subject = CurrentAccountSubject::logged(account.id, account.account_name);
+                let subject = CurrentAccountSubject::logged_from_account(&account);
 
                 Ok(subject)
             }

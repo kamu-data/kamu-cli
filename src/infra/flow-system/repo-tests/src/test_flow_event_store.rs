@@ -41,10 +41,7 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
         flow_event_store.clone(),
         &foo_cases,
         always_happy_filters.clone(),
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         6,
         vec![
             foo_cases.compaction_flow_ids.flow_id_waiting,
@@ -61,10 +58,7 @@ pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalo
         flow_event_store.clone(),
         &bar_cases,
         always_happy_filters.clone(),
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         6,
         vec![
             bar_cases.compaction_flow_ids.flow_id_waiting,
@@ -123,10 +117,7 @@ pub async fn test_dataset_flow_filter_by_status(catalog: &Catalog) {
             flow_event_store.clone(),
             &foo_cases,
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -178,10 +169,7 @@ pub async fn test_dataset_flow_filter_by_flow_type(catalog: &Catalog) {
             flow_event_store.clone(),
             &foo_cases,
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -237,10 +225,7 @@ pub async fn test_dataset_flow_filter_by_initiator(catalog: &Catalog) {
             flow_event_store.clone(),
             &foo_cases,
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -295,10 +280,7 @@ pub async fn test_dataset_flow_filter_by_initiator_with_multiple_variants(catalo
             flow_event_store.clone(),
             &foo_cases,
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -346,10 +328,7 @@ pub async fn test_dataset_flow_filter_combinations(catalog: &Catalog) {
             flow_event_store.clone(),
             &foo_cases,
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -403,10 +382,7 @@ pub async fn test_dataset_flow_filter_by_datasets(catalog: &Catalog) {
             flow_event_store.clone(),
             dataset_ids,
             FlowFilters::default(),
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids,
         )
         .await;
@@ -450,10 +426,7 @@ pub async fn test_dataset_flow_filter_by_datasets_and_status(catalog: &Catalog) 
                 by_flow_statuses: Some(vec![FlowStatus::Waiting]),
                 ..Default::default()
             },
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids,
         )
         .await;
@@ -514,10 +487,7 @@ pub async fn test_dataset_flow_filter_by_datasets_with_pagination(catalog: &Cata
         (
             vec![odf::DatasetID::new_seeded_ed25519(b"wrong")],
             vec![],
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
         ),
     ];
 
@@ -542,10 +512,7 @@ pub async fn test_dataset_flow_pagination(catalog: &Catalog) {
 
     let cases = vec![
         (
-            PaginationOpts {
-                offset: 0,
-                limit: 2,
-            },
+            PaginationOpts::from_max_results(2),
             vec![
                 foo_cases.compaction_flow_ids.flow_id_waiting,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
@@ -610,10 +577,7 @@ pub async fn test_dataset_flow_pagination_with_filters(catalog: &Catalog) {
 
     let cases = vec![
         (
-            PaginationOpts {
-                offset: 0,
-                limit: 2,
-            },
+            PaginationOpts::from_max_results(2),
             FlowFilters {
                 by_flow_types: Some(vec![FLOW_TYPE_DATASET_INGEST.to_string()]),
                 ..Default::default()
@@ -696,10 +660,7 @@ pub async fn test_unfiltered_system_flows(catalog: &Catalog) {
     assert_system_flow_expectations(
         flow_event_store.clone(),
         FlowFilters::default(),
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         3,
         vec![
             system_case.gc_flow_ids.flow_id_waiting,
@@ -733,10 +694,7 @@ pub async fn test_system_flows_filtered_by_flow_type(catalog: &Catalog) {
         assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -779,10 +737,7 @@ pub async fn test_system_flows_filtered_by_flow_status(catalog: &Catalog) {
         assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -829,10 +784,7 @@ pub async fn test_system_flows_filtered_by_initiator(catalog: &Catalog) {
         assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -879,10 +831,7 @@ pub async fn test_system_flows_complex_filter(catalog: &Catalog) {
         assert_system_flow_expectations(
             flow_event_store.clone(),
             filters,
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
             expected_flow_ids.len(),
             expected_flow_ids,
         )
@@ -899,10 +848,7 @@ pub async fn test_system_flow_pagination(catalog: &Catalog) {
 
     let cases = vec![
         (
-            PaginationOpts {
-                offset: 0,
-                limit: 2,
-            },
+            PaginationOpts::from_max_results(2),
             vec![
                 system_case.gc_flow_ids.flow_id_waiting,
                 system_case.gc_flow_ids.flow_id_running,
@@ -955,10 +901,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
 
     let cases = vec![
         (
-            PaginationOpts {
-                offset: 0,
-                limit: 2,
-            },
+            PaginationOpts::from_max_results(2),
             FlowFilters {
                 by_flow_types: Some(vec![FLOW_TYPE_SYSTEM_GC.to_string()]),
                 ..Default::default()
@@ -970,10 +913,7 @@ pub async fn test_system_flow_pagination_with_filters(catalog: &Catalog) {
             ],
         ),
         (
-            PaginationOpts {
-                offset: 0,
-                limit: 2,
-            },
+            PaginationOpts::from_max_results(2),
             FlowFilters {
                 by_flow_statuses: Some(vec![FlowStatus::Waiting]),
                 ..Default::default()
@@ -1019,10 +959,7 @@ pub async fn test_all_flows_unpaged(catalog: &Catalog) {
     assert_all_flow_expectations(
         flow_event_store.clone(),
         FlowFilters::default(),
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         9,
         vec![
             system_case.gc_flow_ids.flow_id_finished,
@@ -1049,10 +986,7 @@ pub async fn test_all_flows_pagination(catalog: &Catalog) {
 
     let cases = vec![
         (
-            PaginationOpts {
-                offset: 0,
-                limit: 2,
-            },
+            PaginationOpts::from_max_results(2),
             vec![
                 system_case.gc_flow_ids.flow_id_finished,
                 system_case.gc_flow_ids.flow_id_running,
@@ -1122,10 +1056,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
             by_flow_statuses: Some(vec![FlowStatus::Waiting]),
             by_initiator: None,
         },
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         3,
         vec![
             system_case.gc_flow_ids.flow_id_waiting,
@@ -1142,10 +1073,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
             by_flow_statuses: Some(vec![FlowStatus::Running]),
             by_initiator: None,
         },
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         3,
         vec![
             system_case.gc_flow_ids.flow_id_running,
@@ -1173,10 +1101,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
             by_flow_statuses: Some(vec![FlowStatus::Waiting, FlowStatus::Running]),
             by_initiator: None,
         },
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         6,
         expected_ids_list,
     )
@@ -1189,10 +1114,7 @@ pub async fn test_all_flows_filters(catalog: &Catalog) {
             by_flow_statuses: Some(vec![FlowStatus::Finished]),
             by_initiator: None,
         },
-        PaginationOpts {
-            offset: 0,
-            limit: 100,
-        },
+        PaginationOpts::from_max_results(100),
         3,
         vec![
             system_case.gc_flow_ids.flow_id_finished,
@@ -2177,10 +2099,7 @@ pub async fn test_get_flows_for_multiple_datasets(catalog: &Catalog) {
             flow_scope_query,
             &FlowFilters::default(),
             &FlowOrder::default(),
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await
@@ -2346,10 +2265,7 @@ pub async fn test_dataset_flow_order_by_scheduled_activation(catalog: &Catalog) 
                 ..Default::default()
             },
             &FlowOrder::scheduled_activation(),
-            PaginationOpts {
-                offset: 0,
-                limit: 100,
-            },
+            PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await

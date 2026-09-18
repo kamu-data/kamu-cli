@@ -11,8 +11,11 @@ mod aes_gcm;
 mod argon2_hash;
 mod encryptor;
 mod hasher;
+pub mod jwe;
+mod secret_cryptor;
 
 pub use aes_gcm::*;
 pub use argon2_hash::*;
 pub use encryptor::*;
 pub use hasher::*;
+pub use secret_cryptor::*;

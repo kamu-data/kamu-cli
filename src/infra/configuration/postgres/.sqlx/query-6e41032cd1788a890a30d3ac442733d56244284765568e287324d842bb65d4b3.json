@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM config_variable_set_entries\n            WHERE resource_id = $1\n              AND resource_generation < $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6e41032cd1788a890a30d3ac442733d56244284765568e287324d842bb65d4b3"
+}

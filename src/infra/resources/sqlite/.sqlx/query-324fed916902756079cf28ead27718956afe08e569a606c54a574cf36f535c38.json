@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE resources\n            SET\n                account_id = $2,\n                resource_schema = $3,\n                resource_name = $4,\n                labels = $5,\n                annotations = $6,\n                spec = $7,\n                status = $8,\n                generation = $9,\n                updated_at = $10,\n                deleted_at = $11,\n                last_event_id = $12\n            WHERE resource_id = $1\n              AND (\n                    last_event_id IS NULL AND CAST($13 as INT8) IS NULL OR\n                    last_event_id IS NOT NULL AND CAST($13 as INT8) IS NOT NULL AND last_event_id = $13\n              )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 13
+    },
+    "nullable": []
+  },
+  "hash": "324fed916902756079cf28ead27718956afe08e569a606c54a574cf36f535c38"
+}

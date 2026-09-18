@@ -277,6 +277,12 @@ impl ContainerRuntime {
         cmd
     }
 
+    pub(crate) fn remove_container_cmd_std(&self, container_name: &str) -> std::process::Command {
+        let mut cmd = self.new_command_std();
+        cmd.arg("rm").arg("--force").arg(container_name);
+        cmd
+    }
+
     pub async fn create_network(
         &self,
         network_name: &str,

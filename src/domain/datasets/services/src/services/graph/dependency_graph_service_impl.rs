@@ -72,7 +72,7 @@ impl State {
         MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
         MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalSelfManaged,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 #[scope(Singleton)]

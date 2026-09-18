@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) AS \"count!: i64\"\n            FROM resources r\n            WHERE r.deleted_at IS NULL\n              -- Each type carries its own query, account and label pairs,\n              -- re-paired here. See `search_resource_handles` for the shape.\n              AND EXISTS (\n                  SELECT 1\n                  FROM UNNEST(\n                           COALESCE($2::text[], ARRAY[NULL]::text[]),\n                           $3::text[],\n                           $4::text[],\n                           $5::text[],\n                           $1::text[]\n                       ) WITH ORDINALITY\n                         AS f(schema, name_pattern, exact_names, exact_ids, account_id, rn)\n                  WHERE r.account_id = f.account_id\n                    AND (f.schema IS NULL OR r.resource_schema = f.schema)\n                    AND (f.name_pattern IS NULL\n                         OR r.resource_name ILIKE f.name_pattern ESCAPE '\\')\n                    AND (f.exact_names IS NULL\n                         OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))\n                    AND (f.exact_ids IS NULL\n                         OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))\n                    AND NOT EXISTS (\n                        SELECT 1\n                        FROM UNNEST($6::int[], $7::text[], $8::text[]) AS l(rn, k, v)\n                        WHERE l.rn = f.rn\n                          AND NOT EXISTS (\n                              SELECT 1\n                              FROM resource_labels_projection rl\n                              WHERE rl.resource_id = r.resource_id\n                                AND rl.label_key = l.k\n                                AND rl.label_value = l.v\n                          )\n                    )\n              )\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Int4Array",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0b2dca47b04d949075d241ed26fee57acf0545e4d78b42d4db07f3e83ca69b61"
+}

@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_env_var_service_impl;
+mod dataset_env_var_compat_service_impl;
 mod dataset_env_var_service_null;
 mod dataset_key_value_service_impl;
 mod dataset_key_value_service_sys_env;
 
-pub use dataset_env_var_service_impl::*;
+pub use dataset_env_var_compat_service_impl::*;
 pub use dataset_env_var_service_null::*;
 pub use dataset_key_value_service_impl::*;
 pub use dataset_key_value_service_sys_env::*;

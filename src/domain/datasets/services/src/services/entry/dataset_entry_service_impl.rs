@@ -761,6 +761,15 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         )
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn all_dataset_handles_paged(
+        &self,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        let listing = self.list_all_dataset_handles(pagination).await?;
+        Ok(listing.list)
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
     fn all_dataset_handles_by_owner_name(
         &self,
@@ -795,6 +804,27 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
         )
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%owner_name))]
+    async fn all_dataset_handles_by_owner_name_paged(
+        &self,
+        owner_name: &odf::AccountName,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        let owner_id = match self
+            .resolve_account_id_by_maybe_name(Some(owner_name))
+            .await
+        {
+            Ok(id) => id,
+            Err(ResolveAccountIdByNameError::NotFound(_)) => return Ok(Vec::new()),
+            Err(e) => return Err(e.int_err()),
+        };
+
+        let listing = self
+            .list_all_dataset_handles_by_owner_id(&owner_id, pagination)
+            .await?;
+        Ok(listing.list)
+    }
+
     fn all_dataset_handles_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
@@ -808,6 +838,18 @@ impl DatasetRegistry for DatasetEntryServiceImpl {
                     .await
             },
         )
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(%owner_id))]
+    async fn all_dataset_handles_by_owner_id_paged(
+        &self,
+        owner_id: &odf::AccountID,
+        pagination: PaginationOpts,
+    ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
+        let listing = self
+            .list_all_dataset_handles_by_owner_id(owner_id, pagination)
+            .await?;
+        Ok(listing.list)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids))]
@@ -951,28 +993,36 @@ impl DatasetEntryWriter for DatasetEntryServiceImpl {
         Ok(())
     }
 
-    async fn remove_entry(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), InternalError> {
-        // Remove entry in repository
-        match self
-            .dataset_entry_repo
-            .delete_dataset_entry(&dataset_handle.id)
-            .await
-        {
-            Ok(_) | Err(DeleteEntryDatasetError::NotFound(_)) => Ok(()),
-            Err(DeleteEntryDatasetError::Internal(e)) => Err(e),
-        }?;
+    async fn remove_entries(
+        &self,
+        dataset_handles: &[odf::DatasetHandle],
+    ) -> Result<(), InternalError> {
+        let dataset_ids = dataset_handles
+            .iter()
+            .map(|dataset_handle| Cow::Borrowed(&dataset_handle.id))
+            .collect::<Vec<_>>();
 
-        // Remove entry from cache
+        // Remove entry in repository
+        self.dataset_entry_repo
+            .delete_dataset_entries(&dataset_ids)
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetEntriesError::Internal(e) => e,
+            })?;
+
+        // Remove entries from cache
         {
             let mut writable_cache = self.cache.write().unwrap();
-            writable_cache
-                .datasets
-                .datasets_by_id
-                .remove(&dataset_handle.id);
-            writable_cache
-                .datasets
-                .entries_by_id
-                .remove(&dataset_handle.id);
+            for dataset_handle in dataset_handles {
+                writable_cache
+                    .datasets
+                    .datasets_by_id
+                    .remove(&dataset_handle.id);
+                writable_cache
+                    .datasets
+                    .entries_by_id
+                    .remove(&dataset_handle.id);
+            }
         }
 
         Ok(())

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO resource_labels_projection (resource_id, label_key, label_value)\n            SELECT $1, k, v\n            FROM UNNEST($2::text[], $3::text[]) AS entry(k, v)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b8cf2d22903cd4ab6ba91cbac57f7d17c3029de158df5da168871eaeb7c6d07c"
+}
