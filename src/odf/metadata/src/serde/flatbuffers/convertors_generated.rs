@@ -5380,6 +5380,7 @@ impl From<odf::resource::ResourcePhase> for fb::ResourcePhase {
             odf::resource::ResourcePhase::Pending => fb::ResourcePhase::Pending,
             odf::resource::ResourcePhase::Reconciling => fb::ResourcePhase::Reconciling,
             odf::resource::ResourcePhase::Ready => fb::ResourcePhase::Ready,
+            odf::resource::ResourcePhase::Degraded => fb::ResourcePhase::Degraded,
             odf::resource::ResourcePhase::Failed => fb::ResourcePhase::Failed,
         }
     }
@@ -5391,6 +5392,7 @@ impl Into<odf::resource::ResourcePhase> for fb::ResourcePhase {
             fb::ResourcePhase::Pending => odf::resource::ResourcePhase::Pending,
             fb::ResourcePhase::Reconciling => odf::resource::ResourcePhase::Reconciling,
             fb::ResourcePhase::Ready => odf::resource::ResourcePhase::Ready,
+            fb::ResourcePhase::Degraded => odf::resource::ResourcePhase::Degraded,
             fb::ResourcePhase::Failed => odf::resource::ResourcePhase::Failed,
             _ => panic!("Invalid enum value: {}", self.0),
         }
@@ -5460,6 +5462,10 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::resource::ResourceStatus {
         builder.add_phase(self.phase.into());
         self.observed_generation
             .map(|v| builder.add_observed_generation(v));
+        self.observed_at
+            .map(|v| builder.add_observed_at(&datetime_to_fb(&v)));
+        self.reconciled_generation
+            .map(|v| builder.add_reconciled_generation(v));
         self.reconciled_at
             .map(|v| builder.add_reconciled_at(&datetime_to_fb(&v)));
         builder.add_conditions(conditions_offset);
@@ -5472,6 +5478,8 @@ impl<'fb> FlatbuffersDeserializable<fb::ResourceStatus<'fb>> for odf::resource::
         odf::resource::ResourceStatus {
             phase: proxy.phase().into(),
             observed_generation: proxy.observed_generation().map(|v| v),
+            observed_at: proxy.observed_at().map(|v| fb_to_datetime(v)),
+            reconciled_generation: proxy.reconciled_generation().map(|v| v),
             reconciled_at: proxy.reconciled_at().map(|v| fb_to_datetime(v)),
             conditions: proxy
                 .conditions()

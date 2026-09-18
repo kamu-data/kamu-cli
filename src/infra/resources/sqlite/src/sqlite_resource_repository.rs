@@ -838,6 +838,9 @@ impl ResourceRepository for SqliteResourceRepository {
                 SUM(
                     CASE WHEN json_extract(status, '$.phase') = 'Ready' THEN 1 ELSE 0 END
                 ) as "ready_count!: i64",
+                 SUM(
+                    CASE WHEN json_extract(status, '$.phase') = 'Degraded' THEN 1 ELSE 0 END
+                ) as "degraded_count!: i64",
                 SUM(
                     CASE WHEN json_extract(status, '$.phase') = 'Failed' THEN 1 ELSE 0 END
                 ) as "failed_count!: i64",
@@ -869,6 +872,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     pending: u64::try_from(row.pending_count).unwrap(),
                     reconciling: u64::try_from(row.reconciling_count).unwrap(),
                     ready: u64::try_from(row.ready_count).unwrap(),
+                    degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
                 },
             })

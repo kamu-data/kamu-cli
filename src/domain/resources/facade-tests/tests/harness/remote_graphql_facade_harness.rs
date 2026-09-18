@@ -14,7 +14,8 @@ use std::sync::Arc;
 use axum::Extension;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
-use kamu_resources_facade::{RemoteGraphqlResourceFacadeImpl, ResourceFacade};
+use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
+use kamu_resources_facade::ResourceFacade;
 use strum::IntoEnumIterator;
 
 use super::facade_harness_trait::{FacadeContractHarness, TestAccount};

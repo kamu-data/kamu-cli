@@ -25,7 +25,7 @@ pub const ENVIRONMENT_LABEL_SCHEMA: &str =
 /// which associates a config resource with the dataset whose legacy env vars it
 /// carries. Registered by the configuration domain, not the resources domain.
 pub const LEGACY_CONFIG_TARGET_DATASET_LABEL_SCHEMA: &str =
-    "https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset";
+    "https://kamu.dev/schemas/config/v1alpha1/labels/LegacyConfigTargetDataset";
 /// Short name of the label above, as authored in manifests and `-l` filters.
 pub const LEGACY_CONFIG_TARGET_DATASET_LABEL_NAME: &str = "legacy-config-target-dataset";
 

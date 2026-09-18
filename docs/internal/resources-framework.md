@@ -1400,7 +1400,7 @@ headers:
 
 | | |
 | --- | --- |
-| Canonical URI | `https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset` |
+| Canonical URI | `https://kamu.dev/schemas/config/v1alpha1/labels/LegacyConfigTargetDataset` |
 | Short name | `legacy-config-target-dataset` |
 | Value | A full `did:odf:…` DID, validated with `odf::DatasetID::from_did_str` |
 | Scope | `ResourceExtensionScopeMeta::ResourceContext` over the ODF `config` context — `VariableSet` and `SecretSet` only |

@@ -619,10 +619,11 @@ impl ResourceRepository for InMemoryResourceRepository {
             row.total_count += 1;
 
             match snapshot.status.as_ref().map(|status| status.phase) {
+                Some(ResourcePhase::Pending) | None => row.phase_counts.increment_pending(),
                 Some(ResourcePhase::Reconciling) => row.phase_counts.increment_reconciling(),
                 Some(ResourcePhase::Ready) => row.phase_counts.increment_ready(),
+                Some(ResourcePhase::Degraded) => row.phase_counts.increment_degraded(),
                 Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),
-                Some(ResourcePhase::Pending) | None => row.phase_counts.increment_pending(),
             }
         }
 

@@ -4183,7 +4183,7 @@ type ResourceNameNotFoundProblem {
 }
 
 """
-Represents the lifecycle stage of a resource.
+Represents the reconciliation phase of a resource.
 
 Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourcePhase
 """
@@ -4191,6 +4191,7 @@ enum ResourcePhase {
 	PENDING
 	RECONCILING
 	READY
+	DEGRADED
 	FAILED
 }
 
@@ -4198,6 +4199,7 @@ type ResourcePhaseCounts {
 	pending: Uint64!
 	reconciling: Uint64!
 	ready: Uint64!
+	degraded: Uint64!
 	failed: Uint64!
 }
 
@@ -4294,17 +4296,27 @@ Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
 """
 type ResourceStatus {
 	"""
-	Represents the lifecycle stage of a resource.
+	Represents the reconciliation phase of a resource as seen by the main
+	resource controller.
 	"""
 	phase: ResourcePhase!
 	"""
-	Resource generation that was last processed by the main resource
-	controller.
+	Resource generation that was last seen by the main resource controller.
 	"""
 	observedGeneration: Uint64
 	"""
+	Time when the controller seen the resource state as defined in
+	`observedGeneration`.
+	"""
+	observedAt: DateTime
+	"""
+	Resource generation that was last successfully reconciled by the main
+	resource controller.
+	"""
+	reconciledGeneration: Uint64
+	"""
 	Time when the controller last reconciled the desired resource state as
-	defined in `observedGeneration`.
+	defined in `reconciledGeneration`.
 	"""
 	reconciledAt: DateTime
 	"""

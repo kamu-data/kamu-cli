@@ -37,7 +37,7 @@ SELECT
     'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet' AS resource_schema,                                                          
     'legacy-vars-' || substr(dev.dataset_id, 9)                                 AS resource_name,
     json_object(
-        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        'https://kamu.dev/schemas/config/v1alpha1/labels/LegacyConfigTargetDataset',
         dev.dataset_id
     )                                                                           AS labels,
     '{}'                                                                        AS annotations,
@@ -53,6 +53,8 @@ SELECT
     json_object(
         'phase', 'Ready',
         'observedGeneration', 1,
+        'observedAt', MIN(dev.created_at),
+        'reconciledGeneration', 1,
         'reconciledAt', MIN(dev.created_at),
         'conditions', json_object(
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
@@ -141,7 +143,7 @@ SELECT
     'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet' AS resource_schema,                                                          
     'legacy-secrets-' || substr(dev.dataset_id, 9)                              AS resource_name,
     json_object(
-        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        'https://kamu.dev/schemas/config/v1alpha1/labels/LegacyConfigTargetDataset',
         dev.dataset_id
     )                                                                           AS labels,
     '{}'                                                                        AS annotations,
@@ -167,6 +169,8 @@ SELECT
     json_object(
         'phase', 'Ready',
         'observedGeneration', 1,
+        'observedAt', MIN(dev.created_at),
+        'reconciledGeneration', 1,
         'reconciledAt', MIN(dev.created_at),
         'conditions', json_object(
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',

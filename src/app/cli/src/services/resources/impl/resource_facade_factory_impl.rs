@@ -9,7 +9,8 @@
 
 use std::sync::Arc;
 
-use kamu_resources_facade::{RemoteGraphqlResourceFacadeImpl, ResourceFacade};
+use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
+use kamu_resources_facade::ResourceFacade;
 
 use crate::CLIError;
 use crate::odf_server::AccessTokenRegistryService;

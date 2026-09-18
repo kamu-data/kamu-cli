@@ -102,6 +102,7 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,
+            "reconciledGeneration": 1,
             "phase": "Ready"
         }
     })
@@ -126,6 +127,7 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,
+            "reconciledGeneration": 1,
             "phase": "Ready"
         }
     })
@@ -148,6 +150,7 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,
+            "reconciledGeneration": 1,
             "phase": "Ready"
         }
     })
@@ -177,12 +180,13 @@ fn successful_conditions() -> serde_json::Value {
 fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
     if let Some(headers) = doc.get_mut("headers").and_then(|m| m.as_object_mut()) {
         for k in ["id", "account", "generation", "createdAt", "updatedAt"] {
-            headers.remove(k);
+            headers.remove(k).unwrap();
         }
     }
     if let Some(obj) = doc.as_object_mut() {
         if let Some(status) = obj.get_mut("status").and_then(|s| s.as_object_mut()) {
-            status.remove("reconciledAt");
+            status.remove("observedAt").unwrap();
+            status.remove("reconciledAt").unwrap();
         }
         if let Some(conditions) = obj
             .get_mut("status")
@@ -191,7 +195,7 @@ fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
         {
             for condition in conditions.values_mut() {
                 if let Some(c) = condition.as_object_mut() {
-                    c.remove("lastTransitionTime");
+                    c.remove("lastTransitionTime").unwrap();
                 }
             }
         }

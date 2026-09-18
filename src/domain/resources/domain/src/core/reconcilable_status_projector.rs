@@ -61,7 +61,7 @@ where
             s.headers_mut().generation = e.new_generation;
             s.headers_mut().updated_at = e.event_time;
 
-            s.status_mut().mark_pending_for_new_generation();
+            s.status_mut().mark_pending();
 
             Ok(s)
         }
@@ -79,7 +79,7 @@ where
         (Some(mut s), E::ReconciliationStarted(e)) => {
             assert_eq!(s.id(), &e.id);
 
-            s.status_mut().mark_reconciling(e.event_time);
+            s.status_mut().mark_reconciling(e.generation, e.event_time);
 
             Ok(s)
         }
@@ -87,7 +87,7 @@ where
         (Some(mut s), E::ReconciliationSucceeded(e)) => {
             assert_eq!(s.id(), &e.id);
 
-            s.status_mut().mark_ready(e.event_time, e.generation);
+            s.status_mut().mark_ready(e.generation, e.event_time);
 
             Ok(s)
         }
@@ -96,7 +96,7 @@ where
             assert_eq!(s.id(), &e.id);
 
             s.status_mut()
-                .mark_failed(e.event_time, e.generation, e.reason, e.message);
+                .mark_failed_or_degraded(e.reason, e.message, e.event_time);
 
             Ok(s)
         }

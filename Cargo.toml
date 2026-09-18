@@ -139,12 +139,13 @@ members = [
     "src/adapter/flight-sql",
     "src/adapter/flow-dataset",
     "src/adapter/flow-webhook",
-    "src/adapter/task-dataset",
-    "src/adapter/task-webhook",
     "src/adapter/graphql",
     "src/adapter/http",
     "src/adapter/oauth",
     "src/adapter/odata",
+    "src/adapter/resources-facade-graphql",
+    "src/adapter/task-dataset",
+    "src/adapter/task-webhook",
     # Apps
     "src/app/cli",
     # E2E
@@ -316,6 +317,7 @@ kamu-adapter-graphql = { version = "0.266.1", path = "src/adapter/graphql", defa
 kamu-adapter-http = { version = "0.266.1", path = "src/adapter/http", default-features = false }
 kamu-adapter-odata = { version = "0.266.1", path = "src/adapter/odata", default-features = false }
 kamu-adapter-oauth = { version = "0.266.1", path = "src/adapter/oauth", default-features = false }
+kamu-adapter-resources-facade-graphql = { version = "0.266.1", path = "src/adapter/resources-facade-graphql", default-features = false }
 
 # E2E
 kamu-cli-e2e-common = { version = "0.266.1", path = "src/e2e/app/cli/common", default-features = false }

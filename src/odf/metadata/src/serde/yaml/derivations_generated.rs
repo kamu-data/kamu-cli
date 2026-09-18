@@ -6307,6 +6307,8 @@ pub mod resource {
         Reconciling,
         #[serde(alias = "ready")]
         Ready,
+        #[serde(alias = "degraded")]
+        Degraded,
         #[serde(alias = "failed")]
         Failed,
     }
@@ -6324,6 +6326,7 @@ pub mod resource {
                 dtos::resource::ResourcePhase::Pending => Self::Pending,
                 dtos::resource::ResourcePhase::Reconciling => Self::Reconciling,
                 dtos::resource::ResourcePhase::Ready => Self::Ready,
+                dtos::resource::ResourcePhase::Degraded => Self::Degraded,
                 dtos::resource::ResourcePhase::Failed => Self::Failed,
             }
         }
@@ -6336,6 +6339,7 @@ pub mod resource {
                 ResourcePhase::Pending => Ok(Self::Pending),
                 ResourcePhase::Reconciling => Ok(Self::Reconciling),
                 ResourcePhase::Ready => Ok(Self::Ready),
+                ResourcePhase::Degraded => Ok(Self::Degraded),
                 ResourcePhase::Failed => Ok(Self::Failed),
             }
         }
@@ -6490,6 +6494,13 @@ pub mod resource {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(with = "datetime_rfc3339_opt")]
+        pub observed_at: Option<DateTime<Utc>>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub reconciled_generation: Option<u64>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(with = "datetime_rfc3339_opt")]
         pub reconciled_at: Option<DateTime<Utc>>,
         pub conditions: resource::ResourceConditions,
     }
@@ -6506,6 +6517,8 @@ pub mod resource {
             Self {
                 phase: v.phase.into(),
                 observed_generation: v.observed_generation,
+                observed_at: v.observed_at,
+                reconciled_generation: v.reconciled_generation,
                 reconciled_at: v.reconciled_at,
                 conditions: v.conditions.into(),
             }
@@ -6518,6 +6531,8 @@ pub mod resource {
             Ok(Self {
                 phase: dtos::resource::ResourcePhase::try_from(v.phase)?,
                 observed_generation: v.observed_generation,
+                observed_at: v.observed_at,
+                reconciled_generation: v.reconciled_generation,
                 reconciled_at: v.reconciled_at,
                 conditions: dtos::resource::ResourceConditions::try_from(v.conditions)?,
             })

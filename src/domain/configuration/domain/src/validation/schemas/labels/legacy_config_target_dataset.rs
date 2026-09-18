@@ -12,7 +12,7 @@ use kamu_resources::ResourceValidateSchemaValue;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI: &str =
-    "https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset";
+    "https://kamu.dev/schemas/config/v1alpha1/labels/LegacyConfigTargetDataset";
 pub const RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SHORT_NAME: &str =
     "legacy-config-target-dataset";
 pub const RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_DOC: &str =

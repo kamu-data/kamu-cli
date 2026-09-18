@@ -27,6 +27,8 @@ pub fn new_pending_resource_status() -> ResourceStatus {
     ResourceStatus {
         phase: ResourcePhase::Pending,
         observed_generation: None,
+        observed_at: None,
+        reconciled_generation: None,
         reconciled_at: None,
         conditions: empty_resource_conditions(),
     }
@@ -46,41 +48,82 @@ pub fn resource_status_to_json(status: &ResourceStatus) -> serde_json::Value {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceStatusExt {
-    fn needs_reconciliation(&self, generation: u64) -> bool;
-    fn ready_condition_status(&self) -> Option<ResourceConditionStatus>;
-    fn mark_reconciling(&mut self, now: DateTime<Utc>);
-    fn mark_ready(&mut self, now: DateTime<Utc>, observed_generation: u64);
-    fn mark_failed(
+    fn was_observed(&self, generation: u64) -> bool;
+
+    fn was_reconciled(&self, generation: u64) -> bool;
+
+    /// Acknowledges the new spec generation before starting to reconcile
+    fn mark_pending(&mut self);
+
+    /// Updates observed generation and indicates that reconcilation had started
+    fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>);
+
+    /// Updated reconciled generation
+    fn mark_ready(&mut self, reconciled_generation: u64, now: DateTime<Utc>);
+
+    /// Indicates failed reconciliation attempt
+    fn mark_failed_or_degraded(
         &mut self,
-        now: DateTime<Utc>,
-        observed_generation: u64,
         reason: impl Into<String>,
         message: impl Into<String>,
+        now: DateTime<Utc>,
     );
-    fn mark_pending_for_new_generation(&mut self);
+
+    // TODO: Remove?
+    fn ready_condition_status(&self) -> Option<ResourceConditionStatus>;
 }
 
 impl ResourceStatusExt for ResourceStatus {
-    fn needs_reconciliation(&self, generation: u64) -> bool {
+    fn was_observed(&self, generation: u64) -> bool {
         self.observed_generation
-            .is_none_or(|observed_generation| observed_generation < generation)
+            .is_some_and(|observed_generation| observed_generation >= generation)
     }
 
-    fn ready_condition_status(&self) -> Option<ResourceConditionStatus> {
-        ready_condition(self).map(|condition| condition.value)
+    fn was_reconciled(&self, generation: u64) -> bool {
+        self.reconciled_generation
+            .is_some_and(|reconciled_generation| reconciled_generation >= generation)
     }
 
-    fn mark_reconciling(&mut self, now: DateTime<Utc>) {
+    fn mark_pending(&mut self) {
+        self.phase = ResourcePhase::Pending;
+
+        // TODO: Should only clear main controller's conditions, not all of them?
+        self.conditions = empty_resource_conditions();
+    }
+
+    fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>) {
+        assert!(
+            self.observed_generation.is_none()
+                || self.observed_generation.unwrap() < observed_generation,
+            "Previous observed generation {:?} >= {observed_generation}",
+            self.reconciled_generation,
+        );
         self.phase = ResourcePhase::Reconciling;
+        self.observed_generation = Some(observed_generation);
+        self.observed_at = Some(now);
+
         ResourceConditionValue::set_condition(
             &mut self.conditions.entries,
             ResourceConditionValue::reconciling_true(now),
         );
     }
 
-    fn mark_ready(&mut self, now: DateTime<Utc>, observed_generation: u64) {
+    fn mark_ready(&mut self, reconciled_generation: u64, now: DateTime<Utc>) {
+        assert!(
+            self.observed_generation.is_some()
+                && self.observed_generation.unwrap() >= reconciled_generation,
+            "Observed generation {:?} < {reconciled_generation}",
+            self.observed_generation,
+        );
+        assert!(
+            self.reconciled_generation.is_none()
+                || self.reconciled_generation.unwrap() < reconciled_generation,
+            "Previous reconciled generation {:?} >= {reconciled_generation}",
+            self.reconciled_generation,
+        );
+
         self.phase = ResourcePhase::Ready;
-        self.observed_generation = Some(observed_generation);
+        self.reconciled_generation = Some(reconciled_generation);
         self.reconciled_at = Some(now);
 
         ResourceConditionValue::set_condition(
@@ -93,16 +136,17 @@ impl ResourceStatusExt for ResourceStatus {
         );
     }
 
-    fn mark_failed(
+    fn mark_failed_or_degraded(
         &mut self,
-        now: DateTime<Utc>,
-        observed_generation: u64,
         reason: impl Into<String>,
         message: impl Into<String>,
+        now: DateTime<Utc>,
     ) {
-        self.phase = ResourcePhase::Failed;
-        self.observed_generation = Some(observed_generation);
-        self.reconciled_at = Some(now);
+        self.phase = if self.reconciled_generation.is_none() {
+            ResourcePhase::Failed
+        } else {
+            ResourcePhase::Degraded
+        };
 
         ResourceConditionValue::set_condition(
             &mut self.conditions.entries,
@@ -114,9 +158,8 @@ impl ResourceStatusExt for ResourceStatus {
         );
     }
 
-    fn mark_pending_for_new_generation(&mut self) {
-        self.phase = ResourcePhase::Pending;
-        self.conditions = empty_resource_conditions();
+    fn ready_condition_status(&self) -> Option<ResourceConditionStatus> {
+        ready_condition(self).map(|condition| condition.value)
     }
 }
 

@@ -11,11 +11,8 @@ use std::sync::Arc;
 
 use graphql_http::{GraphqlHttpClient, GraphqlHttpRequestError};
 use kamu_accounts::CurrentAccountSubject;
-use kamu_resources_facade::{
-    RemoteGraphqlResourceFacadeImpl,
-    ResourceFacade,
-    ResourcesSummaryRequest,
-};
+use kamu_adapter_resources_facade_graphql::RemoteGraphqlResourceFacadeImpl;
+use kamu_resources_facade::{ResourceFacade, ResourcesSummaryRequest};
 use serde::Deserialize;
 use url::Url;
 

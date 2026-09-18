@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod graphql;
 mod local;
 mod resource_account_resolver;
 mod resource_facade;
 mod resource_facade_errors;
 mod resource_selectors;
 
-pub use graphql::*;
 pub use local::*;
 pub use resource_account_resolver::*;
 pub use resource_facade::*;

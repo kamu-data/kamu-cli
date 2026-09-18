@@ -901,16 +901,25 @@ pub struct ResourcePhaseCounts {
     pub pending: UInt64,
     pub reconciling: UInt64,
     pub ready: UInt64,
+    pub degraded: UInt64,
     pub failed: UInt64,
 }
 
 impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
     fn from(value: kamu_resources::ResourcePhaseCounts) -> Self {
+        let kamu_resources::ResourcePhaseCounts {
+            pending,
+            reconciling,
+            ready,
+            degraded,
+            failed,
+        } = value;
         Self {
-            pending: value.pending.into(),
-            reconciling: value.reconciling.into(),
-            ready: value.ready.into(),
-            failed: value.failed.into(),
+            pending: pending.into(),
+            reconciling: reconciling.into(),
+            ready: ready.into(),
+            degraded: degraded.into(),
+            failed: failed.into(),
         }
     }
 }

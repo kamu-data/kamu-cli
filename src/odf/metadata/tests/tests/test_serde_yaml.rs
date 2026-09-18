@@ -1364,6 +1364,8 @@ fn test_serde_resource_canonical() {
         status:
           phase: Ready
           observedGeneration: 1
+          observedAt: 2026-01-01T00:00:00Z
+          reconciledGeneration: 1
           reconciledAt: 2026-01-01T00:00:00Z
           conditions:
             https://opendatafabric.org/core/v1/Bool:
@@ -1427,6 +1429,8 @@ fn test_serde_resource_canonical() {
             status: ResourceStatus {
                 phase: ResourcePhase::Ready,
                 observed_generation: Some(1),
+                observed_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+                reconciled_generation: Some(1),
                 reconciled_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
                 conditions: ResourceConditions {
                     entries: BTreeMap::from_iter([

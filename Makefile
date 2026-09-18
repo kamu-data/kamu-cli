@@ -587,13 +587,13 @@ resources:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::resourcegen::)'
 
 
-.PHONY: codegen-cli-reference
-codegen-cli-reference:
+.PHONY: resources-cli-reference
+resources-cli-reference:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(generate_reference_markdown)'
 
-.PHONY: codegen-graphql-schema
-codegen-graphql-schema:
-	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(update_graphql_schema)'
+.PHONY: resources-graphql-schema
+resources-graphql-schema:
+	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-adapter-graphql -E 'test(update_graphql_schema)'
 
 
 ###############################################################################
@@ -691,4 +691,8 @@ codegen: codegen-odf-dtos \
 # Executes codegen action in a nix flake environment that contains necessary tools like `flatc` and `protoc`
 .PHONY: codegen-nix
 codegen-nix:
-	nix develop .config -c make codegen
+	nix develop ./images/nix-dev -c make codegen
+
+.PHONY: nix
+nix:
+	nix develop ./images/nix-dev

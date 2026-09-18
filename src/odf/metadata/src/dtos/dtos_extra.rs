@@ -45,6 +45,7 @@ impl Display for resource::ResourcePhase {
             Self::Pending => "Pending",
             Self::Reconciling => "Reconciling",
             Self::Ready => "Ready",
+            Self::Degraded => "Degraded",
             Self::Failed => "Failed",
         })
     }

@@ -22,8 +22,9 @@ pub trait ReconcilableResource: DeclarativeResource {
     fn needs_reconciliation(&self) -> bool {
         use crate::ResourceStatusExt;
 
-        self.status()
-            .needs_reconciliation(self.headers().generation)
+        let generation = self.headers().generation;
+
+        !self.status().was_observed(generation) || !self.status().was_reconciled(generation)
     }
 
     fn reconcile_failure_details(error: &Self::ReconcileError) -> Self::ReconcileFailureDetails;
