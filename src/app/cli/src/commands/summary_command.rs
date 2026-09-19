@@ -56,6 +56,7 @@ impl SummaryCommand {
             Field::new("Pending", DataType::UInt64, false),
             Field::new("Reconciling", DataType::UInt64, false),
             Field::new("Ready", DataType::UInt64, false),
+            Field::new("Degraded", DataType::UInt64, false),
             Field::new("Failed", DataType::UInt64, false),
         ]));
 
@@ -101,6 +102,13 @@ impl SummaryCommand {
                     summary
                         .resource_counts
                         .iter()
+                        .map(|item| item.phase_counts.degraded)
+                        .collect::<Vec<_>>(),
+                )),
+                Arc::new(UInt64Array::from(
+                    summary
+                        .resource_counts
+                        .iter()
                         .map(|item| item.phase_counts.failed)
                         .collect::<Vec<_>>(),
                 )),
@@ -117,6 +125,7 @@ impl SummaryCommand {
             .with_column_formats(vec![
                 ColumnFormat::new().with_style_spec("l"),
                 ColumnFormat::new().with_style_spec("l"),
+                ColumnFormat::new().with_style_spec("r"),
                 ColumnFormat::new().with_style_spec("r"),
                 ColumnFormat::new().with_style_spec("r"),
                 ColumnFormat::new().with_style_spec("r"),

@@ -112,11 +112,7 @@ impl TryFrom<fragments::ResourceSummary> for domain::ResourceSummaryView {
     type Error = InternalError;
 
     fn try_from(value: fragments::ResourceSummary) -> Result<Self, Self::Error> {
-        let status = value.status.map(|s| domain::ResourceStatusSummaryView {
-            phase: s.phase.map(Into::into),
-            observed_generation: s.observed_generation.map(Into::into),
-            ready: s.ready,
-        });
+        let status = value.status.map(Into::into);
 
         let list_values = value
             .list_values

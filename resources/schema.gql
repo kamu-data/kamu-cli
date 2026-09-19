@@ -4329,7 +4329,9 @@ type ResourceStatus {
 type ResourceStatusSummary {
 	phase: ResourcePhase
 	observedGeneration: Uint64
-	ready: Boolean
+	observedAt: DateTime
+	reconciledGeneration: Uint64
+	reconciledAt: DateTime
 }
 
 type ResourceSummary {

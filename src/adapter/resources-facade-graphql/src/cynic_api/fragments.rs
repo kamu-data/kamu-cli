@@ -39,7 +39,28 @@ pub(crate) struct ResourceSummary {
 pub(crate) struct ResourceStatusSummary {
     pub phase: Option<ResourcePhase>,
     pub observed_generation: Option<Uint64>,
-    pub ready: Option<bool>,
+    pub observed_at: Option<DateTime<Utc>>,
+    pub reconciled_generation: Option<Uint64>,
+    pub reconciled_at: Option<DateTime<Utc>>,
+}
+
+impl From<ResourceStatusSummary> for kamu_resources::ResourceStatusSummaryView {
+    fn from(value: ResourceStatusSummary) -> Self {
+        let ResourceStatusSummary {
+            phase,
+            observed_generation,
+            observed_at,
+            reconciled_generation,
+            reconciled_at,
+        } = value;
+        Self {
+            phase: phase.map(Into::into),
+            observed_generation: observed_generation.map(Into::into),
+            observed_at,
+            reconciled_generation: reconciled_generation.map(Into::into),
+            reconciled_at,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,14 +11,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ResourceConditionStatus,
     ResourceID,
     ResourceListColumnValueView,
     ResourceName,
     ResourcePhase,
     ResourceSnapshot,
     ResourceStatus,
-    ResourceStatusExt,
     TypeUri,
     get_description,
 };
@@ -46,7 +44,9 @@ pub struct ResourceStatusSummaryView {
     #[serde_as(as = "Option<odf::metadata::serde::yaml::resource::ResourcePhase>")]
     pub phase: Option<ResourcePhase>,
     pub observed_generation: Option<u64>,
-    pub ready: Option<bool>,
+    pub observed_at: Option<DateTime<Utc>>,
+    pub reconciled_generation: Option<u64>,
+    pub reconciled_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,15 +73,20 @@ impl From<ResourceSnapshot> for ResourceSummaryView {
 
 impl From<ResourceStatus> for ResourceStatusSummaryView {
     fn from(value: ResourceStatus) -> Self {
-        let ready = value.ready_condition_status().map(|status| match status {
-            ResourceConditionStatus::True => true,
-            ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
-        });
-
+        let ResourceStatus {
+            phase,
+            observed_generation,
+            observed_at,
+            reconciled_generation,
+            reconciled_at,
+            conditions: _,
+        } = value;
         Self {
-            phase: Some(value.phase),
-            observed_generation: value.observed_generation,
-            ready,
+            phase: Some(phase),
+            observed_generation,
+            observed_at,
+            reconciled_generation,
+            reconciled_at,
         }
     }
 }

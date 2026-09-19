@@ -95,18 +95,17 @@ impl ListResourcesCommand {
             columns.push(ResourceGenericColumn::Id);
         }
 
-        columns.extend([
-            ResourceGenericColumn::Phase,
-            ResourceGenericColumn::Readiness,
-            ResourceGenericColumn::Updated,
-        ]);
+        columns.extend([ResourceGenericColumn::Phase, ResourceGenericColumn::Updated]);
 
         if self.detail_level > 0 {
             columns.extend([
-                ResourceGenericColumn::Description,
                 ResourceGenericColumn::Generation,
                 ResourceGenericColumn::ObservedGeneration,
+                ResourceGenericColumn::ObservedAt,
+                ResourceGenericColumn::ReconciledGeneration,
+                ResourceGenericColumn::ReconciledAt,
                 ResourceGenericColumn::Age,
+                ResourceGenericColumn::Description,
             ]);
         }
 
@@ -143,9 +142,6 @@ impl ListResourcesCommand {
                 ResourceGenericColumn::Type => Field::new("Type", DataType::Utf8, false),
                 ResourceGenericColumn::Id => Field::new("ID", DataType::Utf8, false),
                 ResourceGenericColumn::Phase => Field::new("Phase", DataType::Utf8, true),
-                ResourceGenericColumn::Readiness => {
-                    Field::new("Readiness", DataType::Boolean, true)
-                }
                 ResourceGenericColumn::Updated => Field::new(
                     "Updated",
                     DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
@@ -158,8 +154,21 @@ impl ListResourcesCommand {
                     Field::new("Generation", DataType::UInt64, false)
                 }
                 ResourceGenericColumn::ObservedGeneration => {
-                    Field::new("Observed Generation", DataType::UInt64, true)
+                    Field::new("Observed Gen", DataType::UInt64, true)
                 }
+                ResourceGenericColumn::ObservedAt => Field::new(
+                    "Observed At",
+                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
+                    true,
+                ),
+                ResourceGenericColumn::ReconciledGeneration => {
+                    Field::new("Reconciled Gen", DataType::UInt64, true)
+                }
+                ResourceGenericColumn::ReconciledAt => Field::new(
+                    "Reconciled At",
+                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
+                    true,
+                ),
                 ResourceGenericColumn::Age => Field::new(
                     "Age",
                     DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
@@ -192,17 +201,18 @@ impl ListResourcesCommand {
                 | ResourceGenericColumn::Type
                 | ResourceGenericColumn::Id
                 | ResourceGenericColumn::Description => ColumnFormat::new().with_style_spec("l"),
-                ResourceGenericColumn::Phase | ResourceGenericColumn::Readiness => {
-                    ColumnFormat::new().with_style_spec("c")
-                }
-                ResourceGenericColumn::Updated | ResourceGenericColumn::Age => ColumnFormat::new()
+                ResourceGenericColumn::Phase => ColumnFormat::new().with_style_spec("c"),
+                ResourceGenericColumn::Updated
+                | ResourceGenericColumn::Age
+                | ResourceGenericColumn::ObservedAt
+                | ResourceGenericColumn::ReconciledAt => ColumnFormat::new()
                     .with_style_spec("c")
                     .with_value_fmt_t(common::humanize_relative_date),
-                ResourceGenericColumn::Generation | ResourceGenericColumn::ObservedGeneration => {
-                    ColumnFormat::new()
-                        .with_style_spec("r")
-                        .with_value_fmt_t(common::humanize_quantity)
-                }
+                ResourceGenericColumn::Generation
+                | ResourceGenericColumn::ObservedGeneration
+                | ResourceGenericColumn::ReconciledGeneration => ColumnFormat::new()
+                    .with_style_spec("r")
+                    .with_value_fmt_t(common::humanize_quantity),
             });
         }
 
@@ -388,12 +398,6 @@ impl ListResourcesCommand {
                         })
                         .collect::<Vec<_>>(),
                 )),
-                ResourceGenericColumn::Readiness => Arc::new(BooleanArray::from(
-                    resources
-                        .iter()
-                        .map(|resource| resource.status.as_ref().and_then(|status| status.ready))
-                        .collect::<Vec<_>>(),
-                )),
                 ResourceGenericColumn::Updated => Arc::new(
                     TimestampMicrosecondArray::from(
                         resources
@@ -426,6 +430,43 @@ impl ListResourcesCommand {
                         })
                         .collect::<Vec<_>>(),
                 )),
+                ResourceGenericColumn::ObservedAt => Arc::new(
+                    TimestampMicrosecondArray::from(
+                        resources
+                            .iter()
+                            .map(|resource| {
+                                resource.status.as_ref().and_then(|status| {
+                                    status.observed_at.map(|t| t.timestamp_micros())
+                                })
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .with_timezone_utc(),
+                ),
+                ResourceGenericColumn::ReconciledGeneration => Arc::new(UInt64Array::from(
+                    resources
+                        .iter()
+                        .map(|resource| {
+                            resource
+                                .status
+                                .as_ref()
+                                .and_then(|status| status.reconciled_generation)
+                        })
+                        .collect::<Vec<_>>(),
+                )),
+                ResourceGenericColumn::ReconciledAt => Arc::new(
+                    TimestampMicrosecondArray::from(
+                        resources
+                            .iter()
+                            .map(|resource| {
+                                resource.status.as_ref().and_then(|status| {
+                                    status.reconciled_at.map(|t| t.timestamp_micros())
+                                })
+                            })
+                            .collect::<Vec<_>>(),
+                    )
+                    .with_timezone_utc(),
+                ),
                 ResourceGenericColumn::Age => Arc::new(
                     TimestampMicrosecondArray::from(
                         resources
@@ -554,11 +595,13 @@ enum ResourceGenericColumn {
     Type,
     Id,
     Phase,
-    Readiness,
     Updated,
     Description,
     Generation,
     ObservedGeneration,
+    ObservedAt,
+    ReconciledGeneration,
+    ReconciledAt,
     Age,
 }
 

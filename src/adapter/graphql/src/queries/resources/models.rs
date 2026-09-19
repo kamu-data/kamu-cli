@@ -845,15 +845,26 @@ impl From<kamu_resources::ResourceListColumnValueView> for ResourceListColumnVal
 pub struct ResourceStatusSummary {
     pub phase: Option<ResourcePhase>,
     pub observed_generation: Option<UInt64>,
-    pub ready: Option<bool>,
+    pub observed_at: Option<DateTime<Utc>>,
+    pub reconciled_generation: Option<UInt64>,
+    pub reconciled_at: Option<DateTime<Utc>>,
 }
 
 impl From<kamu_resources::ResourceStatusSummaryView> for ResourceStatusSummary {
     fn from(value: kamu_resources::ResourceStatusSummaryView) -> Self {
+        let kamu_resources::ResourceStatusSummaryView {
+            phase,
+            observed_generation,
+            observed_at,
+            reconciled_generation,
+            reconciled_at,
+        } = value;
         Self {
-            phase: value.phase.map(Into::into),
-            observed_generation: value.observed_generation.map(Into::into),
-            ready: value.ready,
+            phase: phase.map(Into::into),
+            observed_generation: observed_generation.map(Into::into),
+            observed_at,
+            reconciled_generation: reconciled_generation.map(Into::into),
+            reconciled_at,
         }
     }
 }

@@ -9,13 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{
-    ResourceConditionStatus,
-    ResourceConditionValue,
-    ResourcePhase,
-    empty_resource_conditions,
-    ready_condition_type_ref,
-};
+use crate::{ResourceConditionValue, ResourcePhase, empty_resource_conditions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,9 +62,6 @@ pub trait ResourceStatusExt {
         message: impl Into<String>,
         now: DateTime<Utc>,
     );
-
-    // TODO: Remove?
-    fn ready_condition_status(&self) -> Option<ResourceConditionStatus>;
 }
 
 impl ResourceStatusExt for ResourceStatus {
@@ -156,31 +147,6 @@ impl ResourceStatusExt for ResourceStatus {
             &mut self.conditions.entries,
             ResourceConditionValue::reconciling_false(now),
         );
-    }
-
-    fn ready_condition_status(&self) -> Option<ResourceConditionStatus> {
-        ready_condition(self).map(|condition| condition.value)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn ready_condition(status: &ResourceStatus) -> Option<ResourceConditionValue> {
-    let condition_key = ready_condition_type_ref();
-
-    let value = status.conditions.entries.get(&condition_key)?;
-
-    match serde_json::from_value(value.clone()) {
-        Ok(value) => Some(value),
-        Err(error) => {
-            tracing::warn!(
-                %condition_key,
-                %value,
-                %error,
-                "Failed to parse condition value - ignoring",
-            );
-            None
-        }
     }
 }
 
