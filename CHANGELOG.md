@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.267.0] - 2026-09-19
 ### Added
 - **Resources Framework** - a new declarative, Kubernetes-inspired subsystem for managing server-side
   objects from manifests, implementing [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md).
