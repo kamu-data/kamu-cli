@@ -97,7 +97,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "brotli",
     "deflate",
 ] }
-ringbuf = "0.4"
+ringbuf = "0.5"
 zip = { version = "8", default-features = false, features = [
     "deflate",
     "bzip2",
@@ -199,7 +199,9 @@ test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.8", features = ["async_tokio"] }
-datafusion = { version = "54", default-features = false, features = ["parquet"] }
+datafusion = { version = "54", default-features = false, features = [
+    "parquet",
+] }
 filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.14", default-features = false }
