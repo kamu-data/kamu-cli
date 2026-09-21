@@ -1225,10 +1225,6 @@ fn test_serde_resource_input_refs() {
                 type: Dataset
                 account: bob
                 name: bobs-dataset
-          attributes:
-            - object: Dataset:bob/bobs-dataset # Short form of `{ type: Dataset, account: bob, name: bobs-dataset }`
-              name: allowPublicRead
-              value: true
         "#
     );
 
@@ -1274,21 +1270,6 @@ fn test_serde_resource_input_refs() {
                         name: Some("bobs-dataset".parse().unwrap()),
                     },
                 }]),
-                attributes: Some(vec![AttributeInput {
-                    object: ResourceRef {
-                        account: Some(AccountRef {
-                            id: None,
-                            did: None,
-                            name: Some("bob".parse().unwrap()),
-                        }),
-                        r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
-                        id: None,
-                        did: None,
-                        name: Some("bobs-dataset".parse().unwrap()),
-                    },
-                    name: "allowPublicRead".to_string(),
-                    value: json!(true),
-                },],),
             },
         }
     );
@@ -1315,14 +1296,6 @@ fn test_serde_resource_input_refs() {
                     name: bob
                   type: Dataset
                   name: bobs-dataset
-              attributes:
-              - object:
-                  account:
-                    name: bob
-                  type: Dataset
-                  name: bobs-dataset
-                name: allowPublicRead
-                value: true
             "#
         )
     );

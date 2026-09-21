@@ -1027,85 +1027,6 @@ table AttachmentsEmbedded {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceHandle
-// Lint to another resolved resource.
-//
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceHandle {
-  // Account that owns the target resource.
-  account: AccountHandle;
-  // Type URI of the target resource.
-  type: string;
-  // ID of the resource within a node.
-  id: [ubyte];
-  // DID of the resource, if applicable.
-  did: [ubyte];
-  // Name of a resource.
-  name: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Attribute
-// A named attribute attached to a resource, used by auth policies for access control decisions.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Attribute
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table Attribute {
-  // The resource this attribute is attached to.
-  object: ResourceHandle;
-  // Name of the attribute.
-  //
-  // Examples:
-  // - "allowPublicRead"
-  name: string;
-  // Value of the attribute.
-  value: string (json);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceRef
-// Reference to another resource.
-//
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceRef
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceRef {
-  // Reference to an account that owns the target resource.
-  account: AccountRef;
-  // ID of the resource within a node.
-  id: [ubyte];
-  // DID of the resource.
-  did: [ubyte];
-  // Short type name or full type URI of the target resource.
-  //
-  // Examples:
-  // - "SecretSet"
-  // - "https://opendatafabric.org/config/v1/SecretSet"
-  type: string;
-  // Name of a resource.
-  name: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AttributeInput
-// A named attribute attached to a resource, used by auth policies for access control decisions.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AttributeInput
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AttributeInput {
-  // The resource this attribute is attached to.
-  object: ResourceRef;
-  // Name of the attribute e.g. `allowPublicRead`.
-  name: string;
-  // Value of the attribute.
-  value: string (json);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ValueHandle
 // Reference to a value within a `VariableSet` or a `SecretSet`.
 //
@@ -1779,6 +1700,19 @@ table DatasetSpecInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetRole
+// Access role granted to a subject on a dataset. Note: in future this fixed enum schema will likely be replaced by a reference to a `DatasetRole` resources that defines granular permissions on different actions available on a dataset.
+//
+// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetRole
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum DatasetRole: int32 {
+  Reader,
+  Editor,
+  Maintainer,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LabelFilter
 // Filters that work on resource labels and identity headers.
 //
@@ -1835,6 +1769,26 @@ table DatasetSnapshot {
   kind: DatasetKind;
   // An array of metadata events that will be used to populate the chain. Here you can define polling and push sources, set licenses, add attachments etc.
   metadata: [MetadataEventWrapper];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceHandle
+// Lint to another resolved resource.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceHandle {
+  // Account that owns the target resource.
+  account: AccountHandle;
+  // Type URI of the target resource.
+  type: string;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource, if applicable.
+  did: [ubyte];
+  // Name of a resource.
+  name: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1965,6 +1919,30 @@ table FlowTriggerInputEvent {
   cooldown: Duration;
   // If an event is observed a `cooldownMaxBatch` number of times during the `cooldown` interval it will fire the trigger without waiting for cooldown to finish.
   cooldown_max_batch: uint64 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceRef
+// Reference to another resource.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceRef {
+  // Reference to an account that owns the target resource.
+  account: AccountRef;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
+  // Short type name or full type URI of the target resource.
+  //
+  // Examples:
+  // - "SecretSet"
+  // - "https://opendatafabric.org/config/v1/SecretSet"
+  type: string;
+  // Name of a resource.
+  name: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2255,6 +2233,26 @@ table FlowSpec {
   triggers: [FlowTriggerWrapper];
   // List of tasks to run consecutively.
   tasks: [TaskSpecWrapper];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// GroupSpecInput
+// Group specification. Groups have no intrinsic properties — membership and permissions are expressed entirely through relations.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table GroupSpecInput {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// GroupSpec
+// Group specification. Groups have no intrinsic properties — membership and permissions are expressed entirely through relations.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table GroupSpec {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2683,7 +2681,7 @@ table RelationInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RelationsSpecInput
-// Specifies resource attributes and relations between resources on which auth policies act upon.
+// Specifies relations between resources on which auth policies act upon.
 //
 // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2691,13 +2689,11 @@ table RelationInput {
 table RelationsSpecInput {
   // Relations between resources.
   relations: [RelationInput];
-  // Resource attributes.
-  attributes: [AttributeInput];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RelationsSpec
-// Specifies resource attributes and relations between resources on which auth policies act upon.
+// Specifies relations between resources on which auth policies act upon.
 //
 // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2705,8 +2701,6 @@ table RelationsSpecInput {
 table RelationsSpec {
   // Relations between resources.
   relations: [Relation];
-  // Resource attributes.
-  attributes: [Attribute];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -110,10 +110,11 @@ fn test_flatbuffers_maps() {
 #[test]
 fn test_flatbuffers_any_json_property() {
     // String
-    let expected = auth::AttributeInput {
-        object: "X:x".parse().unwrap(),
-        name: "my-attr".to_string(),
-        value: json!("some-attr"),
+    let expected = auth::RelationInput {
+        subject: "X:x".parse().unwrap(),
+        object: "Y:y".parse().unwrap(),
+        relation: "my-rel".to_string(),
+        value: Some(json!("some-values")),
     };
 
     let mut fb = ::flatbuffers::FlatBufferBuilder::new();
@@ -122,14 +123,15 @@ fn test_flatbuffers_any_json_property() {
     let data = fb.finished_data();
 
     let actual =
-        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
+        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Int
-    let expected = auth::AttributeInput {
-        object: "X:x".parse().unwrap(),
-        name: "my-attr".to_string(),
-        value: json!(123),
+    let expected = auth::RelationInput {
+        subject: "X:x".parse().unwrap(),
+        object: "Y:y".parse().unwrap(),
+        relation: "my-rel".to_string(),
+        value: Some(json!(123)),
     };
 
     let mut fb = ::flatbuffers::FlatBufferBuilder::new();
@@ -138,14 +140,15 @@ fn test_flatbuffers_any_json_property() {
     let data = fb.finished_data();
 
     let actual =
-        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
+        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Nested
-    let expected = auth::AttributeInput {
-        object: "X:x".parse().unwrap(),
-        name: "my-attr".to_string(),
-        value: json!({"a": "x", "b": "y"}),
+    let expected = auth::RelationInput {
+        subject: "X:x".parse().unwrap(),
+        object: "Y:y".parse().unwrap(),
+        relation: "my-rel".to_string(),
+        value: Some(json!({"a": "x", "b": "y"})),
     };
 
     let mut fb = ::flatbuffers::FlatBufferBuilder::new();
@@ -154,7 +157,7 @@ fn test_flatbuffers_any_json_property() {
     let data = fb.finished_data();
 
     let actual =
-        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
+        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 }
 
