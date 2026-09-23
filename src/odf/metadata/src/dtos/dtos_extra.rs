@@ -63,6 +63,7 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
             account,
             labels,
             annotations,
+            owner_references,
             generation: _,
             created_at: _,
             updated_at: _,
@@ -78,6 +79,7 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
             }),
             labels: Some(labels),
             annotations: Some(annotations),
+            owner_references: owner_references.map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -217,6 +219,77 @@ impl auth::AccountHandle {
             did: AccountID::new_seeded_ed25519(account_name_str.as_bytes()),
             name: AccountName::new_unchecked(account_name_str),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for dataset::DatasetRef {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(_: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+impl_parse_error!(dataset::DatasetRef);
+impl_try_from_str!(dataset::DatasetRef);
+
+impl From<DatasetID> for dataset::DatasetRef {
+    fn from(value: DatasetID) -> Self {
+        Self {
+            account: None,
+            id: None,
+            did: Some(value),
+            name: None,
+        }
+    }
+}
+
+impl From<dataset::DatasetHandle> for dataset::DatasetRef {
+    fn from(value: dataset::DatasetHandle) -> Self {
+        let dataset::DatasetHandle {
+            account,
+            id,
+            did,
+            name,
+        } = value;
+        Self {
+            account: account.map(Into::into),
+            id: Some(id),
+            did: Some(did),
+            name: Some(name),
+        }
+    }
+}
+
+impl From<dataset::DatasetRef> for resource::ResourceRef {
+    fn from(value: dataset::DatasetRef) -> Self {
+        let dataset::DatasetRef {
+            account,
+            id,
+            did,
+            name,
+        } = value;
+        Self {
+            account,
+            r#type: Some(dataset::Dataset::schema().clone().into()),
+            id,
+            did: did.map(Into::into),
+            name,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<dataset::DatasetHandle> for resource::ResourceRef {
+    fn from(value: dataset::DatasetHandle) -> Self {
+        dataset::DatasetRef::from(value).into()
     }
 }
 
@@ -427,7 +500,9 @@ impl dataset::ExecuteTransformInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl dataset::SetTransform {
-    pub fn as_dataset_ref_alias_map(&self) -> HashMap<&dataset::DatasetRef, &String> {
+    pub fn as_dataset_ref_alias_map(
+        &self,
+    ) -> HashMap<&crate::dataset::legacy::DatasetRef, &String> {
         self.inputs.iter().fold(HashMap::new(), |mut acc, input| {
             if let Some(alias) = input.alias.as_ref() {
                 acc.insert(&input.dataset_ref, alias);

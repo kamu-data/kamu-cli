@@ -87,6 +87,7 @@ impl ResourceHeadersExt for ResourceHeaders {
             annotations: odf::metadata::resource::ResourceAnnotations {
                 entries: std::collections::BTreeMap::new(),
             },
+            owner_references: None,
             generation: 0,
             created_at: now,
             updated_at: now,
@@ -96,6 +97,11 @@ impl ResourceHeadersExt for ResourceHeaders {
 
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self {
         let account = account_handle_from_input(input.account.as_ref());
+
+        assert!(
+            input.owner_references.is_none(),
+            "Owner referece resolution is not yet supported"
+        );
 
         Self {
             id,
@@ -111,6 +117,7 @@ impl ResourceHeadersExt for ResourceHeaders {
                     entries: std::collections::BTreeMap::new(),
                 }
             }),
+            owner_references: None,
             generation: 1,
             created_at: now,
             updated_at: now,
@@ -129,6 +136,9 @@ impl ResourceHeadersExt for ResourceHeaders {
             name: self.name,
             labels: Some(self.labels),
             annotations: Some(self.annotations),
+            owner_references: self
+                .owner_references
+                .map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 
@@ -143,6 +153,10 @@ impl ResourceHeadersExt for ResourceHeaders {
             .annotations
             .as_ref()
             .map_or(&empty_map, |a| &a.entries);
+
+        if self.owner_references.is_some() || input.owner_references.is_some() {
+            unimplemented!("Owner references are not yet supported");
+        }
 
         self.account == account_handle_from_input(input.account.as_ref())
             && self.name == input.name

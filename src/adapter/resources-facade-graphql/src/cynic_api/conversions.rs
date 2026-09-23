@@ -53,6 +53,10 @@ impl TryFrom<fragments::Resource> for domain::Resource {
                 name: value.headers.name,
                 labels: value.headers.labels.0,
                 annotations: value.headers.annotations.0,
+                owner_references: value
+                    .headers
+                    .owner_references
+                    .map(|v| v.into_iter().map(Into::into).collect()),
                 generation: value.headers.generation.into(),
                 created_at: value.headers.created_at,
                 updated_at: value.headers.updated_at,

@@ -282,6 +282,7 @@ pub(crate) struct ResourceHeaders {
     pub name: kamu_resources::ResourceName,
     pub labels: ResourceLabels,
     pub annotations: ResourceAnnotations,
+    pub owner_references: Option<Vec<ResourceHandle>>,
     pub generation: Uint64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

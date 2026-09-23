@@ -24,7 +24,7 @@ impl IDFactory {
         DatasetID::new_seeded_ed25519(&digest)
     }
 
-    pub fn dataset_name() -> DatasetName {
+    pub fn dataset_name() -> legacy::DatasetName {
         // TODO: create more readable IDs like docker does
         let mut name = String::with_capacity(20);
         name.extend(
@@ -33,6 +33,6 @@ impl IDFactory {
                 .take(20)
                 .map(char::from),
         );
-        DatasetName::try_from(name).unwrap()
+        legacy::DatasetName::try_from(name).unwrap()
     }
 }

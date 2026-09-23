@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName, Did, ResourcePhase, TypeName, UInt64};
+use crate::scalars::{AccountID, AccountName, ResourcePhase, TypeName, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -657,32 +657,6 @@ impl From<BatchRenderResourceManifestsResponse> for BatchResourceManifestsResult
 pub struct BatchResourceManifestSuccess {
     pub request_index: usize,
     pub manifest: ResourceRenderManifestResult,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceHandle {
-    pub id: ResourceID<'static>,
-    #[graphql(name = "type")]
-    pub r#type: TypeUri<'static>,
-    // Always `None` until we support DID-aware resource types (see
-    // handle_support.rs).
-    pub did: Option<Did<'static>>,
-    pub name: ResourceName<'static>,
-    pub account: AccountHandle,
-}
-
-impl From<kamu_resources::ResourceHandle> for ResourceHandle {
-    fn from(value: kamu_resources::ResourceHandle) -> Self {
-        Self {
-            id: value.id.into(),
-            r#type: value.r#type.into(),
-            did: value.did.map(Into::into),
-            name: value.name.into(),
-            account: value.account.into(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

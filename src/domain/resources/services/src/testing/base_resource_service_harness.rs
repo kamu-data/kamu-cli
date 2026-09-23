@@ -215,6 +215,7 @@ impl BaseResourceServiceHarness {
             annotations: Some(kamu_resources::ResourceAnnotations {
                 entries: BTreeMap::new(),
             }),
+            owner_references: None,
         }
     }
 

@@ -67,6 +67,30 @@ table ResourceAnnotations {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceRef
+// Reference to another resource.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceRef {
+  // Reference to an account that owns the target resource.
+  account: AccountRef;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
+  // Short type name or full type URI of the target resource.
+  //
+  // Examples:
+  // - "SecretSet"
+  // - "https://opendatafabric.org/config/v1/SecretSet"
+  type: string;
+  // Name of a resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceHeadersInput
 // Container for identity and ownership information of a resource.
 //
@@ -84,6 +108,8 @@ table ResourceHeadersInput {
   labels: ResourceLabels;
   // Annotations is a key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
   annotations: ResourceAnnotations;
+  // References to resources that created this resource. Used for lineage tracking and cascading cleanup.
+  owner_references: [ResourceRef];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1700,6 +1726,42 @@ table DatasetSpecInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetHandle
+// Link to a dataset.
+//
+// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table DatasetHandle {
+  // Reference to an account that owns the dataset.
+  account: AccountHandle;
+  // ID of the dataset resource.
+  id: [ubyte];
+  // DID of the dataset.
+  did: [ubyte];
+  // Name of the dataset.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetRef
+// Reference to a dataset.
+//
+// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table DatasetRef {
+  // Reference to an account that owns the dataset.
+  account: AccountRef;
+  // UUID of the dataset resource.
+  id: [ubyte];
+  // DID of the dataset.
+  did: [ubyte];
+  // Name of the dataset.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetRole
 // Access role granted to a subject on a dataset. Note: in future this fixed enum schema will likely be replaced by a reference to a `DatasetRole` resources that defines granular permissions on different actions available on a dataset.
 //
@@ -1773,7 +1835,7 @@ table DatasetSnapshot {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceHandle
-// Lint to another resolved resource.
+// Link to another resolved resource.
 //
 // Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1887,10 +1949,21 @@ table ResourceSelector {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union FlowTriggerInput {
+  FlowTriggerInputManual,
   FlowTriggerInputSchedule,
   FlowTriggerInputEvent,
   FlowTriggerInputSource,
   FlowTriggerInputDataset,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerInputManual
+// Triggers the flow via an API call or UI action.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Manual
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerInputManual {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1919,30 +1992,6 @@ table FlowTriggerInputEvent {
   cooldown: Duration;
   // If an event is observed a `cooldownMaxBatch` number of times during the `cooldown` interval it will fire the trigger without waiting for cooldown to finish.
   cooldown_max_batch: uint64 = null;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceRef
-// Reference to another resource.
-//
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceRef
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceRef {
-  // Reference to an account that owns the target resource.
-  account: AccountRef;
-  // ID of the resource within a node.
-  id: [ubyte];
-  // DID of the resource.
-  did: [ubyte];
-  // Short type name or full type URI of the target resource.
-  //
-  // Examples:
-  // - "SecretSet"
-  // - "https://opendatafabric.org/config/v1/SecretSet"
-  type: string;
-  // Name of a resource.
-  name: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1983,11 +2032,12 @@ table FlowTriggerInputWrapper {
 // TaskSpecInput
 // An individual work item to be executed as part of a flow.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union TaskSpecInput {
   TaskSpecInputIngest,
+  TaskSpecInputTransform,
   TaskSpecInputCompaction,
   TaskSpecInputGarbageCollection,
   TaskSpecInputWebhookCall,
@@ -2009,10 +2059,12 @@ table IngestParams {
 // TaskSpecInputIngest
 // Fetches data from a source and appends it to a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Ingest
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Ingest
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputIngest {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
   // Reference to the source resource that defines how to fetch data.
   source: ResourceRef;
   // Optional parameters to control ingestion behavior.
@@ -2020,13 +2072,29 @@ table TaskSpecInputIngest {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputTransform
+// Executes transformation of data defined in a derivative dataset.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Transform
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputTransform {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the derivative dataset that defines how to transform data.
+  target: DatasetRef;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskSpecInputCompaction
 // Compacts data files in matching datasets to improve query performance.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Compaction
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Compaction
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputCompaction {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
   // Optional parameters to control ingestion behavior.
   params: CompactionParams;
 }
@@ -2035,24 +2103,58 @@ table TaskSpecInputCompaction {
 // TaskSpecInputGarbageCollection
 // Removes unreferenced data files from matching datasets.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputGarbageCollection {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RetryBackoff
+// Type of the backoff scaling.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/RetryBackoff
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum RetryBackoff: int32 {
+  Linear,
+  Exponential,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RetryPolicy
+// Defines how a flow should react to failures.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/RetryPolicy
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table RetryPolicy {
+  // Number of attempts before flow auto-scheduling will be disabled.
+  max_attempts: uint32 = null;
+  // How long to wait until the first retry.
+  min_delay: Duration;
+  // Type of the backoff scaling.
+  backoff: RetryBackoff = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskSpecInputWebhookCall
 // Dispatches a certain payload to a specific `WebhookTarget`.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/WebhookCall
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/WebhookCall
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputWebhookCall {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
   // Reference to the `WebhookTarget`.
   target: ResourceRef;
   // The payload to send. May include templating.
   payload: string;
+  // Defines how a webhook should react to failures.
+  retry_policy: RetryPolicy;
 }
 
 table TaskSpecInputWrapper {
@@ -2073,6 +2175,22 @@ table FlowSpecInput {
   triggers: [FlowTriggerInputWrapper];
   // List of tasks to run consecutively.
   tasks: [TaskSpecInputWrapper];
+  // Defines how a flow should react to failures.
+  retry_policy: RetryPolicy;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunSpecInput
+// Defines a set of tasks to be executed in a sequence.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowRunSpecInput {
+  // Defines the default target resources on which tasks will be performed.
+  target: ResourceRef;
+  // List of tasks to run consecutively.
+  tasks: [TaskSpecInputWrapper];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2083,10 +2201,21 @@ table FlowSpecInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union FlowTrigger {
+  FlowTriggerManual,
   FlowTriggerSchedule,
   FlowTriggerEvent,
   FlowTriggerSource,
   FlowTriggerDataset,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerManual
+// Triggers the flow via an API call or UI action.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Manual
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerManual {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2147,19 +2276,58 @@ table FlowTriggerDataset {
   events: [string];
 }
 
-table FlowTriggerWrapper {
-  value: FlowTrigger;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunActivationCause
+// Cause of the flow run activation
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunActivationCause
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowRunActivationCause {
+  // Time at which the trigger fired.
+  activation_time: Timestamp;
+  // Account that initiated the run, if applicable.
+  initiator: AccountHandle;
+  // Copy of the trigger configuration from the parent Flow that fired.
+  trigger: FlowTrigger;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunActivationCauses
+// Condition capturing what caused this FlowRun to be scheduled. Set by the controller at creation time; never written by users. In case of a retry, the causes of the original run are preserved.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunActivationCauses
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowRunActivationCauses {
+  // Triggers that caused this run to be scheduled.
+  activation_causes: [FlowRunActivationCause];
+  // Additional triggers that fired while this run was already queued or executing.
+  late_activation_causes: [FlowRunActivationCause];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunRetry
+// Condition linking this FlowRun to the previous FlowRun it is retrying. Set by the controller; never written by users.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunRetry
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowRunRetry {
+  // Reference to the FlowRun this run is retrying.
+  retry_of: ResourceHandle;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskSpec
 // An individual work item to be executed as part of a flow.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union TaskSpec {
   TaskSpecIngest,
+  TaskSpecTransform,
   TaskSpecCompaction,
   TaskSpecGarbageCollection,
   TaskSpecWebhookCall,
@@ -2169,10 +2337,12 @@ union TaskSpec {
 // TaskSpecIngest
 // Fetches data from a source and appends it to a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/Ingest
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Ingest
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecIngest {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
   // Reference to the source resource that defines how to fetch data.
   source: ResourceHandle;
   // Optional parameters to control ingestion behavior.
@@ -2180,13 +2350,29 @@ table TaskSpecIngest {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecTransform
+// Executes transformation of data defined in a derivative dataset.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Transform
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecTransform {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the derivative dataset that defines how to transform data.
+  target: DatasetHandle;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskSpecCompaction
 // Compacts data files in matching datasets to improve query performance.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/Compaction
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Compaction
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecCompaction {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
   // Optional parameters to control ingestion behavior.
   params: CompactionParams;
 }
@@ -2195,20 +2381,24 @@ table TaskSpecCompaction {
 // TaskSpecGarbageCollection
 // Removes unreferenced data files from matching datasets.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/GarbageCollection
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/GarbageCollection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecGarbageCollection {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskSpecWebhookCall
 // Dispatches a certain payload to a specific `WebhookTarget`.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/WebhookCall
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/WebhookCall
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecWebhookCall {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
   // Reference to the `WebhookTarget`.
   target: ResourceHandle;
   // The payload to send. May include templating.
@@ -2217,6 +2407,150 @@ table TaskSpecWebhookCall {
 
 table TaskSpecWrapper {
   value: TaskSpec;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunSpec
+// Defines a set of tasks to be executed in a sequence.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowRunSpec {
+  // Defines the default target resources on which tasks will be performed.
+  target: ResourceHandle;
+  // List of tasks to run consecutively.
+  tasks: [TaskSpecWrapper];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunStatusValue
+// Overall execution status of the FlowRun.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus#/$defs/Value
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum FlowRunStatusValue: int32 {
+  Waiting,
+  Running,
+  Finished,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskStatus
+// Execution phase of a task.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskStatus
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum TaskStatus: int32 {
+  Pending,
+  Planning,
+  Ready,
+  Running,
+  Committing,
+  Finished,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskOutcome
+// Result of the execution of a task.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union TaskOutcome {
+  TaskOutcomeSuccess,
+  TaskOutcomeFailed,
+  TaskOutcomeNoOp,
+  TaskOutcomeCancelled,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskOutcomeSuccess
+// Task completed successfully.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Success
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskOutcomeSuccessEntry {
+  key: string (key);
+  // JSON encoded
+  value: string (json);
+}
+table TaskOutcomeSuccess {
+  // Key-value map
+  entries: [TaskOutcomeSuccessEntry];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskOutcomeFailed
+// Task failed.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Failed
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskOutcomeFailed {
+  // Human-readable description of the failure.
+  message: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskOutcomeNoOp
+// Task completed with no work done (e.g. no new data to process).
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/NoOp
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskOutcomeNoOp {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskOutcomeCancelled
+// Task was cancelled before completion.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Cancelled
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskOutcomeCancelled {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunStatusTaskEntry
+// Describes a task spawned by this FlowRun.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus#/$defs/TaskEntry
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowRunStatusTaskEntry {
+  // Corresponds to the task name in spec.tasks.
+  name: string;
+  // Reference to the spawned Task resource.
+  task: ResourceHandle;
+  // Current execution phase of this task.
+  status: TaskStatus;
+  // Outcome kind once the task has finished.
+  outcome: TaskOutcome;
+  // Last time at which this task's status has been updated.
+  last_updated_at: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowRunStatus
+// Condition tracking the overall execution status of a FlowRun and its spawned tasks.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowRunStatus {
+  // Overall execution status of the FlowRun.
+  status: FlowRunStatusValue;
+  // Tasks spawned by this FlowRun, in execution order.
+  tasks: [FlowRunStatusTaskEntry];
+}
+
+table FlowTriggerWrapper {
+  value: FlowTrigger;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2233,6 +2567,8 @@ table FlowSpec {
   triggers: [FlowTriggerWrapper];
   // List of tasks to run consecutively.
   tasks: [TaskSpecWrapper];
+  // Defines how a flow should react to failures.
+  retry_policy: RetryPolicy;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2721,6 +3057,8 @@ table ResourceHeaders {
   labels: ResourceLabels;
   // Annotations is a key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
   annotations: ResourceAnnotations;
+  // References to resources that created this resource. Used for lineage tracking and cascading cleanup.
+  owner_references: [ResourceHandle];
   // A sequential number that changes every time the resource header and spec are updated. Does not increment on status changes, thus signifying changes to the desired state. Populated by the system. Starts with `1`.
   generation: uint64;
   // Time when the resource was first applied and assigned an identity.
@@ -2921,6 +3259,23 @@ table SourceSpec {
   merge: MergeStrategy;
   // Defines the mapping of system fields to dataset column names.
   vocab: DatasetVocabulary;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskPlan
+// A self-contained logical execution plan of a task.
+//
+// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskPlan
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskPlanEntry {
+  key: string (key);
+  // JSON encoded
+  value: string (json);
+}
+table TaskPlan {
+  // Key-value map
+  entries: [TaskPlanEntry];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3138,29 +3493,5 @@ table WebhookTargetSpec {
   url: string;
   // Shared secret used for HMAC signature of the request payload for authentication.
   secret: Secret;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// WebhookTargetStatusValue
-// Status of the target endpoint
-//
-// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetStatus#/$defs/Value
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-enum WebhookTargetStatusValue: int32 {
-  Ready,
-  Failed,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// WebhookTargetStatus
-// Represents the status of the webhook target endpoint.
-//
-// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetStatus
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table WebhookTargetStatus {
-  // Status value.
-  value: WebhookTargetStatusValue;
 }
 

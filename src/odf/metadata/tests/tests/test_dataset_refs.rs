@@ -10,6 +10,7 @@
 use std::str::FromStr;
 
 use opendatafabric_metadata::auth::*;
+use opendatafabric_metadata::dataset::legacy::{DatasetHandle, DatasetRef, *};
 use opendatafabric_metadata::dataset::*;
 use opendatafabric_metadata::storage::*;
 use url::Url;

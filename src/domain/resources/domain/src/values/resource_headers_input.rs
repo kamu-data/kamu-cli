@@ -67,6 +67,7 @@ impl ResourceHeadersInputExt for ResourceHeadersInput {
             annotations: Some(odf::metadata::resource::ResourceAnnotations {
                 entries: entries_to_map(annotations, ResourceHeaderField::Annotations)?,
             }),
+            owner_references: None,
         };
 
         headers.validate()?;

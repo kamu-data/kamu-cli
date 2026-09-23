@@ -1680,6 +1680,37 @@ impl async_graphql::ScalarType for ResourceConditions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Link to another resolved resource.
+///
+/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceHandle {
+    /// Account that owns the target resource.
+    pub account: AccountHandle,
+    /// Type URI of the target resource.
+    pub r#type: TypeUri<'static>,
+    /// ID of the resource within a node.
+    pub id: ResourceID<'static>,
+    /// DID of the resource, if applicable.
+    pub did: Option<Did<'static>>,
+    /// Name of a resource.
+    pub name: ResourceName<'static>,
+}
+
+impl From<odf::metadata::resource::ResourceHandle> for ResourceHandle {
+    fn from(v: odf::metadata::resource::ResourceHandle) -> Self {
+        Self {
+            account: v.account.into(),
+            r#type: v.r#type.into(),
+            id: v.id.into(),
+            did: v.did.map(Into::into),
+            name: v.name.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Container for identity and ownership information of a resource.
 ///
 /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
@@ -1700,6 +1731,9 @@ pub struct ResourceHeaders {
     /// external tools to store and retrieve arbitrary metadata. Unlike labels,
     /// annotations are not indexed and cannot be queried by.
     pub annotations: ResourceAnnotations,
+    /// References to resources that created this resource. Used for lineage
+    /// tracking and cascading cleanup.
+    pub owner_references: Option<Vec<ResourceHandle>>,
     /// A sequential number that changes every time the resource header and spec
     /// are updated. Does not increment on status changes, thus signifying
     /// changes to the desired state. Populated by the system. Starts with `1`.
@@ -1721,6 +1755,9 @@ impl From<odf::metadata::resource::ResourceHeaders> for ResourceHeaders {
             account: v.account.into(),
             labels: v.labels.into(),
             annotations: v.annotations.into(),
+            owner_references: v
+                .owner_references
+                .map(|v| v.into_iter().map(Into::into).collect()),
             generation: v.generation.into(),
             created_at: v.created_at.into(),
             updated_at: v.updated_at.into(),

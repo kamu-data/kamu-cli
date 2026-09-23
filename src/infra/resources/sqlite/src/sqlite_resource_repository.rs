@@ -480,6 +480,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 labels: kamu_resources::resource_labels_from_json(row.labels),
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
+                owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
@@ -683,6 +684,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 labels: kamu_resources::resource_labels_from_json(row.labels),
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
+                owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,

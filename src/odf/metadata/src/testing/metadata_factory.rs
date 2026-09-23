@@ -398,8 +398,8 @@ impl SetTransformBuilder {
     pub fn inputs_from_refs<R, I>(mut self, inputs: I) -> Self
     where
         I: IntoIterator<Item = R>,
-        R: TryInto<DatasetRef>,
-        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
+        R: TryInto<legacy::DatasetRef>,
+        <R as TryInto<legacy::DatasetRef>>::Error: std::fmt::Debug,
     {
         self.v.inputs = inputs
             .into_iter()
@@ -415,8 +415,8 @@ impl SetTransformBuilder {
     where
         I: IntoIterator<Item = (R, A)>,
         A: Into<String>,
-        R: TryInto<DatasetRef>,
-        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
+        R: TryInto<legacy::DatasetRef>,
+        <R as TryInto<legacy::DatasetRef>>::Error: std::fmt::Debug,
     {
         self.v.inputs = inputs
             .into_iter()
@@ -822,7 +822,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetSnapshotBuilder {
-    name: Option<DatasetAlias>,
+    name: Option<legacy::DatasetAlias>,
     kind: DatasetKind,
     metadata: Vec<MetadataEvent>,
 }
@@ -836,9 +836,9 @@ impl DatasetSnapshotBuilder {
         }
     }
 
-    pub fn name<S: TryInto<DatasetAlias>>(mut self, s: S) -> Self
+    pub fn name<S: TryInto<legacy::DatasetAlias>>(mut self, s: S) -> Self
     where
-        <S as TryInto<DatasetAlias>>::Error: std::fmt::Debug,
+        <S as TryInto<legacy::DatasetAlias>>::Error: std::fmt::Debug,
     {
         self.name = Some(s.try_into().unwrap());
         self
@@ -858,7 +858,7 @@ impl DatasetSnapshotBuilder {
         DatasetSnapshot {
             name: self
                 .name
-                .unwrap_or_else(|| DatasetAlias::new(None, IDFactory::dataset_name())),
+                .unwrap_or_else(|| legacy::DatasetAlias::new(None, IDFactory::dataset_name())),
             kind: self.kind,
             metadata: self.metadata,
         }

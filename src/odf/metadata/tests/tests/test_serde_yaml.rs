@@ -665,11 +665,17 @@ fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
         metadata: vec![MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {
-                    dataset_ref: DatasetRef::try_from("b/com.naturalearthdata.10m.admin0").unwrap(),
+                    dataset_ref: dataset::legacy::DatasetRef::try_from(
+                        "b/com.naturalearthdata.10m.admin0",
+                    )
+                    .unwrap(),
                     alias: None,
                 },
                 TransformInput {
-                    dataset_ref: DatasetRef::try_from("c/com.naturalearthdata.50m.admin0").unwrap(),
+                    dataset_ref: dataset::legacy::DatasetRef::try_from(
+                        "c/com.naturalearthdata.50m.admin0",
+                    )
+                    .unwrap(),
                     alias: None,
                 },
             ],
@@ -1030,6 +1036,7 @@ fn test_serde_resource_input_generics() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: Ignore,
         }
@@ -1053,6 +1060,7 @@ fn test_serde_resource_input_generics() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: SecretSetSpecInput {
                 secrets: Secrets {
@@ -1092,6 +1100,7 @@ fn test_serde_resource_input_generics() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: json!({
                 "secrets": {
@@ -1163,6 +1172,7 @@ fn test_serde_resource_input_short_forms() {
                 account: Some("sergiimk".parse().unwrap()),
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: MySpec {
                 secrets: Secrets {
@@ -1246,6 +1256,7 @@ fn test_serde_resource_input_refs() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: RelationsSpecInput {
                 relations: Some(vec![RelationInput {
@@ -1383,6 +1394,7 @@ fn test_serde_resource_canonical() {
                         ("nested".parse().unwrap(), json!({"a": "x", "b": "y"}))
                     ])
                 },
+                owner_references: None,
                 generation: 1,
                 created_at: "2026-01-01T00:00:00Z".parse().unwrap(),
                 updated_at: "2026-01-01T00:00:00Z".parse().unwrap(),

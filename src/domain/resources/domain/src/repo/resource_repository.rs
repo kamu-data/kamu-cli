@@ -452,6 +452,7 @@ impl ResourceSnapshotRow {
                 created_at: self.created_at,
                 updated_at: self.updated_at,
                 deleted_at: self.deleted_at,
+                owner_references: None,
             },
             spec: self.spec,
             status: self

@@ -18,7 +18,6 @@ use crate::queries::{
     BatchResourcesOutcome,
     ResourceAccountResolutionProblem,
     ResourceConnection,
-    ResourceHandle,
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
     ResourceManifestFormat,

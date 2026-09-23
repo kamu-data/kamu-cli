@@ -1027,6 +1027,22 @@ pub mod dataset {
     static DATASET_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(DATASET_SCHEMA_STR));
 
+    /// Link to a dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetHandle
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct DatasetHandle {
+        /// Reference to an account that owns the dataset.
+        pub account: Option<auth::AccountHandle>,
+        /// ID of the dataset resource.
+        pub id: ResourceID,
+        /// DID of the dataset.
+        pub did: DatasetID,
+        /// Name of the dataset.
+        pub name: ResourceName,
+    }
+    impl IntoResourceRef for DatasetHandle {}
+
     /// Represents type of the dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetKind
@@ -1035,6 +1051,22 @@ pub mod dataset {
         Root,
         Derivative,
     }
+
+    /// Reference to a dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetRef
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct DatasetRef {
+        /// Reference to an account that owns the dataset.
+        pub account: Option<auth::AccountRef>,
+        /// UUID of the dataset resource.
+        pub id: Option<ResourceID>,
+        /// DID of the dataset.
+        pub did: Option<DatasetID>,
+        /// Name of the dataset.
+        pub name: Option<ResourceName>,
+    }
+    impl IntoResourceRef for DatasetRef {}
 
     /// Access role granted to a subject on a dataset. Note: in future this
     /// fixed enum schema will likely be replaced by a reference to a
@@ -1525,7 +1557,7 @@ pub mod dataset {
         /// A local or remote dataset reference. When block is accepted this
         /// MUST be in the form of a DatasetId to guarantee reproducibility, as
         /// aliases can change over time.
-        pub dataset_ref: DatasetRef,
+        pub dataset_ref: crate::dataset::legacy::DatasetRef,
         /// An alias under which this input will be available in queries. Will
         /// be populated from `datasetRef` if not provided before resolving it
         /// to DatasetId.
@@ -1655,7 +1687,7 @@ pub mod engine {
         /// Unique identifier of the output dataset.
         pub dataset_id: DatasetID,
         /// Alias of the output dataset, for logging purposes only.
-        pub dataset_alias: DatasetAlias,
+        pub dataset_alias: crate::dataset::legacy::DatasetAlias,
         /// System time to use for new records.
         pub system_time: DateTime<Utc>,
         /// Vocabulary of the output dataset.
@@ -1687,7 +1719,7 @@ pub mod engine {
         /// Unique identifier of the dataset.
         pub dataset_id: DatasetID,
         /// Alias of the output dataset, for logging purposes only.
-        pub dataset_alias: DatasetAlias,
+        pub dataset_alias: crate::dataset::legacy::DatasetAlias,
         /// An alias of this input to be used in queries.
         pub query_alias: String,
         /// Vocabulary of the input dataset.
@@ -1814,6 +1846,131 @@ pub mod flow {
     static FLOW_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(FLOW_SCHEMA_STR));
 
+    /// Defines a set of tasks to be executed in a sequence.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRun
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRun {
+        /// Container for identity and ownership information of a resource.
+        pub headers: resource::ResourceHeadersInput,
+        /// Specifies the desired state of the flow run.
+        pub spec: flow::FlowRunSpecInput,
+    }
+
+    impl FlowRun {
+        pub fn schema() -> &'static TypeUri {
+            &FLOW_RUN_SCHEMA
+        }
+        pub const fn schema_str() -> &'static str {
+            FLOW_RUN_SCHEMA_STR
+        }
+    }
+
+    static FLOW_RUN_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/flow/v1alpha1/FlowRun";
+
+    static FLOW_RUN_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(FLOW_RUN_SCHEMA_STR));
+
+    /// Cause of the flow run activation
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunActivationCause
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRunActivationCause {
+        /// Time at which the trigger fired.
+        pub activation_time: DateTime<Utc>,
+        /// Account that initiated the run, if applicable.
+        pub initiator: Option<auth::AccountHandle>,
+        /// Copy of the trigger configuration from the parent Flow that fired.
+        pub trigger: flow::FlowTrigger,
+    }
+
+    /// Condition capturing what caused this FlowRun to be scheduled. Set by the
+    /// controller at creation time; never written by users. In case of a retry,
+    /// the causes of the original run are preserved.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunActivationCauses
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRunActivationCauses {
+        /// Triggers that caused this run to be scheduled.
+        pub activation_causes: Vec<flow::FlowRunActivationCause>,
+        /// Additional triggers that fired while this run was already queued or
+        /// executing.
+        pub late_activation_causes: Option<Vec<flow::FlowRunActivationCause>>,
+    }
+
+    /// Condition linking this FlowRun to the previous FlowRun it is retrying.
+    /// Set by the controller; never written by users.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunRetry
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRunRetry {
+        /// Reference to the FlowRun this run is retrying.
+        pub retry_of: resource::ResourceHandle,
+    }
+
+    /// Defines a set of tasks to be executed in a sequence.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunSpec
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRunSpec {
+        /// Defines the default target resources on which tasks will be
+        /// performed.
+        pub target: Option<resource::ResourceHandle>,
+        /// List of tasks to run consecutively.
+        pub tasks: Vec<task::TaskSpec>,
+    }
+
+    /// Defines a set of tasks to be executed in a sequence.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunSpecInput
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRunSpecInput {
+        /// Defines the default target resources on which tasks will be
+        /// performed.
+        pub target: Option<resource::ResourceRef>,
+        /// List of tasks to run consecutively.
+        pub tasks: Vec<task::TaskSpecInput>,
+    }
+
+    /// Condition tracking the overall execution status of a FlowRun and its
+    /// spawned tasks.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRunStatus {
+        /// Overall execution status of the FlowRun.
+        pub status: flow::FlowRunStatusValue,
+        /// Tasks spawned by this FlowRun, in execution order.
+        pub tasks: Option<Vec<flow::FlowRunStatusTaskEntry>>,
+    }
+
+    /// Describes a task spawned by this FlowRun.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus#/$defs/TaskEntry
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowRunStatusTaskEntry {
+        /// Corresponds to the task name in spec.tasks.
+        pub name: String,
+        /// Reference to the spawned Task resource.
+        pub task: resource::ResourceHandle,
+        /// Current execution phase of this task.
+        pub status: task::TaskStatus,
+        /// Outcome kind once the task has finished.
+        pub outcome: Option<task::TaskOutcome>,
+        /// Last time at which this task's status has been updated.
+        pub last_updated_at: DateTime<Utc>,
+    }
+
+    /// Overall execution status of the FlowRun.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus#/$defs/Value
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum FlowRunStatusValue {
+        Waiting,
+        Running,
+        Finished,
+    }
+
     /// Defines a sequence of tasks to be executed upon certain trigger
     /// conditions.
     ///
@@ -1825,7 +1982,9 @@ pub mod flow {
         /// Conditions that cause this flow to execute.
         pub triggers: Vec<flow::FlowTrigger>,
         /// List of tasks to run consecutively.
-        pub tasks: Vec<flow::TaskSpec>,
+        pub tasks: Vec<task::TaskSpec>,
+        /// Defines how a flow should react to failures.
+        pub retry_policy: Option<flow::RetryPolicy>,
     }
 
     /// Defines a sequence of tasks to be executed upon certain trigger
@@ -1839,7 +1998,9 @@ pub mod flow {
         /// Conditions that cause this flow to execute.
         pub triggers: Vec<flow::FlowTriggerInput>,
         /// List of tasks to run consecutively.
-        pub tasks: Vec<flow::TaskSpecInput>,
+        pub tasks: Vec<task::TaskSpecInput>,
+        /// Defines how a flow should react to failures.
+        pub retry_policy: Option<flow::RetryPolicy>,
     }
 
     /// Condition that causes a flow to be executed.
@@ -1847,6 +2008,7 @@ pub mod flow {
     /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger
     #[derive(Clone, PartialEq, Eq, Debug)]
     pub enum FlowTrigger {
+        Manual(flow::FlowTriggerManual),
         Schedule(flow::FlowTriggerSchedule),
         Event(flow::FlowTriggerEvent),
         Source(flow::FlowTriggerSource),
@@ -1854,6 +2016,7 @@ pub mod flow {
     }
 
     impl_enum_with_variants!(FlowTrigger);
+    impl_enum_variant!(FlowTrigger::Manual(flow::FlowTriggerManual));
     impl_enum_variant!(FlowTrigger::Schedule(flow::FlowTriggerSchedule));
     impl_enum_variant!(FlowTrigger::Event(flow::FlowTriggerEvent));
     impl_enum_variant!(FlowTrigger::Source(flow::FlowTriggerSource));
@@ -1894,6 +2057,7 @@ pub mod flow {
     /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput
     #[derive(Clone, PartialEq, Eq, Debug)]
     pub enum FlowTriggerInput {
+        Manual(flow::FlowTriggerInputManual),
         Schedule(flow::FlowTriggerInputSchedule),
         Event(flow::FlowTriggerInputEvent),
         Source(flow::FlowTriggerInputSource),
@@ -1901,6 +2065,7 @@ pub mod flow {
     }
 
     impl_enum_with_variants!(FlowTriggerInput);
+    impl_enum_variant!(FlowTriggerInput::Manual(flow::FlowTriggerInputManual));
     impl_enum_variant!(FlowTriggerInput::Schedule(flow::FlowTriggerInputSchedule));
     impl_enum_variant!(FlowTriggerInput::Event(flow::FlowTriggerInputEvent));
     impl_enum_variant!(FlowTriggerInput::Source(flow::FlowTriggerInputSource));
@@ -1936,6 +2101,12 @@ pub mod flow {
         pub cooldown_max_batch: Option<u64>,
     }
 
+    /// Triggers the flow via an API call or UI action.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Manual
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct FlowTriggerInputManual {}
+
     /// Triggers the flow on a cron schedule.
     ///
     /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Schedule
@@ -1960,6 +2131,12 @@ pub mod flow {
         /// anyway e.g. `1h`.
         pub max_await_interval: Option<DurationString>,
     }
+
+    /// Triggers the flow via an API call or UI action.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Manual
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct FlowTriggerManual {}
 
     /// Triggers the flow on a cron schedule.
     ///
@@ -1986,139 +2163,26 @@ pub mod flow {
         pub max_await_interval: Option<DurationString>,
     }
 
-    /// An individual work item to be executed.
+    /// Type of the backoff scaling.
     ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/Task
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct Task {
-        /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
-        /// Specifies the desired state of the task.
-        pub spec: Option<flow::TaskSpecInput>,
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/RetryBackoff
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum RetryBackoff {
+        Linear,
+        Exponential,
     }
 
-    impl Task {
-        pub fn schema() -> &'static TypeUri {
-            &TASK_SCHEMA
-        }
-        pub const fn schema_str() -> &'static str {
-            TASK_SCHEMA_STR
-        }
-    }
-
-    static TASK_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/flow/v1alpha1/Task";
-
-    static TASK_SCHEMA: std::sync::LazyLock<TypeUri> =
-        std::sync::LazyLock::new(|| TypeUri::new_unchecked(TASK_SCHEMA_STR));
-
-    /// An individual work item to be executed as part of a flow.
+    /// Defines how a flow should react to failures.
     ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    pub enum TaskSpec {
-        Ingest(flow::TaskSpecIngest),
-        Compaction(flow::TaskSpecCompaction),
-        GarbageCollection(flow::TaskSpecGarbageCollection),
-        WebhookCall(flow::TaskSpecWebhookCall),
-    }
-
-    impl_enum_with_variants!(TaskSpec);
-    impl_enum_variant!(TaskSpec::Ingest(flow::TaskSpecIngest));
-    impl_enum_variant!(TaskSpec::Compaction(flow::TaskSpecCompaction));
-    impl_enum_variant!(TaskSpec::GarbageCollection(flow::TaskSpecGarbageCollection));
-    impl_enum_variant!(TaskSpec::WebhookCall(flow::TaskSpecWebhookCall));
-
-    /// Compacts data files in matching datasets to improve query performance.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/Compaction
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/RetryPolicy
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct TaskSpecCompaction {
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<dataset::CompactionParams>,
-    }
-
-    /// Removes unreferenced data files from matching datasets.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/GarbageCollection
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct TaskSpecGarbageCollection {}
-
-    /// Fetches data from a source and appends it to a dataset.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/Ingest
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct TaskSpecIngest {
-        /// Reference to the source resource that defines how to fetch data.
-        pub source: resource::ResourceHandle,
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<source::IngestParams>,
-    }
-
-    /// An individual work item to be executed as part of a flow.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    pub enum TaskSpecInput {
-        Ingest(flow::TaskSpecInputIngest),
-        Compaction(flow::TaskSpecInputCompaction),
-        GarbageCollection(flow::TaskSpecInputGarbageCollection),
-        WebhookCall(flow::TaskSpecInputWebhookCall),
-    }
-
-    impl_enum_with_variants!(TaskSpecInput);
-    impl_enum_variant!(TaskSpecInput::Ingest(flow::TaskSpecInputIngest));
-    impl_enum_variant!(TaskSpecInput::Compaction(flow::TaskSpecInputCompaction));
-    impl_enum_variant!(TaskSpecInput::GarbageCollection(
-        flow::TaskSpecInputGarbageCollection
-    ));
-    impl_enum_variant!(TaskSpecInput::WebhookCall(flow::TaskSpecInputWebhookCall));
-
-    /// Compacts data files in matching datasets to improve query performance.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Compaction
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct TaskSpecInputCompaction {
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<dataset::CompactionParams>,
-    }
-
-    /// Removes unreferenced data files from matching datasets.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct TaskSpecInputGarbageCollection {}
-
-    /// Fetches data from a source and appends it to a dataset.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Ingest
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct TaskSpecInputIngest {
-        /// Reference to the source resource that defines how to fetch data.
-        pub source: resource::ResourceRef,
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<source::IngestParams>,
-    }
-
-    /// Dispatches a certain payload to a specific `WebhookTarget`.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/WebhookCall
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct TaskSpecInputWebhookCall {
-        /// Reference to the `WebhookTarget`.
-        pub target: resource::ResourceRef,
-        /// The payload to send. May include templating.
-        pub payload: Option<String>,
-    }
-
-    /// Dispatches a certain payload to a specific `WebhookTarget`.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec#/$defs/WebhookCall
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct TaskSpecWebhookCall {
-        /// Reference to the `WebhookTarget`.
-        pub target: resource::ResourceHandle,
-        /// The payload to send. May include templating.
-        pub payload: Option<String>,
+    pub struct RetryPolicy {
+        /// Number of attempts before flow auto-scheduling will be disabled.
+        pub max_attempts: Option<u32>,
+        /// How long to wait until the first retry.
+        pub min_delay: Option<DurationString>,
+        /// Type of the backoff scaling.
+        pub backoff: Option<flow::RetryBackoff>,
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2154,7 +2218,7 @@ pub mod legacy {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct DatasetSnapshot {
         /// Alias of the dataset.
-        pub name: DatasetAlias,
+        pub name: crate::dataset::legacy::DatasetAlias,
         /// Type of the dataset.
         pub kind: dataset::DatasetKind,
         /// An array of metadata events that will be used to populate the chain.
@@ -2375,7 +2439,7 @@ pub mod resource {
         pub entries: std::collections::BTreeMap<TypeRef, serde_json::Value>,
     }
 
-    /// Lint to another resolved resource.
+    /// Link to another resolved resource.
     ///
     /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2413,6 +2477,9 @@ pub mod resource {
         /// set by external tools to store and retrieve arbitrary metadata.
         /// Unlike labels, annotations are not indexed and cannot be queried by.
         pub annotations: resource::ResourceAnnotations,
+        /// References to resources that created this resource. Used for lineage
+        /// tracking and cascading cleanup.
+        pub owner_references: Option<Vec<resource::ResourceHandle>>,
         /// A sequential number that changes every time the resource header and
         /// spec are updated. Does not increment on status changes, thus
         /// signifying changes to the desired state. Populated by the system.
@@ -2447,6 +2514,9 @@ pub mod resource {
         /// set by external tools to store and retrieve arbitrary metadata.
         /// Unlike labels, annotations are not indexed and cannot be queried by.
         pub annotations: Option<resource::ResourceAnnotations>,
+        /// References to resources that created this resource. Used for lineage
+        /// tracking and cascading cleanup.
+        pub owner_references: Option<Vec<resource::ResourceRef>>,
     }
 
     /// Top-level container for user-authored representation of a resource that
@@ -2592,24 +2662,6 @@ pub mod sink {
         /// Shared secret used for HMAC signature of the request payload for
         /// authentication.
         pub secret: Option<config::Secret>,
-    }
-
-    /// Represents the status of the webhook target endpoint.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetStatus
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct WebhookTargetStatus {
-        /// Status value.
-        pub value: sink::WebhookTargetStatusValue,
-    }
-
-    /// Status of the target endpoint
-    ///
-    /// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetStatus#/$defs/Value
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-    pub enum WebhookTargetStatusValue {
-        Ready,
-        Failed,
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3737,5 +3789,273 @@ pub mod storage {
     pub struct VolumeCapacity {
         /// Maximum storage size e.g. `10Gi`.
         pub storage: Option<ByteSize>,
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// task
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub mod task {
+    #[allow(unused_imports)]
+    use super::*;
+
+    /// An individual work item to be executed.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/Task
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct Task {
+        /// Container for identity and ownership information of a resource.
+        pub headers: resource::ResourceHeadersInput,
+        /// Specifies the desired state of the task.
+        pub spec: Option<task::TaskSpecInput>,
+    }
+
+    impl Task {
+        pub fn schema() -> &'static TypeUri {
+            &TASK_SCHEMA
+        }
+        pub const fn schema_str() -> &'static str {
+            TASK_SCHEMA_STR
+        }
+    }
+
+    static TASK_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/task/v1alpha1/Task";
+
+    static TASK_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(TASK_SCHEMA_STR));
+
+    /// Result of the execution of a task.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum TaskOutcome {
+        Success(task::TaskOutcomeSuccess),
+        Failed(task::TaskOutcomeFailed),
+        NoOp(task::TaskOutcomeNoOp),
+        Cancelled(task::TaskOutcomeCancelled),
+    }
+
+    impl_enum_with_variants!(TaskOutcome);
+    impl_enum_variant!(TaskOutcome::Success(task::TaskOutcomeSuccess));
+    impl_enum_variant!(TaskOutcome::Failed(task::TaskOutcomeFailed));
+    impl_enum_variant!(TaskOutcome::NoOp(task::TaskOutcomeNoOp));
+    impl_enum_variant!(TaskOutcome::Cancelled(task::TaskOutcomeCancelled));
+
+    /// Task was cancelled before completion.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Cancelled
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskOutcomeCancelled {}
+
+    /// Task failed.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Failed
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct TaskOutcomeFailed {
+        /// Human-readable description of the failure.
+        pub message: String,
+    }
+
+    /// Task completed with no work done (e.g. no new data to process).
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/NoOp
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskOutcomeNoOp {}
+
+    /// Task completed successfully.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Success
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub struct TaskOutcomeSuccess {
+        pub entries: std::collections::BTreeMap<String, serde_json::Value>,
+    }
+
+    /// A self-contained logical execution plan of a task.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskPlan
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub struct TaskPlan {
+        pub entries: std::collections::BTreeMap<String, serde_json::Value>,
+    }
+
+    /// An individual work item to be executed as part of a flow.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum TaskSpec {
+        Ingest(task::TaskSpecIngest),
+        Transform(task::TaskSpecTransform),
+        Compaction(task::TaskSpecCompaction),
+        GarbageCollection(task::TaskSpecGarbageCollection),
+        WebhookCall(task::TaskSpecWebhookCall),
+    }
+
+    impl_enum_with_variants!(TaskSpec);
+    impl_enum_variant!(TaskSpec::Ingest(task::TaskSpecIngest));
+    impl_enum_variant!(TaskSpec::Transform(task::TaskSpecTransform));
+    impl_enum_variant!(TaskSpec::Compaction(task::TaskSpecCompaction));
+    impl_enum_variant!(TaskSpec::GarbageCollection(task::TaskSpecGarbageCollection));
+    impl_enum_variant!(TaskSpec::WebhookCall(task::TaskSpecWebhookCall));
+
+    /// Compacts data files in matching datasets to improve query performance.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Compaction
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecCompaction {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Optional parameters to control ingestion behavior.
+        pub params: Option<dataset::CompactionParams>,
+    }
+
+    /// Removes unreferenced data files from matching datasets.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/GarbageCollection
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecGarbageCollection {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+    }
+
+    /// Fetches data from a source and appends it to a dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Ingest
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct TaskSpecIngest {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the source resource that defines how to fetch data.
+        pub source: resource::ResourceHandle,
+        /// Optional parameters to control ingestion behavior.
+        pub params: Option<source::IngestParams>,
+    }
+
+    /// An individual work item to be executed as part of a flow.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum TaskSpecInput {
+        Ingest(task::TaskSpecInputIngest),
+        Transform(task::TaskSpecInputTransform),
+        Compaction(task::TaskSpecInputCompaction),
+        GarbageCollection(task::TaskSpecInputGarbageCollection),
+        WebhookCall(task::TaskSpecInputWebhookCall),
+    }
+
+    impl_enum_with_variants!(TaskSpecInput);
+    impl_enum_variant!(TaskSpecInput::Ingest(task::TaskSpecInputIngest));
+    impl_enum_variant!(TaskSpecInput::Transform(task::TaskSpecInputTransform));
+    impl_enum_variant!(TaskSpecInput::Compaction(task::TaskSpecInputCompaction));
+    impl_enum_variant!(TaskSpecInput::GarbageCollection(
+        task::TaskSpecInputGarbageCollection
+    ));
+    impl_enum_variant!(TaskSpecInput::WebhookCall(task::TaskSpecInputWebhookCall));
+
+    /// Compacts data files in matching datasets to improve query performance.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Compaction
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecInputCompaction {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Optional parameters to control ingestion behavior.
+        pub params: Option<dataset::CompactionParams>,
+    }
+
+    /// Removes unreferenced data files from matching datasets.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecInputGarbageCollection {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+    }
+
+    /// Fetches data from a source and appends it to a dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Ingest
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct TaskSpecInputIngest {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the source resource that defines how to fetch data.
+        pub source: resource::ResourceRef,
+        /// Optional parameters to control ingestion behavior.
+        pub params: Option<source::IngestParams>,
+    }
+
+    /// Executes transformation of data defined in a derivative dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Transform
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecInputTransform {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the derivative dataset that defines how to transform
+        /// data.
+        pub target: Option<dataset::DatasetRef>,
+    }
+
+    /// Dispatches a certain payload to a specific `WebhookTarget`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/WebhookCall
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct TaskSpecInputWebhookCall {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the `WebhookTarget`.
+        pub target: resource::ResourceRef,
+        /// The payload to send. May include templating.
+        pub payload: Option<String>,
+        /// Defines how a webhook should react to failures.
+        pub retry_policy: Option<flow::RetryPolicy>,
+    }
+
+    /// Executes transformation of data defined in a derivative dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Transform
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecTransform {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the derivative dataset that defines how to transform
+        /// data.
+        pub target: Option<dataset::DatasetHandle>,
+    }
+
+    /// Dispatches a certain payload to a specific `WebhookTarget`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/WebhookCall
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct TaskSpecWebhookCall {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the `WebhookTarget`.
+        pub target: resource::ResourceHandle,
+        /// The payload to send. May include templating.
+        pub payload: Option<String>,
+    }
+
+    /// Execution phase of a task.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskStatus
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum TaskStatus {
+        Pending,
+        Planning,
+        Ready,
+        Running,
+        Committing,
+        Finished,
     }
 }

@@ -59,28 +59,28 @@ impl DatasetID {
         Ok(Self::new(DidOdf::from_multibase(s)?))
     }
 
-    pub fn as_local_ref(&self) -> DatasetRef {
-        DatasetRef::ID(self.clone())
+    pub fn as_local_ref(&self) -> legacy::DatasetRef {
+        legacy::DatasetRef::ID(self.clone())
     }
 
-    pub fn into_local_ref(self) -> DatasetRef {
-        DatasetRef::ID(self)
+    pub fn into_local_ref(self) -> legacy::DatasetRef {
+        legacy::DatasetRef::ID(self)
     }
 
-    pub fn as_remote_ref(&self) -> DatasetRefRemote {
-        DatasetRefRemote::from(self)
+    pub fn as_remote_ref(&self) -> legacy::DatasetRefRemote {
+        legacy::DatasetRefRemote::from(self)
     }
 
-    pub fn into_remote_ref(self) -> DatasetRefRemote {
-        DatasetRefRemote::from(self)
+    pub fn into_remote_ref(self) -> legacy::DatasetRefRemote {
+        legacy::DatasetRefRemote::from(self)
     }
 
-    pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::from(self)
+    pub fn as_any_ref(&self) -> legacy::DatasetRefAny {
+        legacy::DatasetRefAny::from(self)
     }
 
-    pub fn into_any_ref(self) -> DatasetRefAny {
-        DatasetRefAny::from(self)
+    pub fn into_any_ref(self) -> legacy::DatasetRefAny {
+        legacy::DatasetRefAny::from(self)
     }
 }
 
@@ -123,6 +123,12 @@ impl From<DatasetID> for DidOdf {
 impl From<DatasetID> for DidKey {
     fn from(val: DatasetID) -> Self {
         val.did.into()
+    }
+}
+
+impl From<DatasetID> for Did {
+    fn from(value: DatasetID) -> Self {
+        Did::Odf(value.did)
     }
 }
 

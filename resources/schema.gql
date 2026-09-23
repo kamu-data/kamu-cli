@@ -3978,12 +3978,32 @@ type ResourceEmptyRefProblem {
 	message: String!
 }
 
+"""
+Link to another resolved resource.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+"""
 type ResourceHandle {
-	id: ResourceID!
-	type: TypeUri!
-	did: Did
-	name: ResourceName!
+	"""
+	Account that owns the target resource.
+	"""
 	account: AccountHandle!
+	"""
+	Type URI of the target resource.
+	"""
+	type: TypeUri!
+	"""
+	ID of the resource within a node.
+	"""
+	id: ResourceID!
+	"""
+	DID of the resource, if applicable.
+	"""
+	did: Did
+	"""
+	Name of a resource.
+	"""
+	name: ResourceName!
 }
 
 type ResourceHandleConnection {
@@ -4050,6 +4070,11 @@ type ResourceHeaders {
 	annotations are not indexed and cannot be queried by.
 	"""
 	annotations: ResourceAnnotations!
+	"""
+	References to resources that created this resource. Used for lineage
+	tracking and cascading cleanup.
+	"""
+	ownerReferences: [ResourceHandle!]
 	"""
 	A sequential number that changes every time the resource header and spec
 	are updated. Does not increment on status changes, thus signifying
