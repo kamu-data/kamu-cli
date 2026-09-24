@@ -10,36 +10,36 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Queryable [`crate::TypeRef`]-keyed resource metadata.
-pub type ResourceLabels = odf::metadata::resource::ResourceLabels;
+pub type ResourceLabels = odf::metadata::resources::ResourceLabels;
 
 /// Non-queryable [`crate::TypeRef`]-keyed resource metadata.
-pub type ResourceAnnotations = odf::metadata::resource::ResourceAnnotations;
+pub type ResourceAnnotations = odf::metadata::resources::ResourceAnnotations;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Decodes [`ResourceLabels`] through the ODF YAML shadow proxy.
 pub fn resource_labels_from_json(value: serde_json::Value) -> ResourceLabels {
-    let proxy: odf::metadata::serde::yaml::resource::ResourceLabels =
+    let proxy: odf::metadata::serde::yaml::resources::ResourceLabels =
         serde_json::from_value(value).unwrap();
     proxy.try_into().unwrap()
 }
 
 /// Decodes [`ResourceAnnotations`] through the ODF YAML shadow proxy.
 pub fn resource_annotations_from_json(value: serde_json::Value) -> ResourceAnnotations {
-    let proxy: odf::metadata::serde::yaml::resource::ResourceAnnotations =
+    let proxy: odf::metadata::serde::yaml::resources::ResourceAnnotations =
         serde_json::from_value(value).unwrap();
     proxy.try_into().unwrap()
 }
 
 /// Encodes [`ResourceLabels`] through the ODF YAML shadow proxy.
 pub fn resource_labels_to_json(labels: &ResourceLabels) -> serde_json::Value {
-    let proxy: odf::metadata::serde::yaml::resource::ResourceLabels = labels.clone().into();
+    let proxy: odf::metadata::serde::yaml::resources::ResourceLabels = labels.clone().into();
     serde_json::to_value(proxy).unwrap()
 }
 
 /// Encodes [`ResourceAnnotations`] through the ODF YAML shadow proxy.
 pub fn resource_annotations_to_json(annotations: &ResourceAnnotations) -> serde_json::Value {
-    let proxy: odf::metadata::serde::yaml::resource::ResourceAnnotations =
+    let proxy: odf::metadata::serde::yaml::resources::ResourceAnnotations =
         annotations.clone().into();
     serde_json::to_value(proxy).unwrap()
 }

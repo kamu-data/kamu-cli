@@ -10,7 +10,7 @@
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 
 use crate::formats::*;
-use crate::resource::ResourceSelector;
+use crate::resources::ResourceSelector;
 use crate::serde::flatbuffers::{
     FlatbuffersDeserializable,
     FlatbuffersSerializable,

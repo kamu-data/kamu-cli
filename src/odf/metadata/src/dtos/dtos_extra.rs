@@ -16,12 +16,12 @@ use crate::*;
 // Resource
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<SpecT, SpecTInput> From<resource::Resource<SpecT>> for resource::ResourceInput<SpecTInput>
+impl<SpecT, SpecTInput> From<resources::Resource<SpecT>> for resources::ResourceInput<SpecTInput>
 where
     SpecT: Into<SpecTInput>,
 {
-    fn from(value: resource::Resource<SpecT>) -> Self {
-        let resource::Resource {
+    fn from(value: resources::Resource<SpecT>) -> Self {
+        let resources::Resource {
             schema,
             headers,
             spec,
@@ -39,7 +39,7 @@ where
 // ResourcePhase
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Display for resource::ResourcePhase {
+impl Display for resources::ResourcePhase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Self::Pending => "Pending",
@@ -55,9 +55,9 @@ impl Display for resource::ResourcePhase {
 // ResourceHeaders
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
-    fn from(value: resource::ResourceHeaders) -> Self {
-        let resource::ResourceHeaders {
+impl From<resources::ResourceHeaders> for resources::ResourceHeadersInput {
+    fn from(value: resources::ResourceHeaders) -> Self {
+        let resources::ResourceHeaders {
             id,
             name,
             account,
@@ -88,7 +88,7 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
 // ResourceRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::str::FromStr for resource::ResourceRef {
+impl std::str::FromStr for resources::ResourceRef {
     type Err = ::multiformats::ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -98,24 +98,24 @@ impl std::str::FromStr for resource::ResourceRef {
 
         Ok(Self {
             account: account.map(|s| AccountName::new_unchecked(s).into()),
-            r#type: Some(resource::TypeName::new_unchecked(typ).into()),
+            r#type: Some(resources::TypeName::new_unchecked(typ).into()),
             id: None,
             did: None,
-            name: Some(resource::ResourceName::new_unchecked(name)),
+            name: Some(resources::ResourceName::new_unchecked(name)),
         })
     }
 }
 
-impl_parse_error!(resource::ResourceRef);
-impl_try_from_str!(resource::ResourceRef);
+impl_parse_error!(resources::ResourceRef);
+impl_try_from_str!(resources::ResourceRef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<resource::ResourceHandle> for resource::ResourceRef {
-    fn from(value: resource::ResourceHandle) -> Self {
-        let resource::ResourceHandle {
+impl From<resources::ResourceHandle> for resources::ResourceRef {
+    fn from(value: resources::ResourceHandle) -> Self {
+        let resources::ResourceHandle {
             account,
             r#type,
             id,
@@ -186,7 +186,7 @@ impl From<auth::AccountHandle> for auth::AccountRef {
     }
 }
 
-impl From<auth::AccountRef> for resource::ResourceRef {
+impl From<auth::AccountRef> for resources::ResourceRef {
     fn from(value: auth::AccountRef) -> Self {
         let auth::AccountRef { id, did, name } = value;
         Self {
@@ -203,7 +203,7 @@ impl From<auth::AccountRef> for resource::ResourceRef {
 // AccountHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<auth::AccountHandle> for resource::ResourceRef {
+impl From<auth::AccountHandle> for resources::ResourceRef {
     fn from(value: auth::AccountHandle) -> Self {
         auth::AccountRef::from(value).into()
     }
@@ -212,7 +212,7 @@ impl From<auth::AccountHandle> for resource::ResourceRef {
 impl auth::AccountHandle {
     pub fn new_test(account_name_str: &str) -> Self {
         Self {
-            id: crate::resource::ResourceID::new(uuid::Uuid::new_v5(
+            id: crate::resources::ResourceID::new(uuid::Uuid::new_v5(
                 &uuid::Uuid::NAMESPACE_URL,
                 account_name_str.as_bytes(),
             )),
@@ -226,7 +226,7 @@ impl auth::AccountHandle {
 // DatasetRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::str::FromStr for dataset::DatasetRef {
+impl std::str::FromStr for datasets::DatasetRef {
     type Err = ::multiformats::ParseError<Self>;
 
     fn from_str(_: &str) -> Result<Self, Self::Err> {
@@ -234,10 +234,10 @@ impl std::str::FromStr for dataset::DatasetRef {
     }
 }
 
-impl_parse_error!(dataset::DatasetRef);
-impl_try_from_str!(dataset::DatasetRef);
+impl_parse_error!(datasets::DatasetRef);
+impl_try_from_str!(datasets::DatasetRef);
 
-impl From<DatasetID> for dataset::DatasetRef {
+impl From<DatasetID> for datasets::DatasetRef {
     fn from(value: DatasetID) -> Self {
         Self {
             account: None,
@@ -248,9 +248,9 @@ impl From<DatasetID> for dataset::DatasetRef {
     }
 }
 
-impl From<dataset::DatasetHandle> for dataset::DatasetRef {
-    fn from(value: dataset::DatasetHandle) -> Self {
-        let dataset::DatasetHandle {
+impl From<datasets::DatasetHandle> for datasets::DatasetRef {
+    fn from(value: datasets::DatasetHandle) -> Self {
+        let datasets::DatasetHandle {
             account,
             id,
             did,
@@ -265,9 +265,9 @@ impl From<dataset::DatasetHandle> for dataset::DatasetRef {
     }
 }
 
-impl From<dataset::DatasetRef> for resource::ResourceRef {
-    fn from(value: dataset::DatasetRef) -> Self {
-        let dataset::DatasetRef {
+impl From<datasets::DatasetRef> for resources::ResourceRef {
+    fn from(value: datasets::DatasetRef) -> Self {
+        let datasets::DatasetRef {
             account,
             id,
             did,
@@ -275,7 +275,7 @@ impl From<dataset::DatasetRef> for resource::ResourceRef {
         } = value;
         Self {
             account,
-            r#type: Some(dataset::Dataset::schema().clone().into()),
+            r#type: Some(datasets::Dataset::schema().clone().into()),
             id,
             did: did.map(Into::into),
             name,
@@ -287,9 +287,9 @@ impl From<dataset::DatasetRef> for resource::ResourceRef {
 // DatasetHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<dataset::DatasetHandle> for resource::ResourceRef {
-    fn from(value: dataset::DatasetHandle) -> Self {
-        dataset::DatasetRef::from(value).into()
+impl From<datasets::DatasetHandle> for resources::ResourceRef {
+    fn from(value: datasets::DatasetHandle) -> Self {
+        datasets::DatasetRef::from(value).into()
     }
 }
 
@@ -341,7 +341,7 @@ impl std::str::FromStr for config::ValueRef {
 impl_parse_error!(config::ValueRef);
 impl_try_from_str!(config::ValueRef);
 
-impl From<config::ValueRef> for resource::ResourceRef {
+impl From<config::ValueRef> for resources::ResourceRef {
     fn from(value: config::ValueRef) -> Self {
         let config::ValueRef {
             account,
@@ -364,7 +364,7 @@ impl From<config::ValueRef> for resource::ResourceRef {
 // ValueHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<config::ValueHandle> for resource::ResourceRef {
+impl From<config::ValueHandle> for resources::ResourceRef {
     fn from(value: config::ValueHandle) -> Self {
         let config::ValueHandle {
             account,
@@ -398,7 +398,7 @@ impl std::str::FromStr for storage::PersistentVolumeRef {
 impl_parse_error!(storage::PersistentVolumeRef);
 impl_try_from_str!(storage::PersistentVolumeRef);
 
-impl From<storage::PersistentVolumeRef> for resource::ResourceRef {
+impl From<storage::PersistentVolumeRef> for resources::ResourceRef {
     fn from(value: storage::PersistentVolumeRef) -> Self {
         let storage::PersistentVolumeRef { account, id, name } = value;
         Self {
@@ -415,7 +415,7 @@ impl From<storage::PersistentVolumeRef> for resource::ResourceRef {
 // OffsetInterval
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::OffsetInterval {
+impl datasets::OffsetInterval {
     #[allow(clippy::cast_possible_truncation)]
     pub fn len(&self) -> usize {
         (self.end - self.start + 1) as usize
@@ -426,7 +426,7 @@ impl dataset::OffsetInterval {
 // AddData
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::AddData {
+impl datasets::AddData {
     /// Helper for determining the last record offset in the dataset
     pub fn last_offset(&self) -> Option<u64> {
         self.new_data
@@ -447,7 +447,7 @@ impl dataset::AddData {
 // ExecuteTransform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::ExecuteTransform {
+impl datasets::ExecuteTransform {
     /// Helper for determining the last record offset in the dataset
     pub fn last_offset(&self) -> Option<u64> {
         self.new_data
@@ -465,7 +465,7 @@ impl dataset::ExecuteTransform {
 // ExecuteTransformInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::ExecuteTransformInput {
+impl datasets::ExecuteTransformInput {
     /// Helper for determining the input's last block hash included in the
     /// transaction
     pub fn last_block_hash(&self) -> Option<&Multihash> {
@@ -499,10 +499,10 @@ impl dataset::ExecuteTransformInput {
 // SetTransform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::SetTransform {
+impl datasets::SetTransform {
     pub fn as_dataset_ref_alias_map(
         &self,
-    ) -> HashMap<&crate::dataset::legacy::DatasetRef, &String> {
+    ) -> HashMap<&crate::datasets::legacy::DatasetRef, &String> {
         self.inputs.iter().fold(HashMap::new(), |mut acc, input| {
             if let Some(alias) = input.alias.as_ref() {
                 acc.insert(&input.dataset_ref, alias);
@@ -516,7 +516,7 @@ impl dataset::SetTransform {
 // Transform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::Transform {
+impl datasets::Transform {
     pub fn engine(&self) -> &str {
         match self {
             Self::Sql(v) => v.engine.as_str(),
@@ -528,8 +528,8 @@ impl dataset::Transform {
 // SetVocab
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<dataset::SetVocab> for dataset::DatasetVocabulary {
-    fn from(v: dataset::SetVocab) -> Self {
+impl From<datasets::SetVocab> for datasets::DatasetVocabulary {
+    fn from(v: datasets::SetVocab) -> Self {
         Self {
             offset_column: v.offset_column,
             operation_type_column: v.operation_type_column,
@@ -543,7 +543,7 @@ impl From<dataset::SetVocab> for dataset::DatasetVocabulary {
 // ReadStep
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl source::ReadStep {
+impl sources::ReadStep {
     pub fn ddl_schema(&self) -> Option<&Vec<String>> {
         match self {
             Self::Csv(v) => v.ddl_schema.as_ref(),
@@ -606,7 +606,7 @@ impl source::ReadStep {
 // DatasetVocabulary
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::DatasetVocabulary {
+impl datasets::DatasetVocabulary {
     pub fn set_defaults(&mut self) -> &mut Self {
         self.offset_column
             .get_or_insert_with(|| Self::default_offset_column().into());
@@ -629,7 +629,7 @@ impl dataset::DatasetVocabulary {
 // MergeStrategy
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl source::MergeStrategy {
+impl sources::MergeStrategy {
     pub fn primary_key(self) -> Option<Vec<String>> {
         match self {
             Self::Append(_a) => None,
@@ -645,13 +645,13 @@ impl source::MergeStrategy {
 // RawQueryResponse
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Display for engine::RawQueryResponseInvalidQuery {
+impl Display for engines::RawQueryResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)
     }
 }
 
-impl Display for engine::RawQueryResponseInternalError {
+impl Display for engines::RawQueryResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {
@@ -665,13 +665,13 @@ impl Display for engine::RawQueryResponseInternalError {
 // TransformResponse
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Display for engine::TransformResponseInvalidQuery {
+impl Display for engines::TransformResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)
     }
 }
 
-impl Display for engine::TransformResponseInternalError {
+impl Display for engines::TransformResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {
@@ -685,7 +685,7 @@ impl Display for engine::TransformResponseInternalError {
 // DataSlice
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::DataSlice {
+impl datasets::DataSlice {
     pub fn num_records(&self) -> u64 {
         self.offset_interval.end - self.offset_interval.start + 1
     }
@@ -703,7 +703,7 @@ pub struct SetDataSchemaV2 {
     pub schema: data::DataSchema,
 }
 
-impl dataset::SetDataSchema {
+impl datasets::SetDataSchema {
     pub fn new(schema: data::DataSchema) -> Self {
         Self {
             raw_arrow_schema: None,
@@ -784,7 +784,7 @@ pub enum SchemaAsArrowError {
 // SourceState
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl source::SourceState {
+impl sources::SourceState {
     pub const DEFAULT_SOURCE_NAME: &'static str = "default";
     pub const KIND_ETAG: &'static str = "odf/etag";
     pub const KIND_LAST_MODIFIED: &'static str = "odf/last-modified";
@@ -794,7 +794,7 @@ impl source::SourceState {
 // MetadataEventTypeFlags
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl dataset::MetadataEventTypeFlags {
+impl datasets::MetadataEventTypeFlags {
     pub const DATA_BLOCK: Self =
         Self::from_bits_retain(Self::ADD_DATA.bits() | Self::EXECUTE_TRANSFORM.bits());
 
@@ -810,8 +810,8 @@ impl dataset::MetadataEventTypeFlags {
     }
 }
 
-impl From<crate::dataset::MetadataEventType> for dataset::MetadataEventTypeFlags {
-    fn from(value: crate::dataset::MetadataEventType) -> Self {
+impl From<crate::datasets::MetadataEventType> for datasets::MetadataEventTypeFlags {
+    fn from(value: crate::datasets::MetadataEventType) -> Self {
         match value {
             MetadataEventType::AddData => Self::ADD_DATA,
             MetadataEventType::ExecuteTransform => Self::EXECUTE_TRANSFORM,

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 // Combine this module's types with generated DTOs
-pub use crate::dtos::resource::*;
+pub use crate::dtos::resources::*;
 
 mod resource_identity;
 mod resource_selector;

@@ -15,9 +15,9 @@ use multiformats::Multicodec;
 pub use super::convertors_generated::*;
 use super::proxies_generated as fbgen;
 use crate::MetadataBlockBytes;
-use crate::dataset::MetadataBlockHeader;
-use crate::dtos::dataset::MetadataBlock;
-use crate::dtos::engine::*;
+use crate::datasets::MetadataBlockHeader;
+use crate::dtos::datasets::MetadataBlock;
+use crate::dtos::engines::*;
 use crate::serde::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

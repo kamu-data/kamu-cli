@@ -11,7 +11,7 @@
 
 /// Map of condition schema [`crate::TypeRef`] keys to JSON condition payloads
 /// added by controllers to describe the observed state of a resource.
-pub type ResourceConditions = odf::metadata::resource::ResourceConditions;
+pub type ResourceConditions = odf::metadata::resources::ResourceConditions;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

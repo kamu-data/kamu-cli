@@ -24,7 +24,7 @@ use kamu_resources::{
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use mockall::mock;
-use odf::metadata::resource::TypeUri;
+use odf::metadata::resources::TypeUri;
 
 use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher, make_id};
 

@@ -121,9 +121,9 @@ impl GetResourceCommand {
             #[serde_as(as = "odf::metadata::serde::yaml::auth::AccountHandle")]
             account: &'a odf::AccountHandle,
             name: &'a str,
-            #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]
+            #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceLabels")]
             labels: &'a kamu_resources::ResourceLabels,
-            #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceAnnotations")]
+            #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceAnnotations")]
             annotations: &'a kamu_resources::ResourceAnnotations,
             generation: u64,
             created_at: &'a DateTime<Utc>,

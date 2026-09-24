@@ -14,11 +14,11 @@ use crate::{ResourceHeadersInput, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type ResourceName = odf::metadata::resource::ResourceName;
+pub type ResourceName = odf::metadata::resources::ResourceName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type ResourceHeaders = odf::metadata::resource::ResourceHeaders;
+pub type ResourceHeaders = odf::metadata::resources::ResourceHeaders;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,10 +81,10 @@ impl ResourceHeadersExt for ResourceHeaders {
             id,
             account,
             name: ResourceName::new_unchecked(name),
-            labels: odf::metadata::resource::ResourceLabels {
+            labels: odf::metadata::resources::ResourceLabels {
                 entries: std::collections::BTreeMap::new(),
             },
-            annotations: odf::metadata::resource::ResourceAnnotations {
+            annotations: odf::metadata::resources::ResourceAnnotations {
                 entries: std::collections::BTreeMap::new(),
             },
             owner_references: None,
@@ -109,11 +109,11 @@ impl ResourceHeadersExt for ResourceHeaders {
             name: input.name,
             labels: input
                 .labels
-                .unwrap_or_else(|| odf::metadata::resource::ResourceLabels {
+                .unwrap_or_else(|| odf::metadata::resources::ResourceLabels {
                     entries: std::collections::BTreeMap::new(),
                 }),
             annotations: input.annotations.unwrap_or_else(|| {
-                odf::metadata::resource::ResourceAnnotations {
+                odf::metadata::resources::ResourceAnnotations {
                     entries: std::collections::BTreeMap::new(),
                 }
             }),
@@ -169,13 +169,13 @@ impl ResourceHeadersExt for ResourceHeaders {
         self.name = input.name;
         self.labels = input
             .labels
-            .unwrap_or_else(|| odf::metadata::resource::ResourceLabels {
+            .unwrap_or_else(|| odf::metadata::resources::ResourceLabels {
                 entries: std::collections::BTreeMap::new(),
             });
         self.annotations =
             input
                 .annotations
-                .unwrap_or_else(|| odf::metadata::resource::ResourceAnnotations {
+                .unwrap_or_else(|| odf::metadata::resources::ResourceAnnotations {
                     entries: std::collections::BTreeMap::new(),
                 });
 

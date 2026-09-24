@@ -11,7 +11,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures::{Future, Stream, TryStreamExt, future};
-use odf_metadata::dataset::MetadataBlockBytes;
+use odf_metadata::datasets::MetadataBlockBytes;
 use odf_metadata::*;
 use pin_project::pin_project;
 

@@ -19,7 +19,7 @@ newtype_str!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<AccountName> for crate::resource::ResourceName {
+impl From<AccountName> for crate::resources::ResourceName {
     fn from(value: AccountName) -> Self {
         Self::new_unchecked(&value)
     }

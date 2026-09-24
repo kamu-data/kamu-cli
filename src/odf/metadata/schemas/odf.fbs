@@ -36,7 +36,7 @@ table AccountRef {
 // ResourceLabels
 // Map of string keys and values that can be used to organize, categorize, and query resources.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceLabels
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceLabels
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceLabelsEntry {
@@ -53,7 +53,7 @@ table ResourceLabels {
 // ResourceAnnotations
 // Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceAnnotations
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceAnnotations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceAnnotationsEntry {
@@ -70,7 +70,7 @@ table ResourceAnnotations {
 // ResourceRef
 // Reference to another resource.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceRef
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceRef {
@@ -94,7 +94,7 @@ table ResourceRef {
 // ResourceHeadersInput
 // Container for identity and ownership information of a resource.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeadersInput
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeadersInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceHeadersInput {
@@ -206,7 +206,7 @@ table AccountSpec {
 // OffsetInterval
 // Describes a range of data as a closed arithmetic interval of offsets
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/OffsetInterval
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/OffsetInterval
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table OffsetInterval {
@@ -220,7 +220,7 @@ table OffsetInterval {
 // DataSlice
 // Describes a slice of data added to a dataset or produced via transformation
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DataSlice
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DataSlice
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DataSlice {
@@ -238,7 +238,7 @@ table DataSlice {
 // Checkpoint
 // Describes a checkpoint produced by an engine
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Checkpoint
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Checkpoint
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table Checkpoint {
@@ -252,7 +252,7 @@ table Checkpoint {
 // SourceState
 // The state of the source the data was added from to allow fast resuming.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceState
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceState
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SourceState {
@@ -280,7 +280,7 @@ table ExtraAttributes {
 // AddData
 // Indicates that data has been ingested into a root dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/AddData
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/AddData
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table AddData {
@@ -304,7 +304,7 @@ table AddData {
 // ReadStep
 // Defines how raw data should be read into the structured form.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union ReadStep {
@@ -683,7 +683,7 @@ table DataSchema {
 // ReadStepCsv
 // Reader for comma-separated files.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/Csv
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Csv
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ReadStepCsv {
@@ -736,7 +736,7 @@ table ReadStepCsv {
 // ReadStepGeoJson
 // Reader for GeoJSON files. It expects one `FeatureCollection` object in the root and will create a record per each `Feature` inside it extracting the properties into individual columns and leaving the feature geometry in its own column.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/GeoJson
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/GeoJson
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ReadStepGeoJson {
@@ -750,7 +750,7 @@ table ReadStepGeoJson {
 // ReadStepEsriShapefile
 // Reader for ESRI Shapefile format.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/EsriShapefile
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/EsriShapefile
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ReadStepEsriShapefile {
@@ -766,7 +766,7 @@ table ReadStepEsriShapefile {
 // ReadStepParquet
 // Reader for Apache Parquet format.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/Parquet
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Parquet
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ReadStepParquet {
@@ -780,7 +780,7 @@ table ReadStepParquet {
 // ReadStepJson
 // Reader for JSON files that contain an array of objects within them.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/Json
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Json
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ReadStepJson {
@@ -808,7 +808,7 @@ table ReadStepJson {
 // ReadStepNdJson
 // Reader for files containing multiple newline-delimited JSON objects with the same schema.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/NdJson
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdJson
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ReadStepNdJson {
@@ -834,7 +834,7 @@ table ReadStepNdJson {
 // ReadStepNdGeoJson
 // Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson` format but instead of `FeatureCollection` object in the root it expects every individual feature object to appear on its own line.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/NdGeoJson
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdGeoJson
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ReadStepNdGeoJson {
@@ -848,7 +848,7 @@ table ReadStepNdGeoJson {
 // Transform
 // Engine-specific processing queries that shape the resulting data.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Transform
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Transform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union Transform {
@@ -859,7 +859,7 @@ union Transform {
 // SqlQueryStep
 // Defines a query in a multi-step SQL transformation.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SqlQueryStep
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SqlQueryStep
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SqlQueryStep {
@@ -873,7 +873,7 @@ table SqlQueryStep {
 // TemporalTable
 // Temporary Flink-specific extension for creating temporal tables from streams.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/TemporalTable
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/TemporalTable
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TemporalTable {
@@ -887,7 +887,7 @@ table TemporalTable {
 // TransformSql
 // Transform using one of the SQL dialects.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Transform#/$defs/Sql
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Transform#/$defs/Sql
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformSql {
@@ -907,7 +907,7 @@ table TransformSql {
 // MergeStrategy
 // Merge strategy determines how newly ingested data should be combined with the data that already exists in the dataset.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union MergeStrategy {
@@ -924,7 +924,7 @@ union MergeStrategy {
 // 
 // Under this strategy new data will be appended to the dataset in its entirety, without any deduplication.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/Append
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Append
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table MergeStrategyAppend {
@@ -936,7 +936,7 @@ table MergeStrategyAppend {
 // 
 // This strategy should be used for data sources containing ledgers of events. Currently this strategy will only perform deduplication of events using user-specified primary key columns. This means that the source data can contain partially overlapping set of records and only those records that were not previously seen will be appended.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/Ledger
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Ledger
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table MergeStrategyLedger {
@@ -959,7 +959,7 @@ table MergeStrategyLedger {
 // 
 // To identify whether a row has changed this strategy will compare all other columns one by one. If the data contains a column that is guaranteed to change whenever any of the data columns changes (for example a last modification timestamp, an incremental version, or a data hash), then it can be specified in `compareColumns` property to speed up the detection of modified rows.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/Snapshot
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Snapshot
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table MergeStrategySnapshot {
@@ -975,7 +975,7 @@ table MergeStrategySnapshot {
 // 
 // This is the native stream format for ODF that accurately describes the evolution of all event records including appends, retractions, and corrections as per RFC-015. No pre-processing except for format validation is done.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/ChangelogStream
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/ChangelogStream
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table MergeStrategyChangelogStream {
@@ -989,7 +989,7 @@ table MergeStrategyChangelogStream {
 // 
 // This strategy should be used for data sources containing ledgers of insert-or-update and delete events. Unlike ChangelogStream the insert-or-update events only carry the new values, so this strategy will use primary key to re-classify the events into an append or a correction from/to pair, looking up the previous values.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/UpsertStream
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/UpsertStream
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table MergeStrategyUpsertStream {
@@ -1019,7 +1019,7 @@ table AddPushSource {
 // AttachmentEmbedded
 // Embedded attachment item.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/AttachmentEmbedded
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/AttachmentEmbedded
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table AttachmentEmbedded {
@@ -1033,7 +1033,7 @@ table AttachmentEmbedded {
 // Attachments
 // Defines the source of attachment files.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Attachments
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Attachments
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union Attachments {
@@ -1044,7 +1044,7 @@ union Attachments {
 // AttachmentsEmbedded
 // For attachments that are specified inline and are embedded in the metadata.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Attachments#/$defs/Embedded
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Attachments#/$defs/Embedded
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table AttachmentsEmbedded {
@@ -1137,7 +1137,7 @@ table AwsCredentialsInput {
 // CompactionParams
 // Optional parameters to control ingestion behavior.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/CompactionParams
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/CompactionParams
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table CompactionParams {
@@ -1151,7 +1151,7 @@ table CompactionParams {
 // CompressionFormat
 // Defines a compression algorithm.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/CompressionFormat
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/CompressionFormat
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum CompressionFormat: int32 {
@@ -1163,7 +1163,7 @@ enum CompressionFormat: int32 {
 // DatasetKind
 // Represents type of the dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetKind
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetKind
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum DatasetKind: int32 {
@@ -1175,7 +1175,7 @@ enum DatasetKind: int32 {
 // MetadataEvent
 // Represents a transaction that occurred on a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/MetadataEvent
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataEvent
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union MetadataEvent {
@@ -1198,7 +1198,7 @@ union MetadataEvent {
 // ExecuteTransformInput
 // Describes a slice of the input dataset used during a transformation
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ExecuteTransformInput
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ExecuteTransformInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ExecuteTransformInput {
@@ -1218,7 +1218,7 @@ table ExecuteTransformInput {
 // ExecuteTransform
 // Indicates that derivative transformation has been performed.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ExecuteTransform
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ExecuteTransform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ExecuteTransform {
@@ -1240,7 +1240,7 @@ table ExecuteTransform {
 // Seed
 // Establishes the identity of the dataset. Always the first metadata event in the chain.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Seed
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Seed
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table Seed {
@@ -1269,7 +1269,7 @@ union FetchStep {
 // EventTimeSource
 // Defines the external source of data.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union EventTimeSource {
@@ -1282,7 +1282,7 @@ union EventTimeSource {
 // EventTimeSourceFromMetadata
 // Extracts event time from the source's metadata.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource#/$defs/FromMetadata
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource#/$defs/FromMetadata
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table EventTimeSourceFromMetadata {
@@ -1292,7 +1292,7 @@ table EventTimeSourceFromMetadata {
 // EventTimeSourceFromPath
 // Extracts event time from the path component of the source.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource#/$defs/FromPath
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource#/$defs/FromPath
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table EventTimeSourceFromPath {
@@ -1306,7 +1306,7 @@ table EventTimeSourceFromPath {
 // EventTimeSourceFromSystemTime
 // Assigns event time from the system time source.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource#/$defs/FromSystemTime
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource#/$defs/FromSystemTime
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table EventTimeSourceFromSystemTime {
@@ -1316,7 +1316,7 @@ table EventTimeSourceFromSystemTime {
 // SourceCaching
 // Defines how external data should be cached.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceCaching
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceCaching
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union SourceCaching {
@@ -1327,7 +1327,7 @@ union SourceCaching {
 // SourceCachingForever
 // After source was processed once it will never be ingested again.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceCaching#/$defs/Forever
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceCaching#/$defs/Forever
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SourceCachingForever {
@@ -1337,7 +1337,7 @@ table SourceCachingForever {
 // RequestHeader
 // Defines a header (e.g. HTTP) to be passed into some request.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/RequestHeader
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/RequestHeader
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RequestHeader {
@@ -1369,7 +1369,7 @@ table FetchStepUrl {
 // SourceOrdering
 // Specifies how input files should be ordered before ingestion.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceOrdering
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceOrdering
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum SourceOrdering: int32 {
@@ -1401,7 +1401,7 @@ table FetchStepFilesGlob {
 // EnvVar
 // Defines an environment variable passed into some job.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EnvVar
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EnvVar
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table EnvVar {
@@ -1433,7 +1433,7 @@ table FetchStepContainer {
 // MqttQos
 // MQTT quality of service class.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MqttQos
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MqttQos
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum MqttQos: int32 {
@@ -1446,7 +1446,7 @@ enum MqttQos: int32 {
 // MqttTopicSubscription
 // MQTT topic subscription parameters.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MqttTopicSubscription
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MqttTopicSubscription
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table MqttTopicSubscription {
@@ -1503,7 +1503,7 @@ table FetchStepEthereumLogs {
 // PrepStep
 // Defines the steps to prepare raw data for ingestion.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/PrepStep
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/PrepStep
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union PrepStep {
@@ -1515,7 +1515,7 @@ union PrepStep {
 // PrepStepDecompress
 // Pulls data from one of the supported sources by its URL.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/PrepStep#/$defs/Decompress
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/PrepStep#/$defs/Decompress
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table PrepStepDecompress {
@@ -1529,7 +1529,7 @@ table PrepStepDecompress {
 // PrepStepPipe
 // Executes external command to process the data using piped input/output.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/PrepStep#/$defs/Pipe
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/PrepStep#/$defs/Pipe
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table PrepStepPipe {
@@ -1565,7 +1565,7 @@ table SetPollingSource {
 // TransformInput
 // Describes a derivative transformation input
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/TransformInput
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/TransformInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformInput {
@@ -1579,7 +1579,7 @@ table TransformInput {
 // SetTransform
 // Defines a transformation that produces data in a derivative dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetTransform
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetTransform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SetTransform {
@@ -1593,7 +1593,7 @@ table SetTransform {
 // SetVocab
 // Lets you manipulate names of the system columns to avoid conflicts.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetVocab
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetVocab
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SetVocab {
@@ -1611,7 +1611,7 @@ table SetVocab {
 // SetAttachments
 // Associates a set of files with this dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetAttachments
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetAttachments
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SetAttachments {
@@ -1623,7 +1623,7 @@ table SetAttachments {
 // SetInfo
 // Provides basic human-readable information about a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetInfo
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetInfo
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SetInfo {
@@ -1637,7 +1637,7 @@ table SetInfo {
 // SetLicense
 // Defines a license that applies to this dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetLicense
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetLicense
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SetLicense {
@@ -1655,7 +1655,7 @@ table SetLicense {
 // SetDataSchema
 // Specifies the complete schema of Data Slices added to the Dataset following this event.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetDataSchema
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetDataSchema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SetDataSchema {
@@ -1711,7 +1711,7 @@ table PersistentVolumeRef {
 // DatasetSpecInput
 // Represents a desired state of the dataset metadata.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpecInput
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DatasetSpecInput {
@@ -1729,7 +1729,7 @@ table DatasetSpecInput {
 // DatasetHandle
 // Link to a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetHandle
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DatasetHandle {
@@ -1747,7 +1747,7 @@ table DatasetHandle {
 // DatasetRef
 // Reference to a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetRef
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DatasetRef {
@@ -1765,7 +1765,7 @@ table DatasetRef {
 // DatasetRole
 // Access role granted to a subject on a dataset. Note: in future this fixed enum schema will likely be replaced by a reference to a `DatasetRole` resources that defines granular permissions on different actions available on a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetRole
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetRole
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum DatasetRole: int32 {
@@ -1778,7 +1778,7 @@ enum DatasetRole: int32 {
 // LabelFilter
 // Filters that work on resource labels and identity headers.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/LabelFilter
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/LabelFilter
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table LabelFilterEntry {
@@ -1795,7 +1795,7 @@ table LabelFilter {
 // DatasetSelector
 // Selects one or more datasets by name pattern and optional filters.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSelector
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetSelector
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DatasetSelector {
@@ -1837,7 +1837,7 @@ table DatasetSnapshot {
 // ResourceHandle
 // Link to another resolved resource.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceHandle {
@@ -1857,7 +1857,7 @@ table ResourceHandle {
 // DatasetSpec
 // Represents a desired state of the dataset metadata.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpec
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DatasetSpec {
@@ -1875,7 +1875,7 @@ table DatasetSpec {
 // DatasetVocabulary
 // Specifies the mapping of system columns onto dataset schema.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetVocabulary
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetVocabulary
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table DatasetVocabulary {
@@ -1901,7 +1901,7 @@ table DatasetVocabulary {
 // EventFilter
 // Filters that work on domain event types and fields.
 //
-// Schema: https://opendatafabric.org/schemas/event/v1alpha1/EventFilter
+// Schema: https://opendatafabric.org/schemas/events/v1alpha1/EventFilter
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table EventFilterEntry {
@@ -1918,7 +1918,7 @@ table EventFilter {
 // ResourceSelector
 // Matches zero or many resources using identity and label filters.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceSelector
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceSelector
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceSelector {
@@ -1945,7 +1945,7 @@ table ResourceSelector {
 // FlowTriggerInput
 // Condition that causes a flow to be executed.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union FlowTriggerInput {
@@ -1960,7 +1960,7 @@ union FlowTriggerInput {
 // FlowTriggerInputManual
 // Triggers the flow via an API call or UI action.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Manual
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Manual
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputManual {
@@ -1970,7 +1970,7 @@ table FlowTriggerInputManual {
 // FlowTriggerInputSchedule
 // Triggers the flow on a cron schedule.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Schedule
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Schedule
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputSchedule {
@@ -1982,7 +1982,7 @@ table FlowTriggerInputSchedule {
 // FlowTriggerInputEvent
 // Triggers the flow when an event bus event matching one of the filters is observed.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Event
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Event
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputEvent {
@@ -1998,7 +1998,7 @@ table FlowTriggerInputEvent {
 // FlowTriggerInputSource
 // Triggers the flow when a source receives new data, with optional batching controls.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Source
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Source
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputSource {
@@ -2014,7 +2014,7 @@ table FlowTriggerInputSource {
 // FlowTriggerInputDataset
 // Triggers the flow when matching datasets are updated.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Dataset
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Dataset
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputDataset {
@@ -2032,7 +2032,7 @@ table FlowTriggerInputWrapper {
 // TaskSpecInput
 // An individual work item to be executed as part of a flow.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union TaskSpecInput {
@@ -2047,7 +2047,7 @@ union TaskSpecInput {
 // IngestParams
 // Optional parameters to control ingestion behavior.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/IngestParams
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/IngestParams
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngestParams {
@@ -2059,7 +2059,7 @@ table IngestParams {
 // TaskSpecInputIngest
 // Fetches data from a source and appends it to a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Ingest
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Ingest
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputIngest {
@@ -2075,7 +2075,7 @@ table TaskSpecInputIngest {
 // TaskSpecInputTransform
 // Executes transformation of data defined in a derivative dataset.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Transform
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Transform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputTransform {
@@ -2089,7 +2089,7 @@ table TaskSpecInputTransform {
 // TaskSpecInputCompaction
 // Compacts data files in matching datasets to improve query performance.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/Compaction
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Compaction
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputCompaction {
@@ -2103,7 +2103,7 @@ table TaskSpecInputCompaction {
 // TaskSpecInputGarbageCollection
 // Removes unreferenced data files from matching datasets.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputGarbageCollection {
@@ -2115,7 +2115,7 @@ table TaskSpecInputGarbageCollection {
 // RetryBackoff
 // Type of the backoff scaling.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/RetryBackoff
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/RetryBackoff
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum RetryBackoff: int32 {
@@ -2127,7 +2127,7 @@ enum RetryBackoff: int32 {
 // RetryPolicy
 // Defines how a flow should react to failures.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/RetryPolicy
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/RetryPolicy
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RetryPolicy {
@@ -2143,7 +2143,7 @@ table RetryPolicy {
 // TaskSpecInputWebhookCall
 // Dispatches a certain payload to a specific `WebhookTarget`.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpecInput#/$defs/WebhookCall
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/WebhookCall
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecInputWebhookCall {
@@ -2165,7 +2165,7 @@ table TaskSpecInputWrapper {
 // FlowSpecInput
 // Defines a sequence of tasks to be executed upon certain trigger conditions.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowSpecInput
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowSpecInput {
@@ -2183,7 +2183,7 @@ table FlowSpecInput {
 // FlowRunSpecInput
 // Defines a set of tasks to be executed in a sequence.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunSpecInput
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowRunSpecInput {
@@ -2197,7 +2197,7 @@ table FlowRunSpecInput {
 // FlowTrigger
 // Condition that causes a flow to be executed.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union FlowTrigger {
@@ -2212,7 +2212,7 @@ union FlowTrigger {
 // FlowTriggerManual
 // Triggers the flow via an API call or UI action.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Manual
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Manual
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerManual {
@@ -2222,7 +2222,7 @@ table FlowTriggerManual {
 // FlowTriggerSchedule
 // Triggers the flow on a cron schedule.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Schedule
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Schedule
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerSchedule {
@@ -2234,7 +2234,7 @@ table FlowTriggerSchedule {
 // FlowTriggerEvent
 // Triggers the flow when an event bus event matching one of the filters is observed.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Event
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Event
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerEvent {
@@ -2250,7 +2250,7 @@ table FlowTriggerEvent {
 // FlowTriggerSource
 // Triggers the flow when a source receives new data, with optional batching controls.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Source
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Source
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerSource {
@@ -2266,7 +2266,7 @@ table FlowTriggerSource {
 // FlowTriggerDataset
 // Triggers the flow when matching datasets are updated.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Dataset
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Dataset
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerDataset {
@@ -2280,7 +2280,7 @@ table FlowTriggerDataset {
 // FlowRunActivationCause
 // Cause of the flow run activation
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunActivationCause
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunActivationCause
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowRunActivationCause {
@@ -2296,7 +2296,7 @@ table FlowRunActivationCause {
 // FlowRunActivationCauses
 // Condition capturing what caused this FlowRun to be scheduled. Set by the controller at creation time; never written by users. In case of a retry, the causes of the original run are preserved.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunActivationCauses
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunActivationCauses
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowRunActivationCauses {
@@ -2310,7 +2310,7 @@ table FlowRunActivationCauses {
 // FlowRunRetry
 // Condition linking this FlowRun to the previous FlowRun it is retrying. Set by the controller; never written by users.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunRetry
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunRetry
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowRunRetry {
@@ -2322,7 +2322,7 @@ table FlowRunRetry {
 // TaskSpec
 // An individual work item to be executed as part of a flow.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union TaskSpec {
@@ -2337,7 +2337,7 @@ union TaskSpec {
 // TaskSpecIngest
 // Fetches data from a source and appends it to a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Ingest
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Ingest
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecIngest {
@@ -2353,7 +2353,7 @@ table TaskSpecIngest {
 // TaskSpecTransform
 // Executes transformation of data defined in a derivative dataset.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Transform
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Transform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecTransform {
@@ -2367,7 +2367,7 @@ table TaskSpecTransform {
 // TaskSpecCompaction
 // Compacts data files in matching datasets to improve query performance.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/Compaction
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Compaction
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecCompaction {
@@ -2381,7 +2381,7 @@ table TaskSpecCompaction {
 // TaskSpecGarbageCollection
 // Removes unreferenced data files from matching datasets.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/GarbageCollection
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/GarbageCollection
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecGarbageCollection {
@@ -2393,7 +2393,7 @@ table TaskSpecGarbageCollection {
 // TaskSpecWebhookCall
 // Dispatches a certain payload to a specific `WebhookTarget`.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskSpec#/$defs/WebhookCall
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/WebhookCall
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskSpecWebhookCall {
@@ -2413,7 +2413,7 @@ table TaskSpecWrapper {
 // FlowRunSpec
 // Defines a set of tasks to be executed in a sequence.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunSpec
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowRunSpec {
@@ -2427,7 +2427,7 @@ table FlowRunSpec {
 // FlowRunStatusValue
 // Overall execution status of the FlowRun.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus#/$defs/Value
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunStatus#/$defs/Value
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum FlowRunStatusValue: int32 {
@@ -2440,7 +2440,7 @@ enum FlowRunStatusValue: int32 {
 // TaskStatus
 // Execution phase of a task.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskStatus
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskStatus
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum TaskStatus: int32 {
@@ -2456,7 +2456,7 @@ enum TaskStatus: int32 {
 // TaskOutcome
 // Result of the execution of a task.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskOutcome
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union TaskOutcome {
@@ -2470,7 +2470,7 @@ union TaskOutcome {
 // TaskOutcomeSuccess
 // Task completed successfully.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Success
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskOutcome#/$defs/Success
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskOutcomeSuccessEntry {
@@ -2487,7 +2487,7 @@ table TaskOutcomeSuccess {
 // TaskOutcomeFailed
 // Task failed.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Failed
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskOutcome#/$defs/Failed
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskOutcomeFailed {
@@ -2499,7 +2499,7 @@ table TaskOutcomeFailed {
 // TaskOutcomeNoOp
 // Task completed with no work done (e.g. no new data to process).
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/NoOp
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskOutcome#/$defs/NoOp
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskOutcomeNoOp {
@@ -2509,7 +2509,7 @@ table TaskOutcomeNoOp {
 // TaskOutcomeCancelled
 // Task was cancelled before completion.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskOutcome#/$defs/Cancelled
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskOutcome#/$defs/Cancelled
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskOutcomeCancelled {
@@ -2519,7 +2519,7 @@ table TaskOutcomeCancelled {
 // FlowRunStatusTaskEntry
 // Describes a task spawned by this FlowRun.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus#/$defs/TaskEntry
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunStatus#/$defs/TaskEntry
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowRunStatusTaskEntry {
@@ -2539,7 +2539,7 @@ table FlowRunStatusTaskEntry {
 // FlowRunStatus
 // Condition tracking the overall execution status of a FlowRun and its spawned tasks.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowRunStatus
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunStatus
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowRunStatus {
@@ -2557,7 +2557,7 @@ table FlowTriggerWrapper {
 // FlowSpec
 // Defines a sequence of tasks to be executed upon certain trigger conditions.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowSpec
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowSpec {
@@ -2595,7 +2595,7 @@ table GroupSpec {
 // Ingress
 // Defines the point where data enters the system.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/Ingress
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union Ingress {
@@ -2611,7 +2611,7 @@ union Ingress {
 // IngressUrl
 // Pulls data from one of the supported sources by its URL.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/Ingress#/$defs/Url
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress#/$defs/Url
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngressUrl {
@@ -2629,7 +2629,7 @@ table IngressUrl {
 // IngressFilesGlob
 // Uses glob operator to match files on the local file system.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/Ingress#/$defs/FilesGlob
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress#/$defs/FilesGlob
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngressFilesGlob {
@@ -2649,7 +2649,7 @@ table IngressFilesGlob {
 // IngressContainer
 // Runs the specified OCI container to fetch data from an arbitrary source.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/Ingress#/$defs/Container
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress#/$defs/Container
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngressContainer {
@@ -2667,7 +2667,7 @@ table IngressContainer {
 // IngressMqtt
 // Connects to an MQTT broker to fetch events from the specified topic.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/Ingress#/$defs/Mqtt
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress#/$defs/Mqtt
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngressMqtt {
@@ -2687,7 +2687,7 @@ table IngressMqtt {
 // IngressEvmLogs
 // Connects to an EVM (Ethereum) node to stream transaction logs.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/Ingress#/$defs/EvmLogs
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress#/$defs/EvmLogs
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngressEvmLogs {
@@ -2708,7 +2708,7 @@ table IngressEvmLogs {
 // IngressBuffer
 // Buffer configuration for holding pushed records until they are ingested.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/IngressBuffer
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/IngressBuffer
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 union IngressBuffer {
@@ -2719,7 +2719,7 @@ union IngressBuffer {
 // IngressBufferMemory
 // An in-memory buffer.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/IngressBuffer#/$defs/Memory
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/IngressBuffer#/$defs/Memory
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngressBufferMemory {
@@ -2733,7 +2733,7 @@ table IngressBufferMemory {
 // IngressRestEndpoint
 // Exposes a REST HTTP endpoint that accepts pushed data records.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/Ingress#/$defs/RestEndpoint
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress#/$defs/RestEndpoint
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table IngressRestEndpoint {
@@ -2761,7 +2761,7 @@ table Manifest {
 // MetadataBlock
 // An individual block in the metadata chain that captures the history of modifications of a dataset.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/MetadataBlock
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataBlock
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table MetadataBlock {
@@ -2874,7 +2874,7 @@ table PersistentVolumeSpecRoot {
 // ProjectionSpecInput
 // Represents a projection of a dataaset history into a state for fast lookups.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ProjectionSpecInput
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ProjectionSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ProjectionSpecInput {
@@ -2888,7 +2888,7 @@ table ProjectionSpecInput {
 // ProjectionSpec
 // Represents a projection of a dataaset history into a state for fast lookups.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ProjectionSpec
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ProjectionSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ProjectionSpec {
@@ -2902,7 +2902,7 @@ table ProjectionSpec {
 // RawQueryRequest
 // Sent by the coordinator to an engine to perform query on raw input data, usually as part of ingest preprocessing step
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/RawQueryRequest
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryRequest
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RawQueryRequest {
@@ -2925,7 +2925,7 @@ union RawQueryResponse {
 // RawQueryResponseProgress
 // Reports query progress
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/RawQueryResponse#/$defs/Progress
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryResponse#/$defs/Progress
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RawQueryResponseProgress {
@@ -2935,7 +2935,7 @@ table RawQueryResponseProgress {
 // RawQueryResponseSuccess
 // Query executed successfully
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/RawQueryResponse#/$defs/Success
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryResponse#/$defs/Success
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RawQueryResponseSuccess {
@@ -2947,7 +2947,7 @@ table RawQueryResponseSuccess {
 // RawQueryResponseInvalidQuery
 // Query did not pass validation
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/RawQueryResponse#/$defs/InvalidQuery
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryResponse#/$defs/InvalidQuery
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RawQueryResponseInvalidQuery {
@@ -2959,7 +2959,7 @@ table RawQueryResponseInvalidQuery {
 // RawQueryResponseInternalError
 // Internal error during query execution
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/RawQueryResponse#/$defs/InternalError
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryResponse#/$defs/InternalError
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RawQueryResponseInternalError {
@@ -2972,7 +2972,7 @@ table RawQueryResponseInternalError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RawQueryResponseRoot
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/RawQueryResponseRoot
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryResponseRoot
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table RawQueryResponseRoot {
@@ -3043,7 +3043,7 @@ table RelationsSpec {
 // ResourceHeaders
 // Container for identity and ownership information of a resource.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeaders
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceHeaders {
@@ -3073,7 +3073,7 @@ table ResourceHeaders {
 // ResourcePhase
 // Represents the reconciliation phase of a resource.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourcePhase
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourcePhase
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum ResourcePhase: int32 {
@@ -3086,9 +3086,9 @@ enum ResourcePhase: int32 {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceConditions
-// Container of feneric contditions that can be added by contollers to provide additional information about the state of a resource. Keys uniquely identify the condition and should be in the form of URL to a schema describing this condition, e.g. `https://opendatafabric.org/schemas/resource/ConditionReady.json`.
+// Container of generic contditions that can be added by contollers to provide additional information about the state of a resource. Keys uniquely identify the condition and should be in the form of a schema URL describing this condition, e.g. `https://opendatafabric.org/schemas/tasks/v1/TaskStatus`.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceConditions
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceConditions
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceConditionsEntry {
@@ -3105,7 +3105,7 @@ table ResourceConditions {
 // ResourceStatus
 // Resource lifecycle and reconciliation information.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceStatus
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceStatus {
@@ -3127,11 +3127,11 @@ table ResourceStatus {
 // Resource
 // Top-level container for canonical representation of a resource that specifies the type and version of the resource, carries identity, ownership, and status information.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/Resource
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/Resource
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table Resource {
-  // Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
+  // Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset.json`.
   schema: string;
   // Container for identity and ownership information of a resource.
   headers: ResourceHeaders;
@@ -3145,11 +3145,11 @@ table Resource {
 // ResourceInput
 // Top-level container for user-authored representation of a resource that specifies the type and version of the resource and its desired state.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceInput
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table ResourceInput {
-  // Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
+  // Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset`.
   schema: string;
   // Container for identity and ownership information of a resource.
   headers: ResourceHeadersInput;
@@ -3217,7 +3217,7 @@ table ValueRefs {
 // SourceSpecInput
 // Specifies an external source of data for ingestion.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceSpecInput
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SourceSpecInput {
@@ -3241,7 +3241,7 @@ table SourceSpecInput {
 // SourceSpec
 // Specifies an external source of data for ingestion.
 //
-// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceSpec
+// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table SourceSpec {
@@ -3265,7 +3265,7 @@ table SourceSpec {
 // TaskPlan
 // A self-contained logical execution plan of a task.
 //
-// Schema: https://opendatafabric.org/schemas/task/v1alpha1/TaskPlan
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskPlan
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TaskPlanEntry {
@@ -3282,7 +3282,7 @@ table TaskPlan {
 // Watermark
 // Represents a watermark in the event stream.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Watermark
+// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Watermark
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table Watermark {
@@ -3296,7 +3296,7 @@ table Watermark {
 // TransformRequestInput
 // Sent as part of the engine transform request operation to describe the input
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/TransformRequestInput
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformRequestInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformRequestInput {
@@ -3322,7 +3322,7 @@ table TransformRequestInput {
 // TransformRequest
 // Sent by the coordinator to an engine to perform the next step of data transformation
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/TransformRequest
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformRequest
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformRequest {
@@ -3359,7 +3359,7 @@ union TransformResponse {
 // TransformResponseProgress
 // Reports query progress
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/TransformResponse#/$defs/Progress
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformResponse#/$defs/Progress
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformResponseProgress {
@@ -3369,7 +3369,7 @@ table TransformResponseProgress {
 // TransformResponseSuccess
 // Query executed successfully
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/TransformResponse#/$defs/Success
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformResponse#/$defs/Success
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformResponseSuccess {
@@ -3383,7 +3383,7 @@ table TransformResponseSuccess {
 // TransformResponseInvalidQuery
 // Query did not pass validation
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/TransformResponse#/$defs/InvalidQuery
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformResponse#/$defs/InvalidQuery
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformResponseInvalidQuery {
@@ -3395,7 +3395,7 @@ table TransformResponseInvalidQuery {
 // TransformResponseInternalError
 // Internal error during query execution
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/TransformResponse#/$defs/InternalError
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformResponse#/$defs/InternalError
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformResponseInternalError {
@@ -3408,7 +3408,7 @@ table TransformResponseInternalError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformResponseRoot
 //
-// Schema: https://opendatafabric.org/schemas/engine/v1alpha1/TransformResponseRoot
+// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformResponseRoot
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table TransformResponseRoot {
@@ -3471,7 +3471,7 @@ table VariableSetSpec {
 // WebhookTargetSpecInput
 // Defines a webhook target endpoint that can receive event notifications and data.
 //
-// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetSpecInput
+// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTargetSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table WebhookTargetSpecInput {
@@ -3485,7 +3485,7 @@ table WebhookTargetSpecInput {
 // WebhookTargetSpec
 // Defines a webhook target endpoint that can receive event notifications and data.
 //
-// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetSpec
+// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTargetSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table WebhookTargetSpec {

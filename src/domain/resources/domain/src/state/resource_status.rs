@@ -13,7 +13,7 @@ use crate::{ResourceConditionValue, ResourcePhase, empty_resource_conditions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type ResourceStatus = odf::metadata::resource::ResourceStatus;
+pub type ResourceStatus = odf::metadata::resources::ResourceStatus;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,13 +29,13 @@ pub fn new_pending_resource_status() -> ResourceStatus {
 }
 
 pub fn resource_status_from_json(value: &serde_json::Value) -> Option<ResourceStatus> {
-    let proxy: odf::metadata::serde::yaml::resource::ResourceStatus =
+    let proxy: odf::metadata::serde::yaml::resources::ResourceStatus =
         serde_json::from_value(value.clone()).ok()?;
     proxy.try_into().ok()
 }
 
 pub fn resource_status_to_json(status: &ResourceStatus) -> serde_json::Value {
-    let proxy: odf::metadata::serde::yaml::resource::ResourceStatus = status.clone().into();
+    let proxy: odf::metadata::serde::yaml::resources::ResourceStatus = status.clone().into();
     serde_json::to_value(proxy).unwrap()
 }
 

@@ -24,6 +24,6 @@
 /// `did` is forward-reserved in ODF for when datasets and accounts become
 /// resources; no repository can resolve by it today, so the facade rejects a
 /// selector carrying one rather than ignoring it.
-pub type ResourceSelector = odf::metadata::resource::ResourceSelector;
+pub type ResourceSelector = odf::metadata::resources::ResourceSelector;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

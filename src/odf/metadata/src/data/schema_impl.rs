@@ -9,7 +9,7 @@
 
 use super::{ExtraAttribute, IntoExtraAttribute};
 use crate::data::*;
-use crate::dtos::dataset::DatasetVocabulary;
+use crate::dtos::datasets::DatasetVocabulary;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSchema

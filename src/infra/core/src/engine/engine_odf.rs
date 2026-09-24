@@ -19,7 +19,7 @@ use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDatasetsMap;
-use odf::metadata::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
+use odf::metadata::engines::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 
 use super::ODFEngineConfig;
 use super::engine_container::{EngineContainer, LogsConfig};

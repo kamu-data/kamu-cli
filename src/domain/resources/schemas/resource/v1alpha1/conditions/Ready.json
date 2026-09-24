@@ -1,5 +1,5 @@
 {
-  "$schema": "https://opendatafabric.org/schemas/metaschemas/v1alpha1/ResourceCondition",
+  "$schema": "https://opendatafabric.org/schemas/resources/v1alpha1/meta/ResourceCondition",
   "$id": "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready",
   "title": "Ready Resource Condition",
   "type": "object",

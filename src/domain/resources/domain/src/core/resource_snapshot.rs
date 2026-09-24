@@ -28,11 +28,11 @@ use crate::{
 pub struct ResourceSnapshot {
     pub id: ResourceID,
     pub schema: TypeUri,
-    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceHeaders")]
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeaders")]
     pub headers: ResourceHeaders,
 
     pub spec: serde_json::Value,
-    #[serde_as(as = "Option<odf::metadata::serde::yaml::resource::ResourceStatus>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::resources::ResourceStatus>")]
     pub status: Option<ResourceStatus>,
 
     pub last_event_id: Option<EventID>,

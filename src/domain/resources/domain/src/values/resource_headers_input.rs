@@ -15,7 +15,7 @@ use crate::{ResourceValidateHeaders, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type ResourceHeadersInput = odf::metadata::resource::ResourceHeadersInput;
+pub type ResourceHeadersInput = odf::metadata::resources::ResourceHeadersInput;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,10 +61,10 @@ impl ResourceHeadersInputExt for ResourceHeadersInput {
             id: None,
             account,
             name,
-            labels: Some(odf::metadata::resource::ResourceLabels {
+            labels: Some(odf::metadata::resources::ResourceLabels {
                 entries: entries_to_map(labels, ResourceHeaderField::Labels)?,
             }),
-            annotations: Some(odf::metadata::resource::ResourceAnnotations {
+            annotations: Some(odf::metadata::resources::ResourceAnnotations {
                 entries: entries_to_map(annotations, ResourceHeaderField::Annotations)?,
             }),
             owner_references: None,

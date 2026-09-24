@@ -53,7 +53,7 @@ impl From<odf::metadata::auth::AccountHandle> for AccountHandle {
 
 /// Indicates that data has been ingested into a root dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/AddData
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/AddData
 #[derive(SimpleObject, Debug, Clone)]
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
@@ -82,8 +82,8 @@ pub struct AddData {
     pub extra: Option<ExtraAttributes>,
 }
 
-impl From<odf::metadata::dataset::AddData> for AddData {
-    fn from(v: odf::metadata::dataset::AddData) -> Self {
+impl From<odf::metadata::datasets::AddData> for AddData {
+    fn from(v: odf::metadata::datasets::AddData) -> Self {
         Self {
             prev_checkpoint: v.prev_checkpoint.map(Into::into),
             prev_offset: v.prev_offset.map(Into::into),
@@ -130,7 +130,7 @@ impl From<odf::metadata::legacy::AddPushSource> for AddPushSource {
 
 /// Embedded attachment item.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/AttachmentEmbedded
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/AttachmentEmbedded
 #[derive(SimpleObject, Debug, Clone)]
 pub struct AttachmentEmbedded {
     /// Path to an attachment if it was materialized into a file.
@@ -139,8 +139,8 @@ pub struct AttachmentEmbedded {
     pub content: String,
 }
 
-impl From<odf::metadata::dataset::AttachmentEmbedded> for AttachmentEmbedded {
-    fn from(v: odf::metadata::dataset::AttachmentEmbedded) -> Self {
+impl From<odf::metadata::datasets::AttachmentEmbedded> for AttachmentEmbedded {
+    fn from(v: odf::metadata::datasets::AttachmentEmbedded) -> Self {
         Self {
             path: v.path.into(),
             content: v.content.into(),
@@ -152,16 +152,16 @@ impl From<odf::metadata::dataset::AttachmentEmbedded> for AttachmentEmbedded {
 
 /// Defines the source of attachment files.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Attachments
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Attachments
 #[derive(Union, Debug, Clone)]
 pub enum Attachments {
     Embedded(AttachmentsEmbedded),
 }
 
-impl From<odf::metadata::dataset::Attachments> for Attachments {
-    fn from(v: odf::metadata::dataset::Attachments) -> Self {
+impl From<odf::metadata::datasets::Attachments> for Attachments {
+    fn from(v: odf::metadata::datasets::Attachments) -> Self {
         match v {
-            odf::metadata::dataset::Attachments::Embedded(v) => Self::Embedded(v.into()),
+            odf::metadata::datasets::Attachments::Embedded(v) => Self::Embedded(v.into()),
         }
     }
 }
@@ -170,15 +170,15 @@ impl From<odf::metadata::dataset::Attachments> for Attachments {
 
 /// For attachments that are specified inline and are embedded in the metadata.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Attachments#/$defs/Embedded
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Attachments#/$defs/Embedded
 #[derive(SimpleObject, Debug, Clone)]
 pub struct AttachmentsEmbedded {
     /// List of embedded items.
     pub items: Vec<AttachmentEmbedded>,
 }
 
-impl From<odf::metadata::dataset::AttachmentsEmbedded> for AttachmentsEmbedded {
-    fn from(v: odf::metadata::dataset::AttachmentsEmbedded) -> Self {
+impl From<odf::metadata::datasets::AttachmentsEmbedded> for AttachmentsEmbedded {
+    fn from(v: odf::metadata::datasets::AttachmentsEmbedded) -> Self {
         Self {
             items: v.items.into_iter().map(Into::into).collect(),
         }
@@ -189,7 +189,7 @@ impl From<odf::metadata::dataset::AttachmentsEmbedded> for AttachmentsEmbedded {
 
 /// Describes a checkpoint produced by an engine
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Checkpoint
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Checkpoint
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Checkpoint {
     /// Hash sum of the checkpoint file.
@@ -198,8 +198,8 @@ pub struct Checkpoint {
     pub size: UInt64,
 }
 
-impl From<odf::metadata::dataset::Checkpoint> for Checkpoint {
-    fn from(v: odf::metadata::dataset::Checkpoint) -> Self {
+impl From<odf::metadata::datasets::Checkpoint> for Checkpoint {
+    fn from(v: odf::metadata::datasets::Checkpoint) -> Self {
         Self {
             physical_hash: v.physical_hash.into(),
             size: v.size.into(),
@@ -211,9 +211,9 @@ impl From<odf::metadata::dataset::Checkpoint> for Checkpoint {
 
 /// Defines a compression algorithm.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/CompressionFormat
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/CompressionFormat
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::source::CompressionFormat")]
+#[graphql(remote = "odf::metadata::sources::CompressionFormat")]
 pub enum CompressionFormat {
     Gzip,
     Zip,
@@ -223,7 +223,7 @@ pub enum CompressionFormat {
 
 /// Describes a slice of data added to a dataset or produced via transformation
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DataSlice
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DataSlice
 #[derive(SimpleObject, Debug, Clone)]
 pub struct DataSlice {
     /// Logical hash sum of the data in this slice.
@@ -236,8 +236,8 @@ pub struct DataSlice {
     pub size: UInt64,
 }
 
-impl From<odf::metadata::dataset::DataSlice> for DataSlice {
-    fn from(v: odf::metadata::dataset::DataSlice) -> Self {
+impl From<odf::metadata::datasets::DataSlice> for DataSlice {
+    fn from(v: odf::metadata::datasets::DataSlice) -> Self {
         Self {
             logical_hash: v.logical_hash.into(),
             physical_hash: v.physical_hash.into(),
@@ -251,9 +251,9 @@ impl From<odf::metadata::dataset::DataSlice> for DataSlice {
 
 /// Represents type of the dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetKind
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetKind
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::dataset::DatasetKind")]
+#[graphql(remote = "odf::metadata::datasets::DatasetKind")]
 pub enum DatasetKind {
     Root,
     Derivative,
@@ -298,7 +298,7 @@ impl From<odf::metadata::legacy::DisablePushSource> for DisablePushSource {
 
 /// Defines an environment variable passed into some job.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EnvVar
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EnvVar
 #[derive(SimpleObject, Debug, Clone)]
 pub struct EnvVar {
     /// Name of the variable.
@@ -307,8 +307,8 @@ pub struct EnvVar {
     pub value: Option<String>,
 }
 
-impl From<odf::metadata::source::EnvVar> for EnvVar {
-    fn from(v: odf::metadata::source::EnvVar) -> Self {
+impl From<odf::metadata::sources::EnvVar> for EnvVar {
+    fn from(v: odf::metadata::sources::EnvVar) -> Self {
         Self {
             name: v.name.into(),
             value: v.value.map(Into::into),
@@ -320,7 +320,7 @@ impl From<odf::metadata::source::EnvVar> for EnvVar {
 
 /// Defines the external source of data.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource
 #[derive(Union, Debug, Clone)]
 pub enum EventTimeSource {
     FromMetadata(EventTimeSourceFromMetadata),
@@ -328,12 +328,14 @@ pub enum EventTimeSource {
     FromSystemTime(EventTimeSourceFromSystemTime),
 }
 
-impl From<odf::metadata::source::EventTimeSource> for EventTimeSource {
-    fn from(v: odf::metadata::source::EventTimeSource) -> Self {
+impl From<odf::metadata::sources::EventTimeSource> for EventTimeSource {
+    fn from(v: odf::metadata::sources::EventTimeSource) -> Self {
         match v {
-            odf::metadata::source::EventTimeSource::FromMetadata(v) => Self::FromMetadata(v.into()),
-            odf::metadata::source::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
-            odf::metadata::source::EventTimeSource::FromSystemTime(v) => {
+            odf::metadata::sources::EventTimeSource::FromMetadata(v) => {
+                Self::FromMetadata(v.into())
+            }
+            odf::metadata::sources::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
+            odf::metadata::sources::EventTimeSource::FromSystemTime(v) => {
                 Self::FromSystemTime(v.into())
             }
         }
@@ -344,14 +346,14 @@ impl From<odf::metadata::source::EventTimeSource> for EventTimeSource {
 
 /// Extracts event time from the source's metadata.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource#/$defs/FromMetadata
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource#/$defs/FromMetadata
 #[derive(SimpleObject, Debug, Clone)]
 pub struct EventTimeSourceFromMetadata {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::source::EventTimeSourceFromMetadata> for EventTimeSourceFromMetadata {
-    fn from(v: odf::metadata::source::EventTimeSourceFromMetadata) -> Self {
+impl From<odf::metadata::sources::EventTimeSourceFromMetadata> for EventTimeSourceFromMetadata {
+    fn from(v: odf::metadata::sources::EventTimeSourceFromMetadata) -> Self {
         Self { _dummy: None }
     }
 }
@@ -360,7 +362,7 @@ impl From<odf::metadata::source::EventTimeSourceFromMetadata> for EventTimeSourc
 
 /// Extracts event time from the path component of the source.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource#/$defs/FromPath
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource#/$defs/FromPath
 #[derive(SimpleObject, Debug, Clone)]
 pub struct EventTimeSourceFromPath {
     /// Regular expression where first group contains the timestamp string.
@@ -369,8 +371,8 @@ pub struct EventTimeSourceFromPath {
     pub timestamp_format: Option<String>,
 }
 
-impl From<odf::metadata::source::EventTimeSourceFromPath> for EventTimeSourceFromPath {
-    fn from(v: odf::metadata::source::EventTimeSourceFromPath) -> Self {
+impl From<odf::metadata::sources::EventTimeSourceFromPath> for EventTimeSourceFromPath {
+    fn from(v: odf::metadata::sources::EventTimeSourceFromPath) -> Self {
         Self {
             pattern: v.pattern.into(),
             timestamp_format: v.timestamp_format.map(Into::into),
@@ -382,14 +384,14 @@ impl From<odf::metadata::source::EventTimeSourceFromPath> for EventTimeSourceFro
 
 /// Assigns event time from the system time source.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/EventTimeSource#/$defs/FromSystemTime
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource#/$defs/FromSystemTime
 #[derive(SimpleObject, Debug, Clone)]
 pub struct EventTimeSourceFromSystemTime {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::source::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime {
-    fn from(v: odf::metadata::source::EventTimeSourceFromSystemTime) -> Self {
+impl From<odf::metadata::sources::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime {
+    fn from(v: odf::metadata::sources::EventTimeSourceFromSystemTime) -> Self {
         Self { _dummy: None }
     }
 }
@@ -398,7 +400,7 @@ impl From<odf::metadata::source::EventTimeSourceFromSystemTime> for EventTimeSou
 
 /// Indicates that derivative transformation has been performed.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ExecuteTransform
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ExecuteTransform
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ExecuteTransform {
     /// Defines inputs used in this transaction. Slices corresponding to every
@@ -424,8 +426,8 @@ pub struct ExecuteTransform {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-impl From<odf::metadata::dataset::ExecuteTransform> for ExecuteTransform {
-    fn from(v: odf::metadata::dataset::ExecuteTransform) -> Self {
+impl From<odf::metadata::datasets::ExecuteTransform> for ExecuteTransform {
+    fn from(v: odf::metadata::datasets::ExecuteTransform) -> Self {
         Self {
             query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
             prev_checkpoint: v.prev_checkpoint.map(Into::into),
@@ -441,7 +443,7 @@ impl From<odf::metadata::dataset::ExecuteTransform> for ExecuteTransform {
 
 /// Describes a slice of the input dataset used during a transformation
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ExecuteTransformInput
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ExecuteTransformInput
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
@@ -470,8 +472,8 @@ pub struct ExecuteTransformInput {
     pub new_offset: Option<UInt64>,
 }
 
-impl From<odf::metadata::dataset::ExecuteTransformInput> for ExecuteTransformInput {
-    fn from(v: odf::metadata::dataset::ExecuteTransformInput) -> Self {
+impl From<odf::metadata::datasets::ExecuteTransformInput> for ExecuteTransformInput {
+    fn from(v: odf::metadata::datasets::ExecuteTransformInput) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
@@ -700,7 +702,7 @@ impl From<odf::metadata::legacy::FetchStepUrl> for FetchStepUrl {
 /// Merge strategy determines how newly ingested data should be combined with
 /// the data that already exists in the dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy
 #[derive(Union, Debug, Clone)]
 pub enum MergeStrategy {
     Append(MergeStrategyAppend),
@@ -710,16 +712,16 @@ pub enum MergeStrategy {
     UpsertStream(MergeStrategyUpsertStream),
 }
 
-impl From<odf::metadata::source::MergeStrategy> for MergeStrategy {
-    fn from(v: odf::metadata::source::MergeStrategy) -> Self {
+impl From<odf::metadata::sources::MergeStrategy> for MergeStrategy {
+    fn from(v: odf::metadata::sources::MergeStrategy) -> Self {
         match v {
-            odf::metadata::source::MergeStrategy::Append(v) => Self::Append(v.into()),
-            odf::metadata::source::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
-            odf::metadata::source::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
-            odf::metadata::source::MergeStrategy::ChangelogStream(v) => {
+            odf::metadata::sources::MergeStrategy::Append(v) => Self::Append(v.into()),
+            odf::metadata::sources::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
+            odf::metadata::sources::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
+            odf::metadata::sources::MergeStrategy::ChangelogStream(v) => {
                 Self::ChangelogStream(v.into())
             }
-            odf::metadata::source::MergeStrategy::UpsertStream(v) => Self::UpsertStream(v.into()),
+            odf::metadata::sources::MergeStrategy::UpsertStream(v) => Self::UpsertStream(v.into()),
         }
     }
 }
@@ -731,14 +733,14 @@ impl From<odf::metadata::source::MergeStrategy> for MergeStrategy {
 /// Under this strategy new data will be appended to the dataset in its
 /// entirety, without any deduplication.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/Append
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Append
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategyAppend {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::source::MergeStrategyAppend> for MergeStrategyAppend {
-    fn from(v: odf::metadata::source::MergeStrategyAppend) -> Self {
+impl From<odf::metadata::sources::MergeStrategyAppend> for MergeStrategyAppend {
+    fn from(v: odf::metadata::sources::MergeStrategyAppend) -> Self {
         Self { _dummy: None }
     }
 }
@@ -752,7 +754,7 @@ impl From<odf::metadata::source::MergeStrategyAppend> for MergeStrategyAppend {
 /// corrections as per RFC-015. No pre-processing except for format validation
 /// is done.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/ChangelogStream
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/ChangelogStream
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategyChangelogStream {
     /// Names of the columns that uniquely identify the record throughout its
@@ -760,8 +762,8 @@ pub struct MergeStrategyChangelogStream {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::source::MergeStrategyChangelogStream> for MergeStrategyChangelogStream {
-    fn from(v: odf::metadata::source::MergeStrategyChangelogStream) -> Self {
+impl From<odf::metadata::sources::MergeStrategyChangelogStream> for MergeStrategyChangelogStream {
+    fn from(v: odf::metadata::sources::MergeStrategyChangelogStream) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
@@ -778,7 +780,7 @@ impl From<odf::metadata::source::MergeStrategyChangelogStream> for MergeStrategy
 /// contain partially overlapping set of records and only those records that
 /// were not previously seen will be appended.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/Ledger
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Ledger
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategyLedger {
     /// Names of the columns that uniquely identify the record throughout its
@@ -786,8 +788,8 @@ pub struct MergeStrategyLedger {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::source::MergeStrategyLedger> for MergeStrategyLedger {
-    fn from(v: odf::metadata::source::MergeStrategyLedger) -> Self {
+impl From<odf::metadata::sources::MergeStrategyLedger> for MergeStrategyLedger {
+    fn from(v: odf::metadata::sources::MergeStrategyLedger) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
@@ -823,7 +825,7 @@ impl From<odf::metadata::source::MergeStrategyLedger> for MergeStrategyLedger {
 /// be specified in `compareColumns` property to speed up the detection of
 /// modified rows.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/Snapshot
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Snapshot
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategySnapshot {
     /// Names of the columns that uniquely identify the record throughout its
@@ -834,8 +836,8 @@ pub struct MergeStrategySnapshot {
     pub compare_columns: Option<Vec<String>>,
 }
 
-impl From<odf::metadata::source::MergeStrategySnapshot> for MergeStrategySnapshot {
-    fn from(v: odf::metadata::source::MergeStrategySnapshot) -> Self {
+impl From<odf::metadata::sources::MergeStrategySnapshot> for MergeStrategySnapshot {
+    fn from(v: odf::metadata::sources::MergeStrategySnapshot) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
             compare_columns: v
@@ -855,7 +857,7 @@ impl From<odf::metadata::source::MergeStrategySnapshot> for MergeStrategySnapsho
 /// primary key to re-classify the events into an append or a correction from/to
 /// pair, looking up the previous values.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MergeStrategy#/$defs/UpsertStream
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/UpsertStream
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategyUpsertStream {
     /// Names of the columns that uniquely identify the record throughout its
@@ -863,8 +865,8 @@ pub struct MergeStrategyUpsertStream {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::source::MergeStrategyUpsertStream> for MergeStrategyUpsertStream {
-    fn from(v: odf::metadata::source::MergeStrategyUpsertStream) -> Self {
+impl From<odf::metadata::sources::MergeStrategyUpsertStream> for MergeStrategyUpsertStream {
+    fn from(v: odf::metadata::sources::MergeStrategyUpsertStream) -> Self {
         Self {
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
         }
@@ -876,7 +878,7 @@ impl From<odf::metadata::source::MergeStrategyUpsertStream> for MergeStrategyUps
 /// An individual block in the metadata chain that captures the history of
 /// modifications of a dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/MetadataBlock
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataBlock
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MetadataBlock {
     /// System time when this block was written.
@@ -889,8 +891,8 @@ pub struct MetadataBlock {
     pub event: MetadataEvent,
 }
 
-impl From<odf::metadata::dataset::MetadataBlock> for MetadataBlock {
-    fn from(v: odf::metadata::dataset::MetadataBlock) -> Self {
+impl From<odf::metadata::datasets::MetadataBlock> for MetadataBlock {
+    fn from(v: odf::metadata::datasets::MetadataBlock) -> Self {
         Self {
             system_time: v.system_time.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
@@ -904,7 +906,7 @@ impl From<odf::metadata::dataset::MetadataBlock> for MetadataBlock {
 
 /// Represents a transaction that occurred on a dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/MetadataEvent
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataEvent
 #[derive(Union, Debug, Clone)]
 pub enum MetadataEvent {
     AddData(AddData),
@@ -922,34 +924,34 @@ pub enum MetadataEvent {
     DisablePollingSource(DisablePollingSource),
 }
 
-impl From<odf::metadata::dataset::MetadataEvent> for MetadataEvent {
-    fn from(v: odf::metadata::dataset::MetadataEvent) -> Self {
+impl From<odf::metadata::datasets::MetadataEvent> for MetadataEvent {
+    fn from(v: odf::metadata::datasets::MetadataEvent) -> Self {
         match v {
-            odf::metadata::dataset::MetadataEvent::AddData(v) => Self::AddData(v.into()),
-            odf::metadata::dataset::MetadataEvent::ExecuteTransform(v) => {
+            odf::metadata::datasets::MetadataEvent::AddData(v) => Self::AddData(v.into()),
+            odf::metadata::datasets::MetadataEvent::ExecuteTransform(v) => {
                 Self::ExecuteTransform(v.into())
             }
-            odf::metadata::dataset::MetadataEvent::Seed(v) => Self::Seed(v.into()),
-            odf::metadata::dataset::MetadataEvent::SetPollingSource(v) => {
+            odf::metadata::datasets::MetadataEvent::Seed(v) => Self::Seed(v.into()),
+            odf::metadata::datasets::MetadataEvent::SetPollingSource(v) => {
                 Self::SetPollingSource(v.into())
             }
-            odf::metadata::dataset::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
-            odf::metadata::dataset::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
-            odf::metadata::dataset::MetadataEvent::SetAttachments(v) => {
+            odf::metadata::datasets::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
+            odf::metadata::datasets::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
+            odf::metadata::datasets::MetadataEvent::SetAttachments(v) => {
                 Self::SetAttachments(v.into())
             }
-            odf::metadata::dataset::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
-            odf::metadata::dataset::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
-            odf::metadata::dataset::MetadataEvent::SetDataSchema(v) => {
+            odf::metadata::datasets::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
+            odf::metadata::datasets::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
+            odf::metadata::datasets::MetadataEvent::SetDataSchema(v) => {
                 Self::SetDataSchema(v.into())
             }
-            odf::metadata::dataset::MetadataEvent::AddPushSource(v) => {
+            odf::metadata::datasets::MetadataEvent::AddPushSource(v) => {
                 Self::AddPushSource(v.into())
             }
-            odf::metadata::dataset::MetadataEvent::DisablePushSource(v) => {
+            odf::metadata::datasets::MetadataEvent::DisablePushSource(v) => {
                 Self::DisablePushSource(v.into())
             }
-            odf::metadata::dataset::MetadataEvent::DisablePollingSource(v) => {
+            odf::metadata::datasets::MetadataEvent::DisablePollingSource(v) => {
                 Self::DisablePollingSource(v.into())
             }
         }
@@ -960,9 +962,9 @@ impl From<odf::metadata::dataset::MetadataEvent> for MetadataEvent {
 
 /// MQTT quality of service class.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MqttQos
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MqttQos
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::source::MqttQos")]
+#[graphql(remote = "odf::metadata::sources::MqttQos")]
 pub enum MqttQos {
     AtMostOnce,
     AtLeastOnce,
@@ -973,7 +975,7 @@ pub enum MqttQos {
 
 /// MQTT topic subscription parameters.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/MqttTopicSubscription
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MqttTopicSubscription
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MqttTopicSubscription {
     /// Name of the topic (may include patterns).
@@ -984,8 +986,8 @@ pub struct MqttTopicSubscription {
     pub qos: Option<MqttQos>,
 }
 
-impl From<odf::metadata::source::MqttTopicSubscription> for MqttTopicSubscription {
-    fn from(v: odf::metadata::source::MqttTopicSubscription) -> Self {
+impl From<odf::metadata::sources::MqttTopicSubscription> for MqttTopicSubscription {
+    fn from(v: odf::metadata::sources::MqttTopicSubscription) -> Self {
         Self {
             path: v.path.into(),
             qos: v.qos.map(Into::into),
@@ -997,7 +999,7 @@ impl From<odf::metadata::source::MqttTopicSubscription> for MqttTopicSubscriptio
 
 /// Describes a range of data as a closed arithmetic interval of offsets
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/OffsetInterval
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/OffsetInterval
 #[derive(SimpleObject, Debug, Clone)]
 pub struct OffsetInterval {
     /// Start of the closed interval [start; end].
@@ -1006,8 +1008,8 @@ pub struct OffsetInterval {
     pub end: UInt64,
 }
 
-impl From<odf::metadata::dataset::OffsetInterval> for OffsetInterval {
-    fn from(v: odf::metadata::dataset::OffsetInterval) -> Self {
+impl From<odf::metadata::datasets::OffsetInterval> for OffsetInterval {
+    fn from(v: odf::metadata::datasets::OffsetInterval) -> Self {
         Self {
             start: v.start.into(),
             end: v.end.into(),
@@ -1019,18 +1021,18 @@ impl From<odf::metadata::dataset::OffsetInterval> for OffsetInterval {
 
 /// Defines the steps to prepare raw data for ingestion.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/PrepStep
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/PrepStep
 #[derive(Union, Debug, Clone)]
 pub enum PrepStep {
     Decompress(PrepStepDecompress),
     Pipe(PrepStepPipe),
 }
 
-impl From<odf::metadata::source::PrepStep> for PrepStep {
-    fn from(v: odf::metadata::source::PrepStep) -> Self {
+impl From<odf::metadata::sources::PrepStep> for PrepStep {
+    fn from(v: odf::metadata::sources::PrepStep) -> Self {
         match v {
-            odf::metadata::source::PrepStep::Decompress(v) => Self::Decompress(v.into()),
-            odf::metadata::source::PrepStep::Pipe(v) => Self::Pipe(v.into()),
+            odf::metadata::sources::PrepStep::Decompress(v) => Self::Decompress(v.into()),
+            odf::metadata::sources::PrepStep::Pipe(v) => Self::Pipe(v.into()),
         }
     }
 }
@@ -1039,7 +1041,7 @@ impl From<odf::metadata::source::PrepStep> for PrepStep {
 
 /// Pulls data from one of the supported sources by its URL.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/PrepStep#/$defs/Decompress
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/PrepStep#/$defs/Decompress
 #[derive(SimpleObject, Debug, Clone)]
 pub struct PrepStepDecompress {
     /// Name of a compression algorithm used on data.
@@ -1049,8 +1051,8 @@ pub struct PrepStepDecompress {
     pub sub_path: Option<String>,
 }
 
-impl From<odf::metadata::source::PrepStepDecompress> for PrepStepDecompress {
-    fn from(v: odf::metadata::source::PrepStepDecompress) -> Self {
+impl From<odf::metadata::sources::PrepStepDecompress> for PrepStepDecompress {
+    fn from(v: odf::metadata::sources::PrepStepDecompress) -> Self {
         Self {
             format: v.format.into(),
             sub_path: v.sub_path.map(Into::into),
@@ -1062,15 +1064,15 @@ impl From<odf::metadata::source::PrepStepDecompress> for PrepStepDecompress {
 
 /// Executes external command to process the data using piped input/output.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/PrepStep#/$defs/Pipe
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/PrepStep#/$defs/Pipe
 #[derive(SimpleObject, Debug, Clone)]
 pub struct PrepStepPipe {
     /// Command to execute and its arguments.
     pub command: Vec<String>,
 }
 
-impl From<odf::metadata::source::PrepStepPipe> for PrepStepPipe {
-    fn from(v: odf::metadata::source::PrepStepPipe) -> Self {
+impl From<odf::metadata::sources::PrepStepPipe> for PrepStepPipe {
+    fn from(v: odf::metadata::sources::PrepStepPipe) -> Self {
         Self {
             command: v.command.into_iter().map(Into::into).collect(),
         }
@@ -1081,7 +1083,7 @@ impl From<odf::metadata::source::PrepStepPipe> for PrepStepPipe {
 
 /// Defines how raw data should be read into the structured form.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep
 #[derive(Interface, Debug, Clone)]
 #[graphql(field(
     name = "schema",
@@ -1116,7 +1118,7 @@ impl From<odf::metadata::ReadStep> for ReadStep {
 
 /// Reader for comma-separated files.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/Csv
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Csv
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct ReadStepCsv {
@@ -1229,7 +1231,7 @@ impl ReadStepCsv {
 
 /// Reader for ESRI Shapefile format.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/EsriShapefile
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/EsriShapefile
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct ReadStepEsriShapefile {
@@ -1286,7 +1288,7 @@ impl ReadStepEsriShapefile {
 /// properties into individual columns and leaving the feature geometry in its
 /// own column.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/GeoJson
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/GeoJson
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct ReadStepGeoJson {
@@ -1331,7 +1333,7 @@ impl ReadStepGeoJson {
 
 /// Reader for JSON files that contain an array of objects within them.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/Json
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Json
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct ReadStepJson {
@@ -1409,7 +1411,7 @@ impl ReadStepJson {
 /// format but instead of `FeatureCollection` object in the root it expects
 /// every individual feature object to appear on its own line.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/NdGeoJson
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdGeoJson
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct ReadStepNdGeoJson {
@@ -1455,7 +1457,7 @@ impl ReadStepNdGeoJson {
 /// Reader for files containing multiple newline-delimited JSON objects with the
 /// same schema.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/NdJson
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdJson
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct ReadStepNdJson {
@@ -1525,7 +1527,7 @@ impl ReadStepNdJson {
 
 /// Reader for Apache Parquet format.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/ReadStep#/$defs/Parquet
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Parquet
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct ReadStepParquet {
@@ -1570,7 +1572,7 @@ impl ReadStepParquet {
 
 /// Defines a header (e.g. HTTP) to be passed into some request.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/RequestHeader
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/RequestHeader
 #[derive(SimpleObject, Debug, Clone)]
 pub struct RequestHeader {
     /// Name of the header.
@@ -1579,8 +1581,8 @@ pub struct RequestHeader {
     pub value: String,
 }
 
-impl From<odf::metadata::source::RequestHeader> for RequestHeader {
-    fn from(v: odf::metadata::source::RequestHeader) -> Self {
+impl From<odf::metadata::sources::RequestHeader> for RequestHeader {
+    fn from(v: odf::metadata::sources::RequestHeader) -> Self {
         Self {
             name: v.name.into(),
             value: v.value.into(),
@@ -1594,10 +1596,10 @@ impl From<odf::metadata::source::RequestHeader> for RequestHeader {
 /// specifies the type and version of the resource, carries identity, ownership,
 /// and status information.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/Resource
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/Resource
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Resource {
-    /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
+    /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset.json`.
     pub schema: TypeUri<'static>,
     /// Container for identity and ownership information of a resource.
     pub headers: ResourceHeaders,
@@ -1607,8 +1609,8 @@ pub struct Resource {
     pub status: ResourceStatus,
 }
 
-impl From<odf::metadata::resource::Resource<serde_json::Value>> for Resource {
-    fn from(v: odf::metadata::resource::Resource<serde_json::Value>) -> Self {
+impl From<odf::metadata::resources::Resource<serde_json::Value>> for Resource {
+    fn from(v: odf::metadata::resources::Resource<serde_json::Value>) -> Self {
         Self {
             schema: v.schema.into(),
             headers: v.headers.into(),
@@ -1624,15 +1626,15 @@ impl From<odf::metadata::resource::Resource<serde_json::Value>> for Resource {
 /// be set by external tools to store and retrieve arbitrary metadata. Unlike
 /// labels, annotations are not indexed and cannot be queried by.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceAnnotations
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceAnnotations
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
-pub struct ResourceAnnotations(odf::metadata::resource::ResourceAnnotations);
+pub struct ResourceAnnotations(odf::metadata::resources::ResourceAnnotations);
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ResourceAnnotations {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let proxy: odf::metadata::serde::yaml::resource::ResourceAnnotations =
+        let proxy: odf::metadata::serde::yaml::resources::ResourceAnnotations =
             async_graphql::from_value(value)?;
         let dto = proxy
             .try_into()
@@ -1643,7 +1645,7 @@ impl async_graphql::ScalarType for ResourceAnnotations {
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: odf::metadata::serde::yaml::resource::ResourceAnnotations =
+        let value: odf::metadata::serde::yaml::resources::ResourceAnnotations =
             self.as_ref().clone().into();
         async_graphql::to_value(&value).unwrap()
     }
@@ -1651,17 +1653,17 @@ impl async_graphql::ScalarType for ResourceAnnotations {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Container of feneric contditions that can be added by contollers to provide additional information about the state of a resource. Keys uniquely identify the condition and should be in the form of URL to a schema describing this condition, e.g. `https://opendatafabric.org/schemas/resource/ConditionReady.json`.
+/// Container of generic contditions that can be added by contollers to provide additional information about the state of a resource. Keys uniquely identify the condition and should be in the form of a schema URL describing this condition, e.g. `https://opendatafabric.org/schemas/tasks/v1/TaskStatus`.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceConditions
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceConditions
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
-pub struct ResourceConditions(odf::metadata::resource::ResourceConditions);
+pub struct ResourceConditions(odf::metadata::resources::ResourceConditions);
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ResourceConditions {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let proxy: odf::metadata::serde::yaml::resource::ResourceConditions =
+        let proxy: odf::metadata::serde::yaml::resources::ResourceConditions =
             async_graphql::from_value(value)?;
         let dto = proxy
             .try_into()
@@ -1672,7 +1674,7 @@ impl async_graphql::ScalarType for ResourceConditions {
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: odf::metadata::serde::yaml::resource::ResourceConditions =
+        let value: odf::metadata::serde::yaml::resources::ResourceConditions =
             self.as_ref().clone().into();
         async_graphql::to_value(&value).unwrap()
     }
@@ -1682,7 +1684,7 @@ impl async_graphql::ScalarType for ResourceConditions {
 
 /// Link to another resolved resource.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHandle
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHandle {
     /// Account that owns the target resource.
@@ -1697,8 +1699,8 @@ pub struct ResourceHandle {
     pub name: ResourceName<'static>,
 }
 
-impl From<odf::metadata::resource::ResourceHandle> for ResourceHandle {
-    fn from(v: odf::metadata::resource::ResourceHandle) -> Self {
+impl From<odf::metadata::resources::ResourceHandle> for ResourceHandle {
+    fn from(v: odf::metadata::resources::ResourceHandle) -> Self {
         Self {
             account: v.account.into(),
             r#type: v.r#type.into(),
@@ -1713,7 +1715,7 @@ impl From<odf::metadata::resource::ResourceHandle> for ResourceHandle {
 
 /// Container for identity and ownership information of a resource.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeaders
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHeaders {
     /// Unique identifier of a resource within entire ODF node. Automatically
@@ -1747,8 +1749,8 @@ pub struct ResourceHeaders {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-impl From<odf::metadata::resource::ResourceHeaders> for ResourceHeaders {
-    fn from(v: odf::metadata::resource::ResourceHeaders) -> Self {
+impl From<odf::metadata::resources::ResourceHeaders> for ResourceHeaders {
+    fn from(v: odf::metadata::resources::ResourceHeaders) -> Self {
         Self {
             id: v.id.into(),
             name: v.name.into(),
@@ -1771,15 +1773,15 @@ impl From<odf::metadata::resource::ResourceHeaders> for ResourceHeaders {
 /// Map of string keys and values that can be used to organize, categorize, and
 /// query resources.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceLabels
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceLabels
 
 #[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
-pub struct ResourceLabels(odf::metadata::resource::ResourceLabels);
+pub struct ResourceLabels(odf::metadata::resources::ResourceLabels);
 
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ResourceLabels {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let proxy: odf::metadata::serde::yaml::resource::ResourceLabels =
+        let proxy: odf::metadata::serde::yaml::resources::ResourceLabels =
             async_graphql::from_value(value)?;
         let dto = proxy
             .try_into()
@@ -1790,7 +1792,7 @@ impl async_graphql::ScalarType for ResourceLabels {
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: odf::metadata::serde::yaml::resource::ResourceLabels =
+        let value: odf::metadata::serde::yaml::resources::ResourceLabels =
             self.as_ref().clone().into();
         async_graphql::to_value(&value).unwrap()
     }
@@ -1800,9 +1802,9 @@ impl async_graphql::ScalarType for ResourceLabels {
 
 /// Represents the reconciliation phase of a resource.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourcePhase
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourcePhase
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::resource::ResourcePhase")]
+#[graphql(remote = "odf::metadata::resources::ResourcePhase")]
 pub enum ResourcePhase {
     Pending,
     Reconciling,
@@ -1815,7 +1817,7 @@ pub enum ResourcePhase {
 
 /// Resource lifecycle and reconciliation information.
 ///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
+/// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceStatus
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceStatus {
     /// Represents the reconciliation phase of a resource as seen by the main
@@ -1837,8 +1839,8 @@ pub struct ResourceStatus {
     pub conditions: ResourceConditions,
 }
 
-impl From<odf::metadata::resource::ResourceStatus> for ResourceStatus {
-    fn from(v: odf::metadata::resource::ResourceStatus) -> Self {
+impl From<odf::metadata::resources::ResourceStatus> for ResourceStatus {
+    fn from(v: odf::metadata::resources::ResourceStatus) -> Self {
         Self {
             phase: v.phase.into(),
             observed_generation: v.observed_generation.map(Into::into),
@@ -1855,7 +1857,7 @@ impl From<odf::metadata::resource::ResourceStatus> for ResourceStatus {
 /// Establishes the identity of the dataset. Always the first metadata event in
 /// the chain.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Seed
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Seed
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Seed {
     /// Unique identity of the dataset.
@@ -1864,8 +1866,8 @@ pub struct Seed {
     pub dataset_kind: DatasetKind,
 }
 
-impl From<odf::metadata::dataset::Seed> for Seed {
-    fn from(v: odf::metadata::dataset::Seed) -> Self {
+impl From<odf::metadata::datasets::Seed> for Seed {
+    fn from(v: odf::metadata::datasets::Seed) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             dataset_kind: v.dataset_kind.into(),
@@ -1877,15 +1879,15 @@ impl From<odf::metadata::dataset::Seed> for Seed {
 
 /// Associates a set of files with this dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetAttachments
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetAttachments
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SetAttachments {
     /// One of the supported attachment sources.
     pub attachments: Attachments,
 }
 
-impl From<odf::metadata::dataset::SetAttachments> for SetAttachments {
-    fn from(v: odf::metadata::dataset::SetAttachments) -> Self {
+impl From<odf::metadata::datasets::SetAttachments> for SetAttachments {
+    fn from(v: odf::metadata::datasets::SetAttachments) -> Self {
         Self {
             attachments: v.attachments.into(),
         }
@@ -1897,7 +1899,7 @@ impl From<odf::metadata::dataset::SetAttachments> for SetAttachments {
 /// Specifies the complete schema of Data Slices added to the Dataset following
 /// this event.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetDataSchema
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetDataSchema
 #[derive(Debug, Clone)]
 pub struct SetDataSchema {
     pub schema: std::sync::Arc<odf::schema::DataSchema>,
@@ -1926,7 +1928,7 @@ impl From<odf::metadata::SetDataSchema> for SetDataSchema {
 
 /// Provides basic human-readable information about a dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetInfo
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetInfo
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SetInfo {
     /// Brief single-sentence summary of a dataset.
@@ -1935,8 +1937,8 @@ pub struct SetInfo {
     pub keywords: Option<Vec<String>>,
 }
 
-impl From<odf::metadata::dataset::SetInfo> for SetInfo {
-    fn from(v: odf::metadata::dataset::SetInfo) -> Self {
+impl From<odf::metadata::datasets::SetInfo> for SetInfo {
+    fn from(v: odf::metadata::datasets::SetInfo) -> Self {
         Self {
             description: v.description.map(Into::into),
             keywords: v.keywords.map(|v| v.into_iter().map(Into::into).collect()),
@@ -1948,7 +1950,7 @@ impl From<odf::metadata::dataset::SetInfo> for SetInfo {
 
 /// Defines a license that applies to this dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetLicense
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetLicense
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SetLicense {
     /// Abbreviated name of the license.
@@ -1961,8 +1963,8 @@ pub struct SetLicense {
     pub website_url: String,
 }
 
-impl From<odf::metadata::dataset::SetLicense> for SetLicense {
-    fn from(v: odf::metadata::dataset::SetLicense) -> Self {
+impl From<odf::metadata::datasets::SetLicense> for SetLicense {
+    fn from(v: odf::metadata::datasets::SetLicense) -> Self {
         Self {
             short_name: v.short_name.into(),
             name: v.name.into(),
@@ -2009,7 +2011,7 @@ impl From<odf::metadata::legacy::SetPollingSource> for SetPollingSource {
 
 /// Defines a transformation that produces data in a derivative dataset.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetTransform
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetTransform
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SetTransform {
     /// Datasets that will be used as sources.
@@ -2018,8 +2020,8 @@ pub struct SetTransform {
     pub transform: Transform,
 }
 
-impl From<odf::metadata::dataset::SetTransform> for SetTransform {
-    fn from(v: odf::metadata::dataset::SetTransform) -> Self {
+impl From<odf::metadata::datasets::SetTransform> for SetTransform {
+    fn from(v: odf::metadata::datasets::SetTransform) -> Self {
         Self {
             inputs: v.inputs.into_iter().map(Into::into).collect(),
             transform: v.transform.into(),
@@ -2031,7 +2033,7 @@ impl From<odf::metadata::dataset::SetTransform> for SetTransform {
 
 /// Lets you manipulate names of the system columns to avoid conflicts.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SetVocab
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetVocab
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SetVocab {
     /// Name of the offset column.
@@ -2044,8 +2046,8 @@ pub struct SetVocab {
     pub event_time_column: Option<String>,
 }
 
-impl From<odf::metadata::dataset::SetVocab> for SetVocab {
-    fn from(v: odf::metadata::dataset::SetVocab) -> Self {
+impl From<odf::metadata::datasets::SetVocab> for SetVocab {
+    fn from(v: odf::metadata::datasets::SetVocab) -> Self {
         Self {
             offset_column: v.offset_column.map(Into::into),
             operation_type_column: v.operation_type_column.map(Into::into),
@@ -2059,16 +2061,16 @@ impl From<odf::metadata::dataset::SetVocab> for SetVocab {
 
 /// Defines how external data should be cached.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceCaching
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceCaching
 #[derive(Union, Debug, Clone)]
 pub enum SourceCaching {
     Forever(SourceCachingForever),
 }
 
-impl From<odf::metadata::source::SourceCaching> for SourceCaching {
-    fn from(v: odf::metadata::source::SourceCaching) -> Self {
+impl From<odf::metadata::sources::SourceCaching> for SourceCaching {
+    fn from(v: odf::metadata::sources::SourceCaching) -> Self {
         match v {
-            odf::metadata::source::SourceCaching::Forever(v) => Self::Forever(v.into()),
+            odf::metadata::sources::SourceCaching::Forever(v) => Self::Forever(v.into()),
         }
     }
 }
@@ -2077,14 +2079,14 @@ impl From<odf::metadata::source::SourceCaching> for SourceCaching {
 
 /// After source was processed once it will never be ingested again.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceCaching#/$defs/Forever
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceCaching#/$defs/Forever
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SourceCachingForever {
     pub _dummy: Option<String>,
 }
 
-impl From<odf::metadata::source::SourceCachingForever> for SourceCachingForever {
-    fn from(v: odf::metadata::source::SourceCachingForever) -> Self {
+impl From<odf::metadata::sources::SourceCachingForever> for SourceCachingForever {
+    fn from(v: odf::metadata::sources::SourceCachingForever) -> Self {
         Self { _dummy: None }
     }
 }
@@ -2093,9 +2095,9 @@ impl From<odf::metadata::source::SourceCachingForever> for SourceCachingForever 
 
 /// Specifies how input files should be ordered before ingestion.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceOrdering
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceOrdering
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "odf::metadata::source::SourceOrdering")]
+#[graphql(remote = "odf::metadata::sources::SourceOrdering")]
 pub enum SourceOrdering {
     ByEventTime,
     ByName,
@@ -2105,7 +2107,7 @@ pub enum SourceOrdering {
 
 /// The state of the source the data was added from to allow fast resuming.
 ///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceState
+/// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/SourceState
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SourceState {
     /// Identifies the source that the state corresponds to.
@@ -2117,8 +2119,8 @@ pub struct SourceState {
     pub value: String,
 }
 
-impl From<odf::metadata::source::SourceState> for SourceState {
-    fn from(v: odf::metadata::source::SourceState) -> Self {
+impl From<odf::metadata::sources::SourceState> for SourceState {
+    fn from(v: odf::metadata::sources::SourceState) -> Self {
         Self {
             source_name: v.source_name.into(),
             kind: v.kind.into(),
@@ -2131,7 +2133,7 @@ impl From<odf::metadata::source::SourceState> for SourceState {
 
 /// Defines a query in a multi-step SQL transformation.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/SqlQueryStep
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SqlQueryStep
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SqlQueryStep {
     /// Name of the temporary view that will be created from result of the
@@ -2142,8 +2144,8 @@ pub struct SqlQueryStep {
     pub query: String,
 }
 
-impl From<odf::metadata::dataset::SqlQueryStep> for SqlQueryStep {
-    fn from(v: odf::metadata::dataset::SqlQueryStep) -> Self {
+impl From<odf::metadata::datasets::SqlQueryStep> for SqlQueryStep {
+    fn from(v: odf::metadata::datasets::SqlQueryStep) -> Self {
         Self {
             alias: v.alias.map(Into::into),
             query: v.query.into(),
@@ -2156,7 +2158,7 @@ impl From<odf::metadata::dataset::SqlQueryStep> for SqlQueryStep {
 /// Temporary Flink-specific extension for creating temporal tables from
 /// streams.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/TemporalTable
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/TemporalTable
 #[derive(SimpleObject, Debug, Clone)]
 pub struct TemporalTable {
     /// Name of the dataset to be converted into a temporal table.
@@ -2165,8 +2167,8 @@ pub struct TemporalTable {
     pub primary_key: Vec<String>,
 }
 
-impl From<odf::metadata::dataset::TemporalTable> for TemporalTable {
-    fn from(v: odf::metadata::dataset::TemporalTable) -> Self {
+impl From<odf::metadata::datasets::TemporalTable> for TemporalTable {
+    fn from(v: odf::metadata::datasets::TemporalTable) -> Self {
         Self {
             name: v.name.into(),
             primary_key: v.primary_key.into_iter().map(Into::into).collect(),
@@ -2178,16 +2180,16 @@ impl From<odf::metadata::dataset::TemporalTable> for TemporalTable {
 
 /// Engine-specific processing queries that shape the resulting data.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Transform
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Transform
 #[derive(Union, Debug, Clone)]
 pub enum Transform {
     Sql(TransformSql),
 }
 
-impl From<odf::metadata::dataset::Transform> for Transform {
-    fn from(v: odf::metadata::dataset::Transform) -> Self {
+impl From<odf::metadata::datasets::Transform> for Transform {
+    fn from(v: odf::metadata::datasets::Transform) -> Self {
         match v {
-            odf::metadata::dataset::Transform::Sql(v) => Self::Sql(v.into()),
+            odf::metadata::datasets::Transform::Sql(v) => Self::Sql(v.into()),
         }
     }
 }
@@ -2196,7 +2198,7 @@ impl From<odf::metadata::dataset::Transform> for Transform {
 
 /// Transform using one of the SQL dialects.
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/Transform#/$defs/Sql
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Transform#/$defs/Sql
 #[derive(SimpleObject, Debug, Clone)]
 pub struct TransformSql {
     pub engine: String,
@@ -2228,7 +2230,7 @@ impl From<odf::metadata::TransformSql> for TransformSql {
 
 /// Describes a derivative transformation input
 ///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/TransformInput
+/// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/TransformInput
 #[derive(Interface, Debug)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum TransformInputDataset {

@@ -14,13 +14,13 @@ use digest::Digest;
 use opendatafabric_metadata::config::*;
 use opendatafabric_metadata::data::ext::*;
 use opendatafabric_metadata::data::*;
-use opendatafabric_metadata::dataset::*;
-use opendatafabric_metadata::engine::*;
+use opendatafabric_metadata::datasets::*;
+use opendatafabric_metadata::engines::*;
 use opendatafabric_metadata::legacy::*;
-use opendatafabric_metadata::resource::*;
+use opendatafabric_metadata::resources::*;
 use opendatafabric_metadata::serde::flatbuffers::{proxies_generated as fb, *};
 use opendatafabric_metadata::serde::*;
-use opendatafabric_metadata::source::*;
+use opendatafabric_metadata::sources::*;
 use opendatafabric_metadata::*;
 use serde_json::json;
 

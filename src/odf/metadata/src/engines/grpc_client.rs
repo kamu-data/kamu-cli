@@ -15,7 +15,7 @@ use super::grpc_generated::{
     RawQueryRequest as RawQueryRequestGRPC,
     TransformRequest as TransformRequestGRPC,
 };
-use crate::dtos::engine::*;
+use crate::dtos::engines::*;
 use crate::serde::flatbuffers::FlatbuffersEngineProtocol;
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
 

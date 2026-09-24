@@ -34,7 +34,7 @@ pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
 pub struct ResourceEventCreated<TSpec> {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceHeadersInput")]
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeadersInput")]
     pub headers: ResourceHeadersInput,
     pub spec: TSpec,
 }
@@ -44,7 +44,7 @@ pub struct ResourceEventCreated<TSpec> {
 pub struct ResourceEventHeadersUpdated {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceHeadersInput")]
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeadersInput")]
     pub new_headers: ResourceHeadersInput,
 }
 

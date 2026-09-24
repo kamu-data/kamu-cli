@@ -20,6 +20,6 @@
 /// `did` is forward-reserved in ODF for when datasets and accounts become
 /// resources — no repository can resolve by it today, so the facade rejects it
 /// as unsupported rather than ignoring it.
-pub type ResourceRef = odf::metadata::resource::ResourceRef;
+pub type ResourceRef = odf::metadata::resources::ResourceRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

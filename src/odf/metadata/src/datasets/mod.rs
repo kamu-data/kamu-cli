@@ -7,12 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![cfg(feature = "engine-rpc")]
+// Re-export
+pub use enum_variants::*;
 
 // Combine this module's types with generated DTOs
-pub use crate::dtos::engine::*;
+pub use crate::dtos::datasets::*;
 
-mod grpc_client;
-pub mod grpc_generated;
+mod dataset_id;
+mod dataset_selector;
+pub mod legacy;
+mod metadata_block_types;
+mod metadata_event_type;
 
-pub use grpc_client::*;
+pub use dataset_id::*;
+pub use dataset_selector::*;
+pub use metadata_block_types::*;
+pub use metadata_event_type::*;

@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 use internal_error::{BoxedError, InternalError};
-use odf_metadata::dataset::MetadataBlockBytes;
+use odf_metadata::datasets::MetadataBlockBytes;
 use odf_metadata::*;
 use thiserror::Error;
 

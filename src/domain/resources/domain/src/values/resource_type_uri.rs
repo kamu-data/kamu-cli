@@ -15,13 +15,13 @@
 /// This is the ODF-canonical representation of what the framework calls the
 /// resource "schema". See [`crate::ResourceSchemaId`] for the parsed lens over
 /// a `TypeUri` (base/context/version/name decomposition).
-pub type TypeUri = odf::metadata::resource::TypeUri;
+pub type TypeUri = odf::metadata::resources::TypeUri;
 
 /// CRD-style short type name of a resource, e.g. `VariableSet`.
-pub type TypeName = odf::metadata::resource::TypeName;
+pub type TypeName = odf::metadata::resources::TypeName;
 
 /// A label/annotation key: either a short [`TypeName`] (e.g. `env`) or a full
 /// [`TypeUri`] schema URI.
-pub type TypeRef = odf::metadata::resource::TypeRef;
+pub type TypeRef = odf::metadata::resources::TypeRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

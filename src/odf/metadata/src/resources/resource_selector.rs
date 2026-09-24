@@ -11,7 +11,7 @@ use flatbuffers::{FlatBufferBuilder, WIPOffset};
 
 use crate::auth::AccountRef;
 use crate::formats::*;
-use crate::resource::{LabelFilter, ResourceID, TypeRef};
+use crate::resources::{LabelFilter, ResourceID, TypeRef};
 use crate::serde::flatbuffers::{
     FlatbuffersDeserializable,
     FlatbuffersSerializable,
@@ -129,7 +129,7 @@ impl std::str::FromStr for ResourceSelector {
             account: account.map(|s| crate::auth::AccountName::new_unchecked(s).into()),
             id: None,
             did: None,
-            r#type: Some(crate::resource::TypeName::new_unchecked(typ).into()),
+            r#type: Some(crate::resources::TypeName::new_unchecked(typ).into()),
             name: Some(name.to_string()),
             labels: None,
         })

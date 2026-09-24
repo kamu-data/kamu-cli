@@ -66,7 +66,7 @@ impl PollingSourceState {
             ),
         };
         odf::metadata::SourceState {
-            source_name: odf::metadata::source::SourceState::DEFAULT_SOURCE_NAME.to_string(),
+            source_name: odf::metadata::sources::SourceState::DEFAULT_SOURCE_NAME.to_string(),
             kind,
             value,
         }
@@ -79,7 +79,7 @@ impl PollingSourceState {
         match option {
             None => serializer.serialize_none(),
             Some(pss) => {
-                let ss = serdes::source::SourceState::from(pss.to_source_state());
+                let ss = serdes::sources::SourceState::from(pss.to_source_state());
                 ss.serialize(serializer)
             }
         }
@@ -88,7 +88,7 @@ impl PollingSourceState {
     pub fn deserialize<'de, D: Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Option<PollingSourceState>, D::Error> {
-        serdes::source::SourceState::deserialize(deserializer).map(|ss| {
+        serdes::sources::SourceState::deserialize(deserializer).map(|ss| {
             Some(
                 PollingSourceState::from_source_state(&ss.try_into().unwrap())
                     .unwrap()

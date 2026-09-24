@@ -14,9 +14,9 @@ use chrono::{DateTime, Utc};
 use super::IDFactory;
 use crate::Multihash;
 use crate::data::*;
-use crate::dataset::*;
+use crate::datasets::*;
 use crate::legacy::*;
-use crate::source::*;
+use crate::sources::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

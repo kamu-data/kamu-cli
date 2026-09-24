@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use crate::auth::{AccountID, AccountName};
-use crate::dataset::legacy::{DatasetAlias, DatasetHandle, DatasetName};
-use crate::dataset::{DatasetID, DatasetKind};
+use crate::datasets::legacy::{DatasetAlias, DatasetHandle, DatasetName};
+use crate::datasets::{DatasetID, DatasetKind};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -87,7 +87,7 @@ pub(crate) struct ResourceLabels(pub(crate) domain::ResourceLabels);
 
 impl serde::Serialize for ResourceLabels {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let proxy: odf::metadata::serde::yaml::resource::ResourceLabels = self.0.clone().into();
+        let proxy: odf::metadata::serde::yaml::resources::ResourceLabels = self.0.clone().into();
         proxy.serialize(serializer)
     }
 }
@@ -95,7 +95,7 @@ impl serde::Serialize for ResourceLabels {
 impl<'de> serde::Deserialize<'de> for ResourceLabels {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let proxy =
-            odf::metadata::serde::yaml::resource::ResourceLabels::deserialize(deserializer)?;
+            odf::metadata::serde::yaml::resources::ResourceLabels::deserialize(deserializer)?;
         let dto = proxy
             .try_into()
             .map_err(|e: odf::metadata::errors::ValidationError| {
@@ -112,7 +112,7 @@ pub(crate) struct ResourceAnnotations(pub(crate) domain::ResourceAnnotations);
 
 impl serde::Serialize for ResourceAnnotations {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let proxy: odf::metadata::serde::yaml::resource::ResourceAnnotations =
+        let proxy: odf::metadata::serde::yaml::resources::ResourceAnnotations =
             self.0.clone().into();
         proxy.serialize(serializer)
     }
@@ -121,7 +121,7 @@ impl serde::Serialize for ResourceAnnotations {
 impl<'de> serde::Deserialize<'de> for ResourceAnnotations {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let proxy =
-            odf::metadata::serde::yaml::resource::ResourceAnnotations::deserialize(deserializer)?;
+            odf::metadata::serde::yaml::resources::ResourceAnnotations::deserialize(deserializer)?;
         let dto = proxy
             .try_into()
             .map_err(|e: odf::metadata::errors::ValidationError| {
@@ -140,7 +140,8 @@ pub(crate) struct ResourceConditions(pub(crate) domain::ResourceConditions);
 
 impl serde::Serialize for ResourceConditions {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let proxy: odf::metadata::serde::yaml::resource::ResourceConditions = self.0.clone().into();
+        let proxy: odf::metadata::serde::yaml::resources::ResourceConditions =
+            self.0.clone().into();
         proxy.serialize(serializer)
     }
 }
@@ -148,7 +149,7 @@ impl serde::Serialize for ResourceConditions {
 impl<'de> serde::Deserialize<'de> for ResourceConditions {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let proxy =
-            odf::metadata::serde::yaml::resource::ResourceConditions::deserialize(deserializer)?;
+            odf::metadata::serde::yaml::resources::ResourceConditions::deserialize(deserializer)?;
         let dto = proxy
             .try_into()
             .map_err(|e: odf::metadata::errors::ValidationError| {

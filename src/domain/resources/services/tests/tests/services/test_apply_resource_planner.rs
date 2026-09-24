@@ -27,7 +27,7 @@ use kamu_resources::{
 };
 use kamu_resources_services::ApplyResourcePlanner;
 use kamu_resources_services::testing::BaseResourceServiceHarness;
-use odf::metadata::resource::TypeUri;
+use odf::metadata::resources::TypeUri;
 
 use crate::tests::utils::{
     TestResource,
