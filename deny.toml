@@ -102,6 +102,9 @@ ignore = [
     # Unmaintained: proc-macro-error
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
+    # Unmaintained: proc-macro-error2
+    # https://rustsec.org/advisories/RUSTSEC-2026-0173.html
+    "RUSTSEC-2026-0173",
     # Unmaintained: paste
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",
@@ -145,5 +148,5 @@ ignore = [
     # Unmaintained: sized-chunks
     # Dependency of the unmaintained `im` crate
     # https://rustsec.org/advisories/RUSTSEC-2026-0251
-    "RUSTSEC-2026-0251"
+    "RUSTSEC-2026-0251",
 ]
