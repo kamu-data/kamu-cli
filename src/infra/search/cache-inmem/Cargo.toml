@@ -30,7 +30,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
-dill = "0.15"
+dill = "0.17"
 
 
 [dev-dependencies]

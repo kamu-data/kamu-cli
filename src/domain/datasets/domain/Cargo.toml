@@ -50,13 +50,13 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 nonempty = { version = "0.12", default-features = false }
 secrecy = "0.10"
 serde = "1"
 serde_json = { version = "1", default-features = false }
-setty = { version = "1.0", default-features = false }
+setty = { version = "1", default-features = false }
 strum = { version = "0.28", default-features = false, features = ["derive"] }
 thiserror = { version = "2", default-features = false }
 tokio = { version = "1", default-features = false }
@@ -68,7 +68,7 @@ uuid = { version = "1", default-features = false, features = ["v4"] }
 sqlx = { optional = true, version = "0.8", default-features = false, features = [
     "macros",
 ] }
-mockall = { optional = true, version = "0.14", default-features = false }
+mockall = { optional = true, version = "0.15", default-features = false }
 oso = { optional = true, version = "0.27", default-features = false }
 
 [dev-dependencies]

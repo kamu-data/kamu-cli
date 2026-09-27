@@ -30,7 +30,7 @@ random-strings = { workspace = true }
 
 async-trait = "0.1"
 cfg-if = "1"
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 libc = "0.2"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
@@ -42,7 +42,7 @@ tokio = { version = "1", default-features = false, features = [
     "process",
     "parking_lot",
 ] }
-setty = { version = "1.0", default-features = false }
+setty = { version = "1", default-features = false }
 tracing = "0.1"
 url = "2"
 

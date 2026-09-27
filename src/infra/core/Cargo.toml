@@ -125,11 +125,11 @@ cheap-clone = { version = "0.3", default-features = false, features = [
 ] }
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = { version = "6", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = "0.3"
 glob = "0.3" # Used for glob fetch
 indoc = { version = "2" }
-itertools = "0.14"
+itertools = "0.15"
 rand = "0.9"
 regex = "1"
 tempfile = "3"
@@ -173,7 +173,7 @@ datafusion-ethers = { optional = true, version = "54", features = ["eip712"] }
 datafusion-functions-json = { optional = true, version = "0.54" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
-mockall = { optional = true, version = "0.14", default-features = false }
+mockall = { optional = true, version = "0.15", default-features = false }
 oop = { optional = true, version = "0.0.2" }
 
 
@@ -204,7 +204,7 @@ datafusion = { version = "54", default-features = false, features = [
 ] }
 filetime = "0.2"
 indoc = "2"
-mockall = { version = "0.14", default-features = false }
+mockall = { version = "0.15", default-features = false }
 nanoid = "0.5"
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",

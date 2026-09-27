@@ -35,7 +35,7 @@ aws-sdk-secretsmanager = { version = "1", default-features = false, features = [
     "rt-tokio",
 ] }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 hex = "0.4"
 internal-error = { workspace = true }
@@ -62,6 +62,6 @@ features = [
 
 
 [dev-dependencies]
-mockall = { version = "0.14", default-features = false }
+mockall = { version = "0.15", default-features = false }
 pretty_assertions = { version = "1" }
 tokio = { version = "1", default-features = true, features = ["macros"] }

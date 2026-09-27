@@ -56,12 +56,12 @@ axum-extra = { version = "0.12", features = [
     "typed-header",
 ] }
 async-trait = "0.1"
-base64 = { version = "0.22", default-features = false }
+base64 = { version = "0.23", default-features = false }
 bytes = "1"
 canonical_json = { version = "0.7", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
 datafusion = { version = "54", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 flate2 = "1" # GZip decoder
 futures = "0.3"
 graphql-parser = "0.4"
@@ -93,7 +93,7 @@ tokio-util = { version = "0.7", default-features = false, features = [
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.29", features = ["url"] }
+tokio-tungstenite = { version = "0.30", features = ["url"] }
 tower = "0.5"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
@@ -126,4 +126,4 @@ test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tower-http = { version = "0.6", features = ["trace", "cors"] }
 rand = "0.9"
-mockall = "0.14"
+mockall = "0.15"

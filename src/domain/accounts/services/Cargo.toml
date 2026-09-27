@@ -46,22 +46,20 @@ time-source = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = "0.3"
-jsonwebtoken = { version = "10", default-features = false, features = [
-    "rust_crypto",
-] }
+jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto"] }
 secrecy = "0.10"
 serde = "1"
 serde_json = "1"
-setty = { version = "1.0", default-features = false }
+setty = { version = "1", default-features = false }
 thiserror = "2"
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 uuid = { version = "1", default-features = false }
 
 # Optional
-mockall = { optional = true, version = "0.14", default-features = false }
+mockall = { optional = true, version = "0.15", default-features = false }
 
 
 [dev-dependencies]
@@ -81,14 +79,12 @@ kamu-search-elasticsearch = { workspace = true, default-features = false, featur
 kamu-search-services = { workspace = true }
 
 bon = { version = "3", default-features = false }
-mockall = { version = "0.14", default-features = false }
+mockall = { version = "0.15", default-features = false }
 oop = "0.0.2"
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",
 ] }
 regex = { version = "1", default-features = false }
-test-log = { version = "0.2", features = [
-    "trace",
-] }
+test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }

@@ -30,7 +30,7 @@ internal-error = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = "0.3"
 uuid = { version = "1", default-features = false, features = ["v4"] }
 

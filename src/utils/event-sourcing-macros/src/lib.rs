@@ -9,8 +9,6 @@
 
 extern crate proc_macro;
 
-use syn::punctuated::Pair;
-
 fn panic_generic() -> ! {
     panic!(
         "Aggregate derive macro is only supported on structs that follow \
@@ -30,7 +28,7 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
     let syn::Fields::Unnamed(mut aggregate) = data_struct.fields else {
         panic_generic()
     };
-    let Some(aggregate) = aggregate.unnamed.pop().map(Pair::into_value) else {
+    let Some(aggregate) = aggregate.unnamed.pop() else {
         panic_generic()
     };
 
@@ -38,11 +36,8 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
         panic_generic()
     };
 
-    let Some(syn::PathArguments::AngleBracketed(mut generic_args)) = aggregate_type
-        .path
-        .segments
-        .pop()
-        .map(|s| s.into_value().arguments)
+    let Some(syn::PathArguments::AngleBracketed(mut generic_args)) =
+        aggregate_type.path.segments.pop().map(|s| s.arguments)
     else {
         panic_generic()
     };
@@ -51,13 +46,10 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
         panic_generic()
     }
 
-    let Some(syn::GenericArgument::Type(store_type)) =
-        generic_args.args.pop().map(Pair::into_value)
-    else {
+    let Some(syn::GenericArgument::Type(store_type)) = generic_args.args.pop() else {
         panic_generic()
     };
-    let Some(syn::GenericArgument::Type(proj_type)) = generic_args.args.pop().map(Pair::into_value)
-    else {
+    let Some(syn::GenericArgument::Type(proj_type)) = generic_args.args.pop() else {
         panic_generic()
     };
 

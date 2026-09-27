@@ -57,7 +57,7 @@ datafusion = { version = "54", features = [
     "compression",
 ] }
 datafusion-common = { version = "54", default-features = false }
-dirs = "6"
+dirs = "7"
 futures = "0.3"
 log = "0.4"
 object_store = { version = "0.13", features = ["aws", "gcp", "http"] }

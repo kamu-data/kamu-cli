@@ -48,9 +48,9 @@ kamu-datasets-inmem = { workspace = true, optional = true }
 kamu-resources-inmem = { workspace = true, optional = true }
 
 async-trait = { version = "0.1", default-features = false }
-base64 = { version = "0.22", default-features = false, features = ["std"] }
+base64 = { version = "0.23", default-features = false, features = ["std"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 paste = { version = "1", default-features = false }
 secrecy = { version = "0.10", default-features = false }
 serde = { version = "1.0", features = ["derive"] }

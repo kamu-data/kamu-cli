@@ -28,7 +28,7 @@ doctest = false
 
 
 [dependencies]
-base64 = { version = "0.22", default-features = false, features = ["std"] }
+base64 = { version = "0.23", default-features = false, features = ["std"] }
 bs58 = { version = "0.5", default-features = false, features = [] }
 digest = { version = "0.10", default-features = false, features = [] }
 ed25519-dalek = { version = "2", default-features = false, features = [

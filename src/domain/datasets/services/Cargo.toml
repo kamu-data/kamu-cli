@@ -41,7 +41,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-search = { workspace = true }
 messaging-outbox = { workspace = true }
-mockall = { optional = true, version = "0.14" }
+mockall = { optional = true, version = "0.15" }
 odf = { workspace = true, features = ["dataset", "http", "lfs", "s3"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
@@ -54,10 +54,10 @@ cheap-clone = { version = "0.3", default-features = false, features = [
 ] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "54", default-features = false, features = ["nested_expressions"] }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
-itertools = { version = "0.14", default-features = false }
-nutype = { version = "0.7", default-features = false }
+itertools = { version = "0.15", default-features = false }
+nutype = { version = "0.8", default-features = false }
 petgraph = { version = "0.8", default-features = false, features = [
     "stable_graph",
 ] }
@@ -97,7 +97,7 @@ test-utils = { workspace = true }
 arrow = { version = "58", default-features = false }
 bon = { version = "3", default-features = false }
 indoc = "2"
-mockall = "0.14"
+mockall = "0.15"
 oop = "0.0.2"
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [

@@ -166,7 +166,7 @@ rumqttc = { optional = true, version = "0.25", default-features = false, feature
 sqlx = { version = "0.8", default-features = false, features = [
     "tls-rustls-aws-lc-rs",
 ] }
-tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
 
 # CLI
 chrono-humanize = "0.2"                                           # Human readable durations
@@ -203,7 +203,7 @@ mime = "0.3"
 mime_guess = "2"
 
 # Config
-setty = { version = "1.0", features = [
+setty = { version = "1", features = [
     "derive-clone",
     "derive-debug",
     "derive-partial-eq",
@@ -252,20 +252,20 @@ datafusion = { version = "54", default-features = false, features = [
     "unicode_expressions",
     "compression",
 ] }
-dill = { version = "0.15", default-features = false }
-dirs = "6"
+dill = { version = "0.17", default-features = false, features = ["nightly"] }
+dirs = "7"
 fs_extra = "1.3"
 futures = "0.3"
 generic-array = "=0.14.7" # Pinned due to deprecation warnings
 glob = "0.3" # Used for path completions
 hex = { version = "0.4", default-features = false, features = [] }
 indoc = "2"
-itertools = "0.14"
+itertools = "0.15"
 libc = "0.2" # Signal names
 pipecheck = "0.2" # Unix-style broken pipe handling for stdout
 regex = "1"
 secrecy = "0.10"
-shlex = "1" # Parsing partial input for custom completions
+shlex = "2" # Parsing partial input for custom completions
 tempfile = "3"
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [

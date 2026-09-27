@@ -38,13 +38,13 @@ kamu-datasets = { workspace = true }
 odf = { workspace = true, features = ["datafusion"] }
 
 async-trait = { version = "0.1", default-features = false }
-base64 = { version = "0.22", default-features = false }
+base64 = { version = "0.23", default-features = false }
 bytes = "1"
 cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 pathdiff = { version = "0.2", default-features = false }
 strum = { version = "0.28", features = [
@@ -73,9 +73,9 @@ serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 
 # Optional
-mockall = { optional = true, version = "0.14", default-features = false }
+mockall = { optional = true, version = "0.15", default-features = false }
 utoipa = { optional = true, version = "5", default-features = false }
 
 
 [dev-dependencies]
-mockall = { version = "0.14", default-features = false }
+mockall = { version = "0.15", default-features = false }
