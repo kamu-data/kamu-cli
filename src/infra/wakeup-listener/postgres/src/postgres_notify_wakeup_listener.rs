@@ -16,6 +16,11 @@ use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Guards against a tight reconnect loop when the debounce interval is zero
+const MIN_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Waits for Postgres `NOTIFY` signals on the given channel via `LISTEN`.
 /// The channel is expected to be notified by triggers on the watched tables.
 pub struct PostgresNotifyWakeupListener {
@@ -35,17 +40,21 @@ impl PostgresNotifyWakeupListener {
 
     async fn try_create_listener(&self) -> Option<PgListener> {
         match PgListener::connect_with(&self.pool).await {
-            Ok(mut l) => match l.listen(self.channel_name).await {
-                Ok(_) => Some(l),
-                Err(e) => {
-                    tracing::error!(
-                        error = ?e,
-                        error_msg = %e,
-                        "Failed to listen on channel '{}'", self.channel_name,
-                    );
-                    None
+            Ok(mut l) => {
+                // Reconnects must go through `wait_wake()`, which reports a possible change
+                l.eager_reconnect(false);
+                match l.listen(self.channel_name).await {
+                    Ok(_) => Some(l),
+                    Err(e) => {
+                        tracing::error!(
+                            error = ?e,
+                            error_msg = %e,
+                            "Failed to listen on channel '{}'", self.channel_name,
+                        );
+                        None
+                    }
                 }
-            },
+            }
             Err(e) => {
                 tracing::error!(
                     error = ?e,
@@ -57,13 +66,30 @@ impl PostgresNotifyWakeupListener {
         }
     }
 
-    fn calculate_retry_delay(
-        &self,
+    fn calculate_retry_delay(deadline: tokio::time::Instant, retry_interval: Duration) -> Duration {
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        std::cmp::min(retry_interval, remaining)
+    }
+
+    /// Returns `false` if the connection was lost while draining
+    async fn drain_notifications(
+        listener: &mut PgListener,
         deadline: tokio::time::Instant,
         min_debounce_interval: Duration,
-    ) -> Duration {
-        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        std::cmp::min(min_debounce_interval, remaining)
+    ) -> bool {
+        let remaining_after_debounce = deadline
+            .saturating_duration_since(tokio::time::Instant::now())
+            .saturating_sub(min_debounce_interval);
+        if min_debounce_interval.is_zero() || remaining_after_debounce.is_zero() {
+            return true;
+        }
+
+        tokio::time::timeout(min_debounce_interval, async {
+            while let Ok(Some(_notification)) = listener.try_recv().await {}
+            false
+        })
+        .await
+        .unwrap_or(true)
     }
 }
 
@@ -77,11 +103,10 @@ impl WakeupListener for PostgresNotifyWakeupListener {
         min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
+        let retry_interval = min_debounce_interval.max(MIN_RETRY_INTERVAL);
 
         loop {
-            // Try to get or create a listener
             let Some(mut listener) = self.listener.lock().await.take() else {
-                // No listener available, try to create one
                 match self.try_create_listener().await {
                     // Notifications sent before LISTEN was active are lost,
                     // so let the caller re-check the storage
@@ -90,71 +115,40 @@ impl WakeupListener for PostgresNotifyWakeupListener {
                         return Ok(WakeHint::Signaled);
                     }
                     None => {
-                        // Failed to create listener, wait for min_debounce_interval and then
-                        // sleep for remaining timeout if any
-                        let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
+                        let delay = Self::calculate_retry_delay(deadline, retry_interval);
                         if !delay.is_zero() {
                             tokio::time::sleep(delay).await;
                         }
-
-                        // Check if we still have time left after the delay
-                        let remaining_after_delay =
-                            deadline.saturating_duration_since(tokio::time::Instant::now());
-                        if remaining_after_delay.is_zero() {
+                        if deadline <= tokio::time::Instant::now() {
                             return Ok(WakeHint::Timeout);
                         }
-
-                        // Continue to next iteration to try again
                         continue;
                     }
                 }
             };
 
-            // Calculate remaining timeout for this iteration
             let remaining_timeout = deadline.saturating_duration_since(tokio::time::Instant::now());
             if remaining_timeout.is_zero() {
-                // Timeout exceeded, put listener back and return
                 *self.listener.lock().await = Some(listener);
                 return Ok(WakeHint::Timeout);
             }
 
-            // Wait for notification with remaining timeout
-            // Not `recv()`: it reconnects silently, hiding notifications lost meanwhile
             match tokio::time::timeout(remaining_timeout, listener.try_recv()).await {
                 // Got a NOTIFY - new data might be available
                 Ok(Ok(Some(_notification))) => {
-                    // Optionally debounce by waiting a bit to collect more notifications
-                    if !min_debounce_interval.is_zero() {
-                        let remaining_after_debounce = deadline
-                            .saturating_duration_since(tokio::time::Instant::now())
-                            .saturating_sub(min_debounce_interval);
-
-                        if !remaining_after_debounce.is_zero() {
-                            // Drain additional notifications during debounce period
-                            let _ = tokio::time::timeout(min_debounce_interval, async {
-                                while (listener.recv().await).is_ok() {
-                                    // Just drain, we don't need the payload
-                                    // anymore
-                                }
-                            })
-                            .await;
-                        }
+                    if Self::drain_notifications(&mut listener, deadline, min_debounce_interval)
+                        .await
+                    {
+                        *self.listener.lock().await = Some(listener);
                     }
-
-                    // Stash the listener back
-                    *self.listener.lock().await = Some(listener);
-
                     return Ok(WakeHint::Signaled);
                 }
 
-                // Connection was lost and re-established, notifications may have been lost
+                // Connection lost: drop the listener, re-subscribing will report a possible change
                 Ok(Ok(None)) => {
-                    tracing::warn!("PgListener connection was lost, reporting a possible change");
-                    *self.listener.lock().await = Some(listener);
-                    return Ok(WakeHint::Signaled);
+                    tracing::warn!("PgListener connection was lost, re-subscribing");
                 }
 
-                // Socket/conn error — drop listener and try to reconnect after delay
                 Ok(Err(conn_err)) => {
                     tracing::error!(
                         error = ?conn_err,
@@ -162,15 +156,12 @@ impl WakeupListener for PostgresNotifyWakeupListener {
                         "PgListener connection error, will attempt to reconnect after delay",
                     );
 
-                    // Wait for min_debounce_interval before retrying, if we have remaining time
-                    let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
+                    let delay = Self::calculate_retry_delay(deadline, retry_interval);
                     if !delay.is_zero() {
                         tokio::time::sleep(delay).await;
                     }
-                    // Loop will try to reconnect
                 }
 
-                // Timed out waiting — stash listener back and return
                 Err(_elapsed) => {
                     *self.listener.lock().await = Some(listener);
                     return Ok(WakeHint::Timeout);

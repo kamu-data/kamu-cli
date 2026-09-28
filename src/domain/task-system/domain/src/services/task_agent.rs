@@ -34,20 +34,4 @@ pub struct TaskAgentConfig {
     pub max_listening_timeout: Duration,
 }
 
-impl TaskAgentConfig {
-    pub fn local_default() -> Self {
-        Self {
-            min_debounce_interval: Duration::from_millis(100),
-            max_listening_timeout: Duration::from_secs(2),
-        }
-    }
-
-    pub fn production_default() -> Self {
-        Self {
-            min_debounce_interval: Duration::from_millis(100),
-            max_listening_timeout: Duration::from_mins(1),
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

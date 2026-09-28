@@ -9742,6 +9742,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tracing",
  "wakeup-listener",
 ]
 

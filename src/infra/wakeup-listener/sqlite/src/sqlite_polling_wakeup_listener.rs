@@ -15,6 +15,11 @@ use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Guards against busy polling when the debounce interval is zero
+const MIN_POLL_INTERVAL: Duration = Duration::from_millis(10);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Sqlite has no notifications, so this polls a cheap `SELECT MAX(id) FROM ...`
 /// query with exponential backoff.
 pub struct SqlitePollingWakeupListener {
@@ -64,7 +69,7 @@ impl WakeupListener for SqlitePollingWakeupListener {
         min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
-        let mut poll_interval = min_debounce_interval;
+        let mut poll_interval = min_debounce_interval.max(MIN_POLL_INTERVAL);
 
         loop {
             if let Some(_max_id) = self.check_for_new_ids().await? {

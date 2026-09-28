@@ -25,10 +25,17 @@ pub struct SqliteTaskQueueWakeupSource {
 impl SqliteTaskQueueWakeupSource {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self {
-            // Wakes up on any task event, not only queueing: a spurious re-check is cheap
             wakeup_listener: SqlitePollingWakeupListener::new(
                 pool,
-                "SELECT MAX(event_id) FROM task_events",
+                // Descending scan by primary key finds the latest match within a few rows
+                r#"
+                SELECT (
+                    SELECT event_id FROM task_events
+                        WHERE event_type IN ('TaskEventCreated', 'TaskEventRequeued')
+                        ORDER BY event_id DESC
+                        LIMIT 1
+                )
+                "#,
             ),
         }
     }

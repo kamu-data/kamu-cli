@@ -17,7 +17,7 @@ Recommendation: for ease of reading, use the following format:
 ### Changed
 - Task agent no longer polls the task queue when idle:
   - Postgres: tasks table notifies the agent via NOTIFY/LISTEN when a task is created or requeued
-  - SQLite: incremental listening timeout approach, In-memory: broadcast signals
+  - SQLite: incremental listening timeout approach, In-memory: explicit signals
   - **Breaking config change:** `flowSystem.taskAgent.checkingIntervalSecs` was replaced with
     `minDebounceInterval` (default `100ms`) and `maxListeningTimeout` (default `2s`)
 - Extracted the wakeup detector abstraction from the messaging outbox into a standalone `wakeup-listener`

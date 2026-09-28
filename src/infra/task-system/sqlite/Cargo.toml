@@ -50,3 +50,4 @@ kamu-task-system-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
+tracing = { version = "0.1" }

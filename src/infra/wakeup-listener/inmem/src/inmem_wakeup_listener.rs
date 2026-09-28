@@ -28,8 +28,7 @@ impl InMemoryWakeupListener {
     }
 
     pub fn signal(&self) {
-        self.notify.notify_waiters();
-        // Also store a permit, so a signal raised while nobody waits is not lost
+        // Stores a permit if nobody waits, so the signal is not lost
         self.notify.notify_one();
     }
 }

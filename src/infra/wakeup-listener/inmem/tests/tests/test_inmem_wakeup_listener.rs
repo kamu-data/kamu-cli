@@ -65,20 +65,6 @@ async fn test_signals_before_waiting_coalesce() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test(start_paused = true))]
-async fn test_signal_wakes_up_all_waiters() {
-    let harness = InMemoryWakeupHarness::new();
-
-    let (hint_1, hint_2) = harness
-        .wait_wake_twice_while_signaling_after(Duration::from_millis(100))
-        .await;
-
-    assert_matches!(hint_1, WakeHint::Signaled);
-    assert_matches!(hint_2, WakeHint::Signaled);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 struct InMemoryWakeupHarness {
@@ -112,15 +98,6 @@ impl InMemoryWakeupHarness {
         let started_at = tokio::time::Instant::now();
         let (hint, ()) = tokio::join!(self.wait_wake(TIMEOUT), self.signal_after(delay));
         (hint, started_at.elapsed())
-    }
-
-    async fn wait_wake_twice_while_signaling_after(&self, delay: Duration) -> (WakeHint, WakeHint) {
-        let (hint_1, hint_2, ()) = tokio::join!(
-            self.wait_wake(TIMEOUT),
-            self.wait_wake(TIMEOUT),
-            self.signal_after(delay)
-        );
-        (hint_1, hint_2)
     }
 }
 
