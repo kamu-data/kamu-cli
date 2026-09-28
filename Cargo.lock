@@ -9752,7 +9752,6 @@ version = "0.267.0"
 dependencies = [
  "async-trait",
  "internal-error",
- "test-group",
  "test-log",
  "tokio",
  "wakeup-listener",
