@@ -699,7 +699,7 @@ pub struct UploadsConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct OutboxAgentConfig {
-    #[config(default_str = "100ms")]
+    #[config(default_str = "20ms")]
     pub min_debounce_interval: DurationString,
 
     #[config(default_str = "2s")]
@@ -804,7 +804,7 @@ impl From<RetryPolicyConfigBackoffType> for kamu_flow_system::RetryBackoffType {
 // and loopback offset (of batch size * 3)
 #[derive(setty::Config, setty::Default)]
 pub struct FlowSystemEventAgentConfig {
-    #[config(default_str = "100ms")]
+    #[config(default_str = "20ms")]
     pub min_debounce_interval: DurationString,
 
     #[config(default_str = "2s")]
@@ -826,7 +826,7 @@ impl FlowSystemEventAgentConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct TaskAgentConfig {
-    #[config(default_str = "100ms")]
+    #[config(default_str = "20ms")]
     pub min_debounce_interval: DurationString,
 
     #[config(default_str = "2s")]

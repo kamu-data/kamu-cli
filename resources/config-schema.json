@@ -785,14 +785,14 @@
           "default": {
             "batchSize": 20,
             "maxListeningTimeout": "2s",
-            "minDebounceInterval": "100ms"
+            "minDebounceInterval": "20ms"
           }
         },
         "taskAgent": {
           "$ref": "#/$defs/TaskAgentConfig",
           "default": {
             "maxListeningTimeout": "2s",
-            "minDebounceInterval": "100ms"
+            "minDebounceInterval": "20ms"
           }
         }
       },
@@ -813,7 +813,7 @@
         },
         "minDebounceInterval": {
           "$ref": "#/$defs/DurationString",
-          "default": "100ms"
+          "default": "20ms"
         }
       },
       "type": "object"
@@ -957,7 +957,7 @@
         },
         "minDebounceInterval": {
           "$ref": "#/$defs/DurationString",
-          "default": "100ms"
+          "default": "20ms"
         }
       },
       "type": "object"
@@ -1265,7 +1265,7 @@
         },
         "minDebounceInterval": {
           "$ref": "#/$defs/DurationString",
-          "default": "100ms"
+          "default": "20ms"
         }
       },
       "type": "object"
@@ -1393,11 +1393,11 @@
         "flowSystemEventAgent": {
           "batchSize": 20,
           "maxListeningTimeout": "2s",
-          "minDebounceInterval": "100ms"
+          "minDebounceInterval": "20ms"
         },
         "taskAgent": {
           "maxListeningTimeout": "2s",
-          "minDebounceInterval": "100ms"
+          "minDebounceInterval": "20ms"
         }
       },
       "description": "Configuration for flow system"
@@ -1422,7 +1422,7 @@
       "default": {
         "batchSize": 20,
         "maxListeningTimeout": "2s",
-        "minDebounceInterval": "100ms"
+        "minDebounceInterval": "20ms"
       },
       "description": "Messaging outbox agent configuration"
     },

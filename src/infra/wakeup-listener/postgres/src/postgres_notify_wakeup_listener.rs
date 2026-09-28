@@ -16,8 +16,9 @@ use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Guards against a tight reconnect loop when the debounce interval is zero
-const MIN_RETRY_INTERVAL: Duration = Duration::from_millis(10);
+// Independent of the debounce interval, so a short one doesn't flood a database
+// that is down
+const RECONNECT_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,9 +67,9 @@ impl PostgresNotifyWakeupListener {
         }
     }
 
-    fn calculate_retry_delay(deadline: tokio::time::Instant, retry_interval: Duration) -> Duration {
+    fn calculate_retry_delay(deadline: tokio::time::Instant) -> Duration {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        std::cmp::min(retry_interval, remaining)
+        std::cmp::min(RECONNECT_RETRY_INTERVAL, remaining)
     }
 
     /// Returns `false` if the connection was lost while draining
@@ -103,7 +104,6 @@ impl WakeupListener for PostgresNotifyWakeupListener {
         min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
-        let retry_interval = min_debounce_interval.max(MIN_RETRY_INTERVAL);
 
         loop {
             let Some(mut listener) = self.listener.lock().await.take() else {
@@ -115,7 +115,7 @@ impl WakeupListener for PostgresNotifyWakeupListener {
                         return Ok(WakeHint::Signaled);
                     }
                     None => {
-                        let delay = Self::calculate_retry_delay(deadline, retry_interval);
+                        let delay = Self::calculate_retry_delay(deadline);
                         if !delay.is_zero() {
                             tokio::time::sleep(delay).await;
                         }
@@ -156,7 +156,7 @@ impl WakeupListener for PostgresNotifyWakeupListener {
                         "PgListener connection error, will attempt to reconnect after delay",
                     );
 
-                    let delay = Self::calculate_retry_delay(deadline, retry_interval);
+                    let delay = Self::calculate_retry_delay(deadline);
                     if !delay.is_zero() {
                         tokio::time::sleep(delay).await;
                     }

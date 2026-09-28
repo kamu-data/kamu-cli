@@ -20,7 +20,7 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventProjector,
 };
-use wakeup_listener::WakeHint;
+use tracing::Instrument as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,9 +37,9 @@ pub struct FlowSystemEventAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowSystemEventAgentImpl {
-    /// Runs catch-up phase for all projectors
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn run_catch_up_phase(&self) {
+    /// Applies all pending events to every projector
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn apply_pending_events(&self) {
         let catalog = self.catalog.upgrade();
 
         // For each projector, apply all existing unprocessed events
@@ -87,44 +87,6 @@ impl FlowSystemEventAgentImpl {
                         );
                         break;
                     }
-                }
-            }
-        }
-    }
-
-    /// Run a single iteration of the agent main loop.
-    /// Returns number of still active projectors
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_single_iteration(&self, hint: WakeHint) {
-        tracing::debug!(hint = ?hint, "Agent woke up with a hint");
-
-        let catalog = self.catalog.upgrade();
-
-        // For each projector, apply a batch of new events, just 1 batch per iteration.
-        // Each projector will run in a separate transaction.
-        let projector_builders = catalog
-            .builders_for::<dyn FlowSystemEventProjector>()
-            .collect::<Vec<_>>();
-
-        for builder in projector_builders {
-            match self.apply_batch_to_projector(&builder).await {
-                // Success
-                Ok(num_processed) => {
-                    tracing::debug!(
-                        instance_type = builder.instance_type().name,
-                        num_processed,
-                        "Projector batch processed",
-                    );
-                }
-
-                // Problem: log issue and continue with other projectors
-                Err(e) => {
-                    tracing::error!(
-                        error = ?e,
-                        error_msg = %e,
-                        instance_type = builder.instance_type().name,
-                        "Projector batch processing failed",
-                    );
                 }
             }
         }
@@ -181,7 +143,11 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
         // On startup, immediately sync all projectors to catch up with existing events
-        self.run_catch_up_phase().await;
+        self.apply_pending_events()
+            .instrument(tracing::info_span!(
+                "FlowSystemEventAgent::initial_catchup_phase"
+            ))
+            .await;
 
         // Access wakeup listener
         let wakeup_listener = self.flow_system_event_bridge.wakeup_listener();
@@ -195,9 +161,9 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
                     self.agent_config.min_debounce_interval,
                 )
                 .await?;
+            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-            // Process a single iteration using the hint
-            self.run_single_iteration(hint).await;
+            self.apply_pending_events().await;
         }
     }
 }
@@ -207,7 +173,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 #[async_trait::async_trait]
 impl FlowSystemEventAgent for FlowSystemEventAgentImpl {
     async fn catchup_remaining_events(&self) -> Result<(), InternalError> {
-        self.run_catch_up_phase().await;
+        self.apply_pending_events().await;
         Ok(())
     }
 }

@@ -8981,7 +8981,6 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
- "wakeup-listener",
 ]
 
 [[package]]

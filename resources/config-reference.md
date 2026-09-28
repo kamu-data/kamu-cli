@@ -81,11 +81,11 @@
   &quot;flowSystemEventAgent&quot;: {
     &quot;batchSize&quot;: 20,
     &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-    &quot;minDebounceInterval&quot;: &quot;100ms&quot;
+    &quot;minDebounceInterval&quot;: &quot;20ms&quot;
   },
   &quot;taskAgent&quot;: {
     &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-    &quot;minDebounceInterval&quot;: &quot;100ms&quot;
+    &quot;minDebounceInterval&quot;: &quot;20ms&quot;
   }
 }</code></pre></td>
 <td>Configuration for flow system</td>
@@ -113,7 +113,7 @@
 <td><pre><code class="language-json">{
   &quot;batchSize&quot;: 20,
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-  &quot;minDebounceInterval&quot;: &quot;100ms&quot;
+  &quot;minDebounceInterval&quot;: &quot;20ms&quot;
 }</code></pre></td>
 <td>Messaging outbox agent configuration</td>
 </tr>
@@ -1187,7 +1187,7 @@ the resources (for authenticated clients)
 <td><pre><code class="language-json">{
   &quot;batchSize&quot;: 20,
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-  &quot;minDebounceInterval&quot;: &quot;100ms&quot;
+  &quot;minDebounceInterval&quot;: &quot;20ms&quot;
 }</code></pre></td>
 <td></td>
 </tr>
@@ -1196,7 +1196,7 @@ the resources (for authenticated clients)
 <td><a href="#taskagentconfig"><code>TaskAgentConfig</code></a></td>
 <td><pre><code class="language-json">{
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-  &quot;minDebounceInterval&quot;: &quot;100ms&quot;
+  &quot;minDebounceInterval&quot;: &quot;20ms&quot;
 }</code></pre></td>
 <td></td>
 </tr>
@@ -1223,7 +1223,7 @@ the resources (for authenticated clients)
 <tr>
 <td><code>minDebounceInterval</code></td>
 <td><a href="#durationstring"><code>DurationString</code></a></td>
-<td><code class="language-json">&quot;100ms&quot;</code></td>
+<td><code class="language-json">&quot;20ms&quot;</code></td>
 <td></td>
 </tr>
 </tbody>
@@ -1441,7 +1441,7 @@ it usually runs uses host network namespace.
 <tr>
 <td><code>minDebounceInterval</code></td>
 <td><a href="#durationstring"><code>DurationString</code></a></td>
-<td><code class="language-json">&quot;100ms&quot;</code></td>
+<td><code class="language-json">&quot;20ms&quot;</code></td>
 <td></td>
 </tr>
 </tbody>
@@ -1834,7 +1834,7 @@ iteration. This ensures that one data slice doesn't become too big.
 <tr>
 <td><code>minDebounceInterval</code></td>
 <td><a href="#durationstring"><code>DurationString</code></a></td>
-<td><code class="language-json">&quot;100ms&quot;</code></td>
+<td><code class="language-json">&quot;20ms&quot;</code></td>
 <td></td>
 </tr>
 </tbody>
