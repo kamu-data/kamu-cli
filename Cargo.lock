@@ -7712,6 +7712,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -8276,6 +8277,7 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "vergen-gitcl",
+ "wakeup-listener",
  "webbrowser",
  "whoami",
  "winnow 1.0.4",
@@ -8982,6 +8984,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9720,6 +9723,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]

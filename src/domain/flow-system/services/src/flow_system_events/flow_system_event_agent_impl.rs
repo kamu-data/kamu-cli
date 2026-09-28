@@ -21,6 +21,7 @@ use kamu_flow_system::{
     FlowSystemEventProjector,
 };
 use tracing::Instrument as _;
+use wakeup_listener::WakeupListenerConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +33,7 @@ pub struct FlowSystemEventAgentImpl {
     catalog: dill::CatalogWeakRef,
     flow_system_event_bridge: Arc<dyn FlowSystemEventBridge>,
     agent_config: Arc<FlowSystemEventAgentConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,8 +159,8 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
             // Wait for push or timeout - let the store handle the backoff strategy
             let hint = wakeup_listener
                 .wait_wake(
-                    self.agent_config.max_listening_timeout,
-                    self.agent_config.min_debounce_interval,
+                    self.wakeup_config.max_listening_timeout,
+                    self.wakeup_config.min_debounce_interval,
                 )
                 .await?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");

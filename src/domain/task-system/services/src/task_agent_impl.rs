@@ -18,6 +18,7 @@ use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
+use wakeup_listener::WakeupListenerConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +35,7 @@ use tracing::Instrument as _;
 pub struct TaskAgentImpl {
     catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
-    agent_config: Arc<TaskAgentConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
     task_queue_wakeup_source: Arc<dyn TaskQueueWakeupSource>,
 }
 
@@ -153,8 +154,8 @@ impl TaskAgentImpl {
             // Signals are only hints, so the queue is re-checked on any wakeup
             let hint = wakeup_listener
                 .wait_wake(
-                    self.agent_config.max_listening_timeout,
-                    self.agent_config.min_debounce_interval,
+                    self.wakeup_config.max_listening_timeout,
+                    self.wakeup_config.min_debounce_interval,
                 )
                 .await?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");

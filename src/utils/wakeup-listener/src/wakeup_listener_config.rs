@@ -7,16 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_utils::BackgroundAgent;
-
-use crate::*;
+use std::time::Duration;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait TaskAgent: BackgroundAgent {
-    /// Runs single task only, blocks until it is available (for tests only!)
-    async fn run_single_task(&self) -> Result<(), InternalError>;
+/// Timing shared by all agents waiting on a [`crate::WakeupListener`]
+#[derive(Debug, Clone)]
+pub struct WakeupListenerConfig {
+    /// How long to absorb a burst of signals after the first one
+    pub min_debounce_interval: Duration,
+
+    /// Fallback re-check period, in case a signal is missed
+    pub max_listening_timeout: Duration,
+}
+
+impl WakeupListenerConfig {
+    pub fn local_default() -> Self {
+        Self {
+            min_debounce_interval: Duration::from_millis(20),
+            max_listening_timeout: Duration::from_secs(2),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

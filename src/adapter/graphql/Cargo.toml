@@ -122,6 +122,7 @@ kamu-webhooks-services = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = ["testing"] }
 time-source = { workspace = true }
+wakeup-listener = { workspace = true }
 
 bon = { version = "3", default-features = false }
 oop = "0.0.2"

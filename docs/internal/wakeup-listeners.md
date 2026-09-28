@@ -192,17 +192,25 @@ immediately (invariant 2). Multiple signals before a wait coalesce into one wake
 
 ## 7. Configuration
 
-| Agent | Config section | `minDebounceInterval` | `maxListeningTimeout` |
-| --- | --- | --- | --- |
-| Outbox | `outbox` | `20ms` | `2s` |
-| Flow system events | `flowSystem.flowSystemEventAgent` | `20ms` | `2s` |
-| Task agent | `flowSystem.taskAgent` | `20ms` | `2s` |
+All wakeup-driven agents share one CLI config section, mapped to a single `WakeupListenerConfig`
+value in the catalog plus per-agent batch sizes:
+
+```yaml
+backgroundAgents:
+  minDebounceInterval: 20ms
+  maxListeningTimeout: 2s
+  batching:
+    outboxMessages: 20      # OutboxAgentConfig::batch_size
+    flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
+```
 
 - `minDebounceInterval` — how long to absorb a burst after the first signal (Postgres), or the
   initial poll interval (SQLite). Every agent in a flow run chain adds it to end-to-end latency,
   so keep it small.
 - `maxListeningTimeout` — fallback re-check period. Deployments on Postgres typically raise it
   (e.g. `60s`): notifications carry latency, the timeout only bounds the damage of a missed one.
+- `batching` — records processed per transaction. The task agent has no entry: it claims and runs
+  one task at a time (its analogue would be concurrency, not batching).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_wakeup_listener.rs`).
 
@@ -224,8 +232,9 @@ immediately (invariant 2). Multiple signals before a wait coalesce into one wake
    - In-memory: `InMemoryWakeupListener`, call `signal()` from the store's write path.
 4. **DI**: register the implementations in `src/app/cli/src/database.rs`. `PostgresNotificationHub`
    is already registered once in the Postgres block; test catalogs using Postgres bridges must add it.
-5. **Agent loop**: drain everything pending, then `wait_wake(max_listening_timeout, min_debounce_interval)`
-   (§2). Add a config section with both settings.
+5. **Agent loop**: inject `Arc<WakeupListenerConfig>`, drain everything pending, then
+   `wait_wake(max_listening_timeout, min_debounce_interval)` (§2). If the agent processes records in
+   batches, add an entry under `backgroundAgents.batching`.
 6. **Tests**: a storage test that committed changes of interest wake the listener and irrelevant ones
    don't (see `test_wakes_up_only_when_task_is_queued` for Postgres and SQLite).
 7. Update the inventory in §3.

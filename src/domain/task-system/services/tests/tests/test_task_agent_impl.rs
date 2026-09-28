@@ -28,6 +28,7 @@ use mockall::predicate::{eq, function};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -245,7 +246,7 @@ impl TaskAgentHarness {
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_value(TaskAgentConfig {
+            .add_value(WakeupListenerConfig {
                 min_debounce_interval: Duration::from_millis(10),
                 // Long enough to make sure tests never rely on listening timeouts
                 max_listening_timeout: LISTENING_TIMEOUT,

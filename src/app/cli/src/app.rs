@@ -936,8 +936,10 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(config.auth.clone());
     //
 
-    // Outbox configuration
-    catalog_builder.add_value(config.outbox.into_system());
+    // Background agents configuration
+    catalog_builder.add_value(config.background_agents.wakeup_listener_config());
+    catalog_builder.add_value(config.background_agents.outbox_agent_config());
+    catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());
     //
 
     // Password hashing mode configuration
@@ -952,9 +954,7 @@ pub fn register_config_in_catalog(
     //
 
     // Flow system configuration
-    catalog_builder.add_value(config.flow_system.flow_agent.into_system());
-    catalog_builder.add_value(config.flow_system.flow_system_event_agent.into_system());
-    catalog_builder.add_value(config.flow_system.task_agent.into_system());
+    catalog_builder.add_value(config.flow_system.into_system());
 
     // Webhooks configuration
     assert!(

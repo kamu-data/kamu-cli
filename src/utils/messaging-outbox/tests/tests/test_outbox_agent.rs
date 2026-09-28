@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use database_common::NoOpDatabasePlugin;
 use dill::*;
@@ -16,7 +17,7 @@ use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
-use wakeup_listener::WakeupListener;
+use wakeup_listener::{WakeupListener, WakeupListenerConfig};
 
 use crate::{test_message_consumer, test_message_failing_consumer, test_message_type};
 
@@ -1172,10 +1173,10 @@ impl OutboxAgentFailureHarness {
 
         let mut b = CatalogBuilder::new_chained(base_catalog_harness.catalog());
         b.add::<OutboxAgentImpl>();
-        b.add_value(OutboxAgentConfig {
-            min_debounce_interval: std::time::Duration::from_millis(1),
-            max_listening_timeout: std::time::Duration::from_millis(1),
-            batch_size,
+        b.add_value(OutboxAgentConfig { batch_size });
+        b.add_value(WakeupListenerConfig {
+            min_debounce_interval: Duration::from_millis(1),
+            max_listening_timeout: Duration::from_millis(1),
         });
 
         b.add::<TestMessageConsumerA>();
@@ -1209,6 +1210,7 @@ impl OutboxAgentHarness {
         let mut b = CatalogBuilder::new_chained(base_catalog_harness.catalog());
         b.add::<OutboxAgentImpl>();
         b.add_value(OutboxAgentConfig::local_default());
+        b.add_value(WakeupListenerConfig::local_default());
 
         b.add::<TestMessageConsumerA>();
         b.add::<TestMessageConsumerA1>();
@@ -1300,6 +1302,7 @@ impl SelfManagedOutboxAgentHarness {
         b.add::<SystemTimeSourceDefault>();
         b.add::<OutboxAgentImpl>();
         b.add_value(OutboxAgentConfig::local_default());
+        b.add_value(WakeupListenerConfig::local_default());
         b.add::<TestMessageConsumerFSelfManaged>();
         b.add::<TestMessageConsumerGSelfManagedFailing>();
 

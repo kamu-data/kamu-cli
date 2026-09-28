@@ -18,10 +18,13 @@ Recommendation: for ease of reading, use the following format:
 - Task agent no longer polls the task queue when idle:
   - Postgres: tasks table notifies the agent via NOTIFY/LISTEN when a task is created or requeued
   - SQLite: incremental listening timeout approach, In-memory: explicit signals
-  - **Breaking config change:** `flowSystem.taskAgent.checkingIntervalSecs` was replaced with
-    `minDebounceInterval` (default `20ms`) and `maxListeningTimeout` (default `2s`)
-- Lowered the default `minDebounceInterval` of outbox, flow system event and task agents from `100ms` to `20ms`,
-  as each agent in a flow run chain added its full debounce to the end-to-end latency
+- **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
+  - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
+    the per-agent settings in `outbox`, `flowSystem.flowSystemEventAgent` and `flowSystem.taskAgent`
+    (the latter also dropping `checkingIntervalSecs`)
+  - `batching.outboxMessages` and `batching.flowSystemEvents` replace `outbox.batchSize` and
+    `flowSystem.flowSystemEventAgent.batchSize`
+  - `flowSystem.flowAgent.*` settings moved one level up to `flowSystem.*`
 - Extracted the wakeup detector abstraction from the messaging outbox into a standalone `wakeup-listener`
   utility crate (`WakeupListener`), as it's now shared by the outbox, flow system and task system agents.
   Implementations live in `kamu-wakeup-listener-{inmem,postgres,sqlite}` infra crates, with own unit tests.

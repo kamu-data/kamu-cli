@@ -20,6 +20,7 @@ use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tokio::time::{Duration, Instant};
+use wakeup_listener::WakeupListenerConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -195,10 +196,10 @@ impl PostgresOutboxAgentHarness {
 
         b.add::<OutboxAgentMetrics>();
         b.add::<OutboxAgentImpl>();
-        b.add_value(OutboxAgentConfig {
-            min_debounce_interval: std::time::Duration::from_millis(1),
-            max_listening_timeout: std::time::Duration::from_millis(1),
-            batch_size: 1,
+        b.add_value(OutboxAgentConfig { batch_size: 1 });
+        b.add_value(WakeupListenerConfig {
+            min_debounce_interval: Duration::from_millis(1),
+            max_listening_timeout: Duration::from_millis(1),
         });
 
         b.add::<TestMessageConsumerTxOrder>();

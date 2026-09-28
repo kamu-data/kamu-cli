@@ -30,6 +30,7 @@ use kamu_task_system_services::TaskSchedulerImpl;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
+use wakeup_listener::WakeupListenerConfig;
 
 use super::{
     FlowSystemTestListener,
@@ -112,10 +113,10 @@ impl FlowHarness {
                 mandatory_throttling_period,
                 HashMap::new(),
             ))
-            .add_value(FlowSystemEventAgentConfig {
+            .add_value(FlowSystemEventAgentConfig { batch_size: 10 })
+            .add_value(WakeupListenerConfig {
                 min_debounce_interval: awaiting_step.to_std().unwrap(),
                 max_listening_timeout: (awaiting_step * 5).to_std().unwrap(),
-                batch_size: 10,
             })
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()

@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod wakeup_listener;
+mod wakeup_listener_config;
 
 pub use wakeup_listener::*;
+pub use wakeup_listener_config::*;

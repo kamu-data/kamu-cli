@@ -36,6 +36,7 @@ messaging-outbox = { workspace = true }
 observability = { workspace = true, default-features = false }
 odf = { workspace = true }
 time-source = { workspace = true }
+wakeup-listener = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

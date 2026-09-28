@@ -461,7 +461,6 @@ class "StorageTypedResourceQueryServiceImpl"
 class "SyncRequestBuilder"
 class "SyncServiceImpl"
 class "SystemTimeSourceDefault" <<agnostic>>
-class "TaskAgentConfig" <<singleton>>
 class "TenancyConfig" <<singleton>>
 class "TransactionRef" <<singleton>>
 class "TransactionRefT" <<singleton>>
@@ -487,6 +486,7 @@ class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
 class "ViewCollectionEntriesUseCaseImpl"
 class "ViewVersionedFileHistoryUseCaseImpl"
+class "WakeupListenerConfig" <<singleton>>
 class "Web3AuthEip4361NonceServiceImpl"
 class "WebhooksConfig" <<singleton>>
 class "WorkspaceLayout" <<singleton>>
@@ -1235,6 +1235,7 @@ class "WsSmartTransferProtocolClient"
 "OutboxAgentImpl"  --> "OutboxMessageBridge"
 "OutboxAgentImpl"  --> "OutboxAgentMetrics"
 "OutboxAgentImpl"  --> "OutboxAgentConfig"
+"OutboxAgentImpl"  --> "WakeupListenerConfig"
 "MetricsProvider" <|-- "OutboxAgentMetrics"
 "OutboxDispatchingImpl"  --> "Catalog"
 "OutboxDispatchingImpl"  --> "OutboxImmediateImpl"

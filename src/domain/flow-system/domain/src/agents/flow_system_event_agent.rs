@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::time::Duration;
-
 use async_utils::BackgroundAgent;
 use internal_error::InternalError;
 
@@ -24,26 +22,16 @@ pub trait FlowSystemEventAgent: BackgroundAgent {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowSystemEventAgentConfig {
-    pub min_debounce_interval: Duration,
-    pub max_listening_timeout: Duration,
     pub batch_size: usize,
 }
 
 impl FlowSystemEventAgentConfig {
     pub fn local_default() -> Self {
-        Self {
-            min_debounce_interval: Duration::from_millis(20),
-            max_listening_timeout: Duration::from_secs(2),
-            batch_size: 20,
-        }
+        Self { batch_size: 20 }
     }
 
     pub fn production_default() -> Self {
-        Self {
-            min_debounce_interval: Duration::from_millis(20),
-            max_listening_timeout: Duration::from_mins(1),
-            batch_size: 100,
-        }
+        Self { batch_size: 100 }
     }
 }
 

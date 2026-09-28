@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use wakeup_listener::WakeupListenerConfig;
+
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +56,7 @@ impl OutboxProvider {
                     .bind::<dyn crate::Outbox, OutboxDispatchingImpl>()
                     .add::<OutboxAgentImpl>()
                     .add_value(OutboxAgentConfig::local_default())
+                    .add_value(WakeupListenerConfig::local_default())
                     .add::<OutboxAgentMetrics>();
             }
         }
