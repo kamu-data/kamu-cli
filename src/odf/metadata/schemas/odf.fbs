@@ -1134,20 +1134,6 @@ table AwsCredentialsInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// CompactionParams
-// Optional parameters to control ingestion behavior.
-//
-// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/CompactionParams
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table CompactionParams {
-  // Target maximum size of each compacted data slice e.g. `100MiB`.
-  max_slice_size: uint64 = null;
-  // Target maximum number of records per compacted data slice.
-  max_slice_records: uint64 = null;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CompressionFormat
 // Defines a compression algorithm.
 //
@@ -2040,19 +2026,8 @@ union TaskSpecInput {
   TaskSpecInputTransform,
   TaskSpecInputCompaction,
   TaskSpecInputGarbageCollection,
+  TaskSpecInputVerify,
   TaskSpecInputWebhookCall,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// IngestParams
-// Optional parameters to control ingestion behavior.
-//
-// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/IngestParams
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table IngestParams {
-  // Target number of records to ingest per data slice.
-  target_slice_records: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2065,10 +2040,12 @@ table IngestParams {
 table TaskSpecInputIngest {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
+  // Reference to the dataset to ingest into. Defaults to the flow-level target when omitted.
+  target: DatasetRef;
   // Reference to the source resource that defines how to fetch data.
   source: ResourceRef;
-  // Optional parameters to control ingestion behavior.
-  params: IngestParams;
+  // Target number of records to ingest per data slice.
+  target_records_per_slice: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2095,8 +2072,12 @@ table TaskSpecInputTransform {
 table TaskSpecInputCompaction {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
-  // Optional parameters to control ingestion behavior.
-  params: CompactionParams;
+  // Reference to the dataset to compact. Defaults to the flow-level target when omitted.
+  target: DatasetRef;
+  // Target maximum size of each compacted data slice e.g. `100MiB`.
+  max_slice_size: uint64 = null;
+  // Target maximum number of records per compacted data slice.
+  max_slice_records: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2109,6 +2090,24 @@ table TaskSpecInputCompaction {
 table TaskSpecInputGarbageCollection {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
+  // Reference to the dataset to collect garbage from. Defaults to the flow-level target when omitted.
+  target: DatasetRef;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputVerify
+// Checks dataset metadata for integrity.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Verify
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputVerify {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the dataset to verify. Defaults to the flow-level target when omitted.
+  target: DatasetRef;
+  // If true, re-executes transformations on derivative datasets to verify reproducibility.
+  replay_transform: bool = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2141,7 +2140,7 @@ table RetryPolicy {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskSpecInputWebhookCall
-// Dispatches a certain payload to a specific `WebhookTarget`.
+// Dispatches a certain payload to a specific `WebhookEndpoint`.
 //
 // Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/WebhookCall
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2149,8 +2148,8 @@ table RetryPolicy {
 table TaskSpecInputWebhookCall {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
-  // Reference to the `WebhookTarget`.
-  target: ResourceRef;
+  // Reference to the `WebhookEndpoint`.
+  endpoint: ResourceRef;
   // The payload to send. May include templating.
   payload: string;
   // Defines how a webhook should react to failures.
@@ -2316,6 +2315,8 @@ table FlowRunActivationCauses {
 table FlowRunRetry {
   // Reference to the FlowRun this run is retrying.
   retry_of: ResourceHandle;
+  // Retry attempt number (1 = first retry, i.e. second run total).
+  retry_number: uint32;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2330,6 +2331,7 @@ union TaskSpec {
   TaskSpecTransform,
   TaskSpecCompaction,
   TaskSpecGarbageCollection,
+  TaskSpecVerify,
   TaskSpecWebhookCall,
 }
 
@@ -2343,10 +2345,12 @@ union TaskSpec {
 table TaskSpecIngest {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
+  // Reference to the dataset to ingest into. Defaults to the flow-level target when omitted.
+  target: DatasetHandle;
   // Reference to the source resource that defines how to fetch data.
   source: ResourceHandle;
-  // Optional parameters to control ingestion behavior.
-  params: IngestParams;
+  // Target number of records to ingest per data slice.
+  target_records_per_slice: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2373,8 +2377,12 @@ table TaskSpecTransform {
 table TaskSpecCompaction {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
-  // Optional parameters to control ingestion behavior.
-  params: CompactionParams;
+  // Reference to the dataset to compact. Defaults to the flow-level target when omitted.
+  target: DatasetHandle;
+  // Target maximum size of each compacted data slice e.g. `100MiB`.
+  max_slice_size: uint64 = null;
+  // Target maximum number of records per compacted data slice.
+  max_slice_records: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2387,11 +2395,29 @@ table TaskSpecCompaction {
 table TaskSpecGarbageCollection {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
+  // Reference to the dataset to collect garbage from. Defaults to the flow-level target when omitted.
+  target: DatasetHandle;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecVerify
+// Checks dataset metadata for integrity.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Verify
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecVerify {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the dataset to verify. Defaults to the flow-level target when omitted.
+  target: DatasetHandle;
+  // If true, re-executes transformations on derivative datasets to verify reproducibility.
+  replay_transform: bool = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskSpecWebhookCall
-// Dispatches a certain payload to a specific `WebhookTarget`.
+// Dispatches a certain payload to a specific `WebhookEndpoint`.
 //
 // Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/WebhookCall
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2399,8 +2425,8 @@ table TaskSpecGarbageCollection {
 table TaskSpecWebhookCall {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
-  // Reference to the `WebhookTarget`.
-  target: ResourceHandle;
+  // Reference to the `WebhookEndpoint`.
+  endpoint: ResourceHandle;
   // The payload to send. May include templating.
   payload: string;
 }
@@ -2569,6 +2595,72 @@ table FlowSpec {
   tasks: [TaskSpecWrapper];
   // Defines how a flow should react to failures.
   retry_policy: RetryPolicy;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowStatusValue
+// Overall operational status of the Flow.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus#/$defs/Value
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum FlowStatusValue: int32 {
+  Active,
+  Paused,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowStatusBindingEntry
+// A resource currently matched by the flow's target selector.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus#/$defs/BindingEntry
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowStatusBindingEntry {
+  // The matched resource.
+  target: ResourceHandle;
+  // Time at which this binding was established.
+  bound_at: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowStatusRunEntry
+// Summary of a recent FlowRun.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus#/$defs/RunEntry
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowStatusRunEntry {
+  // Reference to the FlowRun resource.
+  flow_run: ResourceHandle;
+  // Execution status of this run.
+  status: string;
+  // Outcome of this run, if finished.
+  outcome: string;
+  // Time at which this run finished.
+  finished_at: Timestamp;
+  // Reference to the FlowRun this run is retrying, if applicable.
+  retry_of: ResourceHandle;
+  // Retry attempt number (1 = first retry, i.e. second run total).
+  retry_number: uint32 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowStatus
+// Condition tracking the overall status of a Flow and a summary of recent runs.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowStatus {
+  // Overall operational status of the Flow.
+  status: FlowStatusValue;
+  // Last N resources matched by the flow's target selector. Bounded by spec.recentBindingsRetention.
+  recent_bindings: [FlowStatusBindingEntry];
+  // Total number of resources currently matched by the flow's target selector.
+  bindings_total: uint64 = null;
+  // Summaries of recent FlowRuns. Bounded by spec.recentRunsRetention.
+  recent_runs: [FlowStatusRunEntry];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3468,28 +3560,28 @@ table VariableSetSpec {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// WebhookTargetSpecInput
-// Defines a webhook target endpoint that can receive event notifications and data.
+// WebhookEndpointSpecInput
+// Defines a webhook endpoint that can receive event notifications and data.
 //
-// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTargetSpecInput
+// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpointSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table WebhookTargetSpecInput {
-  // Target url of the webhook.
+table WebhookEndpointSpecInput {
+  // URL of the webhook endpoint.
   url: string;
   // Shared secret used for HMAC signature of the request payload for authentication.
   secret: Secret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// WebhookTargetSpec
-// Defines a webhook target endpoint that can receive event notifications and data.
+// WebhookEndpointSpec
+// Defines a webhook endpoint that can receive event notifications and data.
 //
-// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTargetSpec
+// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpointSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table WebhookTargetSpec {
-  // Target url of the webhook.
+table WebhookEndpointSpec {
+  // URL of the webhook endpoint.
   url: string;
   // Shared secret used for HMAC signature of the request payload for authentication.
   secret: Secret;

@@ -975,17 +975,6 @@ pub mod datasets {
         pub size: u64,
     }
 
-    /// Optional parameters to control ingestion behavior.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/CompactionParams
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct CompactionParams {
-        /// Target maximum size of each compacted data slice e.g. `100MiB`.
-        pub max_slice_size: Option<ByteSize>,
-        /// Target maximum number of records per compacted data slice.
-        pub max_slice_records: Option<u64>,
-    }
-
     /// Describes a slice of data added to a dataset or produced via
     /// transformation
     ///
@@ -1911,6 +1900,8 @@ pub mod flows {
     pub struct FlowRunRetry {
         /// Reference to the FlowRun this run is retrying.
         pub retry_of: resources::ResourceHandle,
+        /// Retry attempt number (1 = first retry, i.e. second run total).
+        pub retry_number: u32,
     }
 
     /// Defines a set of tasks to be executed in a sequence.
@@ -2006,6 +1997,63 @@ pub mod flows {
         pub tasks: Vec<tasks::TaskSpecInput>,
         /// Defines how a flow should react to failures.
         pub retry_policy: Option<flows::RetryPolicy>,
+    }
+
+    /// Condition tracking the overall status of a Flow and a summary of recent
+    /// runs.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowStatus {
+        /// Overall operational status of the Flow.
+        pub status: flows::FlowStatusValue,
+        /// Last N resources matched by the flow's target selector. Bounded by
+        /// spec.recentBindingsRetention.
+        pub recent_bindings: Option<Vec<flows::FlowStatusBindingEntry>>,
+        /// Total number of resources currently matched by the flow's target
+        /// selector.
+        pub bindings_total: Option<u64>,
+        /// Summaries of recent FlowRuns. Bounded by spec.recentRunsRetention.
+        pub recent_runs: Option<Vec<flows::FlowStatusRunEntry>>,
+    }
+
+    /// A resource currently matched by the flow's target selector.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus#/$defs/BindingEntry
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowStatusBindingEntry {
+        /// The matched resource.
+        pub target: resources::ResourceHandle,
+        /// Time at which this binding was established.
+        pub bound_at: DateTime<Utc>,
+    }
+
+    /// Summary of a recent FlowRun.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus#/$defs/RunEntry
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowStatusRunEntry {
+        /// Reference to the FlowRun resource.
+        pub flow_run: resources::ResourceHandle,
+        /// Execution status of this run.
+        pub status: String,
+        /// Outcome of this run, if finished.
+        pub outcome: Option<String>,
+        /// Time at which this run finished.
+        pub finished_at: Option<DateTime<Utc>>,
+        /// Reference to the FlowRun this run is retrying, if applicable.
+        pub retry_of: Option<resources::ResourceHandle>,
+        /// Retry attempt number (1 = first retry, i.e. second run total).
+        pub retry_number: Option<u32>,
+    }
+
+    /// Overall operational status of the Flow.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus#/$defs/Value
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum FlowStatusValue {
+        Active,
+        Paused,
     }
 
     /// Condition that causes a flow to be executed.
@@ -2616,53 +2664,53 @@ pub mod sinks {
     #[allow(unused_imports)]
     use super::*;
 
-    /// Defines a webhook target endpoint that can receive event notifications
-    /// and data.
+    /// Defines a webhook endpoint that can receive event notifications and
+    /// data.
     ///
-    /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTarget
+    /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpoint
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct WebhookTarget {
+    pub struct WebhookEndpoint {
         /// Container for identity and ownership information of a resource.
         pub headers: resources::ResourceHeadersInput,
         /// Specifies the desired state of the resource.
-        pub spec: sinks::WebhookTargetSpecInput,
+        pub spec: sinks::WebhookEndpointSpecInput,
     }
 
-    impl WebhookTarget {
+    impl WebhookEndpoint {
         pub fn schema() -> &'static TypeUri {
-            &WEBHOOK_TARGET_SCHEMA
+            &WEBHOOK_ENDPOINT_SCHEMA
         }
         pub const fn schema_str() -> &'static str {
-            WEBHOOK_TARGET_SCHEMA_STR
+            WEBHOOK_ENDPOINT_SCHEMA_STR
         }
     }
 
-    static WEBHOOK_TARGET_SCHEMA_STR: &str =
-        "https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTarget";
+    static WEBHOOK_ENDPOINT_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpoint";
 
-    static WEBHOOK_TARGET_SCHEMA: std::sync::LazyLock<TypeUri> =
-        std::sync::LazyLock::new(|| TypeUri::new_unchecked(WEBHOOK_TARGET_SCHEMA_STR));
+    static WEBHOOK_ENDPOINT_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(WEBHOOK_ENDPOINT_SCHEMA_STR));
 
-    /// Defines a webhook target endpoint that can receive event notifications
-    /// and data.
+    /// Defines a webhook endpoint that can receive event notifications and
+    /// data.
     ///
-    /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTargetSpec
+    /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpointSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct WebhookTargetSpec {
-        /// Target url of the webhook.
+    pub struct WebhookEndpointSpec {
+        /// URL of the webhook endpoint.
         pub url: String,
         /// Shared secret used for HMAC signature of the request payload for
         /// authentication.
         pub secret: Option<config::Secret>,
     }
 
-    /// Defines a webhook target endpoint that can receive event notifications
-    /// and data.
+    /// Defines a webhook endpoint that can receive event notifications and
+    /// data.
     ///
-    /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookTargetSpecInput
+    /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpointSpecInput
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct WebhookTargetSpecInput {
-        /// Target url of the webhook.
+    pub struct WebhookEndpointSpecInput {
+        /// URL of the webhook endpoint.
         pub url: String,
         /// Shared secret used for HMAC signature of the request payload for
         /// authentication.
@@ -2738,15 +2786,6 @@ pub mod sources {
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/EventTimeSource#/$defs/FromSystemTime
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct EventTimeSourceFromSystemTime {}
-
-    /// Optional parameters to control ingestion behavior.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/IngestParams
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct IngestParams {
-        /// Target number of records to ingest per data slice.
-        pub target_slice_records: Option<u64>,
-    }
 
     /// Defines the point where data enters the system.
     ///
@@ -3892,6 +3931,7 @@ pub mod tasks {
         Transform(tasks::TaskSpecTransform),
         Compaction(tasks::TaskSpecCompaction),
         GarbageCollection(tasks::TaskSpecGarbageCollection),
+        Verify(tasks::TaskSpecVerify),
         WebhookCall(tasks::TaskSpecWebhookCall),
     }
 
@@ -3902,6 +3942,7 @@ pub mod tasks {
     impl_enum_variant!(TaskSpec::GarbageCollection(
         tasks::TaskSpecGarbageCollection
     ));
+    impl_enum_variant!(TaskSpec::Verify(tasks::TaskSpecVerify));
     impl_enum_variant!(TaskSpec::WebhookCall(tasks::TaskSpecWebhookCall));
 
     /// Compacts data files in matching datasets to improve query performance.
@@ -3912,8 +3953,13 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<datasets::CompactionParams>,
+        /// Reference to the dataset to compact. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetHandle>,
+        /// Target maximum size of each compacted data slice e.g. `100MiB`.
+        pub max_slice_size: Option<ByteSize>,
+        /// Target maximum number of records per compacted data slice.
+        pub max_slice_records: Option<u64>,
     }
 
     /// Removes unreferenced data files from matching datasets.
@@ -3924,6 +3970,9 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
+        /// Reference to the dataset to collect garbage from. Defaults to the
+        /// flow-level target when omitted.
+        pub target: Option<datasets::DatasetHandle>,
     }
 
     /// Fetches data from a source and appends it to a dataset.
@@ -3934,10 +3983,13 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
+        /// Reference to the dataset to ingest into. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetHandle>,
         /// Reference to the source resource that defines how to fetch data.
         pub source: resources::ResourceHandle,
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<sources::IngestParams>,
+        /// Target number of records to ingest per data slice.
+        pub target_records_per_slice: Option<u64>,
     }
 
     /// An individual work item to be executed as part of a flow.
@@ -3949,6 +4001,7 @@ pub mod tasks {
         Transform(tasks::TaskSpecInputTransform),
         Compaction(tasks::TaskSpecInputCompaction),
         GarbageCollection(tasks::TaskSpecInputGarbageCollection),
+        Verify(tasks::TaskSpecInputVerify),
         WebhookCall(tasks::TaskSpecInputWebhookCall),
     }
 
@@ -3959,6 +4012,7 @@ pub mod tasks {
     impl_enum_variant!(TaskSpecInput::GarbageCollection(
         tasks::TaskSpecInputGarbageCollection
     ));
+    impl_enum_variant!(TaskSpecInput::Verify(tasks::TaskSpecInputVerify));
     impl_enum_variant!(TaskSpecInput::WebhookCall(tasks::TaskSpecInputWebhookCall));
 
     /// Compacts data files in matching datasets to improve query performance.
@@ -3969,8 +4023,13 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<datasets::CompactionParams>,
+        /// Reference to the dataset to compact. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetRef>,
+        /// Target maximum size of each compacted data slice e.g. `100MiB`.
+        pub max_slice_size: Option<ByteSize>,
+        /// Target maximum number of records per compacted data slice.
+        pub max_slice_records: Option<u64>,
     }
 
     /// Removes unreferenced data files from matching datasets.
@@ -3981,6 +4040,9 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
+        /// Reference to the dataset to collect garbage from. Defaults to the
+        /// flow-level target when omitted.
+        pub target: Option<datasets::DatasetRef>,
     }
 
     /// Fetches data from a source and appends it to a dataset.
@@ -3991,10 +4053,13 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
+        /// Reference to the dataset to ingest into. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetRef>,
         /// Reference to the source resource that defines how to fetch data.
         pub source: resources::ResourceRef,
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<sources::IngestParams>,
+        /// Target number of records to ingest per data slice.
+        pub target_records_per_slice: Option<u64>,
     }
 
     /// Executes transformation of data defined in a derivative dataset.
@@ -4010,7 +4075,23 @@ pub mod tasks {
         pub target: Option<datasets::DatasetRef>,
     }
 
-    /// Dispatches a certain payload to a specific `WebhookTarget`.
+    /// Checks dataset metadata for integrity.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Verify
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecInputVerify {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the dataset to verify. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetRef>,
+        /// If true, re-executes transformations on derivative datasets to
+        /// verify reproducibility.
+        pub replay_transform: Option<bool>,
+    }
+
+    /// Dispatches a certain payload to a specific `WebhookEndpoint`.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/WebhookCall
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -4018,8 +4099,8 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
-        /// Reference to the `WebhookTarget`.
-        pub target: resources::ResourceRef,
+        /// Reference to the `WebhookEndpoint`.
+        pub endpoint: resources::ResourceRef,
         /// The payload to send. May include templating.
         pub payload: Option<String>,
         /// Defines how a webhook should react to failures.
@@ -4039,7 +4120,23 @@ pub mod tasks {
         pub target: Option<datasets::DatasetHandle>,
     }
 
-    /// Dispatches a certain payload to a specific `WebhookTarget`.
+    /// Checks dataset metadata for integrity.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Verify
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct TaskSpecVerify {
+        /// An alias for the task used to refer to it in flows and access the
+        /// results
+        pub name: Option<String>,
+        /// Reference to the dataset to verify. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetHandle>,
+        /// If true, re-executes transformations on derivative datasets to
+        /// verify reproducibility.
+        pub replay_transform: Option<bool>,
+    }
+
+    /// Dispatches a certain payload to a specific `WebhookEndpoint`.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/WebhookCall
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -4047,8 +4144,8 @@ pub mod tasks {
         /// An alias for the task used to refer to it in flows and access the
         /// results
         pub name: Option<String>,
-        /// Reference to the `WebhookTarget`.
-        pub target: resources::ResourceHandle,
+        /// Reference to the `WebhookEndpoint`.
+        pub endpoint: resources::ResourceHandle,
         /// The payload to send. May include templating.
         pub payload: Option<String>,
     }
