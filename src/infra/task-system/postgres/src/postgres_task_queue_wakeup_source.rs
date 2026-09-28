@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use kamu_task_system::TaskQueueWakeupSource;
-use kamu_wakeup_listener_postgres::{PostgresNotificationHub, PostgresNotifyWakeupListener};
-use wakeup_listener::WakeupListener;
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ const NOTIFY_CHANNEL_NAME: &str = "tasks_queued";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresTaskQueueWakeupSource {
-    wakeup_listener: PostgresNotifyWakeupListener,
+    wakeup_listener: HubWakeupListener<PostgresNotificationHub>,
 }
 
 #[dill::component(pub)]
@@ -29,7 +29,7 @@ pub struct PostgresTaskQueueWakeupSource {
 impl PostgresTaskQueueWakeupSource {
     pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
         Self {
-            wakeup_listener: PostgresNotifyWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: HubWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
         }
     }
 }

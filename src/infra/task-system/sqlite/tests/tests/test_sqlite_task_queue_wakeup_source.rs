@@ -18,8 +18,9 @@ use dill::{Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_task_system::*;
 use kamu_task_system_sqlite::{SqliteTaskEventStore, SqliteTaskQueueWakeupSource};
+use kamu_wakeup_listener_sqlite::SqlitePollingHub;
 use sqlx::SqlitePool;
-use wakeup_listener::WakeHint;
+use wakeup_listener::{WakeHint, WakeupListenerConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,6 +29,8 @@ use wakeup_listener::WakeHint;
 async fn test_wakes_up_only_when_task_is_queued(sqlite_pool: SqlitePool) {
     let harness = SqliteTaskQueueWakeupHarness::new(sqlite_pool);
 
+    // Subscribing reports a possible change, then it's quiet
+    assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
     assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
 
     let task_id = harness.new_task_id().await;
@@ -115,10 +118,12 @@ impl SqliteTaskQueueWakeupHarness {
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteTaskEventStore>();
         catalog_builder.add::<SqliteTaskQueueWakeupSource>();
+        catalog_builder.add::<SqlitePollingHub>();
+        catalog_builder.add_value(WakeupListenerConfig::local_default());
 
         let catalog = catalog_builder.build();
 
-        // Keep a single instance, as it owns the listening connection
+        // Keep a single instance, as it owns the subscriber slot
         let wakeup_source = catalog.get_one().unwrap();
 
         Self {

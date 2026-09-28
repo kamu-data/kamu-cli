@@ -13,27 +13,24 @@ use std::time::Duration;
 use futures::FutureExt as _;
 use internal_error::InternalError;
 use tokio::sync::Notify;
-use wakeup_listener::{WakeHint, WakeupListener};
 
-use crate::PostgresNotificationHub;
+use crate::{WakeHint, WakeupHub, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Waits for Postgres `NOTIFY` signals on the given channel, via the shared
-/// [`PostgresNotificationHub`]. The channel is expected to be notified by
-/// triggers on the watched tables.
-pub struct PostgresNotifyWakeupListener {
-    hub: Arc<PostgresNotificationHub>,
-    channel_name: &'static str,
+/// A lightweight handle listening to one channel of a shared [`WakeupHub`]
+pub struct HubWakeupListener<H: WakeupHub> {
+    hub: Arc<H>,
+    channel: H::Channel,
     // Subscribed lazily, so that only components which actually wait occupy a slot
     slot: OnceLock<Arc<Notify>>,
 }
 
-impl PostgresNotifyWakeupListener {
-    pub fn new(hub: Arc<PostgresNotificationHub>, channel_name: &'static str) -> Self {
+impl<H: WakeupHub> HubWakeupListener<H> {
+    pub fn new(hub: Arc<H>, channel: H::Channel) -> Self {
         Self {
             hub,
-            channel_name,
+            channel,
             slot: OnceLock::new(),
         }
     }
@@ -42,16 +39,14 @@ impl PostgresNotifyWakeupListener {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl WakeupListener for PostgresNotifyWakeupListener {
+impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
     async fn wait_wake(
         &self,
         timeout: Duration,
         min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
-        let slot = self
-            .slot
-            .get_or_init(|| self.hub.subscribe(self.channel_name));
+        let slot = self.slot.get_or_init(|| self.hub.subscribe(self.channel));
 
         if tokio::time::timeout(timeout, slot.notified())
             .await
@@ -60,7 +55,7 @@ impl WakeupListener for PostgresNotifyWakeupListener {
             return Ok(WakeHint::Timeout);
         }
 
-        // Let a burst of notifications coalesce into this wakeup
+        // Let a burst of signals coalesce into this wakeup
         let remaining_after_debounce = deadline
             .saturating_duration_since(tokio::time::Instant::now())
             .saturating_sub(min_debounce_interval);

@@ -30,6 +30,8 @@ Recommendation: for ease of reading, use the following format:
   Implementations live in `kamu-wakeup-listener-{inmem,postgres,sqlite}` infra crates, with own unit tests.
   Flow and task system infra crates no longer depend on outbox infra crates.
   Postgres listeners share a single `LISTEN` connection via `PostgresNotificationHub`, instead of one each.
+  SQLite listeners share a single polling loop via `SqlitePollingHub`, with one connection acquire per tick
+  and a common backoff, instead of a polling timer each.
   Architecture is documented in `docs/internal/wakeup-listeners.md`
 
 ## [0.267.0] - 2026-09-19

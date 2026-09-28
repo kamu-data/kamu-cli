@@ -18,14 +18,21 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_wakeup_listener_sqlite::SqlitePollingWakeupListener;
+use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
 use sqlx::Sqlite;
-use wakeup_listener::WakeupListener;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
+    name: "flow_system_events",
+    max_id_query: "SELECT MAX(event_id) FROM flow_system_events",
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventBridge {
-    wakeup_listener: SqlitePollingWakeupListener,
+    wakeup_listener: HubWakeupListener<SqlitePollingHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,12 +41,9 @@ pub struct SqliteFlowSystemEventBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl SqliteFlowSystemEventBridge {
-    pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
+    pub fn new(hub: Arc<SqlitePollingHub>) -> Self {
         Self {
-            wakeup_listener: SqlitePollingWakeupListener::new(
-                pool,
-                "SELECT MAX(event_id) FROM flow_system_events",
-            ),
+            wakeup_listener: HubWakeupListener::new(hub, POLLING_CHANNEL),
         }
     }
 }

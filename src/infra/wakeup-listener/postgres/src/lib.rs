@@ -8,7 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod postgres_notification_hub;
-mod postgres_notify_wakeup_listener;
 
 pub use postgres_notification_hub::*;
-pub use postgres_notify_wakeup_listener::*;

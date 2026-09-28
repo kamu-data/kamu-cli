@@ -13,9 +13,11 @@
 projections, and the **task agent** executes queued `tasks`. Instead of polling their tables, each agent
 drains everything pending and then sleeps on a **`WakeupListener`** until the data *might* have changed
 or a fallback timeout elapses. A wakeup is only a hint: the agent always re-checks storage. Each storage
-engine implements the listener differently — Postgres uses `LISTEN`/`NOTIFY` fired by table triggers
-and multiplexed over **one shared connection** (`PostgresNotificationHub`), SQLite polls a cheap
-`MAX(id)` query with backoff, and the in-memory storage signals explicitly on write.
+engine provides the signals differently — Postgres uses `LISTEN`/`NOTIFY` fired by table triggers
+and multiplexed over **one shared connection** (`PostgresNotificationHub`), SQLite polls cheap
+`MAX(id)` queries for all channels in **one shared loop** (`SqlitePollingHub`), and the in-memory
+storage signals explicitly on write. On both databases agents hold lightweight per-channel handles
+(`HubWakeupListener`) onto the backend's single hub.
 
 **Where to start reading, by intent:**
 
@@ -24,7 +26,7 @@ and multiplexed over **one shared connection** (`PostgresNotificationHub`), SQLi
 | Know the guarantees an agent can rely on | [§2 Contract](#2-contract) |
 | See which agent listens to what | [§3 Inventory](#3-inventory) |
 | Understand the shared Postgres connection | [§4 Postgres](#4-postgres-listennotify-via-a-shared-hub) |
-| Understand why SQLite polls | [§5 SQLite](#5-sqlite-polling) |
+| Understand why SQLite polls, and how | [§5 SQLite](#5-sqlite-a-shared-polling-hub) |
 | Tune latency / idle load | [§7 Configuration](#7-configuration) |
 | Add a new wakeup-driven agent | [§8 Recipe](#8-recipe-adding-a-wakeup-driven-agent) |
 | Find the file for X | [§10 Reference map](#10-filecrate-reference-map) |
@@ -37,7 +39,7 @@ and multiplexed over **one shared connection** (`PostgresNotificationHub`), SQLi
 - [2. Contract](#2-contract)
 - [3. Inventory](#3-inventory)
 - [4. Postgres: LISTEN/NOTIFY via a shared hub](#4-postgres-listennotify-via-a-shared-hub)
-- [5. SQLite: polling](#5-sqlite-polling)
+- [5. SQLite: a shared polling hub](#5-sqlite-a-shared-polling-hub)
 - [6. In-memory: explicit signals](#6-in-memory-explicit-signals)
 - [7. Configuration](#7-configuration)
 - [8. Recipe: adding a wakeup-driven agent](#8-recipe-adding-a-wakeup-driven-agent)
@@ -52,7 +54,7 @@ Agents used to poll with a fixed interval, issuing a transaction and a query eve
 idle — noisy for the database and for telemetry. Wakeup listeners replace that with
 "sleep until something might have changed", keeping a slow fallback timeout as a safety net.
 
-In scope: the `WakeupListener` abstraction, its three implementations, the Postgres triggers that feed
+In scope: the `WakeupListener` abstraction, the hubs behind it, its three storage implementations, the Postgres triggers that feed
 it, and how the three agents use it. Out of scope: what the agents do once awake (outbox routing,
 flow projections, task execution).
 
@@ -78,9 +80,9 @@ Invariants every implementation upholds:
    immediately. This is what makes the *drain → wait* loop below safe without races.
 3. **Timeout is the safety net**, not the primary mechanism. It bounds latency if a notification path
    is misconfigured (e.g. a missing migration) and paces SQLite polling.
-4. **One listener instance serves one consumer.** The in-memory and SQLite listeners keep a single
-   pending signal / last-seen id; a second concurrent waiter on the *same instance* could steal it.
-   (Postgres handles are independent, but agents never share listeners anyway.)
+4. **One listener instance serves one consumer.** Every listener keeps a single pending signal
+   (a `Notify` permit); a second concurrent waiter on the *same instance* could steal it. Separate
+   handles on one hub are independent, and agents never share listeners anyway.
 
 ### The uniform agent loop
 
@@ -96,6 +98,27 @@ loop {
 
 Because of invariant 2, a change committed while the agent was processing is not lost: it is either
 seen by `process_until_empty` or reported by the next `wait_wake`.
+
+### Hubs and handles
+
+Both databases share one shape, with the plumbing in the generic `wakeup-listener` crate:
+
+- **`WakeupHub`** — a per-process source of change signals, registered once in DI as a `Singleton`.
+  Its `Channel` type names what a listener watches: a Postgres channel name, or an
+  `SqlitePollingChannel` (name + max-id query). `subscribe(channel)` returns a `tokio::sync::Notify`
+  slot. The hub's background task is spawned on the first subscription (DI may build the hub outside a
+  runtime) and aborted when the hub is dropped.
+- **`WakeupSubscribers<C>`** — the registry every hub embeds: slots per channel, held as `Weak`
+  so dropped handles are pruned on the next signal, plus a "channels changed" permit for the hub's task.
+  `signal(channel)` / `signal_all()` call `notify_one`, which stores a permit when the handle isn't
+  waiting, so the signal is picked up by its next `wait_wake`.
+- **`HubWakeupListener<H>`** — the `WakeupListener` agents use: `(hub, channel)`, subscribing lazily
+  on the first `wait_wake`, so components that resolve a bridge but never wait (e.g. to push outbox
+  messages) take no slot. It waits on its slot with the timeout, then debounces: sleeps
+  `min_debounce_interval` and absorbs signals that arrived meanwhile, so a burst produces one wakeup.
+
+A fresh subscription's first wait returns `Signaled` on both backends: the handle has no earlier
+reading of its own, so the agent re-checks once.
 
 ---
 
@@ -137,9 +160,8 @@ flowchart LR
 checked out of the pool, `LISTEN`ing on every subscribed channel. A background task, spawned on the first
 subscription, routes each notification to the subscribers of its channel.
 
-**`PostgresNotifyWakeupListener`** is a thin handle `(hub, channel)`. On its first `wait_wake` it
-subscribes: it registers a `tokio::sync::Notify` slot with the hub. Components that resolve a bridge
-but never wait (e.g. to push outbox messages) never subscribe.
+Bridges hold a `HubWakeupListener<PostgresNotificationHub>` for their channel (see
+[Hubs and handles](#hubs-and-handles)).
 
 Behaviour, and why:
 
@@ -157,28 +179,51 @@ Other points:
   committed rows. Rolled-back transactions notify nobody.
 - Postgres collapses identical notifications within one transaction, so statement-level triggers and
   row-level triggers with `WHEN` filters are both cheap.
-- Debounce (per handle): after the first signal, sleep `min_debounce_interval` and absorb signals
-  that arrived meanwhile, so a burst produces one wakeup.
 - **One connection in total** for all channels, regardless of how many agents listen.
 
 ---
 
-## 5. SQLite: polling
+## 5. SQLite: a shared polling hub
 
-SQLite has no notifications, so `SqlitePollingWakeupListener` polls a query returning the maximum id
-of the watched records and compares it with the last id it has seen.
+```mermaid
+flowchart LR
+    subgraph DB[SQLite file, WAL]
+        T1[outbox_messages]
+        T2[flow_system_events]
+        T3[task_events]
+    end
+    HUB[SqlitePollingHub<br/>background task] -- "one connection acquire per tick,<br/>one MAX(id) query per channel" --> DB
+    HUB -- outbox_messages --> L1[listener handle] --> A1[OutboxAgent]
+    HUB -- flow_system_events --> L2[listener handle] --> A2[FlowSystemEventAgent]
+    HUB -- tasks_queued --> L3[listener handle] --> A3[TaskAgent]
+```
+
+SQLite has no notifications, so the hub polls. Each bridge declares an `SqlitePollingChannel` const:
+a name (for logs) and a query returning the maximum id of the watched records, which must only grow.
 
 **Why not an in-process signal?** The workspace database is opened in WAL mode, so other `kamu`
 processes in the same workspace can write to it while an API server is running (verified: `kamu add`
 succeeds next to a running `kamu system api-server`). Only polling sees those writes.
 
-Backoff within one `wait_wake`: the first poll is immediate (catches changes since the previous call),
-then the interval starts at `max(min_debounce_interval, 10ms)` and doubles, capped by the timeout.
-With the defaults (20ms, 2s) an idle agent runs ~8 cheap primary-key lookups per 2s window; worst-case
-detection latency is roughly the last backoff gap (~0.75s). The backoff restarts on every call.
+**Why a hub, when there is no connection to save?** The pool has a single connection
+(`max_connections(1)`), shared with request transactions. One loop acquires it once per tick for all
+channels, instead of three independent timers competing for it. And one shared backoff means a change
+on any channel makes the next hop of a chain (outbox message → flow event → task) visible at the short
+interval, instead of waiting out that channel's own long backoff.
 
-The first call treats all existing records as new (last-seen id starts at 0), so it returns
-`Signaled` if the table is not empty — a harmless spurious wakeup.
+Each tick: snapshot the channels, acquire the connection, run each channel's query in turn and compare
+it with the channel's watermark (the maximum id seen, starting at 0). Advanced channels are signaled.
+
+| Event | What the hub does | Why |
+| --- | --- | --- |
+| Any channel advanced | Signal its subscribers; reset the interval to `max(minDebounceInterval, 10ms)` | Changes come in bursts, and chained agents write the next hop shortly after. |
+| Nothing advanced | Double the interval, capped by `maxListeningTimeout` | With the defaults (20ms, 2s) an idle process runs ~8 ticks per 2s, each a few primary-key lookups. |
+| New subscription | Signal the new slot at once; take a tick right away | The channel may already be polled and its latest change consumed for another subscriber. A new channel gets its first reading without waiting out the backoff. |
+| First reading of a channel | Watermark starts at 0, so existing rows signal | The agent may have drained before they were written; at worst a spurious wakeup. |
+| Query fails | Log, skip that channel for this tick | Queries run one by one rather than combined, so a broken query only affects its own channel. |
+| Connection acquire fails | Log, retry next tick | — |
+| Pool closed (`PoolClosed`) | Background task exits | Clean shutdown; `sqlx::test` closes its pool after each test. |
+| Hub dropped | Background task aborted | Same pattern as Postgres. |
 
 ---
 
@@ -204,15 +249,16 @@ backgroundAgents:
     flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
 ```
 
-- `minDebounceInterval` — how long to absorb a burst after the first signal (Postgres), or the
-  initial poll interval (SQLite). Every agent in a flow run chain adds it to end-to-end latency,
+- `minDebounceInterval` — how long a handle absorbs a burst after the first signal, and the SQLite
+  hub's shortest poll interval. Every agent in a flow run chain adds it to end-to-end latency,
   so keep it small.
-- `maxListeningTimeout` — fallback re-check period. Deployments on Postgres typically raise it
+- `maxListeningTimeout` — fallback re-check period, and the SQLite hub's longest poll interval
+  (`SqlitePollingHub` injects `WakeupListenerConfig` for both bounds). Deployments on Postgres typically raise it
   (e.g. `60s`): notifications carry latency, the timeout only bounds the damage of a missed one.
 - `batching` — records processed per transaction. The task agent has no entry: it claims and runs
   one task at a time (its analogue would be concurrency, not batching).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
-  floor `10ms` (`sqlite_polling_wakeup_listener.rs`).
+  floor `10ms` (`sqlite_polling_hub.rs`).
 
 ---
 
@@ -226,12 +272,15 @@ backgroundAgents:
 2. **Domain trait**: expose `fn wakeup_listener(&self) -> &dyn WakeupListener` on the agent's
    bridge / source trait (see `TaskQueueWakeupSource`).
 3. **Implementations**:
-   - Postgres: `PostgresNotifyWakeupListener::new(hub, CHANNEL)`, constructor takes
+   - Postgres: `HubWakeupListener::new(hub, CHANNEL)`, constructor takes
      `Arc<PostgresNotificationHub>`; component scope `Agnostic`.
-   - SQLite: `SqlitePollingWakeupListener::new(pool, "<cheap query returning max id>")`.
+   - SQLite: declare `const POLLING_CHANNEL: SqlitePollingChannel` with a cheap query returning the
+     max id, then `HubWakeupListener::new(hub, POLLING_CHANNEL)`; constructor takes
+     `Arc<SqlitePollingHub>`.
    - In-memory: `InMemoryWakeupListener`, call `signal()` from the store's write path.
 4. **DI**: register the implementations in `src/app/cli/src/database.rs`. `PostgresNotificationHub`
-   is already registered once in the Postgres block; test catalogs using Postgres bridges must add it.
+   and `SqlitePollingHub` are already registered once in their blocks; test catalogs using the
+   bridges must add the hub (and, for SQLite, a `WakeupListenerConfig`).
 5. **Agent loop**: inject `Arc<WakeupListenerConfig>`, drain everything pending, then
    `wait_wake(max_listening_timeout, min_debounce_interval)` (§2). If the agent processes records in
    batches, add an entry under `backgroundAgents.batching`.
@@ -246,13 +295,14 @@ backgroundAgents:
 | Tests | Location |
 | --- | --- |
 | Listener behaviour per backend | `src/infra/wakeup-listener/{inmem,postgres,sqlite}/tests` |
-| Hub: shared connection, routing, late subscription, connection loss | `src/infra/wakeup-listener/postgres/tests/tests/test_postgres_notification_hub.rs` |
+| Postgres hub: shared connection, routing, late subscription, connection loss | `src/infra/wakeup-listener/postgres/tests/tests/test_postgres_notification_hub.rs` |
+| SQLite hub: routing, late subscriber, backoff reset, failing query | `src/infra/wakeup-listener/sqlite/tests/tests/test_sqlite_polling_hub.rs` |
 | Task queue triggers / SQLite query filter | `src/infra/task-system/{postgres,sqlite}/tests/tests/test_*_task_queue_wakeup_source.rs` |
 | Agent wakes on a queued task, not on timeout | `src/domain/task-system/services/tests/tests/test_task_agent_impl.rs` |
 
 Gotchas:
 - **Never skip the re-check after `Timeout`** — it is the only thing covering a missing trigger.
-- **Don't reuse one in-memory / SQLite listener instance for two consumers** (§2, invariant 4).
+- **Don't reuse one listener instance for two consumers** (§2, invariant 4); create another handle.
 - **Postgres channels are per database**, so `sqlx::test` databases don't interfere with each other.
 - **Postgres migrations are applied externally** (`sqlx migrate run`), not by the application.
 - Observing it live: with `RUST_LOG=sqlx::query=debug,kamu_task_system_services=debug`, an idle task
@@ -265,9 +315,9 @@ Gotchas:
 
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
-| Contract | `wakeup-listener` | `src/utils/wakeup-listener/src` | `wakeup_listener.rs` |
-| Postgres | `kamu-wakeup-listener-postgres` | `src/infra/wakeup-listener/postgres/src` | `postgres_notification_hub.rs`, `postgres_notify_wakeup_listener.rs` |
-| SQLite | `kamu-wakeup-listener-sqlite` | `src/infra/wakeup-listener/sqlite/src` | `sqlite_polling_wakeup_listener.rs` |
+| Contract, hub plumbing | `wakeup-listener` | `src/utils/wakeup-listener/src` | `wakeup_listener.rs`, `wakeup_hub.rs`, `wakeup_subscribers.rs`, `hub_wakeup_listener.rs` |
+| Postgres | `kamu-wakeup-listener-postgres` | `src/infra/wakeup-listener/postgres/src` | `postgres_notification_hub.rs` |
+| SQLite | `kamu-wakeup-listener-sqlite` | `src/infra/wakeup-listener/sqlite/src` | `sqlite_polling_hub.rs` |
 | In-memory | `kamu-wakeup-listener-inmem` | `src/infra/wakeup-listener/inmem/src` | `inmem_wakeup_listener.rs` |
 | Outbox | `messaging-outbox`, `kamu-messaging-outbox-*` | `src/utils/messaging-outbox/src/agent`, `src/infra/messaging-outbox/*/src/repos` | `outbox_agent_impl.rs`, `*_outbox_message_bridge.rs` |
 | Flow system events | `kamu-flow-system-services`, `kamu-flow-system-*` | `src/domain/flow-system/services/src/flow_system_events`, `src/infra/flow-system/*/src` | `flow_system_event_agent_impl.rs`, `*_flow_system_event_bridge.rs` |

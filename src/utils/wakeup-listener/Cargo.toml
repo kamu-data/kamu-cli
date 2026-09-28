@@ -25,3 +25,5 @@ doctest = false
 internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
+futures = { version = "0.3", default-features = false }
+tokio = { version = "1", default-features = false, features = ["sync", "time"] }

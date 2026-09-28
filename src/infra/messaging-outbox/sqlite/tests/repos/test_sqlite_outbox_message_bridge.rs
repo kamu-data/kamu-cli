@@ -11,7 +11,9 @@ use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_messaging_outbox_sqlite::SqliteOutboxMessageBridge;
+use kamu_wakeup_listener_sqlite::SqlitePollingHub;
 use sqlx::SqlitePool;
+use wakeup_listener::WakeupListenerConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,6 +84,8 @@ impl SqliteOutboxMessageBridgeHarness {
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteOutboxMessageBridge>();
+        catalog_builder.add::<SqlitePollingHub>();
+        catalog_builder.add_value(WakeupListenerConfig::local_default());
 
         Self {
             catalog: catalog_builder.build(),

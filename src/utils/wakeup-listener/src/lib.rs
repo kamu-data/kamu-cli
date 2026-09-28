@@ -7,8 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod hub_wakeup_listener;
+mod wakeup_hub;
 mod wakeup_listener;
 mod wakeup_listener_config;
+mod wakeup_subscribers;
 
+pub use hub_wakeup_listener::*;
+pub use wakeup_hub::*;
 pub use wakeup_listener::*;
 pub use wakeup_listener_config::*;
+pub use wakeup_subscribers::*;

@@ -122,7 +122,7 @@ impl PostgresTaskQueueWakeupHarness {
 
         let catalog = catalog_builder.build();
 
-        // Keep a single instance, as it owns the listening connection
+        // Keep a single instance, as it owns the subscriber slot
         let wakeup_source = catalog.get_one().unwrap();
 
         Self {

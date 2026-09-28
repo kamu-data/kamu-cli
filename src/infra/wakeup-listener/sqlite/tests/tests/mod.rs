@@ -7,4 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod harness;
+mod test_sqlite_polling_hub;
 mod test_sqlite_polling_wakeup_listener;

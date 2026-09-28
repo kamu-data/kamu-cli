@@ -8218,6 +8218,7 @@ dependencies = [
  "kamu-task-system-services",
  "kamu-task-system-sqlite",
  "kamu-wakeup-listener-postgres",
+ "kamu-wakeup-listener-sqlite",
  "kamu-webhooks",
  "kamu-webhooks-inmem",
  "kamu-webhooks-postgres",
@@ -9767,7 +9768,6 @@ version = "0.267.0"
 dependencies = [
  "async-trait",
  "dill",
- "futures",
  "internal-error",
  "sqlx",
  "test-group",
@@ -9781,12 +9781,12 @@ dependencies = [
 name = "kamu-wakeup-listener-sqlite"
 version = "0.267.0"
 dependencies = [
- "async-trait",
- "internal-error",
+ "dill",
  "sqlx",
  "test-group",
  "test-log",
  "tokio",
+ "tracing",
  "wakeup-listener",
 ]
 
@@ -15930,7 +15930,9 @@ name = "wakeup-listener"
 version = "0.267.0"
 dependencies = [
  "async-trait",
+ "futures",
  "internal-error",
+ "tokio",
 ]
 
 [[package]]

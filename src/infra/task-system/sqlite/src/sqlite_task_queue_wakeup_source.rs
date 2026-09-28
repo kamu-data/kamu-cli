@@ -10,33 +10,37 @@
 use std::sync::Arc;
 
 use kamu_task_system::TaskQueueWakeupSource;
-use kamu_wakeup_listener_sqlite::SqlitePollingWakeupListener;
-use wakeup_listener::WakeupListener;
+use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
+    name: "tasks_queued",
+    // Descending scan by primary key finds the latest match within a few rows
+    max_id_query: r#"
+        SELECT (
+            SELECT event_id FROM task_events
+                WHERE event_type IN ('TaskEventCreated', 'TaskEventRequeued')
+                ORDER BY event_id DESC
+                LIMIT 1
+        )
+    "#,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteTaskQueueWakeupSource {
-    wakeup_listener: SqlitePollingWakeupListener,
+    wakeup_listener: HubWakeupListener<SqlitePollingHub>,
 }
 
 #[dill::component(pub)]
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn TaskQueueWakeupSource)]
 impl SqliteTaskQueueWakeupSource {
-    pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
+    pub fn new(hub: Arc<SqlitePollingHub>) -> Self {
         Self {
-            wakeup_listener: SqlitePollingWakeupListener::new(
-                pool,
-                // Descending scan by primary key finds the latest match within a few rows
-                r#"
-                SELECT (
-                    SELECT event_id FROM task_events
-                        WHERE event_type IN ('TaskEventCreated', 'TaskEventRequeued')
-                        ORDER BY event_id DESC
-                        LIMIT 1
-                )
-                "#,
-            ),
+            wakeup_listener: HubWakeupListener::new(hub, POLLING_CHANNEL),
         }
     }
 }

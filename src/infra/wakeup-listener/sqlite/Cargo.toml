@@ -22,15 +22,20 @@ doctest = false
 
 
 [dependencies]
-internal-error = { workspace = true }
 wakeup-listener = { workspace = true }
 
-async-trait = { version = "0.1", default-features = false }
+dill = { version = "0.17", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio",
     "sqlite",
 ] }
-tokio = { version = "1", default-features = false, features = ["time"] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+    "sync",
+    "time",
+] }
+tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]

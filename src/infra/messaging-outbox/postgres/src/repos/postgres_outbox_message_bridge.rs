@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_wakeup_listener_postgres::{PostgresNotificationHub, PostgresNotifyWakeupListener};
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use messaging_outbox::*;
 use sqlx::Postgres;
-use wakeup_listener::WakeupListener;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ const NOTIFY_CHANNEL_NAME: &str = "outbox_messages_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresOutboxMessageBridge {
-    wakeup_listener: PostgresNotifyWakeupListener,
+    wakeup_listener: HubWakeupListener<PostgresNotificationHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,7 +34,7 @@ pub struct PostgresOutboxMessageBridge {
 impl PostgresOutboxMessageBridge {
     pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
         Self {
-            wakeup_listener: PostgresNotifyWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: HubWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
         }
     }
 }

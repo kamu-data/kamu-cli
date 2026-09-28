@@ -19,77 +19,111 @@ use super::harness::*;
 
 #[test_group::group(sqlite)]
 #[test_log::test(sqlx::test(migrations = false))]
-async fn test_subscription_signals_then_times_out_on_empty_table(sqlite_pool: SqlitePool) {
+async fn test_routes_changes_per_channel(sqlite_pool: SqlitePool) {
     let harness = SqliteWakeupHarness::new(sqlite_pool).await;
+    let listener = harness.subscribe(CHANNEL).await;
+    let other = harness.subscribe(OTHER_CHANNEL).await;
+    SqliteWakeupHarness::settle(&listener).await;
+    SqliteWakeupHarness::settle(&other).await;
 
-    harness.start_listening().await;
+    harness.insert_other_record().await;
 
-    assert_matches!(harness.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
+    assert_matches!(
+        SqliteWakeupHarness::wait_wake_on(&other, LONG_TIMEOUT).await,
+        WakeHint::Signaled
+    );
+    assert_matches!(
+        SqliteWakeupHarness::wait_wake_on(&listener, SHORT_TIMEOUT).await,
+        WakeHint::Timeout
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(sqlite)]
 #[test_log::test(sqlx::test(migrations = false))]
-async fn test_wakes_up_on_records_existing_before_subscription(sqlite_pool: SqlitePool) {
+async fn test_change_wakes_up_all_listeners_of_channel(sqlite_pool: SqlitePool) {
     let harness = SqliteWakeupHarness::new(sqlite_pool).await;
+    let listener_1 = harness.subscribe(CHANNEL).await;
+    let listener_2 = harness.subscribe(CHANNEL).await;
+    SqliteWakeupHarness::settle(&listener_1).await;
+    SqliteWakeupHarness::settle(&listener_2).await;
+
     harness.insert_record().await;
 
-    harness.start_listening().await;
-
-    // The records are reported at most once more, by the hub's first reading
-    harness.settle_default().await;
+    assert_matches!(
+        SqliteWakeupHarness::wait_wake_on(&listener_1, LONG_TIMEOUT).await,
+        WakeHint::Signaled
+    );
+    assert_matches!(
+        SqliteWakeupHarness::wait_wake_on(&listener_2, LONG_TIMEOUT).await,
+        WakeHint::Signaled
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(sqlite)]
 #[test_log::test(sqlx::test(migrations = false))]
-async fn test_times_out_when_nothing_new_since_last_wakeup(sqlite_pool: SqlitePool) {
+async fn test_late_subscriber_is_signaled_immediately(sqlite_pool: SqlitePool) {
     let harness = SqliteWakeupHarness::new(sqlite_pool).await;
     harness.start_listening().await;
     harness.settle_default().await;
+
+    // The hub has already consumed this change for the default listener
+    harness.insert_record().await;
+    assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
+
+    let late = harness.new_listener(CHANNEL);
+    assert_matches!(
+        SqliteWakeupHarness::wait_wake_on(&late, SHORT_TIMEOUT).await,
+        WakeHint::Signaled
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(sqlite)]
+#[test_log::test(sqlx::test(migrations = false))]
+async fn test_change_resets_backoff(sqlite_pool: SqlitePool) {
+    let harness = SqliteWakeupHarness::new(sqlite_pool).await;
+    let other = harness.subscribe(OTHER_CHANNEL).await;
+    harness.start_listening().await;
+    harness.settle_default().await;
+    SqliteWakeupHarness::settle(&other).await;
+
+    // Idle long enough for the poll interval to grow past a second
+    assert_matches!(
+        harness.wait_wake(Duration::from_secs(2)).await,
+        WakeHint::Timeout
+    );
 
     harness.insert_record().await;
     assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
 
-    assert_matches!(harness.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(sqlite)]
-#[test_log::test(sqlx::test(migrations = false))]
-async fn test_wakes_up_on_record_inserted_while_waiting(sqlite_pool: SqlitePool) {
-    let harness = SqliteWakeupHarness::new(sqlite_pool).await;
-    harness.start_listening().await;
-    harness.settle_default().await;
-
-    let (hint, elapsed) = harness
-        .wait_wake_while_inserting_after(Duration::from_millis(150))
-        .await;
-
+    // Right after a change the hub polls often again, for every channel
+    harness.insert_other_record().await;
+    let (hint, elapsed) = SqliteWakeupHarness::timed_wait_wake_on(&other).await;
     assert_matches!(hint, WakeHint::Signaled);
-    assert!(elapsed < LONG_TIMEOUT, "Woke up by timeout: {elapsed:?}");
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "Backoff was not reset: {elapsed:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(sqlite)]
 #[test_log::test(sqlx::test(migrations = false))]
-async fn test_wakes_up_once_per_batch_of_new_records(sqlite_pool: SqlitePool) {
+async fn test_failing_channel_query_does_not_block_others(sqlite_pool: SqlitePool) {
     let harness = SqliteWakeupHarness::new(sqlite_pool).await;
+    let _broken = harness.subscribe(BROKEN_CHANNEL).await;
     harness.start_listening().await;
     harness.settle_default().await;
 
     harness.insert_record().await;
-    harness.insert_record().await;
-    assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
-    assert_matches!(harness.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
 
-    harness.insert_record().await;
     assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
-    assert_matches!(harness.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

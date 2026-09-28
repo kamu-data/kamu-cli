@@ -11,9 +11,9 @@ use std::assert_matches;
 use std::sync::Arc;
 use std::time::Duration;
 
-use kamu_wakeup_listener_postgres::{PostgresNotificationHub, PostgresNotifyWakeupListener};
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::PgPool;
-use wakeup_listener::{WakeHint, WakeupListener};
+use wakeup_listener::{HubWakeupListener, WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,13 +30,13 @@ const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(50);
 pub(crate) struct PostgresWakeupHarness {
     pg_pool: PgPool,
     hub: Arc<PostgresNotificationHub>,
-    listener: PostgresNotifyWakeupListener,
+    listener: HubWakeupListener<PostgresNotificationHub>,
 }
 
 impl PostgresWakeupHarness {
     pub(crate) fn new(pg_pool: PgPool) -> Self {
         let hub = Arc::new(PostgresNotificationHub::new(Arc::new(pg_pool.clone())));
-        let listener = PostgresNotifyWakeupListener::new(hub.clone(), CHANNEL);
+        let listener = HubWakeupListener::new(hub.clone(), CHANNEL);
         Self {
             pg_pool,
             hub,
@@ -55,8 +55,11 @@ impl PostgresWakeupHarness {
 
     /// Creates another listener on the shared hub, and waits until it is
     /// subscribed
-    pub(crate) async fn subscribe(&self, channel: &'static str) -> PostgresNotifyWakeupListener {
-        let listener = PostgresNotifyWakeupListener::new(self.hub.clone(), channel);
+    pub(crate) async fn subscribe(
+        &self,
+        channel: &'static str,
+    ) -> HubWakeupListener<PostgresNotificationHub> {
+        let listener = HubWakeupListener::new(self.hub.clone(), channel);
         assert_matches!(
             Self::wait_wake_on(&listener, LONG_TIMEOUT).await,
             WakeHint::Signaled
@@ -65,7 +68,7 @@ impl PostgresWakeupHarness {
     }
 
     pub(crate) async fn wait_wake_on(
-        listener: &PostgresNotifyWakeupListener,
+        listener: &HubWakeupListener<PostgresNotificationHub>,
         timeout: Duration,
     ) -> WakeHint {
         listener
@@ -80,7 +83,7 @@ impl PostgresWakeupHarness {
 
     /// Consumes spurious wakeups, e.g. from a reconnect caused by a later
     /// subscription
-    pub(crate) async fn settle(listener: &PostgresNotifyWakeupListener) {
+    pub(crate) async fn settle(listener: &HubWakeupListener<PostgresNotificationHub>) {
         for _ in 0..5 {
             if let WakeHint::Timeout = Self::wait_wake_on(listener, SHORT_TIMEOUT).await {
                 return;

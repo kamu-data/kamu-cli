@@ -18,9 +18,9 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_wakeup_listener_postgres::{PostgresNotificationHub, PostgresNotifyWakeupListener};
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::Postgres;
-use wakeup_listener::WakeupListener;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +29,7 @@ const NOTIFY_CHANNEL_NAME: &str = "flow_system_events_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresFlowSystemEventBridge {
-    wakeup_listener: PostgresNotifyWakeupListener,
+    wakeup_listener: HubWakeupListener<PostgresNotificationHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ pub struct PostgresFlowSystemEventBridge {
 impl PostgresFlowSystemEventBridge {
     pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
         Self {
-            wakeup_listener: PostgresNotifyWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: HubWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
         }
     }
 }

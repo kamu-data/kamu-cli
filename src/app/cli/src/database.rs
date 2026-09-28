@@ -228,6 +228,7 @@ pub fn configure_database_components(
             b.add::<kamu_task_system_sqlite::SqliteTaskQueueWakeupSource>();
 
             b.add::<kamu_messaging_outbox_sqlite::SqliteOutboxMessageBridge>();
+            b.add::<kamu_wakeup_listener_sqlite::SqlitePollingHub>();
 
             b.add::<kamu_auth_rebac_sqlite::SqliteRebacRepository>();
 

@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock, Weak};
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
-use futures::FutureExt as _;
 use sqlx::postgres::PgListener;
 use tokio::sync::Notify;
+use wakeup_listener::{WakeupHub, WakeupSubscribers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,13 +39,9 @@ pub struct PostgresNotificationHub {
 
 struct HubInner {
     pool: Arc<sqlx::PgPool>,
-    // One slot per waiting listener handle. Weak, so a dropped handle simply
-    // stops receiving signals and is pruned on the next routing.
-    subscribers: Mutex<HashMap<&'static str, Vec<Weak<Notify>>>>,
-    // Tells the task to reconnect with an extended channel set. `Notify`
-    // stores a permit, so a subscription made while the task is busy
-    // connecting is not lost.
-    subscriptions_changed: Notify,
+    // One slot per waiting listener handle, keyed by channel name. A new
+    // channel makes the task reconnect with the extended channel set.
+    subscribers: WakeupSubscribers<&'static str>,
 }
 
 #[dill::component(pub)]
@@ -56,30 +51,22 @@ impl PostgresNotificationHub {
         Self {
             inner: Arc::new(HubInner {
                 pool,
-                subscribers: Mutex::default(),
-                subscriptions_changed: Notify::new(),
+                subscribers: WakeupSubscribers::new(),
             }),
             task: OnceLock::new(),
         }
     }
+}
 
-    /// Registers a subscriber slot, which is signaled once `LISTEN` on the
-    /// channel is active and on every notification afterwards.
-    /// Must be called within a Tokio runtime.
-    pub(crate) fn subscribe(&self, channel: &'static str) -> Arc<Notify> {
-        let slot = Arc::new(Notify::new());
-        self.inner
-            .subscribers
-            .lock()
-            .unwrap()
-            .entry(channel)
-            .or_default()
-            .push(Arc::downgrade(&slot));
+impl WakeupHub for PostgresNotificationHub {
+    type Channel = &'static str;
 
-        self.inner.subscriptions_changed.notify_one();
+    // The slot is signaled once `LISTEN` on the channel is active, and on every
+    // notification afterwards
+    fn subscribe(&self, channel: &'static str) -> Arc<Notify> {
+        let slot = self.inner.subscribers.add(channel);
         self.task
             .get_or_init(|| tokio::spawn(self.inner.clone().run()).abort_handle());
-
         slot
     }
 }
@@ -103,8 +90,8 @@ impl HubInner {
         loop {
             // The snapshot below already covers any pending subscription change.
             // A subscription racing with it leaves a permit, costing one extra reconnect.
-            let _ = self.subscriptions_changed.notified().now_or_never();
-            let channels = self.channels();
+            self.subscribers.take_changed();
+            let channels = self.subscribers.channels();
 
             let mut listener = match self.connect(&channels).await {
                 Ok(listener) => listener,
@@ -127,7 +114,7 @@ impl HubInner {
 
             // Anything notified while LISTEN wasn't active is lost: let everyone re-check.
             // This is also what makes a fresh subscriber's first wait return `Signaled`.
-            self.signal_all();
+            self.subscribers.signal_all();
 
             loop {
                 tokio::select! {
@@ -135,9 +122,9 @@ impl HubInner {
                     // cancelling `try_recv()` (sqlx doesn't document it as cancel-safe),
                     // drop it and reconnect with the full channel set. Subscriptions happen
                     // at startup, so this costs one spurious wakeup to the other channels.
-                    () = self.subscriptions_changed.notified() => break,
+                    () = self.subscribers.changed() => break,
                     res = listener.try_recv() => match res {
-                        Ok(Some(notification)) => self.signal(notification.channel()),
+                        Ok(Some(notification)) => self.subscribers.signal(notification.channel()),
                         // Connection lost. With eager reconnect off, sqlx reports it
                         // instead of silently reconnecting and hiding lost notifications.
                         Ok(None) => {
@@ -166,36 +153,6 @@ impl HubInner {
         listener.eager_reconnect(false);
         listener.listen_all(channels.iter().copied()).await?;
         Ok(listener)
-    }
-
-    fn channels(&self) -> Vec<&'static str> {
-        self.subscribers.lock().unwrap().keys().copied().collect()
-    }
-
-    fn signal(&self, channel: &str) {
-        let mut subscribers = self.subscribers.lock().unwrap();
-        if let Some(slots) = subscribers.get_mut(channel) {
-            Self::signal_slots(slots);
-        }
-    }
-
-    fn signal_all(&self) {
-        let mut subscribers = self.subscribers.lock().unwrap();
-        for slots in subscribers.values_mut() {
-            Self::signal_slots(slots);
-        }
-    }
-
-    // `notify_one` stores a permit if the handle isn't waiting right now, so the
-    // signal is picked up by its next `wait_wake`
-    fn signal_slots(slots: &mut Vec<Weak<Notify>>) {
-        slots.retain(|slot| match slot.upgrade() {
-            Some(slot) => {
-                slot.notify_one();
-                true
-            }
-            None => false,
-        });
     }
 }
 
