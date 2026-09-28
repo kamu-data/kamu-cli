@@ -26,10 +26,14 @@ pub struct FlowSystemEventAgentConfig {
 }
 
 impl FlowSystemEventAgentConfig {
+    // Same reasoning as for the outbox: each batch is one transaction, which on
+    // Sqlite holds the pool's only connection, so keep it short
     pub fn local_default() -> Self {
         Self { batch_size: 20 }
     }
 
+    // Postgres pools connections, so larger batches mostly save round trips
+    // when a projector catches up on a backlog
     pub fn production_default() -> Self {
         Self { batch_size: 100 }
     }

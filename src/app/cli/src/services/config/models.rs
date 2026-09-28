@@ -697,7 +697,9 @@ pub struct UploadsConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Note: defaults suit the CLI with a SQLite target. Postgres targets typically
+// Note: defaults suit the CLI with a SQLite target, and match
+// `WakeupListenerConfig::local_default()` and the agents' `local_default()`
+// batch sizes, where the reasoning is documented. Postgres targets typically
 // use a higher listening timeout (~60s) and larger batches (~100..500).
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsConfig {

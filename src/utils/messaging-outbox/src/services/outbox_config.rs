@@ -14,10 +14,15 @@ pub struct OutboxAgentConfig {
 }
 
 impl OutboxAgentConfig {
+    // Each batch is one transaction, which on Sqlite holds the pool's only
+    // connection: small batches keep API requests from waiting behind a long
+    // catch-up
     pub fn local_default() -> Self {
         Self { batch_size: 20 }
     }
 
+    // Postgres pools connections, so larger batches mostly save round trips
+    // when catching up on a backlog, e.g. after a restart
     pub fn production_default() -> Self {
         Self { batch_size: 100 }
     }
