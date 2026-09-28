@@ -1,9 +1,6 @@
 /* ------------------------------ */
 
--- Wakes up the task agent whenever a task enters the queue:
---  - a new task is created (always queued initially)
---  - an existing task is requeued (i.e. after a crash recovery)
--- Other status transitions (running, finished) do not need to wake up the agent.
+-- Wake the task agent only when a task enters the queue: on creation or requeue
 
 CREATE OR REPLACE FUNCTION notify_tasks_queued()
     RETURNS trigger LANGUAGE plpgsql AS $$
@@ -16,8 +13,7 @@ CREATE TRIGGER tasks_insert_notify
     AFTER INSERT ON tasks
     FOR EACH STATEMENT EXECUTE FUNCTION notify_tasks_queued();
 
--- Row-level, as statement-level triggers cannot filter by the new status.
--- Duplicate notifications within one transaction are collapsed by Postgres.
+-- Row-level to filter by status; Postgres collapses duplicate notifications per transaction
 CREATE TRIGGER tasks_requeue_notify
     AFTER UPDATE OF task_status ON tasks
     FOR EACH ROW

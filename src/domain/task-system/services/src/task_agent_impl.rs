@@ -141,7 +141,6 @@ impl TaskAgentImpl {
     }
 
     async fn take_task(&self) -> Result<Task, InternalError> {
-        // Access wakeup listener
         let wakeup_listener = self.task_queue_wakeup_source.wakeup_listener();
 
         loop {
@@ -151,8 +150,7 @@ impl TaskAgentImpl {
                 return Ok(task);
             }
 
-            // Wait for push or timeout - let the store handle the backoff strategy.
-            // Regardless of the hint, the queue is re-checked afterwards
+            // Signals are only hints, so the queue is re-checked on any wakeup
             let hint = wakeup_listener
                 .wait_wake(
                     self.agent_config.max_listening_timeout,

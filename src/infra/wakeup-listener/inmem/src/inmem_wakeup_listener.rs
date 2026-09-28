@@ -28,7 +28,6 @@ impl InMemoryWakeupListener {
     }
 
     pub fn signal(&self) {
-        // Wake up all listeners
         // We ignore errors here because if there are no listeners, that's fine
         let _ = self.tx.send(());
     }
@@ -43,22 +42,17 @@ impl WakeupListener for InMemoryWakeupListener {
         timeout: Duration,
         _min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError> {
-        // Subscribe to the signals broadcast channel
         let mut rx = self.tx.subscribe();
 
-        // Wait until a signal arrives or timeout elapses
         // For testing purposes, we keep this simple without complex backoff strategies
         match tokio::time::timeout(timeout, rx.recv()).await {
-            Ok(Ok(())) => {
-                // Signal received
-                Ok(WakeHint::Signaled)
-            }
+            Ok(Ok(())) => Ok(WakeHint::Signaled),
             Ok(Err(broadcast::error::RecvError::Closed)) => {
                 // Sender has been dropped, which should never happen in this case
                 unreachable!("InMemoryWakeupListener: broadcast channel closed");
             }
             Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
-                // We lagged behind, but that's fine, just indicate a signal was received
+                // Lagging means several signals were missed, which is still a wakeup
                 Ok(WakeHint::Signaled)
             }
             Err(_elapsed) => {

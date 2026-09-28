@@ -31,7 +31,6 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
     // Nothing happened yet. This also starts listening for notifications
     assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
 
-    // A new task is queued
     let task_id = harness.new_task_id().await;
     let last_event_id = harness
         .save_event(
@@ -62,7 +61,7 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
         .await;
     assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
 
-    // A task is requeued (i.e., recovery after crash)
+    // A requeue (e.g. crash recovery) must wake up the agent
     let last_event_id = harness
         .save_event(
             task_id,

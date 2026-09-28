@@ -11,10 +11,8 @@ use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Signals the task agent that new tasks might have been queued,
-/// so that it does not have to poll the task queue continuously
+/// Signals the task agent that new tasks might have been queued
 pub trait TaskQueueWakeupSource: Send + Sync {
-    /// Provides task queue wakeup listener instance
     fn wakeup_listener(&self) -> &dyn WakeupListener;
 }
 

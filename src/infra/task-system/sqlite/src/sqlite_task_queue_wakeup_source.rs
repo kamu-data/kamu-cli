@@ -25,8 +25,7 @@ pub struct SqliteTaskQueueWakeupSource {
 impl SqliteTaskQueueWakeupSource {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self {
-            // Note: any new task event wakes up the agent, not only queueing ones.
-            // This is acceptable, as the agent will simply re-check the queue
+            // Wakes up on any task event, not only queueing: a spurious re-check is cheap
             wakeup_listener: SqlitePollingWakeupListener::new(
                 pool,
                 "SELECT MAX(event_id) FROM task_events",

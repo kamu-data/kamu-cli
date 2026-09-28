@@ -15,9 +15,8 @@ use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Sqlite has no notification mechanism, so this polls a cheap query returning
-/// the maximum ID of the watched records (`SELECT MAX(id) FROM ...`), with
-/// exponential backoff between `min_debounce_interval` and the timeout.
+/// Sqlite has no notifications, so this polls a cheap `SELECT MAX(id) FROM ...`
+/// query with exponential backoff.
 pub struct SqlitePollingWakeupListener {
     pool: Arc<sqlx::SqlitePool>,
     max_id_query: String,
@@ -68,7 +67,6 @@ impl WakeupListener for SqlitePollingWakeupListener {
         let mut poll_interval = min_debounce_interval;
 
         loop {
-            // Check for new records
             if let Some(_max_id) = self.check_for_new_ids().await? {
                 return Ok(WakeHint::Signaled);
             }

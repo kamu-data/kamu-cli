@@ -134,7 +134,6 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
             .save_events(task_id, maybe_prev_stored_event_id, events)
             .await?;
 
-        // Wake up the task agent, if it's waiting for new tasks
         if has_queued_tasks {
             self.task_queue_wakeup_source.notify_task_queued();
         }
