@@ -12,6 +12,7 @@ use database_common::{DatabaseTransactionManager, PostgresTransactionManager};
 use database_common_macros::{database_transactional_test, transactional_method};
 use dill::{Catalog, CatalogBuilder};
 use kamu_messaging_outbox_postgres::PostgresOutboxMessageBridge;
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use messaging_outbox::{
     NewOutboxMessage,
     OutboxMessage,
@@ -195,6 +196,7 @@ impl PostgresOutboxMessageBridgeHarness {
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresOutboxMessageBridge>();
+        catalog_builder.add::<PostgresNotificationHub>();
 
         Self {
             catalog: catalog_builder.build(),

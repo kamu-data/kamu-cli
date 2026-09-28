@@ -18,6 +18,7 @@ use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::{FlowBinding, FlowTrigger, FlowTriggerEventStore, FlowTriggerStatus};
 use kamu_flow_system_inmem::{InMemoryFlowSystemEventBridge, InMemoryFlowTriggerEventStore};
 use kamu_flow_system_services::FlowTriggerServiceImpl;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use kamu_webhooks::{
     WebhookEventTypeCatalog,
     WebhookSecretGenerator,
@@ -115,6 +116,7 @@ impl WebhookRecoveryJobHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<FlowTriggerServiceImpl>()
         .add::<InMemoryFlowSystemEventBridge>()
+        .add::<InMemoryWakeupHub>()
         .add::<InMemoryFlowTriggerEventStore>()
         .add::<InMemoryWebhookSubscriptionEventStore>()
         .add::<FakeDatasetEntryService>()

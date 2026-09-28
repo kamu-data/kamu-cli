@@ -55,6 +55,7 @@ kamu-datasets-services = { workspace = true, features = ["testing"] }
 kamu-flow-system = { workspace = true, features = ["testing"] }
 kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-services = { workspace = true }
 

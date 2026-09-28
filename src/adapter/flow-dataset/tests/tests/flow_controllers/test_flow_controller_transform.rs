@@ -19,6 +19,7 @@ use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrem
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_task_system::LogicalPlan;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use odf::dataset::MetadataChainIncrementInterval;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
@@ -188,6 +189,7 @@ impl FlowControllerTransformHarness {
         b.add::<FlowControllerTransform>()
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
             .add_value(mock_dataset_increment_service)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
             .add_value(mock_flow_sensor_dispatcher)

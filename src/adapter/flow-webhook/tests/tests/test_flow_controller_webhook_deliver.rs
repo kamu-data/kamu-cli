@@ -19,6 +19,7 @@ use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_task_system::{LogicalPlan, TaskResult};
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use kamu_webhooks::{WebhookEventType, WebhookEventTypeCatalog, WebhookSubscriptionID};
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use kamu_webhooks_services::WebhookSubscriptionQueryServiceImpl;
@@ -248,6 +249,7 @@ impl FlowControllerWebhookDeliverHarness {
         b.add::<FlowControllerWebhookDeliver>()
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
             .add::<FakeDatasetEntryService>()
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_flow_sensor_dispatcher)

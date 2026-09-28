@@ -18,14 +18,21 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_messaging_outbox_sqlite::SqliteMessageStoreWakeupDetector;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
 use sqlx::Sqlite;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
+    name: "flow_system_events",
+    max_id_query: "SELECT MAX(event_id) FROM flow_system_events",
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventBridge {
-    wakeup_detector: SqliteMessageStoreWakeupDetector,
+    hub: Arc<SqlitePollingHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,13 +41,8 @@ pub struct SqliteFlowSystemEventBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl SqliteFlowSystemEventBridge {
-    pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
-        Self {
-            wakeup_detector: SqliteMessageStoreWakeupDetector::new(
-                pool,
-                "SELECT MAX(event_id) FROM flow_system_events",
-            ),
-        }
+    pub fn new(hub: Arc<SqlitePollingHub>) -> Self {
+        Self { hub }
     }
 }
 
@@ -48,9 +50,8 @@ impl SqliteFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
     }
 
     /// Fetch next batch for the given projector; order by global id.

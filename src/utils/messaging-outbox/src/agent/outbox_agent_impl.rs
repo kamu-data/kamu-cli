@@ -17,6 +17,7 @@ use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use tracing::Instrument as _;
+use wakeup_listener::WakeupListenerConfig;
 
 use crate::*;
 
@@ -29,6 +30,7 @@ pub const JOB_MESSAGING_OUTBOX_STARTUP: &str = "dev.kamu.utils.outbox.OutboxAgen
 pub struct OutboxAgentImpl {
     catalog: CatalogWeakRef,
     agent_config: Arc<OutboxAgentConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
     routes_static_info: Arc<OutboxRoutesStaticInfo>,
     producer_consumption_jobs: Vec<ProducerConsumptionJob>,
     outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
@@ -50,6 +52,7 @@ impl OutboxAgentImpl {
     pub fn new(
         catalog: CatalogWeakRef,
         agent_config: Arc<OutboxAgentConfig>,
+        wakeup_config: Arc<WakeupListenerConfig>,
         message_dispatchers_by_producers: Vec<Arc<dyn MessageDispatcher>>,
         outbox_message_bridge: Arc<dyn OutboxMessageBridge>,
         metrics: Arc<OutboxAgentMetrics>,
@@ -75,6 +78,7 @@ impl OutboxAgentImpl {
         Self {
             catalog,
             agent_config,
+            wakeup_config,
             routes_static_info,
             producer_consumption_jobs,
             outbox_message_bridge,
@@ -117,15 +121,14 @@ impl OutboxAgentImpl {
             .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
             .await?;
 
-        // Access wakeup detector
-        let wakeup_detector = self.outbox_message_bridge.wakeup_detector();
+        let wakeup_listener = self.outbox_message_bridge.new_wakeup_listener();
 
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
-            let hint = wakeup_detector
+            let hint = wakeup_listener
                 .wait_wake(
-                    self.agent_config.max_listening_timeout,
-                    self.agent_config.min_debounce_interval,
+                    self.wakeup_config.max_listening_timeout,
+                    self.wakeup_config.min_debounce_interval,
                 )
                 .await?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");

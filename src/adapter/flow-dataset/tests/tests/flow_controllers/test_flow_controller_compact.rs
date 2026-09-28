@@ -18,6 +18,7 @@ use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_task_system::LogicalPlan;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 
@@ -165,6 +166,7 @@ impl FlowControllerCompactHarness {
         b.add::<FlowControllerCompact>()
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
             .add_value(mock_flow_sensor_dispatcher)
             .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
             .add::<FakeDatasetEntryService>()

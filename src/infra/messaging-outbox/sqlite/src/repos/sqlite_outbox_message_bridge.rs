@@ -11,15 +11,22 @@ use std::sync::Arc;
 
 use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
 use messaging_outbox::*;
 use sqlx::Sqlite;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
 
-use crate::SqliteMessageStoreWakeupDetector;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
+    name: "outbox_messages",
+    max_id_query: "SELECT MAX(message_id) FROM outbox_messages",
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteOutboxMessageBridge {
-    wakeup_detector: SqliteMessageStoreWakeupDetector,
+    hub: Arc<SqlitePollingHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,13 +35,8 @@ pub struct SqliteOutboxMessageBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn OutboxMessageBridge)]
 impl SqliteOutboxMessageBridge {
-    pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
-        Self {
-            wakeup_detector: SqliteMessageStoreWakeupDetector::new(
-                pool,
-                "SELECT MAX(message_id) FROM outbox_messages",
-            ),
-        }
+    pub fn new(hub: Arc<SqlitePollingHub>) -> Self {
+        Self { hub }
     }
 }
 
@@ -42,8 +44,8 @@ impl SqliteOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for SqliteOutboxMessageBridge {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
     }
 
     async fn push_message(

@@ -157,6 +157,7 @@ impl LocalFacadeHarness {
         outbox_provider.embed_into_catalog(&mut b);
         if needs_bridge {
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
+            b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
         }
 
         // Accounts

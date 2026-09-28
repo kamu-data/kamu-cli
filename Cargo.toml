@@ -30,6 +30,7 @@ members = [
     "src/utils/test-utils",
     "src/utils/time-source",
     "src/utils/tracing-perfetto",
+    "src/utils/wakeup-listener",
     # ODF
     "src/odf/odf",
     "src/odf/metadata",
@@ -123,6 +124,10 @@ members = [
     "src/infra/messaging-outbox/inmem",
     "src/infra/messaging-outbox/postgres",
     "src/infra/messaging-outbox/sqlite",
+    ## Wakeup listener
+    "src/infra/wakeup-listener/inmem",
+    "src/infra/wakeup-listener/postgres",
+    "src/infra/wakeup-listener/sqlite",
     ## Webhooks
     "src/infra/webhooks/repo-tests",
     "src/infra/webhooks/inmem",
@@ -193,6 +198,7 @@ server-console = { version = "0.267.0", path = "src/utils/server-console", defau
 test-utils = { version = "0.267.0", path = "src/utils/test-utils", default-features = false }
 time-source = { version = "0.267.0", path = "src/utils/time-source", default-features = false }
 tracing-perfetto = { version = "0.267.0", path = "src/utils/tracing-perfetto", default-features = false }
+wakeup-listener = { version = "0.267.0", path = "src/utils/wakeup-listener", default-features = false }
 
 # Domain
 kamu-accounts = { version = "0.267.0", path = "src/domain/accounts/domain", default-features = false }
@@ -284,6 +290,10 @@ kamu-messaging-outbox-inmem = { version = "0.267.0", path = "src/infra/messaging
 kamu-messaging-outbox-postgres = { version = "0.267.0", path = "src/infra/messaging-outbox/postgres", default-features = false }
 kamu-messaging-outbox-sqlite = { version = "0.267.0", path = "src/infra/messaging-outbox/sqlite", default-features = false }
 kamu-messaging-outbox-repo-tests = { version = "0.267.0", path = "src/infra/messaging-outbox/repo-tests", default-features = false }
+# Wakeup listener
+kamu-wakeup-listener-inmem = { version = "0.267.0", path = "src/infra/wakeup-listener/inmem", default-features = false }
+kamu-wakeup-listener-postgres = { version = "0.267.0", path = "src/infra/wakeup-listener/postgres", default-features = false }
+kamu-wakeup-listener-sqlite = { version = "0.267.0", path = "src/infra/wakeup-listener/sqlite", default-features = false }
 ## Webhooks
 kamu-webhooks-inmem = { version = "0.267.0", path = "src/infra/webhooks/inmem", default-features = false }
 kamu-webhooks-postgres = { version = "0.267.0", path = "src/infra/webhooks/postgres", default-features = false }

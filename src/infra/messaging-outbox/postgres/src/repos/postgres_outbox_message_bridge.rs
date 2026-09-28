@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use messaging_outbox::*;
 use sqlx::Postgres;
-
-use crate::PostgresMessageStoreWakeupDetector;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ const NOTIFY_CHANNEL_NAME: &str = "outbox_messages_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresOutboxMessageBridge {
-    wakeup_detector: PostgresMessageStoreWakeupDetector,
+    hub: Arc<PostgresNotificationHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,10 +32,8 @@ pub struct PostgresOutboxMessageBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn OutboxMessageBridge)]
 impl PostgresOutboxMessageBridge {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
-        Self {
-            wakeup_detector: PostgresMessageStoreWakeupDetector::new(pool, NOTIFY_CHANNEL_NAME),
-        }
+    pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
+        Self { hub }
     }
 }
 
@@ -43,8 +41,11 @@ impl PostgresOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for PostgresOutboxMessageBridge {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            NOTIFY_CHANNEL_NAME,
+        ))
     }
 
     async fn push_message(

@@ -8,18 +8,22 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{BTreeSet, HashMap};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use kamu_flow_system::*;
-use kamu_messaging_outbox_inmem::InMemoryMessageStoreWakeupDetector;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const WAKEUP_CHANNEL: &str = "flow_system_events_ready";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowSystemEventBridge {
     state: Mutex<State>,
-    wakeup_detector: InMemoryMessageStoreWakeupDetector,
+    wakeup_hub: Arc<InMemoryWakeupHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,12 +43,10 @@ struct State {
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl InMemoryFlowSystemEventBridge {
-    pub fn new() -> Self {
-        let wakeup_detector = InMemoryMessageStoreWakeupDetector::new();
-
+    pub fn new(wakeup_hub: Arc<InMemoryWakeupHub>) -> Self {
         Self {
             state: Mutex::new(State::default()),
-            wakeup_detector,
+            wakeup_hub,
         }
     }
 
@@ -73,8 +75,7 @@ impl InMemoryFlowSystemEventBridge {
 
         let max_event_id = EventID::new(i64::try_from(state.events.len()).unwrap());
 
-        // Wake up listeners
-        self.wakeup_detector.notify_new_message_arrived();
+        self.wakeup_hub.signal(WAKEUP_CHANNEL);
 
         max_event_id
     }
@@ -84,9 +85,11 @@ impl InMemoryFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.wakeup_hub.clone(),
+            WAKEUP_CHANNEL,
+        ))
     }
 
     /// Fetch next batch for the given projector; order by global id.

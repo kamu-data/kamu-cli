@@ -11,6 +11,7 @@ use async_graphql::value;
 use kamu::MetadataQueryServiceImpl;
 use kamu_datasets::*;
 use kamu_flow_system_inmem::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use odf::metadata::testing::MetadataFactory;
 
 use crate::utils::{
@@ -49,6 +50,7 @@ impl BaseGQLFlowHarness {
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
             .add::<InMemoryFlowProcessState>();
 
         b.build()

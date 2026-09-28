@@ -11,5 +11,7 @@
 pub use kamu_task_system as domain;
 
 mod postgres_task_event_store;
+mod postgres_task_queue_wakeup_source;
 
 pub use postgres_task_event_store::*;
+pub use postgres_task_queue_wakeup_source::*;

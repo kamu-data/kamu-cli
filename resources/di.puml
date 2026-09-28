@@ -169,6 +169,7 @@ interface "StorageEventStore" <<i>>
 interface "SyncService" <<i>>
 interface "SystemTimeSource" <<i>>
 interface "TaskEventStore" <<i>>
+interface "TaskQueueWakeupSource" <<i>>
 interface "TransformElaborationService" <<i>>
 interface "TransformExecutor" <<i>>
 interface "TransformRequestPlanner" <<i>>
@@ -434,12 +435,14 @@ class "SqliteFlowTriggerEventStore"
 class "SqliteOAuthDeviceCodeRepository"
 class "SqliteOutboxMessageBridge" <<agnostic>>
 class "SqlitePlugin"
+class "SqlitePollingHub" <<singleton>>
 class "SqliteRebacRepository"
 class "SqliteResourceLabelProjectionRepository"
 class "SqliteResourceRawEventStore"
 class "SqliteResourceRepository"
 class "SqliteSecretSetProjectionRepository"
 class "SqliteTaskEventStore"
+class "SqliteTaskQueueWakeupSource" <<agnostic>>
 class "SqliteTransactionManager"
 class "SqliteVariableSetProjectionRepository"
 class "SqliteWeb3AuthEip4361NonceRepository"
@@ -459,7 +462,6 @@ class "StorageTypedResourceQueryServiceImpl"
 class "SyncRequestBuilder"
 class "SyncServiceImpl"
 class "SystemTimeSourceDefault" <<agnostic>>
-class "TaskAgentConfig" <<singleton>>
 class "TenancyConfig" <<singleton>>
 class "TransactionRef" <<singleton>>
 class "TransactionRefT" <<singleton>>
@@ -485,6 +487,7 @@ class "VerificationServiceImpl"
 class "VerifyDatasetUseCaseImpl"
 class "ViewCollectionEntriesUseCaseImpl"
 class "ViewVersionedFileHistoryUseCaseImpl"
+class "WakeupListenerConfig" <<singleton>>
 class "Web3AuthEip4361NonceServiceImpl"
 class "WebhooksConfig" <<singleton>>
 class "WorkspaceLayout" <<singleton>>
@@ -1125,11 +1128,11 @@ class "WsSmartTransferProtocolClient"
 "FlowEventStore" <|-- "SqliteFlowEventStore"
 "SqliteFlowEventStore"  --> "TransactionRefT"
 "FlowSystemEventBridge" <|-- "SqliteFlowSystemEventBridge"
-"SqliteFlowSystemEventBridge"  --> "Pool"
+"SqliteFlowSystemEventBridge"  --> "SqlitePollingHub"
 "FlowTriggerEventStore" <|-- "SqliteFlowTriggerEventStore"
 "SqliteFlowTriggerEventStore"  --> "TransactionRefT"
 "OutboxMessageBridge" <|-- "SqliteOutboxMessageBridge"
-"SqliteOutboxMessageBridge"  --> "Pool"
+"SqliteOutboxMessageBridge"  --> "SqlitePollingHub"
 "ResourceFacade" <|-- "LocalResourceFacadeImpl"
 "LocalResourceFacadeImpl"  --> "GenericResourceQueryService"
 "LocalResourceFacadeImpl"  --> "ResourceAccountResolver"
@@ -1219,6 +1222,10 @@ class "WsSmartTransferProtocolClient"
 "StorageTypedResourceQueryServiceImpl"  --> "ResourceRepository"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
+"TaskQueueWakeupSource" <|-- "SqliteTaskQueueWakeupSource"
+"SqliteTaskQueueWakeupSource"  --> "SqlitePollingHub"
+"SqlitePollingHub"  --> "Pool"
+"SqlitePollingHub"  --> "WakeupListenerConfig"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"
 "SqliteWebhookDeliveryRepository"  --> "TransactionRefT"
 "WebhookSubscriptionEventStore" <|-- "SqliteWebhookSubscriptionEventStore"
@@ -1231,6 +1238,7 @@ class "WsSmartTransferProtocolClient"
 "OutboxAgentImpl"  --> "OutboxMessageBridge"
 "OutboxAgentImpl"  --> "OutboxAgentMetrics"
 "OutboxAgentImpl"  --> "OutboxAgentConfig"
+"OutboxAgentImpl"  --> "WakeupListenerConfig"
 "MetricsProvider" <|-- "OutboxAgentMetrics"
 "OutboxDispatchingImpl"  --> "Catalog"
 "OutboxDispatchingImpl"  --> "OutboxImmediateImpl"

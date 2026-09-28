@@ -13,6 +13,7 @@ use std::sync::Arc;
 use kamu_task_system::*;
 use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use time_source::SystemTimeSourceStub;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -145,7 +146,9 @@ async fn test_task_cancellation() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_task_scheduler() -> impl TaskScheduler {
-    let task_event_store = Arc::new(InMemoryTaskEventStore::new());
+    let task_event_store = Arc::new(InMemoryTaskEventStore::new(Arc::new(
+        InMemoryWakeupHub::new(),
+    )));
     let time_source = Arc::new(SystemTimeSourceStub::new());
     TaskSchedulerImpl::new(task_event_store, time_source)
 }

@@ -25,11 +25,13 @@ use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
 use kamu_task_system::{MESSAGE_PRODUCER_KAMU_TASK_AGENT, TaskProgressMessage};
-use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
+use wakeup_listener::WakeupListenerConfig;
 
 use super::{
     FlowSystemTestListener,
@@ -112,15 +114,17 @@ impl FlowHarness {
                 mandatory_throttling_period,
                 HashMap::new(),
             ))
-            .add_value(FlowSystemEventAgentConfig {
-                min_debounce_interval: awaiting_step.to_std().unwrap(),
+            .add_value(FlowSystemEventAgentConfig { batch_size: 10 })
+            .add_value(WakeupListenerConfig {
+                // In-memory stores used to ignore it: keep test timings unchanged
+                min_debounce_interval: std::time::Duration::ZERO,
                 max_listening_timeout: (awaiting_step * 5).to_std().unwrap(),
-                batch_size: 10,
             })
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
             .add::<InMemoryFlowProcessState>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
@@ -132,6 +136,7 @@ impl FlowHarness {
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
+            .add::<InMemoryTaskQueueWakeupSource>()
             .add::<DatabaseTransactionRunner>()
             .add::<FakeDatasetEntryService>();
 

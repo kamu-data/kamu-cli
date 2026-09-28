@@ -8,21 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use wakeup_listener::WakeupListener;
 
-use crate::{
-    MessageStoreWakeupDetector,
-    NewOutboxMessage,
-    OutboxMessage,
-    OutboxMessageBoundary,
-    OutboxMessageID,
-};
+use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageBoundary, OutboxMessageID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait OutboxMessageBridge: Send + Sync {
-    /// Provides outbox message store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector;
+    /// Creates a listener handle for one consumer, which keeps it for its
+    /// lifetime: handles are cheap, but a shared one would lose wakeups
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 
     /// Pushes new message to the outbox
     async fn push_message(

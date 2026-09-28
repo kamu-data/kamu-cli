@@ -18,6 +18,7 @@ use kamu_task_system::*;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
+use wakeup_listener::{WakeupListener, WakeupListenerConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +35,8 @@ use tracing::Instrument as _;
 pub struct TaskAgentImpl {
     catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
-    agent_config: Arc<TaskAgentConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
+    task_queue_wakeup_source: Arc<dyn TaskQueueWakeupSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,8 +86,11 @@ impl TaskAgentImpl {
             })
     }
 
-    async fn run_task_iteration(&self) -> Result<(), InternalError> {
-        let task = self.take_task().await?;
+    async fn run_task_iteration(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+    ) -> Result<(), InternalError> {
+        let task = self.take_task(wakeup_listener).await?;
 
         let task_outcome = self
             .run_task(&task)
@@ -139,7 +144,7 @@ impl TaskAgentImpl {
         Ok(())
     }
 
-    async fn take_task(&self) -> Result<Task, InternalError> {
+    async fn take_task(&self, wakeup_listener: &dyn WakeupListener) -> Result<Task, InternalError> {
         loop {
             let maybe_task = self.take_task_non_blocking().await?;
 
@@ -147,9 +152,14 @@ impl TaskAgentImpl {
                 return Ok(task);
             }
 
-            self.time_source
-                .sleep(self.agent_config.task_checking_interval)
-                .await;
+            // Signals are only hints, so the queue is re-checked on any wakeup
+            let hint = wakeup_listener
+                .wait_wake(
+                    self.wakeup_config.max_listening_timeout,
+                    self.wakeup_config.min_debounce_interval,
+                )
+                .await?;
+            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
         }
     }
 
@@ -268,9 +278,12 @@ impl BackgroundAgent for TaskAgentImpl {
 
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
+        // Kept across iterations, so that no change is missed between them
+        let wakeup_listener = self.task_queue_wakeup_source.new_wakeup_listener();
+
         // TODO: Error and panic handling strategy
         loop {
-            self.run_task_iteration().await?;
+            self.run_task_iteration(wakeup_listener.as_ref()).await?;
         }
     }
 }
@@ -282,7 +295,8 @@ impl TaskAgent for TaskAgentImpl {
     /// Runs single task only, blocks until it is available (for tests only!)
     #[tracing::instrument(level = "info", skip_all)]
     async fn run_single_task(&self) -> Result<(), InternalError> {
-        self.run_task_iteration().await
+        let wakeup_listener = self.task_queue_wakeup_source.new_wakeup_listener();
+        self.run_task_iteration(wakeup_listener.as_ref()).await
     }
 }
 

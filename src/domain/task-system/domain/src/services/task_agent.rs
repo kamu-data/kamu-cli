@@ -20,19 +20,3 @@ pub trait TaskAgent: BackgroundAgent {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct TaskAgentConfig {
-    /// Defines interval between task executor checks for new pending tasks
-    pub task_checking_interval: chrono::Duration,
-}
-
-impl TaskAgentConfig {
-    pub fn new(task_checking_interval: chrono::Duration) -> Self {
-        Self {
-            task_checking_interval,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

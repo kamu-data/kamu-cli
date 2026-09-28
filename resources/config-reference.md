@@ -15,6 +15,19 @@
 <td>Auth configuration</td>
 </tr>
 <tr>
+<td><code>backgroundAgents</code></td>
+<td><a href="#backgroundagentsconfig"><code>BackgroundAgentsConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;batching&quot;: {
+    &quot;flowSystemEvents&quot;: 20,
+    &quot;outboxMessages&quot;: 20
+  },
+  &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
+  &quot;minDebounceInterval&quot;: &quot;20ms&quot;
+}</code></pre></td>
+<td>Background agents configuration (outbox, flow system events, tasks)</td>
+</tr>
+<tr>
 <td><code>database</code></td>
 <td><a href="#databaseconfig"><code>DatabaseConfig</code></a></td>
 <td><code class="language-json">null</code></td>
@@ -73,19 +86,9 @@
 <td><code>flowSystem</code></td>
 <td><a href="#flowsystemconfig"><code>FlowSystemConfig</code></a></td>
 <td><pre><code class="language-json">{
-  &quot;flowAgent&quot;: {
-    &quot;awaitingStepSecs&quot;: 1,
-    &quot;defaultRetryPolicies&quot;: {},
-    &quot;mandatoryThrottlingPeriodSecs&quot;: 60
-  },
-  &quot;flowSystemEventAgent&quot;: {
-    &quot;batchSize&quot;: 20,
-    &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-    &quot;minDebounceInterval&quot;: &quot;100ms&quot;
-  },
-  &quot;taskAgent&quot;: {
-    &quot;checkingIntervalSecs&quot;: 1
-  }
+  &quot;awaitingStepSecs&quot;: 1,
+  &quot;defaultRetryPolicies&quot;: {},
+  &quot;mandatoryThrottlingPeriodSecs&quot;: 60
 }</code></pre></td>
 <td>Configuration for flow system</td>
 </tr>
@@ -105,16 +108,6 @@
 <td><a href="#identityconfig"><code>IdentityConfig</code></a></td>
 <td><code class="language-json">{}</code></td>
 <td>UNSTABLE: Identity configuration</td>
-</tr>
-<tr>
-<td><code>outbox</code></td>
-<td><a href="#outboxagentconfig"><code>OutboxAgentConfig</code></a></td>
-<td><pre><code class="language-json">{
-  &quot;batchSize&quot;: 20,
-  &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-  &quot;minDebounceInterval&quot;: &quot;100ms&quot;
-}</code></pre></td>
-<td>Messaging outbox agent configuration</td>
 </tr>
 <tr>
 <td><code>protocol</code></td>
@@ -370,6 +363,60 @@ Base type: `string`
   &quot;predefined&quot;: []
 }</code></pre></td>
 <td></td>
+</tr>
+</tbody>
+</table>
+
+## `BackgroundAgentsBatchingConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>flowSystemEvents</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">20</code></td>
+<td>Flow system events applied to a projection per transaction</td>
+</tr>
+<tr>
+<td><code>outboxMessages</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">20</code></td>
+<td>Outbox messages relayed per transaction</td>
+</tr>
+</tbody>
+</table>
+
+## `BackgroundAgentsConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>batching</code></td>
+<td><a href="#backgroundagentsbatchingconfig"><code>BackgroundAgentsBatchingConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;flowSystemEvents&quot;: 20,
+  &quot;outboxMessages&quot;: 20
+}</code></pre></td>
+<td>Batch sizes of agents processing records in batches</td>
+</tr>
+<tr>
+<td><code>maxListeningTimeout</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;2s&quot;</code></td>
+<td>
+
+Fallback period to re-check for work if a change signal is missed.
+With `SQLite` it also paces the polling.
+
+</td>
+</tr>
+<tr>
+<td><code>minDebounceInterval</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;20ms&quot;</code></td>
+<td>How long agents absorb a burst of change signals before processing</td>
 </tr>
 </tbody>
 </table>
@@ -1139,7 +1186,7 @@ the resources (for authenticated clients)
 </tbody>
 </table>
 
-## `FlowAgentConfig`
+## `FlowSystemConfig`
 
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
@@ -1160,68 +1207,6 @@ the resources (for authenticated clients)
 <td><code>mandatoryThrottlingPeriodSecs</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">60</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-
-## `FlowSystemConfig`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>flowAgent</code></td>
-<td><a href="#flowagentconfig"><code>FlowAgentConfig</code></a></td>
-<td><pre><code class="language-json">{
-  &quot;awaitingStepSecs&quot;: 1,
-  &quot;defaultRetryPolicies&quot;: {},
-  &quot;mandatoryThrottlingPeriodSecs&quot;: 60
-}</code></pre></td>
-<td></td>
-</tr>
-<tr>
-<td><code>flowSystemEventAgent</code></td>
-<td><a href="#flowsystemeventagentconfig"><code>FlowSystemEventAgentConfig</code></a></td>
-<td><pre><code class="language-json">{
-  &quot;batchSize&quot;: 20,
-  &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
-  &quot;minDebounceInterval&quot;: &quot;100ms&quot;
-}</code></pre></td>
-<td></td>
-</tr>
-<tr>
-<td><code>taskAgent</code></td>
-<td><a href="#taskagentconfig"><code>TaskAgentConfig</code></a></td>
-<td><pre><code class="language-json">{
-  &quot;checkingIntervalSecs&quot;: 1
-}</code></pre></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-
-## `FlowSystemEventAgentConfig`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>batchSize</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">20</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>maxListeningTimeout</code></td>
-<td><a href="#durationstring"><code>DurationString</code></a></td>
-<td><code class="language-json">&quot;2s&quot;</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>minDebounceInterval</code></td>
-<td><a href="#durationstring"><code>DurationString</code></a></td>
-<td><code class="language-json">&quot;100ms&quot;</code></td>
 <td></td>
 </tr>
 </tbody>
@@ -1416,32 +1401,6 @@ it usually runs uses host network namespace.
 <tbody>
 <tr><td><code>Private</code></td></tr>
 <tr><td><code>Host</code></td></tr>
-</tbody>
-</table>
-
-## `OutboxAgentConfig`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>batchSize</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">20</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>maxListeningTimeout</code></td>
-<td><a href="#durationstring"><code>DurationString</code></a></td>
-<td><code class="language-json">&quot;2s&quot;</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>minDebounceInterval</code></td>
-<td><a href="#durationstring"><code>DurationString</code></a></td>
-<td><code class="language-json">&quot;100ms&quot;</code></td>
-<td></td>
-</tr>
 </tbody>
 </table>
 
@@ -1814,20 +1773,6 @@ resumable source and commit data, leaving the rest for the next
 iteration. This ensures that one data slice doesn't become too big.
 
 </td>
-</tr>
-</tbody>
-</table>
-
-## `TaskAgentConfig`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>checkingIntervalSecs</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">1</code></td>
-<td></td>
 </tr>
 </tbody>
 </table>

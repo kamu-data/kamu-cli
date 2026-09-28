@@ -15,7 +15,8 @@ POSTGRES_CRATES := \
 	./src/infra/resources/postgres \
 	./src/infra/search/cache-postgres \
 	./src/infra/task-system/postgres \
-	./src/infra/webhooks/postgres
+	./src/infra/webhooks/postgres \
+	./src/infra/wakeup-listener/postgres
 
 MYSQL_CRATES := \
 	./src/e2e/app/cli/mysql \
@@ -34,7 +35,8 @@ SQLITE_CRATES := \
 	./src/infra/resources/sqlite \
 	./src/infra/search/cache-sqlite \
 	./src/infra/task-system/sqlite \
-	./src/infra/webhooks/sqlite
+	./src/infra/webhooks/sqlite \
+	./src/infra/wakeup-listener/sqlite
 
 ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
 MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite

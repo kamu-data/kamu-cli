@@ -10,6 +10,7 @@
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_flow_system_inmem::{InMemoryFlowEventStore, InMemoryFlowSystemEventBridge};
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -319,6 +320,7 @@ impl InMemoryFlowEventStoreHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryFlowEventStore>();
         catalog_builder.add::<InMemoryFlowSystemEventBridge>();
+        catalog_builder.add::<InMemoryWakeupHub>();
         catalog_builder.add::<SystemTimeSourceDefault>();
 
         Self {

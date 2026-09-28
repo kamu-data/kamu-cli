@@ -13,25 +13,28 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Lets an agent sleep until its data *might* have changed, instead of polling.
+/// Serves a single consumer: changes since its previous call are never missed,
+/// but wakeups may be spurious.
 #[async_trait::async_trait]
-pub trait MessageStoreWakeupDetector: Send + Sync {
-    /// Block until there *might* be new message, or timeout elapses.
+pub trait WakeupListener: Send + Sync {
+    /// Block until there *might* be new data, or timeout elapses.
     async fn wait_wake(
         &self,
         timeout: Duration,
         min_debounce_interval: Duration,
-    ) -> Result<MessageStoreWakeHint, InternalError>;
+    ) -> Result<WakeHint, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum MessageStoreWakeHint {
-    /// Timeout elapsed without new messages
+pub enum WakeHint {
+    /// Timeout elapsed without any signal
     Timeout,
 
-    /// New messages detected
-    NewMessages,
+    /// A signal was received: new data might be available
+    Signaled,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

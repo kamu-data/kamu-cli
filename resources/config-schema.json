@@ -136,6 +136,50 @@
       },
       "type": "object"
     },
+    "BackgroundAgentsBatchingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "flowSystemEvents": {
+          "default": 20,
+          "description": "Flow system events applied to a projection per transaction",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "outboxMessages": {
+          "default": 20,
+          "description": "Outbox messages relayed per transaction",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "BackgroundAgentsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "batching": {
+          "$ref": "#/$defs/BackgroundAgentsBatchingConfig",
+          "default": {
+            "flowSystemEvents": 20,
+            "outboxMessages": 20
+          },
+          "description": "Batch sizes of agents processing records in batches"
+        },
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s",
+          "description": "Fallback period to re-check for work if a change signal is missed.\nWith `SQLite` it also paces the polling."
+        },
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "20ms",
+          "description": "How long agents absorb a burst of change signals before processing"
+        }
+      },
+      "type": "object"
+    },
     "ContainerRuntimeType": {
       "enum": [
         "Docker",
@@ -745,7 +789,7 @@
       },
       "type": "object"
     },
-    "FlowAgentConfig": {
+    "FlowSystemConfig": {
       "additionalProperties": false,
       "properties": {
         "awaitingStepSecs": {
@@ -765,54 +809,6 @@
           "default": 60,
           "format": "int64",
           "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "FlowSystemConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "flowAgent": {
-          "$ref": "#/$defs/FlowAgentConfig",
-          "default": {
-            "awaitingStepSecs": 1,
-            "defaultRetryPolicies": {},
-            "mandatoryThrottlingPeriodSecs": 60
-          }
-        },
-        "flowSystemEventAgent": {
-          "$ref": "#/$defs/FlowSystemEventAgentConfig",
-          "default": {
-            "batchSize": 20,
-            "maxListeningTimeout": "2s",
-            "minDebounceInterval": "100ms"
-          }
-        },
-        "taskAgent": {
-          "$ref": "#/$defs/TaskAgentConfig",
-          "default": {
-            "checkingIntervalSecs": 1
-          }
-        }
-      },
-      "type": "object"
-    },
-    "FlowSystemEventAgentConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "batchSize": {
-          "default": 20,
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "maxListeningTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "2s"
-        },
-        "minDebounceInterval": {
-          "$ref": "#/$defs/DurationString",
-          "default": "100ms"
         }
       },
       "type": "object"
@@ -940,26 +936,6 @@
         "Host"
       ],
       "type": "string"
-    },
-    "OutboxAgentConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "batchSize": {
-          "default": 20,
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "maxListeningTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "2s"
-        },
-        "minDebounceInterval": {
-          "$ref": "#/$defs/DurationString",
-          "default": "100ms"
-        }
-      },
-      "type": "object"
     },
     "Password": {
       "type": "string"
@@ -1255,18 +1231,6 @@
       },
       "type": "object"
     },
-    "TaskAgentConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "checkingIntervalSecs": {
-          "default": 1,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
     "UploadsConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1321,6 +1285,18 @@
         }
       },
       "description": "Auth configuration"
+    },
+    "backgroundAgents": {
+      "$ref": "#/$defs/BackgroundAgentsConfig",
+      "default": {
+        "batching": {
+          "flowSystemEvents": 20,
+          "outboxMessages": 20
+        },
+        "maxListeningTimeout": "2s",
+        "minDebounceInterval": "20ms"
+      },
+      "description": "Background agents configuration (outbox, flow system events, tasks)"
     },
     "database": {
       "anyOf": [
@@ -1382,19 +1358,9 @@
     "flowSystem": {
       "$ref": "#/$defs/FlowSystemConfig",
       "default": {
-        "flowAgent": {
-          "awaitingStepSecs": 1,
-          "defaultRetryPolicies": {},
-          "mandatoryThrottlingPeriodSecs": 60
-        },
-        "flowSystemEventAgent": {
-          "batchSize": 20,
-          "maxListeningTimeout": "2s",
-          "minDebounceInterval": "100ms"
-        },
-        "taskAgent": {
-          "checkingIntervalSecs": 1
-        }
+        "awaitingStepSecs": 1,
+        "defaultRetryPolicies": {},
+        "mandatoryThrottlingPeriodSecs": 60
       },
       "description": "Configuration for flow system"
     },
@@ -1412,15 +1378,6 @@
       "$ref": "#/$defs/IdentityConfig",
       "default": {},
       "description": "UNSTABLE: Identity configuration"
-    },
-    "outbox": {
-      "$ref": "#/$defs/OutboxAgentConfig",
-      "default": {
-        "batchSize": 20,
-        "maxListeningTimeout": "2s",
-        "minDebounceInterval": "100ms"
-      },
-      "description": "Messaging outbox agent configuration"
     },
     "protocol": {
       "$ref": "#/$defs/ProtocolConfig",

@@ -15,10 +15,12 @@ use database_common_macros::transactional_method;
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
 use kamu_messaging_outbox_postgres::PostgresOutboxMessageBridge;
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tokio::time::{Duration, Instant};
+use wakeup_listener::WakeupListenerConfig;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -190,13 +192,14 @@ impl PostgresOutboxAgentHarness {
         b.add_value(pg_pool);
         b.add::<PostgresTransactionManager>();
         b.add::<PostgresOutboxMessageBridge>();
+        b.add::<PostgresNotificationHub>();
 
         b.add::<OutboxAgentMetrics>();
         b.add::<OutboxAgentImpl>();
-        b.add_value(OutboxAgentConfig {
-            min_debounce_interval: std::time::Duration::from_millis(1),
-            max_listening_timeout: std::time::Duration::from_millis(1),
-            batch_size: 1,
+        b.add_value(OutboxAgentConfig { batch_size: 1 });
+        b.add_value(WakeupListenerConfig {
+            min_debounce_interval: Duration::from_millis(1),
+            max_listening_timeout: Duration::from_millis(1),
         });
 
         b.add::<TestMessageConsumerTxOrder>();

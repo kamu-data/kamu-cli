@@ -25,6 +25,8 @@ doctest = false
 database-common = { workspace = true }
 odf = { workspace = true }
 kamu-task-system = { workspace = true }
+kamu-wakeup-listener-sqlite = { workspace = true }
+wakeup-listener = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
@@ -48,3 +50,4 @@ kamu-task-system-repo-tests = { workspace = true }
 
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
+tracing = { version = "0.1" }

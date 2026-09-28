@@ -42,6 +42,7 @@ kamu-resources-inmem = { workspace = true }
 kamu-resources-services = { workspace = true }
 messaging-outbox = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
 

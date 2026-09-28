@@ -49,9 +49,9 @@ pub struct CLIConfig {
     #[config(default)]
     pub identity: kamu_signing::entities::IdentityConfig,
 
-    /// Messaging outbox agent configuration
+    /// Background agents configuration (outbox, flow system events, tasks)
     #[config(default)]
-    pub outbox: OutboxAgentConfig,
+    pub background_agents: BackgroundAgentsConfig,
 
     /// Network protocols configuration
     #[config(default)]
@@ -697,24 +697,54 @@ pub struct UploadsConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Note: defaults suit the CLI with a SQLite target, and match
+// `WakeupListenerConfig::local_default()` and the agents' `local_default()`
+// batch sizes, where the reasoning is documented. Postgres targets typically
+// use a higher listening timeout (~60s) and larger batches (~100..500).
 #[derive(setty::Config, setty::Default)]
-pub struct OutboxAgentConfig {
-    #[config(default_str = "100ms")]
+pub struct BackgroundAgentsConfig {
+    /// How long agents absorb a burst of change signals before processing
+    #[config(default_str = "20ms")]
     pub min_debounce_interval: DurationString,
 
+    /// Fallback period to re-check for work if a change signal is missed.
+    /// With `SQLite` it also paces the polling.
     #[config(default_str = "2s")]
     pub max_listening_timeout: DurationString,
 
-    #[config(default = 20)]
-    pub batch_size: usize,
+    /// Batch sizes of agents processing records in batches
+    #[config(default)]
+    pub batching: BackgroundAgentsBatchingConfig,
 }
 
-impl OutboxAgentConfig {
-    pub fn into_system(&self) -> messaging_outbox::OutboxAgentConfig {
-        messaging_outbox::OutboxAgentConfig {
+#[derive(setty::Config, setty::Default)]
+pub struct BackgroundAgentsBatchingConfig {
+    /// Outbox messages relayed per transaction
+    #[config(default = 20)]
+    pub outbox_messages: usize,
+
+    /// Flow system events applied to a projection per transaction
+    #[config(default = 20)]
+    pub flow_system_events: usize,
+}
+
+impl BackgroundAgentsConfig {
+    pub fn wakeup_listener_config(&self) -> wakeup_listener::WakeupListenerConfig {
+        wakeup_listener::WakeupListenerConfig {
             min_debounce_interval: self.min_debounce_interval.into(),
             max_listening_timeout: self.max_listening_timeout.into(),
-            batch_size: self.batch_size,
+        }
+    }
+
+    pub fn outbox_agent_config(&self) -> messaging_outbox::OutboxAgentConfig {
+        messaging_outbox::OutboxAgentConfig {
+            batch_size: self.batching.outbox_messages,
+        }
+    }
+
+    pub fn flow_system_event_agent_config(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
+        kamu_flow_system::FlowSystemEventAgentConfig {
+            batch_size: self.batching.flow_system_events,
         }
     }
 }
@@ -723,18 +753,6 @@ impl OutboxAgentConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct FlowSystemConfig {
-    #[config(default)]
-    pub flow_agent: FlowAgentConfig,
-
-    #[config(default)]
-    pub flow_system_event_agent: FlowSystemEventAgentConfig,
-
-    #[config(default)]
-    pub task_agent: TaskAgentConfig,
-}
-
-#[derive(setty::Config, setty::Default)]
-pub struct FlowAgentConfig {
     #[config(default = 1)]
     pub awaiting_step_secs: i64,
 
@@ -745,7 +763,7 @@ pub struct FlowAgentConfig {
     pub default_retry_policies: BTreeMap<String, RetryPolicyConfig>,
 }
 
-impl FlowAgentConfig {
+impl FlowSystemConfig {
     pub fn into_system(&self) -> kamu_flow_system::FlowAgentConfig {
         kamu_flow_system::FlowAgentConfig::new(
             chrono::Duration::seconds(self.awaiting_step_secs),
@@ -796,45 +814,6 @@ impl From<RetryPolicyConfigBackoffType> for kamu_flow_system::RetryBackoffType {
             RetryPolicyConfigBackoffType::Exponential => Self::Exponential,
             RetryPolicyConfigBackoffType::ExponentialWithJitter => Self::ExponentialWithJitter,
         }
-    }
-}
-
-// Note: these are good default values for CLI use case with SQLite target
-// Postgres targets need a higher timeout (~60s), larger batch size (~100..500),
-// and loopback offset (of batch size * 3)
-#[derive(setty::Config, setty::Default)]
-pub struct FlowSystemEventAgentConfig {
-    #[config(default_str = "100ms")]
-    pub min_debounce_interval: DurationString,
-
-    #[config(default_str = "2s")]
-    pub max_listening_timeout: DurationString,
-
-    #[config(default = 20)]
-    pub batch_size: usize,
-}
-
-impl FlowSystemEventAgentConfig {
-    pub fn into_system(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
-        kamu_flow_system::FlowSystemEventAgentConfig {
-            min_debounce_interval: self.min_debounce_interval.into(),
-            max_listening_timeout: self.max_listening_timeout.into(),
-            batch_size: self.batch_size,
-        }
-    }
-}
-
-#[derive(setty::Config, setty::Default)]
-pub struct TaskAgentConfig {
-    #[config(default = 1)]
-    pub checking_interval_secs: u32,
-}
-
-impl TaskAgentConfig {
-    pub fn into_system(&self) -> kamu_task_system_inmem::domain::TaskAgentConfig {
-        kamu_task_system_inmem::domain::TaskAgentConfig::new(chrono::Duration::seconds(i64::from(
-            self.checking_interval_secs,
-        )))
     }
 }
 

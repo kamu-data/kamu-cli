@@ -30,6 +30,7 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
+wakeup-listener = { workspace = true }
 observability = { workspace = true, features = ["prometheus"] }
 time-source = { workspace = true }
 
@@ -54,6 +55,7 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
 
 [dev-dependencies]
 kamu-messaging-outbox-inmem = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
 
 oop = { version = "0.0.2", default-features = false }
 paste = "1"
