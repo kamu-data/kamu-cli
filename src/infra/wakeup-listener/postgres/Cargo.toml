@@ -26,11 +26,18 @@ internal-error = { workspace = true }
 wakeup-listener = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
+dill = { version = "0.17", default-features = false }
+futures = { version = "0.3", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio",
     "postgres",
 ] }
-tokio = { version = "1", default-features = false, features = ["sync", "time"] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+    "sync",
+    "time",
+] }
 tracing = { version = "0.1", default-features = false }
 
 

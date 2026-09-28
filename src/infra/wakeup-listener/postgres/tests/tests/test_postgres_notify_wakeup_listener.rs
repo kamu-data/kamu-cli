@@ -8,12 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
-use std::sync::Arc;
 use std::time::Duration;
 
-use kamu_wakeup_listener_postgres::PostgresNotifyWakeupListener;
 use sqlx::PgPool;
-use wakeup_listener::{WakeHint, WakeupListener};
+use wakeup_listener::WakeHint;
+
+use super::harness::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -130,80 +130,6 @@ async fn test_signals_and_recovers_after_connection_loss(pg_pool: PgPool) {
     assert_matches!(harness.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
     harness.notify(CHANNEL).await;
     assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const CHANNEL: &str = "test_wakeup_channel";
-const SHORT_TIMEOUT: Duration = Duration::from_millis(300);
-const LONG_TIMEOUT: Duration = Duration::from_secs(10);
-const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(50);
-
-struct PostgresWakeupHarness {
-    pg_pool: PgPool,
-    listener: PostgresNotifyWakeupListener,
-}
-
-impl PostgresWakeupHarness {
-    fn new(pg_pool: PgPool) -> Self {
-        let listener = PostgresNotifyWakeupListener::new(Arc::new(pg_pool.clone()), CHANNEL);
-        Self { pg_pool, listener }
-    }
-
-    /// The listening connection is established lazily on the first wait
-    async fn start_listening(&self) {
-        assert_matches!(self.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
-    }
-
-    async fn wait_wake(&self, timeout: Duration) -> WakeHint {
-        self.listener
-            .wait_wake(timeout, DEBOUNCE_INTERVAL)
-            .await
-            .unwrap()
-    }
-
-    async fn notify(&self, channel: &str) {
-        sqlx::query("SELECT pg_notify($1, '')")
-            .bind(channel)
-            .execute(&self.pg_pool)
-            .await
-            .unwrap();
-    }
-
-    async fn notify_in_rolled_back_transaction(&self, channel: &str) {
-        let mut tx = self.pg_pool.begin().await.unwrap();
-        sqlx::query("SELECT pg_notify($1, '')")
-            .bind(channel)
-            .execute(&mut *tx)
-            .await
-            .unwrap();
-        tx.rollback().await.unwrap();
-    }
-
-    async fn notify_after(&self, delay: Duration) {
-        tokio::time::sleep(delay).await;
-        self.notify(CHANNEL).await;
-    }
-
-    async fn wait_wake_while_notifying_after(&self, delay: Duration) -> (WakeHint, Duration) {
-        let started_at = tokio::time::Instant::now();
-        let (hint, ()) = tokio::join!(self.wait_wake(LONG_TIMEOUT), self.notify_after(delay));
-        (hint, started_at.elapsed())
-    }
-
-    async fn terminate_listener_connection(&self) {
-        let (terminated,): (i64,) = sqlx::query_as(
-            r#"
-            SELECT COUNT(pg_terminate_backend(pid))
-                FROM pg_stat_activity
-                WHERE datname = current_database() AND query LIKE 'LISTEN%'
-            "#,
-        )
-        .fetch_one(&self.pg_pool)
-        .await
-        .unwrap();
-        assert_eq!(terminated, 1);
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

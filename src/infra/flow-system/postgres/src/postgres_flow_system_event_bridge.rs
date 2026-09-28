@@ -18,7 +18,7 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_wakeup_listener_postgres::PostgresNotifyWakeupListener;
+use kamu_wakeup_listener_postgres::{PostgresNotificationHub, PostgresNotifyWakeupListener};
 use sqlx::Postgres;
 use wakeup_listener::WakeupListener;
 
@@ -38,9 +38,9 @@ pub struct PostgresFlowSystemEventBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl PostgresFlowSystemEventBridge {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
+    pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
         Self {
-            wakeup_listener: PostgresNotifyWakeupListener::new(pool, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: PostgresNotifyWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
         }
     }
 }

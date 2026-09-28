@@ -25,7 +25,9 @@ Recommendation: for ease of reading, use the following format:
 - Extracted the wakeup detector abstraction from the messaging outbox into a standalone `wakeup-listener`
   utility crate (`WakeupListener`), as it's now shared by the outbox, flow system and task system agents.
   Implementations live in `kamu-wakeup-listener-{inmem,postgres,sqlite}` infra crates, with own unit tests.
-  Flow and task system infra crates no longer depend on outbox infra crates
+  Flow and task system infra crates no longer depend on outbox infra crates.
+  Postgres listeners share a single `LISTEN` connection via `PostgresNotificationHub`, instead of one each.
+  Architecture is documented in `docs/internal/wakeup-listeners.md`
 
 ## [0.267.0] - 2026-09-19
 ### Added

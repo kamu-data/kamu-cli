@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use kamu_task_system::TaskQueueWakeupSource;
-use kamu_wakeup_listener_postgres::PostgresNotifyWakeupListener;
+use kamu_wakeup_listener_postgres::{PostgresNotificationHub, PostgresNotifyWakeupListener};
 use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,9 +27,9 @@ pub struct PostgresTaskQueueWakeupSource {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn TaskQueueWakeupSource)]
 impl PostgresTaskQueueWakeupSource {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
+    pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
         Self {
-            wakeup_listener: PostgresNotifyWakeupListener::new(pool, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: PostgresNotifyWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
         }
     }
 }

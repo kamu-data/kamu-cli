@@ -18,6 +18,7 @@ use dill::{Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_task_system::*;
 use kamu_task_system_postgres::{PostgresTaskEventStore, PostgresTaskQueueWakeupSource};
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::PgPool;
 use wakeup_listener::WakeHint;
 
@@ -117,6 +118,7 @@ impl PostgresTaskQueueWakeupHarness {
         catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresTaskEventStore>();
         catalog_builder.add::<PostgresTaskQueueWakeupSource>();
+        catalog_builder.add::<PostgresNotificationHub>();
 
         let catalog = catalog_builder.build();
 

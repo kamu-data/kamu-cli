@@ -137,6 +137,7 @@ pub fn configure_database_components(
             b.add::<kamu_task_system_postgres::PostgresTaskQueueWakeupSource>();
 
             b.add::<kamu_messaging_outbox_postgres::PostgresOutboxMessageBridge>();
+            b.add::<kamu_wakeup_listener_postgres::PostgresNotificationHub>();
 
             b.add::<kamu_auth_rebac_postgres::PostgresRebacRepository>();
 

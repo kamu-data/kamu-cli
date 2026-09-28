@@ -8216,6 +8216,7 @@ dependencies = [
  "kamu-task-system-postgres",
  "kamu-task-system-services",
  "kamu-task-system-sqlite",
+ "kamu-wakeup-listener-postgres",
  "kamu-webhooks",
  "kamu-webhooks-inmem",
  "kamu-webhooks-postgres",
@@ -9762,6 +9763,8 @@ name = "kamu-wakeup-listener-postgres"
 version = "0.267.0"
 dependencies = [
  "async-trait",
+ "dill",
+ "futures",
  "internal-error",
  "sqlx",
  "test-group",

@@ -15,6 +15,7 @@ use database_common_macros::transactional_method;
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
 use kamu_messaging_outbox_postgres::PostgresOutboxMessageBridge;
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -190,6 +191,7 @@ impl PostgresOutboxAgentHarness {
         b.add_value(pg_pool);
         b.add::<PostgresTransactionManager>();
         b.add::<PostgresOutboxMessageBridge>();
+        b.add::<PostgresNotificationHub>();
 
         b.add::<OutboxAgentMetrics>();
         b.add::<OutboxAgentImpl>();

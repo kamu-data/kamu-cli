@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_wakeup_listener_postgres::PostgresNotifyWakeupListener;
+use kamu_wakeup_listener_postgres::{PostgresNotificationHub, PostgresNotifyWakeupListener};
 use messaging_outbox::*;
 use sqlx::Postgres;
 use wakeup_listener::WakeupListener;
@@ -32,9 +32,9 @@ pub struct PostgresOutboxMessageBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn OutboxMessageBridge)]
 impl PostgresOutboxMessageBridge {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
+    pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
         Self {
-            wakeup_listener: PostgresNotifyWakeupListener::new(pool, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: PostgresNotifyWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
         }
     }
 }
