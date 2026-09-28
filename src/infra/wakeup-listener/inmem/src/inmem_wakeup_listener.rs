@@ -10,26 +10,27 @@
 use std::time::Duration;
 
 use internal_error::InternalError;
-use tokio::sync::broadcast;
+use tokio::sync::Notify;
 use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Wakes up on explicit `signal()` calls, for in-memory storages.
 pub struct InMemoryWakeupListener {
-    tx: tokio::sync::broadcast::Sender<()>,
+    notify: Notify,
 }
 
 impl InMemoryWakeupListener {
     pub fn new() -> Self {
-        let (tx, _rx) = broadcast::channel(1024);
-
-        Self { tx }
+        Self {
+            notify: Notify::new(),
+        }
     }
 
     pub fn signal(&self) {
-        // We ignore errors here because if there are no listeners, that's fine
-        let _ = self.tx.send(());
+        self.notify.notify_waiters();
+        // Also store a permit, so a signal raised while nobody waits is not lost
+        self.notify.notify_one();
     }
 }
 
@@ -42,23 +43,9 @@ impl WakeupListener for InMemoryWakeupListener {
         timeout: Duration,
         _min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError> {
-        let mut rx = self.tx.subscribe();
-
-        // For testing purposes, we keep this simple without complex backoff strategies
-        match tokio::time::timeout(timeout, rx.recv()).await {
-            Ok(Ok(())) => Ok(WakeHint::Signaled),
-            Ok(Err(broadcast::error::RecvError::Closed)) => {
-                // Sender has been dropped, which should never happen in this case
-                unreachable!("InMemoryWakeupListener: broadcast channel closed");
-            }
-            Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
-                // Lagging means several signals were missed, which is still a wakeup
-                Ok(WakeHint::Signaled)
-            }
-            Err(_elapsed) => {
-                // Timeout elapsed
-                Ok(WakeHint::Timeout)
-            }
+        match tokio::time::timeout(timeout, self.notify.notified()).await {
+            Ok(()) => Ok(WakeHint::Signaled),
+            Err(_elapsed) => Ok(WakeHint::Timeout),
         }
     }
 }

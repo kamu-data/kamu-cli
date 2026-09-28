@@ -14,8 +14,8 @@ use internal_error::InternalError;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Lets an agent sleep until its data *might* have changed, instead of polling.
-/// A wakeup is only a hint: always re-check the storage, as signals may be
-/// missed.
+/// Changes since the previous call are never missed, but wakeups may be
+/// spurious.
 #[async_trait::async_trait]
 pub trait WakeupListener: Send + Sync {
     /// Block until there *might* be new data, or timeout elapses.

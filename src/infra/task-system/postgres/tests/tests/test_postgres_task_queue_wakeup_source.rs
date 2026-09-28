@@ -28,7 +28,8 @@ use wakeup_listener::WakeHint;
 async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
     let harness = PostgresTaskQueueWakeupHarness::new(pg_pool);
 
-    // Nothing happened yet. This also starts listening for notifications
+    // Subscribing reports a possible change, then it's quiet
+    assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
     assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
 
     let task_id = harness.new_task_id().await;

@@ -41,13 +41,25 @@ async fn test_wakes_up_on_signal_while_waiting() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test(start_paused = true))]
-async fn test_signal_before_waiting_is_not_observed() {
+async fn test_signal_before_waiting_is_not_lost() {
     let harness = InMemoryWakeupHarness::new();
 
-    // Signals are not buffered: the caller must re-check the storage
-    // before waiting, and the timeout acts as a safety net
     harness.signal();
 
+    assert_matches!(harness.wait_wake(TIMEOUT).await, WakeHint::Signaled);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(start_paused = true))]
+async fn test_signals_before_waiting_coalesce() {
+    let harness = InMemoryWakeupHarness::new();
+
+    harness.signal();
+    harness.signal();
+    harness.signal();
+
+    assert_matches!(harness.wait_wake(TIMEOUT).await, WakeHint::Signaled);
     assert_matches!(harness.wait_wake(TIMEOUT).await, WakeHint::Timeout);
 }
 

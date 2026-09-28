@@ -22,8 +22,21 @@ use wakeup_listener::{WakeHint, WakeupListener};
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = false))]
+async fn test_signals_when_subscribed(pg_pool: PgPool) {
+    let harness = PostgresWakeupHarness::new(pg_pool);
+
+    // Notifications sent before LISTEN was active are lost, so subscribing
+    // reports a possible change
+    assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = false))]
 async fn test_times_out_without_notifications(pg_pool: PgPool) {
     let harness = PostgresWakeupHarness::new(pg_pool);
+    harness.start_listening().await;
 
     assert_matches!(harness.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
 }
@@ -105,17 +118,17 @@ async fn test_debounce_coalesces_notification_burst(pg_pool: PgPool) {
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = false))]
-async fn test_recovers_after_listener_connection_loss(pg_pool: PgPool) {
+async fn test_signals_and_recovers_after_connection_loss(pg_pool: PgPool) {
     let harness = PostgresWakeupHarness::new(pg_pool);
     harness.start_listening().await;
 
+    // Notifications sent while disconnected are lost, so reconnecting
+    // reports a possible change
     harness.terminate_listener_connection().await;
+    assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
 
-    // Notifications sent while disconnected may be lost, but the listener
-    // must reconnect and observe the following ones
-    harness.wait_wake(SHORT_TIMEOUT).await;
+    assert_matches!(harness.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
     harness.notify(CHANNEL).await;
-
     assert_matches!(harness.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
 }
 
@@ -137,10 +150,9 @@ impl PostgresWakeupHarness {
         Self { pg_pool, listener }
     }
 
-    /// The listening connection is established lazily on the first wait,
-    /// notifications sent before that are not observed
+    /// The listening connection is established lazily on the first wait
     async fn start_listening(&self) {
-        assert_matches!(self.wait_wake(SHORT_TIMEOUT).await, WakeHint::Timeout);
+        assert_matches!(self.wait_wake(LONG_TIMEOUT).await, WakeHint::Signaled);
     }
 
     async fn wait_wake(&self, timeout: Duration) -> WakeHint {

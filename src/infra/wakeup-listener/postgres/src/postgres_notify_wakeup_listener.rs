@@ -80,30 +80,32 @@ impl WakeupListener for PostgresNotifyWakeupListener {
 
         loop {
             // Try to get or create a listener
-            let mut listener = match self.listener.lock().await.take() {
-                Some(existing_listener) => existing_listener,
-                None => {
-                    // No listener available, try to create one
-                    match self.try_create_listener().await {
-                        Some(new_listener) => new_listener,
-                        None => {
-                            // Failed to create listener, wait for min_debounce_interval and then
-                            // sleep for remaining timeout if any
-                            let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
-                            if !delay.is_zero() {
-                                tokio::time::sleep(delay).await;
-                            }
-
-                            // Check if we still have time left after the delay
-                            let remaining_after_delay =
-                                deadline.saturating_duration_since(tokio::time::Instant::now());
-                            if remaining_after_delay.is_zero() {
-                                return Ok(WakeHint::Timeout);
-                            }
-
-                            // Continue to next iteration to try again
-                            continue;
+            let Some(mut listener) = self.listener.lock().await.take() else {
+                // No listener available, try to create one
+                match self.try_create_listener().await {
+                    // Notifications sent before LISTEN was active are lost,
+                    // so let the caller re-check the storage
+                    Some(new_listener) => {
+                        *self.listener.lock().await = Some(new_listener);
+                        return Ok(WakeHint::Signaled);
+                    }
+                    None => {
+                        // Failed to create listener, wait for min_debounce_interval and then
+                        // sleep for remaining timeout if any
+                        let delay = self.calculate_retry_delay(deadline, min_debounce_interval);
+                        if !delay.is_zero() {
+                            tokio::time::sleep(delay).await;
                         }
+
+                        // Check if we still have time left after the delay
+                        let remaining_after_delay =
+                            deadline.saturating_duration_since(tokio::time::Instant::now());
+                        if remaining_after_delay.is_zero() {
+                            return Ok(WakeHint::Timeout);
+                        }
+
+                        // Continue to next iteration to try again
+                        continue;
                     }
                 }
             };
@@ -117,9 +119,10 @@ impl WakeupListener for PostgresNotifyWakeupListener {
             }
 
             // Wait for notification with remaining timeout
-            match tokio::time::timeout(remaining_timeout, listener.recv()).await {
+            // Not `recv()`: it reconnects silently, hiding notifications lost meanwhile
+            match tokio::time::timeout(remaining_timeout, listener.try_recv()).await {
                 // Got a NOTIFY - new data might be available
-                Ok(Ok(_notification)) => {
+                Ok(Ok(Some(_notification))) => {
                     // Optionally debounce by waiting a bit to collect more notifications
                     if !min_debounce_interval.is_zero() {
                         let remaining_after_debounce = deadline
@@ -141,6 +144,13 @@ impl WakeupListener for PostgresNotifyWakeupListener {
                     // Stash the listener back
                     *self.listener.lock().await = Some(listener);
 
+                    return Ok(WakeHint::Signaled);
+                }
+
+                // Connection was lost and re-established, notifications may have been lost
+                Ok(Ok(None)) => {
+                    tracing::warn!("PgListener connection was lost, reporting a possible change");
+                    *self.listener.lock().await = Some(listener);
                     return Ok(WakeHint::Signaled);
                 }
 
