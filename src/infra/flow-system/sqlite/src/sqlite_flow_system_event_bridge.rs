@@ -32,7 +32,7 @@ const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventBridge {
-    wakeup_listener: HubWakeupListener<SqlitePollingHub>,
+    hub: Arc<SqlitePollingHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -42,9 +42,7 @@ pub struct SqliteFlowSystemEventBridge {
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl SqliteFlowSystemEventBridge {
     pub fn new(hub: Arc<SqlitePollingHub>) -> Self {
-        Self {
-            wakeup_listener: HubWakeupListener::new(hub, POLLING_CHANNEL),
-        }
+        Self { hub }
     }
 }
 
@@ -52,9 +50,8 @@ impl SqliteFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
-    /// Provides event store wakeup listener instance
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        &self.wakeup_listener
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
     }
 
     /// Fetch next batch for the given projector; order by global id.

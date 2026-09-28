@@ -20,7 +20,7 @@ use kamu_task_system::*;
 use kamu_task_system_postgres::{PostgresTaskEventStore, PostgresTaskQueueWakeupSource};
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::PgPool;
-use wakeup_listener::WakeHint;
+use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,7 +108,7 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
 
 struct PostgresTaskQueueWakeupHarness {
     catalog: Catalog,
-    wakeup_source: Arc<dyn TaskQueueWakeupSource>,
+    wakeup_listener: Box<dyn WakeupListener>,
 }
 
 impl PostgresTaskQueueWakeupHarness {
@@ -122,18 +122,19 @@ impl PostgresTaskQueueWakeupHarness {
 
         let catalog = catalog_builder.build();
 
-        // Keep a single instance, as it owns the subscriber slot
-        let wakeup_source = catalog.get_one().unwrap();
+        let wakeup_listener = catalog
+            .get_one::<dyn TaskQueueWakeupSource>()
+            .unwrap()
+            .new_wakeup_listener();
 
         Self {
             catalog,
-            wakeup_source,
+            wakeup_listener,
         }
     }
 
     async fn wait_wake(&self) -> WakeHint {
-        self.wakeup_source
-            .wakeup_listener()
+        self.wakeup_listener
             .wait_wake(Duration::from_millis(500), Duration::from_millis(10))
             .await
             .unwrap()

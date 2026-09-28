@@ -14,6 +14,7 @@ use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
 use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
@@ -83,7 +84,7 @@ struct FailOnceOnMarkConsumedOutboxMessageBridge {
 impl FailOnceOnMarkConsumedOutboxMessageBridge {
     fn new(fail_next_mark_consumed: bool) -> Self {
         Self {
-            inner: InMemoryOutboxMessageBridge::new(),
+            inner: InMemoryOutboxMessageBridge::new(Arc::new(InMemoryWakeupHub::new())),
             fail_next_mark_consumed: Mutex::new(fail_next_mark_consumed),
         }
     }
@@ -91,8 +92,8 @@ impl FailOnceOnMarkConsumedOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for FailOnceOnMarkConsumedOutboxMessageBridge {
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        self.inner.wakeup_listener()
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        self.inner.new_wakeup_listener()
     }
 
     async fn push_message(
@@ -1056,6 +1057,7 @@ impl BaseOutboxCatalogHarness {
 
         b.add::<OutboxAgentMetrics>();
         b.add::<InMemoryOutboxMessageBridge>();
+        b.add::<InMemoryWakeupHub>();
         b.add::<OutboxTransactionalImpl>();
         b.bind::<dyn Outbox, OutboxTransactionalImpl>();
         b.add::<SystemTimeSourceDefault>();

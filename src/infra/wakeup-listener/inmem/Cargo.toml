@@ -22,11 +22,10 @@ doctest = false
 
 
 [dependencies]
-internal-error = { workspace = true }
 wakeup-listener = { workspace = true }
 
-async-trait = { version = "0.1", default-features = false }
-tokio = { version = "1", default-features = false, features = ["sync", "time"] }
+dill = { version = "0.17", default-features = false }
+tokio = { version = "1", default-features = false, features = ["sync"] }
 
 
 [dev-dependencies]

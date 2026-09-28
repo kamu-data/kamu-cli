@@ -34,6 +34,7 @@ use kamu_search_elasticsearch::testing::{
     SearchTestResponse,
 };
 use kamu_search_services::{DummyEmbeddingsEncoder, EmbeddingsProviderImpl, SearchIndexerImpl};
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::*;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -116,6 +117,7 @@ impl ElasticsearchDatasetBaseHarness {
             let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
             // Outbox repositories
             b.add::<InMemoryOutboxMessageBridge>();
+            b.add::<InMemoryWakeupHub>();
 
             // Search
             b.add::<DatasetSearchSchemaProvider>();

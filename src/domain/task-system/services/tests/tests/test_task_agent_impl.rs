@@ -23,6 +23,7 @@ use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImp
 use kamu_task_system::*;
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
@@ -215,6 +216,7 @@ impl TaskAgentHarness {
             .add::<DidGeneratorDefault>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
+            .add::<InMemoryWakeupHub>()
             .add::<InMemoryTaskQueueWakeupSource>()
             .add_value(mock_outbox)
             .add_value(mock_task_runner)

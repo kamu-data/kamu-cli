@@ -91,6 +91,7 @@ kamu-search-elasticsearch = { workspace = true, default-features = false, featur
 ] }
 kamu-search-cache-inmem = { workspace = true }
 kamu-search-services = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 test-utils = { workspace = true }
 

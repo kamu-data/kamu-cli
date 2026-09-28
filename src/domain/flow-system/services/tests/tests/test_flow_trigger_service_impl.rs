@@ -25,6 +25,7 @@ use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVI
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::SystemTimeSourceDefault;
 
@@ -310,6 +311,7 @@ impl FlowTriggerHarness {
             .add::<FlowSensorDispatcherImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
             .add::<InMemoryFlowProcessState>()
             .add::<SystemTimeSourceDefault>();
 

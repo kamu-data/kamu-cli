@@ -55,6 +55,7 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
 
 [dev-dependencies]
 kamu-messaging-outbox-inmem = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
 
 oop = { version = "0.0.2", default-features = false }
 paste = "1"

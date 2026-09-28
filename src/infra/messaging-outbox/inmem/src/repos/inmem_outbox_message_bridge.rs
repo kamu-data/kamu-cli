@@ -8,18 +8,22 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use internal_error::InternalError;
-use kamu_wakeup_listener_inmem::InMemoryWakeupListener;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::*;
-use wakeup_listener::WakeupListener;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const WAKEUP_CHANNEL: &str = "outbox_messages_ready";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryOutboxMessageBridge {
     state: Mutex<State>,
-    wakeup_listener: InMemoryWakeupListener,
+    wakeup_hub: Arc<InMemoryWakeupHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,12 +49,10 @@ struct ChannelKey {
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn OutboxMessageBridge)]
 impl InMemoryOutboxMessageBridge {
-    pub fn new() -> Self {
-        let wakeup_listener = InMemoryWakeupListener::new();
-
+    pub fn new(wakeup_hub: Arc<InMemoryWakeupHub>) -> Self {
         Self {
             state: Mutex::new(State::default()),
-            wakeup_listener,
+            wakeup_hub,
         }
     }
 
@@ -66,8 +68,7 @@ impl InMemoryOutboxMessageBridge {
             .insert(new_message.producer_name, message_id);
         state.messages.push(message.clone());
 
-        // Wake up listeners
-        self.wakeup_listener.signal();
+        self.wakeup_hub.signal(WAKEUP_CHANNEL);
 
         message
     }
@@ -77,8 +78,11 @@ impl InMemoryOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        &self.wakeup_listener
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.wakeup_hub.clone(),
+            WAKEUP_CHANNEL,
+        ))
     }
 
     async fn push_message(

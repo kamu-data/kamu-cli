@@ -23,7 +23,7 @@ const NOTIFY_CHANNEL_NAME: &str = "outbox_messages_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresOutboxMessageBridge {
-    wakeup_listener: HubWakeupListener<PostgresNotificationHub>,
+    hub: Arc<PostgresNotificationHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,9 +33,7 @@ pub struct PostgresOutboxMessageBridge {
 #[dill::interface(dyn OutboxMessageBridge)]
 impl PostgresOutboxMessageBridge {
     pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
-        Self {
-            wakeup_listener: HubWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
-        }
+        Self { hub }
     }
 }
 
@@ -43,8 +41,11 @@ impl PostgresOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for PostgresOutboxMessageBridge {
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        &self.wakeup_listener
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            NOTIFY_CHANNEL_NAME,
+        ))
     }
 
     async fn push_message(

@@ -16,8 +16,9 @@ use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageBoundary, OutboxMessag
 
 #[async_trait::async_trait]
 pub trait OutboxMessageBridge: Send + Sync {
-    /// Provides outbox message store wakeup listener instance
-    fn wakeup_listener(&self) -> &dyn WakeupListener;
+    /// Creates a listener handle for one consumer, which keeps it for its
+    /// lifetime: handles are cheap, but a shared one would lose wakeups
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 
     /// Pushes new message to the outbox
     async fn push_message(

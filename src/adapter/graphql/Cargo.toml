@@ -116,6 +116,7 @@ kamu-resources-services = { workspace = true }
 kamu-resources-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
 kamu-webhooks = { workspace = true, features = ["testing"] }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-services = { workspace = true }

@@ -151,8 +151,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
             ))
             .await;
 
-        // Access wakeup listener
-        let wakeup_listener = self.flow_system_event_bridge.wakeup_listener();
+        let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
 
         // Then enter the infinite main loop
         loop {

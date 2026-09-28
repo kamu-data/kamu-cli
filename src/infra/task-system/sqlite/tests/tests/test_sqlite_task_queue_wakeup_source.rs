@@ -20,7 +20,7 @@ use kamu_task_system::*;
 use kamu_task_system_sqlite::{SqliteTaskEventStore, SqliteTaskQueueWakeupSource};
 use kamu_wakeup_listener_sqlite::SqlitePollingHub;
 use sqlx::SqlitePool;
-use wakeup_listener::{WakeHint, WakeupListenerConfig};
+use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,7 +108,7 @@ async fn test_wakes_up_only_when_task_is_queued(sqlite_pool: SqlitePool) {
 
 struct SqliteTaskQueueWakeupHarness {
     catalog: Catalog,
-    wakeup_source: Arc<dyn TaskQueueWakeupSource>,
+    wakeup_listener: Box<dyn WakeupListener>,
 }
 
 impl SqliteTaskQueueWakeupHarness {
@@ -123,18 +123,19 @@ impl SqliteTaskQueueWakeupHarness {
 
         let catalog = catalog_builder.build();
 
-        // Keep a single instance, as it owns the subscriber slot
-        let wakeup_source = catalog.get_one().unwrap();
+        let wakeup_listener = catalog
+            .get_one::<dyn TaskQueueWakeupSource>()
+            .unwrap()
+            .new_wakeup_listener();
 
         Self {
             catalog,
-            wakeup_source,
+            wakeup_listener,
         }
     }
 
     async fn wait_wake(&self) -> WakeHint {
-        self.wakeup_source
-            .wakeup_listener()
+        self.wakeup_listener
             .wait_wake(Duration::from_millis(500), Duration::from_millis(10))
             .await
             .unwrap()

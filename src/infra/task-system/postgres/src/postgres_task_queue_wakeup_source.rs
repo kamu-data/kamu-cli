@@ -20,7 +20,7 @@ const NOTIFY_CHANNEL_NAME: &str = "tasks_queued";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresTaskQueueWakeupSource {
-    wakeup_listener: HubWakeupListener<PostgresNotificationHub>,
+    hub: Arc<PostgresNotificationHub>,
 }
 
 #[dill::component(pub)]
@@ -28,17 +28,18 @@ pub struct PostgresTaskQueueWakeupSource {
 #[dill::interface(dyn TaskQueueWakeupSource)]
 impl PostgresTaskQueueWakeupSource {
     pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
-        Self {
-            wakeup_listener: HubWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
-        }
+        Self { hub }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TaskQueueWakeupSource for PostgresTaskQueueWakeupSource {
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        &self.wakeup_listener
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            NOTIFY_CHANNEL_NAME,
+        ))
     }
 }
 

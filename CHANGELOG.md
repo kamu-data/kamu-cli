@@ -32,6 +32,8 @@ Recommendation: for ease of reading, use the following format:
   Postgres listeners share a single `LISTEN` connection via `PostgresNotificationHub`, instead of one each.
   SQLite listeners share a single polling loop via `SqlitePollingHub`, with one connection acquire per tick
   and a common backoff, instead of a polling timer each.
+  In-memory stores signal channels through `InMemoryWakeupHub`, and every consumer creates its own listener
+  handle (`new_wakeup_listener()`), so several consumers can watch the same changes.
   Architecture is documented in `docs/internal/wakeup-listeners.md`
 
 ## [0.267.0] - 2026-09-19

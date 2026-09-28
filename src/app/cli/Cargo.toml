@@ -120,6 +120,7 @@ kamu-messaging-outbox-inmem = { workspace = true }
 kamu-messaging-outbox-postgres = { workspace = true }
 kamu-messaging-outbox-sqlite = { workspace = true }
 
+kamu-wakeup-listener-inmem = { workspace = true }
 kamu-wakeup-listener-postgres = { workspace = true }
 kamu-wakeup-listener-sqlite = { workspace = true }
 wakeup-listener = { workspace = true }

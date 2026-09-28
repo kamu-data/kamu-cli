@@ -27,6 +27,7 @@ use kamu_flow_system_services::*;
 use kamu_task_system::{MESSAGE_PRODUCER_KAMU_TASK_AGENT, TaskProgressMessage};
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
@@ -115,13 +116,15 @@ impl FlowHarness {
             ))
             .add_value(FlowSystemEventAgentConfig { batch_size: 10 })
             .add_value(WakeupListenerConfig {
-                min_debounce_interval: awaiting_step.to_std().unwrap(),
+                // In-memory stores used to ignore it: keep test timings unchanged
+                min_debounce_interval: std::time::Duration::ZERO,
                 max_listening_timeout: (awaiting_step * 5).to_std().unwrap(),
             })
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
             .add::<InMemoryFlowProcessState>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()

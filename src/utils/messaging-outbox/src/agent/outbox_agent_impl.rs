@@ -121,8 +121,7 @@ impl OutboxAgentImpl {
             .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
             .await?;
 
-        // Access wakeup listener
-        let wakeup_listener = self.outbox_message_bridge.wakeup_listener();
+        let wakeup_listener = self.outbox_message_bridge.new_wakeup_listener();
 
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy

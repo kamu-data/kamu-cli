@@ -29,7 +29,7 @@ const NOTIFY_CHANNEL_NAME: &str = "flow_system_events_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresFlowSystemEventBridge {
-    wakeup_listener: HubWakeupListener<PostgresNotificationHub>,
+    hub: Arc<PostgresNotificationHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,9 +39,7 @@ pub struct PostgresFlowSystemEventBridge {
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl PostgresFlowSystemEventBridge {
     pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
-        Self {
-            wakeup_listener: HubWakeupListener::new(hub, NOTIFY_CHANNEL_NAME),
-        }
+        Self { hub }
     }
 }
 
@@ -49,9 +47,11 @@ impl PostgresFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
-    /// Provides event store wakeup listener instance
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        &self.wakeup_listener
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            NOTIFY_CHANNEL_NAME,
+        ))
     }
 
     /// Fetch next batch for the given projector; order by global id.

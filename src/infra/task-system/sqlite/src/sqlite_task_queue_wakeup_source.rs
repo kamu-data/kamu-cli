@@ -31,7 +31,7 @@ const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteTaskQueueWakeupSource {
-    wakeup_listener: HubWakeupListener<SqlitePollingHub>,
+    hub: Arc<SqlitePollingHub>,
 }
 
 #[dill::component(pub)]
@@ -39,17 +39,15 @@ pub struct SqliteTaskQueueWakeupSource {
 #[dill::interface(dyn TaskQueueWakeupSource)]
 impl SqliteTaskQueueWakeupSource {
     pub fn new(hub: Arc<SqlitePollingHub>) -> Self {
-        Self {
-            wakeup_listener: HubWakeupListener::new(hub, POLLING_CHANNEL),
-        }
+        Self { hub }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TaskQueueWakeupSource for SqliteTaskQueueWakeupSource {
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        &self.wakeup_listener
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
     }
 }
 

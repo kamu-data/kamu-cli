@@ -14,14 +14,15 @@ use std::sync::Arc;
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_task_system::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 
-use crate::InMemoryTaskQueueWakeupSource;
+use crate::TASKS_QUEUED_CHANNEL;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryTaskEventStore {
     inner: InMemoryEventStore<TaskState, State>,
-    task_queue_wakeup_source: Arc<InMemoryTaskQueueWakeupSource>,
+    wakeup_hub: Arc<InMemoryWakeupHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,10 +68,10 @@ impl EventStoreState<TaskState> for State {
 #[interface(dyn TaskEventStore)]
 #[scope(Singleton)]
 impl InMemoryTaskEventStore {
-    pub fn new(task_queue_wakeup_source: Arc<InMemoryTaskQueueWakeupSource>) -> Self {
+    pub fn new(wakeup_hub: Arc<InMemoryWakeupHub>) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
-            task_queue_wakeup_source,
+            wakeup_hub,
         }
     }
 
@@ -135,7 +136,7 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
             .await?;
 
         if has_queued_tasks {
-            self.task_queue_wakeup_source.notify_task_queued();
+            self.wakeup_hub.signal(TASKS_QUEUED_CHANNEL);
         }
 
         Ok(last_event_id)

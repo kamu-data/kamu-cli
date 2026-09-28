@@ -7,37 +7,41 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::*;
 use kamu_task_system::TaskQueueWakeupSource;
-use kamu_wakeup_listener_inmem::InMemoryWakeupListener;
-use wakeup_listener::WakeupListener;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Signaled by `InMemoryTaskEventStore` when a task becomes queued
+pub(crate) const TASKS_QUEUED_CHANNEL: &str = "tasks_queued";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryTaskQueueWakeupSource {
-    wakeup_listener: InMemoryWakeupListener,
+    hub: Arc<InMemoryWakeupHub>,
 }
 
 #[component(pub)]
 #[interface(dyn TaskQueueWakeupSource)]
-#[scope(Singleton)]
+#[scope(Agnostic)]
 impl InMemoryTaskQueueWakeupSource {
-    pub fn new() -> Self {
-        Self {
-            wakeup_listener: InMemoryWakeupListener::new(),
-        }
-    }
-
-    pub fn notify_task_queued(&self) {
-        self.wakeup_listener.signal();
+    pub fn new(hub: Arc<InMemoryWakeupHub>) -> Self {
+        Self { hub }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TaskQueueWakeupSource for InMemoryTaskQueueWakeupSource {
-    fn wakeup_listener(&self) -> &dyn WakeupListener {
-        &self.wakeup_listener
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            TASKS_QUEUED_CHANNEL,
+        ))
     }
 }
 

@@ -184,6 +184,7 @@ pub fn configure_database_components(
             b.add::<kamu_task_system_inmem::InMemoryTaskQueueWakeupSource>();
 
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
+            b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
 
             b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 
@@ -251,6 +252,7 @@ pub fn configure_database_components(
 // Public only for tests
 pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
+    b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
 
     b.add::<kamu_accounts_inmem::InMemoryAccountRepository>();
     b.add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>();
