@@ -13,25 +13,31 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Lets a background agent sleep until the data it processes *might* have
+/// changed, instead of polling the storage continuously.
+///
+/// A wakeup is only a hint: the caller must always re-check the storage after
+/// waking up, as notifications may be spurious, coalesced, or missed (in which
+/// case the timeout acts as a safety net).
 #[async_trait::async_trait]
-pub trait MessageStoreWakeupDetector: Send + Sync {
-    /// Block until there *might* be new message, or timeout elapses.
+pub trait WakeupListener: Send + Sync {
+    /// Block until there *might* be new data, or timeout elapses.
     async fn wait_wake(
         &self,
         timeout: Duration,
         min_debounce_interval: Duration,
-    ) -> Result<MessageStoreWakeHint, InternalError>;
+    ) -> Result<WakeHint, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum MessageStoreWakeHint {
-    /// Timeout elapsed without new messages
+pub enum WakeHint {
+    /// Timeout elapsed without any signal
     Timeout,
 
-    /// New messages detected
-    NewMessages,
+    /// A signal was received: new data might be available
+    Signaled,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

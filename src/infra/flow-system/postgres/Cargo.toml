@@ -24,12 +24,12 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-messaging-outbox = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
+kamu-wakeup-listener-postgres = { workspace = true }
+wakeup-listener = { workspace = true }
 
 kamu-flow-system = { workspace = true, features = ["sqlx"] }
-kamu-messaging-outbox-postgres = { workspace = true }
 
 
 async-stream = "0.3"

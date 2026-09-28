@@ -20,7 +20,7 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventProjector,
 };
-use messaging_outbox::MessageStoreWakeHint;
+use wakeup_listener::WakeHint;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,7 +95,7 @@ impl FlowSystemEventAgentImpl {
     /// Run a single iteration of the agent main loop.
     /// Returns number of still active projectors
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_single_iteration(&self, hint: MessageStoreWakeHint) {
+    async fn run_single_iteration(&self, hint: WakeHint) {
         tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
         let catalog = self.catalog.upgrade();
@@ -183,13 +183,13 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
         // On startup, immediately sync all projectors to catch up with existing events
         self.run_catch_up_phase().await;
 
-        // Access wakeup detector
-        let wakeup_detector = self.flow_system_event_bridge.wakeup_detector();
+        // Access wakeup listener
+        let wakeup_listener = self.flow_system_event_bridge.wakeup_listener();
 
         // Then enter the infinite main loop
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
-            let hint = wakeup_detector
+            let hint = wakeup_listener
                 .wait_wake(
                     self.agent_config.max_listening_timeout,
                     self.agent_config.min_debounce_interval,

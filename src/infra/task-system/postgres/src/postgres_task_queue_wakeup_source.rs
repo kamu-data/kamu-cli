@@ -9,9 +9,9 @@
 
 use std::sync::Arc;
 
-use kamu_messaging_outbox_postgres::PostgresMessageStoreWakeupDetector;
 use kamu_task_system::TaskQueueWakeupSource;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_postgres::PostgresNotifyWakeupListener;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,7 +20,7 @@ const NOTIFY_CHANNEL_NAME: &str = "tasks_queued";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresTaskQueueWakeupSource {
-    wakeup_detector: PostgresMessageStoreWakeupDetector,
+    wakeup_listener: PostgresNotifyWakeupListener,
 }
 
 #[dill::component(pub)]
@@ -29,7 +29,7 @@ pub struct PostgresTaskQueueWakeupSource {
 impl PostgresTaskQueueWakeupSource {
     pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
         Self {
-            wakeup_detector: PostgresMessageStoreWakeupDetector::new(pool, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: PostgresNotifyWakeupListener::new(pool, NOTIFY_CHANNEL_NAME),
         }
     }
 }
@@ -37,8 +37,8 @@ impl PostgresTaskQueueWakeupSource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TaskQueueWakeupSource for PostgresTaskQueueWakeupSource {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        &self.wakeup_listener
     }
 }
 

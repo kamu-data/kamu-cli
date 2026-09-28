@@ -9,7 +9,7 @@
 
 use event_sourcing::EventID;
 use internal_error::InternalError;
-use messaging_outbox::MessageStoreWakeupDetector;
+use wakeup_listener::WakeupListener;
 
 use crate::FlowSystemEvent;
 
@@ -17,8 +17,8 @@ use crate::FlowSystemEvent;
 
 #[async_trait::async_trait]
 pub trait FlowSystemEventBridge: Send + Sync {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector;
+    /// Provides event store wakeup listener instance
+    fn wakeup_listener(&self) -> &dyn WakeupListener;
 
     /// Fetch next batch for the given projector; order by global id.
     async fn fetch_next_batch(

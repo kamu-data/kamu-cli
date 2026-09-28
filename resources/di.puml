@@ -169,6 +169,7 @@ interface "StorageEventStore" <<i>>
 interface "SyncService" <<i>>
 interface "SystemTimeSource" <<i>>
 interface "TaskEventStore" <<i>>
+interface "TaskQueueWakeupSource" <<i>>
 interface "TransformElaborationService" <<i>>
 interface "TransformExecutor" <<i>>
 interface "TransformRequestPlanner" <<i>>
@@ -440,6 +441,7 @@ class "SqliteResourceRawEventStore"
 class "SqliteResourceRepository"
 class "SqliteSecretSetProjectionRepository"
 class "SqliteTaskEventStore"
+class "SqliteTaskQueueWakeupSource" <<agnostic>>
 class "SqliteTransactionManager"
 class "SqliteVariableSetProjectionRepository"
 class "SqliteWeb3AuthEip4361NonceRepository"
@@ -1219,6 +1221,8 @@ class "WsSmartTransferProtocolClient"
 "StorageTypedResourceQueryServiceImpl"  --> "ResourceRepository"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
+"TaskQueueWakeupSource" <|-- "SqliteTaskQueueWakeupSource"
+"SqliteTaskQueueWakeupSource"  --> "Pool"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"
 "SqliteWebhookDeliveryRepository"  --> "TransactionRefT"
 "WebhookSubscriptionEventStore" <|-- "SqliteWebhookSubscriptionEventStore"

@@ -10,24 +10,25 @@
 use std::time::Duration;
 
 use internal_error::InternalError;
-use messaging_outbox::{MessageStoreWakeHint, MessageStoreWakeupDetector};
 use tokio::sync::broadcast;
+use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct InMemoryMessageStoreWakeupDetector {
+/// Wakes up on explicit `signal()` calls, for in-memory storages.
+pub struct InMemoryWakeupListener {
     tx: tokio::sync::broadcast::Sender<()>,
 }
 
-impl InMemoryMessageStoreWakeupDetector {
+impl InMemoryWakeupListener {
     pub fn new() -> Self {
         let (tx, _rx) = broadcast::channel(1024);
 
         Self { tx }
     }
 
-    pub fn notify_new_message_arrived(&self) {
-        // Notify all listeners that a new message has arrived
+    pub fn signal(&self) {
+        // Wake up all listeners
         // We ignore errors here because if there are no listeners, that's fine
         let _ = self.tx.send(());
     }
@@ -36,33 +37,33 @@ impl InMemoryMessageStoreWakeupDetector {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageStoreWakeupDetector for InMemoryMessageStoreWakeupDetector {
+impl WakeupListener for InMemoryWakeupListener {
     async fn wait_wake(
         &self,
         timeout: Duration,
         _min_debounce_interval: Duration,
-    ) -> Result<MessageStoreWakeHint, InternalError> {
-        // Subscribe to messages broadcast channel
+    ) -> Result<WakeHint, InternalError> {
+        // Subscribe to the signals broadcast channel
         let mut rx = self.tx.subscribe();
 
-        // Wait until a new message arrives or timeout elapses
+        // Wait until a signal arrives or timeout elapses
         // For testing purposes, we keep this simple without complex backoff strategies
         match tokio::time::timeout(timeout, rx.recv()).await {
             Ok(Ok(())) => {
-                // New message arrived
-                Ok(MessageStoreWakeHint::NewMessages)
+                // Signal received
+                Ok(WakeHint::Signaled)
             }
             Ok(Err(broadcast::error::RecvError::Closed)) => {
                 // Sender has been dropped, which should never happen in this case
-                unreachable!("InMemoryMessageStoreWakeupDetector: broadcast channel closed");
+                unreachable!("InMemoryWakeupListener: broadcast channel closed");
             }
             Ok(Err(broadcast::error::RecvError::Lagged(_))) => {
-                // We lagged behind, but that's fine, just indicate new messages are available
-                Ok(MessageStoreWakeHint::NewMessages)
+                // We lagged behind, but that's fine, just indicate a signal was received
+                Ok(WakeHint::Signaled)
             }
             Err(_elapsed) => {
                 // Timeout elapsed
-                Ok(MessageStoreWakeHint::Timeout)
+                Ok(WakeHint::Timeout)
             }
         }
     }

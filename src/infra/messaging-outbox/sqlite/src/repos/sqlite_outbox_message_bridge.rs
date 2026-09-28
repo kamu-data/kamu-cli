@@ -11,15 +11,15 @@ use std::sync::Arc;
 
 use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_wakeup_listener_sqlite::SqlitePollingWakeupListener;
 use messaging_outbox::*;
 use sqlx::Sqlite;
-
-use crate::SqliteMessageStoreWakeupDetector;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteOutboxMessageBridge {
-    wakeup_detector: SqliteMessageStoreWakeupDetector,
+    wakeup_listener: SqlitePollingWakeupListener,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +30,7 @@ pub struct SqliteOutboxMessageBridge {
 impl SqliteOutboxMessageBridge {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self {
-            wakeup_detector: SqliteMessageStoreWakeupDetector::new(
+            wakeup_listener: SqlitePollingWakeupListener::new(
                 pool,
                 "SELECT MAX(message_id) FROM outbox_messages",
             ),
@@ -42,8 +42,8 @@ impl SqliteOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for SqliteOutboxMessageBridge {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        &self.wakeup_listener
     }
 
     async fn push_message(

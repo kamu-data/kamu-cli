@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use messaging_outbox::MessageStoreWakeupDetector;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Signals the task agent that new tasks might have been queued,
 /// so that it does not have to poll the task queue continuously
 pub trait TaskQueueWakeupSource: Send + Sync {
-    /// Provides task queue wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector;
+    /// Provides task queue wakeup listener instance
+    fn wakeup_listener(&self) -> &dyn WakeupListener;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

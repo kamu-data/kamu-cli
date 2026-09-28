@@ -11,42 +11,44 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use internal_error::InternalError;
-use messaging_outbox::{MessageStoreWakeHint, MessageStoreWakeupDetector};
+use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SqliteMessageStoreWakeupDetector {
+/// Sqlite has no notification mechanism, so this polls a cheap query returning
+/// the maximum ID of the watched records (`SELECT MAX(id) FROM ...`), with
+/// exponential backoff between `min_debounce_interval` and the timeout.
+pub struct SqlitePollingWakeupListener {
     pool: Arc<sqlx::SqlitePool>,
-    message_max_fetch_query: String,
-    max_seen_event_id: Mutex<i64>,
+    max_id_query: String,
+    max_seen_id: Mutex<i64>,
 }
 
-impl SqliteMessageStoreWakeupDetector {
-    pub fn new(pool: Arc<sqlx::SqlitePool>, message_max_fetch_query: impl Into<String>) -> Self {
-        let message_max_fetch_query = message_max_fetch_query.into();
+impl SqlitePollingWakeupListener {
+    pub fn new(pool: Arc<sqlx::SqlitePool>, max_id_query: impl Into<String>) -> Self {
+        let max_id_query = max_id_query.into();
 
         Self {
             pool,
-            message_max_fetch_query,
-            max_seen_event_id: Mutex::new(0),
+            max_id_query,
+            max_seen_id: Mutex::new(0),
         }
     }
 
-    async fn check_for_new_events(&self) -> Result<Option<i64>, InternalError> {
-        let max_present_event_id = {
-            let (max_present_event_id,): (Option<i64>,) =
-                sqlx::query_as(&self.message_max_fetch_query)
-                    .fetch_one(self.pool.as_ref())
-                    .await
-                    .unwrap_or((None,));
+    async fn check_for_new_ids(&self) -> Result<Option<i64>, InternalError> {
+        let max_present_id = {
+            let (max_present_id,): (Option<i64>,) = sqlx::query_as(&self.max_id_query)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .unwrap_or((None,));
 
-            Ok(max_present_event_id.unwrap_or_default())
+            Ok(max_present_id.unwrap_or_default())
         }?;
 
-        let mut max_seen_event_id = self.max_seen_event_id.lock().unwrap();
-        if max_present_event_id > *max_seen_event_id {
-            *max_seen_event_id = max_present_event_id;
-            Ok(Some(max_present_event_id))
+        let mut max_seen_id = self.max_seen_id.lock().unwrap();
+        if max_present_id > *max_seen_id {
+            *max_seen_id = max_present_id;
+            Ok(Some(max_present_id))
         } else {
             Ok(None)
         }
@@ -56,26 +58,26 @@ impl SqliteMessageStoreWakeupDetector {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageStoreWakeupDetector for SqliteMessageStoreWakeupDetector {
+impl WakeupListener for SqlitePollingWakeupListener {
     async fn wait_wake(
         &self,
         timeout: Duration,
         min_debounce_interval: Duration,
-    ) -> Result<MessageStoreWakeHint, InternalError> {
+    ) -> Result<WakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
         let mut poll_interval = min_debounce_interval;
 
         loop {
-            // Check for new events
-            if let Some(_max_event_id) = self.check_for_new_events().await? {
-                return Ok(MessageStoreWakeHint::NewMessages);
+            // Check for new records
+            if let Some(_max_id) = self.check_for_new_ids().await? {
+                return Ok(WakeHint::Signaled);
             }
 
             // Calculate remaining time
             let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
             if remaining.is_zero() {
                 // Timeout elapsed, no new work
-                return Ok(MessageStoreWakeHint::Timeout);
+                return Ok(WakeHint::Timeout);
             }
 
             // Sleep for the shorter of poll_interval or remaining time

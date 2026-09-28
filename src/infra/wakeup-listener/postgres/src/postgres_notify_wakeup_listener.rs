@@ -11,18 +11,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use internal_error::InternalError;
-use messaging_outbox::{MessageStoreWakeHint, MessageStoreWakeupDetector};
 use sqlx::postgres::PgListener;
+use wakeup_listener::{WakeHint, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresMessageStoreWakeupDetector {
+/// Waits for Postgres `NOTIFY` signals on the given channel via `LISTEN`.
+/// The channel is expected to be notified by triggers on the watched tables.
+pub struct PostgresNotifyWakeupListener {
     pool: Arc<sqlx::PgPool>,
     listener: tokio::sync::Mutex<Option<PgListener>>,
     channel_name: &'static str,
 }
 
-impl PostgresMessageStoreWakeupDetector {
+impl PostgresNotifyWakeupListener {
     pub fn new(pool: Arc<sqlx::PgPool>, channel_name: &'static str) -> Self {
         Self {
             pool,
@@ -68,12 +70,12 @@ impl PostgresMessageStoreWakeupDetector {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl MessageStoreWakeupDetector for PostgresMessageStoreWakeupDetector {
+impl WakeupListener for PostgresNotifyWakeupListener {
     async fn wait_wake(
         &self,
         timeout: Duration,
         min_debounce_interval: Duration,
-    ) -> Result<MessageStoreWakeHint, InternalError> {
+    ) -> Result<WakeHint, InternalError> {
         let deadline = tokio::time::Instant::now() + timeout;
 
         loop {
@@ -96,7 +98,7 @@ impl MessageStoreWakeupDetector for PostgresMessageStoreWakeupDetector {
                             let remaining_after_delay =
                                 deadline.saturating_duration_since(tokio::time::Instant::now());
                             if remaining_after_delay.is_zero() {
-                                return Ok(MessageStoreWakeHint::Timeout);
+                                return Ok(WakeHint::Timeout);
                             }
 
                             // Continue to next iteration to try again
@@ -111,12 +113,12 @@ impl MessageStoreWakeupDetector for PostgresMessageStoreWakeupDetector {
             if remaining_timeout.is_zero() {
                 // Timeout exceeded, put listener back and return
                 *self.listener.lock().await = Some(listener);
-                return Ok(MessageStoreWakeHint::Timeout);
+                return Ok(WakeHint::Timeout);
             }
 
             // Wait for notification with remaining timeout
             match tokio::time::timeout(remaining_timeout, listener.recv()).await {
-                // Got a NOTIFY - new messages are available
+                // Got a NOTIFY - new data might be available
                 Ok(Ok(_notification)) => {
                     // Optionally debounce by waiting a bit to collect more notifications
                     if !min_debounce_interval.is_zero() {
@@ -139,7 +141,7 @@ impl MessageStoreWakeupDetector for PostgresMessageStoreWakeupDetector {
                     // Stash the listener back
                     *self.listener.lock().await = Some(listener);
 
-                    return Ok(MessageStoreWakeHint::NewMessages);
+                    return Ok(WakeHint::Signaled);
                 }
 
                 // Socket/conn error — drop listener and try to reconnect after delay
@@ -161,7 +163,7 @@ impl MessageStoreWakeupDetector for PostgresMessageStoreWakeupDetector {
                 // Timed out waiting — stash listener back and return
                 Err(_elapsed) => {
                     *self.listener.lock().await = Some(listener);
-                    return Ok(MessageStoreWakeHint::Timeout);
+                    return Ok(WakeHint::Timeout);
                 }
             }
         }

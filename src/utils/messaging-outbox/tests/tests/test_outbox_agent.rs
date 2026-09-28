@@ -16,6 +16,7 @@ use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListener;
 
 use crate::{test_message_consumer, test_message_failing_consumer, test_message_type};
 
@@ -89,8 +90,8 @@ impl FailOnceOnMarkConsumedOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for FailOnceOnMarkConsumedOutboxMessageBridge {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        self.inner.wakeup_detector()
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        self.inner.wakeup_listener()
     }
 
     async fn push_message(

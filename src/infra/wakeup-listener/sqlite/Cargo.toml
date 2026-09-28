@@ -1,0 +1,50 @@
+[package]
+name = "kamu-wakeup-listener-sqlite"
+description = "Sqlite-specific implementation of wakeup listener (polling)"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+internal-error = { workspace = true }
+wakeup-listener = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "sqlite",
+] }
+tokio = { version = "1", default-features = false, features = ["time"] }
+
+
+[dev-dependencies]
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "macros",
+    "migrate",
+    "sqlite",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+    "test-util",
+    "time",
+] }

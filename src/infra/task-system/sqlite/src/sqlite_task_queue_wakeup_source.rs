@@ -9,14 +9,14 @@
 
 use std::sync::Arc;
 
-use kamu_messaging_outbox_sqlite::SqliteMessageStoreWakeupDetector;
 use kamu_task_system::TaskQueueWakeupSource;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_sqlite::SqlitePollingWakeupListener;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteTaskQueueWakeupSource {
-    wakeup_detector: SqliteMessageStoreWakeupDetector,
+    wakeup_listener: SqlitePollingWakeupListener,
 }
 
 #[dill::component(pub)]
@@ -27,7 +27,7 @@ impl SqliteTaskQueueWakeupSource {
         Self {
             // Note: any new task event wakes up the agent, not only queueing ones.
             // This is acceptable, as the agent will simply re-check the queue
-            wakeup_detector: SqliteMessageStoreWakeupDetector::new(
+            wakeup_listener: SqlitePollingWakeupListener::new(
                 pool,
                 "SELECT MAX(event_id) FROM task_events",
             ),
@@ -38,8 +38,8 @@ impl SqliteTaskQueueWakeupSource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TaskQueueWakeupSource for SqliteTaskQueueWakeupSource {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        &self.wakeup_listener
     }
 }
 

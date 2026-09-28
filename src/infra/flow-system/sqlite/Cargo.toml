@@ -25,12 +25,12 @@ doctest = false
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 internal-error = { workspace = true }
-messaging-outbox = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
+kamu-wakeup-listener-sqlite = { workspace = true }
+wakeup-listener = { workspace = true }
 
 kamu-flow-system = { workspace = true, features = ["sqlx"] }
-kamu-messaging-outbox-sqlite = { workspace = true }
 
 
 async-stream = "0.3"

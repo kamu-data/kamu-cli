@@ -11,15 +11,15 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use internal_error::InternalError;
+use kamu_wakeup_listener_inmem::InMemoryWakeupListener;
 use messaging_outbox::*;
-
-use crate::InMemoryMessageStoreWakeupDetector;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryOutboxMessageBridge {
     state: Mutex<State>,
-    wakeup_detector: InMemoryMessageStoreWakeupDetector,
+    wakeup_listener: InMemoryWakeupListener,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,11 +46,11 @@ struct ChannelKey {
 #[dill::interface(dyn OutboxMessageBridge)]
 impl InMemoryOutboxMessageBridge {
     pub fn new() -> Self {
-        let wakeup_detector = InMemoryMessageStoreWakeupDetector::new();
+        let wakeup_listener = InMemoryWakeupListener::new();
 
         Self {
             state: Mutex::new(State::default()),
-            wakeup_detector,
+            wakeup_listener,
         }
     }
 
@@ -67,7 +67,7 @@ impl InMemoryOutboxMessageBridge {
         state.messages.push(message.clone());
 
         // Wake up listeners
-        self.wakeup_detector.notify_new_message_arrived();
+        self.wakeup_listener.signal();
 
         message
     }
@@ -77,8 +77,8 @@ impl InMemoryOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        &self.wakeup_listener
     }
 
     async fn push_message(

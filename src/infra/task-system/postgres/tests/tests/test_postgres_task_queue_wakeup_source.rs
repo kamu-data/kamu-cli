@@ -18,8 +18,8 @@ use dill::{Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_task_system::*;
 use kamu_task_system_postgres::{PostgresTaskEventStore, PostgresTaskQueueWakeupSource};
-use messaging_outbox::MessageStoreWakeHint;
 use sqlx::PgPool;
+use wakeup_listener::WakeHint;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +29,7 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
     let harness = PostgresTaskQueueWakeupHarness::new(pg_pool);
 
     // Nothing happened yet. This also starts listening for notifications
-    assert_matches!(harness.wait_wake().await, MessageStoreWakeHint::Timeout);
+    assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
 
     // A new task is queued
     let task_id = harness.new_task_id().await;
@@ -46,7 +46,7 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
             .into(),
         )
         .await;
-    assert_matches!(harness.wait_wake().await, MessageStoreWakeHint::NewMessages);
+    assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
 
     // A task starts running: not a reason to wake up
     let last_event_id = harness
@@ -60,7 +60,7 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
             .into(),
         )
         .await;
-    assert_matches!(harness.wait_wake().await, MessageStoreWakeHint::Timeout);
+    assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
 
     // A task is requeued (i.e., recovery after crash)
     let last_event_id = harness
@@ -74,7 +74,7 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
             .into(),
         )
         .await;
-    assert_matches!(harness.wait_wake().await, MessageStoreWakeHint::NewMessages);
+    assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
 
     // A task runs again and finishes: not a reason to wake up
     let last_event_id = harness
@@ -100,7 +100,7 @@ async fn test_wakes_up_only_when_task_is_queued(pg_pool: PgPool) {
             .into(),
         )
         .await;
-    assert_matches!(harness.wait_wake().await, MessageStoreWakeHint::Timeout);
+    assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,9 +129,9 @@ impl PostgresTaskQueueWakeupHarness {
         }
     }
 
-    async fn wait_wake(&self) -> MessageStoreWakeHint {
+    async fn wait_wake(&self) -> WakeHint {
         self.wakeup_source
-            .wakeup_detector()
+            .wakeup_listener()
             .wait_wake(Duration::from_millis(500), Duration::from_millis(10))
             .await
             .unwrap()

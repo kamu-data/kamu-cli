@@ -25,8 +25,8 @@ doctest = false
 database-common = { workspace = true }
 odf = { workspace = true }
 kamu-task-system = { workspace = true }
-kamu-messaging-outbox-postgres = { workspace = true }
-messaging-outbox = { workspace = true }
+kamu-wakeup-listener-postgres = { workspace = true }
+wakeup-listener = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

@@ -25,8 +25,8 @@ doctest = false
 database-common = { workspace = true }
 odf = { workspace = true }
 kamu-task-system = { workspace = true }
-kamu-messaging-outbox-inmem = { workspace = true }
-messaging-outbox = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
+wakeup-listener = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.17", default-features = false }

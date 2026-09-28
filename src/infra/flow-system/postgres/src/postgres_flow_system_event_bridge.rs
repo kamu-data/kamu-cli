@@ -18,9 +18,9 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_messaging_outbox_postgres::PostgresMessageStoreWakeupDetector;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_postgres::PostgresNotifyWakeupListener;
 use sqlx::Postgres;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +29,7 @@ const NOTIFY_CHANNEL_NAME: &str = "flow_system_events_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresFlowSystemEventBridge {
-    wakeup_detector: PostgresMessageStoreWakeupDetector,
+    wakeup_listener: PostgresNotifyWakeupListener,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ pub struct PostgresFlowSystemEventBridge {
 impl PostgresFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
         Self {
-            wakeup_detector: PostgresMessageStoreWakeupDetector::new(pool, NOTIFY_CHANNEL_NAME),
+            wakeup_listener: PostgresNotifyWakeupListener::new(pool, NOTIFY_CHANNEL_NAME),
         }
     }
 }
@@ -49,9 +49,9 @@ impl PostgresFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    /// Provides event store wakeup listener instance
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        &self.wakeup_listener
     }
 
     /// Fetch next batch for the given projector; order by global id.

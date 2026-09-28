@@ -25,6 +25,8 @@ doctest = false
 database-common = { workspace = true }
 messaging-outbox = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }
+kamu-wakeup-listener-postgres = { workspace = true }
+wakeup-listener = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

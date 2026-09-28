@@ -8861,6 +8861,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio-stream",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -8876,8 +8877,7 @@ dependencies = [
  "futures",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
- "kamu-messaging-outbox-inmem",
- "messaging-outbox",
+ "kamu-wakeup-listener-inmem",
  "opendatafabric",
  "serde",
  "serde_json",
@@ -8887,6 +8887,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -8903,8 +8904,7 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
- "kamu-messaging-outbox-postgres",
- "messaging-outbox",
+ "kamu-wakeup-listener-postgres",
  "opendatafabric",
  "serde",
  "serde_json",
@@ -8914,6 +8914,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -8980,6 +8981,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -8997,8 +8999,7 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
- "kamu-messaging-outbox-sqlite",
- "messaging-outbox",
+ "kamu-wakeup-listener-sqlite",
  "opendatafabric",
  "serde_json",
  "sqlx",
@@ -9007,6 +9008,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9051,11 +9053,13 @@ dependencies = [
  "dill",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
+ "kamu-wakeup-listener-inmem",
  "messaging-outbox",
  "serde_json",
  "test-group",
  "test-log",
  "tokio",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9071,6 +9075,7 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
+ "kamu-wakeup-listener-postgres",
  "messaging-outbox",
  "serde",
  "serde_json",
@@ -9079,6 +9084,7 @@ dependencies = [
  "test-log",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9107,6 +9113,7 @@ dependencies = [
  "futures",
  "internal-error",
  "kamu-messaging-outbox-repo-tests",
+ "kamu-wakeup-listener-sqlite",
  "messaging-outbox",
  "serde_json",
  "sqlx",
@@ -9114,6 +9121,7 @@ dependencies = [
  "test-log",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9622,6 +9630,7 @@ dependencies = [
  "thiserror 2.0.21",
  "tokio-stream",
  "uuid",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9633,14 +9642,14 @@ dependencies = [
  "database-common-macros",
  "dill",
  "futures",
- "kamu-messaging-outbox-inmem",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "messaging-outbox",
+ "kamu-wakeup-listener-inmem",
  "opendatafabric",
  "test-group",
  "test-log",
  "tokio",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9655,16 +9664,16 @@ dependencies = [
  "dill",
  "futures",
  "internal-error",
- "kamu-messaging-outbox-postgres",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "messaging-outbox",
+ "kamu-wakeup-listener-postgres",
  "opendatafabric",
  "serde_json",
  "sqlx",
  "test-group",
  "test-log",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9725,15 +9734,54 @@ dependencies = [
  "dill",
  "futures",
  "internal-error",
- "kamu-messaging-outbox-sqlite",
  "kamu-task-system",
  "kamu-task-system-repo-tests",
- "messaging-outbox",
+ "kamu-wakeup-listener-sqlite",
  "opendatafabric",
  "serde_json",
  "sqlx",
  "test-group",
  "test-log",
+ "wakeup-listener",
+]
+
+[[package]]
+name = "kamu-wakeup-listener-inmem"
+version = "0.267.0"
+dependencies = [
+ "async-trait",
+ "internal-error",
+ "test-group",
+ "test-log",
+ "tokio",
+ "wakeup-listener",
+]
+
+[[package]]
+name = "kamu-wakeup-listener-postgres"
+version = "0.267.0"
+dependencies = [
+ "async-trait",
+ "internal-error",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tracing",
+ "wakeup-listener",
+]
+
+[[package]]
+name = "kamu-wakeup-listener-sqlite"
+version = "0.267.0"
+dependencies = [
+ "async-trait",
+ "internal-error",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tokio",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -10464,6 +10512,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -15868,6 +15917,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "wakeup-listener"
+version = "0.267.0"
+dependencies = [
+ "async-trait",
+ "internal-error",
 ]
 
 [[package]]

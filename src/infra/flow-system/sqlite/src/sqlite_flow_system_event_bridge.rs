@@ -18,14 +18,14 @@ use kamu_flow_system::{
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_messaging_outbox_sqlite::SqliteMessageStoreWakeupDetector;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_sqlite::SqlitePollingWakeupListener;
 use sqlx::Sqlite;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventBridge {
-    wakeup_detector: SqliteMessageStoreWakeupDetector,
+    wakeup_listener: SqlitePollingWakeupListener,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +36,7 @@ pub struct SqliteFlowSystemEventBridge {
 impl SqliteFlowSystemEventBridge {
     pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
         Self {
-            wakeup_detector: SqliteMessageStoreWakeupDetector::new(
+            wakeup_listener: SqlitePollingWakeupListener::new(
                 pool,
                 "SELECT MAX(event_id) FROM flow_system_events",
             ),
@@ -48,9 +48,9 @@ impl SqliteFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    /// Provides event store wakeup listener instance
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        &self.wakeup_listener
     }
 
     /// Fetch next batch for the given projector; order by global id.

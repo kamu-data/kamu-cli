@@ -8,14 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use kamu_messaging_outbox_inmem::InMemoryMessageStoreWakeupDetector;
 use kamu_task_system::TaskQueueWakeupSource;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_inmem::InMemoryWakeupListener;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryTaskQueueWakeupSource {
-    wakeup_detector: InMemoryMessageStoreWakeupDetector,
+    wakeup_listener: InMemoryWakeupListener,
 }
 
 #[component(pub)]
@@ -24,20 +24,20 @@ pub struct InMemoryTaskQueueWakeupSource {
 impl InMemoryTaskQueueWakeupSource {
     pub fn new() -> Self {
         Self {
-            wakeup_detector: InMemoryMessageStoreWakeupDetector::new(),
+            wakeup_listener: InMemoryWakeupListener::new(),
         }
     }
 
     pub fn notify_task_queued(&self) {
-        self.wakeup_detector.notify_new_message_arrived();
+        self.wakeup_listener.signal();
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl TaskQueueWakeupSource for InMemoryTaskQueueWakeupSource {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn wakeup_listener(&self) -> &dyn WakeupListener {
+        &self.wakeup_listener
     }
 }
 
