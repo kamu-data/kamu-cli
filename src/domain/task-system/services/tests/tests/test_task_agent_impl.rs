@@ -9,6 +9,7 @@
 
 use std::assert_matches;
 use std::sync::Arc;
+use std::time::Duration;
 
 use database_common::NoOpDatabasePlugin;
 use dill::{Catalog, CatalogBuilder};
@@ -20,7 +21,7 @@ use kamu_datasets::SecretsEncryptionConfig;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImpl};
 use kamu_task_system::*;
-use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::*;
 use messaging_outbox::{MockOutbox, Outbox};
 use mockall::predicate::{eq, function};
@@ -152,6 +153,41 @@ async fn test_run_two_of_three_tasks() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_agent_wakes_up_when_task_is_queued() {
+    // Expect the only task to notify about Running and Finished transitions
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+
+    // Start the agent on an empty queue, then schedule a task a bit later,
+    // when the agent is already waiting for a wakeup
+    let (run_result, task_id) = tokio::time::timeout(LISTENING_TIMEOUT / 10, async {
+        tokio::join!(harness.task_agent.run_single_task(), async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            harness
+                .schedule_probe_task(LogicalPlanProbe::default())
+                .await
+        })
+    })
+    .await
+    .expect("Agent must be woken up by the queued task, not by the listening timeout");
+    run_result.unwrap();
+
+    // Check the task has Finished status at the end
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Finished);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
+
 struct TaskAgentHarness {
     _tempdir: TempDir,
     catalog: Catalog,
@@ -178,6 +214,7 @@ impl TaskAgentHarness {
             .add::<DidGeneratorDefault>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
+            .add::<InMemoryTaskQueueWakeupSource>()
             .add_value(mock_outbox)
             .add_value(mock_task_runner)
             .bind::<dyn TaskRunner, MockTaskRunner>()
@@ -208,7 +245,11 @@ impl TaskAgentHarness {
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
-            .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
+            .add_value(TaskAgentConfig {
+                min_debounce_interval: Duration::from_millis(10),
+                // Long enough to make sure tests never rely on listening timeouts
+                max_listening_timeout: LISTENING_TIMEOUT,
+            })
             .add::<ProbeTaskPlanner>()
             .add::<ProbeTaskRunner>()
             .add_value(SecretsEncryptionConfig::sample());

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::time::Duration;
+
 use async_utils::BackgroundAgent;
 
 use crate::*;
@@ -23,14 +25,27 @@ pub trait TaskAgent: BackgroundAgent {
 
 #[derive(Debug)]
 pub struct TaskAgentConfig {
-    /// Defines interval between task executor checks for new pending tasks
-    pub task_checking_interval: chrono::Duration,
+    /// Minimal interval to collect further wakeup notifications after the
+    /// first one arrives
+    pub min_debounce_interval: Duration,
+
+    /// Maximal time to wait for a wakeup notification before re-checking the
+    /// task queue anyway
+    pub max_listening_timeout: Duration,
 }
 
 impl TaskAgentConfig {
-    pub fn new(task_checking_interval: chrono::Duration) -> Self {
+    pub fn local_default() -> Self {
         Self {
-            task_checking_interval,
+            min_debounce_interval: Duration::from_millis(100),
+            max_listening_timeout: Duration::from_secs(2),
+        }
+    }
+
+    pub fn production_default() -> Self {
+        Self {
+            min_debounce_interval: Duration::from_millis(100),
+            max_listening_timeout: Duration::from_mins(1),
         }
     }
 }

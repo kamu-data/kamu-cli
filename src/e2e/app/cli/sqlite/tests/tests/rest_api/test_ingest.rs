@@ -25,7 +25,7 @@ kamu_cli_run_api_server_e2e_test!(
               awaitingStepSecs: 1
               mandatoryThrottlingPeriodSecs: 5
             taskAgent:
-              checkingIntervalSecs: 1
+              maxListeningTimeout: 1s
         "#
     )),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"

@@ -791,7 +791,8 @@
         "taskAgent": {
           "$ref": "#/$defs/TaskAgentConfig",
           "default": {
-            "checkingIntervalSecs": 1
+            "maxListeningTimeout": "2s",
+            "minDebounceInterval": "100ms"
           }
         }
       },
@@ -1258,11 +1259,13 @@
     "TaskAgentConfig": {
       "additionalProperties": false,
       "properties": {
-        "checkingIntervalSecs": {
-          "default": 1,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s"
+        },
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms"
         }
       },
       "type": "object"
@@ -1393,7 +1396,8 @@
           "minDebounceInterval": "100ms"
         },
         "taskAgent": {
-          "checkingIntervalSecs": 1
+          "maxListeningTimeout": "2s",
+          "minDebounceInterval": "100ms"
         }
       },
       "description": "Configuration for flow system"

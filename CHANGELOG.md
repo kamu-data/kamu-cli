@@ -13,6 +13,14 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Changed
+- Task agent no longer polls the task queue when idle:
+  - Postgres: tasks table notifies the agent via NOTIFY/LISTEN when a task is created or requeued
+  - SQLite: incremental listening timeout approach, In-memory: broadcast signals
+  - **Breaking config change:** `flowSystem.taskAgent.checkingIntervalSecs` was replaced with
+    `minDebounceInterval` (default `100ms`) and `maxListeningTimeout` (default `2s`)
+
 ## [0.267.0] - 2026-09-19
 ### Added
 - **Resources Framework** - a new declarative, Kubernetes-inspired subsystem for managing server-side

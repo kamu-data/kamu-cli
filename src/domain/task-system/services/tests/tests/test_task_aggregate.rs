@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::sync::Arc;
 
 use chrono::Utc;
 use kamu_task_system_inmem::*;
@@ -17,7 +18,7 @@ use kamu_task_system_services::domain::*;
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_create_new() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryTaskQueueWakeupSource::new()));
 
     let metadata = TaskMetadata::from(vec![("foo", "x"), ("bar", "y")]);
 
@@ -48,7 +49,7 @@ async fn test_task_agg_create_new() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_save_load_update() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryTaskQueueWakeupSource::new()));
     let task_id = event_store.new_task_id().await.unwrap();
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
@@ -96,7 +97,7 @@ async fn test_task_save_load_update() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_load_multi() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryTaskQueueWakeupSource::new()));
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
@@ -130,7 +131,7 @@ async fn test_task_load_multi() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_illegal_transition() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryTaskQueueWakeupSource::new()));
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
@@ -150,7 +151,7 @@ async fn test_task_agg_illegal_transition() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_requeue() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryTaskQueueWakeupSource::new()));
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 

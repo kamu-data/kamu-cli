@@ -35,6 +35,7 @@ pub struct TaskAgentImpl {
     catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<TaskAgentConfig>,
+    task_queue_wakeup_source: Arc<dyn TaskQueueWakeupSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +141,9 @@ impl TaskAgentImpl {
     }
 
     async fn take_task(&self) -> Result<Task, InternalError> {
+        // Access wakeup detector
+        let wakeup_detector = self.task_queue_wakeup_source.wakeup_detector();
+
         loop {
             let maybe_task = self.take_task_non_blocking().await?;
 
@@ -147,9 +151,15 @@ impl TaskAgentImpl {
                 return Ok(task);
             }
 
-            self.time_source
-                .sleep(self.agent_config.task_checking_interval)
-                .await;
+            // Wait for push or timeout - let the store handle the backoff strategy.
+            // Regardless of the hint, the queue is re-checked afterwards
+            let hint = wakeup_detector
+                .wait_wake(
+                    self.agent_config.max_listening_timeout,
+                    self.agent_config.min_debounce_interval,
+                )
+                .await?;
+            tracing::debug!(hint = ?hint, "Agent woke up with a hint");
         }
     }
 

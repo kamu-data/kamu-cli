@@ -9,7 +9,7 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -93,6 +93,7 @@ impl InMemoryTaskSystemEventStoreHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryTaskEventStore>();
+        catalog_builder.add::<InMemoryTaskQueueWakeupSource>();
 
         Self {
             catalog: catalog_builder.build(),

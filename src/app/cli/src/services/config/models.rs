@@ -826,15 +826,19 @@ impl FlowSystemEventAgentConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct TaskAgentConfig {
-    #[config(default = 1)]
-    pub checking_interval_secs: u32,
+    #[config(default_str = "100ms")]
+    pub min_debounce_interval: DurationString,
+
+    #[config(default_str = "2s")]
+    pub max_listening_timeout: DurationString,
 }
 
 impl TaskAgentConfig {
     pub fn into_system(&self) -> kamu_task_system_inmem::domain::TaskAgentConfig {
-        kamu_task_system_inmem::domain::TaskAgentConfig::new(chrono::Duration::seconds(i64::from(
-            self.checking_interval_secs,
-        )))
+        kamu_task_system_inmem::domain::TaskAgentConfig {
+            min_debounce_interval: self.min_debounce_interval.into(),
+            max_listening_timeout: self.max_listening_timeout.into(),
+        }
     }
 }
 

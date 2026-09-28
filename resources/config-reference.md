@@ -84,7 +84,8 @@
     &quot;minDebounceInterval&quot;: &quot;100ms&quot;
   },
   &quot;taskAgent&quot;: {
-    &quot;checkingIntervalSecs&quot;: 1
+    &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
+    &quot;minDebounceInterval&quot;: &quot;100ms&quot;
   }
 }</code></pre></td>
 <td>Configuration for flow system</td>
@@ -1194,7 +1195,8 @@ the resources (for authenticated clients)
 <td><code>taskAgent</code></td>
 <td><a href="#taskagentconfig"><code>TaskAgentConfig</code></a></td>
 <td><pre><code class="language-json">{
-  &quot;checkingIntervalSecs&quot;: 1
+  &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
+  &quot;minDebounceInterval&quot;: &quot;100ms&quot;
 }</code></pre></td>
 <td></td>
 </tr>
@@ -1824,9 +1826,15 @@ iteration. This ensures that one data slice doesn't become too big.
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr>
-<td><code>checkingIntervalSecs</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">1</code></td>
+<td><code>maxListeningTimeout</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;2s&quot;</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>minDebounceInterval</code></td>
+<td><a href="#durationstring"><code>DurationString</code></a></td>
+<td><code class="language-json">&quot;100ms&quot;</code></td>
 <td></td>
 </tr>
 </tbody>

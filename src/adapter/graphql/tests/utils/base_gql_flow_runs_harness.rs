@@ -23,7 +23,7 @@ use kamu_datasets_services::testing::{
 };
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
@@ -85,6 +85,7 @@ impl BaseGQLFlowRunsHarness {
             .add_value(FlowSystemEventAgentConfig::local_default())
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
+            .add::<InMemoryTaskQueueWakeupSource>()
             .add::<TransformRequestPlannerImpl>()
             .add::<FakeDependencyGraphIndexer>();
 

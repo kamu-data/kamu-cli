@@ -9,15 +9,19 @@
 
 use std::collections::BTreeMap;
 use std::collections::hash_map::{Entry, HashMap};
+use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_task_system::*;
 
+use crate::InMemoryTaskQueueWakeupSource;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryTaskEventStore {
     inner: InMemoryEventStore<TaskState, State>,
+    task_queue_wakeup_source: Arc<InMemoryTaskQueueWakeupSource>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,9 +67,10 @@ impl EventStoreState<TaskState> for State {
 #[interface(dyn TaskEventStore)]
 #[scope(Singleton)]
 impl InMemoryTaskEventStore {
-    pub fn new() -> Self {
+    pub fn new(task_queue_wakeup_source: Arc<InMemoryTaskQueueWakeupSource>) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
+            task_queue_wakeup_source,
         }
     }
 
@@ -112,6 +117,10 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
             return Err(SaveEventsError::NothingToSave);
         }
 
+        let has_queued_tasks = events
+            .iter()
+            .any(|event| event.new_status() == TaskStatus::Queued);
+
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
@@ -120,9 +129,17 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
             }
         }
 
-        self.inner
+        let last_event_id = self
+            .inner
             .save_events(task_id, maybe_prev_stored_event_id, events)
-            .await
+            .await?;
+
+        // Wake up the task agent, if it's waiting for new tasks
+        if has_queued_tasks {
+            self.task_queue_wakeup_source.notify_task_queued();
+        }
+
+        Ok(last_event_id)
     }
 }
 
