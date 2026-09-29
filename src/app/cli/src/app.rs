@@ -940,6 +940,7 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(config.background_agents.wakeup_listener_config());
     catalog_builder.add_value(config.background_agents.outbox_agent_config());
     catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());
+    catalog_builder.add_value(config.background_agents.flow_agent_activation_config());
     //
 
     // Password hashing mode configuration

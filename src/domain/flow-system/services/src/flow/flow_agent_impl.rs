@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use database_common_macros::{transactional_method, transactional_method1};
 use dill::*;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_datasets::JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER;
@@ -35,6 +35,7 @@ pub struct FlowAgentImpl {
     catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
+    activation_config: Arc<FlowAgentActivationConfig>,
     wakeup_config: Arc<WakeupListenerConfig>,
     flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
     state: Arc<Mutex<State>>,
@@ -79,6 +80,7 @@ impl FlowAgentImpl {
         catalog: CatalogWeakRef,
         time_source: Arc<dyn SystemTimeSource>,
         agent_config: Arc<FlowAgentConfig>,
+        activation_config: Arc<FlowAgentActivationConfig>,
         wakeup_config: Arc<WakeupListenerConfig>,
         flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
     ) -> Self {
@@ -86,6 +88,7 @@ impl FlowAgentImpl {
             catalog,
             time_source,
             agent_config,
+            activation_config,
             wakeup_config,
             flow_activation_wakeup_source,
             state: Arc::new(Mutex::new(State::default())),
@@ -241,19 +244,71 @@ impl FlowAgentImpl {
     async fn activate_due_flows(&self) -> Result<(), InternalError> {
         let current_time = self.time_source.now();
 
-        let due_flows = self.get_flows_due_for_activation(current_time).await?;
-        if due_flows.is_empty() {
-            return Ok(());
-        }
+        let due_flows = self.load_flows_due_for_activation(current_time).await?;
 
-        // Activate flows grouped by timeslot, in the order of activation moments
-        for timeslot_flows in due_flows.chunk_by(|a, b| a.activation_time == b.activation_time) {
-            self.activate_timeslot_flows(timeslot_flows)
-                .instrument(observability::tracing::root_span!("FlowAgent::activation"))
-                .await;
-        }
+        // Each flow is activated in its own transaction, so that a failure of one flow
+        // rolls back only its own changes. Activations start in the order of
+        // activation moments, and run concurrently on separate connections
+        futures::stream::iter(due_flows)
+            .for_each_concurrent(
+                self.activation_config.concurrency.get(),
+                |(flow, activation_time)| {
+                    let flow_id = flow.flow_id;
+                    async move {
+                        match self.activate_flow(flow, activation_time).await {
+                            Ok(()) => {}
+                            Err(ActivateFlowError::ConcurrentModification) => {
+                                // The store is re-read on the next iteration
+                                tracing::info!(
+                                    %flow_id,
+                                    "Flow activation skipped as the flow changed concurrently"
+                                );
+                            }
+                            Err(ActivateFlowError::Internal(e)) => {
+                                tracing::error!(
+                                    %flow_id,
+                                    error = ?e,
+                                    error_msg = %e,
+                                    "Flow activation failed"
+                                );
+                            }
+                        }
+                    }
+                    .instrument(observability::tracing::root_span!(
+                        "FlowAgent::activation",
+                        %flow_id,
+                        %activation_time
+                    ))
+                },
+            )
+            .await;
 
         Ok(())
+    }
+
+    /// Loads flows due for activation, paired with their activation moments,
+    /// in one transaction
+    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
+    async fn load_flows_due_for_activation(
+        &self,
+        current_time: DateTime<Utc>,
+    ) -> Result<Vec<(Flow, DateTime<Utc>)>, InternalError> {
+        let due_flows = flow_event_store
+            .get_flows_due_for_activation(current_time)
+            .await?;
+        if due_flows.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let flow_ids: Vec<_> = due_flows.iter().map(|due_flow| due_flow.flow_id).collect();
+        let flows = Flow::load_multi_simple(&flow_ids, flow_event_store.as_ref())
+            .await
+            .int_err()?;
+
+        Ok(flows
+            .into_iter()
+            .zip(due_flows.iter().map(|due_flow| due_flow.activation_time))
+            .collect())
     }
 
     #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
@@ -305,61 +360,17 @@ impl FlowAgentImpl {
         Ok(())
     }
 
-    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
-    async fn get_flows_due_for_activation(
-        &self,
-        current_time: DateTime<Utc>,
-    ) -> Result<Vec<DueFlowActivation>, InternalError> {
-        flow_event_store
-            .get_flows_due_for_activation(current_time)
-            .await
-    }
-
-    async fn activate_timeslot_flows(&self, timeslot_flows: &[DueFlowActivation]) {
-        // Each flow is activated in its own transaction, so that a failure of one flow
-        // rolls back only its own changes, and does not affect the others
-        for due_flow in timeslot_flows {
-            if let Err(e) = self
-                .activate_flow(due_flow.flow_id, due_flow.activation_time)
-                .await
-            {
-                tracing::error!(
-                    flow_id = %due_flow.flow_id,
-                    error = ?e,
-                    error_msg = %e,
-                    "Scheduling flow failed"
-                );
-            }
-        }
-    }
-
+    /// Activates a flow loaded beforehand. If the flow changed since then,
+    /// saving it fails as a concurrent modification, and the transaction is
+    /// rolled back
     #[transactional_method]
     async fn activate_flow(
         &self,
-        flow_id: FlowID,
-        activation_moment: DateTime<Utc>,
-    ) -> Result<(), InternalError> {
-        let flow_event_store = transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-        let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
-            .await
-            .int_err()?;
-
-        // The flow might have changed since the due flows were listed
-        if !flow.can_schedule()
-            || flow.timing.scheduled_for_activation_at != Some(activation_moment)
-        {
-            tracing::warn!(
-                flow_id = %flow_id,
-                flow_status = %flow.status(),
-                "Skipped flow scheduling as no longer relevant"
-            );
-            return Ok(());
-        }
-
-        self.schedule_flow_task(transaction_catalog, &mut flow, activation_moment)
+        mut flow: Flow,
+        activation_time: DateTime<Utc>,
+    ) -> Result<(), ActivateFlowError> {
+        self.schedule_flow_task(transaction_catalog, &mut flow, activation_time)
             .await?;
-
         Ok(())
     }
 
@@ -369,7 +380,7 @@ impl FlowAgentImpl {
         target_catalog: Catalog,
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
-    ) -> Result<TaskID, InternalError> {
+    ) -> Result<TaskID, ActivateFlowError> {
         // Find a controller for this flow type
         let flow_controller =
             get_flow_controller_from_catalog(&target_catalog, &flow.flow_binding.flow_type)?;
@@ -404,7 +415,12 @@ impl FlowAgentImpl {
             .int_err()?;
 
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        flow.save(flow_event_store.as_ref()).await.int_err()?;
+        flow.save(flow_event_store.as_ref())
+            .await
+            .map_err(|e| match e {
+                SaveError::ConcurrentModification(_) => ActivateFlowError::ConcurrentModification,
+                e => ActivateFlowError::Internal(e.int_err()),
+            })?;
 
         Ok(task.task_id)
     }
@@ -469,6 +485,17 @@ impl FlowAgent for FlowAgentImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, thiserror::Error)]
+enum ActivateFlowError {
+    #[error("Flow was modified concurrently")]
+    ConcurrentModification,
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl FlowAgentTestDriver for FlowAgentImpl {
     /// Pretends it is time to schedule the given flow that was not waiting for
@@ -487,7 +514,8 @@ impl FlowAgentTestDriver for FlowAgentImpl {
 
         let task_id = self
             .schedule_flow_task(target_catalog.clone(), &mut flow, schedule_time)
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(task_id)
     }

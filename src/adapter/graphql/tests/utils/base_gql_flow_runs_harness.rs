@@ -87,6 +87,9 @@ impl BaseGQLFlowRunsHarness {
                 Duration::minutes(1),
                 HashMap::new(),
             ))
+            .add_value(FlowAgentActivationConfig {
+                concurrency: std::num::NonZeroUsize::new(8).unwrap(),
+            })
             .add_value(FlowSystemEventAgentConfig::local_default())
             .add_value(WakeupListenerConfig::local_default())
             .add::<TaskSchedulerImpl>()

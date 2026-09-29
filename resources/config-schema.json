@@ -156,6 +156,19 @@
       },
       "type": "object"
     },
+    "BackgroundAgentsConcurrencyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "flowActivations": {
+          "default": 8,
+          "description": "Flows activated at once, each in its own transaction with a pooled\nconnection. Keep it well below the database pool size. `SQLite` has a\nsingle connection, so activations run one at a time regardless.\n0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
     "BackgroundAgentsConfig": {
       "additionalProperties": false,
       "properties": {
@@ -166,6 +179,13 @@
             "outboxMessages": 20
           },
           "description": "Batch sizes of agents processing records in batches"
+        },
+        "concurrency": {
+          "$ref": "#/$defs/BackgroundAgentsConcurrencyConfig",
+          "default": {
+            "flowActivations": 8
+          },
+          "description": "Concurrency limits of agents processing records in parallel"
         },
         "maxListeningTimeout": {
           "$ref": "#/$defs/DurationString",
@@ -1295,6 +1315,9 @@
         "batching": {
           "flowSystemEvents": 20,
           "outboxMessages": 20
+        },
+        "concurrency": {
+          "flowActivations": 8
         },
         "maxListeningTimeout": "2s",
         "minDebounceInterval": "20ms"

@@ -22,6 +22,9 @@
     &quot;flowSystemEvents&quot;: 20,
     &quot;outboxMessages&quot;: 20
   },
+  &quot;concurrency&quot;: {
+    &quot;flowActivations&quot;: 8
+  },
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
   &quot;minDebounceInterval&quot;: &quot;20ms&quot;
 }</code></pre></td>
@@ -387,6 +390,27 @@ Base type: `string`
 </tbody>
 </table>
 
+## `BackgroundAgentsConcurrencyConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>flowActivations</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">8</code></td>
+<td>
+
+Flows activated at once, each in its own transaction with a pooled
+connection. Keep it well below the database pool size. `SQLite` has a
+single connection, so activations run one at a time regardless.
+0 is treated as 1
+
+</td>
+</tr>
+</tbody>
+</table>
+
 ## `BackgroundAgentsConfig`
 
 <table>
@@ -400,6 +424,14 @@ Base type: `string`
   &quot;outboxMessages&quot;: 20
 }</code></pre></td>
 <td>Batch sizes of agents processing records in batches</td>
+</tr>
+<tr>
+<td><code>concurrency</code></td>
+<td><a href="#backgroundagentsconcurrencyconfig"><code>BackgroundAgentsConcurrencyConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;flowActivations&quot;: 8
+}</code></pre></td>
+<td>Concurrency limits of agents processing records in parallel</td>
 </tr>
 <tr>
 <td><code>maxListeningTimeout</code></td>

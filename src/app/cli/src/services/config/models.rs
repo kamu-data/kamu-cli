@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 use kamu::utils::docker_images;
@@ -716,6 +717,10 @@ pub struct BackgroundAgentsConfig {
     /// Batch sizes of agents processing records in batches
     #[config(default)]
     pub batching: BackgroundAgentsBatchingConfig,
+
+    /// Concurrency limits of agents processing records in parallel
+    #[config(default)]
+    pub concurrency: BackgroundAgentsConcurrencyConfig,
 }
 
 #[derive(setty::Config, setty::Default)]
@@ -727,6 +732,16 @@ pub struct BackgroundAgentsBatchingConfig {
     /// Flow system events applied to a projection per transaction
     #[config(default = 20)]
     pub flow_system_events: usize,
+}
+
+#[derive(setty::Config, setty::Default)]
+pub struct BackgroundAgentsConcurrencyConfig {
+    /// Flows activated at once, each in its own transaction with a pooled
+    /// connection. Keep it well below the database pool size. `SQLite` has a
+    /// single connection, so activations run one at a time regardless.
+    /// 0 is treated as 1
+    #[config(default = 8)]
+    pub flow_activations: usize,
 }
 
 impl BackgroundAgentsConfig {
@@ -746,6 +761,13 @@ impl BackgroundAgentsConfig {
     pub fn flow_system_event_agent_config(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
         kamu_flow_system::FlowSystemEventAgentConfig {
             batch_size: self.batching.flow_system_events,
+        }
+    }
+
+    pub fn flow_agent_activation_config(&self) -> kamu_flow_system::FlowAgentActivationConfig {
+        kamu_flow_system::FlowAgentActivationConfig {
+            concurrency: NonZeroUsize::new(self.concurrency.flow_activations)
+                .unwrap_or(NonZeroUsize::MIN),
         }
     }
 }

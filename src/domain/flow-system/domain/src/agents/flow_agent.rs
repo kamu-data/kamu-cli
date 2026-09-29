@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 
 use async_utils::BackgroundAgent;
 use chrono::{DateTime, DurationRound, Utc};
@@ -52,6 +53,15 @@ impl FlowAgentConfig {
         let rounded_time = time.duration_round(self.awaiting_step).int_err()?;
         Ok(rounded_time)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct FlowAgentActivationConfig {
+    /// How many due flows are activated at once. Each activation is its own
+    /// transaction, holding a pooled connection until it commits
+    pub concurrency: NonZeroUsize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

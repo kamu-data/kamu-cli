@@ -279,6 +279,7 @@ class "FileUploadLimitConfig" <<singleton>>
 class "FindCollectionEntriesUseCaseImpl"
 class "FindVersionedFileVersionUseCaseImpl"
 class "FlightSqlServiceFactory"
+class "FlowAgentActivationConfig" <<singleton>>
 class "FlowAgentConfig" <<singleton>>
 class "FlowSystemEventAgentConfig" <<singleton>>
 class "GcService"

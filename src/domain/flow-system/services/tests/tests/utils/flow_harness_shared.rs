@@ -117,6 +117,9 @@ impl FlowHarness {
                 mandatory_throttling_period,
                 HashMap::new(),
             ))
+            .add_value(FlowAgentActivationConfig {
+                concurrency: std::num::NonZeroUsize::new(8).unwrap(),
+            })
             .add_value(FlowSystemEventAgentConfig { batch_size: 10 })
             .add_value(WakeupListenerConfig {
                 // In-memory stores used to ignore it: keep test timings unchanged

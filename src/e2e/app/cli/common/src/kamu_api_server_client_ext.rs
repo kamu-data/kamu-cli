@@ -1689,6 +1689,66 @@ impl FlowApi<'_> {
         .await
         .unwrap();
     }
+
+    pub async fn list_flows(&self, dataset_id: &odf::DatasetID) -> Vec<FlowSummary> {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          flows {
+                            runs {
+                              listFlows {
+                                edges {
+                                  node {
+                                    flowId
+                                    status
+                                    taskIds
+                                    outcome {
+                                      __typename
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+                None,
+            )
+            .await
+            .data();
+
+        response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|edge| {
+                let node = &edge["node"];
+                FlowSummary {
+                    flow_id: node["flowId"].as_str().unwrap().to_owned(),
+                    status: node["status"].as_str().unwrap().to_owned(),
+                    outcome: node["outcome"]["__typename"]
+                        .as_str()
+                        .map(ToOwned::to_owned),
+                    task_ids: node["taskIds"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|task_id| task_id.as_str().unwrap().to_owned())
+                        .collect(),
+                }
+            })
+            .collect()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1697,6 +1757,15 @@ impl FlowApi<'_> {
 pub enum FlowTriggerResponse {
     Success(FlowID),
     Error(String),
+}
+
+#[derive(Debug)]
+pub struct FlowSummary {
+    pub flow_id: String,
+    pub status: String,
+    /// GraphQL type name of the outcome, if the flow finished
+    pub outcome: Option<String>,
+    pub task_ids: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

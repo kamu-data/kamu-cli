@@ -113,7 +113,7 @@ wait races the listener against a sleep until the nearest moment:
 
 ```rust
 loop {
-    activate_due_flows().await?;             // each due flow in its own transaction
+    activate_due_flows().await?;             // bulk load, then one transaction per flow
     let nearest = nearest_flow_activation_moment().await?;
     select! {
         hint = listener.wait_wake(max_listening_timeout, min_debounce_interval) => ...,
@@ -129,9 +129,12 @@ loop {
 - **The sleep uses `SystemTimeSource`**, not a tokio timer, so tests on a fake clock control it.
 - **Cancelling `wait_wake` in `select!` is safe**: a signal it consumed was committed before, and the
   next iteration re-reads storage anyway.
+- **Activations run concurrently.** Due flows are listed and loaded in one transaction, then each is
+  activated in its own transaction, up to `concurrency.flowActivations` at once, started in
+  `(activation moment, flow ID)` order. A flow changed after loading fails to save as a concurrent
+  modification, and only its own transaction (including its new task) rolls back.
 - **Failed activations don't spin.** A flow still due right after a pass failed to activate; it is
-  retried after `awaiting_step`. Other flows are not blocked by it: all due flows are processed in
-  `(activation moment, flow ID)` order.
+  retried after `awaiting_step`. Other flows are not blocked by it.
 
 ### Hubs and handles
 
@@ -300,6 +303,8 @@ backgroundAgents:
   batching:
     outboxMessages: 20      # OutboxAgentConfig::batch_size
     flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
+  concurrency:
+    flowActivations: 8      # FlowAgentActivationConfig::concurrency
 ```
 
 - `minDebounceInterval` — how long a handle absorbs a burst after the first signal, and the SQLite
@@ -313,6 +318,9 @@ backgroundAgents:
   are rounded to it) and the retry delay for flows whose activation failed.
 - `batching` — records processed per transaction. The task agent has no entry: it claims and runs
   one task at a time (its analogue would be concurrency, not batching).
+- `concurrency.flowActivations` — flows activated at once, each holding a pooled connection for its
+  transaction; keep it well below the Postgres pool size. On SQLite activations run one at a time
+  regardless, as the pool has a single connection.
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_hub.rs`).
 

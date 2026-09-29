@@ -23,6 +23,8 @@ Recommendation: for ease of reading, use the following format:
     (Postgres: NOTIFY/LISTEN on `flows`, SQLite: polling of flow events, In-memory: explicit signals)
   - `flowSystem.awaitingStepSecs` keeps its meaning of scheduling granularity, and also sets the retry
     delay for flows whose activation failed
+  - due flows are loaded in bulk and activated concurrently, each in its own transaction, up to
+    `backgroundAgents.concurrency.flowActivations` (default `8`) at once
 - **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
   - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
     the per-agent settings in `outbox`, `flowSystem.flowSystemEventAgent` and `flowSystem.taskAgent`
