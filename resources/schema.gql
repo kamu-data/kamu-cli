@@ -2833,7 +2833,8 @@ type FlowTimingRecords {
 	"""
 	initiatedAt: DateTime!
 	"""
-	First scheduling time
+	Time when the first attempt's task was scheduled; unset while the flow
+	waits for activation
 	"""
 	firstAttemptScheduledAt: DateTime
 	"""

@@ -94,7 +94,7 @@ when it is aborted. Recorded by the flow agent (task finished) and `FlowAbortHel
 
 | Metric | Type | Labels | Meaning |
 | --- | --- | --- | --- |
-| `flow_system_flow_duration_seconds` | histogram | `flow_type`, `outcome` = `success` / `failed` | Time from the flow's first planned activation to its completion, across all its tasks and retry backoff. Its `_count` is the number of completed flows |
+| `flow_system_flow_duration_seconds` | histogram | `flow_type`, `outcome` = `success` / `failed` | Time from the flow's first activation (its first task scheduled) to its completion, across all its tasks and retry backoff. Its `_count` is the number of completed flows |
 | `flow_system_flow_retries` | histogram (buckets `0, 1, 2, 3, 5, 10`) | `flow_type`, `outcome` = `success` / `failed` | Retried task attempts of a completed flow: a flakiness indicator |
 | `flow_system_flows_aborted_total` | counter | `flow_type` | Flows aborted: by a user, or by removing their trigger or dataset |
 
@@ -145,6 +145,9 @@ embedding kamu that pass it to `S3Context` do.
   - *per-projector lag* — needs a query per projector; the failing gauge covers a stuck projection;
   - *tasks per flow* — equal to retries + 1 while a flow runs one task at a time; worth adding
     with composite flows.
+- **Flow duration starts at the first activation.** The planned activation time moves earlier on a
+  manual run or once batching is satisfied, so measuring from the first plan would count such flows
+  as `0`. The first task's scheduling time never moves; retries keep it.
 - **Aborts are counted, not timed.** An abort is a user's decision, so its timing says nothing about
   the system; a counter shows spikes. Only successful and failed flows get durations and retries.
 - **Flow failures are not task failures.** A task failure that gets retried is visible in

@@ -41,8 +41,9 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
-    /// Flow scheduled for the first time
-    pub first_scheduled_at: Option<DateTime<Utc>>,
+    /// First task scheduled; unlike the planned activation time, never moved
+    /// by manual runs, batching or retries
+    pub first_activated_at: Option<DateTime<Utc>>,
     /// Flow scheduled and will be activated at time
     /// (different than first in case of retries)
     pub scheduled_for_activation_at: Option<DateTime<Utc>>,
@@ -135,7 +136,7 @@ impl Projection for FlowState {
                     late_activation_causes: vec![],
                     start_condition: None,
                     timing: FlowTimingRecords {
-                        first_scheduled_at: None,
+                        first_activated_at: None,
                         scheduled_for_activation_at: None,
                         awaiting_executor_since: None,
                         running_since: None,
@@ -222,13 +223,7 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
-                                    // First time: pick the time of scheduling
-                                    // After that, keep the previous value
-                                    first_scheduled_at: s
-                                        .timing
-                                        .first_scheduled_at
-                                        .or(Some(scheduled_for_activation_at)),
-
+                                    first_activated_at: s.timing.first_activated_at,
                                     scheduled_for_activation_at: Some(scheduled_for_activation_at),
                                     awaiting_executor_since: None,
                                     running_since: None,
@@ -240,13 +235,27 @@ impl Projection for FlowState {
                         }
                     }
 
-                    E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
+                    E::TaskScheduled(FlowEventTaskScheduled {
+                        event_time,
+                        task_id,
+                        ..
+                    }) => {
                         if s.outcome.is_some() || s.timing.scheduled_for_activation_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-                            Ok(FlowState { task_ids, ..s })
+                            Ok(FlowState {
+                                task_ids,
+                                timing: FlowTimingRecords {
+                                    first_activated_at: s
+                                        .timing
+                                        .first_activated_at
+                                        .or(Some(event_time)),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
                         }
                     }
 
@@ -309,7 +318,7 @@ impl Projection for FlowState {
                                     if let Some(next_attempt_at) = next_attempt_at {
                                         Ok(FlowState {
                                             timing: FlowTimingRecords {
-                                                first_scheduled_at: s.timing.first_scheduled_at,
+                                                first_activated_at: s.timing.first_activated_at,
                                                 // Next task will have to be scheduled
                                                 awaiting_executor_since: None,
                                                 // No longer running

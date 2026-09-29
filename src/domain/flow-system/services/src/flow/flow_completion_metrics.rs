@@ -46,8 +46,8 @@ impl FlowCompletionMetrics {
             flow_duration_seconds: HistogramVec::new(
                 HistogramOpts::new(
                     "flow_system_flow_duration_seconds",
-                    "Time from a flow's first planned activation to its completion, across all \
-                     its tasks and retries, by flow type and outcome",
+                    "Time from a flow's first activation to its completion, across all its tasks \
+                     and retries, by flow type and outcome",
                 )
                 .buckets(FLOW_DURATION_BUCKETS_SECONDS.to_vec()),
                 &["flow_type", "outcome"],
@@ -103,12 +103,14 @@ impl FlowCompletionMetrics {
             None => return,
         };
 
-        if let (Some(first_scheduled_at), Some(completed_at)) =
-            (flow.timing.first_scheduled_at, flow.timing.completed_at)
+        // From the first activation, as planned times move with manual runs and
+        // batching
+        if let (Some(first_activated_at), Some(completed_at)) =
+            (flow.timing.first_activated_at, flow.timing.completed_at)
         {
             self.flow_duration_seconds
                 .with_label_values(&[flow_type, outcome])
-                .observe(seconds_between(first_scheduled_at, completed_at));
+                .observe(seconds_between(first_activated_at, completed_at));
         }
 
         let retries = flow.task_ids.len().saturating_sub(1);
