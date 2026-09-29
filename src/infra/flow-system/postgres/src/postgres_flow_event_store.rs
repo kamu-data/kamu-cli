@@ -525,7 +525,7 @@ impl FlowEventStore for PostgresFlowEventStore {
     async fn get_flows_due_for_activation(
         &self,
         up_to: DateTime<Utc>,
-    ) -> Result<Vec<(FlowID, DateTime<Utc>)>, InternalError> {
+    ) -> Result<Vec<DueFlowActivation>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -542,7 +542,10 @@ impl FlowEventStore for PostgresFlowEventStore {
             "#,
             up_to,
         )
-        .map(|row| (FlowID::try_from(row.flow_id).unwrap(), row.activation_time))
+        .map(|row| DueFlowActivation {
+            flow_id: FlowID::try_from(row.flow_id).unwrap(),
+            activation_time: row.activation_time,
+        })
         .fetch_all(connection_mut)
         .await
         .int_err()?;

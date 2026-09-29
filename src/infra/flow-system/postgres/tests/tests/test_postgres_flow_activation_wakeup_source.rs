@@ -42,7 +42,7 @@ async fn test_wakes_up_only_when_flow_activation_is_scheduled(pg_pool: PgPool) {
     harness.schedule_for_activation(flow_id, Utc::now()).await;
     assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
 
-    // Task scheduled and running: the activation time is reset, not a reason to wake up
+    // Task scheduled, then running: activation time is reset, no reason to wake up
     harness.schedule_task(flow_id, TaskID::new(1)).await;
     harness.start_task(flow_id, TaskID::new(1)).await;
     assert_matches!(harness.wait_wake().await, WakeHint::Timeout);

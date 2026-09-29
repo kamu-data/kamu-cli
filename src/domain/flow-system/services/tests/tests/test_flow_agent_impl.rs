@@ -10920,10 +10920,10 @@ async fn test_retry_planned_before_restart_happens_after_restart() {
         .await
         .unwrap();
 
-    // Second run after a restart: nothing but the stored retry time brings the flow back
+    // After a restart, only the stored retry time brings the flow back
     harness
         .simulate_flow_scenario(|| async {
-            // Task 1: the retry, created at 1040ms, starts running at 1050ms, succeeds at 1060ms
+            // Task 1: the retry at 1040ms, runs at 1050ms, succeeds at 1060ms
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
@@ -11029,7 +11029,7 @@ async fn test_schedule_trigger_modified_while_flow_waits() {
 
     harness
         .simulate_flow_scenario(|| async {
-            // Task 0: "foo" start running at 10ms, finish at 20ms, next run waits until 120ms
+            // Task 0: runs 10..20ms, the next run then waits until 120ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),

@@ -43,7 +43,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     async fn get_flows_due_for_activation(
         &self,
         up_to: DateTime<Utc>,
-    ) -> Result<Vec<(FlowID, DateTime<Utc>)>, InternalError>;
+    ) -> Result<Vec<DueFlowActivation>, InternalError>;
 
     /// Returns IDs of the flows where scope matches the pattern,
     /// in reverse chronological order based on creation time.
@@ -86,6 +86,15 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
     /// Returns stream of flow states for the given flow IDs
     fn get_stream(&self, flow_ids: Vec<FlowID>) -> FlowStateStream<'_>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A flow due for activation, and the moment it was scheduled for
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct DueFlowActivation {
+    pub flow_id: FlowID,
+    pub activation_time: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

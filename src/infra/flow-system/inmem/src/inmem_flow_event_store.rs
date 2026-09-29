@@ -473,16 +473,17 @@ impl FlowEventStore for InMemoryFlowEventStore {
     async fn get_flows_due_for_activation(
         &self,
         up_to: DateTime<Utc>,
-    ) -> Result<Vec<(FlowID, DateTime<Utc>)>, InternalError> {
+    ) -> Result<Vec<DueFlowActivation>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
         Ok(g.flows_by_scheduled_for_activation_time
             .range(..=up_to)
             .flat_map(|(activation_time, flow_ids)| {
-                flow_ids
-                    .iter()
-                    .map(|flow_id| (*flow_id, *activation_time))
+                flow_ids.iter().map(|flow_id| DueFlowActivation {
+                    flow_id: *flow_id,
+                    activation_time: *activation_time,
+                })
             })
             .collect())
     }

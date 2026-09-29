@@ -45,7 +45,6 @@ pub struct FlowAgentImpl {
 #[derive(Default)]
 struct State {
     agent_started: bool,
-    loop_synchronizer: Option<Arc<dyn FlowAgentLoopSynchronizer>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -247,13 +246,9 @@ impl FlowAgentImpl {
             return Ok(());
         }
 
-        // Synchronize with other agents if needed
-        self.synchronize_execution_loop().await?;
-
         // Activate flows grouped by timeslot, in the order of activation moments
-        for timeslot_flows in due_flows.chunk_by(|a, b| a.1 == b.1) {
-            let activation_moment = timeslot_flows[0].1;
-            self.activate_timeslot_flows(timeslot_flows, activation_moment)
+        for timeslot_flows in due_flows.chunk_by(|a, b| a.activation_time == b.activation_time) {
+            self.activate_timeslot_flows(timeslot_flows)
                 .instrument(observability::tracing::root_span!("FlowAgent::activation"))
                 .await;
         }
@@ -314,33 +309,22 @@ impl FlowAgentImpl {
     async fn get_flows_due_for_activation(
         &self,
         current_time: DateTime<Utc>,
-    ) -> Result<Vec<(FlowID, DateTime<Utc>)>, InternalError> {
+    ) -> Result<Vec<DueFlowActivation>, InternalError> {
         flow_event_store
             .get_flows_due_for_activation(current_time)
             .await
     }
 
-    async fn synchronize_execution_loop(&self) -> Result<(), InternalError> {
-        if let Some(synchronizer) = {
-            let state = self.state.lock().unwrap();
-            state.loop_synchronizer.clone()
-        } {
-            synchronizer.synchronize_execution_loop().await?;
-        }
-        Ok(())
-    }
-
-    async fn activate_timeslot_flows(
-        &self,
-        timeslot_flows: &[(FlowID, DateTime<Utc>)],
-        activation_moment: DateTime<Utc>,
-    ) {
+    async fn activate_timeslot_flows(&self, timeslot_flows: &[DueFlowActivation]) {
         // Each flow is activated in its own transaction, so that a failure of one flow
         // rolls back only its own changes, and does not affect the others
-        for (flow_id, _) in timeslot_flows {
-            if let Err(e) = self.activate_flow(*flow_id, activation_moment).await {
+        for due_flow in timeslot_flows {
+            if let Err(e) = self
+                .activate_flow(due_flow.flow_id, due_flow.activation_time)
+                .await
+            {
                 tracing::error!(
-                    flow_id = %flow_id,
+                    flow_id = %due_flow.flow_id,
                     error = ?e,
                     error_msg = %e,
                     "Scheduling flow failed"
@@ -362,7 +346,8 @@ impl FlowAgentImpl {
             .int_err()?;
 
         // The flow might have changed since the due flows were listed
-        if !flow.can_schedule() || flow.timing.scheduled_for_activation_at != Some(activation_moment)
+        if !flow.can_schedule()
+            || flow.timing.scheduled_for_activation_at != Some(activation_moment)
         {
             tracing::warn!(
                 flow_id = %flow_id,
@@ -444,9 +429,6 @@ impl InitOnStartup for FlowAgentImpl {
         let start_time = self.agent_config.round_time(self.time_source.now())?;
         self.recover_initial_flows_state(start_time).await?;
 
-        // Synchronize with other agents if needed
-        self.synchronize_execution_loop().await?;
-
         // Mark the agent as started
         self.mark_engine_as_started();
 
@@ -508,15 +490,6 @@ impl FlowAgentTestDriver for FlowAgentImpl {
             .await?;
 
         Ok(task_id)
-    }
-
-    async fn set_loop_synchronizer(
-        &self,
-        synchronizer: Arc<dyn FlowAgentLoopSynchronizer>,
-    ) -> Result<(), InternalError> {
-        let mut state = self.state.lock().unwrap();
-        state.loop_synchronizer = Some(synchronizer);
-        Ok(())
     }
 }
 

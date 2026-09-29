@@ -48,7 +48,6 @@ use super::{
     TaskDriver,
     TaskDriverArgs,
 };
-use crate::tests::FlowAgentTestLoopSynchronizer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,7 +70,6 @@ pub(crate) struct FlowHarness {
     pub flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
-    pub flow_agent_test_loop_synchronizer: Arc<FlowAgentTestLoopSynchronizer>,
 }
 
 #[derive(Default)]
@@ -114,7 +112,6 @@ impl FlowHarness {
             ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowSystemTestListener>()
-            .add::<FlowAgentTestLoopSynchronizer>()
             .add_value(FlowAgentConfig::new(
                 awaiting_step,
                 mandatory_throttling_period,
@@ -195,7 +192,6 @@ impl FlowHarness {
             flow_trigger_service: catalog.get_one().unwrap(),
             flow_trigger_event_store: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
-            flow_agent_test_loop_synchronizer: catalog.get_one().unwrap(),
 
             fake_system_time_source,
             catalog,
@@ -402,11 +398,9 @@ impl FlowHarness {
                         event_time: now,
                         flow_id,
                         flow_binding: flow_binding.clone(),
-                        start_condition: FlowStartCondition::Schedule(
-                            FlowStartConditionSchedule {
-                                wake_up_at: activation_at,
-                            },
-                        ),
+                        start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                            wake_up_at: activation_at,
+                        }),
                         last_activation_cause_index: 0,
                     }
                     .into(),
@@ -532,15 +526,14 @@ impl FlowHarness {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
-        // Setup test loop synchronizer
-        self.flow_agent
-            .set_loop_synchronizer(self.flow_agent_test_loop_synchronizer.clone())
-            .await
-            .unwrap();
-
         // Ensure flow agent is initialized
         use init_on_startup::InitOnStartup;
         self.flow_agent.run_initialization().await.unwrap();
+
+        // Project what the initialization wrote before the initial snapshot
+        self.flow_system_event_agent
+            .catchup_remaining_events()
+            .await?;
 
         // Create initial snapshot - the state at moment 0 after flow agent loaded
         let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
@@ -549,18 +542,20 @@ impl FlowHarness {
 
         // Run scheduler concurrently with the provided simulation script.
         // Polling order is fixed, so that the order of events written at the same
-        // virtual moment by the script and the agents does not depend on chance
+        // virtual moment by the script and the agents does not depend on chance.
+        // Projections catch up on what the script wrote before the flow agent acts,
+        // as they would have long done by then in a real deployment
         tokio::select! {
             biased;
 
             // Run the user-provided simulation script
             _ = simulation_script() => Ok(()),
 
-            // Run flow agent
-            res = self.flow_agent.run() => res.int_err(),
-
             // Run flow system event agent
             _  = self.flow_system_event_agent.run() => Ok(()),
+
+            // Run flow agent
+            res = self.flow_agent.run() => res.int_err(),
         }?;
 
         // Catchup remaining events

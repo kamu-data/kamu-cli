@@ -1674,7 +1674,10 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
             .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
-        vec![(flow_id, activation_moment)]
+        vec![DueFlowActivation {
+            flow_id,
+            activation_time: activation_moment,
+        }]
     );
 
     let last_event_id = event_store
@@ -1811,7 +1814,10 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
             .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
-        vec![(flow_id, activation_moment)]
+        vec![DueFlowActivation {
+            flow_id,
+            activation_time: activation_moment,
+        }]
     );
 
     event_store
@@ -1990,8 +1996,14 @@ pub async fn test_flow_activation_on_multiple_flows(catalog: &Catalog) {
             .await
             .unwrap(),
         vec![
-            (flow_id_foo, activation_moment_1),
-            (flow_id_bar, activation_moment_1)
+            DueFlowActivation {
+                flow_id: flow_id_foo,
+                activation_time: activation_moment_1,
+            },
+            DueFlowActivation {
+                flow_id: flow_id_bar,
+                activation_time: activation_moment_1,
+            }
         ]
     );
     assert_eq!(
@@ -2000,9 +2012,18 @@ pub async fn test_flow_activation_on_multiple_flows(catalog: &Catalog) {
             .await
             .unwrap(),
         vec![
-            (flow_id_foo, activation_moment_1),
-            (flow_id_bar, activation_moment_1),
-            (flow_id_baz, activation_moment_2)
+            DueFlowActivation {
+                flow_id: flow_id_foo,
+                activation_time: activation_moment_1,
+            },
+            DueFlowActivation {
+                flow_id: flow_id_bar,
+                activation_time: activation_moment_1,
+            },
+            DueFlowActivation {
+                flow_id: flow_id_baz,
+                activation_time: activation_moment_2,
+            }
         ]
     );
 }
@@ -2131,8 +2152,14 @@ pub async fn test_flows_due_for_activation(catalog: &Catalog) {
             .await
             .unwrap(),
         vec![
-            (flow_id_foo, activation_moment_1),
-            (flow_id_bar, activation_moment_1)
+            DueFlowActivation {
+                flow_id: flow_id_foo,
+                activation_time: activation_moment_1,
+            },
+            DueFlowActivation {
+                flow_id: flow_id_bar,
+                activation_time: activation_moment_1,
+            }
         ]
     );
 
@@ -2143,9 +2170,18 @@ pub async fn test_flows_due_for_activation(catalog: &Catalog) {
             .await
             .unwrap(),
         vec![
-            (flow_id_foo, activation_moment_1),
-            (flow_id_bar, activation_moment_1),
-            (flow_id_late, activation_moment_2),
+            DueFlowActivation {
+                flow_id: flow_id_foo,
+                activation_time: activation_moment_1,
+            },
+            DueFlowActivation {
+                flow_id: flow_id_bar,
+                activation_time: activation_moment_1,
+            },
+            DueFlowActivation {
+                flow_id: flow_id_late,
+                activation_time: activation_moment_2,
+            },
         ]
     );
 }
