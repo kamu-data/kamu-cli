@@ -35,7 +35,7 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = [
     "serde",
 ] }
-datafusion = { version = "54", default-features = false }
+datafusion = { version = "55", default-features = false }
 futures = "0.3"
 geo-types = { version = "0.7", default-features = false, features = [
 ] }

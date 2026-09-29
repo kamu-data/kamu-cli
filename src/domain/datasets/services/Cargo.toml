@@ -64,7 +64,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "54", default-features = false, features = [
+datafusion = { version = "55", default-features = false, features = [
     "nested_expressions",
 ] }
 dill = { version = "0.17", default-features = false }
@@ -123,7 +123,7 @@ odf = { workspace = true, features = [
 test-utils = { workspace = true }
 wakeup-listener = { workspace = true }
 
-arrow = { version = "58", default-features = false }
+arrow = { version = "59", default-features = false }
 bon = { version = "3", default-features = false }
 indoc = "2"
 mockall = "0.15"

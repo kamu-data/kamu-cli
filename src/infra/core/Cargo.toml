@@ -102,7 +102,7 @@ chrono = { version = "0.4", features = [
     "serde",
 ] }
 dashmap = { version = "6", default-features = false }
-datafusion = { version = "54", default-features = false }
+datafusion = { version = "55", default-features = false }
 dill = { version = "0.17", default-features = false }
 flatbuffers = "25"
 flate2 = "1" # GZip decoder
@@ -171,10 +171,10 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "54", features = [
+datafusion-ethers = { optional = true, version = "55", features = [
     "eip712",
 ] }
-datafusion-functions-json = { optional = true, version = "0.54" }
+datafusion-functions-json = { optional = true, version = "0.55" }
 kamu-datasets-services = { optional = true, workspace = true, features = [
     "testing",
 ] }
@@ -211,7 +211,7 @@ bon = { version = "3", default-features = false }
 criterion = { version = "0.8", features = [
     "async_tokio",
 ] }
-datafusion = { version = "54", default-features = false, features = [
+datafusion = { version = "55", default-features = false, features = [
     "parquet",
 ] }
 filetime = "0.2"

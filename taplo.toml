@@ -1,5 +1,5 @@
-include = ["**/Cargo.toml"]
-exclude = ["target/**/Cargo.toml"]
+include = ["Cargo.toml", "src/**/Cargo.toml"]
+exclude = []
 
 [formatting]
 align_entries = false

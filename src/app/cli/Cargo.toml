@@ -163,7 +163,7 @@ wakeup-listener = { workspace = true }
 # TODO: Include alloy, aws-smithy
 # TODO: Unify deps around either ring or aws-lc-rs
 # TODO: Unify deps around either using webpki or native certs
-arrow-flight = { version = "58", features = [
+arrow-flight = { version = "59", features = [
     "flight-sql-experimental",
 ] }
 async-graphql = { version = "7", default-features = false }
@@ -178,7 +178,7 @@ chrono-humanize = "0.2" # Human readable durations
 clap = "4"
 clap_complete = "4"
 console = "0.16" # Terminal colors
-datafusion = { version = "54", default-features = false, features = [
+datafusion = { version = "55", default-features = false, features = [
     "compression",
     "crypto_expressions",
     "encoding_expressions",

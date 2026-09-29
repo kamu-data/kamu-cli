@@ -118,7 +118,7 @@ serde_with = { version = "3", default-features = false, features = [
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
 # Optional
-arrow = { optional = true, version = "58", default-features = false, features = [
+arrow = { optional = true, version = "59", default-features = false, features = [
     "ipc",
 ] }
 prost = { optional = true, version = "0.14", default-features = false, features = [

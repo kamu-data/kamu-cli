@@ -23,6 +23,7 @@ Recommendation: for ease of reading, use the following format:
 - Storage quotas no longer limit datasets owned by admin accounts, even when a quota is set for them
 - GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when the account's
   storage is unlimited
+- Upgraded to `datafusion v55` and `arrow v59`
 ### Fixed
 - Running an older kamu in a workspace whose database was migrated by a newer version no longer crashes with
   "Migration failed: VersionMissing"; it reports the schema versions and asks to upgrade kamu

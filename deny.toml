@@ -49,6 +49,11 @@ deny = [
     { name = "tonic", deny-multiple-versions = true },
 ]
 
+# Detect crates that enable this feature accidentally
+[[bans.features]]
+crate = "serde_json"
+deny = ["preserve_order"]
+
 
 [licenses]
 allow = [

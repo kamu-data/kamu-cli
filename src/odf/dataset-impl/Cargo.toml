@@ -84,7 +84,7 @@ odf = { workspace = true, features = [
 ] }
 test-utils = { workspace = true }
 
-arrow = { version = "58", default-features = false }
+arrow = { version = "59", default-features = false }
 futures = "0.3"
 mockall = { version = "0.15", default-features = false }
 serde_json = { version = "1", default-features = false }

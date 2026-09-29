@@ -24,7 +24,7 @@ use super::test_reader_common;
 async fn test_read_shapefile_with_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
-    test_reader_common::test_reader_success(
+    test_reader_common::test_reader(
         ReaderEsriShapefile::new(
             SessionContext::new(),
             odf::metadata::ReadStepEsriShapefile {
@@ -42,50 +42,64 @@ async fn test_read_shapefile_with_schema() {
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
         },
-        indoc!(
-            r#"
-            message arrow_schema {
-              REQUIRED BYTE_ARRAY iso (STRING);
-              REQUIRED BYTE_ARRAY name_0 (STRING);
-              REQUIRED BYTE_ARRAY name_1 (STRING);
-            }
-            "#
-        ),
-        indoc!(
-            r#"
-            +-----+---------+------------------+
-            | iso | name_0  | name_1           |
-            +-----+---------+------------------+
-            | UKR | Ukraine | Cherkasy         |
-            | UKR | Ukraine | Chernihiv        |
-            | UKR | Ukraine | Chernivtsi       |
-            | UKR | Ukraine | Crimea           |
-            | UKR | Ukraine | Dnipropetrovs'k  |
-            | UKR | Ukraine | Donets'k         |
-            | UKR | Ukraine | Ivano-Frankivs'k |
-            | UKR | Ukraine | Kharkiv          |
-            | UKR | Ukraine | Kherson          |
-            | UKR | Ukraine | Khmel'nyts'kyy   |
-            | UKR | Ukraine | Kiev City        |
-            | UKR | Ukraine | Kiev             |
-            | UKR | Ukraine | Kirovohrad       |
-            | UKR | Ukraine | L'viv            |
-            | UKR | Ukraine | Luhans'k         |
-            | UKR | Ukraine | Mykolayiv        |
-            | UKR | Ukraine | Odessa           |
-            | UKR | Ukraine | Poltava          |
-            | UKR | Ukraine | Rivne            |
-            | UKR | Ukraine | Sevastopol'      |
-            | UKR | Ukraine | Sumy             |
-            | UKR | Ukraine | Ternopil'        |
-            | UKR | Ukraine | Transcarpathia   |
-            | UKR | Ukraine | Vinnytsya        |
-            | UKR | Ukraine | Volyn            |
-            | UKR | Ukraine | Zaporizhzhya     |
-            | UKR | Ukraine | Zhytomyr         |
-            +-----+---------+------------------+
-            "#
-        ),
+        |res| async {
+            let df = res
+                .unwrap()
+                .sort(vec![col("name_1").sort(true, false)])
+                .unwrap();
+
+            odf::utils::testing::assert_schema_eq(
+                df.schema(),
+                indoc!(
+                    r#"
+                    message arrow_schema {
+                      REQUIRED BYTE_ARRAY iso (STRING);
+                      REQUIRED BYTE_ARRAY name_0 (STRING);
+                      REQUIRED BYTE_ARRAY name_1 (STRING);
+                    }
+                    "#
+                ),
+            );
+            odf::utils::testing::assert_data_eq(
+                df,
+                indoc!(
+                    r#"
+                    +-----+---------+------------------+
+                    | iso | name_0  | name_1           |
+                    +-----+---------+------------------+
+                    | UKR | Ukraine | Cherkasy         |
+                    | UKR | Ukraine | Chernihiv        |
+                    | UKR | Ukraine | Chernivtsi       |
+                    | UKR | Ukraine | Crimea           |
+                    | UKR | Ukraine | Dnipropetrovs'k  |
+                    | UKR | Ukraine | Donets'k         |
+                    | UKR | Ukraine | Ivano-Frankivs'k |
+                    | UKR | Ukraine | Kharkiv          |
+                    | UKR | Ukraine | Kherson          |
+                    | UKR | Ukraine | Khmel'nyts'kyy   |
+                    | UKR | Ukraine | Kiev             |
+                    | UKR | Ukraine | Kiev City        |
+                    | UKR | Ukraine | Kirovohrad       |
+                    | UKR | Ukraine | L'viv            |
+                    | UKR | Ukraine | Luhans'k         |
+                    | UKR | Ukraine | Mykolayiv        |
+                    | UKR | Ukraine | Odessa           |
+                    | UKR | Ukraine | Poltava          |
+                    | UKR | Ukraine | Rivne            |
+                    | UKR | Ukraine | Sevastopol'      |
+                    | UKR | Ukraine | Sumy             |
+                    | UKR | Ukraine | Ternopil'        |
+                    | UKR | Ukraine | Transcarpathia   |
+                    | UKR | Ukraine | Vinnytsya        |
+                    | UKR | Ukraine | Volyn            |
+                    | UKR | Ukraine | Zaporizhzhya     |
+                    | UKR | Ukraine | Zhytomyr         |
+                    +-----+---------+------------------+
+                    "#
+                ),
+            )
+            .await;
+        },
     )
     .await;
 }

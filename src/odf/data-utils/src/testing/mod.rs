@@ -13,9 +13,8 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::{Field, Schema};
-use datafusion::common::{Column, DFSchema};
+use datafusion::common::{Column, DFSchema, TableReference};
 use datafusion::prelude::col;
-use datafusion::sql::TableReference;
 use pretty_assertions::assert_eq;
 
 use crate::data::DataFrameExt;
