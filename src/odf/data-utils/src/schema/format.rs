@@ -205,29 +205,29 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
         match logical_type {
             Some(logical_type) => match logical_type {
                 LogicalType::Float16 => "FLOAT16".to_string(),
-                LogicalType::Integer {
+                LogicalType::Integer(parquet::basic::IntType {
                     bit_width,
                     is_signed,
-                } => {
+                }) => {
                     format!("INTEGER({bit_width},{is_signed})")
                 }
-                LogicalType::Decimal { precision, scale } => {
+                LogicalType::Decimal(parquet::basic::DecimalType { precision, scale }) => {
                     format!("DECIMAL({precision},{scale})")
                 }
-                LogicalType::Timestamp {
+                LogicalType::Timestamp(parquet::basic::TimestampType {
                     is_adjusted_to_u_t_c,
                     unit,
-                } => {
+                }) => {
                     format!(
                         "TIMESTAMP({},{})",
                         Self::print_timeunit(unit),
                         is_adjusted_to_u_t_c
                     )
                 }
-                LogicalType::Time {
+                LogicalType::Time(parquet::basic::TimeType {
                     is_adjusted_to_u_t_c,
                     unit,
-                } => {
+                }) => {
                     format!(
                         "TIME({},{})",
                         Self::print_timeunit(unit),

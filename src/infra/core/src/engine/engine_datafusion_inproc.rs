@@ -34,8 +34,8 @@ impl EngineDatafusionInproc {
         alias: &str,
         query: &str,
     ) -> Result<(), EngineError> {
+        use datafusion::common::TableReference;
         use datafusion::logical_expr::*;
-        use datafusion::sql::TableReference;
 
         tracing::debug!(
             %alias,
