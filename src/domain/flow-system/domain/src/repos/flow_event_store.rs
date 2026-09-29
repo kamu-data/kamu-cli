@@ -38,11 +38,14 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Returns nearest time when one or more flows are scheduled for activation
     async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError>;
 
-    /// Returns flows scheduled for activation at or before the given time,
-    /// with their activation moments, ordered by activation moment, then ID
+    /// Returns up to `limit` flows scheduled for activation at or before the
+    /// given time, with their activation moments, ordered by activation moment,
+    /// then ID. Starts right after `after`, if given, to page through them
     async fn get_flows_due_for_activation(
         &self,
         up_to: DateTime<Utc>,
+        after: Option<DueFlowActivation>,
+        limit: usize,
     ) -> Result<Vec<DueFlowActivation>, InternalError>;
 
     /// Returns IDs of the flows where scope matches the pattern,

@@ -139,6 +139,13 @@
     "BackgroundAgentsBatchingConfig": {
       "additionalProperties": false,
       "properties": {
+        "flowActivations": {
+          "default": 20,
+          "description": "Due flows the flow agent loads at once before activating them.\n0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
         "flowSystemEvents": {
           "default": 20,
           "description": "Flow system events applied to a projection per transaction",
@@ -182,6 +189,7 @@
         "batching": {
           "$ref": "#/$defs/BackgroundAgentsBatchingConfig",
           "default": {
+            "flowActivations": 20,
             "flowSystemEvents": 20,
             "outboxMessages": 20
           },
@@ -1321,6 +1329,7 @@
       "$ref": "#/$defs/BackgroundAgentsConfig",
       "default": {
         "batching": {
+          "flowActivations": 20,
           "flowSystemEvents": 20,
           "outboxMessages": 20
         },

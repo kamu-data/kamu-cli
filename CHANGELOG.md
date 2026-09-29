@@ -31,7 +31,8 @@ Recommendation: for ease of reading, use the following format:
     (Postgres: NOTIFY/LISTEN on `flows`, SQLite: polling of flow events, In-memory: explicit signals)
   - `flowSystem.awaitingStepSecs` keeps its meaning of scheduling granularity, and also sets the retry
     delay for flows whose activation failed
-  - due flows are loaded in bulk and activated concurrently, each in its own transaction, up to
+  - due flows are loaded in pages of `backgroundAgents.batching.flowActivations` (default `20`) and
+    activated concurrently, each in its own transaction, up to
     `backgroundAgents.concurrency.flowActivations` (default `8`) at once
 - Outbox consumers handling messages at once, across all producers, are limited by
   `backgroundAgents.concurrency.outboxConsumers` (default `8`); previously unbounded, a burst could

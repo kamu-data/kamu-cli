@@ -19,6 +19,7 @@
 <td><a href="#backgroundagentsconfig"><code>BackgroundAgentsConfig</code></a></td>
 <td><pre><code class="language-json">{
   &quot;batching&quot;: {
+    &quot;flowActivations&quot;: 20,
     &quot;flowSystemEvents&quot;: 20,
     &quot;outboxMessages&quot;: 20
   },
@@ -377,6 +378,17 @@ Base type: `string`
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr>
+<td><code>flowActivations</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">20</code></td>
+<td>
+
+Due flows the flow agent loads at once before activating them.
+0 is treated as 1
+
+</td>
+</tr>
+<tr>
 <td><code>flowSystemEvents</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">20</code></td>
@@ -434,6 +446,7 @@ are still handled in order. Keep it well below the database pool size.
 <td><code>batching</code></td>
 <td><a href="#backgroundagentsbatchingconfig"><code>BackgroundAgentsBatchingConfig</code></a></td>
 <td><pre><code class="language-json">{
+  &quot;flowActivations&quot;: 20,
   &quot;flowSystemEvents&quot;: 20,
   &quot;outboxMessages&quot;: 20
 }</code></pre></td>

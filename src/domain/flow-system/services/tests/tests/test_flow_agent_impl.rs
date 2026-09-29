@@ -10706,6 +10706,76 @@ async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_due_flows_activated_in_pages_past_failing_ones() {
+    const UNREGISTERED_FLOW_TYPE: &str = "dev.kamu.flow.test.unregistered";
+
+    // One flow per page: failing flows stay due, and fill the first pages
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        activation_batch_size: Some(1),
+        ..Default::default()
+    });
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let bar_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
+            account_name: None,
+        })
+        .await;
+
+    let start_time = harness
+        .now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // No controller is registered for this flow type, so scheduling it always fails
+    for dataset_id in [&foo_id, &bar_id] {
+        harness
+            .schedule_flow_for_activation(
+                &FlowBinding::new(
+                    UNREGISTERED_FLOW_TYPE,
+                    FlowScopeDataset::make_scope(dataset_id),
+                ),
+                start_time + Duration::milliseconds(10),
+            )
+            .await;
+    }
+
+    for dataset_id in [&foo_id, &bar_id] {
+        harness
+            .schedule_flow_for_activation(
+                &ingest_dataset_binding(dataset_id),
+                start_time + Duration::milliseconds(20),
+            )
+            .await;
+    }
+
+    harness
+        .simulate_flow_scenario(|| async {
+            harness.advance_time(Duration::milliseconds(30)).await;
+        })
+        .await
+        .unwrap();
+
+    // Activated right at their moment, in the same pass as the failing flows'
+    // retries
+    let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
+    assert_eq!(harness.flow_activations(&ingest_flow_type, "activated"), 2);
+    assert!(harness.flow_activations(UNREGISTERED_FLOW_TYPE, "failed") >= 2);
+    assert_eq!(harness.flow_activation_delay_samples(), 2);
+    assert!(harness.flow_activation_delays_total_seconds() < 0.001);
+    assert!(harness.task_exists(TaskID::new(0)).await);
+    assert!(harness.task_exists(TaskID::new(1)).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_failing_projector_reported_without_blocking_others() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         with_failing_projector: true,

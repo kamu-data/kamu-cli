@@ -595,7 +595,13 @@ impl FlowEventStore for SqliteFlowEventStore {
     async fn get_flows_due_for_activation(
         &self,
         up_to: DateTime<Utc>,
+        after: Option<DueFlowActivation>,
+        limit: usize,
     ) -> Result<Vec<DueFlowActivation>, InternalError> {
+        let after_activation_time = after.map(|after| after.activation_time);
+        let after_flow_id: Option<i64> = after.map(|after| after.flow_id.try_into().unwrap());
+        let limit = i64::try_from(limit).unwrap();
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -607,10 +613,15 @@ impl FlowEventStore for SqliteFlowEventStore {
                 FROM flows f
                 WHERE
                     f.scheduled_for_activation_at <= $1 AND
-                    (f.flow_status = 'waiting' OR f.flow_status = 'retrying')
+                    (f.flow_status = 'waiting' OR f.flow_status = 'retrying') AND
+                    ($2 IS NULL OR (f.scheduled_for_activation_at, f.flow_id) > ($2, $3))
                 ORDER BY f.scheduled_for_activation_at, f.flow_id
+                LIMIT $4
             "#,
             up_to,
+            after_activation_time,
+            after_flow_id,
+            limit,
         )
         .map(|row| DueFlowActivation {
             flow_id: FlowID::try_from(row.flow_id).unwrap(),

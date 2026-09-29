@@ -114,7 +114,7 @@ wait races the listener against a sleep until the nearest moment:
 
 ```rust
 loop {
-    activate_due_flows().await?;             // bulk load, then one transaction per flow
+    activate_due_flows().await?;             // pages of due flows, one transaction per flow
     let nearest = nearest_flow_activation_moment().await?;
     select! {
         hint = listener.wait_wake(max_listening_timeout, min_debounce_interval) => ...,
@@ -130,9 +130,11 @@ loop {
 - **The sleep uses `SystemTimeSource`**, not a tokio timer, so tests on a fake clock control it.
 - **Cancelling `wait_wake` in `select!` is safe**: a signal it consumed was committed before, and the
   next iteration re-reads storage anyway.
-- **Activations run concurrently.** Due flows are listed and loaded in one transaction, then each is
-  activated in its own transaction, up to `concurrency.flowActivations` at once, started in
-  `(activation moment, flow ID)` order. A flow changed after loading fails to save as a concurrent
+- **Activations run in pages, concurrently.** A pass pages through flows due by its start time,
+  `batching.flowActivations` at a time, each page listed and loaded in one transaction. Each flow is
+  then activated in its own transaction, up to `concurrency.flowActivations` at once, started in
+  `(activation moment, flow ID)` order. Pages continue after the last key seen rather than from the
+  first due flow: failed flows stay due and would otherwise fill every page. A flow changed after loading fails to save as a concurrent
   modification, and only its own transaction (including its new task) rolls back.
 - **Failed activations don't spin.** A flow still due right after a pass failed to activate; it is
   retried after `awaiting_step`. Other flows are not blocked by it.
@@ -327,6 +329,7 @@ backgroundAgents:
   batching:
     outboxMessages: 20      # OutboxAgentConfig::batch_size
     flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
+    flowActivations: 20     # FlowAgentActivationConfig::batch_size
   concurrency:
     flowActivations: 8      # FlowAgentActivationConfig::concurrency
     outboxConsumers: 8      # OutboxAgentConfig::consumer_concurrency
@@ -341,8 +344,9 @@ backgroundAgents:
   The flow agent wakes up at the nearest flow activation moment regardless of it.
 - `flowSystem.awaitingStepSecs` — not a polling period: the scheduling granularity (activation times
   are rounded to it) and the retry delay for flows whose activation failed.
-- `batching` — records processed per transaction. The task agent has no entry: it claims and runs
-  one task at a time (its analogue would be concurrency, not batching).
+- `batching` — records processed per transaction; for the flow agent, due flows loaded per page.
+  The task agent has no entry: it claims and runs one task at a time (its analogue would be
+  concurrency, not batching).
 - `concurrency.flowActivations` — flows activated at once, each holding a pooled connection for its
   transaction; keep it well below the Postgres pool size. On SQLite activations run one at a time
   regardless, as the pool has a single connection.

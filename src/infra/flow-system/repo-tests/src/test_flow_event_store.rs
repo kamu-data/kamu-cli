@@ -29,6 +29,11 @@ use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Due flows page limit above what any fixture here schedules
+const LARGE_LIMIT: usize = 1000;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_dataset_flow_empty_filters_distingush_dataset(catalog: &Catalog) {
     let flow_event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
 
@@ -1644,7 +1649,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment)
+            .get_flows_due_for_activation(activation_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![]
@@ -1671,7 +1676,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert_eq!(maybe_nearest_activation_time, Some(activation_moment));
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment)
+            .get_flows_due_for_activation(activation_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![DueFlowActivation {
@@ -1701,7 +1706,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment)
+            .get_flows_due_for_activation(activation_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![]
@@ -1728,7 +1733,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment)
+            .get_flows_due_for_activation(activation_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![]
@@ -1811,7 +1816,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
     assert_eq!(maybe_nearest_activation_time, Some(activation_moment));
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment)
+            .get_flows_due_for_activation(activation_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![DueFlowActivation {
@@ -1840,7 +1845,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment)
+            .get_flows_due_for_activation(activation_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![]
@@ -1992,7 +1997,7 @@ pub async fn test_flow_activation_on_multiple_flows(catalog: &Catalog) {
     assert_eq!(maybe_nearest_activation_time, Some(activation_moment_1));
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment_1)
+            .get_flows_due_for_activation(activation_moment_1, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![
@@ -2008,7 +2013,7 @@ pub async fn test_flow_activation_on_multiple_flows(catalog: &Catalog) {
     );
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment_2)
+            .get_flows_due_for_activation(activation_moment_2, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![
@@ -2139,7 +2144,7 @@ pub async fn test_flows_due_for_activation(catalog: &Catalog) {
     // Nothing is due yet
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(start_moment)
+            .get_flows_due_for_activation(start_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![]
@@ -2148,7 +2153,7 @@ pub async fn test_flows_due_for_activation(catalog: &Catalog) {
     // The bound is inclusive
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment_1)
+            .get_flows_due_for_activation(activation_moment_1, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![
@@ -2166,7 +2171,11 @@ pub async fn test_flows_due_for_activation(catalog: &Catalog) {
     // Ordered by activation moment first, then by flow ID
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment_2 + Duration::seconds(30))
+            .get_flows_due_for_activation(
+                activation_moment_2 + Duration::seconds(30),
+                None,
+                LARGE_LIMIT
+            )
             .await
             .unwrap(),
         vec![
@@ -2183,6 +2192,60 @@ pub async fn test_flows_due_for_activation(catalog: &Catalog) {
                 activation_time: activation_moment_2,
             },
         ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flows_due_for_activation_paged(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let start_moment = Utc::now().trunc_subsecs(6);
+    let activation_moment_1 = start_moment + Duration::minutes(1);
+    let activation_moment_2 = start_moment + Duration::minutes(2);
+
+    let mut due_flows = Vec::new();
+    for (dataset_seed, activation_time) in [
+        (b"foo", activation_moment_1),
+        (b"bar", activation_moment_1),
+        (b"baz", activation_moment_1),
+        (b"qux", activation_moment_2),
+    ] {
+        let flow_id = event_store.new_flow_id().await.unwrap();
+        schedule_flow_for_activation(
+            event_store.as_ref(),
+            flow_id,
+            dataset_seed,
+            start_moment,
+            activation_time,
+        )
+        .await;
+        due_flows.push(DueFlowActivation {
+            flow_id,
+            activation_time,
+        });
+    }
+
+    let up_to = activation_moment_2;
+    let get_page = async |after: Option<DueFlowActivation>, limit: usize| {
+        event_store
+            .get_flows_due_for_activation(up_to, after, limit)
+            .await
+            .unwrap()
+    };
+
+    // A page boundary between flows sharing an activation moment
+    assert_eq!(get_page(None, 2).await, due_flows[0..2]);
+    assert_eq!(get_page(Some(due_flows[1]), 2).await, due_flows[2..4]);
+    assert_eq!(get_page(Some(due_flows[3]), 2).await, vec![]);
+
+    // The time bound applies to every page
+    assert_eq!(
+        event_store
+            .get_flows_due_for_activation(activation_moment_1, Some(due_flows[0]), LARGE_LIMIT)
+            .await
+            .unwrap(),
+        due_flows[1..3]
     );
 }
 
@@ -2232,7 +2295,7 @@ pub async fn test_flow_stays_due_after_rejected_save(catalog: &Catalog) {
     );
     assert_eq!(
         event_store
-            .get_flows_due_for_activation(activation_moment)
+            .get_flows_due_for_activation(activation_moment, None, LARGE_LIMIT)
             .await
             .unwrap(),
         vec![DueFlowActivation {

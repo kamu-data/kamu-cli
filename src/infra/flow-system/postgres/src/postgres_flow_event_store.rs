@@ -525,7 +525,13 @@ impl FlowEventStore for PostgresFlowEventStore {
     async fn get_flows_due_for_activation(
         &self,
         up_to: DateTime<Utc>,
+        after: Option<DueFlowActivation>,
+        limit: usize,
     ) -> Result<Vec<DueFlowActivation>, InternalError> {
+        let after_activation_time = after.map(|after| after.activation_time);
+        let after_flow_id: Option<i64> = after.map(|after| after.flow_id.try_into().unwrap());
+        let limit = i64::try_from(limit).unwrap();
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
@@ -537,10 +543,18 @@ impl FlowEventStore for PostgresFlowEventStore {
                 FROM flows f
                 WHERE
                     f.scheduled_for_activation_at <= $1 AND
-                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
+                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type) AND
+                    (
+                        $2::timestamptz IS NULL OR
+                        (f.scheduled_for_activation_at, f.flow_id) > ($2::timestamptz, $3::bigint)
+                    )
                 ORDER BY f.scheduled_for_activation_at, f.flow_id
+                LIMIT $4
             "#,
             up_to,
+            after_activation_time,
+            after_flow_id,
+            limit,
         )
         .map(|row| DueFlowActivation {
             flow_id: FlowID::try_from(row.flow_id).unwrap(),

@@ -10,6 +10,7 @@
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::ops::Bound;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -474,18 +475,34 @@ impl FlowEventStore for InMemoryFlowEventStore {
     async fn get_flows_due_for_activation(
         &self,
         up_to: DateTime<Utc>,
+        after: Option<DueFlowActivation>,
+        limit: usize,
     ) -> Result<Vec<DueFlowActivation>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
+        let from = match after {
+            // A range starting past its end panics
+            Some(after) if after.activation_time > up_to => return Ok(Vec::new()),
+            Some(after) => Bound::Included(after.activation_time),
+            None => Bound::Unbounded,
+        };
+
         Ok(g.flows_by_scheduled_for_activation_time
-            .range(..=up_to)
+            .range((from, Bound::Included(up_to)))
             .flat_map(|(activation_time, flow_ids)| {
                 flow_ids.iter().map(|flow_id| DueFlowActivation {
                     flow_id: *flow_id,
                     activation_time: *activation_time,
                 })
             })
+            .filter(|due_flow| {
+                after.is_none_or(|after| {
+                    (due_flow.activation_time, due_flow.flow_id)
+                        > (after.activation_time, after.flow_id)
+                })
+            })
+            .take(limit)
             .collect())
     }
 

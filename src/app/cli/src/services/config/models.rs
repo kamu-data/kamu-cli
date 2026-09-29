@@ -732,6 +732,11 @@ pub struct BackgroundAgentsBatchingConfig {
     /// Flow system events applied to a projection per transaction
     #[config(default = 20)]
     pub flow_system_events: usize,
+
+    /// Due flows the flow agent loads at once before activating them.
+    /// 0 is treated as 1
+    #[config(default = 20)]
+    pub flow_activations: usize,
 }
 
 #[derive(setty::Config, setty::Default)]
@@ -775,6 +780,8 @@ impl BackgroundAgentsConfig {
 
     pub fn flow_agent_activation_config(&self) -> kamu_flow_system::FlowAgentActivationConfig {
         kamu_flow_system::FlowAgentActivationConfig {
+            batch_size: NonZeroUsize::new(self.batching.flow_activations)
+                .unwrap_or(NonZeroUsize::MIN),
             concurrency: NonZeroUsize::new(self.concurrency.flow_activations)
                 .unwrap_or(NonZeroUsize::MIN),
         }

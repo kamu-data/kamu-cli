@@ -248,14 +248,28 @@ impl FlowAgentImpl {
     }
 
     async fn activate_due_flows(&self) -> Result<(), InternalError> {
+        // Fixed for the pass, so that it ends even while more flows become due
         let current_time = self.time_source.now();
 
-        let due_flows = self.load_flows_due_for_activation(current_time).await?;
+        let mut page_after = None;
+        loop {
+            let page = self
+                .load_flows_due_for_activation(current_time, page_after)
+                .await?;
+            self.activate_flows(page.flows).await;
 
-        // Each flow is activated in its own transaction, so that a failure of one flow
-        // rolls back only its own changes. Activations start in the order of
-        // activation moments, and run concurrently on separate connections
-        futures::stream::iter(due_flows)
+            let Some(next_page_after) = page.next_page_after else {
+                return Ok(());
+            };
+            page_after = Some(next_page_after);
+        }
+    }
+
+    /// Each flow is activated in its own transaction, so that a failure of one
+    /// flow rolls back only its own changes. Activations start in the order of
+    /// activation moments, and run concurrently on separate connections
+    async fn activate_flows(&self, flows: Vec<(Flow, DateTime<Utc>)>) {
+        futures::stream::iter(flows)
             .for_each_concurrent(
                 self.activation_config.concurrency.get(),
                 |(flow, activation_time)| {
@@ -296,33 +310,55 @@ impl FlowAgentImpl {
                 },
             )
             .await;
-
-        Ok(())
     }
 
-    /// Loads flows due for activation, paired with their activation moments,
-    /// in one transaction
+    /// Loads a page of flows due for activation in one transaction.
+    /// Pages by the activation key rather than restarting from the first due
+    /// flow: flows whose activation failed stay due, and would come back first
     #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
     async fn load_flows_due_for_activation(
         &self,
         current_time: DateTime<Utc>,
-    ) -> Result<Vec<(Flow, DateTime<Utc>)>, InternalError> {
+        page_after: Option<DueFlowActivation>,
+    ) -> Result<DueFlowsPage, InternalError> {
+        let batch_size = self.activation_config.batch_size.get();
         let due_flows = flow_event_store
-            .get_flows_due_for_activation(current_time)
+            .get_flows_due_for_activation(current_time, page_after, batch_size)
             .await?;
-        if due_flows.is_empty() {
-            return Ok(Vec::new());
-        }
+
+        let next_page_after = if due_flows.len() == batch_size {
+            due_flows.last().copied()
+        } else {
+            None
+        };
 
         let flow_ids: Vec<_> = due_flows.iter().map(|due_flow| due_flow.flow_id).collect();
-        let flows = Flow::load_multi_simple(&flow_ids, flow_event_store.as_ref())
+        let load_results = Flow::load_multi(&flow_ids, flow_event_store.as_ref())
             .await
             .int_err()?;
 
-        Ok(flows
+        // A flow failing to load must not hold back the others
+        let flows = load_results
             .into_iter()
-            .zip(due_flows.iter().map(|due_flow| due_flow.activation_time))
-            .collect())
+            .zip(due_flows)
+            .filter_map(|(load_result, due_flow)| match load_result {
+                Ok(flow) => Some((flow, due_flow.activation_time)),
+                Err(e) => {
+                    tracing::error!(
+                        flow_id = %due_flow.flow_id,
+                        error = ?e,
+                        error_msg = %e,
+                        "Flow due for activation failed to load"
+                    );
+                    None
+                }
+            })
+            .collect();
+
+        Ok(DueFlowsPage {
+            flows,
+            next_page_after,
+        })
     }
 
     #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
@@ -510,6 +546,15 @@ impl BackgroundAgent for FlowAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowAgent for FlowAgentImpl {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct DueFlowsPage {
+    /// Loaded flows, paired with their activation moments
+    flows: Vec<(Flow, DateTime<Utc>)>,
+    /// Where the next page starts, unless this page was the last one
+    next_page_after: Option<DueFlowActivation>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

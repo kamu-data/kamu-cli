@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                f.flow_id as flow_id,\n                f.scheduled_for_activation_at as \"activation_time!\"\n                FROM flows f\n                WHERE\n                    f.scheduled_for_activation_at <= $1 AND\n                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type) AND\n                    (\n                        $2::timestamptz IS NULL OR\n                        (f.scheduled_for_activation_at, f.flow_id) > ($2::timestamptz, $3::bigint)\n                    )\n                ORDER BY f.scheduled_for_activation_at, f.flow_id\n                LIMIT $4\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "flow_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "activation_time!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "131d50648e03bb43766bd948ce3668456c96b5a84cadb84711ee43295ca0a0bf"
+}

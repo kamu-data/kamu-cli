@@ -77,6 +77,8 @@ pub(crate) struct FlowHarness {
 pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
+    /// Due flows loaded per page by the flow agent
+    pub activation_batch_size: Option<usize>,
     pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
     pub mock_transform_flow_evaluator: Option<MockTransformFlowEvaluator>,
     /// Registers a projector that fails on every event
@@ -130,6 +132,8 @@ impl FlowHarness {
                 HashMap::new(),
             ))
             .add_value(FlowAgentActivationConfig {
+                batch_size: NonZeroUsize::new(overrides.activation_batch_size.unwrap_or(20))
+                    .unwrap(),
                 concurrency: NonZeroUsize::new(8).unwrap(),
             })
             .add_value(FlowSystemEventAgentConfig { batch_size: 10 })

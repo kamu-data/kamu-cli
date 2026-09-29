@@ -61,6 +61,9 @@ impl FlowAgentConfig {
 
 #[derive(Debug)]
 pub struct FlowAgentActivationConfig {
+    /// How many due flows are loaded at once, bounding the memory and the
+    /// loading transaction of a pass after downtime
+    pub batch_size: NonZeroUsize,
     /// How many due flows are activated at once. Each activation is its own
     /// transaction, holding a pooled connection until it commits
     pub concurrency: NonZeroUsize,
