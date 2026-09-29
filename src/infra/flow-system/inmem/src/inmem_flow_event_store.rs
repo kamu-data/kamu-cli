@@ -16,15 +16,17 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 
-use crate::InMemoryFlowSystemEventBridge;
 use crate::flow_event_data_helper::FlowEventDataHelper;
+use crate::{FLOW_ACTIVATION_SCHEDULED_CHANNEL, InMemoryFlowSystemEventBridge};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowEventStore {
     inner: InMemoryEventStore<FlowState, State>,
     flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>,
+    wakeup_hub: Arc<InMemoryWakeupHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,10 +126,23 @@ impl FlowIndexEntry {
 #[interface(dyn FlowEventStore)]
 #[scope(Singleton)]
 impl InMemoryFlowEventStore {
-    pub fn new(flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>) -> Self {
+    pub fn new(
+        flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>,
+        wakeup_hub: Arc<InMemoryWakeupHub>,
+    ) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
             flow_system_event_store,
+            wakeup_hub,
+        }
+    }
+
+    /// Whether the event sets a new activation time for the flow
+    fn schedules_activation(event: &FlowEvent) -> bool {
+        match event {
+            FlowEvent::ScheduledForActivation(_) => true,
+            FlowEvent::TaskFinished(e) => e.next_attempt_at.is_some(),
+            _ => false,
         }
     }
 
@@ -351,6 +366,8 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
         let merge_event_data =
             FlowEventDataHelper::prepare_merge_event_data(&events, FlowEvent::event_time);
 
+        let schedules_activation = events.iter().any(Self::schedules_activation);
+
         // Update in-memory indexes
         {
             let state = self.inner.as_state();
@@ -369,6 +386,10 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
         let global_event_id = self
             .flow_system_event_store
             .save_events(FlowSystemEventSourceType::Flow, &merge_event_data);
+
+        if schedules_activation {
+            self.wakeup_hub.signal(FLOW_ACTIVATION_SCHEDULED_CHANNEL);
+        }
 
         // Return the global event ID as the result of this operation,
         // ignore local event ID in the inner store

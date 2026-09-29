@@ -50,6 +50,7 @@ impl BaseGQLFlowHarness {
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<InMemoryFlowProcessState>();
 

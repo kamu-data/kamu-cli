@@ -311,6 +311,7 @@ impl FlowTriggerHarness {
             .add::<FlowSensorDispatcherImpl>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<InMemoryFlowProcessState>()
             .add::<SystemTimeSourceDefault>();

@@ -250,6 +250,7 @@ impl FlowConfigurationHarness {
             .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<FlowDatasetsEventBridge>()
             .add::<FlowSensorDispatcherImpl>()

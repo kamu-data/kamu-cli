@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod flow_activation_wakeup_source;
 mod flow_configuration_event_store;
 mod flow_event_store;
 mod flow_process_state_query;
@@ -14,6 +15,7 @@ mod flow_process_state_repository;
 mod flow_system_event_bridge;
 mod flow_trigger_event_store;
 
+pub use flow_activation_wakeup_source::*;
 pub use flow_configuration_event_store::*;
 pub use flow_event_store::*;
 pub use flow_process_state_query::*;

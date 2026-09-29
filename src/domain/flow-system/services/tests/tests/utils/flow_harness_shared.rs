@@ -118,12 +118,15 @@ impl FlowHarness {
             .add_value(WakeupListenerConfig {
                 // In-memory stores used to ignore it: keep test timings unchanged
                 min_debounce_interval: std::time::Duration::ZERO,
-                max_listening_timeout: (awaiting_step * 5).to_std().unwrap(),
+                // Scenarios run on virtual time: wall-clock fallback timeouts must never fire,
+                // or they add polls at random moments and reorder same-moment events
+                max_listening_timeout: std::time::Duration::from_hours(1),
             })
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<InMemoryFlowProcessState>()
             .add_value(fake_system_time_source.clone())
@@ -520,16 +523,20 @@ impl FlowHarness {
         test_flow_listener.mark_as_loaded();
         test_flow_listener.make_a_snapshot(self.now());
 
-        // Run scheduler concurrently with the provided simulation script
+        // Run scheduler concurrently with the provided simulation script.
+        // Polling order is fixed, so that the order of events written at the same
+        // virtual moment by the script and the agents does not depend on chance
         tokio::select! {
+            biased;
+
+            // Run the user-provided simulation script
+            _ = simulation_script() => Ok(()),
+
             // Run flow agent
             res = self.flow_agent.run() => res.int_err(),
 
             // Run flow system event agent
             _  = self.flow_system_event_agent.run() => Ok(()),
-
-            // Run the user-provided simulation script
-            _ = simulation_script() => Ok(())
         }?;
 
         // Catchup remaining events

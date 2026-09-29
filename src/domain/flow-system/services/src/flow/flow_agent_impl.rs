@@ -25,6 +25,7 @@ use kamu_task_system::*;
 use messaging_outbox::*;
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
+use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig};
 
 use crate::{FlowAbortHelper, FlowSchedulingServiceImpl};
 
@@ -34,6 +35,8 @@ pub struct FlowAgentImpl {
     catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
+    flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
     state: Arc<Mutex<State>>,
 }
 
@@ -77,11 +80,15 @@ impl FlowAgentImpl {
         catalog: CatalogWeakRef,
         time_source: Arc<dyn SystemTimeSource>,
         agent_config: Arc<FlowAgentConfig>,
+        wakeup_config: Arc<WakeupListenerConfig>,
+        flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
     ) -> Self {
         Self {
             catalog,
             time_source,
             agent_config,
+            wakeup_config,
+            flow_activation_wakeup_source,
             state: Arc::new(Mutex::new(State::default())),
         }
     }
@@ -255,6 +262,55 @@ impl FlowAgentImpl {
     }
 
     #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
+    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
+        flow_event_store.nearest_flow_activation_moment().await
+    }
+
+    /// Sleeps until the nearest activation moment, or until a flow might have
+    /// been scheduled for activation, whichever comes first
+    async fn wait_for_next_activation(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+    ) -> Result<(), InternalError> {
+        let maybe_nearest_activation_moment = self.nearest_flow_activation_moment().await?;
+
+        let wait_signal = wakeup_listener.wait_wake(
+            self.wakeup_config.max_listening_timeout,
+            self.wakeup_config.min_debounce_interval,
+        );
+
+        let hint = match maybe_nearest_activation_moment {
+            None => wait_signal.await?,
+            Some(nearest_activation_moment) => {
+                let time_left = nearest_activation_moment - self.time_source.now();
+                let sleep_duration = if time_left > chrono::Duration::zero() {
+                    time_left
+                } else {
+                    // Still due right after activating due flows means their activation failed:
+                    // retry them later rather than spin
+                    self.agent_config.awaiting_step
+                };
+
+                // Dropping the signal wait is safe: whatever it could have consumed was
+                // committed before, so the next iteration sees it in the store anyway.
+                // The deadline is measured by the time source, which tests control
+                tokio::select! {
+                    hint = wait_signal => hint?,
+                    () = self.time_source.sleep(sleep_duration) => WakeHint::Timeout,
+                }
+            }
+        };
+
+        tracing::debug!(
+            ?hint,
+            ?maybe_nearest_activation_moment,
+            "Flow agent woke up with a hint"
+        );
+
+        Ok(())
+    }
+
+    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
     async fn get_flows_due_for_activation(
         &self,
         current_time: DateTime<Utc>,
@@ -408,16 +464,19 @@ impl BackgroundAgent for FlowAgentImpl {
 
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
-        // Main scanning loop
+        // Kept across iterations, so that no change is missed between them
+        let wakeup_listener = self.flow_activation_wakeup_source.new_wakeup_listener();
+
         loop {
-            // Run scheduling for current time slot
+            // Activate all flows that are due by now
             self.activate_due_flows()
                 .instrument(tracing::debug_span!("FlowAgent::tick"))
                 .await?;
 
-            self.time_source
-                .sleep(self.agent_config.awaiting_step)
-                .await;
+            // The deadline is re-read from the store on every iteration,
+            // so aborted or rescheduled flows need no signal
+            self.wait_for_next_activation(wakeup_listener.as_ref())
+                .await?;
         }
     }
 }

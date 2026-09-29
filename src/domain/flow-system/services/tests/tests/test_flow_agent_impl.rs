@@ -1342,10 +1342,10 @@ async fn test_ingest_flow_with_multiple_iterations() {
 
             #17: +100ms:
               "bar" ExecuteTransform:
-                Flow ID = 4 Waiting Input(foo) Throttling(for=20ms, wakeup=100ms, shifted=60ms)
+                Flow ID = 4 Waiting Input(foo) Executor(task=4, since=100ms)
                 Flow ID = 2 Finished Success
               "foo" Ingest:
-                Flow ID = 3 Running(task=3)
+                Flow ID = 3 Waiting Iteration Finish Executor(task=3, since=60ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 

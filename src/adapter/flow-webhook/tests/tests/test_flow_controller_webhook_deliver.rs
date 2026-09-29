@@ -249,6 +249,7 @@ impl FlowControllerWebhookDeliverHarness {
         b.add::<FlowControllerWebhookDeliver>()
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<FakeDatasetEntryService>()
             .add::<SystemTimeSourceDefault>()
