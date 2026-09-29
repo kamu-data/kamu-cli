@@ -1,1327 +1,7 @@
 {
-  "$defs": {
-    "AccountConfig": {
-      "additionalProperties": false,
-      "description": "The declarative account configuration used to register an account if one\ndoes not already exist.\n\nTo update an existing account, either `id` or `private_key` must be\nspecified.",
-      "properties": {
-        "accountName": {
-          "$ref": "#/$defs/AccountName",
-          "combine": "replace"
-        },
-        "accountType": {
-          "$ref": "#/$defs/AccountType",
-          "combine": "replace",
-          "default": "User"
-        },
-        "avatarUrl": {
-          "combine": "replace",
-          "format": "uri",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "displayName": {
-          "combine": "replace",
-          "description": "Auto-derived from `account_name` if omitted",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "email": {
-          "$ref": "#/$defs/Email",
-          "combine": "replace"
-        },
-        "id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AccountID"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "combine": "replace",
-          "description": "May be omitted in favor of `private_key`."
-        },
-        "password": {
-          "$ref": "#/$defs/Password",
-          "combine": "replace"
-        },
-        "privateKey": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PrivateKey"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "combine": "replace",
-          "description": "Optional ed25519 private key. When set, `id` is derived from it\n(and must match `id` if both are present)."
-        },
-        "properties": {
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/AccountPropertyName"
-          },
-          "type": "array"
-        },
-        "provider": {
-          "default": "password",
-          "type": "string"
-        },
-        "providerIdentityKey": {
-          "combine": "replace",
-          "description": "Auto-derived from `account_name` if omitted",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "registeredAt": {
-          "combine": "replace",
-          "format": "date-time",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "treatDatasetsAsPublic": {
-          "default": false,
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "accountName",
-        "password",
-        "email"
-      ],
-      "type": "object"
-    },
-    "AccountID": {
-      "type": "string"
-    },
-    "AccountName": {
-      "type": "string"
-    },
-    "AccountPropertyName": {
-      "enum": [
-        "CanProvisionAccounts",
-        "Admin"
-      ],
-      "type": "string"
-    },
-    "AccountType": {
-      "enum": [
-        "User",
-        "Organization"
-      ],
-      "type": "string"
-    },
-    "AuthConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "allowAnonymous": {
-          "default": true,
-          "type": "boolean"
-        },
-        "users": {
-          "$ref": "#/$defs/PredefinedAccountsConfig",
-          "default": {
-            "predefined": []
-          }
-        }
-      },
-      "type": "object"
-    },
-    "ContainerRuntimeType": {
-      "enum": [
-        "Docker",
-        "Podman"
-      ],
-      "type": "string"
-    },
-    "DatabaseConfig": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "databasePath": {
-              "type": "string"
-            },
-            "provider": {
-              "const": "Sqlite",
-              "type": "string"
-            }
-          },
-          "required": [
-            "provider",
-            "databasePath"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "acquireTimeoutSecs": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "credentialsPolicy": {
-              "$ref": "#/$defs/DatabaseCredentialsPolicyConfig"
-            },
-            "databaseName": {
-              "type": "string"
-            },
-            "host": {
-              "type": "string"
-            },
-            "maxConnections": {
-              "format": "uint32",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "maxLifetimeSecs": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "port": {
-              "format": "uint16",
-              "maximum": 65535,
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "provider": {
-              "const": "Postgres",
-              "type": "string"
-            }
-          },
-          "required": [
-            "provider",
-            "credentialsPolicy",
-            "databaseName",
-            "host"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "acquireTimeoutSecs": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "credentialsPolicy": {
-              "$ref": "#/$defs/DatabaseCredentialsPolicyConfig"
-            },
-            "databaseName": {
-              "type": "string"
-            },
-            "host": {
-              "type": "string"
-            },
-            "maxConnections": {
-              "format": "uint32",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "maxLifetimeSecs": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "port": {
-              "format": "uint16",
-              "maximum": 65535,
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "provider": {
-              "const": "MySql",
-              "type": "string"
-            }
-          },
-          "required": [
-            "provider",
-            "credentialsPolicy",
-            "databaseName",
-            "host"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "acquireTimeoutSecs": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "credentialsPolicy": {
-              "$ref": "#/$defs/DatabaseCredentialsPolicyConfig"
-            },
-            "databaseName": {
-              "type": "string"
-            },
-            "host": {
-              "type": "string"
-            },
-            "maxConnections": {
-              "format": "uint32",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "maxLifetimeSecs": {
-              "format": "uint64",
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "port": {
-              "format": "uint16",
-              "maximum": 65535,
-              "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "provider": {
-              "const": "MariaDB",
-              "type": "string"
-            }
-          },
-          "required": [
-            "provider",
-            "credentialsPolicy",
-            "databaseName",
-            "host"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "DatabaseCredentialSourceConfig": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "const": "RawPassword",
-              "type": "string"
-            },
-            "rawPassword": {
-              "type": "string"
-            },
-            "userName": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "userName",
-            "rawPassword"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "const": "AwsSecret",
-              "type": "string"
-            },
-            "secretName": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "secretName"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "DatabaseCredentialsPolicyConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "rotationFrequencyInMinutes": {
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "source": {
-          "$ref": "#/$defs/DatabaseCredentialSourceConfig"
-        }
-      },
-      "required": [
-        "source"
-      ],
-      "type": "object"
-    },
-    "DidSecretEncryptionConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "default": false,
-          "type": "boolean"
-        },
-        "encryptionKey": {
-          "description": "The encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate, use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
-    "DurationString": {
-      "type": "string"
-    },
-    "Email": {
-      "type": "string"
-    },
-    "EmbeddingsChunkerConfig": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "const": "Simple",
-              "type": "string"
-            },
-            "splitParagraphs": {
-              "default": false,
-              "type": "boolean"
-            },
-            "splitSections": {
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "kind"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "EmbeddingsEncoderConfig": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "const": "Dummy",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "apiKey": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "dimensions": {
-              "default": 1536,
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "kind": {
-              "const": "OpenAi",
-              "type": "string"
-            },
-            "modelName": {
-              "default": "text-embedding-ada-002",
-              "type": "string"
-            },
-            "url": {
-              "type": [
-                "string",
-                "null"
-              ]
-            }
-          },
-          "required": [
-            "kind"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "EngineConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "datafusionEmbedded": {
-          "$ref": "#/$defs/EngineConfigDatafusion",
-          "default": {
-            "base": {
-              "datafusion.catalog.default_catalog": "kamu",
-              "datafusion.catalog.default_schema": "kamu",
-              "datafusion.catalog.information_schema": "true",
-              "datafusion.sql_parser.enable_ident_normalization": "false"
-            },
-            "batchQuery": {},
-            "compaction": {
-              "datafusion.execution.target_partitions": "1"
-            },
-            "ingest": {
-              "datafusion.execution.target_partitions": "1"
-            },
-            "useLegacyArrowBufferEncoding": false
-          },
-          "description": "Embedded Datafusion engine configuration"
-        },
-        "images": {
-          "$ref": "#/$defs/EngineImagesConfig",
-          "default": {
-            "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
-            "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
-            "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
-            "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
-          },
-          "description": "UNSTABLE: Default engine images"
-        },
-        "maxConcurrency": {
-          "description": "Maximum number of engine operations that can be performed concurrently",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "networkNs": {
-          "$ref": "#/$defs/NetworkNamespaceType",
-          "default": "Private",
-          "description": "Type of the networking namespace (relevant when running in container\nenvironments)"
-        },
-        "runtime": {
-          "$ref": "#/$defs/ContainerRuntimeType",
-          "default": "Docker",
-          "description": "Type of the runtime to use when running the data processing engines"
-        },
-        "shutdownTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "5s",
-          "description": "Timeout for waiting the engine container to stop gracefully"
-        },
-        "startTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "30s",
-          "description": "Timeout for starting an engine container"
-        }
-      },
-      "type": "object"
-    },
-    "EngineConfigDatafusion": {
-      "additionalProperties": false,
-      "properties": {
-        "base": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "combine": "merge",
-          "default": {
-            "datafusion.catalog.default_catalog": "kamu",
-            "datafusion.catalog.default_schema": "kamu",
-            "datafusion.catalog.information_schema": "true",
-            "datafusion.sql_parser.enable_ident_normalization": "false"
-          },
-          "description": "Base configuration options\nSee: `<https://datafusion.apache.org/user-guide/configs.html>`",
-          "type": "object"
-        },
-        "batchQuery": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "combine": "merge",
-          "default": {},
-          "description": "Batch query-specific overrides to the base config",
-          "type": "object"
-        },
-        "compaction": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "combine": "merge",
-          "default": {
-            "datafusion.execution.target_partitions": "1"
-          },
-          "description": "Compaction-specific overrides to the base config",
-          "type": "object"
-        },
-        "ingest": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "combine": "merge",
-          "default": {
-            "datafusion.execution.target_partitions": "1"
-          },
-          "description": "Ingest-specific overrides to the base config",
-          "type": "object"
-        },
-        "useLegacyArrowBufferEncoding": {
-          "default": false,
-          "description": "Makes arrow batches use contiguous `Binary` and `Utf8` encodings instead\nof more modern `BinaryView` and `Utf8View`. This is only needed for\ncompatibility with some older libraries that don't yet support them.\n\nSee: [kamu-node#277](https://github.com/kamu-data/kamu-node/issues/277)",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "EngineImagesConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "datafusion": {
-          "default": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
-          "description": "UNSTABLE: `Datafusion` engine image",
-          "type": "string"
-        },
-        "flink": {
-          "default": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
-          "description": "UNSTABLE: `Flink` engine image",
-          "type": "string"
-        },
-        "risingwave": {
-          "default": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
-          "description": "UNSTABLE: `RisingWave` engine image",
-          "type": "string"
-        },
-        "spark": {
-          "default": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0",
-          "description": "UNSTABLE: `Spark` engine image",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "EthRpcEndpoint": {
-      "additionalProperties": false,
-      "properties": {
-        "chainId": {
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "chainName": {
-          "type": "string"
-        },
-        "nodeUrl": {
-          "format": "uri",
-          "type": "string"
-        }
-      },
-      "required": [
-        "chainId",
-        "chainName",
-        "nodeUrl"
-      ],
-      "type": "object"
-    },
-    "EthereumSourceConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "commitAfterBlocksScanned": {
-          "default": 1000000,
-          "description": "Forces iteration to stop after the specified number of blocks were\nscanned even if we didn't reach the target record number. This is useful\nto not lose a lot of scanning progress in case of an RPC error.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "getLogsBlockStride": {
-          "default": 100000,
-          "description": "Default number of blocks to scan within one query to `eth_getLogs` RPC\nendpoint.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "rpcEndpoints": {
-          "combine": "merge",
-          "default": [],
-          "description": "Default RPC endpoints to use if source does not specify one explicitly.",
-          "items": {
-            "$ref": "#/$defs/EthRpcEndpoint"
-          },
-          "type": "array"
-        },
-        "useBlockTimestampFallback": {
-          "default": false,
-          "description": "Many providers don't yet return `blockTimestamp` from `eth_getLogs` RPC\nendpoint and in such cases `block_timestamp` column will be `null`.\nIf you enable this fallback the library will perform additional call to\n`eth_getBlock` to populate the timestam, but this may result in\nsignificant performance penalty when fetching many log records.\n\nSee: [ethereum/execution-apis#295](https://github.com/ethereum/execution-apis/issues/295)",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "ExtraConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "graphql": {
-          "$ref": "#/$defs/GqlConfig",
-          "default": {}
-        }
-      },
-      "type": "object"
-    },
-    "FlightSqlConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "allowAnonymous": {
-          "default": true,
-          "description": "Whether clients can authenticate as 'anonymous' user",
-          "type": "boolean"
-        },
-        "anonSessionExpirationTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "30m",
-          "description": "Time after which `FlightSQL` client session will be forgotten and client\nwill have to re-authroize (for anonymous clients)"
-        },
-        "anonSessionInactivityTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "5s",
-          "description": "Time after which `FlightSQL` session context will be released to free\nthe resources (for anonymous clients)"
-        },
-        "authedSessionExpirationTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "30m",
-          "description": "Time after which `FlightSQL` client session will be forgotten and client\nwill have to re-authroize (for authenticated clients)"
-        },
-        "authedSessionInactivityTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "5s",
-          "description": "Time after which `FlightSQL` session context will be released to free\nthe resources (for authenticated clients)"
-        }
-      },
-      "type": "object"
-    },
-    "FlowAgentConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "awaitingStepSecs": {
-          "default": 1,
-          "format": "int64",
-          "type": "integer"
-        },
-        "defaultRetryPolicies": {
-          "additionalProperties": {
-            "$ref": "#/$defs/RetryPolicyConfig"
-          },
-          "combine": "merge",
-          "default": {},
-          "type": "object"
-        },
-        "mandatoryThrottlingPeriodSecs": {
-          "default": 60,
-          "format": "int64",
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "FlowSystemConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "flowAgent": {
-          "$ref": "#/$defs/FlowAgentConfig",
-          "default": {
-            "awaitingStepSecs": 1,
-            "defaultRetryPolicies": {},
-            "mandatoryThrottlingPeriodSecs": 60
-          }
-        },
-        "flowSystemEventAgent": {
-          "$ref": "#/$defs/FlowSystemEventAgentConfig",
-          "default": {
-            "batchSize": 20,
-            "maxListeningTimeout": "2s",
-            "minDebounceInterval": "100ms"
-          }
-        },
-        "taskAgent": {
-          "$ref": "#/$defs/TaskAgentConfig",
-          "default": {
-            "checkingIntervalSecs": 1
-          }
-        }
-      },
-      "type": "object"
-    },
-    "FlowSystemEventAgentConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "batchSize": {
-          "default": 20,
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "maxListeningTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "2s"
-        },
-        "minDebounceInterval": {
-          "$ref": "#/$defs/DurationString",
-          "default": "100ms"
-        }
-      },
-      "type": "object"
-    },
-    "FrontendConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "jupyter": {
-          "$ref": "#/$defs/JupyterConfig",
-          "default": {
-            "image": "ghcr.io/kamu-data/jupyter:0.7.1",
-            "livyImage": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
-          },
-          "description": "Integrated Jupyter notebook configuration"
-        }
-      },
-      "type": "object"
-    },
-    "GqlConfig": {
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "HttpSourceConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "connectTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "30s",
-          "description": "Timeout for the connect phase of the HTTP client"
-        },
-        "maxRedirects": {
-          "default": 10,
-          "description": "Maximum number of redirects to follow",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "userAgent": {
-          "default": "kamu-cli/0.267.0",
-          "description": "Value to use for User-Agent header",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "IdentityConfig": {
-      "additionalProperties": false,
-      "description": "Private keys are used to sign API responses.\nSupported algorithms: `ed25519`, `secp256k1`.",
-      "properties": {
-        "ed25519PrivateKey": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PrivateKey"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "combine": "replace",
-          "description": "Root private key that corresponds to the `authority` and is used to sign\nresponses.\n\nTo generate, use:\n```sh\nod -vN 32 -An -tx1 /dev/urandom | tr -d ' \\n' && echo\n```\nor\n```sh\nopenssl rand -hex 32\n```"
-        },
-        "secp256k1PrivateKey": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Secp256k1Signer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "combine": "replace",
-          "description": "Secp256k1 private key used to sign EIP-712 typed data.\n\nTo generate, use:\n```sh\nod -vN 32 -An -tx1 /dev/urandom | tr -d ' \\n' && echo\n```\nor\n```sh\nopenssl rand -hex 32\n```\nor\n```sh\ncast wallet new\n```"
-        }
-      },
-      "type": "object"
-    },
-    "IpfsConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "httpGateway": {
-          "default": "http://localhost:8080/",
-          "description": "HTTP Gateway URL to use for downloads.\nFor safety, it defaults to `http://localhost:8080` - a local IPFS daemon.\nIf you don't have IPFS installed, you can set this URL to\none of the public gateways like `https://ipfs.io`.\nList of public gateways can be found here: `https://ipfs.github.io/public-gateway-checker/`",
-          "format": "uri",
-          "type": "string"
-        },
-        "preResolveDnslink": {
-          "default": true,
-          "description": "Whether kamu should pre-resolve IPNS `DNSLink` names using DNS or leave\nit to the Gateway.",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "JupyterConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "image": {
-          "default": "ghcr.io/kamu-data/jupyter:0.7.1",
-          "description": "Jupyter notebook server image",
-          "type": "string"
-        },
-        "livyImage": {
-          "default": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0",
-          "description": "UNSTABLE: Livy + Spark server image",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "MqttSourceConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "brokerIdleTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "1s",
-          "description": "Time in milliseconds to wait for MQTT broker to send us some data after\nwhich we will consider that we have \"caught up\" and end the polling\nloop."
-        }
-      },
-      "type": "object"
-    },
-    "NetworkNamespaceType": {
-      "description": "Corresponds to podman's `containers.conf::netns`\nWe podman is used inside containers (e.g. podman-in-docker or podman-in-k8s)\nit usually runs uses host network namespace.",
-      "enum": [
-        "Private",
-        "Host"
-      ],
-      "type": "string"
-    },
-    "OutboxAgentConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "batchSize": {
-          "default": 20,
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "maxListeningTimeout": {
-          "$ref": "#/$defs/DurationString",
-          "default": "2s"
-        },
-        "minDebounceInterval": {
-          "$ref": "#/$defs/DurationString",
-          "default": "100ms"
-        }
-      },
-      "type": "object"
-    },
-    "Password": {
-      "type": "string"
-    },
-    "PredefinedAccountsConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "predefined": {
-          "combine": "merge",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/AccountConfig"
-          },
-          "type": "array"
-        }
-      },
-      "type": "object"
-    },
-    "PrivateKey": {
-      "type": "string"
-    },
-    "ProtocolConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "flightSql": {
-          "$ref": "#/$defs/FlightSqlConfig",
-          "default": {
-            "allowAnonymous": true,
-            "anonSessionExpirationTimeout": "30m",
-            "anonSessionInactivityTimeout": "5s",
-            "authedSessionExpirationTimeout": "30m",
-            "authedSessionInactivityTimeout": "5s"
-          },
-          "description": "`FlightSQL` configuration"
-        },
-        "ipfs": {
-          "$ref": "#/$defs/IpfsConfig",
-          "default": {
-            "httpGateway": "http://localhost:8080/",
-            "preResolveDnslink": true
-          },
-          "description": "IPFS configuration"
-        }
-      },
-      "type": "object"
-    },
-    "QuotaDefaults": {
-      "additionalProperties": false,
-      "properties": {
-        "storage": {
-          "default": 1000000000,
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "RetryPolicyConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "backoffType": {
-          "$ref": "#/$defs/RetryPolicyConfigBackoffType",
-          "default": "Fixed"
-        },
-        "maxAttempts": {
-          "default": 0,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "minDelaySecs": {
-          "default": 0,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "RetryPolicyConfigBackoffType": {
-      "enum": [
-        "Fixed",
-        "Linear",
-        "Exponential",
-        "ExponentialWithJitter"
-      ],
-      "type": "string"
-    },
-    "SearchConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "embeddingsChunker": {
-          "$ref": "#/$defs/EmbeddingsChunkerConfig",
-          "default": {
-            "kind": "Simple",
-            "splitParagraphs": false,
-            "splitSections": false
-          },
-          "description": "Embeddings chunker configuration"
-        },
-        "embeddingsEncoder": {
-          "$ref": "#/$defs/EmbeddingsEncoderConfig",
-          "default": {
-            "kind": "Dummy"
-          },
-          "description": "Embeddings encoder configuration"
-        },
-        "indexer": {
-          "$ref": "#/$defs/SearchIndexerConfig",
-          "default": {
-            "clearOnStart": false,
-            "incrementalIndexing": true
-          },
-          "description": "Indexer configuration"
-        },
-        "repo": {
-          "$ref": "#/$defs/SearchRepositoryConfig",
-          "default": {
-            "kind": "Dummy"
-          },
-          "description": "Search repository configuration"
-        }
-      },
-      "type": "object"
-    },
-    "SearchIndexerConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "clearOnStart": {
-          "default": false,
-          "description": "Whether to clear and re-index on start or use existing vectors if any",
-          "type": "boolean"
-        },
-        "incrementalIndexing": {
-          "default": true,
-          "description": "Whether incremental indexing is enabled",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "SearchRepositoryConfig": {
-      "oneOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "const": "Dummy",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "caCertPemPath": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "embeddingDimensions": {
-              "default": 1536,
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "enableCompression": {
-              "default": false,
-              "type": "boolean"
-            },
-            "indexPrefix": {
-              "default": "",
-              "type": "string"
-            },
-            "kind": {
-              "const": "Elasticsearch",
-              "type": "string"
-            },
-            "password": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "timeoutSecs": {
-              "default": 30,
-              "format": "uint64",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "url": {
-              "default": "http://localhost:9200/",
-              "format": "uri",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind"
-          ],
-          "type": "object"
-        },
-        {
-          "additionalProperties": false,
-          "properties": {
-            "embeddingDimensions": {
-              "default": 1536,
-              "format": "uint",
-              "minimum": 0,
-              "type": "integer"
-            },
-            "image": {
-              "default": "docker.io/elasticsearch:9.2.1",
-              "type": "string"
-            },
-            "kind": {
-              "const": "ElasticsearchContainer",
-              "type": "string"
-            },
-            "startTimeout": {
-              "$ref": "#/$defs/DurationString",
-              "default": "30s"
-            }
-          },
-          "required": [
-            "kind"
-          ],
-          "type": "object"
-        }
-      ]
-    },
-    "Secp256k1Signer": {
-      "type": "string"
-    },
-    "SecretsEncryptionConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "default": false,
-          "type": "boolean"
-        },
-        "encryptionKey": {
-          "description": "Represents the encryption key for secrets. This field is required if\n`enabled` is `true` or `None`.\n\nThe encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
-    "SourceConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "ethereum": {
-          "$ref": "#/$defs/EthereumSourceConfig",
-          "default": {
-            "commitAfterBlocksScanned": 1000000,
-            "getLogsBlockStride": 100000,
-            "rpcEndpoints": [],
-            "useBlockTimestampFallback": false
-          },
-          "description": "Ethereum-specific configuration"
-        },
-        "http": {
-          "$ref": "#/$defs/HttpSourceConfig",
-          "default": {
-            "connectTimeout": "30s",
-            "maxRedirects": 10,
-            "userAgent": "kamu-cli/0.267.0"
-          },
-          "description": "HTTP-specific configuration"
-        },
-        "mqtt": {
-          "$ref": "#/$defs/MqttSourceConfig",
-          "default": {
-            "brokerIdleTimeout": "1s"
-          },
-          "description": "MQTT-specific configuration"
-        },
-        "targetRecordsPerSlice": {
-          "default": 10000,
-          "description": "Target number of records after which we will stop consuming from the\nresumable source and commit data, leaving the rest for the next\niteration. This ensures that one data slice doesn't become too big.",
-          "format": "uint64",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "TaskAgentConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "checkingIntervalSecs": {
-          "default": 1,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "UploadsConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "maxFileSizeInMb": {
-          "default": 50,
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "WebhooksConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "deliveryTimeout": {
-          "default": 10,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "maxConsecutiveFailures": {
-          "default": 5,
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "secretEncryptionEnabled": {
-          "default": false,
-          "type": "boolean"
-        },
-        "secretEncryptionKey": {
-          "description": "Represents the encryption key for the webhooks secret. This field is\nrequired if `secret_encryption_enabled` is `true` or `None`.\n\nThe encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\n# Example\n```\nlet config = WebhooksConfig {\n    ...\n    secret_encryption_enabled: Some(true),\n    encryption_key:\nSome(String::from(\"aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\")) };\n```",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    }
-  },
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
   "additionalProperties": false,
   "properties": {
-    "auth": {
-      "$ref": "#/$defs/AuthConfig",
-      "default": {
-        "allowAnonymous": true,
-        "users": {
-          "predefined": []
-        }
-      },
-      "description": "Auth configuration"
-    },
     "database": {
       "anyOf": [
         {
@@ -1333,16 +13,27 @@
       ],
       "description": "Database connection configuration"
     },
-    "didEncryption": {
-      "$ref": "#/$defs/DidSecretEncryptionConfig",
+    "secretsEncryption": {
+      "$ref": "#/$defs/SecretsEncryptionConfig",
+      "description": "Secrets encryption configuration",
       "default": {
         "enabled": false
-      },
-      "description": "Did secret key encryption configuration"
+      }
     },
     "engine": {
       "$ref": "#/$defs/EngineConfig",
+      "description": "Engine configuration",
       "default": {
+        "runtime": "Docker",
+        "networkNs": "Private",
+        "startTimeout": "30s",
+        "shutdownTimeout": "5s",
+        "images": {
+          "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0",
+          "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
+          "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
+          "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0"
+        },
         "datafusionEmbedded": {
           "base": {
             "datafusion.catalog.default_catalog": "kamu",
@@ -1350,168 +41,1477 @@
             "datafusion.catalog.information_schema": "true",
             "datafusion.sql_parser.enable_ident_normalization": "false"
           },
+          "ingest": {
+            "datafusion.execution.target_partitions": "1"
+          },
           "batchQuery": {},
           "compaction": {
             "datafusion.execution.target_partitions": "1"
           },
-          "ingest": {
-            "datafusion.execution.target_partitions": "1"
-          },
           "useLegacyArrowBufferEncoding": false
-        },
-        "images": {
-          "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
-          "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
-          "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0",
-          "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
-        },
-        "networkNs": "Private",
-        "runtime": "Docker",
-        "shutdownTimeout": "5s",
-        "startTimeout": "30s"
-      },
-      "description": "Engine configuration"
-    },
-    "extra": {
-      "$ref": "#/$defs/ExtraConfig",
-      "default": {
-        "graphql": {}
-      },
-      "description": "Experimental and temporary configuration options"
+        }
+      }
     },
     "flowSystem": {
       "$ref": "#/$defs/FlowSystemConfig",
+      "description": "Configuration for flow system",
       "default": {
         "flowAgent": {
           "awaitingStepSecs": 1,
-          "defaultRetryPolicies": {},
-          "mandatoryThrottlingPeriodSecs": 60
+          "mandatoryThrottlingPeriodSecs": 60,
+          "defaultRetryPolicies": {}
         },
         "flowSystemEventAgent": {
-          "batchSize": 20,
+          "minDebounceInterval": "100ms",
           "maxListeningTimeout": "2s",
-          "minDebounceInterval": "100ms"
+          "batchSize": 20
         },
         "taskAgent": {
           "checkingIntervalSecs": 1
         }
-      },
-      "description": "Configuration for flow system"
+      }
+    },
+    "webhooks": {
+      "$ref": "#/$defs/WebhooksConfig",
+      "description": "Configuration for webhooks",
+      "default": {
+        "maxConsecutiveFailures": 5,
+        "deliveryTimeout": 10,
+        "secretEncryptionEnabled": false
+      }
     },
     "frontend": {
       "$ref": "#/$defs/FrontendConfig",
+      "description": "Data access and visualization configuration",
       "default": {
         "jupyter": {
           "image": "ghcr.io/kamu-data/jupyter:0.7.1",
           "livyImage": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
         }
-      },
-      "description": "Data access and visualization configuration"
+      }
     },
     "identity": {
       "$ref": "#/$defs/IdentityConfig",
-      "default": {},
-      "description": "UNSTABLE: Identity configuration"
+      "description": "UNSTABLE: Identity configuration",
+      "default": {}
     },
     "outbox": {
       "$ref": "#/$defs/OutboxAgentConfig",
+      "description": "Messaging outbox agent configuration",
       "default": {
-        "batchSize": 20,
+        "minDebounceInterval": "100ms",
         "maxListeningTimeout": "2s",
-        "minDebounceInterval": "100ms"
-      },
-      "description": "Messaging outbox agent configuration"
+        "batchSize": 20
+      }
     },
     "protocol": {
       "$ref": "#/$defs/ProtocolConfig",
+      "description": "Network protocols configuration",
       "default": {
-        "flightSql": {
-          "allowAnonymous": true,
-          "anonSessionExpirationTimeout": "30m",
-          "anonSessionInactivityTimeout": "5s",
-          "authedSessionExpirationTimeout": "30m",
-          "authedSessionInactivityTimeout": "5s"
-        },
         "ipfs": {
           "httpGateway": "http://localhost:8080/",
           "preResolveDnslink": true
+        },
+        "flightSql": {
+          "allowAnonymous": true,
+          "authedSessionExpirationTimeout": "30m",
+          "authedSessionInactivityTimeout": "5s",
+          "anonSessionExpirationTimeout": "30m",
+          "anonSessionInactivityTimeout": "5s"
         }
-      },
-      "description": "Network protocols configuration"
-    },
-    "quotaDefaults": {
-      "$ref": "#/$defs/QuotaDefaults",
-      "default": {
-        "storage": 1000000000
-      },
-      "description": "Default quotas configured by type"
+      }
     },
     "search": {
       "$ref": "#/$defs/SearchConfig",
+      "description": "Search configuration",
       "default": {
+        "indexer": {
+          "incrementalIndexing": true,
+          "clearOnStart": false
+        },
         "embeddingsChunker": {
           "kind": "Simple",
-          "splitParagraphs": false,
-          "splitSections": false
+          "splitSections": false,
+          "splitParagraphs": false
         },
         "embeddingsEncoder": {
           "kind": "Dummy"
         },
-        "indexer": {
-          "clearOnStart": false,
-          "incrementalIndexing": true
-        },
         "repo": {
           "kind": "Dummy"
         }
-      },
-      "description": "Search configuration"
-    },
-    "secretsEncryption": {
-      "$ref": "#/$defs/SecretsEncryptionConfig",
-      "default": {
-        "enabled": false
-      },
-      "description": "Secrets encryption configuration"
+      }
     },
     "source": {
       "$ref": "#/$defs/SourceConfig",
+      "description": "Source configuration",
       "default": {
-        "ethereum": {
-          "commitAfterBlocksScanned": 1000000,
-          "getLogsBlockStride": 100000,
-          "rpcEndpoints": [],
-          "useBlockTimestampFallback": false
-        },
+        "targetRecordsPerSlice": 10000,
         "http": {
+          "userAgent": "kamu-cli/0.267.0",
           "connectTimeout": "30s",
-          "maxRedirects": 10,
-          "userAgent": "kamu-cli/0.267.0"
+          "maxRedirects": 10
         },
         "mqtt": {
           "brokerIdleTimeout": "1s"
         },
-        "targetRecordsPerSlice": 10000
-      },
-      "description": "Source configuration"
+        "ethereum": {
+          "rpcEndpoints": [],
+          "getLogsBlockStride": 100000,
+          "commitAfterBlocksScanned": 1000000,
+          "useBlockTimestampFallback": false
+        }
+      }
+    },
+    "auth": {
+      "$ref": "#/$defs/AuthConfig",
+      "description": "Auth configuration",
+      "default": {
+        "allowAnonymous": true,
+        "users": {
+          "predefined": []
+        }
+      }
     },
     "uploads": {
       "$ref": "#/$defs/UploadsConfig",
+      "description": "Uploads configuration",
       "default": {
         "maxFileSizeInMb": 50
-      },
-      "description": "Uploads configuration"
+      }
     },
-    "webhooks": {
-      "$ref": "#/$defs/WebhooksConfig",
+    "didEncryption": {
+      "$ref": "#/$defs/DidSecretEncryptionConfig",
+      "description": "Did secret key encryption configuration",
       "default": {
-        "deliveryTimeout": 10,
-        "maxConsecutiveFailures": 5,
-        "secretEncryptionEnabled": false
-      },
-      "description": "Configuration for webhooks"
+        "enabled": false
+      }
+    },
+    "quotaDefaults": {
+      "$ref": "#/$defs/QuotaDefaults",
+      "description": "Default quotas configured by type",
+      "default": {
+        "storage": 1000000000
+      }
+    },
+    "extra": {
+      "$ref": "#/$defs/ExtraConfig",
+      "description": "Experimental and temporary configuration options",
+      "default": {
+        "graphql": {}
+      }
     }
   },
   "title": "CLIConfig",
-  "type": "object"
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "DatabaseConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "databasePath": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string",
+              "const": "Sqlite"
+            }
+          },
+          "required": [
+            "provider",
+            "databasePath"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "credentialsPolicy": {
+              "$ref": "#/$defs/DatabaseCredentialsPolicyConfig"
+            },
+            "databaseName": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "maxConnections": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "maxLifetimeSecs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "acquireTimeoutSecs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "provider": {
+              "type": "string",
+              "const": "Postgres"
+            }
+          },
+          "required": [
+            "provider",
+            "credentialsPolicy",
+            "databaseName",
+            "host"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "credentialsPolicy": {
+              "$ref": "#/$defs/DatabaseCredentialsPolicyConfig"
+            },
+            "databaseName": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "maxConnections": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "maxLifetimeSecs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "acquireTimeoutSecs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "provider": {
+              "type": "string",
+              "const": "MySql"
+            }
+          },
+          "required": [
+            "provider",
+            "credentialsPolicy",
+            "databaseName",
+            "host"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "credentialsPolicy": {
+              "$ref": "#/$defs/DatabaseCredentialsPolicyConfig"
+            },
+            "databaseName": {
+              "type": "string"
+            },
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint16",
+              "minimum": 0,
+              "maximum": 65535
+            },
+            "maxConnections": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0
+            },
+            "maxLifetimeSecs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "acquireTimeoutSecs": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0
+            },
+            "provider": {
+              "type": "string",
+              "const": "MariaDB"
+            }
+          },
+          "required": [
+            "provider",
+            "credentialsPolicy",
+            "databaseName",
+            "host"
+          ]
+        }
+      ]
+    },
+    "DatabaseCredentialsPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/DatabaseCredentialSourceConfig"
+        },
+        "rotationFrequencyInMinutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "source"
+      ]
+    },
+    "DatabaseCredentialSourceConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "userName": {
+              "type": "string"
+            },
+            "rawPassword": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "RawPassword"
+            }
+          },
+          "required": [
+            "kind",
+            "userName",
+            "rawPassword"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "secretName": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "AwsSecret"
+            }
+          },
+          "required": [
+            "kind",
+            "secretName"
+          ]
+        }
+      ]
+    },
+    "SecretsEncryptionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "encryptionKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Represents the encryption key for secrets. This field is required if\n`enabled` is `true` or `None`.\n\nThe encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```"
+        }
+      }
+    },
+    "EngineConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxConcurrency": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Maximum number of engine operations that can be performed concurrently"
+        },
+        "runtime": {
+          "$ref": "#/$defs/ContainerRuntimeType",
+          "description": "Type of the runtime to use when running the data processing engines",
+          "default": "Docker"
+        },
+        "networkNs": {
+          "$ref": "#/$defs/NetworkNamespaceType",
+          "description": "Type of the networking namespace (relevant when running in container\nenvironments)",
+          "default": "Private"
+        },
+        "startTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Timeout for starting an engine container",
+          "default": "30s"
+        },
+        "shutdownTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Timeout for waiting the engine container to stop gracefully",
+          "default": "5s"
+        },
+        "images": {
+          "$ref": "#/$defs/EngineImagesConfig",
+          "description": "UNSTABLE: Default engine images",
+          "default": {
+            "spark": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0",
+            "flink": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8",
+            "datafusion": "ghcr.io/kamu-data/engine-datafusion:0.9.0",
+            "risingwave": "ghcr.io/kamu-data/engine-risingwave:0.3.0"
+          }
+        },
+        "datafusionEmbedded": {
+          "$ref": "#/$defs/EngineConfigDatafusion",
+          "description": "Embedded Datafusion engine configuration",
+          "default": {
+            "base": {
+              "datafusion.catalog.default_catalog": "kamu",
+              "datafusion.catalog.default_schema": "kamu",
+              "datafusion.catalog.information_schema": "true",
+              "datafusion.sql_parser.enable_ident_normalization": "false"
+            },
+            "ingest": {
+              "datafusion.execution.target_partitions": "1"
+            },
+            "batchQuery": {},
+            "compaction": {
+              "datafusion.execution.target_partitions": "1"
+            },
+            "useLegacyArrowBufferEncoding": false
+          }
+        }
+      }
+    },
+    "ContainerRuntimeType": {
+      "type": "string",
+      "enum": [
+        "Docker",
+        "Podman"
+      ]
+    },
+    "NetworkNamespaceType": {
+      "type": "string",
+      "enum": [
+        "Private",
+        "Host"
+      ],
+      "description": "Corresponds to podman's `containers.conf::netns`\nWe podman is used inside containers (e.g. podman-in-docker or podman-in-k8s)\nit usually runs uses host network namespace."
+    },
+    "DurationString": {
+      "type": "string"
+    },
+    "EngineImagesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "spark": {
+          "type": "string",
+          "description": "UNSTABLE: `Spark` engine image",
+          "default": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
+        },
+        "flink": {
+          "type": "string",
+          "description": "UNSTABLE: `Flink` engine image",
+          "default": "ghcr.io/kamu-data/engine-flink:0.18.2-flink_1.16.0-scala_2.12-java8"
+        },
+        "datafusion": {
+          "type": "string",
+          "description": "UNSTABLE: `Datafusion` engine image",
+          "default": "ghcr.io/kamu-data/engine-datafusion:0.9.0"
+        },
+        "risingwave": {
+          "type": "string",
+          "description": "UNSTABLE: `RisingWave` engine image",
+          "default": "ghcr.io/kamu-data/engine-risingwave:0.3.0"
+        }
+      }
+    },
+    "EngineConfigDatafusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Base configuration options\nSee: `<https://datafusion.apache.org/user-guide/configs.html>`",
+          "default": {
+            "datafusion.catalog.default_catalog": "kamu",
+            "datafusion.catalog.default_schema": "kamu",
+            "datafusion.catalog.information_schema": "true",
+            "datafusion.sql_parser.enable_ident_normalization": "false"
+          },
+          "combine": "merge"
+        },
+        "ingest": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Ingest-specific overrides to the base config",
+          "default": {
+            "datafusion.execution.target_partitions": "1"
+          },
+          "combine": "merge"
+        },
+        "batchQuery": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Batch query-specific overrides to the base config",
+          "default": {},
+          "combine": "merge"
+        },
+        "compaction": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Compaction-specific overrides to the base config",
+          "default": {
+            "datafusion.execution.target_partitions": "1"
+          },
+          "combine": "merge"
+        },
+        "useLegacyArrowBufferEncoding": {
+          "type": "boolean",
+          "description": "Makes arrow batches use contiguous `Binary` and `Utf8` encodings instead\nof more modern `BinaryView` and `Utf8View`. This is only needed for\ncompatibility with some older libraries that don't yet support them.\n\nSee: [kamu-node#277](https://github.com/kamu-data/kamu-node/issues/277)",
+          "default": false
+        }
+      }
+    },
+    "FlowSystemConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "flowAgent": {
+          "$ref": "#/$defs/FlowAgentConfig",
+          "default": {
+            "awaitingStepSecs": 1,
+            "mandatoryThrottlingPeriodSecs": 60,
+            "defaultRetryPolicies": {}
+          }
+        },
+        "flowSystemEventAgent": {
+          "$ref": "#/$defs/FlowSystemEventAgentConfig",
+          "default": {
+            "minDebounceInterval": "100ms",
+            "maxListeningTimeout": "2s",
+            "batchSize": 20
+          }
+        },
+        "taskAgent": {
+          "$ref": "#/$defs/TaskAgentConfig",
+          "default": {
+            "checkingIntervalSecs": 1
+          }
+        }
+      }
+    },
+    "FlowAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "awaitingStepSecs": {
+          "type": "integer",
+          "format": "int64",
+          "default": 1
+        },
+        "mandatoryThrottlingPeriodSecs": {
+          "type": "integer",
+          "format": "int64",
+          "default": 60
+        },
+        "defaultRetryPolicies": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/RetryPolicyConfig"
+          },
+          "default": {},
+          "combine": "merge"
+        }
+      }
+    },
+    "RetryPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxAttempts": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 0
+        },
+        "minDelaySecs": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 0
+        },
+        "backoffType": {
+          "$ref": "#/$defs/RetryPolicyConfigBackoffType",
+          "default": "Fixed"
+        }
+      }
+    },
+    "RetryPolicyConfigBackoffType": {
+      "type": "string",
+      "enum": [
+        "Fixed",
+        "Linear",
+        "Exponential",
+        "ExponentialWithJitter"
+      ]
+    },
+    "FlowSystemEventAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms"
+        },
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s"
+        },
+        "batchSize": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 20
+        }
+      }
+    },
+    "TaskAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkingIntervalSecs": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 1
+        }
+      }
+    },
+    "WebhooksConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxConsecutiveFailures": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 5
+        },
+        "deliveryTimeout": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "default": 10
+        },
+        "secretEncryptionEnabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "secretEncryptionKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Represents the encryption key for the webhooks secret. This field is\nrequired if `secret_encryption_enabled` is `true` or `None`.\n\nThe encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\n# Example\n```\nlet config = WebhooksConfig {\n    ...\n    secret_encryption_enabled: Some(true),\n    encryption_key:\nSome(String::from(\"aBcDeFgHiJkLmNoPqRsTuVwXyZ012345\")) };\n```"
+        }
+      }
+    },
+    "FrontendConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jupyter": {
+          "$ref": "#/$defs/JupyterConfig",
+          "description": "Integrated Jupyter notebook configuration",
+          "default": {
+            "image": "ghcr.io/kamu-data/jupyter:0.7.1",
+            "livyImage": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
+          }
+        }
+      }
+    },
+    "JupyterConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Jupyter notebook server image",
+          "default": "ghcr.io/kamu-data/jupyter:0.7.1"
+        },
+        "livyImage": {
+          "type": "string",
+          "description": "UNSTABLE: Livy + Spark server image",
+          "default": "ghcr.io/kamu-data/engine-spark:0.23.1-spark_3.5.0"
+        }
+      }
+    },
+    "IdentityConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ed25519PrivateKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrivateKey"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Root private key that corresponds to the `authority` and is used to sign\nresponses.\n\nTo generate, use:\n```sh\nod -vN 32 -An -tx1 /dev/urandom | tr -d ' \\n' && echo\n```\nor\n```sh\nopenssl rand -hex 32\n```",
+          "combine": "replace"
+        },
+        "secp256k1PrivateKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Secp256k1Signer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Secp256k1 private key used to sign EIP-712 typed data.\n\nTo generate, use:\n```sh\nod -vN 32 -An -tx1 /dev/urandom | tr -d ' \\n' && echo\n```\nor\n```sh\nopenssl rand -hex 32\n```\nor\n```sh\ncast wallet new\n```",
+          "combine": "replace"
+        }
+      },
+      "description": "Private keys are used to sign API responses.\nSupported algorithms: `ed25519`, `secp256k1`."
+    },
+    "PrivateKey": {
+      "type": "string"
+    },
+    "Secp256k1Signer": {
+      "type": "string"
+    },
+    "OutboxAgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minDebounceInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "100ms"
+        },
+        "maxListeningTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "default": "2s"
+        },
+        "batchSize": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 20
+        }
+      }
+    },
+    "ProtocolConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ipfs": {
+          "$ref": "#/$defs/IpfsConfig",
+          "description": "IPFS configuration",
+          "default": {
+            "httpGateway": "http://localhost:8080/",
+            "preResolveDnslink": true
+          }
+        },
+        "flightSql": {
+          "$ref": "#/$defs/FlightSqlConfig",
+          "description": "`FlightSQL` configuration",
+          "default": {
+            "allowAnonymous": true,
+            "authedSessionExpirationTimeout": "30m",
+            "authedSessionInactivityTimeout": "5s",
+            "anonSessionExpirationTimeout": "30m",
+            "anonSessionInactivityTimeout": "5s"
+          }
+        }
+      }
+    },
+    "IpfsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "httpGateway": {
+          "type": "string",
+          "format": "uri",
+          "description": "HTTP Gateway URL to use for downloads.\nFor safety, it defaults to `http://localhost:8080` - a local IPFS daemon.\nIf you don't have IPFS installed, you can set this URL to\none of the public gateways like `https://ipfs.io`.\nList of public gateways can be found here: `https://ipfs.github.io/public-gateway-checker/`",
+          "default": "http://localhost:8080/"
+        },
+        "preResolveDnslink": {
+          "type": "boolean",
+          "description": "Whether kamu should pre-resolve IPNS `DNSLink` names using DNS or leave\nit to the Gateway.",
+          "default": true
+        }
+      }
+    },
+    "FlightSqlConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowAnonymous": {
+          "type": "boolean",
+          "description": "Whether clients can authenticate as 'anonymous' user",
+          "default": true
+        },
+        "authedSessionExpirationTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Time after which `FlightSQL` client session will be forgotten and client\nwill have to re-authroize (for authenticated clients)",
+          "default": "30m"
+        },
+        "authedSessionInactivityTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Time after which `FlightSQL` session context will be released to free\nthe resources (for authenticated clients)",
+          "default": "5s"
+        },
+        "anonSessionExpirationTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Time after which `FlightSQL` client session will be forgotten and client\nwill have to re-authroize (for anonymous clients)",
+          "default": "30m"
+        },
+        "anonSessionInactivityTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Time after which `FlightSQL` session context will be released to free\nthe resources (for anonymous clients)",
+          "default": "5s"
+        }
+      }
+    },
+    "SearchConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "indexer": {
+          "$ref": "#/$defs/SearchIndexerConfig",
+          "description": "Indexer configuration",
+          "default": {
+            "incrementalIndexing": true,
+            "clearOnStart": false
+          }
+        },
+        "embeddingsChunker": {
+          "$ref": "#/$defs/EmbeddingsChunkerConfig",
+          "description": "Embeddings chunker configuration",
+          "default": {
+            "kind": "Simple",
+            "splitSections": false,
+            "splitParagraphs": false
+          }
+        },
+        "embeddingsEncoder": {
+          "$ref": "#/$defs/EmbeddingsEncoderConfig",
+          "description": "Embeddings encoder configuration",
+          "default": {
+            "kind": "Dummy"
+          }
+        },
+        "repo": {
+          "$ref": "#/$defs/SearchRepositoryConfig",
+          "description": "Search repository configuration",
+          "default": {
+            "kind": "Dummy"
+          }
+        }
+      }
+    },
+    "SearchIndexerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "incrementalIndexing": {
+          "type": "boolean",
+          "description": "Whether incremental indexing is enabled",
+          "default": true
+        },
+        "clearOnStart": {
+          "type": "boolean",
+          "description": "Whether to clear and re-index on start or use existing vectors if any",
+          "default": false
+        }
+      }
+    },
+    "EmbeddingsChunkerConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "splitSections": {
+              "type": "boolean",
+              "default": false
+            },
+            "splitParagraphs": {
+              "type": "boolean",
+              "default": false
+            },
+            "kind": {
+              "type": "string",
+              "const": "Simple"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "EmbeddingsEncoderConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "Dummy"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "apiKey": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "modelName": {
+              "type": "string",
+              "default": "text-embedding-ada-002"
+            },
+            "dimensions": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0,
+              "default": 1536
+            },
+            "kind": {
+              "type": "string",
+              "const": "OpenAi"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "SearchRepositoryConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "Dummy"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "default": "http://localhost:9200/"
+            },
+            "password": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "caCertPemPath": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "indexPrefix": {
+              "type": "string",
+              "default": ""
+            },
+            "timeoutSecs": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0,
+              "default": 30
+            },
+            "enableCompression": {
+              "type": "boolean",
+              "default": false
+            },
+            "embeddingDimensions": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0,
+              "default": 1536
+            },
+            "kind": {
+              "type": "string",
+              "const": "Elasticsearch"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "image": {
+              "type": "string",
+              "default": "docker.io/elasticsearch:9.2.1"
+            },
+            "startTimeout": {
+              "$ref": "#/$defs/DurationString",
+              "default": "30s"
+            },
+            "embeddingDimensions": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0,
+              "default": 1536
+            },
+            "kind": {
+              "type": "string",
+              "const": "ElasticsearchContainer"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "SourceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targetRecordsPerSlice": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Target number of records after which we will stop consuming from the\nresumable source and commit data, leaving the rest for the next\niteration. This ensures that one data slice doesn't become too big.",
+          "default": 10000
+        },
+        "http": {
+          "$ref": "#/$defs/HttpSourceConfig",
+          "description": "HTTP-specific configuration",
+          "default": {
+            "userAgent": "kamu-cli/0.267.0",
+            "connectTimeout": "30s",
+            "maxRedirects": 10
+          }
+        },
+        "mqtt": {
+          "$ref": "#/$defs/MqttSourceConfig",
+          "description": "MQTT-specific configuration",
+          "default": {
+            "brokerIdleTimeout": "1s"
+          }
+        },
+        "ethereum": {
+          "$ref": "#/$defs/EthereumSourceConfig",
+          "description": "Ethereum-specific configuration",
+          "default": {
+            "rpcEndpoints": [],
+            "getLogsBlockStride": 100000,
+            "commitAfterBlocksScanned": 1000000,
+            "useBlockTimestampFallback": false
+          }
+        }
+      }
+    },
+    "HttpSourceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "userAgent": {
+          "type": "string",
+          "description": "Value to use for User-Agent header",
+          "default": "kamu-cli/0.267.0"
+        },
+        "connectTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Timeout for the connect phase of the HTTP client",
+          "default": "30s"
+        },
+        "maxRedirects": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "description": "Maximum number of redirects to follow",
+          "default": 10
+        }
+      }
+    },
+    "MqttSourceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "brokerIdleTimeout": {
+          "$ref": "#/$defs/DurationString",
+          "description": "Time in milliseconds to wait for MQTT broker to send us some data after\nwhich we will consider that we have \"caught up\" and end the polling\nloop.",
+          "default": "1s"
+        }
+      }
+    },
+    "EthereumSourceConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rpcEndpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EthRpcEndpoint"
+          },
+          "description": "Default RPC endpoints to use if source does not specify one explicitly.",
+          "default": [],
+          "combine": "merge"
+        },
+        "getLogsBlockStride": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Default number of blocks to scan within one query to `eth_getLogs` RPC\nendpoint.",
+          "default": 100000
+        },
+        "commitAfterBlocksScanned": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Forces iteration to stop after the specified number of blocks were\nscanned even if we didn't reach the target record number. This is useful\nto not lose a lot of scanning progress in case of an RPC error.",
+          "default": 1000000
+        },
+        "useBlockTimestampFallback": {
+          "type": "boolean",
+          "description": "Many providers don't yet return `blockTimestamp` from `eth_getLogs` RPC\nendpoint and in such cases `block_timestamp` column will be `null`.\nIf you enable this fallback the library will perform additional call to\n`eth_getBlock` to populate the timestam, but this may result in\nsignificant performance penalty when fetching many log records.\n\nSee: [ethereum/execution-apis#295](https://github.com/ethereum/execution-apis/issues/295)",
+          "default": false
+        }
+      }
+    },
+    "EthRpcEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chainId": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "chainName": {
+          "type": "string"
+        },
+        "nodeUrl": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "chainId",
+        "chainName",
+        "nodeUrl"
+      ]
+    },
+    "AuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowAnonymous": {
+          "type": "boolean",
+          "default": true
+        },
+        "users": {
+          "$ref": "#/$defs/PredefinedAccountsConfig",
+          "default": {
+            "predefined": []
+          }
+        }
+      }
+    },
+    "PredefinedAccountsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "predefined": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AccountConfig"
+          },
+          "default": [],
+          "combine": "merge"
+        }
+      }
+    },
+    "AccountConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AccountID"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "May be omitted in favor of `private_key`.",
+          "combine": "replace"
+        },
+        "privateKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrivateKey"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional ed25519 private key. When set, `id` is derived from it\n(and must match `id` if both are present).",
+          "combine": "replace"
+        },
+        "accountName": {
+          "$ref": "#/$defs/AccountName",
+          "combine": "replace"
+        },
+        "password": {
+          "$ref": "#/$defs/Password",
+          "combine": "replace"
+        },
+        "email": {
+          "$ref": "#/$defs/Email",
+          "combine": "replace"
+        },
+        "displayName": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Auto-derived from `account_name` if omitted",
+          "combine": "replace"
+        },
+        "accountType": {
+          "$ref": "#/$defs/AccountType",
+          "default": "User",
+          "combine": "replace"
+        },
+        "provider": {
+          "type": "string",
+          "default": "password"
+        },
+        "providerIdentityKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Auto-derived from `account_name` if omitted",
+          "combine": "replace"
+        },
+        "avatarUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri",
+          "combine": "replace"
+        },
+        "registeredAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time",
+          "combine": "replace"
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AccountPropertyName"
+          },
+          "default": []
+        },
+        "treatDatasetsAsPublic": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "accountName",
+        "password",
+        "email"
+      ],
+      "description": "The declarative account configuration used to register an account if one\ndoes not already exist.\n\nTo update an existing account, either `id` or `private_key` must be\nspecified."
+    },
+    "AccountID": {
+      "type": "string"
+    },
+    "AccountName": {
+      "type": "string"
+    },
+    "Password": {
+      "type": "string"
+    },
+    "Email": {
+      "type": "string"
+    },
+    "AccountType": {
+      "type": "string",
+      "enum": [
+        "User",
+        "Organization"
+      ]
+    },
+    "AccountPropertyName": {
+      "type": "string",
+      "enum": [
+        "CanProvisionAccounts",
+        "Admin"
+      ]
+    },
+    "UploadsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxFileSizeInMb": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 50
+        }
+      }
+    },
+    "DidSecretEncryptionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "encryptionKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate, use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```"
+        }
+      }
+    },
+    "QuotaDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "storage": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 1000000000
+        }
+      }
+    },
+    "ExtraConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "graphql": {
+          "$ref": "#/$defs/GqlConfig",
+          "default": {}
+        }
+      }
+    },
+    "GqlConfig": {
+      "type": "object",
+      "additionalProperties": false
+    }
+  }
 }

@@ -64,7 +64,8 @@ impl ExportService for ExportServiceImpl {
             .config_mut()
             .options_mut()
             .execution
-            .minimum_parallel_output_files = 1;
+            .minimum_parallel_output_files =
+            datafusion::config::ConfigNonZeroUsize::try_new(1).unwrap();
 
         session_state
             .config_mut()
@@ -77,7 +78,8 @@ impl ExportService for ExportServiceImpl {
                 .config_mut()
                 .options_mut()
                 .execution
-                .soft_max_rows_per_output_file = partition_size;
+                .soft_max_rows_per_output_file =
+                datafusion::config::ConfigNonZeroUsize::try_new(partition_size).unwrap();
         }
 
         let export_df = DataFrameExt::from(DataFrame::new(session_state, plan))

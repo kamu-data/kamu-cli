@@ -827,17 +827,17 @@ async fn test_ingest_inference_automatic_renaming_of_conflicting_columns() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY foo (STRING);
                   OPTIONAL INT64 _op;
+                  OPTIONAL BYTE_ARRAY foo (STRING);
                 }
                 "#
             ),
             indoc!(
                 r#"
                 +--------+----+----------------------+----------------------+-----+-----+
-                | offset | op | system_time          | event_time           | foo | _op |
+                | offset | op | system_time          | event_time           | _op | foo |
                 +--------+----+----------------------+----------------------+-----+-----+
-                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | bar | 123 |
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | 123 | bar |
                 +--------+----+----------------------+----------------------+-----+-----+
                 "#
             ),

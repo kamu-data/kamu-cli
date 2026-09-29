@@ -13,8 +13,8 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use cheap_clone::CheapClone;
+use datafusion::common::TableReference;
 use datafusion::prelude::*;
-use datafusion::sql::TableReference;
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;

@@ -1,20 +1,1558 @@
 {
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Kamu REST API",
+    "description": "You are currently running Kamu CLI in the API server mode. For a fully-featured\nserver consider using [Kamu Node](https://docs.kamu.dev/node/).\n\n## Auth\nSome operation require an **API token**. Pass `--get-token` command line argument\nfor CLI to generate a token for you.\n\n## Resources\n- [Documentation](https://docs.kamu.dev)\n- [Discord](https://discord.gg/nU6TXRQNXC)\n- [Other protocols](https://docs.kamu.dev/node/protocols/)\n- [Open Data Fabric specification](https://docs.kamu.dev/odf/)\n",
+    "termsOfService": "https://docs.kamu.dev/terms-of-service/",
+    "license": {
+      "name": "BSL",
+      "url": "https://docs.kamu.dev/license/"
+    },
+    "version": "0.267.0"
+  },
+  "paths": {
+    "/accounts/me": {
+      "get": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Get account information",
+        "operationId": "account_handler",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/datasets/{id}": {
+      "get": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Get dataset info by ID",
+        "operationId": "dataset_info_handler",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Dataset ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetInfoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/info": {
+      "get": {
+        "tags": [
+          "odf-core"
+        ],
+        "summary": "Get ODF node description",
+        "operationId": "node_info_handler",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeInfoResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/odata/{account_name}": {
+      "get": {
+        "tags": [
+          "kamu-odata"
+        ],
+        "summary": "OData root service description",
+        "operationId": "odata_service_handler_mt",
+        "parameters": [
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Account name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/odata/{account_name}/$metadata": {
+      "get": {
+        "tags": [
+          "kamu-odata"
+        ],
+        "summary": "OData service metadata",
+        "operationId": "odata_metadata_handler_mt",
+        "parameters": [
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Account name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/odata/{account_name}/{dataset_name}": {
+      "get": {
+        "tags": [
+          "kamu-odata"
+        ],
+        "summary": "OData collection",
+        "operationId": "odata_collection_handler_mt",
+        "parameters": [
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Account name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Dataset name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/platform/file/upload/prepare": {
+      "post": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Prepare file upload",
+        "operationId": "file_upload_prepare_post_handler",
+        "parameters": [
+          {
+            "name": "fileName",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contentLength",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "contentType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadContext"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/platform/file/upload/{upload_token}": {
+      "get": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Get file from temporary storage",
+        "operationId": "file_upload_get_handler",
+        "parameters": [
+          {
+            "name": "upload_token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "file content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Upload a file to temporary storage",
+        "operationId": "file_upload_post_handler",
+        "parameters": [
+          {
+            "name": "upload_token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadContext"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/platform/login": {
+      "post": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Authenticate with the node",
+        "operationId": "login_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseBody"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ]
+      }
+    },
+    "/platform/token/device": {
+      "post": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Polling to obtain a token for the device",
+        "operationId": "token_device_handler",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAccessTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAccessTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAccessTokenError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/platform/token/device/authorization": {
+      "post": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Authorization of a device",
+        "operationId": "token_device_authorization_handler",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceAuthorizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAuthorizationResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/platform/token/validate": {
+      "get": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Validate auth token",
+        "operationId": "token_validate_handler",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/query": {
+      "get": {
+        "tags": [
+          "odf-query"
+        ],
+        "summary": "Execute a batch query",
+        "description": "Functions exactly like the [POST version](#tag/odf-query/POST/query) of the\nendpoint with all parameters passed in the query string instead of the body.",
+        "operationId": "query_handler",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "Query to execute (e.g. SQL)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "select 1"
+          },
+          {
+            "name": "queryDialect",
+            "in": "query",
+            "description": "Dialect of the query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "Number of leading records to skip when returning result (used for\npagination)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return (used for pagination)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "dataFormat",
+            "in": "query",
+            "description": "How the output data should be encoded",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DataFormat"
+            }
+          },
+          {
+            "name": "schemaFormat",
+            "in": "query",
+            "description": "How to encode the schema of the result",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SchemaFormat"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "description": "What information to include in the response",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "odf-query"
+        ],
+        "summary": "Execute a batch query",
+        "description": "### Regular Queries\nThis endpoint lets you execute arbitrary SQL that can access multiple\ndatasets at once.\n\nExample request body:\n```json\n{\n    \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n    \"limit\": 3,\n    \"queryDialect\": \"SqlDataFusion\",\n    \"dataFormat\": \"JsonAoA\",\n    \"schemaFormat\": \"ArrowJson\"\n}\n```\n\nExample response:\n```json\n{\n    \"output\": {\n        \"data\": [\n            [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],\n            [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],\n            [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]\n        ],\n        \"dataFormat\": \"JsonAoA\",\n        \"schema\": {\"fields\": [\"...\"]},\n        \"schemaFormat\": \"ArrowJson\"\n    }\n}\n```\n\n### Verifiable Queries\n[Cryptographic proofs](https://docs.kamu.dev/node/commitments) can be\nalso requested to hold the node **forever accountable** for the provided\nresult.\n\nExample request body:\n```json\n{\n    \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n    \"limit\": 3,\n    \"queryDialect\": \"SqlDataFusion\",\n    \"dataFormat\": \"JsonAoA\",\n    \"schemaFormat\": \"ArrowJson\",\n    \"include\": [\"proof\"]\n}\n```\n\nCurrently, we support verifiability by ensuring that queries are\ndeterministic and fully reproducible and signing the original response with\nNode's private key. In future more types of proofs will be supported.\n\nExample response:\n```json\n{\n    \"input\": {\n        \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n        \"queryDialect\": \"SqlDataFusion\",\n        \"dataFormat\": \"JsonAoA\",\n        \"include\": [\"Input\", \"Proof\", \"Schema\"],\n        \"schemaFormat\": \"ArrowJson\",\n        \"datasets\": [{\n            \"id\": \"did:odf:fed0119d20360650afd3d412c6b11529778b784c697559c0107d37ee5da61465726c4\",\n            \"alias\": \"kamu/eth-to-usd\",\n            \"blockHash\": \"f1620708557a44c88d23c83f2b915abc10a41cc38d2a278e851e5dc6bb02b7e1f9a1a\"\n        }],\n        \"skip\": 0,\n        \"limit\": 3\n    },\n    \"output\": {\n        \"data\": [\n            [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],\n            [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],\n            [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]\n        ],\n        \"dataFormat\": \"JsonAoA\",\n        \"schema\": {\"fields\": [\"...\"]},\n        \"schemaFormat\": \"ArrowJson\"\n    },\n    \"subQueries\": [],\n    \"commitment\": {\n        \"inputHash\": \"f1620e23f7d8cdde7504eadb86f3cdf34b3b1a7d71f10fe5b54b528dd803387422efc\",\n        \"outputHash\": \"f1620e91f4d3fa26bc4ca0c49d681c8b630550239b64d3cbcfd7c6c2d6ff45998b088\",\n        \"subQueriesHash\": \"f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210\"\n    },\n    \"proof\": {\n        \"type\": \"Ed25519Signature2020\",\n        \"verificationMethod\": \"did:key:z6MkkhJQPHpA41mTPLFgBeygnjeeADUSwuGDoF9pbGQsfwZp\",\n        \"proofValue\": \"uJfY3_g03WbmqlQG8TL-WUxKYU8ZoJaP14MzOzbnJedNiu7jpoKnCTNnDI3TYuaXv89vKlirlGs-5AN06mBseCg\"\n    }\n}\n```\n\nA client that gets a proof in response should\nperform [a few basic steps](https://docs.kamu.dev/node/commitments#response-validation) to validate\nthe proof integrity. For example making sure that the DID in\n`proof.verificationMethod` actually corresponds to the node you're querying\ndata from and that the signature in `proof.proofValue` is actually valid.\nOnly after this you can use this proof to hold the node accountable for the\nresult.\n\nA proof can be stored long-term and then disputed at a later point using\nyour own node or a 3rd party node you can trust via the\n[`/verify`](#tag/odf-query/POST/verify) endpoint.\n\nSee [commitments documentation](https://docs.kamu.dev/node/commitments) for details.",
+        "operationId": "query_handler_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/sign/eip712": {
+      "post": {
+        "tags": [
+          "odf-sign"
+        ],
+        "summary": "Sign EIP-712 typed data",
+        "description": "This endpoint authorizes that the caller has signing permissions for a\nspecified managed key and signs the message with it.\n\nThe optional `includeNodeProof` flag is used to additionally sign the\nresulting signature with the node's own secp256k1 key, allowing for on-chain\nverification.",
+        "operationId": "sign_eip712_handler",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "description": "DID of the managed key to sign with",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": [
+                "did:odf:fed01a561ed291d9c38b6a561ed291d9c38b63017d606c75606006bfe2508acbc4c25"
+              ]
+            }
+          },
+          {
+            "name": "includeNodeProof",
+            "in": "query",
+            "description": "Include a node proof over the resulting signature",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Eip712TypedData"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignEip712Response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/verify": {
+      "post": {
+        "tags": [
+          "odf-query"
+        ],
+        "summary": "Verify query commitment",
+        "description": "A query proof can be stored long-term and then disputed at a later point\nusing this endpoint.\n\nExample request:\n```json\n{\n    \"input\": {\n        \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n        \"queryDialect\": \"SqlDataFusion\",\n        \"dataFormat\": \"JsonAoA\",\n        \"include\": [\"Input\", \"Proof\", \"Schema\"],\n        \"schemaFormat\": \"ArrowJson\",\n        \"datasets\": [{\n            \"id\": \"did:odf:fed0..26c4\",\n            \"alias\": \"kamu/eth-to-usd\",\n            \"blockHash\": \"f162..9a1a\"\n        }],\n        \"skip\": 0,\n        \"limit\": 3\n    },\n    \"subQueries\": [],\n    \"commitment\": {\n        \"inputHash\": \"f162..2efc\",\n        \"outputHash\": \"f162..b088\",\n        \"subQueriesHash\": \"f162..d210\"\n    },\n    \"proof\": {\n        \"type\": \"Ed25519Signature2020\",\n        \"verificationMethod\": \"did:key:z6Mk..fwZp\",\n        \"proofValue\": \"uJfY..seCg\"\n    }\n}\n```\n\nExample response:\n```json\n{\n    \"ok\": false,\n    \"error\": {\n        \"kind\": \"VerificationFailed::OutputMismatch\",\n        \"actual_hash\": \"f162..c12a\",\n        \"expected_hash\": \"f162..2a2d\",\n        \"message\": \"Query was reproduced but resulted in output hash different from expected.\n                    This means that the output was either falsified, or the query\n                    reproducibility was not guaranteed by the system.\",\n    }\n}\n```\n\nSee [commitments documentation](https://docs.kamu.dev/node/commitments) for details.",
+        "operationId": "verify_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                },
+                "examples": {
+                  "Invalid commitment": {
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "InvalidRequest::BadSignature",
+                        "message": "The commitment is invalid and cannot be disputed: bad signature"
+                      }
+                    }
+                  },
+                  "Success": {
+                    "summary": "Verified successfully",
+                    "value": {
+                      "ok": true
+                    }
+                  },
+                  "Verification fail": {
+                    "value": {
+                      "ok": false,
+                      "error": {
+                        "kind": "VerificationFailed::OutputMismatch",
+                        "message": "Query was reproduced but resulted in output hash different from expected. This means that the output was either falsified, or the query reproducibility was not guaranteed by the system.",
+                        "expected_hash": "f162080084bf2fba02475726feb2cab2d8215eab14bc6bdd8bfb2c8151257032ecd8b",
+                        "actual_hash": "f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/blocks/{block_hash}": {
+      "get": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Get block by hash",
+        "operationId": "dataset_blocks_handler",
+        "parameters": [
+          {
+            "name": "block_hash",
+            "in": "path",
+            "description": "Hash of the block",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "block content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/checkpoints/{physical_hash}": {
+      "get": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Get checkpoint by hash",
+        "operationId": "dataset_checkpoints_get_handler",
+        "parameters": [
+          {
+            "name": "physical_hash",
+            "in": "path",
+            "description": "Physical hash of the block",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "checkpoint file content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Upload checkpoint",
+        "operationId": "dataset_checkpoints_put_handler",
+        "parameters": [
+          {
+            "name": "physical_hash",
+            "in": "path",
+            "description": "Physical hash of the block",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/data/{physical_hash}": {
+      "get": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Get data slice by hash",
+        "operationId": "dataset_data_get_handler",
+        "parameters": [
+          {
+            "name": "physical_hash",
+            "in": "path",
+            "description": "Physical hash of the block",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "data file content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Upload data slice",
+        "operationId": "dataset_data_put_handler",
+        "parameters": [
+          {
+            "name": "physical_hash",
+            "in": "path",
+            "description": "Physical hash of the block",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/ingest": {
+      "post": {
+        "tags": [
+          "kamu"
+        ],
+        "summary": "Push data ingestion",
+        "operationId": "dataset_ingest_handler",
+        "parameters": [
+          {
+            "name": "sourceName",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uploadToken",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "format": "int32",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/metadata": {
+      "get": {
+        "tags": [
+          "odf-query"
+        ],
+        "summary": "Access dataset metadata chain",
+        "operationId": "dataset_metadata_handler",
+        "parameters": [
+          {
+            "name": "include",
+            "in": "query",
+            "description": "What information to include in response",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "schemaFormat",
+            "in": "query",
+            "description": "Format to return the schema in",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SchemaFormat"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetMetadataResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/pull": {
+      "get": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Initiate pull via Smart Transfer Protocol",
+        "operationId": "dataset_pull_ws_upgrade_handler",
+        "parameters": [
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/push": {
+      "get": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Initiate push via Smart Transfer Protocol",
+        "operationId": "dataset_push_ws_upgrade_handler",
+        "parameters": [
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "default": null
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/refs/{reference}": {
+      "get": {
+        "tags": [
+          "odf-transfer"
+        ],
+        "summary": "Get named block reference",
+        "operationId": "dataset_refs_handler",
+        "parameters": [
+          {
+            "name": "reference",
+            "in": "path",
+            "description": "Name of the reference",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/{account_name}/{dataset_name}/tail": {
+      "get": {
+        "tags": [
+          "odf-query"
+        ],
+        "summary": "Get a sample of latest events",
+        "operationId": "dataset_tail_handler",
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "Number of leading records to skip when returning result (used for\npagination)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return (used for pagination)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "dataFormat",
+            "in": "query",
+            "description": "How the output data should be encoded",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DataFormat"
+            }
+          },
+          {
+            "name": "schemaFormat",
+            "in": "query",
+            "description": "How to encode the schema of the result",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SchemaFormat"
+            }
+          },
+          {
+            "name": "account_name",
+            "in": "path",
+            "description": "Name of the account",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dataset_name",
+            "in": "path",
+            "description": "Name of the dataset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetTailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ]
+      }
+    }
+  },
   "components": {
     "schemas": {
       "AccountID": {
+        "type": "string",
         "examples": [
           "did:odf:fed01989de31f27202c3b989de31f27202c3b103636f656e746078ac3c053218d8e6b",
           "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
-        ],
-        "type": "string"
+        ]
       },
       "AccountName": {
+        "type": "string",
         "examples": [
           "my-account"
-        ],
-        "type": "string"
+        ]
       },
       "AccountResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "accountName"
+        ],
         "properties": {
           "accountName": {
             "$ref": "#/components/schemas/AccountName"
@@ -22,26 +1560,26 @@
           "id": {
             "$ref": "#/components/schemas/AccountID"
           }
-        },
-        "required": [
-          "id",
-          "accountName"
-        ],
-        "type": "object"
+        }
       },
       "ApiErrorResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
         "properties": {
           "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "message"
-        ],
-        "type": "object"
+        }
       },
       "Commitment": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "inputHash",
+          "outputHash",
+          "subQueriesHash"
+        ],
         "properties": {
           "inputHash": {
             "$ref": "#/components/schemas/Multihash",
@@ -56,22 +1594,23 @@
             "description": "Hash of the \"subQueries\" object in the [multihash](https://multiformats.io/multihash/) format"
           }
         },
-        "required": [
-          "inputHash",
-          "outputHash",
-          "subQueriesHash"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "DataFormat": {
+        "type": "string",
         "enum": [
           "JsonAoS",
           "JsonSoA",
           "JsonAoA"
-        ],
-        "type": "string"
+        ]
       },
       "DatasetBlockNotFound": {
+        "type": "object",
+        "required": [
+          "message",
+          "dataset_id",
+          "block_hash"
+        ],
         "properties": {
           "block_hash": {
             "$ref": "#/components/schemas/Multihash"
@@ -82,21 +1621,20 @@
           "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "message",
-          "dataset_id",
-          "block_hash"
-        ],
-        "type": "object"
+        }
       },
       "DatasetID": {
+        "type": "string",
         "examples": [
           "did:odf:fed01969b7413a41f25ba969b7413a41f25ba4016461736574607650ec170632ade10"
-        ],
-        "type": "string"
+        ]
       },
       "DatasetInfoResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "datasetName"
+        ],
         "properties": {
           "datasetName": {
             "$ref": "#/components/schemas/DatasetName"
@@ -107,32 +1645,32 @@
           "owner": {
             "$ref": "#/components/schemas/DatasetOwnerInfo"
           }
-        },
-        "required": [
-          "id",
-          "datasetName"
-        ],
-        "type": "object"
+        }
       },
       "DatasetMetadataResponse": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "output"
+        ],
         "properties": {
           "output": {
             "$ref": "#/components/schemas/Output"
           }
         },
-        "required": [
-          "output"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "DatasetName": {
+        "type": "string",
         "examples": [
           "my-dataset"
-        ],
-        "type": "string"
+        ]
       },
       "DatasetNotFound": {
+        "type": "object",
+        "required": [
+          "message",
+          "dataset_id"
+        ],
         "properties": {
           "dataset_id": {
             "$ref": "#/components/schemas/DatasetID"
@@ -140,14 +1678,13 @@
           "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "message",
-          "dataset_id"
-        ],
-        "type": "object"
+        }
       },
       "DatasetOwnerInfo": {
+        "type": "object",
+        "required": [
+          "accountName"
+        ],
         "properties": {
           "accountId": {
             "type": "string"
@@ -155,19 +1692,19 @@
           "accountName": {
             "$ref": "#/components/schemas/AccountName"
           }
-        },
-        "required": [
-          "accountName"
-        ],
-        "type": "object"
+        }
       },
       "DatasetState": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "alias"
+        ],
         "properties": {
           "alias": {
+            "type": "string",
             "description": "Alias to be used in the query",
-            "example": "kamu/eth-to-usd",
-            "type": "string"
+            "example": "kamu/eth-to-usd"
           },
           "blockHash": {
             "$ref": "#/components/schemas/Multihash",
@@ -178,17 +1715,18 @@
             "description": "Globally unique identity of the dataset"
           }
         },
-        "required": [
-          "id",
-          "alias"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "DatasetTailResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "dataFormat"
+        ],
         "properties": {
           "data": {
-            "description": "Resulting data",
-            "type": "object"
+            "type": "object",
+            "description": "Resulting data"
           },
           "dataFormat": {
             "$ref": "#/components/schemas/DataFormat",
@@ -202,25 +1740,21 @@
             "$ref": "#/components/schemas/SchemaFormat",
             "description": "What representation is used for the schema"
           }
-        },
-        "required": [
-          "data",
-          "dataFormat"
-        ],
-        "type": "object"
+        }
       },
       "DeviceAccessTokenError": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
         "properties": {
           "message": {
             "$ref": "#/components/schemas/DeviceAccessTokenErrorStatus"
           }
-        },
-        "required": [
-          "message"
-        ],
-        "type": "object"
+        }
       },
       "DeviceAccessTokenErrorStatus": {
+        "type": "string",
         "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.5>",
         "enum": [
           "authorization_pending",
@@ -228,152 +1762,156 @@
           "access_denied",
           "expired_token",
           "invalid_grant"
-        ],
-        "type": "string"
+        ]
       },
       "DeviceAccessTokenRequest": {
+        "type": "object",
         "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.4>",
-        "properties": {
-          "client_id": {
-            "description": "REQUIRED.  The device verification code, \"`device_code`\" from the\ndevice authorization response, defined in [Section 3.2](https://datatracker.ietf.org/doc/html/rfc8628#section-3.2).",
-            "type": "string"
-          },
-          "device_code": {
-            "description": "REQUIRED if the client is not authenticating with the\nauthorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).\nThe client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2).",
-            "type": "string"
-          },
-          "grant_type": {
-            "description": "REQUIRED.  Value MUST be set to\n\"urn:ietf:params:oauth:grant-type:device_code\".",
-            "type": "string"
-          }
-        },
         "required": [
           "grant_type",
           "client_id",
           "device_code"
         ],
-        "type": "object"
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "REQUIRED.  The device verification code, \"`device_code`\" from the\ndevice authorization response, defined in [Section 3.2](https://datatracker.ietf.org/doc/html/rfc8628#section-3.2)."
+          },
+          "device_code": {
+            "type": "string",
+            "description": "REQUIRED if the client is not authenticating with the\nauthorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).\nThe client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2)."
+          },
+          "grant_type": {
+            "type": "string",
+            "description": "REQUIRED.  Value MUST be set to\n\"urn:ietf:params:oauth:grant-type:device_code\"."
+          }
+        }
       },
       "DeviceAccessTokenResponse": {
+        "type": "object",
         "description": "<https://datatracker.ietf.org/doc/html/rfc6749#section-5.1>",
-        "properties": {
-          "access_token": {
-            "description": "REQUIRED.  The access token issued by the authorization server.",
-            "type": "string"
-          },
-          "expires_in": {
-            "description": "RECOMMENDED.  The lifetime in seconds of the access token.  For\nexample, the value \"3600\" denotes that the access token will\nexpire in one hour from the time the response was generated.\nIf omitted, the authorization server SHOULD provide the\nexpiration time via other means or document the default value.",
-            "example": 3600,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "refresh_token": {
-            "description": "OPTIONAL.  The refresh token, which can be used to obtain new\naccess tokens using the same authorization grant as described\nin [Section 6](https://datatracker.ietf.org/doc/html/rfc6749#section-6).",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "score": {
-            "description": "OPTIONAL.  The scope of the access request as described by\n[Section 3.3](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3).  The requested scope MUST NOT include any scope\nnot originally granted by the resource owner, and if omitted is\ntreated as equal to the scope originally granted by the\nresource owner.",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "token_type": {
-            "description": "REQUIRED.  The type of the token issued as described in\n[Section 7.1](https://datatracker.ietf.org/doc/html/rfc6749#section-7.1).  Value is case insensitive.",
-            "type": "string"
-          }
-        },
         "required": [
           "access_token",
           "token_type",
           "expires_in"
         ],
-        "type": "object"
-      },
-      "DeviceAuthorizationRequest": {
-        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.1>",
         "properties": {
-          "client_id": {
-            "description": "REQUIRED if the client is not authenticating with the\nauthorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).\nThe client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2).",
-            "type": "string"
+          "access_token": {
+            "type": "string",
+            "description": "REQUIRED.  The access token issued by the authorization server."
           },
-          "scope": {
-            "description": "OPTIONAL.  The scope of the access request as defined by\n[Section 3.3 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3).",
+          "expires_in": {
+            "type": "integer",
+            "description": "RECOMMENDED.  The lifetime in seconds of the access token.  For\nexample, the value \"3600\" denotes that the access token will\nexpire in one hour from the time the response was generated.\nIf omitted, the authorization server SHOULD provide the\nexpiration time via other means or document the default value.",
+            "example": 3600,
+            "minimum": 1
+          },
+          "refresh_token": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "OPTIONAL.  The refresh token, which can be used to obtain new\naccess tokens using the same authorization grant as described\nin [Section 6](https://datatracker.ietf.org/doc/html/rfc6749#section-6)."
+          },
+          "score": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "OPTIONAL.  The scope of the access request as described by\n[Section 3.3](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3).  The requested scope MUST NOT include any scope\nnot originally granted by the resource owner, and if omitted is\ntreated as equal to the scope originally granted by the\nresource owner."
+          },
+          "token_type": {
+            "type": "string",
+            "description": "REQUIRED.  The type of the token issued as described in\n[Section 7.1](https://datatracker.ietf.org/doc/html/rfc6749#section-7.1).  Value is case insensitive."
           }
-        },
+        }
+      },
+      "DeviceAuthorizationRequest": {
+        "type": "object",
+        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.1>",
         "required": [
           "client_id"
         ],
-        "type": "object"
-      },
-      "DeviceAuthorizationResponse": {
-        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.2>",
         "properties": {
-          "device_code": {
-            "description": "REQUIRED.  The device verification code.",
-            "type": "string"
+          "client_id": {
+            "type": "string",
+            "description": "REQUIRED if the client is not authenticating with the\nauthorization server as described in [Section 3.2.1. of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.2.1).\nThe client identifier as described in [Section 2.2 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-2.2)."
           },
-          "expires_in": {
-            "description": "REQUIRED.  The lifetime in seconds of the \"`device_code`\" and\n\"`user_code`\".",
-            "example": 300,
-            "format": "int64",
-            "minimum": 1,
-            "type": "integer"
-          },
-          "interval": {
-            "description": "OPTIONAL.  The minimum amount of time in seconds that the client\nSHOULD wait between polling requests to the token endpoint.  If no\nvalue is provided, clients MUST use 5 as the default.",
-            "example": 5,
-            "format": "int64",
-            "minimum": 1,
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "user_code": {
-            "description": "REQUIRED.  The end-user verification code.",
-            "type": "string"
-          },
-          "verification_uri": {
-            "description": "REQUIRED.  The end-user verification URI on the authorization\nserver.  The URI should be short and easy to remember as end users\nwill be asked to manually type it into their user agent.",
-            "type": "string"
-          },
-          "verification_uri_complete": {
-            "description": "OPTIONAL.  A verification URI that includes the \"`user_code`\" (or\nother information with the same function as the \"`user_code`\"),\nwhich is designed for non-textual transmission.",
+          "scope": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "OPTIONAL.  The scope of the access request as defined by\n[Section 3.3 of RFC6749](https://datatracker.ietf.org/doc/html/rfc6749#section-3.3)."
           }
-        },
+        }
+      },
+      "DeviceAuthorizationResponse": {
+        "type": "object",
+        "description": "<https://datatracker.ietf.org/doc/html/rfc8628#section-3.2>",
         "required": [
           "device_code",
           "user_code",
           "verification_uri",
           "expires_in"
         ],
-        "type": "object"
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "description": "REQUIRED.  The device verification code."
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int64",
+            "description": "REQUIRED.  The lifetime in seconds of the \"`device_code`\" and\n\"`user_code`\".",
+            "example": 300,
+            "minimum": 1
+          },
+          "interval": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "OPTIONAL.  The minimum amount of time in seconds that the client\nSHOULD wait between polling requests to the token endpoint.  If no\nvalue is provided, clients MUST use 5 as the default.",
+            "example": 5,
+            "minimum": 1
+          },
+          "user_code": {
+            "type": "string",
+            "description": "REQUIRED.  The end-user verification code."
+          },
+          "verification_uri": {
+            "type": "string",
+            "description": "REQUIRED.  The end-user verification URI on the authorization\nserver.  The URI should be short and easy to remember as end users\nwill be asked to manually type it into their user agent."
+          },
+          "verification_uri_complete": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "OPTIONAL.  A verification URI that includes the \"`user_code`\" (or\nother information with the same function as the \"`user_code`\"),\nwhich is designed for non-textual transmission."
+          }
+        }
       },
       "DidKey": {
+        "type": "string",
         "examples": [
           "did:key:z6MkmgVreHBu2ABaD59Jq1J2JneXwzpsUWwEWXS4kLhjb4V4"
-        ],
-        "type": "string"
+        ]
       },
       "Eip712DomainSchema": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "version",
+          "chainId"
+        ],
         "properties": {
           "chainId": {
+            "type": "integer",
             "format": "int64",
-            "minimum": 0,
-            "type": "integer"
+            "minimum": 0
           },
           "name": {
             "type": "string"
@@ -388,15 +1926,14 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "version",
-          "chainId"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "Eip712TypeDetailsSchema": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
         "properties": {
           "name": {
             "type": "string"
@@ -405,14 +1942,16 @@
             "type": "string"
           }
         },
-        "required": [
-          "name",
-          "type"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "Eip712TypedData": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "domain",
+          "primaryType",
+          "types",
+          "message"
+        ],
         "properties": {
           "domain": {
             "$ref": "#/components/schemas/Eip712DomainSchema"
@@ -424,33 +1963,27 @@
             "type": "string"
           },
           "types": {
+            "type": "object",
             "additionalProperties": {
+              "type": "array",
               "items": {
                 "$ref": "#/components/schemas/Eip712TypeDetailsSchema"
-              },
-              "type": "array"
+              }
             },
             "propertyNames": {
               "type": "string"
-            },
-            "type": "object"
+            }
           }
         },
-        "required": [
-          "domain",
-          "primaryType",
-          "types",
-          "message"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "Include": {
+        "type": "string",
         "enum": [
           "Input",
           "Proof",
           "Schema"
-        ],
-        "type": "string"
+        ]
       },
       "InvalidRequest": {
         "oneOf": [
@@ -460,18 +1993,18 @@
                 "$ref": "#/components/schemas/InvalidRequestInputHash"
               },
               {
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "InvalidRequest::InputHash"
-                    ],
-                    "type": "string"
-                  }
-                },
+                "type": "object",
                 "required": [
                   "kind"
                 ],
-                "type": "object"
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "InvalidRequest::InputHash"
+                    ]
+                  }
+                }
               }
             ]
           },
@@ -481,18 +2014,18 @@
                 "$ref": "#/components/schemas/InvalidRequestSubQueriesHash"
               },
               {
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "InvalidRequest::SubQueriesHash"
-                    ],
-                    "type": "string"
-                  }
-                },
+                "type": "object",
                 "required": [
                   "kind"
                 ],
-                "type": "object"
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "InvalidRequest::SubQueriesHash"
+                    ]
+                  }
+                }
               }
             ]
           },
@@ -502,57 +2035,62 @@
                 "$ref": "#/components/schemas/InvalidRequestBadSignature"
               },
               {
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "InvalidRequest::BadSignature"
-                    ],
-                    "type": "string"
-                  }
-                },
+                "type": "object",
                 "required": [
                   "kind"
                 ],
-                "type": "object"
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "InvalidRequest::BadSignature"
+                    ]
+                  }
+                }
               }
             ]
           }
         ]
       },
       "InvalidRequestBadSignature": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
         "properties": {
           "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "message"
-        ],
-        "type": "object"
+        }
       },
       "InvalidRequestInputHash": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
         "properties": {
           "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "message"
-        ],
-        "type": "object"
+        }
       },
       "InvalidRequestSubQueriesHash": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
         "properties": {
           "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "message"
-        ],
-        "type": "object"
+        }
       },
       "LoginRequestBody": {
+        "type": "object",
+        "required": [
+          "loginMethod",
+          "loginCredentialsJson"
+        ],
         "properties": {
           "loginCredentialsJson": {
             "type": "string"
@@ -560,43 +2098,38 @@
           "loginMethod": {
             "type": "string"
           }
-        },
-        "required": [
-          "loginMethod",
-          "loginCredentialsJson"
-        ],
-        "type": "object"
+        }
       },
       "LoginResponseBody": {
+        "type": "object",
+        "required": [
+          "accessToken"
+        ],
         "properties": {
           "accessToken": {
             "type": "string"
           }
-        },
-        "required": [
-          "accessToken"
-        ],
-        "type": "object"
+        }
       },
       "Multihash": {
+        "type": "string",
         "examples": [
           "f162070983d692f648185febe6d6fa607630ae68649f7e6fc45b94680096c06e4fadb"
-        ],
-        "type": "string"
+        ]
       },
       "NodeInfoResponse": {
+        "type": "object",
+        "required": [
+          "isMultiTenant"
+        ],
         "properties": {
           "isMultiTenant": {
             "type": "boolean"
           }
-        },
-        "required": [
-          "isMultiTenant"
-        ],
-        "type": "object"
+        }
       },
       "Output": {
-        "additionalProperties": false,
+        "type": "object",
         "properties": {
           "attachments": {
             "type": "object"
@@ -608,13 +2141,13 @@
             "type": "object"
           },
           "refs": {
-            "items": {
-              "type": "string"
-            },
             "type": [
               "array",
               "null"
-            ]
+            ],
+            "items": {
+              "type": "string"
+            }
           },
           "schema": {
             "$ref": "#/components/schemas/Schema"
@@ -629,9 +2162,15 @@
             "type": "object"
           }
         },
-        "type": "object"
+        "additionalProperties": false
       },
       "OutputMismatch": {
+        "type": "object",
+        "required": [
+          "message",
+          "expected_hash",
+          "actual_hash"
+        ],
         "properties": {
           "actual_hash": {
             "$ref": "#/components/schemas/Multihash"
@@ -642,15 +2181,14 @@
           "message": {
             "type": "string"
           }
-        },
-        "required": [
-          "message",
-          "expected_hash",
-          "actual_hash"
-        ],
-        "type": "object"
+        }
       },
       "Outputs": {
+        "type": "object",
+        "required": [
+          "data",
+          "dataFormat"
+        ],
         "properties": {
           "data": {
             "description": "Resulting data"
@@ -667,15 +2205,15 @@
             "$ref": "#/components/schemas/SchemaFormat",
             "description": "What representation is used for the schema"
           }
-        },
-        "required": [
-          "data",
-          "dataFormat"
-        ],
-        "type": "object"
+        }
       },
       "Proof": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type",
+          "verificationMethod",
+          "proofValue"
+        ],
         "properties": {
           "proofValue": {
             "$ref": "#/components/schemas/Signature",
@@ -690,65 +2228,63 @@
             "description": "DID (public key) of the node performing the computation"
           }
         },
-        "required": [
-          "type",
-          "verificationMethod",
-          "proofValue"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "ProofType": {
+        "type": "string",
         "enum": [
           "Ed25519Signature2020",
           "EcdsaSecp256k1Signature2019"
-        ],
-        "type": "string"
+        ]
       },
       "QueryDialect": {
+        "type": "string",
         "enum": [
           "SqlDataFusion",
           "SqlFlink",
           "SqlRisingWave",
           "SqlSpark"
-        ],
-        "type": "string"
+        ]
       },
       "QueryRequest": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "query"
+        ],
         "properties": {
           "dataFormat": {
             "$ref": "#/components/schemas/DataFormat",
             "description": "How data should be laid out in the response"
           },
           "datasets": {
-            "description": "Optional information used to affix an alias to the specific\n[`odf::DatasetID`] and reproduce the query at a specific state in time",
-            "items": {
-              "$ref": "#/components/schemas/DatasetState"
-            },
             "type": [
               "array",
               "null"
-            ]
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DatasetState"
+            },
+            "description": "Optional information used to affix an alias to the specific\n[`odf::DatasetID`] and reproduce the query at a specific state in time"
           },
           "include": {
-            "description": "What information to include",
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/Include"
             },
-            "type": "array",
+            "description": "What information to include",
             "uniqueItems": true
           },
           "limit": {
-            "description": "Pagination: limits number of records in response to N",
+            "type": "integer",
             "format": "int64",
+            "description": "Pagination: limits number of records in response to N",
             "maximum": 100000000,
-            "minimum": 0,
-            "type": "integer"
+            "minimum": 0
           },
           "query": {
+            "type": "string",
             "description": "Query string",
-            "example": "select event_time, from, to, close from \"kamu/eth-to-usd\"",
-            "type": "string"
+            "example": "select event_time, from, to, close from \"kamu/eth-to-usd\""
           },
           "queryDialect": {
             "$ref": "#/components/schemas/QueryDialect",
@@ -759,19 +2295,20 @@
             "description": "What representation to use for the schema"
           },
           "skip": {
-            "description": "Pagination: skips first N records",
+            "type": "integer",
             "format": "int64",
+            "description": "Pagination: skips first N records",
             "maximum": 100000000,
-            "minimum": 0,
-            "type": "integer"
+            "minimum": 0
           }
         },
-        "required": [
-          "query"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "QueryResponse": {
+        "type": "object",
+        "required": [
+          "output"
+        ],
         "properties": {
           "commitment": {
             "$ref": "#/components/schemas/Commitment",
@@ -790,48 +2327,50 @@
             "description": "Signature block"
           },
           "subQueries": {
-            "description": "Information about processing performed by other nodes as part of this\noperation",
-            "example": [],
-            "items": {
-              "$ref": "#/components/schemas/SubQuery"
-            },
             "type": [
               "array",
               "null"
-            ]
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SubQuery"
+            },
+            "description": "Information about processing performed by other nodes as part of this\noperation",
+            "example": []
           }
-        },
-        "required": [
-          "output"
-        ],
-        "type": "object"
+        }
       },
       "Schema": {
         "type": "object"
       },
       "SchemaFormat": {
+        "type": "string",
         "enum": [
           "ArrowJson",
           "OdfJson",
           "OdfYaml",
           "Parquet",
           "ParquetJson"
-        ],
-        "type": "string"
+        ]
       },
       "Secp256k1Signature": {
+        "type": "string",
         "examples": [
           "0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b"
-        ],
-        "type": "string"
+        ]
       },
       "Secp256k1VerifyingKey": {
+        "type": "string",
         "examples": [
           "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31"
-        ],
-        "type": "string"
+        ]
       },
       "SignEip712Proof": {
+        "type": "object",
+        "required": [
+          "type",
+          "verificationMethod",
+          "signature"
+        ],
         "properties": {
           "signature": {
             "$ref": "#/components/schemas/Secp256k1Signature"
@@ -842,15 +2381,15 @@
           "verificationMethod": {
             "$ref": "#/components/schemas/Secp256k1VerifyingKey"
           }
-        },
+        }
+      },
+      "SignEip712Response": {
+        "type": "object",
         "required": [
           "type",
           "verificationMethod",
           "signature"
         ],
-        "type": "object"
-      },
-      "SignEip712Response": {
         "properties": {
           "proof": {
             "$ref": "#/components/schemas/SignEip712Proof"
@@ -864,23 +2403,23 @@
           "verificationMethod": {
             "$ref": "#/components/schemas/DidKey"
           }
-        },
-        "required": [
-          "type",
-          "verificationMethod",
-          "signature"
-        ],
-        "type": "object"
+        }
       },
       "Signature": {
+        "type": "string",
         "examples": [
           "uAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-        ],
-        "type": "string"
+        ]
       },
       "SubQuery": {
-        "additionalProperties": false,
+        "type": "object",
         "description": "Mirrors the structure of [`QueryRequest`] without the `outputs`",
+        "required": [
+          "input",
+          "subQueries",
+          "commitment",
+          "proof"
+        ],
         "properties": {
           "commitment": {
             "$ref": "#/components/schemas/Commitment",
@@ -895,22 +2434,27 @@
             "description": "Signature block"
           },
           "subQueries": {
-            "description": "Information about processing performed by other nodes as part of this\noperation",
-            "type": "object"
+            "type": "object",
+            "description": "Information about processing performed by other nodes as part of this\noperation"
           }
         },
-        "required": [
-          "input",
-          "subQueries",
-          "commitment",
-          "proof"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "UploadContext": {
+        "type": "object",
+        "required": [
+          "uploadUrl",
+          "method",
+          "useMultipart",
+          "headers",
+          "fields",
+          "uploadToken"
+        ],
         "properties": {
           "fields": {
+            "type": "array",
             "items": {
+              "type": "array",
               "items": false,
               "prefixItems": [
                 {
@@ -919,13 +2463,13 @@
                 {
                   "type": "string"
                 }
-              ],
-              "type": "array"
-            },
-            "type": "array"
+              ]
+            }
           },
           "headers": {
+            "type": "array",
             "items": {
+              "type": "array",
               "items": false,
               "prefixItems": [
                 {
@@ -934,10 +2478,8 @@
                 {
                   "type": "string"
                 }
-              ],
-              "type": "array"
-            },
-            "type": "array"
+              ]
+            }
           },
           "method": {
             "type": "string"
@@ -951,16 +2493,7 @@
           "useMultipart": {
             "type": "boolean"
           }
-        },
-        "required": [
-          "uploadUrl",
-          "method",
-          "useMultipart",
-          "headers",
-          "fields",
-          "uploadToken"
-        ],
-        "type": "object"
+        }
       },
       "ValidationError": {
         "oneOf": [
@@ -980,18 +2513,18 @@
                 "$ref": "#/components/schemas/OutputMismatch"
               },
               {
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "VerificationFailed::OutputMismatch"
-                    ],
-                    "type": "string"
-                  }
-                },
+                "type": "object",
                 "required": [
                   "kind"
                 ],
-                "type": "object"
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "VerificationFailed::OutputMismatch"
+                    ]
+                  }
+                }
               }
             ]
           },
@@ -1001,18 +2534,18 @@
                 "$ref": "#/components/schemas/DatasetNotFound"
               },
               {
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "VerificationFailed::DatasetNotFound"
-                    ],
-                    "type": "string"
-                  }
-                },
+                "type": "object",
                 "required": [
                   "kind"
                 ],
-                "type": "object"
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "VerificationFailed::DatasetNotFound"
+                    ]
+                  }
+                }
               }
             ]
           },
@@ -1022,25 +2555,31 @@
                 "$ref": "#/components/schemas/DatasetBlockNotFound"
               },
               {
-                "properties": {
-                  "kind": {
-                    "enum": [
-                      "VerificationFailed::DatasetBlockNotFound"
-                    ],
-                    "type": "string"
-                  }
-                },
+                "type": "object",
                 "required": [
                   "kind"
                 ],
-                "type": "object"
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "VerificationFailed::DatasetBlockNotFound"
+                    ]
+                  }
+                }
               }
             ]
           }
         ]
       },
       "VerifyRequest": {
-        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input",
+          "subQueries",
+          "commitment",
+          "proof"
+        ],
         "properties": {
           "commitment": {
             "$ref": "#/components/schemas/Commitment",
@@ -1055,1600 +2594,61 @@
             "description": "Signature block"
           },
           "subQueries": {
-            "description": "Information about processing performed by other nodes as part of the\noriginal operation",
-            "example": [],
+            "type": "array",
             "items": {
               "$ref": "#/components/schemas/SubQuery"
             },
-            "type": "array"
+            "description": "Information about processing performed by other nodes as part of the\noriginal operation",
+            "example": []
           }
         },
-        "required": [
-          "input",
-          "subQueries",
-          "commitment",
-          "proof"
-        ],
-        "type": "object"
+        "additionalProperties": false
       },
       "VerifyResponse": {
+        "type": "object",
+        "required": [
+          "ok"
+        ],
         "properties": {
           "error": {
             "$ref": "#/components/schemas/ValidationError",
             "description": "Will contain error details if validation was unsuccessful"
           },
           "ok": {
-            "description": "Whether validation was successful",
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether validation was successful"
           }
-        },
-        "required": [
-          "ok"
-        ],
-        "type": "object"
+        }
       }
     },
     "securitySchemes": {
       "api_key": {
-        "bearerFormat": "AccessToken",
+        "type": "http",
         "scheme": "bearer",
-        "type": "http"
-      }
-    }
-  },
-  "info": {
-    "description": "You are currently running Kamu CLI in the API server mode. For a fully-featured\nserver consider using [Kamu Node](https://docs.kamu.dev/node/).\n\n## Auth\nSome operation require an **API token**. Pass `--get-token` command line argument\nfor CLI to generate a token for you.\n\n## Resources\n- [Documentation](https://docs.kamu.dev)\n- [Discord](https://discord.gg/nU6TXRQNXC)\n- [Other protocols](https://docs.kamu.dev/node/protocols/)\n- [Open Data Fabric specification](https://docs.kamu.dev/odf/)\n",
-    "license": {
-      "name": "BSL",
-      "url": "https://docs.kamu.dev/license/"
-    },
-    "termsOfService": "https://docs.kamu.dev/terms-of-service/",
-    "title": "Kamu REST API",
-    "version": "0.267.0"
-  },
-  "openapi": "3.1.0",
-  "paths": {
-    "/accounts/me": {
-      "get": {
-        "operationId": "account_handler",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccountResponse"
-                }
-              }
-            },
-            "description": ""
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get account information",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/datasets/{id}": {
-      "get": {
-        "operationId": "dataset_info_handler",
-        "parameters": [
-          {
-            "description": "Dataset ID",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DatasetInfoResponse"
-                }
-              }
-            },
-            "description": ""
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get dataset info by ID",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/info": {
-      "get": {
-        "operationId": "node_info_handler",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NodeInfoResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get ODF node description",
-        "tags": [
-          "odf-core"
-        ]
-      }
-    },
-    "/odata/{account_name}": {
-      "get": {
-        "operationId": "odata_service_handler_mt",
-        "parameters": [
-          {
-            "description": "Account name",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "OData root service description",
-        "tags": [
-          "kamu-odata"
-        ]
-      }
-    },
-    "/odata/{account_name}/$metadata": {
-      "get": {
-        "operationId": "odata_metadata_handler_mt",
-        "parameters": [
-          {
-            "description": "Account name",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "OData service metadata",
-        "tags": [
-          "kamu-odata"
-        ]
-      }
-    },
-    "/odata/{account_name}/{dataset_name}": {
-      "get": {
-        "operationId": "odata_collection_handler_mt",
-        "parameters": [
-          {
-            "description": "Account name",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Dataset name",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "OData collection",
-        "tags": [
-          "kamu-odata"
-        ]
-      }
-    },
-    "/platform/file/upload/prepare": {
-      "post": {
-        "operationId": "file_upload_prepare_post_handler",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "fileName",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "contentLength",
-            "required": true,
-            "schema": {
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "contentType",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UploadContext"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Prepare file upload",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/platform/file/upload/{upload_token}": {
-      "get": {
-        "operationId": "file_upload_get_handler",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "upload_token",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": "file content"
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get file from temporary storage",
-        "tags": [
-          "kamu"
-        ]
-      },
-      "post": {
-        "operationId": "file_upload_post_handler",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "upload_token",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "items": {
-                  "format": "int32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "type": "array"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UploadContext"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Upload a file to temporary storage",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/platform/login": {
-      "post": {
-        "operationId": "login_handler",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequestBody"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoginResponseBody"
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {}
-        ],
-        "summary": "Authenticate with the node",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/platform/token/device": {
-      "post": {
-        "operationId": "token_device_handler",
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/DeviceAccessTokenRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceAccessTokenResponse"
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceAccessTokenError"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Polling to obtain a token for the device",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/platform/token/device/authorization": {
-      "post": {
-        "operationId": "token_device_authorization_handler",
-        "requestBody": {
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/DeviceAuthorizationRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeviceAuthorizationResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Authorization of a device",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/platform/token/validate": {
-      "get": {
-        "operationId": "token_validate_handler",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": ""
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Validate auth token",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/query": {
-      "get": {
-        "description": "Functions exactly like the [POST version](#tag/odf-query/POST/query) of the\nendpoint with all parameters passed in the query string instead of the body.",
-        "operationId": "query_handler",
-        "parameters": [
-          {
-            "description": "Query to execute (e.g. SQL)",
-            "example": "select 1",
-            "in": "query",
-            "name": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Dialect of the query",
-            "in": "query",
-            "name": "queryDialect",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Number of leading records to skip when returning result (used for\npagination)",
-            "in": "query",
-            "name": "skip",
-            "required": false,
-            "schema": {
-              "format": "int64",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          {
-            "description": "Maximum number of records to return (used for pagination)",
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "format": "int64",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          {
-            "description": "How the output data should be encoded",
-            "in": "query",
-            "name": "dataFormat",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/DataFormat"
-            }
-          },
-          {
-            "description": "How to encode the schema of the result",
-            "in": "query",
-            "name": "schemaFormat",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/SchemaFormat"
-            }
-          },
-          {
-            "description": "What information to include in the response",
-            "in": "query",
-            "name": "include",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueryResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Execute a batch query",
-        "tags": [
-          "odf-query"
-        ]
-      },
-      "post": {
-        "description": "### Regular Queries\nThis endpoint lets you execute arbitrary SQL that can access multiple\ndatasets at once.\n\nExample request body:\n```json\n{\n    \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n    \"limit\": 3,\n    \"queryDialect\": \"SqlDataFusion\",\n    \"dataFormat\": \"JsonAoA\",\n    \"schemaFormat\": \"ArrowJson\"\n}\n```\n\nExample response:\n```json\n{\n    \"output\": {\n        \"data\": [\n            [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],\n            [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],\n            [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]\n        ],\n        \"dataFormat\": \"JsonAoA\",\n        \"schema\": {\"fields\": [\"...\"]},\n        \"schemaFormat\": \"ArrowJson\"\n    }\n}\n```\n\n### Verifiable Queries\n[Cryptographic proofs](https://docs.kamu.dev/node/commitments) can be\nalso requested to hold the node **forever accountable** for the provided\nresult.\n\nExample request body:\n```json\n{\n    \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n    \"limit\": 3,\n    \"queryDialect\": \"SqlDataFusion\",\n    \"dataFormat\": \"JsonAoA\",\n    \"schemaFormat\": \"ArrowJson\",\n    \"include\": [\"proof\"]\n}\n```\n\nCurrently, we support verifiability by ensuring that queries are\ndeterministic and fully reproducible and signing the original response with\nNode's private key. In future more types of proofs will be supported.\n\nExample response:\n```json\n{\n    \"input\": {\n        \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n        \"queryDialect\": \"SqlDataFusion\",\n        \"dataFormat\": \"JsonAoA\",\n        \"include\": [\"Input\", \"Proof\", \"Schema\"],\n        \"schemaFormat\": \"ArrowJson\",\n        \"datasets\": [{\n            \"id\": \"did:odf:fed0119d20360650afd3d412c6b11529778b784c697559c0107d37ee5da61465726c4\",\n            \"alias\": \"kamu/eth-to-usd\",\n            \"blockHash\": \"f1620708557a44c88d23c83f2b915abc10a41cc38d2a278e851e5dc6bb02b7e1f9a1a\"\n        }],\n        \"skip\": 0,\n        \"limit\": 3\n    },\n    \"output\": {\n        \"data\": [\n            [\"2024-09-02T21:50:00Z\", \"eth\", \"usd\", 2537.07],\n            [\"2024-09-02T21:51:00Z\", \"eth\", \"usd\", 2541.37],\n            [\"2024-09-02T21:52:00Z\", \"eth\", \"usd\", 2542.66]\n        ],\n        \"dataFormat\": \"JsonAoA\",\n        \"schema\": {\"fields\": [\"...\"]},\n        \"schemaFormat\": \"ArrowJson\"\n    },\n    \"subQueries\": [],\n    \"commitment\": {\n        \"inputHash\": \"f1620e23f7d8cdde7504eadb86f3cdf34b3b1a7d71f10fe5b54b528dd803387422efc\",\n        \"outputHash\": \"f1620e91f4d3fa26bc4ca0c49d681c8b630550239b64d3cbcfd7c6c2d6ff45998b088\",\n        \"subQueriesHash\": \"f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210\"\n    },\n    \"proof\": {\n        \"type\": \"Ed25519Signature2020\",\n        \"verificationMethod\": \"did:key:z6MkkhJQPHpA41mTPLFgBeygnjeeADUSwuGDoF9pbGQsfwZp\",\n        \"proofValue\": \"uJfY3_g03WbmqlQG8TL-WUxKYU8ZoJaP14MzOzbnJedNiu7jpoKnCTNnDI3TYuaXv89vKlirlGs-5AN06mBseCg\"\n    }\n}\n```\n\nA client that gets a proof in response should\nperform [a few basic steps](https://docs.kamu.dev/node/commitments#response-validation) to validate\nthe proof integrity. For example making sure that the DID in\n`proof.verificationMethod` actually corresponds to the node you're querying\ndata from and that the signature in `proof.proofValue` is actually valid.\nOnly after this you can use this proof to hold the node accountable for the\nresult.\n\nA proof can be stored long-term and then disputed at a later point using\nyour own node or a 3rd party node you can trust via the\n[`/verify`](#tag/odf-query/POST/verify) endpoint.\n\nSee [commitments documentation](https://docs.kamu.dev/node/commitments) for details.",
-        "operationId": "query_handler_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueryRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueryResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Execute a batch query",
-        "tags": [
-          "odf-query"
-        ]
-      }
-    },
-    "/sign/eip712": {
-      "post": {
-        "description": "This endpoint authorizes that the caller has signing permissions for a\nspecified managed key and signs the message with it.\n\nThe optional `includeNodeProof` flag is used to additionally sign the\nresulting signature with the node's own secp256k1 key, allowing for on-chain\nverification.",
-        "operationId": "sign_eip712_handler",
-        "parameters": [
-          {
-            "description": "DID of the managed key to sign with",
-            "in": "query",
-            "name": "key",
-            "required": true,
-            "schema": {
-              "examples": [
-                "did:odf:fed01a561ed291d9c38b6a561ed291d9c38b63017d606c75606006bfe2508acbc4c25"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "description": "Include a node proof over the resulting signature",
-            "in": "query",
-            "name": "includeNodeProof",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Eip712TypedData"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SignEip712Response"
-                }
-              }
-            },
-            "description": ""
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Sign EIP-712 typed data",
-        "tags": [
-          "odf-sign"
-        ]
-      }
-    },
-    "/verify": {
-      "post": {
-        "description": "A query proof can be stored long-term and then disputed at a later point\nusing this endpoint.\n\nExample request:\n```json\n{\n    \"input\": {\n        \"query\": \"select event_time, from, to, close from \\\"kamu/eth-to-usd\\\"\",\n        \"queryDialect\": \"SqlDataFusion\",\n        \"dataFormat\": \"JsonAoA\",\n        \"include\": [\"Input\", \"Proof\", \"Schema\"],\n        \"schemaFormat\": \"ArrowJson\",\n        \"datasets\": [{\n            \"id\": \"did:odf:fed0..26c4\",\n            \"alias\": \"kamu/eth-to-usd\",\n            \"blockHash\": \"f162..9a1a\"\n        }],\n        \"skip\": 0,\n        \"limit\": 3\n    },\n    \"subQueries\": [],\n    \"commitment\": {\n        \"inputHash\": \"f162..2efc\",\n        \"outputHash\": \"f162..b088\",\n        \"subQueriesHash\": \"f162..d210\"\n    },\n    \"proof\": {\n        \"type\": \"Ed25519Signature2020\",\n        \"verificationMethod\": \"did:key:z6Mk..fwZp\",\n        \"proofValue\": \"uJfY..seCg\"\n    }\n}\n```\n\nExample response:\n```json\n{\n    \"ok\": false,\n    \"error\": {\n        \"kind\": \"VerificationFailed::OutputMismatch\",\n        \"actual_hash\": \"f162..c12a\",\n        \"expected_hash\": \"f162..2a2d\",\n        \"message\": \"Query was reproduced but resulted in output hash different from expected.\n                    This means that the output was either falsified, or the query\n                    reproducibility was not guaranteed by the system.\",\n    }\n}\n```\n\nSee [commitments documentation](https://docs.kamu.dev/node/commitments) for details.",
-        "operationId": "verify_handler",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/VerifyRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "examples": {
-                  "Invalid commitment": {
-                    "value": {
-                      "error": {
-                        "kind": "InvalidRequest::BadSignature",
-                        "message": "The commitment is invalid and cannot be disputed: bad signature"
-                      },
-                      "ok": false
-                    }
-                  },
-                  "Success": {
-                    "summary": "Verified successfully",
-                    "value": {
-                      "ok": true
-                    }
-                  },
-                  "Verification fail": {
-                    "value": {
-                      "error": {
-                        "actual_hash": "f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7",
-                        "expected_hash": "f162080084bf2fba02475726feb2cab2d8215eab14bc6bdd8bfb2c8151257032ecd8b",
-                        "kind": "VerificationFailed::OutputMismatch",
-                        "message": "Query was reproduced but resulted in output hash different from expected. This means that the output was either falsified, or the query reproducibility was not guaranteed by the system."
-                      },
-                      "ok": false
-                    }
-                  }
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/VerifyResponse"
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Verify query commitment",
-        "tags": [
-          "odf-query"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/blocks/{block_hash}": {
-      "get": {
-        "operationId": "dataset_blocks_handler",
-        "parameters": [
-          {
-            "description": "Hash of the block",
-            "in": "path",
-            "name": "block_hash",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": "block content"
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get block by hash",
-        "tags": [
-          "odf-transfer"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/checkpoints/{physical_hash}": {
-      "get": {
-        "operationId": "dataset_checkpoints_get_handler",
-        "parameters": [
-          {
-            "description": "Physical hash of the block",
-            "in": "path",
-            "name": "physical_hash",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": "checkpoint file content"
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get checkpoint by hash",
-        "tags": [
-          "odf-transfer"
-        ]
-      },
-      "put": {
-        "operationId": "dataset_checkpoints_put_handler",
-        "parameters": [
-          {
-            "description": "Physical hash of the block",
-            "in": "path",
-            "name": "physical_hash",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "items": {
-                  "format": "int32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "type": "array"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Upload checkpoint",
-        "tags": [
-          "odf-transfer"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/data/{physical_hash}": {
-      "get": {
-        "operationId": "dataset_data_get_handler",
-        "parameters": [
-          {
-            "description": "Physical hash of the block",
-            "in": "path",
-            "name": "physical_hash",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/octet-stream": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": "data file content"
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get data slice by hash",
-        "tags": [
-          "odf-transfer"
-        ]
-      },
-      "put": {
-        "operationId": "dataset_data_put_handler",
-        "parameters": [
-          {
-            "description": "Physical hash of the block",
-            "in": "path",
-            "name": "physical_hash",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "items": {
-                  "format": "int32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "type": "array"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Upload data slice",
-        "tags": [
-          "odf-transfer"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/ingest": {
-      "post": {
-        "operationId": "dataset_ingest_handler",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "sourceName",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "uploadToken",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "items": {
-                  "format": "int32",
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "type": "array"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Push data ingestion",
-        "tags": [
-          "kamu"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/metadata": {
-      "get": {
-        "operationId": "dataset_metadata_handler",
-        "parameters": [
-          {
-            "description": "What information to include in response",
-            "in": "query",
-            "name": "include",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Format to return the schema in",
-            "in": "query",
-            "name": "schemaFormat",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/SchemaFormat"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DatasetMetadataResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Access dataset metadata chain",
-        "tags": [
-          "odf-query"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/pull": {
-      "get": {
-        "operationId": "dataset_pull_ws_upgrade_handler",
-        "parameters": [
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Initiate pull via Smart Transfer Protocol",
-        "tags": [
-          "odf-transfer"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/push": {
-      "get": {
-        "operationId": "dataset_push_ws_upgrade_handler",
-        "parameters": [
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "default": null
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Initiate push via Smart Transfer Protocol",
-        "tags": [
-          "odf-transfer"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/refs/{reference}": {
-      "get": {
-        "operationId": "dataset_refs_handler",
-        "parameters": [
-          {
-            "description": "Name of the reference",
-            "in": "path",
-            "name": "reference",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get named block reference",
-        "tags": [
-          "odf-transfer"
-        ]
-      }
-    },
-    "/{account_name}/{dataset_name}/tail": {
-      "get": {
-        "operationId": "dataset_tail_handler",
-        "parameters": [
-          {
-            "description": "Number of leading records to skip when returning result (used for\npagination)",
-            "in": "query",
-            "name": "skip",
-            "required": false,
-            "schema": {
-              "format": "int64",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          {
-            "description": "Maximum number of records to return (used for pagination)",
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "format": "int64",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          {
-            "description": "How the output data should be encoded",
-            "in": "query",
-            "name": "dataFormat",
-            "required": false,
-            "schema": {
-              "$ref": "#/components/schemas/DataFormat"
-            }
-          },
-          {
-            "description": "How to encode the schema of the result",
-            "in": "query",
-            "name": "schemaFormat",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/SchemaFormat"
-            }
-          },
-          {
-            "description": "Name of the account",
-            "in": "path",
-            "name": "account_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "description": "Name of the dataset",
-            "in": "path",
-            "name": "dataset_name",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DatasetTailResponse"
-                }
-              }
-            },
-            "description": ""
-          }
-        },
-        "security": [
-          {},
-          {
-            "api_key": []
-          }
-        ],
-        "summary": "Get a sample of latest events",
-        "tags": [
-          "odf-query"
-        ]
+        "bearerFormat": "AccessToken"
       }
     }
   },
   "tags": [
     {
-      "description": "Core ODF APIs.\n\n[Open Data Fabric](https://docs.kamu.dev/odf/) (ODF) is a specification for\nopen data formats and protocols for interoperable data exchange and processing.\nKamu is just one possible implementation of this spec. APIs in this group are\npart of the spec and thus should be supported by most ODF implementations.\n",
-      "name": "odf-core"
+      "name": "odf-core",
+      "description": "Core ODF APIs.\n\n[Open Data Fabric](https://docs.kamu.dev/odf/) (ODF) is a specification for\nopen data formats and protocols for interoperable data exchange and processing.\nKamu is just one possible implementation of this spec. APIs in this group are\npart of the spec and thus should be supported by most ODF implementations.\n"
     },
     {
-      "description": "ODF Data Transfer APIs.\n\nThis group includes two main protocols:\n\n- [Simple Transfer Protocol](https://docs.kamu.dev/odf/spec/#simple-transfer-protocol)\n(SiTP) is a bare-minimum read-only protocol used for synchronizing datasets between\nrepositories. It is simple to implement and support, but accesses metadata blocks and\nother dataset components on individual object basis which may be inefficient for\nlarge datasets.\n\n- [Smart Transfer Protocol](https://docs.kamu.dev/odf/spec/#smart-transfer-protocol)\n(SmTP) is an extension of SiTP that adds efficient batch transfer of small objects,\ncompression, and can proxy reads and writes of large objects directly to underlying\nstorage.\n",
-      "name": "odf-transfer"
+      "name": "odf-transfer",
+      "description": "ODF Data Transfer APIs.\n\nThis group includes two main protocols:\n\n- [Simple Transfer Protocol](https://docs.kamu.dev/odf/spec/#simple-transfer-protocol)\n(SiTP) is a bare-minimum read-only protocol used for synchronizing datasets between\nrepositories. It is simple to implement and support, but accesses metadata blocks and\nother dataset components on individual object basis which may be inefficient for\nlarge datasets.\n\n- [Smart Transfer Protocol](https://docs.kamu.dev/odf/spec/#smart-transfer-protocol)\n(SmTP) is an extension of SiTP that adds efficient batch transfer of small objects,\ncompression, and can proxy reads and writes of large objects directly to underlying\nstorage.\n"
     },
     {
-      "description": "ODF Data Query APIs.\n\nAPIs in this group allow to query data and metadata of datasets and generate\ncryptographic proofs for the results.\n",
-      "name": "odf-query"
+      "name": "odf-query",
+      "description": "ODF Data Query APIs.\n\nAPIs in this group allow to query data and metadata of datasets and generate\ncryptographic proofs for the results.\n"
     },
     {
-      "description": "General Node APIs.\n\nAPIs in this group are either Kamu-specific or are experimental before they\nare included into ODF spec.\n",
-      "name": "kamu"
+      "name": "kamu",
+      "description": "General Node APIs.\n\nAPIs in this group are either Kamu-specific or are experimental before they\nare included into ODF spec.\n"
     },
     {
-      "description": "OData Adapter.\n\nThis group f APIs represente an [OData](https://learn.microsoft.com/en-us/odata/overview)\nprotocol adapter on top of the ODF query API. See\n[datafusion-odata](https://github.com/kamu-data/datafusion-odata/) library for details\non what parts of the OData protocol are currently supported.\n",
-      "name": "kamu-odata"
+      "name": "kamu-odata",
+      "description": "OData Adapter.\n\nThis group f APIs represente an [OData](https://learn.microsoft.com/en-us/odata/overview)\nprotocol adapter on top of the ODF query API. See\n[datafusion-odata](https://github.com/kamu-data/datafusion-odata/) library for details\non what parts of the OData protocol are currently supported.\n"
     }
   ]
 }

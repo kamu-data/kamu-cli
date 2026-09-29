@@ -49,6 +49,13 @@ deny = [
     { name = "tonic", deny-multiple-versions = true },
 ]
 
+# datafusion-physical-plan v55 unconditionally enables this, which changes
+# serde_json::Map to IndexMap process-wide. Should use explicit IndexMap types
+# instead of a process-wide side-effect.
+[[bans.features]]
+crate = "serde_json"
+deny = ["preserve_order"]
+
 
 [licenses]
 allow = [

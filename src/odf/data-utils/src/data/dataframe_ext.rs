@@ -300,6 +300,13 @@ impl DataFrameExt {
         self.select(columns)
     }
 
+    pub fn columns_sorted(self) -> Self {
+        let mut columns = self.schema().columns();
+        columns.sort();
+        let exprs = columns.into_iter().map(Expr::Column).collect();
+        self.select(exprs).unwrap()
+    }
+
     pub fn without_columns(self, cols: &[&str]) -> Result<Self> {
         let columns: Vec<_> = self
             .schema()

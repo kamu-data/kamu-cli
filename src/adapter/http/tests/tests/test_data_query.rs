@@ -301,7 +301,7 @@ async fn test_data_query_handler_success() {
                     "limit": 100,
                     "datasets": [{
                         "alias": "kamu-server/population",
-                        "blockHash": "f1620efdd11877825ad5f30fce4fb64a130e3d6273ea8fc81d72507c59081cc1d430e",
+                        "blockHash": "f162057336ddc3f97bf1a2c2f75d27e72e9b4a5b4c37c42c6b038c0af33ce975dfde6",
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
                     }],
                 },
@@ -316,14 +316,14 @@ async fn test_data_query_handler_success() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f16207ec84999fec29898a304aab4c4990bff33e455a409c0c2958894ecb87717dc6a",
+                    "inputHash": "f162097e67d5c5e7865095e4ac9e5ba58e304f3807b29dd51d9d6cb4cda5b1bfb591f",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uu5cFSKBj004FnB-e4dRajWz5q6loJDMMH-2_WwilhJarqBnwm0urFzZKVTk5OYzUMz75sukMjb5u8A--aR5tDg",
+                    "proofValue": "uaMRirt1YItFmw_Rab5knmKlw6KhyDdQh5W1ZfN_MmK2wxTYpxMLrI_IKVdSQa8S5tVvaVrk9gLocDjGBoAhkAw",
                 }
             }),
             response
@@ -461,7 +461,7 @@ async fn test_data_verify_handler() {
                     "limit": 100,
                     "datasets": [{
                         "alias": "kamu-server/population",
-                        "blockHash": "f1620efdd11877825ad5f30fce4fb64a130e3d6273ea8fc81d72507c59081cc1d430e",
+                        "blockHash": "f162057336ddc3f97bf1a2c2f75d27e72e9b4a5b4c37c42c6b038c0af33ce975dfde6",
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
                     }],
                 },
@@ -474,14 +474,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620ef74430b1ad8916e80c148f7a9e8815ca702610a2655971b2f9852f00d5caa31",
+                    "inputHash": "f1620a655fb882e6cd0055c765c4afe92ce6532b186e365495698c012a3b93f9fd2e8",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "u43jJXaMAJCmMzZ0SL2HBQloggw5PQzOnG7gCPTZAoJKCtAx-mrhSmqtWna676x3gm09_b0V7_Qb8zcca8nuABg",
+                    "proofValue": "umIAWvDyvieUjULtvnDggAoKU5naiNp1z6M2DFjIzXLohj5cmvGuAGwrtiWgOez3Fc4rMpliNkyajh45WHqOiDQ",
                 }
             }),
             response
@@ -774,6 +774,7 @@ async fn test_data_query_handler_error_sql_missing_column() {
         pretty_assertions::assert_eq!(
             json!({
                 "message": "No field named offzet. \
+                    Did you mean '\"kamu-server/population\".offset'?\n\
                     Valid fields are \"kamu-server/population\".offset, \
                     \"kamu-server/population\".op, \"kamu-server/population\".system_time, \
                     \"kamu-server/population\".event_time, \"kamu-server/population\".city, \

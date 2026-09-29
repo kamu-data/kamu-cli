@@ -7,10 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::common::DFSchema;
+use datafusion::common::{DFSchema, TableReference};
 use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
-use datafusion::sql::TableReference;
 use internal_error::*;
 use odf::utils::data::DataFrameExt;
 

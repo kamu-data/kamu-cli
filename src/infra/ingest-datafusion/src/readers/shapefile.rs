@@ -251,6 +251,9 @@ impl Reader for ReaderEsriShapefile {
         .await
         .int_err()??;
 
-        self.inner.read(&temp_json_path).await
+        self.inner
+            .read(&temp_json_path)
+            .await
+            .map(DataFrameExt::columns_sorted)
     }
 }
