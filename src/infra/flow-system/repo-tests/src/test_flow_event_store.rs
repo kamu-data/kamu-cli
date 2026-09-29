@@ -2186,6 +2186,64 @@ pub async fn test_flows_due_for_activation(catalog: &Catalog) {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flow_stays_due_after_rejected_save(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let start_moment = Utc::now().trunc_subsecs(6);
+    let activation_moment = start_moment + Duration::minutes(1);
+
+    let flow_id = event_store.new_flow_id().await.unwrap();
+    let last_event_id = schedule_flow_for_activation(
+        event_store.as_ref(),
+        flow_id,
+        b"foo",
+        start_moment,
+        activation_moment,
+    )
+    .await;
+
+    // Scheduling a task based on a stale version of the flow
+    let stale_event_id = EventID::new(i64::from(last_event_id) - 1);
+    let res = event_store
+        .save_events(
+            &flow_id,
+            Some(stale_event_id),
+            vec![
+                FlowEventTaskScheduled {
+                    flow_id,
+                    flow_binding: ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(
+                        b"foo",
+                    )),
+                    event_time: activation_moment,
+                    task_id: TaskID::new(1),
+                }
+                .into(),
+            ],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // The rejected save left the flow waiting for its activation
+    assert_eq!(
+        event_store.nearest_flow_activation_moment().await.unwrap(),
+        Some(activation_moment)
+    );
+    assert_eq!(
+        event_store
+            .get_flows_due_for_activation(activation_moment)
+            .await
+            .unwrap(),
+        vec![DueFlowActivation {
+            flow_id,
+            activation_time: activation_moment,
+        }]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn schedule_flow_for_activation(
     event_store: &dyn FlowEventStore,
     flow_id: FlowID,

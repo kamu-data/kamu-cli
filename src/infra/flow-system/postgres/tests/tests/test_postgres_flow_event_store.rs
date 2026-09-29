@@ -285,6 +285,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_event_store::test_flow_stays_due_after_rejected_save,
+    harness = PostgresFlowEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = kamu_flow_system_repo_tests::test_flow_event_store::test_get_all_scope_pending_flows,
     harness = PostgresFlowEventStoreHarness
 );

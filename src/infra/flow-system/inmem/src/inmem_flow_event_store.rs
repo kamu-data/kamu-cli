@@ -368,7 +368,13 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
 
         let schedules_activation = events.iter().any(Self::schedules_activation);
 
-        // Update in-memory indexes
+        // Save events to this store
+        self.inner
+            .save_events(query, maybe_prev_stored_event_id, events.clone())
+            .await?;
+
+        // Update in-memory indexes only once the save passed the concurrent
+        // modification check, as a rejected save must leave them intact
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
@@ -376,11 +382,6 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
                 Self::update_index(&mut g, event);
             }
         }
-
-        // Save events to this store
-        self.inner
-            .save_events(query, maybe_prev_stored_event_id, events)
-            .await?;
 
         // Save merged events to FlowSystemEventStore
         let global_event_id = self
