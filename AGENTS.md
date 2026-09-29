@@ -101,6 +101,18 @@ Repo-local skills live in `.agents/skills/`. Load them only when the task matche
 - `.agents/skills/kamu-datafusion-upgrade-workflows`: DataFusion, Arrow, Object Store, Parquet, and related query-engine dependency upgrades.
 - `.agents/skills/kamu-jupyter-demo-release-workflows`: Jupyter demo, rustfs, and multi-platform demo image release workflows.
 
+## Design Documents
+
+Architecture docs live in `docs/internal/`. Read the relevant one before changing that area, and
+update it when the change invalidates what it says:
+
+- `docs/internal/outbox.md`: posting messages, adding message types or consumers, consumption modes,
+  the outbox agent, delivery ordering by transaction ID.
+- `docs/internal/wakeup-listeners.md`: how background agents (outbox, flow system events, task, flow)
+  wake up, Postgres `LISTEN`/`NOTIFY` triggers, SQLite polling, deadline-driven waits.
+- `docs/internal/resources-framework.md`: the declarative resources subsystem; its companions
+  `resources-anatomy.md` (authored vs generated fields) and `resources-label-filtering.md`.
+
 Reusable sub-agent role descriptions for Rust build/test delegation live in
 `.claude/agents/rust-builder.md` and `.claude/agents/rust-tester.md`; treat
 those files as the canonical role prompts instead of duplicating them elsewhere.
@@ -109,4 +121,3 @@ those files as the canonical role prompts instead of duplicating them elsewhere.
 
 - Keep this file short and repo-specific.
 - Do not edit `DEVELOPER.md` for agent guidance extraction; it is the stable human developer guide.
-- Keep `.github/copilot-instructions.md` usable for Copilot users that cannot load Codex skills.

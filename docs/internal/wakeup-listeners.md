@@ -58,8 +58,8 @@ idle — noisy for the database and for telemetry. Wakeup listeners replace that
 "sleep until something might have changed", keeping a slow fallback timeout as a safety net.
 
 In scope: the `WakeupListener` abstraction, the hubs behind it, its three storage implementations, the Postgres triggers that feed
-it, and how the four agents use it. Out of scope: what the agents do once awake (outbox routing,
-flow projections, task execution).
+it, and how the four agents use it. Out of scope: what the agents do once awake (outbox routing —
+see [outbox.md](outbox.md), flow projections, task execution).
 
 ---
 
