@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_task_system::TaskQueueWakeupSource;
+use kamu_task_system::{TASK_AGENT_NAME, TaskQueueWakeupSource};
 use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
 use wakeup_listener::{HubWakeupListener, WakeupListener};
 
@@ -47,7 +47,11 @@ impl SqliteTaskQueueWakeupSource {
 
 impl TaskQueueWakeupSource for SqliteTaskQueueWakeupSource {
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
-        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            POLLING_CHANNEL,
+            TASK_AGENT_NAME,
+        ))
     }
 }
 

@@ -13,7 +13,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_messaging_outbox_sqlite::SqliteOutboxMessageBridge;
 use kamu_wakeup_listener_sqlite::SqlitePollingHub;
 use sqlx::SqlitePool;
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,6 +85,7 @@ impl SqliteOutboxMessageBridgeHarness {
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteOutboxMessageBridge>();
         catalog_builder.add::<SqlitePollingHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
         catalog_builder.add_value(WakeupListenerConfig::local_default());
 
         Self {

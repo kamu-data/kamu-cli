@@ -14,6 +14,14 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- Prometheus metrics for background agents, with recommended alerts in `docs/internal/metrics.md`:
+  - `wakeup_listener_last_wait_timestamp_seconds`: heartbeat of every wakeup-driven agent's loop, recorded by
+    the shared wakeup listener, labelled by agent
+  - task agent: task duration by outcome (also counting finished tasks), queue wait, running task start time
+  - flow agent: activations by outcome, activation delay
+  - flows: duration and retries of completed flows by outcome (also counting them), aborted flows
+  - flow system event agent: projector failing state
 ### Changed
 - Task agent no longer polls the task queue when idle:
   - Postgres: tasks table notifies the agent via NOTIFY/LISTEN when a task is created or requeued
@@ -42,12 +50,14 @@ Recommendation: for ease of reading, use the following format:
   Postgres listeners share a single `LISTEN` connection via `PostgresNotificationHub`, instead of one each.
   SQLite listeners share a single polling loop via `SqlitePollingHub`, with one connection acquire per tick
   and a common backoff, instead of a polling timer each.
-  In-memory stores signal channels through `InMemoryWakeupHub`, and every consumer creates its own listener
-  handle (`new_wakeup_listener()`), so several consumers can watch the same changes.
+  In-memory stores signal channels through `InMemoryWakeupHub`, and every agent creates its own listener
+  handle (`new_wakeup_listener()`), so several listeners can watch the same changes.
   Architecture is documented in `docs/internal/wakeup-listeners.md`
 ### Fixed
 - Flow agent: a flow failing to activate no longer blocks activation of flows scheduled after it,
   and its partial writes (task, flow events) are rolled back instead of committed
+- In-memory flow system event store: a projector that failed to apply a batch of events no longer
+  skips those events on the next attempt
 
 ## [0.267.0] - 2026-09-19
 ### Added

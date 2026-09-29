@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_flow_system::FlowActivationWakeupSource;
+use kamu_flow_system::{FLOW_AGENT_NAME, FlowActivationWakeupSource};
 use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
 use wakeup_listener::{HubWakeupListener, WakeupListener};
 
@@ -53,7 +53,11 @@ impl SqliteFlowActivationWakeupSource {
 
 impl FlowActivationWakeupSource for SqliteFlowActivationWakeupSource {
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
-        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            POLLING_CHANNEL,
+            FLOW_AGENT_NAME,
+        ))
     }
 }
 

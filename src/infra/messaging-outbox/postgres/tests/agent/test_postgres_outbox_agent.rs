@@ -20,7 +20,7 @@ use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tokio::time::{Duration, Instant};
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -193,6 +193,7 @@ impl PostgresOutboxAgentHarness {
         b.add::<PostgresTransactionManager>();
         b.add::<PostgresOutboxMessageBridge>();
         b.add::<PostgresNotificationHub>();
+        b.add::<WakeupListenerMetrics>();
 
         b.add::<OutboxAgentMetrics>();
         b.add::<OutboxAgentImpl>();

@@ -13,6 +13,8 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const OUTBOX_AGENT_NAME: &str = "dev.kamu.utils.messaging.OutboxAgent";
+
 #[async_trait::async_trait]
 pub trait OutboxAgent: BackgroundAgent + InitOnStartup {
     async fn run_while_has_tasks(&self) -> Result<(), InternalError>;

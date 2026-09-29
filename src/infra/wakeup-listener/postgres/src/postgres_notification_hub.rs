@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use sqlx::postgres::PgListener;
 use tokio::sync::Notify;
-use wakeup_listener::{WakeupHub, WakeupSubscribers};
+use wakeup_listener::{WakeupHub, WakeupListenerMetrics, WakeupSubscribers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +35,7 @@ pub struct PostgresNotificationHub {
     inner: Arc<HubInner>,
     // Spawned on the first subscription: DI may build the hub outside a runtime
     task: OnceLock<tokio::task::AbortHandle>,
+    metrics: Arc<WakeupListenerMetrics>,
 }
 
 struct HubInner {
@@ -47,13 +48,14 @@ struct HubInner {
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
 impl PostgresNotificationHub {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
+    pub fn new(pool: Arc<sqlx::PgPool>, metrics: Arc<WakeupListenerMetrics>) -> Self {
         Self {
             inner: Arc::new(HubInner {
                 pool,
                 subscribers: WakeupSubscribers::new(),
             }),
             task: OnceLock::new(),
+            metrics,
         }
     }
 }
@@ -68,6 +70,10 @@ impl WakeupHub for PostgresNotificationHub {
         self.task
             .get_or_init(|| tokio::spawn(self.inner.clone().run()).abort_handle());
         slot
+    }
+
+    fn metrics(&self) -> &WakeupListenerMetrics {
+        &self.metrics
     }
 }
 

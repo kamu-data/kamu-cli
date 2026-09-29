@@ -17,8 +17,10 @@ use crate::FlowSystemEvent;
 
 #[async_trait::async_trait]
 pub trait FlowSystemEventBridge: Send + Sync {
-    /// Creates a listener handle for one consumer, which keeps it for its
-    /// lifetime: handles are cheap, but a shared one would lose wakeups
+    /// Creates a listener handle for the flow system event agent, which keeps
+    /// it for its lifetime: handles are cheap, but a shared one would lose
+    /// wakeups. Its wait metrics are labelled with the flow system event
+    /// agent's name
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 
     /// Fetch next batch for the given projector; order by global id.

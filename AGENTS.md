@@ -26,7 +26,9 @@ Small project-specific guidance for coding agents working in this repository.
 
 - Run `cargo fmt` after edits.
 - Run `make clippy` before considering the task finished.
-- Treat Clippy warnings as errors to fix, not to ignore.
+- Treat Clippy warnings as errors to fix, not to ignore. Never silence them with
+  `#[allow(clippy::...)]` or `#[expect(...)]`: a pragma hides the potential problem instead of
+  resolving it. If a lint seems genuinely wrong for a case, ask before suppressing it.
 - Prefer full workspace incremental commands over narrowing by package with `-p`;
   this workspace is usually precompiled and package narrowing is often slower for
   builds, tests, and validation commands.
@@ -72,7 +74,15 @@ cargo nextest run -E 'test(test_name_here)'
 
 - Follow existing Rust style and naming in surrounding code.
 - Prefer inline formatting like `format!("value={value}")`.
-- Prefer checked numeric conversions like `usize::try_from(x).unwrap()` when narrowing types.
+- Import items with `use`; never spell out crate paths inline (`b.add::<wakeup_listener::WakeupListenerMetrics>()`,
+  `kamu_flow_system::FLOW_AGENT_NAME`). Qualify a name only to resolve a clash. Exception: app
+  wiring (`src/app/cli/src/app.rs`, `database.rs`) integrates all crates, so it qualifies
+  components explicitly to show where each comes from.
+- Numeric conversions never use `as`:
+  - lossless ones use `From` (`f64::from(x_u32)`, `i64::from(x_i32)`);
+  - narrowing ones are checked (`usize::try_from(x).unwrap()`, or handle the error);
+  - time spans become floats through `chrono::TimeDelta::as_seconds_f64()` or
+    `std::time::Duration::as_secs_f64()`, not `as f64` on integer milliseconds.
 - Respect exact long separator comment style where surrounding files use it.
 - Keep comments concise — one or two lines, never prose poems.
 - Never explain what the code plainly says. If a reader can see it, do not restate it.
@@ -110,6 +120,7 @@ update it when the change invalidates what it says:
   the outbox agent, delivery ordering by transaction ID.
 - `docs/internal/wakeup-listeners.md`: how background agents (outbox, flow system events, task, flow)
   wake up, Postgres `LISTEN`/`NOTIFY` triggers, SQLite polling, deadline-driven waits.
+- `docs/internal/metrics.md`: every exported Prometheus metric, recommended alerts, adding metrics.
 - `docs/internal/resources-framework.md`: the declarative resources subsystem; its companions
   `resources-anatomy.md` (authored vs generated fields) and `resources-label-filtering.md`.
 

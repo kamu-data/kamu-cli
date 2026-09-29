@@ -491,6 +491,7 @@ class "VerifyDatasetUseCaseImpl"
 class "ViewCollectionEntriesUseCaseImpl"
 class "ViewVersionedFileHistoryUseCaseImpl"
 class "WakeupListenerConfig" <<singleton>>
+class "WakeupListenerMetrics" <<singleton>>
 class "Web3AuthEip4361NonceServiceImpl"
 class "WebhooksConfig" <<singleton>>
 class "WorkspaceLayout" <<singleton>>
@@ -1231,6 +1232,7 @@ class "WsSmartTransferProtocolClient"
 "SqliteTaskQueueWakeupSource"  --> "SqlitePollingHub"
 "SqlitePollingHub"  --> "Pool"
 "SqlitePollingHub"  --> "WakeupListenerConfig"
+"SqlitePollingHub"  --> "WakeupListenerMetrics"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"
 "SqliteWebhookDeliveryRepository"  --> "TransactionRefT"
 "WebhookSubscriptionEventStore" <|-- "SqliteWebhookSubscriptionEventStore"
@@ -1261,4 +1263,5 @@ class "WsSmartTransferProtocolClient"
 "DatasetFactoryImpl"  --> "IpfsGateway"
 "DatasetFactoryImpl" "?" --> "S3Metrics"
 "SystemTimeSource" <|-- "SystemTimeSourceDefault"
+"MetricsProvider" <|-- "WakeupListenerMetrics"
 @enduml

@@ -12,7 +12,12 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::EnumDiscriminants)]
+#[strum_discriminants(
+    name(FlowOutcomeKind),
+    derive(strum::IntoStaticStr),
+    strum(serialize_all = "snake_case")
+)]
 pub enum FlowOutcome {
     /// Flow succeeded
     Success(ts::TaskResult),

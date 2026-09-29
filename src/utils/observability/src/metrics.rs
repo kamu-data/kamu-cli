@@ -23,6 +23,21 @@ pub trait MetricsProvider: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Seconds between two moments, for duration metrics; 0 if `to` precedes `from`
+pub fn seconds_between(
+    from: chrono::DateTime<chrono::Utc>,
+    to: chrono::DateTime<chrono::Utc>,
+) -> f64 {
+    (to - from).as_seconds_f64().max(0.0)
+}
+
+/// Unix time in seconds, for timestamp gauges
+pub fn unix_timestamp_seconds(at: chrono::DateTime<chrono::Utc>) -> f64 {
+    seconds_between(chrono::DateTime::UNIX_EPOCH, at)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Uses catalog to extract all [`MetricsProvider`]s and register all provided
 /// metrics in the [`prometheus::Registry`]
 #[cfg(feature = "dill")]

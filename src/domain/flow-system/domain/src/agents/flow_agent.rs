@@ -18,6 +18,8 @@ use crate::RetryPolicy;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const FLOW_AGENT_NAME: &str = "dev.kamu.domain.flow-system.FlowAgent";
+
 #[async_trait::async_trait]
 pub trait FlowAgent: BackgroundAgent {}
 

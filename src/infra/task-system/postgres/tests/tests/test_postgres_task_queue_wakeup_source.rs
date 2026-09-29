@@ -20,7 +20,7 @@ use kamu_task_system::*;
 use kamu_task_system_postgres::{PostgresTaskEventStore, PostgresTaskQueueWakeupSource};
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::PgPool;
-use wakeup_listener::{WakeHint, WakeupListener};
+use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -119,6 +119,7 @@ impl PostgresTaskQueueWakeupHarness {
         catalog_builder.add::<PostgresTaskEventStore>();
         catalog_builder.add::<PostgresTaskQueueWakeupSource>();
         catalog_builder.add::<PostgresNotificationHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
 
         let catalog = catalog_builder.build();
 

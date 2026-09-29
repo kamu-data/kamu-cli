@@ -12,7 +12,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use tokio::sync::Notify;
-use wakeup_listener::{WakeupHub, WakeupListenerConfig, WakeupSubscribers};
+use wakeup_listener::{WakeupHub, WakeupListenerConfig, WakeupListenerMetrics, WakeupSubscribers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,6 +49,7 @@ pub struct SqlitePollingHub {
     inner: Arc<HubInner>,
     // Spawned on the first subscription: DI may build the hub outside a runtime
     task: OnceLock<tokio::task::AbortHandle>,
+    metrics: Arc<WakeupListenerMetrics>,
 }
 
 struct HubInner {
@@ -62,7 +63,11 @@ struct HubInner {
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
 impl SqlitePollingHub {
-    pub fn new(pool: Arc<sqlx::SqlitePool>, config: Arc<WakeupListenerConfig>) -> Self {
+    pub fn new(
+        pool: Arc<sqlx::SqlitePool>,
+        config: Arc<WakeupListenerConfig>,
+        metrics: Arc<WakeupListenerMetrics>,
+    ) -> Self {
         Self {
             inner: Arc::new(HubInner {
                 pool,
@@ -70,6 +75,7 @@ impl SqlitePollingHub {
                 subscribers: WakeupSubscribers::new(),
             }),
             task: OnceLock::new(),
+            metrics,
         }
     }
 }
@@ -88,6 +94,10 @@ impl WakeupHub for SqlitePollingHub {
         self.task
             .get_or_init(|| tokio::spawn(self.inner.clone().run()).abort_handle());
         slot
+    }
+
+    fn metrics(&self) -> &WakeupListenerMetrics {
+        &self.metrics
     }
 }
 

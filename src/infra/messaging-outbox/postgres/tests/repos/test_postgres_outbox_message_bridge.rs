@@ -20,6 +20,7 @@ use messaging_outbox::{
     OutboxMessageBridge,
 };
 use sqlx::PgPool;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -197,6 +198,7 @@ impl PostgresOutboxMessageBridgeHarness {
         catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresOutboxMessageBridge>();
         catalog_builder.add::<PostgresNotificationHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
 
         Self {
             catalog: catalog_builder.build(),

@@ -26,6 +26,7 @@ use kamu_webhooks_services::WebhookSubscriptionQueryServiceImpl;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
 use uuid::Uuid;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -251,6 +252,7 @@ impl FlowControllerWebhookDeliverHarness {
             .add::<InMemoryFlowSystemEventBridge>()
             .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add::<FakeDatasetEntryService>()
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_flow_sensor_dispatcher)

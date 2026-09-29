@@ -13,6 +13,8 @@ use std::sync::Arc;
 
 use tokio::sync::Notify;
 
+use crate::WakeupListenerMetrics;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A per-process source of change signals for a storage backend, shared by
@@ -25,6 +27,9 @@ pub trait WakeupHub: Send + Sync + 'static {
     /// Registers a slot, signaled once the channel is watched and on every
     /// change afterwards. Must be called within a Tokio runtime.
     fn subscribe(&self, channel: Self::Channel) -> Arc<Notify>;
+
+    /// Where listeners report their waits
+    fn metrics(&self) -> &WakeupListenerMetrics;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

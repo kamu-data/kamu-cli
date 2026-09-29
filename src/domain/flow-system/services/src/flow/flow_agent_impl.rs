@@ -27,7 +27,7 @@ use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig};
 
-use crate::{FlowAbortHelper, FlowSchedulingServiceImpl};
+use crate::{FlowAbortHelper, FlowAgentMetrics, FlowCompletionMetrics, FlowSchedulingServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,6 +38,8 @@ pub struct FlowAgentImpl {
     activation_config: Arc<FlowAgentActivationConfig>,
     wakeup_config: Arc<WakeupListenerConfig>,
     flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
+    metrics: Arc<FlowAgentMetrics>,
+    completion_metrics: Arc<FlowCompletionMetrics>,
     state: Arc<Mutex<State>>,
 }
 
@@ -83,6 +85,8 @@ impl FlowAgentImpl {
         activation_config: Arc<FlowAgentActivationConfig>,
         wakeup_config: Arc<WakeupListenerConfig>,
         flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
+        metrics: Arc<FlowAgentMetrics>,
+        completion_metrics: Arc<FlowCompletionMetrics>,
     ) -> Self {
         Self {
             catalog,
@@ -91,6 +95,8 @@ impl FlowAgentImpl {
             activation_config,
             wakeup_config,
             flow_activation_wakeup_source,
+            metrics,
+            completion_metrics,
             state: Arc::new(Mutex::new(State::default())),
         }
     }
@@ -254,8 +260,16 @@ impl FlowAgentImpl {
                 self.activation_config.concurrency.get(),
                 |(flow, activation_time)| {
                     let flow_id = flow.flow_id;
+                    let flow_type = flow.flow_binding.flow_type.clone();
                     async move {
-                        match self.activate_flow(flow, activation_time).await {
+                        let result = self.activate_flow(flow, activation_time).await;
+                        self.metrics.on_activation(
+                            &flow_type,
+                            &result,
+                            activation_time,
+                            self.time_source.now(),
+                        );
+                        match result {
                             Ok(()) => {}
                             Err(ActivateFlowError::ConcurrentModification) => {
                                 // The store is re-read on the next iteration
@@ -441,6 +455,20 @@ impl FlowAgentImpl {
 #[async_trait::async_trait]
 impl InitOnStartup for FlowAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        let catalog = self.catalog.upgrade();
+        let flow_types: Vec<&'static str> = catalog
+            .builders_for::<dyn FlowController>()
+            .flat_map(|builder| {
+                builder
+                    .metadata_get_all::<FlowControllerMeta>()
+                    .into_iter()
+                    .map(|meta| meta.flow_type)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        self.metrics.init(flow_types.iter().copied());
+        self.completion_metrics.init(flow_types.iter().copied());
+
         // Run recovery procedure
         let start_time = self.agent_config.round_time(self.time_source.now())?;
         self.recover_initial_flows_state(start_time).await?;
@@ -457,7 +485,7 @@ impl InitOnStartup for FlowAgentImpl {
 #[async_trait::async_trait]
 impl BackgroundAgent for FlowAgentImpl {
     fn agent_name(&self) -> &'static str {
-        "dev.kamu.domain.flow-system.FlowAgent"
+        FLOW_AGENT_NAME
     }
 
     /// Runs the update main loop
@@ -486,7 +514,7 @@ impl FlowAgent for FlowAgentImpl {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-enum ActivateFlowError {
+pub(crate) enum ActivateFlowError {
     #[error("Flow was modified concurrently")]
     ConcurrentModification,
 
@@ -581,6 +609,8 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
                         if flow.outcome.is_some() {
+                            self.completion_metrics.on_flow_finished(&flow);
+
                             // Handle flow failure if it reached a terminal state
                             if message.outcome.is_failure() {
                                 let recoverable = message.outcome.is_recoverable_failure();

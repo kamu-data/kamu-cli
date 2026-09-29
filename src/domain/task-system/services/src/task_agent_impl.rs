@@ -20,6 +20,8 @@ use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 use wakeup_listener::{WakeupListener, WakeupListenerConfig};
 
+use crate::TaskAgentMetrics;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
@@ -37,6 +39,7 @@ pub struct TaskAgentImpl {
     time_source: Arc<dyn SystemTimeSource>,
     wakeup_config: Arc<WakeupListenerConfig>,
     task_queue_wakeup_source: Arc<dyn TaskQueueWakeupSource>,
+    metrics: Arc<TaskAgentMetrics>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +94,10 @@ impl TaskAgentImpl {
         wakeup_listener: &dyn WakeupListener,
     ) -> Result<(), InternalError> {
         let task = self.take_task(wakeup_listener).await?;
+        self.metrics.on_task_started(
+            task.timing.created_at,
+            task.timing.ran_at.unwrap_or_else(|| self.time_source.now()),
+        );
 
         let task_outcome = self
             .run_task(&task)
@@ -100,7 +107,16 @@ impl TaskAgentImpl {
             ))
             .await?;
 
-        self.process_task_outcome(task, task_outcome).await?;
+        let task = self.process_task_outcome(task, task_outcome).await?;
+        if let Some(outcome) = &task.outcome {
+            let now = self.time_source.now();
+            self.metrics.on_task_finished(
+                &task.logical_plan.plan_type,
+                outcome,
+                task.timing.ran_at.unwrap_or(now),
+                task.timing.finished_at.unwrap_or(now),
+            );
+        }
 
         Ok(())
     }
@@ -245,7 +261,7 @@ impl TaskAgentImpl {
         &self,
         mut task: Task,
         task_outcome: TaskOutcome,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Task, InternalError> {
         // Refresh the task in case it was updated concurrently (e.g. late cancellation)
         task.update(event_store.as_ref()).await.int_err()?;
         task.finish(self.time_source.now(), task_outcome.clone())
@@ -264,7 +280,7 @@ impl TaskAgentImpl {
             )
             .await?;
 
-        Ok(())
+        Ok(task)
     }
 }
 
@@ -273,7 +289,7 @@ impl TaskAgentImpl {
 #[async_trait::async_trait]
 impl BackgroundAgent for TaskAgentImpl {
     fn agent_name(&self) -> &'static str {
-        "dev.kamu.domain.task-system.TaskAgent"
+        TASK_AGENT_NAME
     }
 
     /// Runs the update main loop
@@ -305,6 +321,21 @@ impl TaskAgent for TaskAgentImpl {
 #[async_trait::async_trait]
 impl InitOnStartup for TaskAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        use dill::BuilderExt;
+
+        let catalog = self.catalog.upgrade();
+        let plan_types: Vec<&'static str> = catalog
+            .builders_for::<dyn TaskDefinitionPlanner>()
+            .flat_map(|builder| {
+                builder
+                    .metadata_get_all::<TaskDefinitionPlannerMeta>()
+                    .into_iter()
+                    .map(|meta| meta.logic_plan_type)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        self.metrics.init(plan_types.into_iter());
+
         self.recover_running_tasks().await
     }
 }

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use async_utils::BackgroundAgent;
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -37,7 +37,7 @@ use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 use super::{
     FlowSystemTestListener,
@@ -78,6 +78,10 @@ pub(crate) struct FlowHarnessOverrides {
     pub mandatory_throttling_period: Option<Duration>,
     pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
     pub mock_transform_flow_evaluator: Option<MockTransformFlowEvaluator>,
+    /// Registers a projector that fails on every event
+    pub with_failing_projector: bool,
+    /// Registers a projector that fails on its first event only
+    pub with_flaky_projector: bool,
 }
 
 impl FlowHarness {
@@ -107,6 +111,13 @@ impl FlowHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
+            if overrides.with_failing_projector {
+                b.add::<FailingFlowSystemEventProjector>();
+            }
+            if overrides.with_flaky_projector {
+                b.add::<FlakyFlowSystemEventProjector>();
+            }
+
             b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                 messaging_outbox::ConsumerFilter::AllConsumers,
             ))
@@ -134,6 +145,7 @@ impl FlowHarness {
             .add::<InMemoryFlowSystemEventBridge>()
             .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add::<InMemoryFlowProcessState>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
@@ -440,6 +452,99 @@ impl FlowHarness {
             .is_some()
     }
 
+    pub fn flow_activations(&self, flow_type: &str, outcome: &str) -> u64 {
+        self.catalog
+            .get_one::<FlowAgentMetrics>()
+            .unwrap()
+            .activations_total
+            .with_label_values(&[flow_type, outcome])
+            .get()
+    }
+
+    pub fn flow_activation_delay_samples(&self) -> u64 {
+        self.catalog
+            .get_one::<FlowAgentMetrics>()
+            .unwrap()
+            .activation_delay_seconds
+            .get_sample_count()
+    }
+
+    pub fn flow_activation_delays_total_seconds(&self) -> f64 {
+        self.catalog
+            .get_one::<FlowAgentMetrics>()
+            .unwrap()
+            .activation_delay_seconds
+            .get_sample_sum()
+    }
+
+    pub fn completed_flows(&self, flow_type: &str, outcome: &str) -> u64 {
+        self.completion_metrics()
+            .flow_duration_seconds
+            .with_label_values(&[flow_type, outcome])
+            .get_sample_count()
+    }
+
+    pub fn completed_flows_duration_seconds(&self, flow_type: &str, outcome: &str) -> f64 {
+        self.completion_metrics()
+            .flow_duration_seconds
+            .with_label_values(&[flow_type, outcome])
+            .get_sample_sum()
+    }
+
+    /// Completed flows with at most this many retries
+    pub fn completed_flows_retried_at_most(
+        &self,
+        flow_type: &str,
+        outcome: &str,
+        retries: u32,
+    ) -> u64 {
+        use prometheus::core::Metric as _;
+
+        self.completion_metrics()
+            .flow_retries
+            .with_label_values(&[flow_type, outcome])
+            .metric()
+            .get_histogram()
+            .get_bucket()
+            .iter()
+            .find(|bucket| bucket.upper_bound() >= f64::from(retries))
+            .unwrap()
+            .cumulative_count()
+    }
+
+    pub fn aborted_flows(&self, flow_type: &str) -> u64 {
+        self.completion_metrics()
+            .flows_aborted_total
+            .with_label_values(&[flow_type])
+            .get()
+    }
+
+    fn completion_metrics(&self) -> Arc<FlowCompletionMetrics> {
+        self.catalog.get_one::<FlowCompletionMetrics>().unwrap()
+    }
+
+    pub fn is_projector_failing(&self, projector_name: &str) -> bool {
+        self.catalog
+            .get_one::<FlowSystemEventAgentMetrics>()
+            .unwrap()
+            .projector_failing
+            .with_label_values(&[projector_name])
+            .get()
+            > 0
+    }
+
+    /// Whether the flaky projector applied the event it failed on at first
+    pub fn has_flaky_projector_applied_failed_event(&self) -> bool {
+        let projector = self
+            .catalog
+            .get_one::<FlakyFlowSystemEventProjector>()
+            .unwrap();
+        let state = projector.state.lock().unwrap();
+        state
+            .failed_event_id
+            .is_some_and(|failed_event_id| state.applied_event_ids.contains(&failed_event_id))
+    }
+
     pub fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {
         TaskDriver::new(
             self.catalog.get_one().unwrap(),
@@ -566,6 +671,69 @@ impl FlowHarness {
             .catchup_remaining_events()
             .await?;
 
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const FAILING_PROJECTOR_NAME: &str = "FailingFlowSystemEventProjector";
+
+#[component(pub)]
+#[interface(dyn FlowSystemEventProjector)]
+pub(crate) struct FailingFlowSystemEventProjector {}
+
+#[async_trait::async_trait]
+impl FlowSystemEventProjector for FailingFlowSystemEventProjector {
+    fn name(&self) -> &'static str {
+        FAILING_PROJECTOR_NAME
+    }
+
+    async fn apply(&self, _: &FlowSystemEvent) -> Result<(), InternalError> {
+        Err(InternalError::new("Projection failed"))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const FLAKY_PROJECTOR_NAME: &str = "FlakyFlowSystemEventProjector";
+
+#[derive(Default)]
+struct FlakyProjectorState {
+    failed_event_id: Option<EventID>,
+    applied_event_ids: Vec<EventID>,
+}
+
+// Singleton: the agent builds projectors per transaction, and the state must
+// survive between attempts
+pub(crate) struct FlakyFlowSystemEventProjector {
+    state: Mutex<FlakyProjectorState>,
+}
+
+#[component(pub)]
+#[interface(dyn FlowSystemEventProjector)]
+#[scope(Singleton)]
+impl FlakyFlowSystemEventProjector {
+    pub fn new() -> Self {
+        Self {
+            state: Mutex::new(FlakyProjectorState::default()),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl FlowSystemEventProjector for FlakyFlowSystemEventProjector {
+    fn name(&self) -> &'static str {
+        FLAKY_PROJECTOR_NAME
+    }
+
+    async fn apply(&self, e: &FlowSystemEvent) -> Result<(), InternalError> {
+        let mut state = self.state.lock().unwrap();
+        if state.failed_event_id.is_none() {
+            state.failed_event_id = Some(e.event_id);
+            return Err(InternalError::new("Projection failed once"));
+        }
+        state.applied_event_ids.push(e.event_id);
         Ok(())
     }
 }

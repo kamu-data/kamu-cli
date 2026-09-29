@@ -26,7 +26,8 @@ creates its own lightweight per-channel handle (`HubWakeupListener`) onto the ba
 | --- | --- |
 | Know the guarantees an agent can rely on | [§2 Contract](#2-contract) |
 | See which agent listens to what | [§3 Inventory](#3-inventory) |
-| Understand hubs and per-consumer handles | [§2 Hubs and handles](#hubs-and-handles) |
+| Understand hubs and per-agent handles | [§2 Hubs and handles](#hubs-and-handles) |
+| Monitor that agents are alive | [§2 Monitoring](#monitoring) |
 | Wake up at a stored time, not only on changes | [§2 Deadline-driven agents](#deadline-driven-agents) |
 | Understand the shared Postgres connection | [§4 Postgres](#4-postgres-listennotify-via-a-shared-hub) |
 | Understand why SQLite polls, and how | [§5 SQLite](#5-sqlite-a-shared-polling-hub) |
@@ -83,9 +84,9 @@ Invariants every implementation upholds:
    immediately. This is what makes the *drain → wait* loop below safe without races.
 3. **Timeout is the safety net**, not the primary mechanism. It bounds latency if a notification path
    is misconfigured (e.g. a missing migration) and paces SQLite polling.
-4. **One listener instance serves one consumer.** Every listener keeps a single pending signal
+4. **One listener instance serves one agent.** Every listener keeps a single pending signal
    (a `Notify` permit); a second waiter on the *same instance* would steal it. That's why the domain
-   traits hand out a fresh handle per call (`new_wakeup_listener()`), and each consumer keeps its own.
+   traits hand out a fresh handle per call (`new_wakeup_listener()`), and each agent keeps its own.
    Handles on one hub are independent.
 
 ### The uniform agent loop
@@ -149,13 +150,36 @@ All three backends share one shape, with the plumbing in the generic `wakeup-lis
   so dropped handles are pruned on the next signal, plus a "channels changed" permit for the hub's task.
   `signal(channel)` / `signal_all()` call `notify_one`, which stores a permit when the handle isn't
   waiting, so the signal is picked up by its next `wait_wake`.
-- **`HubWakeupListener<H>`** — the `WakeupListener` agents use: `(hub, channel)`, subscribing lazily
+- **`HubWakeupListener<H>`** — the `WakeupListener` agents use: `(hub, channel, agent name)`, subscribing lazily
   on the first `wait_wake`, so components that resolve a bridge but never wait (e.g. to push outbox
   messages) take no slot. It waits on its slot with the timeout, then debounces: sleeps
   `min_debounce_interval` and absorbs signals that arrived meanwhile, so a burst produces one wakeup.
 
 A fresh subscription's first wait returns `Signaled` on every backend: the handle has no earlier
 reading of its own, so the agent re-checks once.
+
+### Monitoring
+
+`HubWakeupListener` records `wakeup_listener_last_wait_timestamp_seconds{agent}` when a wait
+starts and when it ends, so every wakeup-driven agent reports a heartbeat without code of its own.
+Agents wait at least every `maxListeningTimeout`, so a stale value means a loop stuck in
+processing.
+
+- **Recorded on entry, too**: reaching the wait proves a pass finished, and the flow agent drops the
+  wait whenever its activation deadline wins (§2 Deadline-driven agents), so recording on return only
+  would make a busy, healthy scheduler look hung.
+- **Labelled by agent.** Each wakeup source serves exactly one agent, so its implementations label
+  their handles with that agent's name constant (`OUTBOX_AGENT_NAME`, `TASK_AGENT_NAME`,
+  `FLOW_AGENT_NAME`, `FLOW_SYSTEM_EVENT_AGENT_NAME`), which the agent's `agent_name()` also returns.
+  A new agent gets its own source and name; two agents sharing a source would share one gauge.
+- **Required wiring**: each hub takes `Arc<WakeupListenerMetrics>` and exposes it through
+  `WakeupHub::metrics()`, so an app that forgets to register the metrics fails at startup instead of
+  silently losing the heartbeat. The app registers them once in `app.rs`; test catalogs add them
+  next to the hub.
+- A task agent busy with a task does not wait, so its heartbeat pauses; the running task gauge covers
+  that time.
+
+Agent-specific metrics and recommended alerts are in [metrics.md](metrics.md).
 
 ---
 
@@ -170,7 +194,7 @@ reading of its own, so the agent re-checks once.
 
 Each agent obtains its handle through a domain-level trait exposing `new_wakeup_listener()`:
 `OutboxMessageBridge`, `FlowSystemEventBridge`, `TaskQueueWakeupSource`, `FlowActivationWakeupSource`.
-Another consumer of the same changes simply calls it again and gets an independent handle.
+Every call returns an independent handle, labelled with the agent the source serves.
 
 Notes:
 - The task queue triggers fire on the `tasks` projection, not `task_events`, so the agent's own
@@ -339,9 +363,11 @@ backgroundAgents:
    Prefer statement-level `AFTER INSERT`; use row-level with `WHEN` to filter by column values.
    The migration must be applied before the new binary runs — without it, work is only picked up on
    the fallback timeout.
-2. **Domain trait**: expose `fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>` on the
-   agent's bridge / source trait (see `TaskQueueWakeupSource`). Implementations store the hub and
-   return `Box::new(HubWakeupListener::new(self.hub.clone(), CHANNEL))`.
+2. **Domain trait**: expose
+   `fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>` on the agent's bridge / source trait
+   (see `TaskQueueWakeupSource`), and a `pub const <AGENT>_NAME` next to the agent trait, returned
+   by the agent's `agent_name()`. Implementations store the hub and return
+   `Box::new(HubWakeupListener::new(self.hub.clone(), CHANNEL, <AGENT>_NAME))`.
 3. **Implementations**:
    - Postgres: constructor takes `Arc<PostgresNotificationHub>`, channel is the `pg_notify` name;
      component scope `Agnostic`.
@@ -350,10 +376,11 @@ backgroundAgents:
    - In-memory: constructor takes `Arc<InMemoryWakeupHub>`; the store calls `hub.signal(CHANNEL)` on
      its write path.
 4. **DI**: register the implementations in `src/app/cli/src/database.rs`. The three hubs are
-   already registered once per backend; test catalogs using the bridges must add the hub (and, for
-   SQLite, a `WakeupListenerConfig`).
+   already registered once per backend; test catalogs using the bridges must add the hub with
+   `WakeupListenerMetrics` (and, for SQLite, a `WakeupListenerConfig`).
 5. **Agent loop**: inject `Arc<WakeupListenerConfig>`, create the handle once at the start of
-   `run`, drain everything pending, then
+   `run` (the heartbeat metric comes with it), drain
+   everything pending, then
    `wait_wake(max_listening_timeout, min_debounce_interval)` (§2). If the agent processes records in
    batches, add an entry under `backgroundAgents.batching`.
 6. **Tests**: a storage test that committed changes of interest wake the listener and irrelevant ones
@@ -369,7 +396,7 @@ backgroundAgents:
 | Listener behaviour per backend | `src/infra/wakeup-listener/{inmem,postgres,sqlite}/tests` |
 | Postgres hub: shared connection, routing, late subscription, connection loss | `src/infra/wakeup-listener/postgres/tests/tests/test_postgres_notification_hub.rs` |
 | SQLite hub: routing, late subscriber, backoff reset, failing query | `src/infra/wakeup-listener/sqlite/tests/tests/test_sqlite_polling_hub.rs` |
-| In-memory hub: routing, coalescing, late subscriber | `src/infra/wakeup-listener/inmem/tests/tests/test_inmem_wakeup_hub.rs` |
+| In-memory hub: routing, coalescing, late subscriber; waits recorded per agent, also when dropped | `src/infra/wakeup-listener/inmem/tests/tests/test_inmem_wakeup_hub.rs` |
 | Task queue triggers / SQLite query filter | `src/infra/task-system/{postgres,sqlite}/tests/tests/test_*_task_queue_wakeup_source.rs` |
 | Agent wakes on a queued task, not on timeout | `src/domain/task-system/services/tests/tests/test_task_agent_impl.rs` |
 | Flow activation triggers / SQLite query filter | `src/infra/flow-system/{postgres,sqlite}/tests/tests/test_*_flow_activation_wakeup_source.rs` |
@@ -377,7 +404,7 @@ backgroundAgents:
 
 Gotchas:
 - **Never skip the re-check after `Timeout`** — it is the only thing covering a missing trigger.
-- **Don't share one listener instance between two consumers** (§2, invariant 4); call
+- **Don't share one listener instance between two agents** (§2, invariant 4); call
   `new_wakeup_listener()` again instead.
 - **Postgres channels are per database**, so `sqlx::test` databases don't interfere with each other.
 - **Postgres migrations are applied externally** (`sqlx migrate run`), not by the application.
@@ -391,7 +418,7 @@ Gotchas:
 
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
-| Contract, hub plumbing | `wakeup-listener` | `src/utils/wakeup-listener/src` | `wakeup_listener.rs`, `wakeup_hub.rs`, `wakeup_subscribers.rs`, `hub_wakeup_listener.rs` |
+| Contract, hub plumbing, metrics | `wakeup-listener` | `src/utils/wakeup-listener/src` | `wakeup_listener.rs`, `wakeup_hub.rs`, `wakeup_subscribers.rs`, `hub_wakeup_listener.rs`, `wakeup_listener_metrics.rs` |
 | Postgres | `kamu-wakeup-listener-postgres` | `src/infra/wakeup-listener/postgres/src` | `postgres_notification_hub.rs` |
 | SQLite | `kamu-wakeup-listener-sqlite` | `src/infra/wakeup-listener/sqlite/src` | `sqlite_polling_hub.rs` |
 | In-memory | `kamu-wakeup-listener-inmem` | `src/infra/wakeup-listener/inmem/src` | `inmem_wakeup_hub.rs` |

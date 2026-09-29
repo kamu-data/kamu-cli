@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::PgPool;
-use wakeup_listener::{HubWakeupListener, WakeHint, WakeupListener};
+use wakeup_listener::{HubWakeupListener, WakeHint, WakeupListener, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +21,7 @@ pub(crate) const CHANNEL: &str = "test_wakeup_channel";
 pub(crate) const OTHER_CHANNEL: &str = "test_other_wakeup_channel";
 pub(crate) const SHORT_TIMEOUT: Duration = Duration::from_millis(300);
 pub(crate) const LONG_TIMEOUT: Duration = Duration::from_secs(10);
+const AGENT: &str = "test_agent";
 const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(50);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,8 +36,11 @@ pub(crate) struct PostgresWakeupHarness {
 
 impl PostgresWakeupHarness {
     pub(crate) fn new(pg_pool: PgPool) -> Self {
-        let hub = Arc::new(PostgresNotificationHub::new(Arc::new(pg_pool.clone())));
-        let listener = HubWakeupListener::new(hub.clone(), CHANNEL);
+        let hub = Arc::new(PostgresNotificationHub::new(
+            Arc::new(pg_pool.clone()),
+            Arc::new(WakeupListenerMetrics::new()),
+        ));
+        let listener = HubWakeupListener::new(hub.clone(), CHANNEL, AGENT);
         Self {
             pg_pool,
             hub,
@@ -59,7 +63,7 @@ impl PostgresWakeupHarness {
         &self,
         channel: &'static str,
     ) -> HubWakeupListener<PostgresNotificationHub> {
-        let listener = HubWakeupListener::new(self.hub.clone(), channel);
+        let listener = HubWakeupListener::new(self.hub.clone(), channel, AGENT);
         assert_matches!(
             Self::wait_wake_on(&listener, LONG_TIMEOUT).await,
             WakeHint::Signaled

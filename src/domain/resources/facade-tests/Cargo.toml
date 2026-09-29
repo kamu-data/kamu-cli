@@ -45,6 +45,7 @@ kamu-messaging-outbox-inmem = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
+wakeup-listener = { workspace = true }
 
 async-graphql = { version = "7", default-features = false, features = [
     "chrono",

@@ -18,21 +18,51 @@ use crate::{WakeHint, WakeupHub, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A lightweight handle listening to one channel of a shared [`WakeupHub`]
+/// A lightweight handle listening to one channel of a shared [`WakeupHub`] on
+/// behalf of one named agent
 pub struct HubWakeupListener<H: WakeupHub> {
     hub: Arc<H>,
     channel: H::Channel,
+    agent_name: &'static str,
     // Subscribed lazily, so that only components which actually wait occupy a slot
     slot: OnceLock<Arc<Notify>>,
 }
 
 impl<H: WakeupHub> HubWakeupListener<H> {
-    pub fn new(hub: Arc<H>, channel: H::Channel) -> Self {
+    pub fn new(hub: Arc<H>, channel: H::Channel, agent_name: &'static str) -> Self {
         Self {
             hub,
             channel,
+            agent_name,
             slot: OnceLock::new(),
         }
+    }
+
+    fn record_wait(&self) {
+        self.hub.metrics().record_wait(self.agent_name);
+    }
+
+    async fn wait_signal(&self, timeout: Duration, min_debounce_interval: Duration) -> WakeHint {
+        let deadline = tokio::time::Instant::now() + timeout;
+        let slot = self.slot.get_or_init(|| self.hub.subscribe(self.channel));
+
+        if tokio::time::timeout(timeout, slot.notified())
+            .await
+            .is_err()
+        {
+            return WakeHint::Timeout;
+        }
+
+        // Let a burst of signals coalesce into this wakeup
+        let remaining_after_debounce = deadline
+            .saturating_duration_since(tokio::time::Instant::now())
+            .saturating_sub(min_debounce_interval);
+        if !min_debounce_interval.is_zero() && !remaining_after_debounce.is_zero() {
+            tokio::time::sleep(min_debounce_interval).await;
+            let _ = slot.notified().now_or_never();
+        }
+
+        WakeHint::Signaled
     }
 }
 
@@ -45,26 +75,13 @@ impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
         timeout: Duration,
         min_debounce_interval: Duration,
     ) -> Result<WakeHint, InternalError> {
-        let deadline = tokio::time::Instant::now() + timeout;
-        let slot = self.slot.get_or_init(|| self.hub.subscribe(self.channel));
+        // Reaching the wait proves the agent finished a pass; recorded before and
+        // after, as callers racing the wait against a deadline may drop it early
+        self.record_wait();
 
-        if tokio::time::timeout(timeout, slot.notified())
-            .await
-            .is_err()
-        {
-            return Ok(WakeHint::Timeout);
-        }
-
-        // Let a burst of signals coalesce into this wakeup
-        let remaining_after_debounce = deadline
-            .saturating_duration_since(tokio::time::Instant::now())
-            .saturating_sub(min_debounce_interval);
-        if !min_debounce_interval.is_zero() && !remaining_after_debounce.is_zero() {
-            tokio::time::sleep(min_debounce_interval).await;
-            let _ = slot.notified().now_or_never();
-        }
-
-        Ok(WakeHint::Signaled)
+        let hint = self.wait_signal(timeout, min_debounce_interval).await;
+        self.record_wait();
+        Ok(hint)
     }
 }
 

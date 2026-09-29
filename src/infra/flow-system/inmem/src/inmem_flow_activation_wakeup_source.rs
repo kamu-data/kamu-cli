@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_flow_system::FlowActivationWakeupSource;
+use kamu_flow_system::{FLOW_AGENT_NAME, FlowActivationWakeupSource};
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use wakeup_listener::{HubWakeupListener, WakeupListener};
 
@@ -41,6 +41,7 @@ impl FlowActivationWakeupSource for InMemoryFlowActivationWakeupSource {
         Box::new(HubWakeupListener::new(
             self.hub.clone(),
             FLOW_ACTIVATION_SCHEDULED_CHANNEL,
+            FLOW_AGENT_NAME,
         ))
     }
 }

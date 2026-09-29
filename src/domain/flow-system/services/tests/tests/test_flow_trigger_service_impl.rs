@@ -28,6 +28,7 @@ use kamu_flow_system_services::*;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 use super::FlowTriggerTestListener;
 
@@ -313,6 +314,7 @@ impl FlowTriggerHarness {
             .add::<InMemoryFlowSystemEventBridge>()
             .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add::<InMemoryFlowProcessState>()
             .add::<SystemTimeSourceDefault>();
 

@@ -21,7 +21,7 @@ use kamu_flow_system_sqlite::{SqliteFlowActivationWakeupSource, SqliteFlowEventS
 use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
 use kamu_wakeup_listener_sqlite::SqlitePollingHub;
 use sqlx::SqlitePool;
-use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig};
+use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,6 +97,7 @@ impl SqliteFlowActivationWakeupHarness {
         catalog_builder.add::<SqliteFlowEventStore>();
         catalog_builder.add::<SqliteFlowActivationWakeupSource>();
         catalog_builder.add::<SqlitePollingHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
         catalog_builder.add_value(WakeupListenerConfig::local_default());
 
         let catalog = catalog_builder.build();

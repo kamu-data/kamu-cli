@@ -12,6 +12,8 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const FLOW_SYSTEM_EVENT_AGENT_NAME: &str = "dev.kamu.domain.flow-system.FlowSystemEventAgent";
+
 #[async_trait::async_trait]
 pub trait FlowSystemEventAgent: BackgroundAgent {
     /// Handle any remaining events

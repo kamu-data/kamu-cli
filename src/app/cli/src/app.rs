@@ -573,6 +573,7 @@ pub fn configure_base_catalog(
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
     b.add::<messaging_outbox::OutboxAgentImpl>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
+    b.add::<wakeup_listener::WakeupListenerMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 

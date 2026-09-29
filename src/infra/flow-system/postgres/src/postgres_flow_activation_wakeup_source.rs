@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_flow_system::FlowActivationWakeupSource;
+use kamu_flow_system::{FLOW_AGENT_NAME, FlowActivationWakeupSource};
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use wakeup_listener::{HubWakeupListener, WakeupListener};
 
@@ -39,6 +39,7 @@ impl FlowActivationWakeupSource for PostgresFlowActivationWakeupSource {
         Box::new(HubWakeupListener::new(
             self.hub.clone(),
             NOTIFY_CHANNEL_NAME,
+            FLOW_AGENT_NAME,
         ))
     }
 }

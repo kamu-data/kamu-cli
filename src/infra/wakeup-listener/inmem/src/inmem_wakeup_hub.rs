@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use tokio::sync::Notify;
-use wakeup_listener::{WakeupHub, WakeupSubscribers};
+use wakeup_listener::{WakeupHub, WakeupListenerMetrics, WakeupSubscribers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,14 +18,16 @@ use wakeup_listener::{WakeupHub, WakeupSubscribers};
 /// channel name. See `docs/internal/wakeup-listeners.md`.
 pub struct InMemoryWakeupHub {
     subscribers: WakeupSubscribers<&'static str>,
+    metrics: Arc<WakeupListenerMetrics>,
 }
 
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
 impl InMemoryWakeupHub {
-    pub fn new() -> Self {
+    pub fn new(metrics: Arc<WakeupListenerMetrics>) -> Self {
         Self {
             subscribers: WakeupSubscribers::new(),
+            metrics,
         }
     }
 
@@ -46,6 +48,10 @@ impl WakeupHub for InMemoryWakeupHub {
         slot.notify_one();
 
         slot
+    }
+
+    fn metrics(&self) -> &WakeupListenerMetrics {
+        &self.metrics
     }
 }
 

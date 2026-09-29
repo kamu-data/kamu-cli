@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
-use wakeup_listener::{HubWakeupListener, WakeHint, WakeupListener};
+use wakeup_listener::{HubWakeupListener, WakeHint, WakeupListener, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +22,38 @@ async fn test_subscription_signals_then_times_out() {
 
     assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
     assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(start_paused = true))]
+async fn test_waits_are_recorded_per_agent() {
+    let harness = InMemoryWakeupHarness::new();
+    assert!(!harness.has_recorded_wait(AGENT));
+
+    harness.start_listening().await;
+    assert!(harness.has_recorded_wait(AGENT));
+    assert!(!harness.has_recorded_wait(OTHER_AGENT));
+
+    harness.subscribe(OTHER_CHANNEL).await;
+    assert!(harness.has_recorded_wait(OTHER_AGENT));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(start_paused = true))]
+async fn test_dropped_wait_is_recorded() {
+    let harness = InMemoryWakeupHarness::new();
+    harness.start_listening().await;
+    harness.forget_recorded_wait(AGENT);
+
+    // Like an agent racing the wait against its own deadline, which wins
+    tokio::select! {
+        _ = harness.wait_wake() => panic!("Nothing was signaled"),
+        () = tokio::time::sleep(TIMEOUT / 10) => {}
+    }
+
+    assert!(harness.has_recorded_wait(AGENT));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,19 +148,28 @@ const OTHER_CHANNEL: &str = "test_other_channel";
 const TIMEOUT: Duration = Duration::from_secs(1);
 const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(20);
 
+const AGENT: &str = "test_agent";
+const OTHER_AGENT: &str = "test_other_agent";
+
 type Listener = HubWakeupListener<InMemoryWakeupHub>;
 
 /// Owns a hub and a default listener on [`CHANNEL`]
 struct InMemoryWakeupHarness {
     hub: Arc<InMemoryWakeupHub>,
+    metrics: Arc<WakeupListenerMetrics>,
     listener: Listener,
 }
 
 impl InMemoryWakeupHarness {
     fn new() -> Self {
-        let hub = Arc::new(InMemoryWakeupHub::new());
-        let listener = HubWakeupListener::new(hub.clone(), CHANNEL);
-        Self { hub, listener }
+        let metrics = Arc::new(WakeupListenerMetrics::new());
+        let hub = Arc::new(InMemoryWakeupHub::new(metrics.clone()));
+        let listener = HubWakeupListener::new(hub.clone(), CHANNEL, AGENT);
+        Self {
+            hub,
+            metrics,
+            listener,
+        }
     }
 
     /// The default listener subscribes lazily on its first wait
@@ -137,7 +178,7 @@ impl InMemoryWakeupHarness {
     }
 
     async fn subscribe(&self, channel: &'static str) -> Listener {
-        let listener = HubWakeupListener::new(self.hub.clone(), channel);
+        let listener = HubWakeupListener::new(self.hub.clone(), channel, OTHER_AGENT);
         assert_matches!(Self::wait_wake_on(&listener).await, WakeHint::Signaled);
         listener
     }
@@ -151,6 +192,21 @@ impl InMemoryWakeupHarness {
             .wait_wake(TIMEOUT, DEBOUNCE_INTERVAL)
             .await
             .unwrap()
+    }
+
+    fn has_recorded_wait(&self, agent_name: &str) -> bool {
+        self.metrics
+            .last_wait_timestamp_seconds
+            .with_label_values(&[agent_name])
+            .get()
+            > 0.0
+    }
+
+    fn forget_recorded_wait(&self, agent_name: &str) {
+        self.metrics
+            .last_wait_timestamp_seconds
+            .with_label_values(&[agent_name])
+            .set(0.0);
     }
 
     fn signal(&self, channel: &'static str) {

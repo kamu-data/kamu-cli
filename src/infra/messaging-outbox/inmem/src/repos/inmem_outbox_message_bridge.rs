@@ -82,6 +82,7 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         Box::new(HubWakeupListener::new(
             self.wakeup_hub.clone(),
             WAKEUP_CHANNEL,
+            OUTBOX_AGENT_NAME,
         ))
     }
 

@@ -348,7 +348,7 @@ impl InitOnStartup for OutboxAgentImpl {
 #[async_trait::async_trait]
 impl BackgroundAgent for OutboxAgentImpl {
     fn agent_name(&self) -> &'static str {
-        "dev.kamu.utils.messaging.OutboxAgent"
+        OUTBOX_AGENT_NAME
     }
 
     async fn run(&self) -> Result<(), InternalError> {

@@ -14,6 +14,7 @@ use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     EventID,
+    FLOW_SYSTEM_EVENT_AGENT_NAME,
     FlowSystemEvent,
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
@@ -51,7 +52,11 @@ impl SqliteFlowSystemEventBridge {
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
-        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            POLLING_CHANNEL,
+            FLOW_SYSTEM_EVENT_AGENT_NAME,
+        ))
     }
 
     /// Fetch next batch for the given projector; order by global id.

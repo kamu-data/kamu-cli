@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_task_system::TaskQueueWakeupSource;
+use kamu_task_system::{TASK_AGENT_NAME, TaskQueueWakeupSource};
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use wakeup_listener::{HubWakeupListener, WakeupListener};
 
@@ -41,6 +41,7 @@ impl TaskQueueWakeupSource for InMemoryTaskQueueWakeupSource {
         Box::new(HubWakeupListener::new(
             self.hub.clone(),
             TASKS_QUEUED_CHANNEL,
+            TASK_AGENT_NAME,
         ))
     }
 }

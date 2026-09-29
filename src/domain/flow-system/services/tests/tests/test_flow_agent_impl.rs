@@ -22,6 +22,8 @@ use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
 
 use super::{
+    FAILING_PROJECTOR_NAME,
+    FLAKY_PROJECTOR_NAME,
     FlowHarness,
     FlowHarnessOverrides,
     FlowSystemTestListener,
@@ -4294,6 +4296,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             },
         )),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
+        ..Default::default()
     });
 
     let foo_id = harness
@@ -7419,6 +7422,11 @@ async fn test_abort_flow_after_task_running_has_started() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    // Counted as aborted only, even though its cancelled task finishes later
+    let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
+    assert_eq!(harness.aborted_flows(&ingest_flow_type), 1);
+    assert_eq!(harness.completed_flows(&ingest_flow_type, "success"), 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10291,6 +10299,23 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    // Planned at 20ms, completed at 2070ms, after 2 retries
+    let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
+    assert_eq!(harness.completed_flows(&ingest_flow_type, "success"), 1);
+    assert_eq!(harness.completed_flows(&ingest_flow_type, "failed"), 0);
+    assert!(
+        (harness.completed_flows_duration_seconds(&ingest_flow_type, "success") - 2.05).abs()
+            < 0.001
+    );
+    assert_eq!(
+        harness.completed_flows_retried_at_most(&ingest_flow_type, "success", 1),
+        0
+    );
+    assert_eq!(
+        harness.completed_flows_retried_at_most(&ingest_flow_type, "success", 2),
+        1
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10455,6 +10480,19 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
             "#
         ),
         format!("{}", test_flow_listener.as_ref())
+    );
+
+    // Retries do not complete the flow: only the final failure counts
+    let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
+    assert_eq!(harness.completed_flows(&ingest_flow_type, "failed"), 1);
+    assert_eq!(harness.completed_flows(&ingest_flow_type, "success"), 0);
+    assert_eq!(
+        harness.completed_flows_retried_at_most(&ingest_flow_type, "failed", 1),
+        0
+    );
+    assert_eq!(
+        harness.completed_flows_retried_at_most(&ingest_flow_type, "failed", 2),
+        1
     );
 }
 
@@ -10655,8 +10693,143 @@ async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    // Activated right at its moment, as time is virtual; the failing flow is
+    // retried
+    let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
+    assert_eq!(harness.flow_activations(&ingest_flow_type, "activated"), 1);
+    assert!(harness.flow_activations("dev.kamu.flow.test.unregistered", "failed") >= 1);
+    assert_eq!(harness.flow_activation_delay_samples(), 1);
+    assert!(harness.flow_activation_delays_total_seconds() < 0.001);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_failing_projector_reported_without_blocking_others() {
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        with_failing_projector: true,
+        ..Default::default()
+    });
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let start_time = harness
+        .now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            start_time + Duration::milliseconds(10),
+        )
+        .await;
+
+    harness
+        .simulate_flow_scenario(|| async {
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            let sim_handle = harness.advance_time(Duration::milliseconds(50));
+            tokio::join!(foo_task0_handle, sim_handle);
+        })
+        .await
+        .unwrap();
+
+    // The failing projector stays failing, the others keep up
+    assert!(harness.is_projector_failing(FAILING_PROJECTOR_NAME));
+    assert!(!harness.is_projector_failing("FlowSystemTestListener"));
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    assert!(
+        format!("{}", test_flow_listener.as_ref()).contains("Finished Success"),
+        "{test_flow_listener}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_projector_recovers_after_failed_batch() {
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        with_flaky_projector: true,
+        ..Default::default()
+    });
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let start_time = harness
+        .now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            start_time + Duration::milliseconds(10),
+        )
+        .await;
+
+    harness
+        .simulate_flow_scenario(|| async {
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(20),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            let sim_handle = harness.advance_time(Duration::milliseconds(50));
+            tokio::join!(foo_task0_handle, sim_handle);
+        })
+        .await
+        .unwrap();
+
+    // The failed batch is fetched again on a later wakeup, not skipped
+    assert!(harness.has_flaky_projector_applied_failed_event());
+    assert!(!harness.is_projector_failing(FLAKY_PROJECTOR_NAME));
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    assert!(
+        format!("{}", test_flow_listener.as_ref()).contains("Finished Success"),
+        "{test_flow_listener}"
+    );
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]

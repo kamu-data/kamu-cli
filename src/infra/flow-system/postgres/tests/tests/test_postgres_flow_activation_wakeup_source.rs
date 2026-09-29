@@ -21,7 +21,7 @@ use kamu_flow_system_postgres::{PostgresFlowActivationWakeupSource, PostgresFlow
 use kamu_task_system::{TaskError, TaskID, TaskOutcome, TaskResult};
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::PgPool;
-use wakeup_listener::{WakeHint, WakeupListener};
+use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,6 +97,7 @@ impl PostgresFlowActivationWakeupHarness {
         catalog_builder.add::<PostgresFlowEventStore>();
         catalog_builder.add::<PostgresFlowActivationWakeupSource>();
         catalog_builder.add::<PostgresNotificationHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
 
         let catalog = catalog_builder.build();
 

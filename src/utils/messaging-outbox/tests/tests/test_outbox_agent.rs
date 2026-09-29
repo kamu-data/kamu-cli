@@ -19,7 +19,7 @@ use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
-use wakeup_listener::{WakeupListener, WakeupListenerConfig};
+use wakeup_listener::{WakeupListener, WakeupListenerConfig, WakeupListenerMetrics};
 
 use crate::{test_message_consumer, test_message_failing_consumer, test_message_type};
 
@@ -153,7 +153,9 @@ struct FailOnceOnMarkConsumedOutboxMessageBridge {
 impl FailOnceOnMarkConsumedOutboxMessageBridge {
     fn new(fail_next_mark_consumed: bool) -> Self {
         Self {
-            inner: InMemoryOutboxMessageBridge::new(Arc::new(InMemoryWakeupHub::new())),
+            inner: InMemoryOutboxMessageBridge::new(Arc::new(InMemoryWakeupHub::new(Arc::new(
+                WakeupListenerMetrics::new(),
+            )))),
             fail_next_mark_consumed: Mutex::new(fail_next_mark_consumed),
         }
     }
@@ -1154,6 +1156,7 @@ impl BaseOutboxCatalogHarness {
         b.add::<OutboxAgentMetrics>();
         b.add::<InMemoryOutboxMessageBridge>();
         b.add::<InMemoryWakeupHub>();
+        b.add::<WakeupListenerMetrics>();
         b.add::<OutboxTransactionalImpl>();
         b.bind::<dyn Outbox, OutboxTransactionalImpl>();
         b.add::<SystemTimeSourceDefault>();

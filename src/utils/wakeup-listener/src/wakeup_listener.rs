@@ -14,7 +14,7 @@ use internal_error::InternalError;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Lets an agent sleep until its data *might* have changed, instead of polling.
-/// Serves a single consumer: changes since its previous call are never missed,
+/// Serves a single agent: changes since its previous call are never missed,
 /// but wakeups may be spurious.
 #[async_trait::async_trait]
 pub trait WakeupListener: Send + Sync {
