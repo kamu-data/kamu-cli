@@ -151,8 +151,9 @@ kamu_cli_execute_command_e2e_test!(
         .with_multi_tenant()
         .with_today_as_frozen_system_time()
         .with_kamu_config(PRIVATE_DATESET_WORKSPACE_KAMU_CONFIG),
-    // NOTE: Pulling the derivative dataset intermittently fails on MySQL
-    //       with the private root dataset not found
+    // NOTE: ReBAC is in-memory with MySQL: each command rebuilds visibility from
+    //       predefined accounts, making alice's public root private too. Bob's pull
+    //       then fails on either root, while the assertion names the private one
     extra_test_groups = "flaky",
 );
 
