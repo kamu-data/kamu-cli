@@ -742,6 +742,13 @@ pub struct BackgroundAgentsConcurrencyConfig {
     /// 0 is treated as 1
     #[config(default = 8)]
     pub flow_activations: usize,
+
+    /// Outbox consumers handling messages at once, across all producers, each
+    /// in its own transaction with a pooled connection. Messages of a producer
+    /// are still handled in order. Keep it well below the database pool size.
+    /// 0 is treated as 1
+    #[config(default = 8)]
+    pub outbox_consumers: usize,
 }
 
 impl BackgroundAgentsConfig {
@@ -755,6 +762,8 @@ impl BackgroundAgentsConfig {
     pub fn outbox_agent_config(&self) -> messaging_outbox::OutboxAgentConfig {
         messaging_outbox::OutboxAgentConfig {
             batch_size: self.batching.outbox_messages,
+            consumer_concurrency: NonZeroUsize::new(self.concurrency.outbox_consumers)
+                .unwrap_or(NonZeroUsize::MIN),
         }
     }
 

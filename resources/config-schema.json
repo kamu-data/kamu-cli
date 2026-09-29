@@ -165,6 +165,13 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "outboxConsumers": {
+          "default": 8,
+          "description": "Outbox consumers handling messages at once, across all producers, each\nin its own transaction with a pooled connection. Messages of a producer\nare still handled in order. Keep it well below the database pool size.\n0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "type": "object"
@@ -183,7 +190,8 @@
         "concurrency": {
           "$ref": "#/$defs/BackgroundAgentsConcurrencyConfig",
           "default": {
-            "flowActivations": 8
+            "flowActivations": 8,
+            "outboxConsumers": 8
           },
           "description": "Concurrency limits of agents processing records in parallel"
         },
@@ -1317,7 +1325,8 @@
           "outboxMessages": 20
         },
         "concurrency": {
-          "flowActivations": 8
+          "flowActivations": 8,
+          "outboxConsumers": 8
         },
         "maxListeningTimeout": "2s",
         "minDebounceInterval": "20ms"

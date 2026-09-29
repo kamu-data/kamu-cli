@@ -9,8 +9,16 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use std::num::NonZeroUsize;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct OutboxAgentConfig {
     pub batch_size: usize,
+
+    /// Consumers handling messages at once, across all producers. Each one
+    /// runs in its own transaction with a pooled connection
+    pub consumer_concurrency: NonZeroUsize,
 }
 
 impl OutboxAgentConfig {
@@ -18,14 +26,22 @@ impl OutboxAgentConfig {
     // connection: small batches keep API requests from waiting behind a long
     // catch-up
     pub fn local_default() -> Self {
-        Self { batch_size: 20 }
+        Self {
+            batch_size: 20,
+            consumer_concurrency: Self::DEFAULT_CONSUMER_CONCURRENCY,
+        }
     }
 
     // Postgres pools connections, so larger batches mostly save round trips
     // when catching up on a backlog, e.g. after a restart
     pub fn production_default() -> Self {
-        Self { batch_size: 100 }
+        Self {
+            batch_size: 100,
+            consumer_concurrency: Self::DEFAULT_CONSUMER_CONCURRENCY,
+        }
     }
+
+    const DEFAULT_CONSUMER_CONCURRENCY: NonZeroUsize = NonZeroUsize::new(8).unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

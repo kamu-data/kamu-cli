@@ -196,7 +196,10 @@ impl PostgresOutboxAgentHarness {
 
         b.add::<OutboxAgentMetrics>();
         b.add::<OutboxAgentImpl>();
-        b.add_value(OutboxAgentConfig { batch_size: 1 });
+        b.add_value(OutboxAgentConfig {
+            batch_size: 1,
+            ..OutboxAgentConfig::local_default()
+        });
         b.add_value(WakeupListenerConfig {
             min_debounce_interval: Duration::from_millis(1),
             max_listening_timeout: Duration::from_millis(1),

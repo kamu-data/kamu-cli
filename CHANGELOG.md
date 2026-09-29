@@ -25,6 +25,9 @@ Recommendation: for ease of reading, use the following format:
     delay for flows whose activation failed
   - due flows are loaded in bulk and activated concurrently, each in its own transaction, up to
     `backgroundAgents.concurrency.flowActivations` (default `8`) at once
+- Outbox consumers handling messages at once, across all producers, are limited by
+  `backgroundAgents.concurrency.outboxConsumers` (default `8`); previously unbounded, a burst could
+  exhaust the database connection pool
 - **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
   - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
     the per-agent settings in `outbox`, `flowSystem.flowSystemEventAgent` and `flowSystem.taskAgent`

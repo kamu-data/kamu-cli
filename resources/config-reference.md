@@ -23,7 +23,8 @@
     &quot;outboxMessages&quot;: 20
   },
   &quot;concurrency&quot;: {
-    &quot;flowActivations&quot;: 8
+    &quot;flowActivations&quot;: 8,
+    &quot;outboxConsumers&quot;: 8
   },
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
   &quot;minDebounceInterval&quot;: &quot;20ms&quot;
@@ -408,6 +409,19 @@ single connection, so activations run one at a time regardless.
 
 </td>
 </tr>
+<tr>
+<td><code>outboxConsumers</code></td>
+<td><code>integer</code></td>
+<td><code class="language-json">8</code></td>
+<td>
+
+Outbox consumers handling messages at once, across all producers, each
+in its own transaction with a pooled connection. Messages of a producer
+are still handled in order. Keep it well below the database pool size.
+0 is treated as 1
+
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -429,7 +443,8 @@ single connection, so activations run one at a time regardless.
 <td><code>concurrency</code></td>
 <td><a href="#backgroundagentsconcurrencyconfig"><code>BackgroundAgentsConcurrencyConfig</code></a></td>
 <td><pre><code class="language-json">{
-  &quot;flowActivations&quot;: 8
+  &quot;flowActivations&quot;: 8,
+  &quot;outboxConsumers&quot;: 8
 }</code></pre></td>
 <td>Concurrency limits of agents processing records in parallel</td>
 </tr>

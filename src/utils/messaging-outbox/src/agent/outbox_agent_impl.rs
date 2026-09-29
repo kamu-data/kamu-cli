@@ -64,6 +64,11 @@ impl OutboxAgentImpl {
 
         metrics.init(&routes_static_info.consumers_by_producers);
 
+        // Shared by all producers, so that the limit holds across them
+        let consumer_permits = Arc::new(tokio::sync::Semaphore::new(
+            agent_config.consumer_concurrency.get(),
+        ));
+
         let mut producer_consumption_jobs = Vec::new();
         for (producer_name, consumer_names) in &routes_static_info.consumers_by_producers {
             producer_consumption_jobs.push(ProducerConsumptionJob::new(
@@ -72,6 +77,7 @@ impl OutboxAgentImpl {
                 producer_name.clone(),
                 consumer_names.clone(),
                 metrics.clone(),
+                consumer_permits.clone(),
             ));
         }
 

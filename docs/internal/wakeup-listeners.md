@@ -305,6 +305,7 @@ backgroundAgents:
     flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
   concurrency:
     flowActivations: 8      # FlowAgentActivationConfig::concurrency
+    outboxConsumers: 8      # OutboxAgentConfig::consumer_concurrency
 ```
 
 - `minDebounceInterval` — how long a handle absorbs a burst after the first signal, and the SQLite
@@ -321,6 +322,11 @@ backgroundAgents:
 - `concurrency.flowActivations` — flows activated at once, each holding a pooled connection for its
   transaction; keep it well below the Postgres pool size. On SQLite activations run one at a time
   regardless, as the pool has a single connection.
+- `concurrency.outboxConsumers` — outbox consumers handling messages at once, across all producers,
+  each in its own transaction. Messages of one producer are still handled in order: all consumers
+  finish message N before any gets N+1. Without a limit, a burst over several producers could
+  demand more connections than the pool has. The two limits, the task agent and API requests all
+  share one pool, so keep their sum in mind when sizing `database.maxConnections`.
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_hub.rs`).
 

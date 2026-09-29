@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -31,6 +32,8 @@ const TEST_PRODUCER_D: &str = "TEST-PRODUCER-D";
 const TEST_PRODUCER_E: &str = "TEST-PRODUCER-E";
 const TEST_PRODUCER_F: &str = "TEST-PRODUCER-F";
 const TEST_PRODUCER_G: &str = "TEST-PRODUCER-G";
+const TEST_PRODUCER_H: &str = "TEST-PRODUCER-H";
+const TEST_PRODUCER_I: &str = "TEST-PRODUCER-I";
 
 const TEST_CONSUMER_A: &str = "TestMessageConsumerA";
 const TEST_CONSUMER_A1: &str = "TestMessageConsumerA1";
@@ -50,6 +53,8 @@ test_message_type!(D);
 test_message_type!(E);
 test_message_type!(F);
 test_message_type!(G);
+test_message_type!(H);
+test_message_type!(I);
 
 test_message_consumer!(A, A, TEST_PRODUCER_A, TransactionalWrapped, All);
 test_message_consumer!(A, A1, TEST_PRODUCER_A, TransactionalWrapped, Latest);
@@ -73,6 +78,70 @@ test_message_failing_consumer!(
     TransactionalSelfManaged,
     All
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Consumers handling messages at the moment, shared by the tracked consumers
+#[derive(Default)]
+struct ConsumerLoad {
+    in_flight: AtomicUsize,
+    max_in_flight: AtomicUsize,
+    consumed: AtomicUsize,
+}
+
+macro_rules! tracked_message_consumer {
+    ($message_type_suffix: ident, $message_consumer_suffix: ident, $producer_name: ident) => {
+        paste::paste! {
+            struct [<"TestMessageConsumer" $message_consumer_suffix>] {
+                load: Arc<ConsumerLoad>,
+            }
+
+            #[component(pub)]
+            #[scope(Singleton)]
+            #[interface(dyn MessageConsumer)]
+            #[interface(dyn MessageConsumerT<[<TestMessage $message_type_suffix>]>)]
+            #[meta(MessageConsumerMeta {
+                consumer_name: concat!("TestMessageConsumer", stringify!($message_consumer_suffix)),
+                feeding_producers: &[$producer_name],
+                consumption_mode: MessageConsumptionMode::TransactionalWrapped,
+                initial_consumer_boundary: InitialConsumerBoundary::All,
+            })]
+            impl [<"TestMessageConsumer" $message_consumer_suffix>] {
+                fn new(load: Arc<ConsumerLoad>) -> Self {
+                    Self { load }
+                }
+            }
+
+            impl MessageConsumer for [<"TestMessageConsumer" $message_consumer_suffix>] {}
+
+            #[async_trait::async_trait]
+            impl MessageConsumerT<[<TestMessage $message_type_suffix>]> for [<"TestMessageConsumer" $message_consumer_suffix>] {
+                async fn consume_message(
+                    &self,
+                    _: &Catalog,
+                    _: &[<TestMessage $message_type_suffix>],
+                ) -> Result<(), InternalError> {
+                    let in_flight = self.load.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+                    self.load.max_in_flight.fetch_max(in_flight, Ordering::SeqCst);
+
+                    // Let other consumer tasks run, so that they overlap unless limited
+                    for _ in 0..10 {
+                        tokio::task::yield_now().await;
+                    }
+
+                    self.load.in_flight.fetch_sub(1, Ordering::SeqCst);
+                    self.load.consumed.fetch_add(1, Ordering::SeqCst);
+                    Ok(())
+                }
+            }
+        }
+    };
+}
+
+tracked_message_consumer!(H, H1, TEST_PRODUCER_H);
+tracked_message_consumer!(H, H2, TEST_PRODUCER_H);
+tracked_message_consumer!(H, H3, TEST_PRODUCER_H);
+tracked_message_consumer!(I, I, TEST_PRODUCER_I);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1045,6 +1114,33 @@ async fn test_run_while_has_tasks_drains_backlog_with_small_batch_size() {
     harness.check_metric_pending(TEST_PRODUCER_A, TEST_CONSUMER_A, 0);
 }
 
+#[test_log::test(tokio::test)]
+async fn test_consumers_limited_across_producers() {
+    let harness = OutboxAgentConcurrencyHarness::new(1);
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    harness.post_messages(3).await;
+    harness.outbox_agent.run_while_has_tasks().await.unwrap();
+
+    // 3 consumers of H and 1 consumer of I, 3 messages each
+    assert_eq!(harness.consumed(), 12);
+    assert_eq!(harness.max_in_flight(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_consumers_run_concurrently_up_to_limit() {
+    let harness = OutboxAgentConcurrencyHarness::new(8);
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    harness.post_messages(3).await;
+    harness.outbox_agent.run_while_has_tasks().await.unwrap();
+
+    assert_eq!(harness.consumed(), 12);
+    assert!(harness.max_in_flight() > 1, "{}", harness.max_in_flight());
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct BaseOutboxCatalogHarness {
@@ -1175,7 +1271,10 @@ impl OutboxAgentFailureHarness {
 
         let mut b = CatalogBuilder::new_chained(base_catalog_harness.catalog());
         b.add::<OutboxAgentImpl>();
-        b.add_value(OutboxAgentConfig { batch_size });
+        b.add_value(OutboxAgentConfig {
+            batch_size,
+            ..OutboxAgentConfig::local_default()
+        });
         b.add_value(WakeupListenerConfig {
             min_debounce_interval: Duration::from_millis(1),
             max_listening_timeout: Duration::from_millis(1),
@@ -1318,6 +1417,68 @@ impl SelfManagedOutboxAgentHarness {
         Self {
             base_harness: BaseOutboxAgentHarness::from_catalog(catalog),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseOutboxAgentHarness, base_harness)]
+struct OutboxAgentConcurrencyHarness {
+    base_harness: BaseOutboxAgentHarness,
+    load: Arc<ConsumerLoad>,
+}
+
+impl OutboxAgentConcurrencyHarness {
+    fn new(consumer_concurrency: usize) -> Self {
+        let base_catalog_harness = BaseOutboxCatalogHarness::new();
+
+        let mut b = CatalogBuilder::new_chained(base_catalog_harness.catalog());
+        b.add::<OutboxAgentImpl>();
+        b.add_value(OutboxAgentConfig {
+            consumer_concurrency: consumer_concurrency.try_into().unwrap(),
+            ..OutboxAgentConfig::local_default()
+        });
+        b.add_value(WakeupListenerConfig::local_default());
+        b.add_value(ConsumerLoad::default());
+
+        b.add::<TestMessageConsumerH1>();
+        b.add::<TestMessageConsumerH2>();
+        b.add::<TestMessageConsumerH3>();
+        b.add::<TestMessageConsumerI>();
+
+        register_message_dispatcher::<TestMessageH>(&mut b, TEST_PRODUCER_H);
+        register_message_dispatcher::<TestMessageI>(&mut b, TEST_PRODUCER_I);
+
+        let catalog = b.build();
+        let load = catalog.get_one().unwrap();
+
+        Self {
+            base_harness: BaseOutboxAgentHarness::from_catalog(catalog),
+            load,
+        }
+    }
+
+    /// Posts the given number of messages by each of producers H and I
+    async fn post_messages(&self, count: usize) {
+        for i in 0..count {
+            let body = format!("message-{i}");
+            self.outbox
+                .post_message(TEST_PRODUCER_H, TestMessageH { body: body.clone() })
+                .await
+                .unwrap();
+            self.outbox
+                .post_message(TEST_PRODUCER_I, TestMessageI { body })
+                .await
+                .unwrap();
+        }
+    }
+
+    fn consumed(&self) -> usize {
+        self.load.consumed.load(Ordering::SeqCst)
+    }
+
+    fn max_in_flight(&self) -> usize {
+        self.load.max_in_flight.load(Ordering::SeqCst)
     }
 }
 
