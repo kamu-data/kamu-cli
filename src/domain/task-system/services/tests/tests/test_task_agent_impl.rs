@@ -236,9 +236,6 @@ async fn test_task_metrics_track_outcomes_and_running_task() {
 
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
-// Probe tasks are the only ones registered in the harness
-const PROBE_PLAN_TYPE: &str = "Probe";
-
 struct TaskAgentHarness {
     _tempdir: TempDir,
     catalog: Catalog,
@@ -329,7 +326,7 @@ impl TaskAgentHarness {
     fn finished_tasks(&self, outcome: &str) -> u64 {
         self.task_agent_metrics
             .task_duration_seconds
-            .with_label_values(&[PROBE_PLAN_TYPE, outcome])
+            .with_label_values(&[LogicalPlanProbe::TYPE_ID, outcome])
             .get_sample_count()
     }
 

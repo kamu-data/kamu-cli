@@ -206,10 +206,10 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Alert | Expression | Why |
 | --- | --- | --- |
 | Task stuck | `task_agent_running_task_started_timestamp_seconds > 0 and time() - task_agent_running_task_started_timestamp_seconds > 7200` | Fires per `executor`. An executor runs one task at a time: a stuck task blocks every flow waiting for it. Set above the p99 of `task_agent_task_duration_seconds{outcome="success"}` |
-| Agent loop hung | `time() - wakeup_listener_last_wait_timestamp_seconds{agent!="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout>`, and for the task agent `time() - wakeup_listener_last_wait_timestamp_seconds{agent="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout> unless on() (max(task_agent_running_task_started_timestamp_seconds) > 0)` | Agents wait at least every `maxListeningTimeout`; no wait means the loop is blocked. A busy task agent does not wait, and "Task stuck" covers it |
+| Agent loop hung | `time() - wakeup_listener_last_wait_timestamp_seconds{agent!="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout>`, and for the task agent `time() - wakeup_listener_last_wait_timestamp_seconds{agent="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout> unless on() (max(task_agent_running_task_started_timestamp_seconds) > 0)`, `for: 2m` | Agents wait at least every `maxListeningTimeout`; no wait means the loop is blocked. A busy task agent does not wait, and "Task stuck" covers it. `for` rides over the gap between back-to-back tasks |
 | Projector failing | `flow_system_event_projector_failing > 0`, `for: 5m` | The projection is stuck on a batch: flow process states (UI, stop policies) go stale. `for` rides over transient errors, as every wakeup retries |
 | Outbox consumer failed | `outbox_failed_consumers_total > 0` | The consumer stopped until restart; its producer's messages pile up for it |
-| Metrics missing | `absent(wakeup_listener_last_wait_timestamp_seconds)` | Scraping or wiring is broken — every other alert is silently off |
+| Metrics missing | `absent(wakeup_listener_last_wait_timestamp_seconds)`, `for: 10m` | Scraping or wiring is broken — every other alert is silently off. `for` rides over startup, as the series appears on an agent's first wait |
 
 ### Warning — degraded, still working
 
@@ -220,7 +220,7 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Flow activations failing | `increase(flow_agent_activations_total{outcome="failed"}[15m]) > 0` | A failed flow is retried every `awaitingStepSecs`; a lasting increase means a flow stuck in retries |
 | Scheduler lagging | `histogram_quantile(0.95, rate(flow_agent_activation_delay_seconds_bucket[10m])) > 60`, `for: 15m` | Slow database, exhausted connection pool, or too low `concurrency.flowActivations` |
 | Task slot saturated | `histogram_quantile(0.95, rate(task_agent_task_queue_wait_seconds_bucket[30m])) > 900`, `for: 30m` | More work than one task slot handles — a capacity signal |
-| Outbox backlog growing | `outbox_messages_pending_total > 1000`, `for: 15m` | Consumers fall behind producers |
+| Outbox backlog growing | `outbox_messages_pending_total > 1000`, `for: 15m` | Consumers fall behind producers. Units are global message IDs, not messages of this producer: tune per deployment |
 
 ### Dashboards only
 
@@ -268,7 +268,8 @@ Follow `OutboxAgentMetrics` or `TaskAgentMetrics`:
    alertable question.
 
 Naming: `<component>_<what>_<unit>` with Prometheus suffixes — `_total` for counters, `_seconds`
-for durations, `_timestamp_seconds` for Unix times.
+for durations, `_timestamp_seconds` for Unix times. The gauges `outbox_messages_pending_total` and
+`outbox_failed_consumers_total` predate this rule and keep their names for compatibility.
 
 ---
 

@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use database_common_macros::transactional_method;
 use internal_error::{InternalError, ResultIntoInternal};
+use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use super::{OutboxAgentMetrics, OutboxRoutesStaticInfo, ProducerConsumptionTask};
@@ -37,7 +38,7 @@ pub(crate) struct ProducerConsumptionJob {
     consumer_names: Vec<String>,
     failed_consumer_names: Mutex<HashSet<String>>,
     metrics: Arc<OutboxAgentMetrics>,
-    consumer_permits: Arc<tokio::sync::Semaphore>,
+    consumer_permits: Arc<Semaphore>,
 }
 
 impl ProducerConsumptionJob {
@@ -47,7 +48,7 @@ impl ProducerConsumptionJob {
         producer_name: String,
         consumer_names: Vec<String>,
         metrics: Arc<OutboxAgentMetrics>,
-        consumer_permits: Arc<tokio::sync::Semaphore>,
+        consumer_permits: Arc<Semaphore>,
     ) -> Self {
         Self {
             catalog,

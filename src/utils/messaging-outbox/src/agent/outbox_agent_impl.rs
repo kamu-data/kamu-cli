@@ -16,6 +16,7 @@ use database_common_macros::transactional_method;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
+use tokio::sync::Semaphore;
 use tracing::Instrument as _;
 use wakeup_listener::WakeupListenerConfig;
 
@@ -65,9 +66,7 @@ impl OutboxAgentImpl {
         metrics.init(&routes_static_info.consumers_by_producers);
 
         // Shared by all producers, so that the limit holds across them
-        let consumer_permits = Arc::new(tokio::sync::Semaphore::new(
-            agent_config.consumer_concurrency.get(),
-        ));
+        let consumer_permits = Arc::new(Semaphore::new(agent_config.consumer_concurrency.get()));
 
         let mut producer_consumption_jobs = Vec::new();
         for (producer_name, consumer_names) in &routes_static_info.consumers_by_producers {

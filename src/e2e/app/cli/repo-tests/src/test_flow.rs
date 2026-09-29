@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::HashSet;
 
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
@@ -1000,7 +1001,7 @@ pub async fn test_trigger_many_ingest_flows_at_once(
     }
 
     // Every flow succeeded with a single task of its own
-    let mut all_task_ids = std::collections::HashSet::new();
+    let mut all_task_ids = HashSet::new();
     for dataset_id in &dataset_ids {
         let flows = flow_api.list_flows(dataset_id).await;
         assert_eq!(flows.len(), 1, "{flows:?}");

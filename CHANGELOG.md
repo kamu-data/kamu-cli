@@ -56,11 +56,12 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 - Flow agent: a flow failing to activate no longer blocks activation of flows scheduled after it,
   and its partial writes (task, flow events) are rolled back instead of committed
-- In-memory flow system event store: a projector that failed to apply a batch of events no longer
+- In-memory flow system event bridge: a projector that failed to apply a batch of events no longer
   skips those events on the next attempt
 - GQL: `FlowTimingRecords.firstAttemptScheduledAt` is the time the flow's first task was scheduled,
-  unset while the flow waits. It used to be the first planned activation, which a manual run or
-  satisfied batching moves earlier, so run durations counted from it showed as under a second
+  unset while the flow waits. It used to be the first planned activation time, which stays put when
+  a manual run or satisfied batching activates the flow earlier, so run durations counted from it
+  came out too short
 
 ## [0.267.0] - 2026-09-19
 ### Added

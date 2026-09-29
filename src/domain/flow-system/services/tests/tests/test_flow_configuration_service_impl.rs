@@ -251,7 +251,6 @@ impl FlowConfigurationHarness {
             .add::<FlowConfigurationServiceImpl>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
-            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<WakeupListenerMetrics>()
             .add::<FlowDatasetsEventBridge>()

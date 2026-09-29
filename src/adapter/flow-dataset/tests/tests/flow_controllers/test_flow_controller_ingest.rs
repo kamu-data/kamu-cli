@@ -203,7 +203,6 @@ impl FlowControllerIngestHarness {
             .add_value(mock_flow_run_service)
             .bind::<dyn FlowRunService, MockFlowRunService>()
             .add::<InMemoryFlowSystemEventBridge>()
-            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<WakeupListenerMetrics>()
             .add_value(mock_dataset_increment_service)

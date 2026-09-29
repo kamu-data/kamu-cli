@@ -24,6 +24,7 @@ use odf::dataset::MetadataChainIncrementInterval;
 use super::{
     FAILING_PROJECTOR_NAME,
     FLAKY_PROJECTOR_NAME,
+    FLOW_SYSTEM_TEST_LISTENER_NAME,
     FlowHarness,
     FlowHarnessOverrides,
     FlowSystemTestListener,
@@ -10304,10 +10305,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
     let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
     assert_eq!(harness.completed_flows(&ingest_flow_type, "success"), 1);
     assert_eq!(harness.completed_flows(&ingest_flow_type, "failed"), 0);
-    assert!(
-        (harness.completed_flows_duration_seconds(&ingest_flow_type, "success") - 2.05).abs()
-            < 0.001
-    );
+    harness.assert_completed_flows_duration_seconds(&ingest_flow_type, "success", 2.05);
     assert_eq!(
         harness.completed_flows_retried_at_most(&ingest_flow_type, "success", 1),
         0
@@ -10600,6 +10598,8 @@ async fn test_manual_ingest_with_retry_policy_ignored_on_unrecoverable_error() {
 
 #[test_log::test(tokio::test)]
 async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
+    const UNREGISTERED_FLOW_TYPE: &str = "dev.kamu.flow.test.unregistered";
+
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -10618,7 +10618,7 @@ async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
     harness
         .schedule_flow_for_activation(
             &FlowBinding::new(
-                "dev.kamu.flow.test.unregistered",
+                UNREGISTERED_FLOW_TYPE,
                 FlowScopeDataset::make_scope(&foo_id),
             ),
             start_time + Duration::milliseconds(10),
@@ -10698,7 +10698,7 @@ async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
     // retried
     let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
     assert_eq!(harness.flow_activations(&ingest_flow_type, "activated"), 1);
-    assert!(harness.flow_activations("dev.kamu.flow.test.unregistered", "failed") >= 1);
+    assert!(harness.flow_activations(UNREGISTERED_FLOW_TYPE, "failed") >= 1);
     assert_eq!(harness.flow_activation_delay_samples(), 1);
     assert!(harness.flow_activation_delays_total_seconds() < 0.001);
 }
@@ -10757,7 +10757,7 @@ async fn test_failing_projector_reported_without_blocking_others() {
 
     // The failing projector stays failing, the others keep up
     assert!(harness.is_projector_failing(FAILING_PROJECTOR_NAME));
-    assert!(!harness.is_projector_failing("FlowSystemTestListener"));
+    assert!(!harness.is_projector_failing(FLOW_SYSTEM_TEST_LISTENER_NAME));
 
     let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
@@ -10969,10 +10969,7 @@ async fn test_flow_duration_starts_at_manual_activation_before_schedule() {
     // after it completed: measured from that plan, it would count as 0
     let ingest_flow_type = ingest_dataset_binding(&foo_id).flow_type;
     assert_eq!(harness.completed_flows(&ingest_flow_type, "success"), 2);
-    assert!(
-        (harness.completed_flows_duration_seconds(&ingest_flow_type, "success") - 0.05).abs()
-            < 0.001
-    );
+    harness.assert_completed_flows_duration_seconds(&ingest_flow_type, "success", 0.05);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -11260,11 +11257,9 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
     // once enough records arrived: measured from that plan, it would count as 0
     let transform_flow_type = transform_dataset_binding(&bar_id).flow_type;
     assert_eq!(harness.completed_flows(&transform_flow_type, "success"), 1);
-    assert!(
-        (harness.completed_flows_duration_seconds(&transform_flow_type, "success") - 0.02).abs()
-            < 0.001
-    );
+    harness.assert_completed_flows_duration_seconds(&transform_flow_type, "success", 0.02);
 }
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
@@ -11983,7 +11978,7 @@ async fn test_abort_flow_waiting_in_throttling() {
             });
             let task0_handle = task0_driver.run();
 
-            // Manual trigger for "foo" at 50ms: throttled until 130ms
+            // Manual trigger for "foo" at 50ms: throttled until 140ms
             let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
                 flow_binding: foo_flow_binding,
                 run_since_start: Duration::milliseconds(50),

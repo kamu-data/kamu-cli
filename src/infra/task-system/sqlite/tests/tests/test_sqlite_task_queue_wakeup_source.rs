@@ -120,7 +120,12 @@ impl SqliteTaskQueueWakeupHarness {
         catalog_builder.add::<SqliteTaskQueueWakeupSource>();
         catalog_builder.add::<SqlitePollingHub>();
         catalog_builder.add::<WakeupListenerMetrics>();
-        catalog_builder.add_value(WakeupListenerConfig::local_default());
+        // Polling backoff capped well below the wait timeout, so a write is
+        // always detected within one wait
+        catalog_builder.add_value(WakeupListenerConfig {
+            min_debounce_interval: Duration::from_millis(20),
+            max_listening_timeout: Duration::from_millis(100),
+        });
 
         let catalog = catalog_builder.build();
 

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
+use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 
 use async_utils::BackgroundAgent;
@@ -129,7 +130,7 @@ impl FlowHarness {
                 HashMap::new(),
             ))
             .add_value(FlowAgentActivationConfig {
-                concurrency: std::num::NonZeroUsize::new(8).unwrap(),
+                concurrency: NonZeroUsize::new(8).unwrap(),
             })
             .add_value(FlowSystemEventAgentConfig { batch_size: 10 })
             .add_value(WakeupListenerConfig {
@@ -484,11 +485,18 @@ impl FlowHarness {
             .get_sample_count()
     }
 
-    pub fn completed_flows_duration_seconds(&self, flow_type: &str, outcome: &str) -> f64 {
-        self.completion_metrics()
+    pub fn assert_completed_flows_duration_seconds(
+        &self,
+        flow_type: &str,
+        outcome: &str,
+        expected: f64,
+    ) {
+        let actual = self
+            .completion_metrics()
             .flow_duration_seconds
             .with_label_values(&[flow_type, outcome])
-            .get_sample_sum()
+            .get_sample_sum();
+        assert!((actual - expected).abs() < 0.001, "{actual} != {expected}");
     }
 
     /// Completed flows with at most this many retries
@@ -507,8 +515,8 @@ impl FlowHarness {
             .get_histogram()
             .get_bucket()
             .iter()
-            .find(|bucket| bucket.upper_bound() >= f64::from(retries))
-            .unwrap()
+            .find(|bucket| (bucket.upper_bound() - f64::from(retries)).abs() < f64::EPSILON)
+            .expect("retries must be a bucket bound")
             .cumulative_count()
     }
 

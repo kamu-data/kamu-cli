@@ -190,7 +190,6 @@ impl FlowControllerTransformHarness {
         b.add::<FlowControllerTransform>()
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
-            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<WakeupListenerMetrics>()
             .add_value(mock_dataset_increment_service)

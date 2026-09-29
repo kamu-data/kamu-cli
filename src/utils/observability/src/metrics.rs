@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use prometheus::Encoder as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,16 +25,13 @@ pub trait MetricsProvider: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Seconds between two moments, for duration metrics; 0 if `to` precedes `from`
-pub fn seconds_between(
-    from: chrono::DateTime<chrono::Utc>,
-    to: chrono::DateTime<chrono::Utc>,
-) -> f64 {
+pub fn seconds_between(from: DateTime<Utc>, to: DateTime<Utc>) -> f64 {
     (to - from).as_seconds_f64().max(0.0)
 }
 
 /// Unix time in seconds, for timestamp gauges
-pub fn unix_timestamp_seconds(at: chrono::DateTime<chrono::Utc>) -> f64 {
-    seconds_between(chrono::DateTime::UNIX_EPOCH, at)
+pub fn unix_timestamp_seconds(at: DateTime<Utc>) -> f64 {
+    seconds_between(DateTime::UNIX_EPOCH, at)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

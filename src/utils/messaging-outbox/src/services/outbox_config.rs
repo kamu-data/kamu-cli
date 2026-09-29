@@ -17,7 +17,7 @@ pub struct OutboxAgentConfig {
     pub batch_size: usize,
 
     /// Consumers handling messages at once, across all producers. Each one
-    /// runs in its own transaction with a pooled connection
+    /// typically holds a pooled connection while it runs
     pub consumer_concurrency: NonZeroUsize,
 }
 

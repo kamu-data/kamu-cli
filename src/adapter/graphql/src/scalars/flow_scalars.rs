@@ -34,7 +34,8 @@ pub struct FlowTimingRecords {
     /// waits for activation
     pub first_attempt_scheduled_at: Option<DateTime<Utc>>,
 
-    /// Planned scheduling time (different than first in case of retries)
+    /// Planned activation time of the next attempt; moved by manual runs,
+    /// batching and retries
     pub scheduled_at: Option<DateTime<Utc>>,
 
     /// Recorded time of last task scheduling

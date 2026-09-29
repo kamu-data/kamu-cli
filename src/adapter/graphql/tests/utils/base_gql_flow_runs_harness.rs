@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
@@ -88,7 +89,7 @@ impl BaseGQLFlowRunsHarness {
                 HashMap::new(),
             ))
             .add_value(FlowAgentActivationConfig {
-                concurrency: std::num::NonZeroUsize::new(8).unwrap(),
+                concurrency: NonZeroUsize::new(8).unwrap(),
             })
             .add_value(FlowSystemEventAgentConfig::local_default())
             .add_value(WakeupListenerConfig::local_default())

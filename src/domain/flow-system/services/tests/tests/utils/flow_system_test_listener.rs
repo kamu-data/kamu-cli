@@ -31,6 +31,8 @@ use time_source::FakeSystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) const FLOW_SYSTEM_TEST_LISTENER_NAME: &str = "FlowSystemTestListener";
+
 pub(crate) struct FlowSystemTestListener {
     fake_time_source: Arc<FakeSystemTimeSource>,
     state: Arc<Mutex<FlowSystemTestListenerState>>,
@@ -371,7 +373,7 @@ impl std::fmt::Display for FlowSystemTestListener {
 #[async_trait::async_trait]
 impl FlowSystemEventProjector for FlowSystemTestListener {
     fn name(&self) -> &'static str {
-        "FlowSystemTestListener"
+        FLOW_SYSTEM_TEST_LISTENER_NAME
     }
 
     /// Apply a *single* event using the open transaction.

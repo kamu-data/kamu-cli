@@ -167,7 +167,6 @@ impl FlowControllerCompactHarness {
         b.add::<FlowControllerCompact>()
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
-            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<WakeupListenerMetrics>()
             .add_value(mock_flow_sensor_dispatcher)

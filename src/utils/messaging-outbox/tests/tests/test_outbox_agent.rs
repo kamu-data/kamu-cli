@@ -1132,15 +1132,17 @@ async fn test_consumers_limited_across_producers() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_consumers_run_concurrently_up_to_limit() {
+async fn test_consumers_run_concurrently_below_limit() {
     let harness = OutboxAgentConcurrencyHarness::new(8);
     harness.outbox_agent.run_initialization().await.unwrap();
 
     harness.post_messages(3).await;
     harness.outbox_agent.run_while_has_tasks().await.unwrap();
 
+    // At most 3 consumers of H and 1 consumer of I overlap
     assert_eq!(harness.consumed(), 12);
-    assert!(harness.max_in_flight() > 1, "{}", harness.max_in_flight());
+    let max_in_flight = harness.max_in_flight();
+    assert!((2..=4).contains(&max_in_flight), "{max_in_flight}");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

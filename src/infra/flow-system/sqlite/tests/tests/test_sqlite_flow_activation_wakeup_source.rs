@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -86,11 +87,11 @@ struct SqliteFlowActivationWakeupHarness {
     catalog: Catalog,
     wakeup_listener: Box<dyn WakeupListener>,
     flow_binding: FlowBinding,
-    last_event_ids: std::sync::Mutex<std::collections::HashMap<FlowID, EventID>>,
+    last_event_ids: Mutex<HashMap<FlowID, EventID>>,
 }
 
 impl SqliteFlowActivationWakeupHarness {
-    pub fn new(sqlite_pool: SqlitePool) -> Self {
+    fn new(sqlite_pool: SqlitePool) -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
@@ -98,7 +99,12 @@ impl SqliteFlowActivationWakeupHarness {
         catalog_builder.add::<SqliteFlowActivationWakeupSource>();
         catalog_builder.add::<SqlitePollingHub>();
         catalog_builder.add::<WakeupListenerMetrics>();
-        catalog_builder.add_value(WakeupListenerConfig::local_default());
+        // Polling backoff capped well below the wait timeout, so a write is
+        // always detected within one wait
+        catalog_builder.add_value(WakeupListenerConfig {
+            min_debounce_interval: Duration::from_millis(20),
+            max_listening_timeout: Duration::from_millis(100),
+        });
 
         let catalog = catalog_builder.build();
 

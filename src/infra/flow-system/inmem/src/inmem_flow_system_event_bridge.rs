@@ -33,7 +33,7 @@ struct State {
     events: Vec<FlowSystemEvent>,
     // projector name -> applied event ids
     applied: HashMap<&'static str, BTreeSet<EventID>>,
-    // projector name -> next scan position in `merged`
+    // projector name -> length of the applied prefix of `events`
     next_pos: HashMap<&'static str, usize>,
 }
 
@@ -100,16 +100,16 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         projector_name: &'static str,
         batch_size: usize,
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
-        let mut state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap();
 
         let pos = state.next_pos.get(projector_name).copied().unwrap_or(0);
-        let applied = state.applied.entry(projector_name).or_default().clone();
+        let applied = state.applied.get(projector_name);
 
         // The cursor stays put: a batch that fails to apply is fetched again,
         // as a rolled back transaction would leave it in a database
         Ok(state.events[pos..]
             .iter()
-            .filter(|e| !applied.contains(&e.event_id))
+            .filter(|e| applied.is_none_or(|applied| !applied.contains(&e.event_id)))
             .take(batch_size)
             .cloned()
             .collect())

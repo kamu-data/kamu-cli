@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
@@ -86,11 +87,11 @@ struct PostgresFlowActivationWakeupHarness {
     catalog: Catalog,
     wakeup_listener: Box<dyn WakeupListener>,
     flow_binding: FlowBinding,
-    last_event_ids: std::sync::Mutex<std::collections::HashMap<FlowID, EventID>>,
+    last_event_ids: Mutex<HashMap<FlowID, EventID>>,
 }
 
 impl PostgresFlowActivationWakeupHarness {
-    pub fn new(pg_pool: PgPool) -> Self {
+    fn new(pg_pool: PgPool) -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();

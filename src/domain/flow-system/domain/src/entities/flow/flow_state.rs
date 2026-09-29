@@ -44,8 +44,8 @@ pub struct FlowTimingRecords {
     /// First task scheduled; unlike the planned activation time, never moved
     /// by manual runs, batching or retries
     pub first_activated_at: Option<DateTime<Utc>>,
-    /// Flow scheduled and will be activated at time
-    /// (different than first in case of retries)
+    /// Planned activation time of the next attempt; moved by manual runs,
+    /// batching and retries
     pub scheduled_for_activation_at: Option<DateTime<Utc>>,
     /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
@@ -81,10 +81,6 @@ impl FlowState {
         self.outcome
             .as_ref()
             .and_then(|outcome| outcome.try_task_result_as_ref())
-    }
-
-    pub fn can_schedule(&self) -> bool {
-        matches!(self.status(), FlowStatus::Waiting | FlowStatus::Retrying)
     }
 
     pub fn get_reactive_data_increment(
