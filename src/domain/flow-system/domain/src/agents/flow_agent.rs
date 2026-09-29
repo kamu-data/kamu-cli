@@ -69,4 +69,24 @@ pub struct FlowAgentActivationConfig {
     pub concurrency: NonZeroUsize,
 }
 
+impl FlowAgentActivationConfig {
+    // Sqlite has a single connection: concurrent activations would only queue
+    // for it, risking acquire timeouts
+    pub fn local_default() -> Self {
+        Self {
+            batch_size: NonZeroUsize::new(20).unwrap(),
+            concurrency: NonZeroUsize::MIN,
+        }
+    }
+
+    // Postgres pools connections: activations run in parallel, well below the
+    // default pool size, which API requests and other agents share
+    pub fn production_default() -> Self {
+        Self {
+            batch_size: NonZeroUsize::new(100).unwrap(),
+            concurrency: NonZeroUsize::new(8).unwrap(),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

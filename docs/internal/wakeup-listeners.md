@@ -331,8 +331,8 @@ backgroundAgents:
     flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
     flowActivations: 20     # FlowAgentActivationConfig::batch_size
   concurrency:
-    flowActivations: 8      # FlowAgentActivationConfig::concurrency
-    outboxConsumers: 8      # OutboxAgentConfig::consumer_concurrency
+    flowActivations: 1      # FlowAgentActivationConfig::concurrency
+    outboxConsumers: 1      # OutboxAgentConfig::consumer_concurrency
 ```
 
 - `minDebounceInterval` — how long a handle absorbs a burst after the first signal, and the SQLite
@@ -347,14 +347,16 @@ backgroundAgents:
 - `batching` — records processed per transaction; for the flow agent, due flows loaded per page.
   The task agent has no entry: it claims and runs one task at a time (its analogue would be
   concurrency, not batching).
+- `concurrency` — defaults to 1, as SQLite has a single connection: more would only queue on it,
+  and an outbox consumer timing out on it stays failed until restart. Postgres deployments raise
+  both limits (`production_default()`: 8 each).
 - `concurrency.flowActivations` — flows activated at once, each holding a pooled connection for its
-  transaction; keep it well below the Postgres pool size. On SQLite activations run one at a time
-  regardless, as the pool has a single connection.
+  transaction; keep it well below the Postgres pool size.
 - `concurrency.outboxConsumers` — outbox consumers handling messages at once, across all producers,
   each in its own transaction. Messages of one producer are still handled in order: all consumers
   finish message N before any gets N+1. Without a limit, a burst over several producers could
   demand more connections than the pool has. The two limits, the task agent and API requests all
-  share one pool, so keep their sum in mind when sizing `database.maxConnections`.
+  share one pool, so keep their sum in mind when sizing `database.maxConnections` (default `20`).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_hub.rs`).
 

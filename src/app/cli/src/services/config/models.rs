@@ -528,6 +528,9 @@ pub struct RemoteDatabaseConfig {
     pub database_name: String,
     pub host: String,
     pub port: Option<u16>,
+    /// Connection pool size, 20 by default. Background agents may hold up to
+    /// `backgroundAgents.concurrency.flowActivations + outboxConsumers`
+    /// connections alongside API requests
     pub max_connections: Option<u32>,
     pub max_lifetime_secs: Option<u64>,
     pub acquire_timeout_secs: Option<u64>,
@@ -700,8 +703,9 @@ pub struct UploadsConfig {
 
 // Note: defaults suit the CLI with a SQLite target, and match
 // `WakeupListenerConfig::local_default()` and the agents' `local_default()`
-// batch sizes, where the reasoning is documented. Postgres targets typically
-// use a higher listening timeout (~60s) and larger batches (~100..500).
+// batch sizes and concurrency, where the reasoning is documented. Postgres
+// targets typically use a higher listening timeout (~60s), larger batches
+// (~100..500) and concurrency (~8).
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsConfig {
     /// How long agents absorb a burst of change signals before processing
@@ -742,17 +746,18 @@ pub struct BackgroundAgentsBatchingConfig {
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsConcurrencyConfig {
     /// Flows activated at once, each in its own transaction with a pooled
-    /// connection. Keep it well below the database pool size. `SQLite` has a
-    /// single connection, so activations run one at a time regardless.
-    /// 0 is treated as 1
-    #[config(default = 8)]
+    /// connection. Keep it well below the database pool size (e.g. 8 with
+    /// Postgres). `SQLite` has a single connection, so more than 1 only queues
+    /// activations for it. 0 is treated as 1
+    #[config(default = 1)]
     pub flow_activations: usize,
 
     /// Outbox consumers handling messages at once, across all producers, each
     /// in its own transaction with a pooled connection. Messages of a producer
-    /// are still handled in order. Keep it well below the database pool size.
-    /// 0 is treated as 1
-    #[config(default = 8)]
+    /// are still handled in order. Keep it well below the database pool size
+    /// (e.g. 8 with Postgres). `SQLite` has a single connection, so more than 1
+    /// only queues consumers for it. 0 is treated as 1
+    #[config(default = 1)]
     pub outbox_consumers: usize,
 }
 

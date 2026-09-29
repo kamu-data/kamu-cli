@@ -167,15 +167,15 @@
       "additionalProperties": false,
       "properties": {
         "flowActivations": {
-          "default": 8,
-          "description": "Flows activated at once, each in its own transaction with a pooled\nconnection. Keep it well below the database pool size. `SQLite` has a\nsingle connection, so activations run one at a time regardless.\n0 is treated as 1",
+          "default": 1,
+          "description": "Flows activated at once, each in its own transaction with a pooled\nconnection. Keep it well below the database pool size (e.g. 8 with\nPostgres). `SQLite` has a single connection, so more than 1 only queues\nactivations for it. 0 is treated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "outboxConsumers": {
-          "default": 8,
-          "description": "Outbox consumers handling messages at once, across all producers, each\nin its own transaction with a pooled connection. Messages of a producer\nare still handled in order. Keep it well below the database pool size.\n0 is treated as 1",
+          "default": 1,
+          "description": "Outbox consumers handling messages at once, across all producers, each\nin its own transaction with a pooled connection. Messages of a producer\nare still handled in order. Keep it well below the database pool size\n(e.g. 8 with Postgres). `SQLite` has a single connection, so more than 1\nonly queues consumers for it. 0 is treated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -198,8 +198,8 @@
         "concurrency": {
           "$ref": "#/$defs/BackgroundAgentsConcurrencyConfig",
           "default": {
-            "flowActivations": 8,
-            "outboxConsumers": 8
+            "flowActivations": 1,
+            "outboxConsumers": 1
           },
           "description": "Concurrency limits of agents processing records in parallel"
         },
@@ -263,6 +263,7 @@
               "type": "string"
             },
             "maxConnections": {
+              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections alongside API requests",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -321,6 +322,7 @@
               "type": "string"
             },
             "maxConnections": {
+              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections alongside API requests",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -379,6 +381,7 @@
               "type": "string"
             },
             "maxConnections": {
+              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections alongside API requests",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -1334,8 +1337,8 @@
           "outboxMessages": 20
         },
         "concurrency": {
-          "flowActivations": 8,
-          "outboxConsumers": 8
+          "flowActivations": 1,
+          "outboxConsumers": 1
         },
         "maxListeningTimeout": "2s",
         "minDebounceInterval": "20ms"

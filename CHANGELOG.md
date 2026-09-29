@@ -33,10 +33,13 @@ Recommendation: for ease of reading, use the following format:
     delay for flows whose activation failed
   - due flows are loaded in pages of `backgroundAgents.batching.flowActivations` (default `20`) and
     activated concurrently, each in its own transaction, up to
-    `backgroundAgents.concurrency.flowActivations` (default `8`) at once
+    `backgroundAgents.concurrency.flowActivations` at once (default `1` for SQLite, `8` suggested
+    for Postgres)
 - Outbox consumers handling messages at once, across all producers, are limited by
-  `backgroundAgents.concurrency.outboxConsumers` (default `8`); previously unbounded, a burst could
-  exhaust the database connection pool
+  `backgroundAgents.concurrency.outboxConsumers` (default `1` for SQLite, `8` suggested for
+  Postgres); previously unbounded, a burst could exhaust the database connection pool
+- Postgres and MySQL connection pools default to 20 connections (`database.maxConnections`), was 10:
+  with Postgres concurrency limits of 8 each, background agents alone may hold up to 16
 - **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
   - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
     the per-agent settings in `outbox`, `flowSystem.flowSystemEventAgent` and `flowSystem.taskAgent`

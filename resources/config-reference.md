@@ -24,8 +24,8 @@
     &quot;outboxMessages&quot;: 20
   },
   &quot;concurrency&quot;: {
-    &quot;flowActivations&quot;: 8,
-    &quot;outboxConsumers&quot;: 8
+    &quot;flowActivations&quot;: 1,
+    &quot;outboxConsumers&quot;: 1
   },
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
   &quot;minDebounceInterval&quot;: &quot;20ms&quot;
@@ -411,26 +411,27 @@ Due flows the flow agent loads at once before activating them.
 <tr>
 <td><code>flowActivations</code></td>
 <td><code>integer</code></td>
-<td><code class="language-json">8</code></td>
+<td><code class="language-json">1</code></td>
 <td>
 
 Flows activated at once, each in its own transaction with a pooled
-connection. Keep it well below the database pool size. `SQLite` has a
-single connection, so activations run one at a time regardless.
-0 is treated as 1
+connection. Keep it well below the database pool size (e.g. 8 with
+Postgres). `SQLite` has a single connection, so more than 1 only queues
+activations for it. 0 is treated as 1
 
 </td>
 </tr>
 <tr>
 <td><code>outboxConsumers</code></td>
 <td><code>integer</code></td>
-<td><code class="language-json">8</code></td>
+<td><code class="language-json">1</code></td>
 <td>
 
 Outbox consumers handling messages at once, across all producers, each
 in its own transaction with a pooled connection. Messages of a producer
-are still handled in order. Keep it well below the database pool size.
-0 is treated as 1
+are still handled in order. Keep it well below the database pool size
+(e.g. 8 with Postgres). `SQLite` has a single connection, so more than 1
+only queues consumers for it. 0 is treated as 1
 
 </td>
 </tr>
@@ -456,8 +457,8 @@ are still handled in order. Keep it well below the database pool size.
 <td><code>concurrency</code></td>
 <td><a href="#backgroundagentsconcurrencyconfig"><code>BackgroundAgentsConcurrencyConfig</code></a></td>
 <td><pre><code class="language-json">{
-  &quot;flowActivations&quot;: 8,
-  &quot;outboxConsumers&quot;: 8
+  &quot;flowActivations&quot;: 1,
+  &quot;outboxConsumers&quot;: 1
 }</code></pre></td>
 <td>Concurrency limits of agents processing records in parallel</td>
 </tr>
@@ -559,7 +560,13 @@ the next flow activation moment regardless of it.
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">null</code></td>
-<td></td>
+<td>
+
+Connection pool size, 20 by default. Background agents may hold up to
+`backgroundAgents.concurrency.flowActivations + outboxConsumers`
+connections alongside API requests
+
+</td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>
@@ -616,7 +623,13 @@ the next flow activation moment regardless of it.
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">null</code></td>
-<td></td>
+<td>
+
+Connection pool size, 20 by default. Background agents may hold up to
+`backgroundAgents.concurrency.flowActivations + outboxConsumers`
+connections alongside API requests
+
+</td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>
@@ -673,7 +686,13 @@ the next flow activation moment regardless of it.
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">null</code></td>
-<td></td>
+<td>
+
+Connection pool size, 20 by default. Background agents may hold up to
+`backgroundAgents.concurrency.flowActivations + outboxConsumers`
+connections alongside API requests
+
+</td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>

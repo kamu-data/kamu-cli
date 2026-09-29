@@ -412,15 +412,15 @@ backgroundAgents:
   batching:
     outboxMessages: 20        # OutboxAgentConfig::batch_size — messages loaded per iteration
   concurrency:
-    outboxConsumers: 8        # OutboxAgentConfig::consumer_concurrency — consumer tasks at once
+    outboxConsumers: 1        # OutboxAgentConfig::consumer_concurrency — consumer tasks at once
 ```
 
 - `batching.outboxMessages` — messages planned per iteration, across producers. Larger batches
   save planning round trips when catching up on a backlog; smaller ones hand the SQLite connection
   back to API requests sooner.
 - `concurrency.outboxConsumers` — consumer tasks running at once, across all producers, each holding
-  a pooled connection. It shares the pool with flow activations, the task agent and API requests,
-  so size `database.maxConnections` for their sum.
+  a pooled connection. 1 by default for SQLite's single connection; 8 in `production_default()`. It shares the pool with flow activations, the task agent and API requests,
+  so size `database.maxConnections` (default `20`) for their sum.
 
 Prometheus metrics (`OutboxAgentMetrics`), labelled by `producer` and `consumer`:
 
