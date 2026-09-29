@@ -433,6 +433,16 @@ impl FlowHarness {
             .is_some()
     }
 
+    pub async fn task_cancellation_requested(&self, task_id: TaskID) -> bool {
+        let task_event_store = self.catalog.get_one::<dyn TaskEventStore>().unwrap();
+        Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap()
+            .timing
+            .cancellation_requested_at
+            .is_some()
+    }
+
     pub fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {
         TaskDriver::new(
             self.catalog.get_one().unwrap(),

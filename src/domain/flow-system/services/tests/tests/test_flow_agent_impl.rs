@@ -10741,5 +10741,712 @@ async fn test_flow_scheduled_earlier_than_awaited_activation() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_abort_flow_waiting_for_retry() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+                fetch_next_iteration: false,
+            },
+            Some(RetryPolicy {
+                max_attempts: 2,
+                min_delay_seconds: 1,
+                backoff_type: RetryBackoffType::Fixed,
+            }),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
+
+            // Task 0: "foo" start running at 30ms, fail at 40ms, retry planned at 1040ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            // Abort the flow at 500ms, while it waits for the retry
+            let abort0_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(0),
+                abort_since_start: Duration::milliseconds(500),
+            });
+            let abort0_handle = abort0_driver.run();
+
+            // Main simulation script: well past the planned retry
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(1100)).await;
+            };
+
+            tokio::join!(trigger0_handle, task0_handle, abort0_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    // The retry never happened
+    assert!(!harness.task_exists(TaskID::new(1)).await);
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual
+
+            #2: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #3: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #4: +40ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms)
+
+            #5: +500ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Aborted
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_retry_planned_before_restart_happens_after_restart() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+                fetch_next_iteration: false,
+            },
+            Some(RetryPolicy {
+                max_attempts: 2,
+                min_delay_seconds: 1,
+                backoff_type: RetryBackoffType::Fixed,
+            }),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    // First run: the task fails, a retry is planned at 1040ms
+    harness
+        .simulate_flow_scenario(|| async {
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
+
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(100)).await;
+            };
+
+            tokio::join!(trigger0_handle, task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    // Second run after a restart: nothing but the stored retry time brings the flow back
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 1: the retry, created at 1040ms, starts running at 1050ms, succeeds at 1060ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(950),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
+
+            let main_handle = async {
+                // Restarted at 100ms: the retry is not due before 1040ms
+                harness.advance_time(Duration::milliseconds(930)).await;
+                assert!(!harness.task_exists(TaskID::new(1)).await);
+
+                // It's due right at 1040ms
+                harness.advance_time(Duration::milliseconds(10)).await;
+                assert!(harness.task_exists(TaskID::new(1)).await);
+
+                harness.advance_time(Duration::milliseconds(50)).await;
+            };
+
+            tokio::join!(task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual
+
+            #2: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #3: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #4: +40ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms)
+
+            #5: +100ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms)
+
+            #6: +1040ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms) Executor(task=1, since=1040ms)
+
+            #7: +1050ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0,1)
+
+            #8: +1060ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_schedule_trigger_modified_while_flow_waits() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            foo_flow_binding.clone(),
+            FlowTriggerRule::Schedule(Duration::milliseconds(100).into()),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms, next run waits until 120ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(50)).await;
+
+                // The rule changes while the flow waits for its scheduled activation at 120ms:
+                // the flow is re-evaluated, and runs right away, as throttling allows it
+                harness
+                    .set_flow_trigger(
+                        harness.now(),
+                        foo_flow_binding.clone(),
+                        FlowTriggerRule::Schedule(Duration::milliseconds(40).into()),
+                        FlowTriggerStopPolicy::default(),
+                    )
+                    .await;
+
+                harness.advance_time(Duration::milliseconds(10)).await;
+                assert!(harness.task_exists(TaskID::new(1)).await);
+
+                harness.advance_time(Duration::milliseconds(90)).await;
+            };
+
+            tokio::join!(task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=120ms)
+                Flow ID = 0 Finished Success
+
+            #5: +50ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=120ms) Activating(at=50ms)
+                Flow ID = 0 Finished Success
+
+            #6: +50ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=50ms)
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_independent_flows_due_at_same_moment() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let bar_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("bar"),
+            account_name: None,
+        })
+        .await;
+
+    let start_time = harness
+        .now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            start_time + Duration::milliseconds(50),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            harness.advance_time(Duration::milliseconds(20)).await;
+
+            // Scheduled later, for the same moment
+            harness
+                .schedule_flow_for_activation(
+                    &ingest_dataset_binding(&bar_id),
+                    start_time + Duration::milliseconds(50),
+                )
+                .await;
+
+            harness.advance_time(Duration::milliseconds(30)).await;
+
+            // Both activated at that moment, in the order of flow IDs
+            assert!(harness.task_exists(TaskID::new(0)).await);
+            assert!(harness.task_exists(TaskID::new(1)).await);
+
+            harness.advance_time(Duration::milliseconds(20)).await;
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=50ms)
+
+            #1: +20ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=50ms)
+
+            #2: +50ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=50ms)
+
+            #3: +50ms:
+              "bar" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=50ms)
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=50ms)
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_activation_moment_between_scheduling_steps() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let start_time = harness
+        .now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Not a multiple of the scheduling step
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            start_time + Duration::milliseconds(25),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            harness.advance_time(Duration::milliseconds(20)).await;
+            assert!(!harness.task_exists(TaskID::new(0)).await);
+
+            // The first step past the activation moment activates the flow
+            harness.advance_time(Duration::milliseconds(10)).await;
+            assert!(harness.task_exists(TaskID::new(0)).await);
+
+            harness.advance_time(Duration::milliseconds(20)).await;
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=25ms)
+
+            #1: +25ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=25ms)
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pause_trigger_while_flow_waits_for_executor() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            foo_flow_binding.clone(),
+            FlowTriggerRule::Schedule(Duration::milliseconds(50).into()),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0 is created at 0ms, but no executor picks it up
+            harness.advance_time(Duration::milliseconds(30)).await;
+            assert!(harness.task_exists(TaskID::new(0)).await);
+
+            harness.pause_flow(harness.now(), &foo_flow_binding).await;
+            assert!(harness.task_cancellation_requested(TaskID::new(0)).await);
+
+            // Nothing is scheduled any more
+            harness.advance_time(Duration::milliseconds(150)).await;
+            assert!(!harness.task_exists(TaskID::new(1)).await);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling
+
+            #1: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Aborted
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_abort_flow_waiting_in_throttling() {
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mandatory_throttling_period: Some(Duration::milliseconds(100)),
+        ..Default::default()
+    });
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding.clone(),
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
+
+            // Task 0: "foo" start running at 30ms, finish at 40ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            // Manual trigger for "foo" at 50ms: throttled until 130ms
+            let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding,
+                run_since_start: Duration::milliseconds(50),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger1_handle = trigger1_driver.run();
+
+            // Abort the throttled flow at 80ms
+            let abort1_driver = harness.manual_flow_abort_driver(ManualFlowAbortArgs {
+                flow_id: FlowID::new(1),
+                abort_since_start: Duration::milliseconds(80),
+            });
+            let abort1_handle = abort1_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(200)).await;
+            };
+
+            tokio::join!(
+                trigger0_handle,
+                task0_handle,
+                trigger1_handle,
+                abort1_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
+
+    // The throttled activation never happened
+    assert!(!harness.task_exists(TaskID::new(1)).await);
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual
+
+            #2: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #3: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #4: +40ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #5: +50ms:
+              "foo" Ingest:
+                Flow ID = 1 Waiting Manual Throttling(for=100ms, wakeup=140ms, shifted=50ms)
+                Flow ID = 0 Finished Success
+
+            #6: +80ms:
+              "foo" Ingest:
+                Flow ID = 1 Finished Aborted
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO next:
 //  - derived more than 1 level
