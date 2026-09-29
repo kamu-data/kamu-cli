@@ -408,7 +408,8 @@ Base type: `string`
 <td>
 
 Fallback period to re-check for work if a change signal is missed.
-With `SQLite` it also paces the polling.
+With `SQLite` it also paces the polling. The flow agent wakes up at
+the next flow activation moment regardless of it.
 
 </td>
 </tr>
@@ -1195,19 +1196,26 @@ the resources (for authenticated clients)
 <td><code>awaitingStepSecs</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">1</code></td>
-<td></td>
+<td>
+
+Scheduling granularity: flow activation times are rounded to it.
+Also the delay before retrying to activate a flow whose activation
+failed. The flow agent does not poll with this period: it wakes up at
+activation moments and when flows get scheduled.
+
+</td>
 </tr>
 <tr>
 <td><code>defaultRetryPolicies</code></td>
 <td><code>object</code></td>
 <td><code class="language-json">{}</code></td>
-<td></td>
+<td>Retry policies applied by default, by flow type</td>
 </tr>
 <tr>
 <td><code>mandatoryThrottlingPeriodSecs</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">60</code></td>
-<td></td>
+<td>Minimal time between two runs of the same flow</td>
 </tr>
 </tbody>
 </table>

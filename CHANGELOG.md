@@ -18,6 +18,11 @@ Recommendation: for ease of reading, use the following format:
 - Task agent no longer polls the task queue when idle:
   - Postgres: tasks table notifies the agent via NOTIFY/LISTEN when a task is created or requeued
   - SQLite: incremental listening timeout approach, In-memory: explicit signals
+- Flow agent no longer polls for due flows every `awaitingStepSecs`:
+  - it sleeps until the nearest flow activation moment, and wakes up earlier when a flow gets scheduled
+    (Postgres: NOTIFY/LISTEN on `flows`, SQLite: polling of flow events, In-memory: explicit signals)
+  - `flowSystem.awaitingStepSecs` keeps its meaning of scheduling granularity, and also sets the retry
+    delay for flows whose activation failed
 - **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
   - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
     the per-agent settings in `outbox`, `flowSystem.flowSystemEventAgent` and `flowSystem.taskAgent`
@@ -35,6 +40,9 @@ Recommendation: for ease of reading, use the following format:
   In-memory stores signal channels through `InMemoryWakeupHub`, and every consumer creates its own listener
   handle (`new_wakeup_listener()`), so several consumers can watch the same changes.
   Architecture is documented in `docs/internal/wakeup-listeners.md`
+### Fixed
+- Flow agent: a flow failing to activate no longer blocks activation of flows scheduled after it,
+  and its partial writes (task, flow events) are rolled back instead of committed
 
 ## [0.267.0] - 2026-09-19
 ### Added

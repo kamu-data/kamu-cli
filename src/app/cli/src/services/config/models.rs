@@ -708,7 +708,8 @@ pub struct BackgroundAgentsConfig {
     pub min_debounce_interval: DurationString,
 
     /// Fallback period to re-check for work if a change signal is missed.
-    /// With `SQLite` it also paces the polling.
+    /// With `SQLite` it also paces the polling. The flow agent wakes up at
+    /// the next flow activation moment regardless of it.
     #[config(default_str = "2s")]
     pub max_listening_timeout: DurationString,
 
@@ -753,12 +754,18 @@ impl BackgroundAgentsConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct FlowSystemConfig {
+    /// Scheduling granularity: flow activation times are rounded to it.
+    /// Also the delay before retrying to activate a flow whose activation
+    /// failed. The flow agent does not poll with this period: it wakes up at
+    /// activation moments and when flows get scheduled.
     #[config(default = 1)]
     pub awaiting_step_secs: i64,
 
+    /// Minimal time between two runs of the same flow
     #[config(default = 60)]
     pub mandatory_throttling_period_secs: i64,
 
+    /// Retry policies applied by default, by flow type
     #[config(default, combine(merge))]
     pub default_retry_policies: BTreeMap<String, RetryPolicyConfig>,
 }

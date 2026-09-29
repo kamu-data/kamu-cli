@@ -24,7 +24,13 @@ use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrem
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use kamu_task_system::{MESSAGE_PRODUCER_KAMU_TASK_AGENT, TaskProgressMessage};
+use kamu_task_system::{
+    MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+    Task,
+    TaskEventStore,
+    TaskID,
+    TaskProgressMessage,
+};
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
@@ -417,6 +423,14 @@ impl FlowHarness {
             .unwrap();
 
         flow_id
+    }
+
+    pub async fn task_exists(&self, task_id: TaskID) -> bool {
+        let task_event_store = self.catalog.get_one::<dyn TaskEventStore>().unwrap();
+        Task::try_load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap()
+            .is_some()
     }
 
     pub fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {

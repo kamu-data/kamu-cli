@@ -170,7 +170,7 @@
         "maxListeningTimeout": {
           "$ref": "#/$defs/DurationString",
           "default": "2s",
-          "description": "Fallback period to re-check for work if a change signal is missed.\nWith `SQLite` it also paces the polling."
+          "description": "Fallback period to re-check for work if a change signal is missed.\nWith `SQLite` it also paces the polling. The flow agent wakes up at\nthe next flow activation moment regardless of it."
         },
         "minDebounceInterval": {
           "$ref": "#/$defs/DurationString",
@@ -794,6 +794,7 @@
       "properties": {
         "awaitingStepSecs": {
           "default": 1,
+          "description": "Scheduling granularity: flow activation times are rounded to it.\nAlso the delay before retrying to activate a flow whose activation\nfailed. The flow agent does not poll with this period: it wakes up at\nactivation moments and when flows get scheduled.",
           "format": "int64",
           "type": "integer"
         },
@@ -803,10 +804,12 @@
           },
           "combine": "merge",
           "default": {},
+          "description": "Retry policies applied by default, by flow type",
           "type": "object"
         },
         "mandatoryThrottlingPeriodSecs": {
           "default": 60,
+          "description": "Minimal time between two runs of the same flow",
           "format": "int64",
           "type": "integer"
         }

@@ -10659,5 +10659,87 @@ async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_flow_scheduled_earlier_than_awaited_activation() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let start_time = harness
+        .now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // The agent will sleep towards this activation
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            start_time + Duration::milliseconds(100),
+        )
+        .await;
+
+    harness
+        .simulate_flow_scenario(|| async {
+            harness.advance_time(Duration::milliseconds(30)).await;
+
+            // Scheduled while the agent sleeps, and activates earlier than it awaits
+            harness
+                .schedule_flow_for_activation(
+                    &compaction_dataset_binding(&foo_id),
+                    start_time + Duration::milliseconds(50),
+                )
+                .await;
+
+            // The task exists right at the earlier moment, not only at the awaited one
+            harness.advance_time(Duration::milliseconds(20)).await;
+            assert!(harness.task_exists(TaskID::new(0)).await);
+            assert!(!harness.task_exists(TaskID::new(1)).await);
+
+            harness.advance_time(Duration::milliseconds(60)).await;
+        })
+        .await
+        .unwrap();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=100ms)
+
+            #1: +30ms:
+              "foo" HardCompaction:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=100ms)
+
+            #2: +50ms:
+              "foo" HardCompaction:
+                Flow ID = 1 Waiting AutoPolling Executor(task=0, since=50ms)
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=100ms)
+
+            #3: +100ms:
+              "foo" HardCompaction:
+                Flow ID = 1 Waiting AutoPolling Executor(task=0, since=50ms)
+              "foo" Ingest:
+                Flow ID = 0 Waiting AutoPolling Executor(task=1, since=100ms)
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO next:
 //  - derived more than 1 level

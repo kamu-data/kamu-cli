@@ -78,6 +78,7 @@ interface "ExpensiveAccountRepository" <<i>>
 interface "ExportService" <<i>>
 interface "FindCollectionEntriesUseCase" <<i>>
 interface "FindVersionedFileVersionUseCase" <<i>>
+interface "FlowActivationWakeupSource" <<i>>
 interface "FlowConfigurationEventStore" <<i>>
 interface "FlowEventStore" <<i>>
 interface "FlowProcessStateQuery" <<i>>
@@ -426,6 +427,7 @@ class "SqliteDatasetReferenceRepository"
 class "SqliteDatasetStatisticsRepository"
 class "SqliteDidSecretKeyRepository"
 class "SqliteEmbeddingsCacheRepository"
+class "SqliteFlowActivationWakeupSource" <<agnostic>>
 class "SqliteFlowConfigurationEventStore"
 class "SqliteFlowEventStore"
 class "SqliteFlowProcessStateQuery"
@@ -1123,6 +1125,8 @@ class "WsSmartTransferProtocolClient"
 "FlowProcessStateRepository" <|-- "SqliteFlowProcessStateRepository"
 "SqliteFlowProcessStateRepository"  --> "TransactionRefT"
 "SqliteFlowProcessStateRepository"  --> "SystemTimeSource"
+"FlowActivationWakeupSource" <|-- "SqliteFlowActivationWakeupSource"
+"SqliteFlowActivationWakeupSource"  --> "SqlitePollingHub"
 "FlowConfigurationEventStore" <|-- "SqliteFlowConfigurationEventStore"
 "SqliteFlowConfigurationEventStore"  --> "TransactionRefT"
 "FlowEventStore" <|-- "SqliteFlowEventStore"
