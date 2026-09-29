@@ -592,30 +592,32 @@ impl FlowEventStore for SqliteFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn get_flows_scheduled_for_activation_at(
+    async fn get_flows_due_for_activation(
         &self,
-        scheduled_for_activation_at: DateTime<Utc>,
-    ) -> Result<Vec<FlowID>, InternalError> {
+        up_to: DateTime<Utc>,
+    ) -> Result<Vec<(FlowID, DateTime<Utc>)>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-        let flow_ids = sqlx::query!(
+        let due_flows = sqlx::query!(
             r#"
-            SELECT f.flow_id as flow_id
+            SELECT
+                f.flow_id as flow_id,
+                f.scheduled_for_activation_at as "activation_time!: DateTime<Utc>"
                 FROM flows f
                 WHERE
-                    f.scheduled_for_activation_at = $1 AND
+                    f.scheduled_for_activation_at <= $1 AND
                     (f.flow_status = 'waiting' OR f.flow_status = 'retrying')
-                ORDER BY f.flow_id
+                ORDER BY f.scheduled_for_activation_at, f.flow_id
             "#,
-            scheduled_for_activation_at,
+            up_to,
         )
-        .map(|row| FlowID::try_from(row.flow_id).unwrap())
+        .map(|row| (FlowID::try_from(row.flow_id).unwrap(), row.activation_time))
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        Ok(flow_ids)
+        Ok(due_flows)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(flow_scope_query))]

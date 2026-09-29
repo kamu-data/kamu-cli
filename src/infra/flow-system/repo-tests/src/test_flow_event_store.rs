@@ -1644,7 +1644,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
+            .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
         vec![]
@@ -1671,10 +1671,10 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert_eq!(maybe_nearest_activation_time, Some(activation_moment));
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
+            .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
-        vec![flow_id]
+        vec![(flow_id, activation_moment)]
     );
 
     let last_event_id = event_store
@@ -1698,7 +1698,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
+            .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
         vec![]
@@ -1725,7 +1725,7 @@ pub async fn test_flow_activation_visibility_at_different_stages_through_success
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
+            .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
         vec![]
@@ -1808,10 +1808,10 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
     assert_eq!(maybe_nearest_activation_time, Some(activation_moment));
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
+            .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
-        vec![flow_id]
+        vec![(flow_id, activation_moment)]
     );
 
     event_store
@@ -1834,7 +1834,7 @@ pub async fn test_flow_activation_visibility_when_aborted_before_activation(cata
     assert!(maybe_nearest_activation_time.is_none());
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
+            .get_flows_due_for_activation(activation_moment)
             .await
             .unwrap(),
         vec![]
@@ -1986,18 +1986,218 @@ pub async fn test_flow_activation_on_multiple_flows(catalog: &Catalog) {
     assert_eq!(maybe_nearest_activation_time, Some(activation_moment_1));
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment_1)
+            .get_flows_due_for_activation(activation_moment_1)
             .await
             .unwrap(),
-        vec![flow_id_foo, flow_id_bar]
+        vec![
+            (flow_id_foo, activation_moment_1),
+            (flow_id_bar, activation_moment_1)
+        ]
     );
     assert_eq!(
         event_store
-            .get_flows_scheduled_for_activation_at(activation_moment_2)
+            .get_flows_due_for_activation(activation_moment_2)
             .await
             .unwrap(),
-        vec![flow_id_baz]
+        vec![
+            (flow_id_foo, activation_moment_1),
+            (flow_id_bar, activation_moment_1),
+            (flow_id_baz, activation_moment_2)
+        ]
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_flows_due_for_activation(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+    let start_moment = Utc::now().trunc_subsecs(6);
+    let activation_moment_1 = start_moment + Duration::minutes(1);
+    let activation_moment_2 = start_moment + Duration::minutes(2);
+    let activation_moment_3 = start_moment + Duration::minutes(3);
+
+    // Created first, so has the lowest ID, but activates later than the others
+    let flow_id_late = event_store.new_flow_id().await.unwrap();
+    schedule_flow_for_activation(
+        event_store.as_ref(),
+        flow_id_late,
+        b"late",
+        start_moment,
+        activation_moment_2,
+    )
+    .await;
+
+    let flow_id_foo = event_store.new_flow_id().await.unwrap();
+    schedule_flow_for_activation(
+        event_store.as_ref(),
+        flow_id_foo,
+        b"foo",
+        start_moment,
+        activation_moment_1,
+    )
+    .await;
+
+    let flow_id_bar = event_store.new_flow_id().await.unwrap();
+    schedule_flow_for_activation(
+        event_store.as_ref(),
+        flow_id_bar,
+        b"bar",
+        start_moment,
+        activation_moment_1,
+    )
+    .await;
+
+    // Already has a task, so no longer waits for activation
+    let flow_id_scheduled = event_store.new_flow_id().await.unwrap();
+    let last_event_id = schedule_flow_for_activation(
+        event_store.as_ref(),
+        flow_id_scheduled,
+        b"scheduled",
+        start_moment,
+        activation_moment_1,
+    )
+    .await;
+    event_store
+        .save_events(
+            &flow_id_scheduled,
+            Some(last_event_id),
+            vec![
+                FlowEventTaskScheduled {
+                    flow_id: flow_id_scheduled,
+                    flow_binding: ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(
+                        b"scheduled",
+                    )),
+                    event_time: activation_moment_1,
+                    task_id: TaskID::new(1),
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    // Aborted before activation
+    let flow_id_aborted = event_store.new_flow_id().await.unwrap();
+    let last_event_id = schedule_flow_for_activation(
+        event_store.as_ref(),
+        flow_id_aborted,
+        b"aborted",
+        start_moment,
+        activation_moment_1,
+    )
+    .await;
+    event_store
+        .save_events(
+            &flow_id_aborted,
+            Some(last_event_id),
+            vec![
+                FlowEventAborted {
+                    flow_id: flow_id_aborted,
+                    flow_binding: ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(
+                        b"aborted",
+                    )),
+                    event_time: start_moment,
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let flow_id_future = event_store.new_flow_id().await.unwrap();
+    schedule_flow_for_activation(
+        event_store.as_ref(),
+        flow_id_future,
+        b"future",
+        start_moment,
+        activation_moment_3,
+    )
+    .await;
+
+    // Nothing is due yet
+    assert_eq!(
+        event_store
+            .get_flows_due_for_activation(start_moment)
+            .await
+            .unwrap(),
+        vec![]
+    );
+
+    // The bound is inclusive
+    assert_eq!(
+        event_store
+            .get_flows_due_for_activation(activation_moment_1)
+            .await
+            .unwrap(),
+        vec![
+            (flow_id_foo, activation_moment_1),
+            (flow_id_bar, activation_moment_1)
+        ]
+    );
+
+    // Ordered by activation moment first, then by flow ID
+    assert_eq!(
+        event_store
+            .get_flows_due_for_activation(activation_moment_2 + Duration::seconds(30))
+            .await
+            .unwrap(),
+        vec![
+            (flow_id_foo, activation_moment_1),
+            (flow_id_bar, activation_moment_1),
+            (flow_id_late, activation_moment_2),
+        ]
+    );
+}
+
+async fn schedule_flow_for_activation(
+    event_store: &dyn FlowEventStore,
+    flow_id: FlowID,
+    dataset_seed: &[u8],
+    start_moment: DateTime<Utc>,
+    activation_moment: DateTime<Utc>,
+) -> EventID {
+    let flow_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(dataset_seed));
+
+    event_store
+        .save_events(
+            &flow_id,
+            None,
+            vec![
+                FlowEventInitiated {
+                    event_time: start_moment,
+                    flow_binding: flow_binding.clone(),
+                    flow_id,
+                    activation_cause: FlowActivationCause::AutoPolling(
+                        FlowActivationCauseAutoPolling {
+                            activation_time: start_moment,
+                        },
+                    ),
+                    config_snapshot: None,
+                    retry_policy: None,
+                }
+                .into(),
+                FlowEventStartConditionUpdated {
+                    flow_id,
+                    flow_binding: flow_binding.clone(),
+                    event_time: start_moment,
+                    start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                        wake_up_at: activation_moment,
+                    }),
+                    last_activation_cause_index: 0,
+                }
+                .into(),
+                FlowEventScheduledForActivation {
+                    flow_id,
+                    flow_binding,
+                    event_time: start_moment,
+                    scheduled_for_activation_at: activation_moment,
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use async_utils::BackgroundAgent;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use database_common_macros::transactional_method;
+use database_common_macros::{transactional_method, transactional_method1};
 use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -232,33 +232,36 @@ impl FlowAgentImpl {
         Ok(())
     }
 
-    #[transactional_method]
-    async fn tick_current_timeslot(&self) -> Result<(), InternalError> {
-        let flow_event_store = transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-        // Do we have a timeslot scheduled?
-        let Some(nearest_flow_activation_moment) =
-            flow_event_store.nearest_flow_activation_moment().await?
-        else {
-            return Ok(());
-        };
-
-        // Is it time to execute it yet?
+    async fn activate_due_flows(&self) -> Result<(), InternalError> {
         let current_time = self.time_source.now();
-        if nearest_flow_activation_moment > current_time {
+
+        let due_flows = self.get_flows_due_for_activation(current_time).await?;
+        if due_flows.is_empty() {
             return Ok(());
         }
 
         // Synchronize with other agents if needed
         self.synchronize_execution_loop().await?;
 
-        self.run_flows_for_timeslot(
-            nearest_flow_activation_moment,
-            flow_event_store,
-            transaction_catalog,
-        )
-        .instrument(observability::tracing::root_span!("FlowAgent::activation"))
-        .await
+        // Activate flows grouped by timeslot, in the order of activation moments
+        for timeslot_flows in due_flows.chunk_by(|a, b| a.1 == b.1) {
+            let activation_moment = timeslot_flows[0].1;
+            self.activate_timeslot_flows(timeslot_flows, activation_moment)
+                .instrument(observability::tracing::root_span!("FlowAgent::activation"))
+                .await;
+        }
+
+        Ok(())
+    }
+
+    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
+    async fn get_flows_due_for_activation(
+        &self,
+        current_time: DateTime<Utc>,
+    ) -> Result<Vec<(FlowID, DateTime<Utc>)>, InternalError> {
+        flow_event_store
+            .get_flows_due_for_activation(current_time)
+            .await
     }
 
     async fn synchronize_execution_loop(&self) -> Result<(), InternalError> {
@@ -271,54 +274,50 @@ impl FlowAgentImpl {
         Ok(())
     }
 
-    async fn run_flows_for_timeslot(
+    async fn activate_timeslot_flows(
         &self,
+        timeslot_flows: &[(FlowID, DateTime<Utc>)],
         activation_moment: DateTime<Utc>,
-        flow_event_store: Arc<dyn FlowEventStore>,
-        transaction_catalog: Catalog,
-    ) -> Result<(), InternalError> {
-        let planned_flow_ids: Vec<_> = flow_event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
-            .await?;
-
-        let mut planned_task_futures = Vec::new();
-        for planned_flow_id in planned_flow_ids {
-            let transaction_catalog = transaction_catalog.clone();
-            let flow_event_store = flow_event_store.clone();
-
-            planned_task_futures.push(async move {
-                let mut flow = Flow::load(planned_flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-
-                if flow.can_schedule() {
-                    self.schedule_flow_task(transaction_catalog, &mut flow, activation_moment)
-                        .await?;
-                } else {
-                    tracing::warn!(
-                        flow_id = %planned_flow_id,
-                        flow_status = %flow.status(),
-                        "Skipped flow scheduling as no longer relevant"
-                    );
-                }
-
-                Ok(())
-            });
-        }
-
-        // TODO: PERF: use tokio-tasks?
-        let results = futures::future::join_all(planned_task_futures).await;
-        results
-            .into_iter()
-            .filter(Result::is_err)
-            .map(|e| e.err().unwrap())
-            .for_each(|e: InternalError| {
+    ) {
+        // Each flow is activated in its own transaction, so that a failure of one flow
+        // rolls back only its own changes, and does not affect the others
+        for (flow_id, _) in timeslot_flows {
+            if let Err(e) = self.activate_flow(*flow_id, activation_moment).await {
                 tracing::error!(
+                    flow_id = %flow_id,
                     error = ?e,
                     error_msg = %e,
                     "Scheduling flow failed"
                 );
-            });
+            }
+        }
+    }
+
+    #[transactional_method]
+    async fn activate_flow(
+        &self,
+        flow_id: FlowID,
+        activation_moment: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        let flow_event_store = transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
+
+        let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
+            .await
+            .int_err()?;
+
+        // The flow might have changed since the due flows were listed
+        if !flow.can_schedule() || flow.timing.scheduled_for_activation_at != Some(activation_moment)
+        {
+            tracing::warn!(
+                flow_id = %flow_id,
+                flow_status = %flow.status(),
+                "Skipped flow scheduling as no longer relevant"
+            );
+            return Ok(());
+        }
+
+        self.schedule_flow_task(transaction_catalog, &mut flow, activation_moment)
+            .await?;
 
         Ok(())
     }
@@ -412,7 +411,7 @@ impl BackgroundAgent for FlowAgentImpl {
         // Main scanning loop
         loop {
             // Run scheduling for current time slot
-            self.tick_current_timeslot()
+            self.activate_due_flows()
                 .instrument(tracing::debug_span!("FlowAgent::tick"))
                 .await?;
 

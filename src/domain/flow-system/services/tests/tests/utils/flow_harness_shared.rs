@@ -361,6 +361,61 @@ impl FlowHarness {
             .unwrap();
     }
 
+    /// Stores a waiting flow scheduled for activation at the given moment,
+    /// bypassing triggers and flow controllers
+    pub async fn schedule_flow_for_activation(
+        &self,
+        flow_binding: &FlowBinding,
+        activation_at: DateTime<Utc>,
+    ) -> FlowID {
+        let now = self.now();
+        let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
+
+        self.flow_event_store
+            .save_events(
+                &flow_id,
+                None,
+                vec![
+                    FlowEventInitiated {
+                        event_time: now,
+                        flow_id,
+                        flow_binding: flow_binding.clone(),
+                        activation_cause: FlowActivationCause::AutoPolling(
+                            FlowActivationCauseAutoPolling {
+                                activation_time: now,
+                            },
+                        ),
+                        config_snapshot: None,
+                        retry_policy: None,
+                    }
+                    .into(),
+                    FlowEventStartConditionUpdated {
+                        event_time: now,
+                        flow_id,
+                        flow_binding: flow_binding.clone(),
+                        start_condition: FlowStartCondition::Schedule(
+                            FlowStartConditionSchedule {
+                                wake_up_at: activation_at,
+                            },
+                        ),
+                        last_activation_cause_index: 0,
+                    }
+                    .into(),
+                    FlowEventScheduledForActivation {
+                        event_time: now,
+                        flow_id,
+                        flow_binding: flow_binding.clone(),
+                        scheduled_for_activation_at: activation_at,
+                    }
+                    .into(),
+                ],
+            )
+            .await
+            .unwrap();
+
+        flow_id
+    }
+
     pub fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {
         TaskDriver::new(
             self.catalog.get_one().unwrap(),

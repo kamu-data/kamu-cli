@@ -10560,5 +10560,104 @@ async fn test_manual_ingest_with_retry_policy_ignored_on_unrecoverable_error() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let start_time = harness
+        .now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // No controller is registered for this flow type, so scheduling it always fails
+    harness
+        .schedule_flow_for_activation(
+            &FlowBinding::new(
+                "dev.kamu.flow.test.unregistered",
+                FlowScopeDataset::make_scope(&foo_id),
+            ),
+            start_time + Duration::milliseconds(10),
+        )
+        .await;
+
+    // Activates later than the failing flow
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            start_time + Duration::milliseconds(20),
+        )
+        .await;
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 30ms, finish at 40ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            let sim_handle = harness.advance_time(Duration::milliseconds(60));
+            tokio::join!(foo_task0_handle, sim_handle);
+        })
+        .await
+        .unwrap();
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" <unknown>:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=10ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=20ms)
+
+            #1: +20ms:
+              "foo" <unknown>:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=10ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=0, since=20ms)
+
+            #2: +30ms:
+              "foo" <unknown>:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=10ms)
+              "foo" Ingest:
+                Flow ID = 1 Running(task=0)
+
+            #3: +40ms:
+              "foo" <unknown>:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=10ms)
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO next:
 //  - derived more than 1 level
