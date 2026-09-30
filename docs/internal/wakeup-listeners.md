@@ -162,14 +162,17 @@ reading of its own, so the agent re-checks once.
 
 ### Monitoring
 
-`HubWakeupListener` records `wakeup_listener_last_wait_timestamp_seconds{agent}` when a wait
-starts and when it ends, so every wakeup-driven agent reports a heartbeat without code of its own.
-Agents wait at least every `maxListeningTimeout`, so a stale value means a loop stuck in
-processing.
+`HubWakeupListener` records `wakeup_listener_last_heartbeat_timestamp_seconds{agent}` when it is
+created, when a wait starts and when it ends, and whenever the agent calls
+`WakeupListener::heartbeat()`. Agents call it after every batch, as they drain their whole backlog
+before waiting again. Agents wait at least every `maxListeningTimeout` and a batch is short, so a
+stale value means a loop stuck in processing.
 
-- **Recorded on entry, too**: reaching the wait proves a pass finished, and the flow agent drops the
-  wait whenever its activation deadline wins (§2 Deadline-driven agents), so recording on return only
-  would make a busy, healthy scheduler look hung.
+- **Recorded on creation**: agents create their listener as their loop starts, before the initial
+  catch-up, so the series exists even if that catch-up hangs.
+- **Recorded on wait entry, too**: reaching the wait proves a pass finished, and the flow agent drops
+  the wait whenever its activation deadline wins (§2 Deadline-driven agents), so recording on return
+  only would make a busy, healthy scheduler look hung.
 - **Labelled by agent.** Each wakeup source serves exactly one agent, so its implementations label
   their handles with that agent's name constant (`OUTBOX_AGENT_NAME`, `TASK_AGENT_NAME`,
   `FLOW_AGENT_NAME`, `FLOW_SYSTEM_EVENT_AGENT_NAME`), which the agent's `agent_name()` also returns.
@@ -178,7 +181,7 @@ processing.
   `WakeupHub::metrics()`, so an app that forgets to register the metrics fails at startup instead of
   silently losing the heartbeat. The app registers them once in `app.rs`; test catalogs add them
   next to the hub.
-- A task agent busy with a task does not wait, so its heartbeat pauses; the running task gauge covers
+- A task agent beats when it takes a task, but not while running it; the running task gauge covers
   that time.
 
 Agent-specific metrics and recommended alerts are in [metrics.md](metrics.md).

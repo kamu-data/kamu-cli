@@ -14,7 +14,7 @@ use observability::metrics::MetricsProvider;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WakeupListenerMetrics {
-    pub last_wait_timestamp_seconds: prometheus::GaugeVec,
+    pub last_heartbeat_timestamp_seconds: prometheus::GaugeVec,
 }
 
 #[dill::component(pub)]
@@ -25,11 +25,11 @@ impl WakeupListenerMetrics {
         use prometheus::*;
 
         Self {
-            last_wait_timestamp_seconds: GaugeVec::new(
+            last_heartbeat_timestamp_seconds: GaugeVec::new(
                 Opts::new(
-                    "wakeup_listener_last_wait_timestamp_seconds",
-                    "Time when an agent last started or finished waiting for changes: agents wait \
-                     at least every max listening timeout, so a stale value means a hung loop",
+                    "wakeup_listener_last_heartbeat_timestamp_seconds",
+                    "Time when an agent's loop last proved alive: on start, around every wait for \
+                     changes, and after every processed batch, so a stale value means a hung loop",
                 ),
                 &["agent"],
             )
@@ -37,14 +37,14 @@ impl WakeupListenerMetrics {
         }
     }
 
-    pub(crate) fn record_wait(&self, agent_name: &str) {
+    pub(crate) fn record_heartbeat(&self, agent_name: &str) {
         // Wall clock, as waits run on real time on every backend
         let now_seconds = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs_f64();
 
-        self.last_wait_timestamp_seconds
+        self.last_heartbeat_timestamp_seconds
             .with_label_values(&[agent_name])
             .set(now_seconds);
     }
@@ -52,7 +52,7 @@ impl WakeupListenerMetrics {
 
 impl MetricsProvider for WakeupListenerMetrics {
     fn register(&self, reg: &prometheus::Registry) -> prometheus::Result<()> {
-        reg.register(Box::new(self.last_wait_timestamp_seconds.clone()))?;
+        reg.register(Box::new(self.last_heartbeat_timestamp_seconds.clone()))?;
         Ok(())
     }
 }

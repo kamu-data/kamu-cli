@@ -22,7 +22,7 @@ use kamu_flow_system::{
     FlowSystemEventProjector,
 };
 use tracing::Instrument as _;
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListener, WakeupListenerConfig};
 
 use crate::FlowSystemEventAgentMetrics;
 
@@ -43,9 +43,10 @@ pub struct FlowSystemEventAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowSystemEventAgentImpl {
-    /// Applies all pending events to every projector
+    /// Applies all pending events to every projector. Given the agent's
+    /// listener, keeps its heartbeat going between batches
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn apply_pending_events(&self) {
+    async fn apply_pending_events(&self, wakeup_listener: Option<&dyn WakeupListener>) {
         let catalog = self.catalog.upgrade();
 
         // For each projector, apply all existing unprocessed events
@@ -64,7 +65,12 @@ impl FlowSystemEventAgentImpl {
             let mut num_total_processed = 0;
             loop {
                 // Apply a batch of events to the projector
-                match self.apply_batch_to_projector(&builder).await {
+                let result = self.apply_batch_to_projector(&builder).await;
+                if let Some(wakeup_listener) = wakeup_listener {
+                    wakeup_listener.heartbeat();
+                }
+
+                match result {
                     // Success
                     Ok(num_processed) => {
                         tracing::debug!(
@@ -162,14 +168,14 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
     }
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
+        let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
+
         // On startup, immediately sync all projectors to catch up with existing events
-        self.apply_pending_events()
+        self.apply_pending_events(Some(wakeup_listener.as_ref()))
             .instrument(tracing::info_span!(
                 "FlowSystemEventAgent::initial_catchup_phase"
             ))
             .await;
-
-        let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
 
         // Then enter the infinite main loop
         loop {
@@ -182,7 +188,8 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
                 .await?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-            self.apply_pending_events().await;
+            self.apply_pending_events(Some(wakeup_listener.as_ref()))
+                .await;
         }
     }
 }
@@ -192,7 +199,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 #[async_trait::async_trait]
 impl FlowSystemEventAgent for FlowSystemEventAgentImpl {
     async fn catchup_remaining_events(&self) -> Result<(), InternalError> {
-        self.apply_pending_events().await;
+        self.apply_pending_events(None).await;
         Ok(())
     }
 }

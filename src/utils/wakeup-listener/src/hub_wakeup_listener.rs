@@ -30,16 +30,16 @@ pub struct HubWakeupListener<H: WakeupHub> {
 
 impl<H: WakeupHub> HubWakeupListener<H> {
     pub fn new(hub: Arc<H>, channel: H::Channel, agent_name: &'static str) -> Self {
+        // Agents create their listener as their loop starts, so the heartbeat
+        // series exists even while the initial catch-up is still running
+        hub.metrics().record_heartbeat(agent_name);
+
         Self {
             hub,
             channel,
             agent_name,
             slot: OnceLock::new(),
         }
-    }
-
-    fn record_wait(&self) {
-        self.hub.metrics().record_wait(self.agent_name);
     }
 
     async fn wait_signal(&self, timeout: Duration, min_debounce_interval: Duration) -> WakeHint {
@@ -70,6 +70,10 @@ impl<H: WakeupHub> HubWakeupListener<H> {
 
 #[async_trait::async_trait]
 impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
+    fn heartbeat(&self) {
+        self.hub.metrics().record_heartbeat(self.agent_name);
+    }
+
     async fn wait_wake(
         &self,
         timeout: Duration,
@@ -77,10 +81,10 @@ impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
     ) -> Result<WakeHint, InternalError> {
         // Reaching the wait proves the agent finished a pass; recorded before and
         // after, as callers racing the wait against a deadline may drop it early
-        self.record_wait();
+        self.heartbeat();
 
         let hint = self.wait_signal(timeout, min_debounce_interval).await;
-        self.record_wait();
+        self.heartbeat();
         Ok(hint)
     }
 }

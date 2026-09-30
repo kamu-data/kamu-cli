@@ -56,7 +56,7 @@ provider must be a `#[scope(Singleton)]` component registered exactly once.
 
 | Metric | Type | Labels | Meaning |
 | --- | --- | --- | --- |
-| `wakeup_listener_last_wait_timestamp_seconds` | gauge | `agent` | Unix time when the agent last started or finished waiting for changes. An agent waits at least every `backgroundAgents.maxListeningTimeout`, so a stale value means its loop is hung. The task agent waits only while idle (see `task_agent_running_task_started_timestamp_seconds`) |
+| `wakeup_listener_last_heartbeat_timestamp_seconds` | gauge | `agent` | Unix time when the agent's loop last proved alive: when it started, when it started or finished waiting for changes, and after every processed batch. An agent waits at least every `backgroundAgents.maxListeningTimeout` and a batch is short, so a stale value means its loop is hung. The task agent records it only while idle or taking a task, not while running one (see `task_agent_running_task_started_timestamp_seconds`) |
 
 Recorded by the shared `HubWakeupListener` on every backend, so any wakeup-driven agent reports it
 without code of its own ([wakeup-listeners.md](wakeup-listeners.md#monitoring)). `agent` is the
@@ -157,11 +157,16 @@ embedding kamu that pass it to `S3Context` do.
   stuck on a batch is as serious as a failed outbox consumer, so both are `1`/`0` gauges to page on.
   They differ in recovery: a failed outbox consumer stays stopped until restart, a projector
   retries on every wakeup and clears the gauge once a batch succeeds.
-- **The heartbeat lives in the wakeup layer, not in agents.** Every agent waits through the shared
+- **The heartbeat lives in the wakeup layer.** Every agent waits through the shared
   `HubWakeupListener`, so recording there covers all of them, and any future wakeup-driven agent,
-  without per-agent code. It records both on entering and on leaving the wait: the flow agent races
-  the wait against its activation deadline and drops it when the deadline wins, so recording only on
-  return would make a busy, healthy scheduler look hung.
+  with its label. It records on creation, so the series exists during the initial catch-up, and both
+  on entering and on leaving the wait: the flow agent races the wait against its activation deadline
+  and drops it when the deadline wins, so recording only on return would make a busy, healthy
+  scheduler look hung.
+- **Batches beat too.** Agents drain their whole backlog before waiting again, which after an outage
+  can take minutes. So they call `WakeupListener::heartbeat()` after every batch (outbox iteration,
+  projector batch, page of due flows, taken task): a stale value then means a single batch is stuck,
+  not that the agent is busy.
 - **Labelled by agent, with no code in agents.** Each wakeup source serves exactly one agent, so it
   labels its handles with that agent's name constant; alerts then name the agent directly.
 - **Low-cardinality labels only.** Types and names from code (`plan_type`, `flow_type`,
@@ -206,10 +211,10 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Alert | Expression | Why |
 | --- | --- | --- |
 | Task stuck | `task_agent_running_task_started_timestamp_seconds > 0 and time() - task_agent_running_task_started_timestamp_seconds > 7200` | Fires per `executor`. An executor runs one task at a time: a stuck task blocks every flow waiting for it. Set above the p99 of `task_agent_task_duration_seconds{outcome="success"}` |
-| Agent loop hung | `time() - wakeup_listener_last_wait_timestamp_seconds{agent!="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout>`, and for the task agent `time() - wakeup_listener_last_wait_timestamp_seconds{agent="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout> unless on() (max(task_agent_running_task_started_timestamp_seconds) > 0)`, `for: 2m` | Agents wait at least every `maxListeningTimeout`; no wait means the loop is blocked. A busy task agent does not wait, and "Task stuck" covers it. `for` rides over the gap between back-to-back tasks |
+| Agent loop hung | `time() - wakeup_listener_last_heartbeat_timestamp_seconds{agent!="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout>`, and for the task agent `time() - wakeup_listener_last_heartbeat_timestamp_seconds{agent="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout> unless on() (max(task_agent_running_task_started_timestamp_seconds) > 0)`, `for: 2m` | Agents beat on every wait and batch; no heartbeat means the loop is blocked, even while draining a backlog. A task agent running a task does not beat, and "Task stuck" covers it. `for` rides over the gap between back-to-back tasks and over slow batches |
 | Projector failing | `flow_system_event_projector_failing > 0`, `for: 5m` | The projection is stuck on a batch: flow process states (UI, stop policies) go stale. `for` rides over transient errors, as every wakeup retries |
 | Outbox consumer failed | `outbox_failed_consumers_total > 0` | The consumer stopped until restart; its producer's messages pile up for it |
-| Metrics missing | `absent(wakeup_listener_last_wait_timestamp_seconds)`, `for: 10m` | Scraping or wiring is broken — every other alert is silently off. `for` rides over startup, as the series appears on an agent's first wait |
+| Metrics missing | `absent(wakeup_listener_last_heartbeat_timestamp_seconds)`, `for: 10m` | Scraping or wiring is broken — every other alert is silently off. `for` rides over startup, as the series appears once an agent's loop starts |
 
 ### Warning — degraded, still working
 

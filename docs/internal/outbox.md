@@ -430,7 +430,8 @@ Prometheus metrics (`OutboxAgentMetrics`), labelled by `producer` and `consumer`
 | `outbox_messages_pending_total` | Best-effort backlog estimate (latest message ID − consumed message ID) |
 | `outbox_failed_consumers_total` | `1` while the consumer is failed (until restart) |
 
-Like every wakeup-driven agent, it also reports `wakeup_listener_last_wait_timestamp_seconds`.
+Like every wakeup-driven agent, it also reports `wakeup_listener_last_heartbeat_timestamp_seconds`,
+beating after every consumption iteration.
 Recommended alerts on these metrics are in [metrics.md](metrics.md#4-recommended-alerts).
 
 ---

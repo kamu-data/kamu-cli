@@ -27,25 +27,47 @@ async fn test_subscription_signals_then_times_out() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test(start_paused = true))]
-async fn test_waits_are_recorded_per_agent() {
+async fn test_listener_creation_records_heartbeat_per_agent() {
     let harness = InMemoryWakeupHarness::new();
-    assert!(!harness.has_recorded_wait(AGENT));
-
-    harness.start_listening().await;
-    assert!(harness.has_recorded_wait(AGENT));
-    assert!(!harness.has_recorded_wait(OTHER_AGENT));
+    assert!(harness.has_recorded_heartbeat(AGENT));
+    assert!(!harness.has_recorded_heartbeat(OTHER_AGENT));
 
     harness.subscribe(OTHER_CHANNEL).await;
-    assert!(harness.has_recorded_wait(OTHER_AGENT));
+    assert!(harness.has_recorded_heartbeat(OTHER_AGENT));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test(start_paused = true))]
-async fn test_dropped_wait_is_recorded() {
+async fn test_wait_records_heartbeat() {
+    let harness = InMemoryWakeupHarness::new();
+    harness.forget_recorded_heartbeat(AGENT);
+
+    harness.start_listening().await;
+
+    assert!(harness.has_recorded_heartbeat(AGENT));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(start_paused = true))]
+async fn test_explicit_heartbeat_is_recorded() {
+    let harness = InMemoryWakeupHarness::new();
+    harness.forget_recorded_heartbeat(AGENT);
+
+    // Like an agent working through a backlog without waiting
+    harness.listener.heartbeat();
+
+    assert!(harness.has_recorded_heartbeat(AGENT));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(start_paused = true))]
+async fn test_dropped_wait_records_heartbeat() {
     let harness = InMemoryWakeupHarness::new();
     harness.start_listening().await;
-    harness.forget_recorded_wait(AGENT);
+    harness.forget_recorded_heartbeat(AGENT);
 
     // Like an agent racing the wait against its own deadline, which wins
     tokio::select! {
@@ -53,7 +75,7 @@ async fn test_dropped_wait_is_recorded() {
         () = tokio::time::sleep(TIMEOUT / 10) => {}
     }
 
-    assert!(harness.has_recorded_wait(AGENT));
+    assert!(harness.has_recorded_heartbeat(AGENT));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,17 +216,17 @@ impl InMemoryWakeupHarness {
             .unwrap()
     }
 
-    fn has_recorded_wait(&self, agent_name: &str) -> bool {
+    fn has_recorded_heartbeat(&self, agent_name: &str) -> bool {
         self.metrics
-            .last_wait_timestamp_seconds
+            .last_heartbeat_timestamp_seconds
             .with_label_values(&[agent_name])
             .get()
             > 0.0
     }
 
-    fn forget_recorded_wait(&self, agent_name: &str) {
+    fn forget_recorded_heartbeat(&self, agent_name: &str) {
         self.metrics
-            .last_wait_timestamp_seconds
+            .last_heartbeat_timestamp_seconds
             .with_label_values(&[agent_name])
             .set(0.0);
     }

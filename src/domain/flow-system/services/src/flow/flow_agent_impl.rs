@@ -247,7 +247,10 @@ impl FlowAgentImpl {
         Ok(())
     }
 
-    async fn activate_due_flows(&self) -> Result<(), InternalError> {
+    async fn activate_due_flows(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+    ) -> Result<(), InternalError> {
         // Fixed for the pass, so that it ends even while more flows become due
         let current_time = self.time_source.now();
 
@@ -257,6 +260,7 @@ impl FlowAgentImpl {
                 .load_flows_due_for_activation(current_time, page_after)
                 .await?;
             self.activate_flows(page.flows).await;
+            wakeup_listener.heartbeat();
 
             let Some(next_page_after) = page.next_page_after else {
                 return Ok(());
@@ -531,7 +535,7 @@ impl BackgroundAgent for FlowAgentImpl {
 
         loop {
             // Activate all flows that are due by now
-            self.activate_due_flows()
+            self.activate_due_flows(wakeup_listener.as_ref())
                 .instrument(tracing::debug_span!("FlowAgent::tick"))
                 .await?;
 

@@ -204,6 +204,8 @@ impl TaskAgentImpl {
             };
 
             if let Some(task) = maybe_task {
+                // Back-to-back tasks leave no room for waits
+                wakeup_listener.heartbeat();
                 return Ok(task);
             }
 
