@@ -82,6 +82,47 @@ async fn test_pre_run_requeues_running_tasks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_pre_run_finishes_cancelled_running_tasks() {
+    let harness = TaskAgentHarness::new(
+        TaskAgentHarness::outbox_expecting_cancelled_task(TaskID::new(0)),
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+
+    let task_id_1 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_2 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    assert_eq!(task_id_1, TaskID::new(0));
+
+    // Both running, then the 1st cancelled: its run cannot be interrupted
+    harness.try_take_task().await.unwrap();
+    harness.try_take_task().await.unwrap();
+    harness.cancel_task(task_id_1).await;
+    assert_eq!(
+        harness.get_task(task_id_1).await.status(),
+        TaskStatus::Running
+    );
+
+    // Interrupted by a restart: the cancelled one is finished, the other requeued
+    init_on_startup::run_startup_jobs(&harness.catalog)
+        .await
+        .unwrap();
+
+    let task_1 = harness.get_task(task_id_1).await;
+    assert_eq!(task_1.status(), TaskStatus::Finished);
+    assert_eq!(task_1.outcome, Some(TaskOutcome::Cancelled));
+    assert_eq!(
+        harness.get_task(task_id_2).await.status(),
+        TaskStatus::Queued
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_run_single_task() {
     // Expect the only task to notify about Running and Finished transitions
     let mut mock_outbox = MockOutbox::new();
@@ -360,6 +401,33 @@ impl TaskAgentHarness {
 
     async fn get_task(&self, task_id: TaskID) -> TaskState {
         self.task_scheduler.get_task(task_id).await.unwrap()
+    }
+
+    async fn cancel_task(&self, task_id: TaskID) {
+        self.task_scheduler.cancel_task(task_id).await.unwrap();
+    }
+
+    fn outbox_expecting_cancelled_task(a_task_id: TaskID) -> MockOutbox {
+        let mut mock_outbox = MockOutbox::new();
+        mock_outbox
+            .expect_post_message_as_json()
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_TASK_AGENT),
+                function(move |message_as_json: &serde_json::Value| {
+                    matches!(
+                        serde_json::from_value::<TaskProgressMessage>(message_as_json.clone()),
+                        Ok(TaskProgressMessage::Finished(TaskProgressMessageFinished {
+                            task_id,
+                            outcome: TaskOutcome::Cancelled,
+                            ..
+                        })) if task_id == a_task_id
+                    )
+                }),
+                eq(1),
+            )
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        mock_outbox
     }
 
     fn add_outbox_task_expectations(mock_outbox: &mut MockOutbox, a_task_id: TaskID) {

@@ -81,6 +81,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_task_status_on_cancellation,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_task_system_repo_tests::test_event_store_concurrent_modification,
     harness = InMemoryTaskSystemEventStoreHarness
 );

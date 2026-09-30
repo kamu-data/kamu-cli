@@ -139,9 +139,20 @@ impl Projection for TaskState {
 
                     // May cancel in all states except finished or already cancelled
                     E::TaskCancelled(TaskEventCancelled { event_time, .. }) => match s.status() {
-                        TaskStatus::Queued | TaskStatus::Running
-                            if s.timing.cancellation_requested_at.is_none() =>
-                        {
+                        // Never taken by an executor, so nothing else would ever finish it
+                        TaskStatus::Queued if s.timing.cancellation_requested_at.is_none() => {
+                            Ok(Self {
+                                outcome: Some(TaskOutcome::Cancelled),
+                                timing: TaskTimingRecords {
+                                    cancellation_requested_at: Some(event_time),
+                                    finished_at: Some(event_time),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
+                        }
+                        // The executor finishes it, as a run cannot be interrupted
+                        TaskStatus::Running if s.timing.cancellation_requested_at.is_none() => {
                             Ok(Self {
                                 timing: TaskTimingRecords {
                                     cancellation_requested_at: Some(event_time),

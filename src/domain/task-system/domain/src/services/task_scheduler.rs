@@ -80,6 +80,10 @@ pub enum ListTasksByDatasetError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum TakeTaskError {
+    /// The task changed while being taken, e.g. it was cancelled
+    #[error("Task {task_id} was modified concurrently")]
+    ConcurrentModification { task_id: TaskID },
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

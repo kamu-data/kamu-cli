@@ -86,9 +86,14 @@ impl InMemoryTaskEventStore {
             entries.push(event.task_id());
         }
 
+        let current_status = state
+            .task_statuses
+            .get(&event.task_id())
+            .copied()
+            .unwrap_or(TaskStatus::Queued);
         state
             .task_statuses
-            .insert(event.task_id(), event.new_status());
+            .insert(event.task_id(), event.next_status(current_status));
     }
 }
 
@@ -118,10 +123,20 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
             return Err(SaveEventsError::NothingToSave);
         }
 
-        let has_queued_tasks = events
-            .iter()
-            .any(|event| event.new_status() == TaskStatus::Queued);
+        let has_queued_tasks = events.iter().any(|event| {
+            matches!(
+                event,
+                TaskEvent::TaskCreated(_) | TaskEvent::TaskRequeued(_)
+            )
+        });
 
+        let last_event_id = self
+            .inner
+            .save_events(task_id, maybe_prev_stored_event_id, events.clone())
+            .await?;
+
+        // Indexed only once the save passed the concurrent modification check,
+        // as a rejected save must leave them intact
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
@@ -129,11 +144,6 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
                 Self::update_index(&mut g, event);
             }
         }
-
-        let last_event_id = self
-            .inner
-            .save_events(task_id, maybe_prev_stored_event_id, events)
-            .await?;
 
         if has_queued_tasks {
             self.wakeup_hub.signal(TASKS_QUEUED_CHANNEL);

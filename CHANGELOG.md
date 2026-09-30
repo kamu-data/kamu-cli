@@ -66,6 +66,11 @@ Recommendation: for ease of reading, use the following format:
   unset while the flow waits. It used to be the first planned activation time, which stays put when
   a manual run or satisfied batching activates the flow earlier, so run durations counted from it
   came out too short
+- Task cancellation (e.g. aborting a flow):
+  - a queued task is finished with the `Cancelled` outcome, instead of staying queued forever
+  - a task cancelled while being taken is no longer started, nor stops the task agent
+  - a running task is still stored as running until its run ends, so a restart meanwhile finishes it
+    as `Cancelled` instead of leaving it running forever
 
 ## [0.267.0] - 2026-09-19
 ### Added

@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_utils::BackgroundAgent;
 use database_common::PaginationOpts;
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common_macros::transactional_method2;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use kamu_task_system::*;
@@ -121,11 +121,12 @@ impl TaskAgentImpl {
         Ok(())
     }
 
-    #[transactional_method1(task_event_store: Arc<dyn TaskEventStore>)]
+    #[transactional_method2(task_event_store: Arc<dyn TaskEventStore>, outbox: Arc<dyn Outbox>)]
     #[tracing::instrument(level = "info", skip_all)]
     async fn recover_running_tasks(&self) -> Result<(), InternalError> {
         // Recovering tasks means we are re-queuing tasks that started running, but got
-        // aborted due to server shutdown or crash
+        // aborted due to server shutdown or crash. Those cancelled meanwhile are
+        // finished
 
         // Total number of running tasks
         let total_running_tasks = task_event_store.get_count_running_tasks().await?;
@@ -149,9 +150,13 @@ impl TaskAgentImpl {
                 .int_err()?;
 
             for mut task in tasks {
-                // Requeue
-                task.requeue(self.time_source.now()).int_err()?;
-                task.save(task_event_store.as_ref()).await.int_err()?;
+                if task.timing.cancellation_requested_at.is_some() {
+                    self.finish_interrupted_cancelled_task(&mut task, &task_event_store, &outbox)
+                        .await?;
+                } else {
+                    task.requeue(self.time_source.now()).int_err()?;
+                    task.save(task_event_store.as_ref()).await.int_err()?;
+                }
             }
 
             processed_running_tasks += batch_size;
@@ -160,9 +165,43 @@ impl TaskAgentImpl {
         Ok(())
     }
 
+    async fn finish_interrupted_cancelled_task(
+        &self,
+        task: &mut Task,
+        task_event_store: &Arc<dyn TaskEventStore>,
+        outbox: &Arc<dyn Outbox>,
+    ) -> Result<(), InternalError> {
+        let now = self.time_source.now();
+        task.finish(now, TaskOutcome::Cancelled).int_err()?;
+        task.save(task_event_store.as_ref()).await.int_err()?;
+
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+                TaskProgressMessage::finished(
+                    now,
+                    task.task_id,
+                    task.metadata.clone(),
+                    TaskOutcome::Cancelled,
+                ),
+            )
+            .await?;
+
+        tracing::info!(task_id = %task.task_id, "Interrupted cancelled task finished");
+        Ok(())
+    }
+
     async fn take_task(&self, wakeup_listener: &dyn WakeupListener) -> Result<Task, InternalError> {
         loop {
-            let maybe_task = self.take_task_non_blocking().await?;
+            let maybe_task = match self.take_task_non_blocking().await {
+                Ok(maybe_task) => maybe_task,
+                Err(TakeTaskError::ConcurrentModification { task_id }) => {
+                    // Rolled back, and the queue already reflects the change
+                    tracing::info!(%task_id, "Task changed while being taken, retrying");
+                    continue;
+                }
+                Err(TakeTaskError::Internal(e)) => return Err(e),
+            };
 
             if let Some(task) = maybe_task {
                 return Ok(task);
@@ -180,8 +219,8 @@ impl TaskAgentImpl {
     }
 
     #[transactional_method2(task_scheduler: Arc<dyn TaskScheduler>, outbox: Arc<dyn Outbox>)]
-    async fn take_task_non_blocking(&self) -> Result<Option<Task>, InternalError> {
-        let maybe_task = task_scheduler.try_take().await.int_err()?;
+    async fn take_task_non_blocking(&self) -> Result<Option<Task>, TakeTaskError> {
+        let maybe_task = task_scheduler.try_take().await?;
         let Some(task) = maybe_task else {
             return Ok(None);
         };

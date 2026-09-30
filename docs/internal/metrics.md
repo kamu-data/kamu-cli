@@ -68,7 +68,7 @@ name of the agent the wakeup source serves, the same as its `agent_name()`:
 
 | Metric | Type | Labels | Meaning |
 | --- | --- | --- | --- |
-| `task_agent_task_duration_seconds` | histogram | `plan_type`, `outcome` = `success` / `failed` / `cancelled` | Time from taking a task off the queue to its outcome. Its `_count` is the number of finished tasks |
+| `task_agent_task_duration_seconds` | histogram | `plan_type`, `outcome` = `success` / `failed` / `cancelled` | Time from taking a task off the queue to its outcome. Its `_count` is the number of finished tasks. `cancelled` stays at 0: a cancelled queued task never reaches the agent, and a running one runs to its outcome |
 | `task_agent_task_queue_wait_seconds` | histogram | — | Time a task waited in the queue before the agent took it. A webhook delivery retry is a new task, so each attempt waits anew |
 | `task_agent_running_task_started_timestamp_seconds` | gauge | `executor` | Unix time when the task running on the executor started; `0` while it is idle |
 

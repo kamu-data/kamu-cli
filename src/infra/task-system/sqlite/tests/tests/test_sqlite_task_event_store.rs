@@ -81,6 +81,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = kamu_task_system_repo_tests::test_event_store_task_status_on_cancellation,
+    harness = SqliteTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = kamu_task_system_repo_tests::test_event_store_concurrent_modification,
     harness = SqliteTaskSystemEventStoreHarness
 );

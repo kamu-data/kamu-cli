@@ -135,7 +135,11 @@ async fn test_task_cancellation() {
         .unwrap()
         .task_id;
 
-    task_sched.cancel_task(task_id_1).await.unwrap();
+    // Never taken, so cancellation finishes it
+    let task_1 = task_sched.cancel_task(task_id_1).await.unwrap();
+    assert_eq!(task_1.status(), TaskStatus::Finished);
+    assert_eq!(task_1.outcome, Some(TaskOutcome::Cancelled));
+    assert!(task_1.timing.finished_at.is_some());
 
     let maybe_task = task_sched.try_take().await.unwrap();
     assert!(maybe_task.is_some_and(|t| t.task_id == task_id_2));
