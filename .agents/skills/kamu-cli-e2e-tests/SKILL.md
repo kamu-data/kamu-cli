@@ -7,7 +7,7 @@ description: >
     and assert on observable behavior — stdout/stderr/exit code or API
     responses. Covers: where shared scenario bodies live, the two harness modes
     (execute_command vs run_api_server) and their fixture signatures, the
-    per-database wiring macros and SQLite/Postgres/MySQL mirror files, the
+    per-database wiring macros and SQLite/Postgres mirror files, the
     combined CLI↔server (login/remote) pattern, generating permutation wrapper
     fns with `paste!`, and the KamuCliPuppet / KamuApiServerClient APIs. This is
     distinct from `kamu-test-harness`, which covers in-process dill
@@ -44,12 +44,12 @@ src/e2e/app/cli/
     src/e2e_harness.rs
   common-macros/     # the per-DB instantiation macros
     lib.rs
-  sqlite/  postgres/  mysql/   # per-DB WIRING (thin macro invocations)
+  sqlite/  postgres/   # per-DB WIRING (thin macro invocations)
     tests/tests/commands/...
 ```
 
 Key idea: **scenario logic is written once** in `repo-tests`, then **instantiated
-per database** by thin wiring files in `sqlite/`, `postgres/`, `mysql/`.
+per database** by thin wiring files in `sqlite/` and `postgres/`.
 
 ---
 
@@ -147,7 +147,7 @@ kamu_cli_execute_command_e2e_test!(
 ```
 
 `postgres/tests/tests/commands/test_<area>.rs` is the **identical file with
-`storage = postgres`** (Postgres/MySQL macros add a `sqlx::test(migrator = …)`
+`storage = postgres`** (the Postgres macros add a `sqlx::test(migrator = …)`
 pool arg; SQLite creates its own DB).
 
 > **Lockstep rule:** every fixture must be listed in *each* DB directory you want
@@ -261,9 +261,9 @@ Do not pass `SQLX_OFFLINE=true` on the command line and do not scope builds with
 `.env` files (see the `kamu-sqlx-database-work` skill); overriding it forces
 query checking against the stale offline cache instead of the live schema.
 
-SQLite e2e tests run without a DB container. Postgres/MySQL tests are tagged
-`#[test_group::group(e2e, database, postgres|mysql, …)]` and require the
-corresponding DB available per repo convention.
+SQLite e2e tests run without a DB container. Postgres tests are tagged
+`#[test_group::group(e2e, database, postgres, …)]` and require the
+Postgres DB available per repo convention.
 
 ### Instant failures that pass in isolation
 

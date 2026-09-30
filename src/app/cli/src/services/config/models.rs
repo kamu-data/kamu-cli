@@ -506,8 +506,6 @@ pub struct JupyterConfig {
 pub enum DatabaseConfig {
     Sqlite(SqliteDatabaseConfig),
     Postgres(RemoteDatabaseConfig),
-    MySql(RemoteDatabaseConfig),
-    MariaDB(RemoteDatabaseConfig),
 }
 
 impl DatabaseConfig {

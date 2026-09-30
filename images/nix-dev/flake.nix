@@ -28,7 +28,6 @@
             pkgs.protoc-gen-prost
             pkgs.protoc-gen-tonic
             pkgs.postgresql
-            pkgs.mariadb
           ];
         };
       });

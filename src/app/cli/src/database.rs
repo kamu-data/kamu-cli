@@ -149,54 +149,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_search_cache_postgres::PostgresEmbeddingsCacheRepository>();
         }
-        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            MySqlPlugin::init_database_components(b);
-
-            // TODO: many components are not implemented for MySQL
-            //    and are substituted with in-memory equivalents
-
-            b.add::<kamu_accounts_mysql::MySqlAccountRepository>();
-            b.add::<kamu_accounts_mysql::MySqlAccessTokenRepository>();
-            b.add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>();
-            b.add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>();
-            b.add::<kamu_accounts_inmem::InMemoryAccountQuotaEventStore>();
-
-            b.add::<kamu_datasets_mysql::MySqlDatasetEntryRepository>();
-            b.add::<kamu_datasets_inmem::InMemoryDatasetDependencyRepository>();
-            b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
-            b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();
-            b.add::<kamu_datasets_inmem::InMemoryDatasetKeyBlockRepository>();
-            b.add::<kamu_datasets_inmem::InMemoryDatasetDataBlockRepository>();
-
-            b.add::<kamu_resources_inmem::InMemoryRawResourceEventStore>();
-            b.add::<kamu_resources_inmem::InMemoryResourceRepository>();
-            b.add::<kamu_resources_inmem::InMemoryResourceLabelProjectionRepository>();
-
-            b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
-            b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();
-
-            b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
-            b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
-            b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
-            b.add::<kamu_flow_system_inmem::InMemoryFlowSystemEventBridge>();
-            b.add::<kamu_flow_system_inmem::InMemoryFlowProcessState>();
-            b.add::<kamu_flow_system_inmem::InMemoryFlowActivationWakeupSource>();
-
-            b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();
-            b.add::<kamu_task_system_inmem::InMemoryTaskQueueWakeupSource>();
-
-            b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
-            b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
-
-            b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
-
-            b.add::<kamu_webhooks_inmem::InMemoryWebhookDeliveryRepository>();
-            b.add::<kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore>();
-
-            b.add::<kamu_auth_web3_inmem::InMemoryWeb3AuthEip4361NonceRepository>();
-
-            b.add::<kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository>();
-        }
         DatabaseProvider::Sqlite => {
             SqlitePlugin::init_database_components(b);
 
@@ -320,8 +272,6 @@ pub fn build_db_connection_settings(raw_db_config: &DatabaseConfig) -> DatabaseC
             DatabaseConnectionSettings::sqlite_from(path)
         }
         DatabaseConfig::Postgres(config) => convert(config, DatabaseProvider::Postgres),
-        DatabaseConfig::MySql(config) => convert(config, DatabaseProvider::MySql),
-        DatabaseConfig::MariaDB(config) => convert(config, DatabaseProvider::MariaDB),
     }
 }
 
@@ -344,14 +294,6 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
             db_credentials.as_ref(),
         )
         .int_err(),
-        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
-            MySqlPlugin::catalog_with_connected_pool(
-                base_catalog,
-                &db_connection_settings,
-                db_credentials.as_ref(),
-            )
-            .int_err()
-        }
         DatabaseProvider::Sqlite => {
             SqlitePlugin::catalog_with_connected_pool(base_catalog, &db_connection_settings)
                 .await
@@ -374,7 +316,7 @@ pub async fn database_flush(base_catalog: &Catalog) -> Result<(), InternalError>
                 .await
                 .int_err()
         }
-        DatabaseProvider::Postgres | DatabaseProvider::MySql | DatabaseProvider::MariaDB => Ok(()),
+        DatabaseProvider::Postgres => Ok(()),
     }
 }
 
@@ -383,9 +325,7 @@ pub async fn database_flush(base_catalog: &Catalog) -> Result<(), InternalError>
 pub async fn spawn_password_refreshing_job(db_config: &DatabaseConfig, catalog: &Catalog) {
     let credentials_policy_config = match db_config {
         DatabaseConfig::Sqlite(_) => None,
-        DatabaseConfig::Postgres(config)
-        | DatabaseConfig::MySql(config)
-        | DatabaseConfig::MariaDB(config) => Some(config.credentials_policy.clone()),
+        DatabaseConfig::Postgres(config) => Some(config.credentials_policy.clone()),
     };
 
     if let Some(rotation_frequency_in_minutes) =
@@ -417,9 +357,7 @@ fn init_database_password_provider(b: &mut CatalogBuilder, raw_db_config: &Datab
         DatabaseConfig::Sqlite(_) => {
             b.add::<DatabaseNoPasswordProvider>();
         }
-        DatabaseConfig::MySql(config)
-        | DatabaseConfig::Postgres(config)
-        | DatabaseConfig::MariaDB(config) => match &config.credentials_policy.source {
+        DatabaseConfig::Postgres(config) => match &config.credentials_policy.source {
             DatabaseCredentialSourceConfig::RawPassword(raw_password_config) => {
                 b.add_builder(DatabaseFixedPasswordProvider::builder(
                     SecretString::from(raw_password_config.user_name.clone()),

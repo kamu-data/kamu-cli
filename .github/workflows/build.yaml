@@ -158,13 +158,6 @@ jobs:
           POSTGRES_DB: kamu-test
         ports:
           - 5432:5432
-      mariadb:
-        image: ${{ matrix.database && 'mariadb:11' || '' }}
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: kamu-test
-        ports:
-          - 3306:3306
       elasticsearch:
         image: ${{ matrix.elasticsearch && 'elasticsearch:9.2.1' || '' }}
         env:
@@ -284,13 +277,6 @@ jobs:
           SQLX_OFFLINE: false
           DATABASE_URL: postgres://root:root@127.0.0.1:5432/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set-part }}'
-
-      - name: MariaDB database tests
-        if: matrix.database
-        env:
-          SQLX_OFFLINE: false
-          DATABASE_URL: mariadb://root:root@127.0.0.1:3306/kamu-test
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       # Note: Not running on windows due to line ending differences
       - name: Check generated files

@@ -112,23 +112,6 @@ pub fn kamu_cli_resource_e2e_test(input: TokenStream) -> TokenStream {
                     .await;
             }
         },
-        "mysql" => quote! {
-            #[test_group::group(e2e, database, mysql, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrator = "database_common::MYSQL_MIGRATOR"))]
-            async fn #local_name (mysql_pool: sqlx::MySqlPool) {
-                KamuCliApiServerHarness::mysql(&mysql_pool, #base_options )
-                    .execute_command( #local_body )
-                    .await;
-            }
-
-            #[test_group::group(e2e, database, mysql, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrator = "database_common::MYSQL_MIGRATOR"))]
-            async fn #remote_name (mysql_pool: sqlx::MySqlPool) {
-                KamuCliApiServerHarness::mysql(&mysql_pool, #remote_options )
-                    .run_api_server( #remote_body )
-                    .await;
-            }
-        },
         "sqlite" => quote! {
             // kamu-cli will create sqlite database by itself and apply migrations to it
             #[test_group::group(e2e, #extra_test_groups)]
@@ -149,8 +132,8 @@ pub fn kamu_cli_resource_e2e_test(input: TokenStream) -> TokenStream {
         },
         unexpected => {
             panic!(
-                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"postgres\", \
-                 \"mysql\", and \"sqlite\"."
+                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"postgres\" \
+                 and \"sqlite\"."
             );
         }
     };
@@ -190,15 +173,6 @@ fn kamu_cli_e2e_test_impl(harness_method: &Ident, input: TokenStream) -> TokenSt
                     .await;
             }
         },
-        "mysql" => quote! {
-            #[test_group::group(e2e, database, mysql, #extra_test_groups)]
-            #[test_log::test(sqlx::test(migrator = "database_common::MYSQL_MIGRATOR"))]
-            async fn #test_function_name (mysql_pool: sqlx::MySqlPool) {
-                KamuCliApiServerHarness::mysql(&mysql_pool, #options )
-                    . #harness_method ( #fixture )
-                    .await;
-            }
-        },
         "sqlite" => quote! {
            // kamu-cli will create sqlite database by itself and apply migrations to it
            #[test_group::group(e2e, #extra_test_groups)]
@@ -211,8 +185,8 @@ fn kamu_cli_e2e_test_impl(harness_method: &Ident, input: TokenStream) -> TokenSt
         },
         unexpected => {
             panic!(
-                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"postgres\", \
-                 \"mysql\", and \"sqlite\"."
+                "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"postgres\" \
+                 and \"sqlite\"."
             );
         }
     };

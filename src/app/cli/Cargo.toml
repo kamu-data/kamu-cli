@@ -93,13 +93,11 @@ kamu-accounts = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-postgres = { workspace = true }
-kamu-accounts-mysql = { workspace = true }
 kamu-accounts-sqlite = { workspace = true }
 
 kamu-datasets-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-mysql = { workspace = true }
 kamu-datasets-postgres = { workspace = true }
 kamu-datasets-sqlite = { workspace = true }
 

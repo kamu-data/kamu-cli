@@ -59,10 +59,10 @@ pub struct InMemoryResourceRepository {
     state: Arc<Mutex<State>>,
     // Resolved lazily per call rather than injected: this repository is a
     // singleton, while `AccountRepository` may be a transaction-scoped
-    // component (it is under the MySQL prototype, where only the accounts
-    // domain has a real backend and the rest fall back to in-memory). Holding
-    // an `Arc` to it here would pin a transaction reference for the lifetime
-    // of the process and trip the leaked-transaction guard.
+    // component (whenever it is paired with a database-backed
+    // implementation). Holding an `Arc` to it here would pin a transaction
+    // reference for the lifetime of the process and trip the
+    // leaked-transaction guard.
     catalog: CatalogWeakRef,
 }
 

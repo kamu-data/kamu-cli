@@ -36,7 +36,7 @@ Recommendation: for ease of reading, use the following format:
 - Outbox consumers handling messages at once, across all producers, are limited by
   `backgroundAgents.concurrency.outboxConsumers` (default `1` for SQLite, `8` suggested for
   Postgres); previously unbounded, a burst could exhaust the database connection pool
-- Postgres and MySQL connection pools default to 20 connections (`database.maxConnections`), was 10:
+- Postgres connection pool defaults to 20 connections (`database.maxConnections`), was 10:
   with 8 outbox consumers on Postgres, background agents alone may hold up to 12
 - **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
   - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
@@ -55,6 +55,11 @@ Recommendation: for ease of reading, use the following format:
   In-memory stores signal channels through `InMemoryWakeupHub`, and every agent creates its own listener
   handle (`new_wakeup_listener()`), so several listeners can watch the same changes.
   Architecture is documented in `docs/internal/wakeup-listeners.md`
+### Removed
+- **Breaking config change:** MySQL/MariaDB support is dropped: `database.provider: mySql` and `mariaDB`
+  are no longer accepted, use Postgres or SQLite instead.
+  Removed `kamu-accounts-mysql`, `kamu-datasets-mysql` and `kamu-cli-e2e-mysql` crates, MySQL migrations,
+  `sqlx-*-mariadb` Makefile targets and the MariaDB CI service
 ### Fixed
 - Flow agent: a flow failing to activate no longer blocks activation of flows scheduled after it,
   and its partial writes (task, flow events) are rolled back instead of committed

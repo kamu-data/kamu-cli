@@ -33,17 +33,6 @@ macro_rules! impl_sqlx {
             }
         }
 
-        #[cfg(feature = "sqlx-mysql")]
-        impl ::sqlx::Type<::sqlx::MySql> for $typ {
-            fn type_info() -> <::sqlx::MySql as ::sqlx::Database>::TypeInfo {
-                <&str as ::sqlx::Type<::sqlx::MySql>>::type_info()
-            }
-
-            fn compatible(ty: &<::sqlx::MySql as ::sqlx::Database>::TypeInfo) -> bool {
-                <&str as ::sqlx::Type<::sqlx::MySql>>::compatible(ty)
-            }
-        }
-
         #[cfg(feature = "sqlx-sqlite")]
         impl ::sqlx::Type<::sqlx::Sqlite> for $typ {
             fn type_info() -> <::sqlx::Sqlite as ::sqlx::Database>::TypeInfo {

@@ -112,9 +112,9 @@ impl InMemoryResourceRepository {
 Note that in-memory repositories are themselves singletons, so this applies to
 them too. A violation may stay dormant for a long time: it only fires in a
 configuration that pairs the singleton with a *real* transactional
-implementation of its dependency. The MySQL/MariaDB prototype is the usual
-trigger, because only the accounts domain has a real backend there while
-everything else falls back to in-memory (see `configure_database_components`).
+implementation of its dependency, e.g. an in-memory repository wired next to a
+database-backed one (see `configure_database_components` for the per-provider
+wiring).
 
 To audit, parse `#[component]` / `#[interface(dyn ...)]` / `#[scope(Singleton)]`,
 treat any component whose body mentions `TransactionRef` as transaction-scoped,

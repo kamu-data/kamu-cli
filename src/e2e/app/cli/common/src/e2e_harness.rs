@@ -12,7 +12,7 @@ use std::future::Future;
 use chrono::{DateTime, NaiveTime, TimeZone, Utc};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
-use sqlx::{MySqlPool, PgPool};
+use sqlx::PgPool;
 
 use crate::{KamuApiServerClient, api_server_e2e_test};
 
@@ -143,32 +143,6 @@ impl KamuCliApiServerHarness {
                             rawPassword: {password}
                     databaseName: {database}
             "#,
-            host = db.get_host(),
-            user = db.get_username(),
-            password = db.get_username(), // It's intended: password is same as user for tests
-            database = db.get_database().unwrap(),
-        );
-
-        Self::new(options, Some(kamu_config))
-    }
-
-    pub fn mysql(mysql_pool: &MySqlPool, options: KamuCliApiServerHarnessOptions) -> Self {
-        let db = mysql_pool.connect_options();
-        let kamu_config = indoc::formatdoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-                database:
-                    provider: mySql
-                    host: {host}
-                    credentialsPolicy:
-                        source:
-                            kind: rawPassword
-                            userName: {user}
-                            rawPassword: {password}
-                    databaseName: {database}
-                "#,
             host = db.get_host(),
             user = db.get_username(),
             password = db.get_username(), // It's intended: password is same as user for tests

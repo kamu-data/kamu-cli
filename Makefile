@@ -18,11 +18,6 @@ POSTGRES_CRATES := \
 	./src/infra/webhooks/postgres \
 	./src/infra/wakeup-listener/postgres
 
-MYSQL_CRATES := \
-	./src/e2e/app/cli/mysql \
-	./src/infra/accounts/mysql \
-	./src/infra/datasets/mysql
-
 SQLITE_CRATES := \
 	./src/e2e/app/cli/sqlite \
 	./src/infra/accounts/sqlite \
@@ -38,8 +33,8 @@ SQLITE_CRATES := \
 	./src/infra/webhooks/sqlite \
 	./src/infra/wakeup-listener/sqlite
 
-ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
-MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
+ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(SQLITE_CRATES)
+MIGRATION_DIRS := ./migrations/postgres ./migrations/sqlite
 
 KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 
@@ -117,7 +112,7 @@ echo "SQLX_OFFLINE=false" >> $(2)/.env;
 endef
 
 .PHONY: sqlx-local-setup
-sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-mariadb sqlx-local-setup-sqlite
+sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-sqlite
 
 .PHONY: sqlx-local-setup-postgres
 sqlx-local-setup-postgres:
@@ -130,17 +125,6 @@ sqlx-local-setup-postgres:
 	sqlx database create --database-url postgres://root:root@localhost:5432/kamu
 	sqlx migrate run --source ./migrations/postgres --database-url postgres://root:root@localhost:5432/kamu
 
-.PHONY: sqlx-local-setup-mariadb
-sqlx-local-setup-mariadb:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) pull mariadb:latest
-	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
-	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
-	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
-	sleep 10  # Letting the container to start
-	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done
-	sqlx database create --database-url mysql://root:root@localhost:3306/kamu
-	sqlx migrate run --source ./migrations/mysql --database-url mysql://root:root@localhost:3306/kamu
-
 .PHONY: sqlx-local-setup-sqlite
 sqlx-local-setup-sqlite:
 	sqlx database drop -y --database-url sqlite://kamu.sqlite.db
@@ -149,17 +133,12 @@ sqlx-local-setup-sqlite:
 	$(foreach crate,$(SQLITE_CRATES),$(call Setup_EnvFile_Sqlite,$(shell pwd),$(crate)))
 
 .PHONY: sqlx-local-clean
-sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-mariadb sqlx-local-clean-sqlite
+sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-sqlite
 
 .PHONY: sqlx-local-clean-postgres
 sqlx-local-clean-postgres:
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
 	$(foreach crate,$(POSTGRES_CRATES),rm $(crate)/.env -f ;)
-
-.PHONY: sqlx-local-clean-mariadb
-sqlx-local-clean-mariadb:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
-	$(foreach crate,$(MYSQL_CRATES),rm $(crate)/.env -f ;)
 
 .PHONY: sqlx-local-clean-sqlite
 sqlx-local-clean-sqlite:
@@ -177,10 +156,6 @@ sqlx-prepare:
 .PHONY: sqlx-prepare-postgres
 sqlx-prepare-postgres:
 	$(foreach crate,$(POSTGRES_CRATES),(cd $(crate) && cargo sqlx prepare);)
-
-.PHONY: sqlx-prepare-mariadb
-sqlx-prepare-mariadb:
-	$(foreach crate,$(MYSQL_CRATES),(cd $(crate) && cargo sqlx prepare);)
 
 .PHONY: sqlx-prepare-sqlite
 sqlx-prepare-sqlite:

@@ -16,15 +16,12 @@ use serde::{Deserialize, Serialize};
 #[strum(serialize_all = "lowercase")]
 pub enum DatabaseProvider {
     Postgres,
-    MySql,
-    MariaDB,
     Sqlite,
 }
 
 impl DatabaseProvider {
     pub fn default_port(&self) -> u16 {
         match self {
-            DatabaseProvider::MariaDB | DatabaseProvider::MySql => 3306,
             DatabaseProvider::Postgres => 5432,
             DatabaseProvider::Sqlite => unreachable!(),
         }

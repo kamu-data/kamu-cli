@@ -488,8 +488,6 @@ the next flow activation moment regardless of it.
 <tbody>
 <tr><td><a href="#databaseconfigsqlite"><code>Sqlite</code></a></td></tr>
 <tr><td><a href="#databaseconfigpostgres"><code>Postgres</code></a></td></tr>
-<tr><td><a href="#databaseconfigmysql"><code>MySql</code></a></td></tr>
-<tr><td><a href="#databaseconfigmariadb"><code>MariaDB</code></a></td></tr>
 </tbody>
 </table>
 
@@ -516,120 +514,6 @@ the next flow activation moment regardless of it.
 
 
 ## `DatabaseConfig::Postgres`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>acquireTimeoutSecs</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>credentialsPolicy</code></td>
-<td><a href="#databasecredentialspolicyconfig"><code>DatabaseCredentialsPolicyConfig</code></a></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>databaseName</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>host</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>maxConnections</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">20</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>maxLifetimeSecs</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>port</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>provider</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-
-
-## `DatabaseConfig::MySql`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>acquireTimeoutSecs</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>credentialsPolicy</code></td>
-<td><a href="#databasecredentialspolicyconfig"><code>DatabaseCredentialsPolicyConfig</code></a></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>databaseName</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>host</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><code>maxConnections</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">20</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>maxLifetimeSecs</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>port</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>provider</code></td>
-<td><code>string</code></td>
-<td></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-
-
-## `DatabaseConfig::MariaDB`
 
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>

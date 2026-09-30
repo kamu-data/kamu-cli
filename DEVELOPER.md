@@ -68,9 +68,6 @@ Prerequisites:
   * Install Postgres command line client `psql`:
     * deb: `sudo apt install -y postgresql-client`
     * rpm: `sudo dnf install -y postgresql`
-  * Install MariaDB command line client `mariadb`: 
-    * deb: `sudo apt install -y mariadb-client`
-    * rpm: `sudo dnf install -y mariadb`
   <!-- Installation using `cargo install` (rather than `cargo binstall`) is used intentionally -->
   <!-- Details: https://github.com/launchbadge/sqlx/issues/3396 -->
   * Install `sqlx-cli`: `cargo install sqlx-cli`
@@ -388,7 +385,6 @@ With these ideas in mind:
 We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate to organize tests in groups. The complete set of groups is:
 - `containerized` - for tests that spawn Docker/Podman containers
 - `database` - for tests that involve any database interaction, subsequently grouped by:
-  - `mysql` - tests that use MySQL/MariaDB
   - `postgres` - tests that use PostreSQL
 - `engine` - for tests that involve any data engine or data framework (query, ingest, or transform paths), subsequently grouped by:
   - `datafusion` - tests that use Apache DataFusion

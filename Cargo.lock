@@ -7323,30 +7323,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-accounts-mysql"
-version = "0.267.0"
-dependencies = [
- "async-stream",
- "async-trait",
- "chrono",
- "database-common",
- "database-common-macros",
- "dill",
- "email-utils",
- "futures",
- "internal-error",
- "kamu-accounts",
- "kamu-accounts-repo-tests",
- "opendatafabric",
- "sqlx",
- "test-group",
- "test-log",
- "tracing",
- "url",
- "uuid",
-]
-
-[[package]]
 name = "kamu-accounts-postgres"
 version = "0.267.0"
 dependencies = [
@@ -8157,7 +8133,6 @@ dependencies = [
  "kamu",
  "kamu-accounts",
  "kamu-accounts-inmem",
- "kamu-accounts-mysql",
  "kamu-accounts-postgres",
  "kamu-accounts-services",
  "kamu-accounts-sqlite",
@@ -8190,7 +8165,6 @@ dependencies = [
  "kamu-datafusion-cli",
  "kamu-datasets",
  "kamu-datasets-inmem",
- "kamu-datasets-mysql",
  "kamu-datasets-postgres",
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
@@ -8336,19 +8310,6 @@ dependencies = [
  "pretty_assertions",
  "serde_json",
  "test-group",
-]
-
-[[package]]
-name = "kamu-cli-e2e-mysql"
-version = "0.267.0"
-dependencies = [
- "database-common",
- "indoc 2.0.7",
- "kamu-cli-e2e-common",
- "kamu-cli-e2e-repo-tests",
- "sqlx",
- "test-group",
- "test-log",
 ]
 
 [[package]]
@@ -8688,28 +8649,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "uuid",
-]
-
-[[package]]
-name = "kamu-datasets-mysql"
-version = "0.267.0"
-dependencies = [
- "async-stream",
- "async-trait",
- "chrono",
- "database-common",
- "database-common-macros",
- "dill",
- "futures",
- "internal-error",
- "kamu-accounts-mysql",
- "kamu-datasets",
- "kamu-datasets-repo-tests",
- "opendatafabric",
- "sqlx",
- "test-group",
- "test-log",
- "tracing",
 ]
 
 [[package]]
