@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.268.0] - 2026-09-30
 ### Added
 - Prometheus metrics for background agents, with recommended alerts in `docs/internal/metrics.md`:
   - `wakeup_listener_last_heartbeat_timestamp_seconds`: heartbeat of every wakeup-driven agent's loop, recorded by
