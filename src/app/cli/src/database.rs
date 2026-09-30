@@ -308,7 +308,7 @@ pub fn build_db_connection_settings(raw_db_config: &DatabaseConfig) -> DatabaseC
             c.database_name.clone(),
             c.host.clone(),
             c.port,
-            c.max_connections,
+            Some(c.max_connections),
             c.max_lifetime_secs,
             c.acquire_timeout_secs,
         )

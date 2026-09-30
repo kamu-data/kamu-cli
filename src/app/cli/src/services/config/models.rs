@@ -529,9 +529,8 @@ pub struct RemoteDatabaseConfig {
     pub database_name: String,
     pub host: String,
     pub port: Option<u16>,
-    /// Pool size, 20 by default, shared by API requests and background agents:
-    /// their `concurrency` limits plus task, event and `LISTEN` loops
-    pub max_connections: Option<u32>,
+    #[config(default = database_common::DatabaseConnectionSettings::DEFAULT_MAX_CONNECTIONS)]
+    pub max_connections: u32,
     pub max_lifetime_secs: Option<u64>,
     pub acquire_timeout_secs: Option<u64>,
 }

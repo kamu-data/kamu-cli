@@ -559,13 +559,8 @@ the next flow activation moment regardless of it.
 <tr>
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td>
-
-Pool size, 20 by default, shared by API requests and background agents:
-their `concurrency` limits plus task, event and `LISTEN` loops
-
-</td>
+<td><code class="language-json">20</code></td>
+<td>Connection pool size</td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>
@@ -621,13 +616,8 @@ their `concurrency` limits plus task, event and `LISTEN` loops
 <tr>
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td>
-
-Pool size, 20 by default, shared by API requests and background agents:
-their `concurrency` limits plus task, event and `LISTEN` loops
-
-</td>
+<td><code class="language-json">20</code></td>
+<td>Connection pool size</td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>
@@ -683,13 +673,8 @@ their `concurrency` limits plus task, event and `LISTEN` loops
 <tr>
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
-<td><code class="language-json">null</code></td>
-<td>
-
-Pool size, 20 by default, shared by API requests and background agents:
-their `concurrency` limits plus task, event and `LISTEN` loops
-
-</td>
+<td><code class="language-json">20</code></td>
+<td>Connection pool size</td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>

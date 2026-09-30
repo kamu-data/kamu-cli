@@ -263,13 +263,11 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Pool size, 20 by default, shared by API requests and background agents:\ntheir `concurrency` limits plus task, event and `LISTEN` loops",
+              "default": 20,
+              "description": "Connection pool size",
               "format": "uint32",
               "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
+              "type": "integer"
             },
             "maxLifetimeSecs": {
               "format": "uint64",
@@ -322,13 +320,11 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Pool size, 20 by default, shared by API requests and background agents:\ntheir `concurrency` limits plus task, event and `LISTEN` loops",
+              "default": 20,
+              "description": "Connection pool size",
               "format": "uint32",
               "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
+              "type": "integer"
             },
             "maxLifetimeSecs": {
               "format": "uint64",
@@ -381,13 +377,11 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Pool size, 20 by default, shared by API requests and background agents:\ntheir `concurrency` limits plus task, event and `LISTEN` loops",
+              "default": 20,
+              "description": "Connection pool size",
               "format": "uint32",
               "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
+              "type": "integer"
             },
             "maxLifetimeSecs": {
               "format": "uint64",
