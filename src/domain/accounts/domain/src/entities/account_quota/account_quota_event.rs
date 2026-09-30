@@ -23,7 +23,7 @@ pub struct AccountQuotaPayload {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::IntoStaticStr)]
 pub enum AccountQuotaEvent {
     AccountQuotaAdded(AccountQuotaAdded),
     AccountQuotaModified(AccountQuotaModified),
@@ -66,11 +66,7 @@ pub struct AccountQuotaRemoved {
 
 impl AccountQuotaEvent {
     pub fn typename(&self) -> &'static str {
-        match self {
-            AccountQuotaEvent::AccountQuotaAdded(_) => "AccountQuotaAdded",
-            AccountQuotaEvent::AccountQuotaModified(_) => "AccountQuotaModified",
-            AccountQuotaEvent::AccountQuotaRemoved(_) => "AccountQuotaRemoved",
-        }
+        self.into()
     }
 
     pub fn account_id(&self) -> odf::AccountID {

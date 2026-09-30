@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 use async_utils::BackgroundAgent;
-use chrono::{DateTime, DurationRound, Utc};
+use chrono::{DateTime, Duration, DurationRound, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
 use crate::RetryPolicy;
@@ -29,26 +29,14 @@ pub trait FlowAgent: BackgroundAgent {}
 pub struct FlowAgentConfig {
     /// Scheduling granularity: activation times are rounded to it, and failed
     /// activations retried after it. Not a polling period
-    pub awaiting_step: chrono::Duration,
+    pub awaiting_step: Duration,
     /// Defines minimal time between 2 runs of the same flow configuration
-    pub mandatory_throttling_period: chrono::Duration,
+    pub mandatory_throttling_period: Duration,
     /// Default retry policy for specific flow types
     pub default_retry_policy_by_flow_type: HashMap<String, RetryPolicy>,
 }
 
 impl FlowAgentConfig {
-    pub fn new(
-        awaiting_step: chrono::Duration,
-        mandatory_throttling_period: chrono::Duration,
-        default_retry_policy_by_flow_type: HashMap<String, RetryPolicy>,
-    ) -> Self {
-        Self {
-            awaiting_step,
-            mandatory_throttling_period,
-            default_retry_policy_by_flow_type,
-        }
-    }
-
     pub fn round_time(&self, time: DateTime<Utc>) -> Result<DateTime<Utc>, InternalError> {
         let rounded_time = time.duration_round(self.awaiting_step).int_err()?;
         Ok(rounded_time)

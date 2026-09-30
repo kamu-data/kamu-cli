@@ -35,7 +35,7 @@ impl PostgresFlowProcessStateRepository {
         let scope_data_json =
             serde_json::to_value(&process_state.flow_binding().scope).int_err()?;
 
-        let stop_policy_kind = process_state.stop_policy().kind_to_string();
+        let stop_policy_kind: &str = process_state.stop_policy().into();
         let stop_policy_data = serde_json::to_value(process_state.stop_policy()).int_err()?;
 
         let mut tr = self.transaction.lock().await;
@@ -114,6 +114,7 @@ impl PostgresFlowProcessStateRepository {
         expected_last_event_id: EventID,
     ) -> Result<(), FlowProcessSaveError> {
         let scope_data_json = serde_json::to_value(&state.flow_binding().scope).int_err()?;
+        let stop_policy_kind: &str = state.stop_policy().into();
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -141,7 +142,7 @@ impl PostgresFlowProcessStateRepository {
                     last_applied_flow_system_event_id = $18
             "#,
             state.user_intent() as FlowProcessUserIntent,
-            state.stop_policy().kind_to_string() as &str,
+            stop_policy_kind as &str,
             serde_json::to_value(state.stop_policy()).int_err()?,
             i32::try_from(state.consecutive_failures()).unwrap(),
             state.last_success_at(),

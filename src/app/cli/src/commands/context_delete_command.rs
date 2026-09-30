@@ -16,7 +16,7 @@ use crate::resource_context::{
     ResourceContextRegistryService,
     ResourceContextStoreScope,
 };
-use crate::{ContextListCommand, Interact, WorkspaceService};
+use crate::{Interact, WorkspaceService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,7 +50,7 @@ impl ContextDeleteCommand {
                         "{} {} ({})",
                         console::style("Current context switched to").green().bold(),
                         name,
-                        ContextListCommand::scope_label(scoped_context.scope).to_lowercase(),
+                        scoped_context.scope.to_string().to_lowercase(),
                     );
                 } else if self.workspace_service.is_in_workspace() {
                     eprintln!(
@@ -173,7 +173,7 @@ impl ContextDeleteCommand {
             if names.is_empty() {
                 return Err(CLIError::usage_error(format!(
                     "No resource contexts found in {} scope",
-                    ContextListCommand::scope_label(self.scope).to_lowercase(),
+                    self.scope.to_string().to_lowercase(),
                 )));
             }
 
@@ -189,7 +189,7 @@ impl ContextDeleteCommand {
                 return Err(CLIError::usage_error(format!(
                     "Resource context '{}' not found in {} scope",
                     name,
-                    ContextListCommand::scope_label(self.scope).to_lowercase(),
+                    self.scope.to_string().to_lowercase(),
                 )));
             }
 
@@ -219,7 +219,7 @@ impl ContextDeleteCommand {
                 console::style("Deleted").green().bold(),
                 names.len(),
                 console::style("contexts from").green().bold(),
-                ContextListCommand::scope_label(self.scope).to_lowercase(),
+                self.scope.to_string().to_lowercase(),
             );
         } else {
             eprintln!(
@@ -227,7 +227,7 @@ impl ContextDeleteCommand {
                 console::style("Deleted").green().bold(),
                 names.first().unwrap(),
                 console::style("from").green().bold(),
-                ContextListCommand::scope_label(self.scope).to_lowercase(),
+                self.scope.to_string().to_lowercase(),
             );
         }
     }

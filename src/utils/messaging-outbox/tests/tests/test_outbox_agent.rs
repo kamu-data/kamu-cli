@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -1367,7 +1368,7 @@ impl OutboxAgentFailureHarness {
         let mut b = CatalogBuilder::new_chained(base_catalog_harness.catalog());
         b.add::<OutboxAgentImpl>();
         b.add_value(OutboxAgentConfig {
-            batch_size,
+            batch_size: batch_size.try_into().unwrap(),
             ..OutboxAgentConfig::local_default()
         });
         b.add_value(WakeupListenerConfig {
@@ -1592,7 +1593,7 @@ impl OutboxAgentHeartbeatHarness {
         let mut b = CatalogBuilder::new_chained(base_catalog_harness.catalog());
         b.add::<OutboxAgentImpl>();
         b.add_value(OutboxAgentConfig {
-            batch_size: 1,
+            batch_size: NonZeroUsize::MIN,
             ..OutboxAgentConfig::local_default()
         });
         b.add_value(WakeupListenerConfig::local_default());

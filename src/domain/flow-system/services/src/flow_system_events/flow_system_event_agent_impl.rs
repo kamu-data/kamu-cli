@@ -133,7 +133,7 @@ impl FlowSystemEventAgentImpl {
             .fetch_next_batch(
                 transaction_catalog,
                 projector.name(),
-                self.agent_config.batch_size,
+                self.agent_config.batch_size.get(),
             )
             .await?;
         tracing::debug!(batch_size = batch.len(), "Fetched batch");

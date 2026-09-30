@@ -133,18 +133,19 @@ impl FlowHarness {
             ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowSystemTestListener>()
-            .add_value(FlowAgentConfig::new(
+            .add_value(FlowAgentConfig {
                 awaiting_step,
                 mandatory_throttling_period,
-                HashMap::new(),
-            ))
+                default_retry_policy_by_flow_type: HashMap::new(),
+            })
             .add_value(FlowAgentActivationConfig {
                 batch_size: NonZeroUsize::new(overrides.activation_batch_size.unwrap_or(20))
                     .unwrap(),
                 concurrency: NonZeroUsize::new(8).unwrap(),
             })
             .add_value(FlowSystemEventAgentConfig {
-                batch_size: overrides.flow_system_event_batch_size.unwrap_or(10),
+                batch_size: NonZeroUsize::new(overrides.flow_system_event_batch_size.unwrap_or(10))
+                    .unwrap(),
             })
             .add_value(WakeupListenerConfig {
                 // In-memory stores used to ignore it: keep test timings unchanged

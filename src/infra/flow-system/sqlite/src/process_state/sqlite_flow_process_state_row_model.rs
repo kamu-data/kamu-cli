@@ -63,7 +63,7 @@ impl TryFrom<SqliteFlowProcessStateRowModel> for FlowProcessState {
             .unwrap_or_default();
 
         assert_eq!(
-            stop_policy.kind_to_string(),
+            <&str>::from(stop_policy),
             row.stop_policy_kind,
             "Inconsistent stop policy kind and data in the database",
         );

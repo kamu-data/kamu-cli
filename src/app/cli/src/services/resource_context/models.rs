@@ -20,7 +20,7 @@ pub const LOCAL_CONTEXT_NAME: &str = "local";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, strum::Display)]
 pub enum ResourceContextStoreScope {
     Workspace,
     User,

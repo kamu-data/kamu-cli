@@ -328,7 +328,7 @@ impl OutboxAgentImpl {
             outbox_message_bridge,
             self.metrics.clone(),
             &failed_consumer_names_by_producer,
-            self.agent_config.batch_size,
+            self.agent_config.batch_size.get(),
         );
 
         planner.plan_consumption_tasks_by_producer().await

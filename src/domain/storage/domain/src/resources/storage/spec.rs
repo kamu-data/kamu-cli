@@ -24,19 +24,14 @@ kamu_resources::declare_identity_resource_spec_from_input!(StorageSpec);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[strum(serialize_all = "camelCase")]
-pub enum StorageProviderKind {
-    LocalFs,
-    S3,
-    Ipfs,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::EnumDiscriminants)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+#[strum_discriminants(
+    name(StorageProviderKind),
+    derive(Display, Serialize, Deserialize),
+    serde(rename_all = "camelCase"),
+    strum(serialize_all = "camelCase")
+)]
 pub enum StorageProviderSpec {
     LocalFs(StorageProviderSpecLocalFs),
     S3(StorageProviderSpecS3),
@@ -65,11 +60,7 @@ pub struct StorageProviderSpecS3 {
 
 impl StorageProviderSpec {
     pub fn kind(&self) -> StorageProviderKind {
-        match self {
-            Self::LocalFs(_) => StorageProviderKind::LocalFs,
-            Self::S3(_) => StorageProviderKind::S3,
-            Self::Ipfs(_) => StorageProviderKind::Ipfs,
-        }
+        self.into()
     }
 }
 

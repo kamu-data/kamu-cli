@@ -83,6 +83,10 @@ cargo nextest run -E 'test(test_name_here)'
   - narrowing ones are checked (`usize::try_from(x).unwrap()`, or handle the error);
   - time spans become floats through `chrono::TimeDelta::as_seconds_f64()` or
     `std::time::Duration::as_secs_f64()`, not `as f64` on integer milliseconds.
+- Derive enum ↔ string mappings and variant-kind enums with `strum` (`IntoStaticStr`, `Display`,
+  `EnumString`, `EnumDiscriminants`, `EnumIter`) instead of hand-written `match` arms, e.g.
+  `FlowOutcome` → `FlowOutcomeKind`. Keep a manual mapping only when strings are irregular, and pin
+  persisted strings with a test before converting.
 - Respect exact long separator comment style where surrounding files use it.
 - Keep comments concise — one or two lines, never prose poems.
 - Never explain what the code plainly says. If a reader can see it, do not restate it.

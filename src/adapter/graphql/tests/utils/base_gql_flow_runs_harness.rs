@@ -83,11 +83,11 @@ impl BaseGQLFlowRunsHarness {
 
         b.add_value(dataset_changes_mock)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-            .add_value(FlowAgentConfig::new(
-                Duration::seconds(1),
-                Duration::minutes(1),
-                HashMap::new(),
-            ))
+            .add_value(FlowAgentConfig {
+                awaiting_step: Duration::seconds(1),
+                mandatory_throttling_period: Duration::minutes(1),
+                default_retry_policy_by_flow_type: HashMap::new(),
+            })
             .add_value(FlowAgentActivationConfig {
                 batch_size: NonZeroUsize::new(20).unwrap(),
                 concurrency: NonZeroUsize::new(8).unwrap(),

@@ -42,6 +42,7 @@ internal-error = { workspace = true }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
+strum = { version = "0.28", default-features = false, features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = ["sync"] }
 tracing = "0.1"

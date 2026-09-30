@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
@@ -198,7 +199,7 @@ impl PostgresOutboxAgentHarness {
         b.add::<OutboxAgentMetrics>();
         b.add::<OutboxAgentImpl>();
         b.add_value(OutboxAgentConfig {
-            batch_size: 1,
+            batch_size: NonZeroUsize::MIN,
             ..OutboxAgentConfig::local_default()
         });
         b.add_value(WakeupListenerConfig {

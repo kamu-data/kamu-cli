@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::path::Path;
 
+use chrono::Duration;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::SecretsEncryptionConfig;
@@ -763,7 +764,8 @@ impl BackgroundAgentsConfig {
 
     pub fn outbox_agent_config(&self) -> messaging_outbox::OutboxAgentConfig {
         messaging_outbox::OutboxAgentConfig {
-            batch_size: self.batching.outbox_messages.max(1),
+            batch_size: NonZeroUsize::new(self.batching.outbox_messages)
+                .unwrap_or(NonZeroUsize::MIN),
             consumer_concurrency: NonZeroUsize::new(self.concurrency.outbox_consumers)
                 .unwrap_or(NonZeroUsize::MIN),
         }
@@ -771,7 +773,8 @@ impl BackgroundAgentsConfig {
 
     pub fn flow_system_event_agent_config(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
         kamu_flow_system::FlowSystemEventAgentConfig {
-            batch_size: self.batching.flow_system_events.max(1),
+            batch_size: NonZeroUsize::new(self.batching.flow_system_events)
+                .unwrap_or(NonZeroUsize::MIN),
         }
     }
 
@@ -805,14 +808,15 @@ pub struct FlowSystemConfig {
 
 impl FlowSystemConfig {
     pub fn into_system(&self) -> kamu_flow_system::FlowAgentConfig {
-        kamu_flow_system::FlowAgentConfig::new(
-            chrono::Duration::seconds(self.awaiting_step_secs),
-            chrono::Duration::seconds(self.mandatory_throttling_period_secs),
-            self.default_retry_policies
+        kamu_flow_system::FlowAgentConfig {
+            awaiting_step: Duration::seconds(self.awaiting_step_secs),
+            mandatory_throttling_period: Duration::seconds(self.mandatory_throttling_period_secs),
+            default_retry_policy_by_flow_type: self
+                .default_retry_policies
                 .iter()
                 .map(|(t, policy)| (t.clone(), policy.into_system()))
                 .collect(),
-        )
+        }
     }
 }
 

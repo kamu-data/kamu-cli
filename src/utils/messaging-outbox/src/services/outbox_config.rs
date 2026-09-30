@@ -13,9 +13,10 @@ use std::num::NonZeroUsize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct OutboxAgentConfig {
-    pub batch_size: usize,
-
+    /// How many messages are relayed per transaction
+    pub batch_size: NonZeroUsize,
     /// Consumers handling messages at once, across all producers. Each one
     /// typically holds a pooled connection while it runs
     pub consumer_concurrency: NonZeroUsize,
@@ -26,7 +27,7 @@ impl OutboxAgentConfig {
     // requests from waiting; concurrent consumers would only queue and time out
     pub fn local_default() -> Self {
         Self {
-            batch_size: 20,
+            batch_size: NonZeroUsize::new(20).unwrap(),
             consumer_concurrency: NonZeroUsize::MIN,
         }
     }
@@ -35,7 +36,7 @@ impl OutboxAgentConfig {
     // and consumers run in parallel, well below the default pool size
     pub fn production_default() -> Self {
         Self {
-            batch_size: 100,
+            batch_size: NonZeroUsize::new(100).unwrap(),
             consumer_concurrency: NonZeroUsize::new(8).unwrap(),
         }
     }

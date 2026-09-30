@@ -19,7 +19,7 @@ use crate::resource_context::{
     ResourceContextStoreScope,
     ResourceContextTestService,
 };
-use crate::{ContextListCommand, OutputConfig, WorkspaceService, odf_server};
+use crate::{OutputConfig, WorkspaceService, odf_server};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -188,7 +188,7 @@ impl Command for ContextAddCommand {
                 .bold(),
             self.name,
             console::style("in").green().bold(),
-            ContextListCommand::scope_label(self.scope).to_lowercase(),
+            self.scope.to_string().to_lowercase(),
         );
 
         // Registered first: that is the user's primary intent and is purely
