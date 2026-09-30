@@ -20,8 +20,7 @@ const TASK_TIME_BUCKETS_SECONDS: &[f64] = &[
     1.0, 5.0, 15.0, 60.0, 300.0, 900.0, 1800.0, 3600.0, 7200.0, 21600.0,
 ];
 
-/// The only task executor for now: the task agent runs tasks in-process, one
-/// at a time. Clustered deployments will run several executors
+/// The task agent, running tasks in-process one at a time, is the only executor
 pub const MAIN_TASK_EXECUTOR: &str = "main";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,9 +39,8 @@ impl TaskAgentMetrics {
         use prometheus::*;
 
         Self {
-            // Split by outcome, as failures and cancellations have timings of their
-            // own. Only runs are counted: tasks cancelled while queued, or while
-            // running across a restart, never ran here
+            // By outcome, as failures and cancellations time differently. Counts
+            // only completed runs, not tasks cancelled while queued or on restart
             task_duration_seconds: HistogramVec::new(
                 HistogramOpts::new(
                     "task_agent_task_duration_seconds",

@@ -14,9 +14,8 @@ use wakeup_listener::WakeupListener;
 /// Signals the flow agent that a flow might have been scheduled for activation,
 /// possibly earlier than the moment the agent is waiting for
 pub trait FlowActivationWakeupSource: Send + Sync {
-    /// Creates a listener handle for the flow agent, which keeps it for its
-    /// lifetime: handles are cheap, but a shared one would lose wakeups.
-    /// Its heartbeat is labelled with the flow agent's name
+    /// The agent's own listener handle, kept for its lifetime: a shared one
+    /// would lose wakeups. Its heartbeat is labelled with the agent's name
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 }
 

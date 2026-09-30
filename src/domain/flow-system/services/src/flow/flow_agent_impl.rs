@@ -269,9 +269,8 @@ impl FlowAgentImpl {
         }
     }
 
-    /// Each flow is activated in its own transaction, so that a failure of one
-    /// flow rolls back only its own changes. Activations start in the order of
-    /// activation moments, and run concurrently on separate connections
+    /// Each flow gets its own transaction, so a failure rolls back only its own
+    /// changes. Started in activation order, run concurrently
     async fn activate_flows(&self, flows: Vec<(Flow, DateTime<Utc>)>) {
         futures::stream::iter(flows)
             .for_each_concurrent(
@@ -316,9 +315,8 @@ impl FlowAgentImpl {
             .await;
     }
 
-    /// Loads a page of flows due for activation in one transaction.
-    /// Pages by the activation key rather than restarting from the first due
-    /// flow: flows whose activation failed stay due, and would come back first
+    /// Loads a page of due flows. Pages by key rather than from the first due
+    /// flow: flows that failed to activate stay due and would come first
     #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
     async fn load_flows_due_for_activation(
         &self,
@@ -395,9 +393,8 @@ impl FlowAgentImpl {
                     self.agent_config.awaiting_step
                 };
 
-                // Dropping the signal wait is safe: whatever it could have consumed was
-                // committed before, so the next iteration sees it in the store anyway.
-                // The deadline is measured by the time source, which tests control
+                // Dropping the signal wait loses nothing, as the store is re-read on
+                // the next pass. The time source measures the deadline, so tests control it
                 tokio::select! {
                     hint = wait_signal => hint?,
                     () = self.time_source.sleep(sleep_duration) => WakeHint::Timeout,
@@ -414,9 +411,8 @@ impl FlowAgentImpl {
         Ok(())
     }
 
-    /// Activates a flow loaded beforehand. If the flow changed since then,
-    /// saving it fails as a concurrent modification, and the transaction is
-    /// rolled back
+    /// Activates a flow loaded beforehand; if it changed since, the save fails
+    /// as a concurrent modification and the transaction rolls back
     #[transactional_method]
     async fn activate_flow(
         &self,
@@ -534,7 +530,6 @@ impl BackgroundAgent for FlowAgentImpl {
         let wakeup_listener = self.flow_activation_wakeup_source.new_wakeup_listener();
 
         loop {
-            // Activate all flows that are due by now
             self.activate_due_flows(wakeup_listener.as_ref())
                 .instrument(tracing::debug_span!("FlowAgent::tick"))
                 .await?;

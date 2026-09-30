@@ -124,12 +124,8 @@ impl TaskAgentImpl {
     #[transactional_method2(task_event_store: Arc<dyn TaskEventStore>, outbox: Arc<dyn Outbox>)]
     #[tracing::instrument(level = "info", skip_all)]
     async fn recover_running_tasks(&self) -> Result<(), InternalError> {
-        // Recovering tasks means we are re-queuing tasks that started running, but got
-        // aborted due to server shutdown or crash. Those cancelled meanwhile are
-        // finished
-
-        // Process them in pages. Each processed task leaves the running set, so the
-        // next page is always the first one
+        // Tasks interrupted by a shutdown or crash are requeued, or finished if
+        // cancelled meanwhile. Each leaves the running set, so re-read page one
         loop {
             use futures::TryStreamExt;
             let running_task_ids: Vec<_> = task_event_store

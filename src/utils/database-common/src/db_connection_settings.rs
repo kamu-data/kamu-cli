@@ -25,9 +25,8 @@ pub struct DatabaseConnectionSettings {
 }
 
 impl DatabaseConnectionSettings {
-    /// Pool size unless configured. Background agents alone may hold up to
-    /// the flow activation and outbox consumer concurrency limits (8 + 8 in
-    /// their production defaults), and API requests share the same pool
+    /// Pool size unless configured: API requests share it with background
+    /// agents, which hold up to 8 + 8 concurrent transactions in production
     pub const DEFAULT_MAX_CONNECTIONS: u32 = 20;
 
     pub fn new(

@@ -676,11 +676,8 @@ impl FlowHarness {
         test_flow_listener.mark_as_loaded();
         test_flow_listener.make_a_snapshot(self.now());
 
-        // Run scheduler concurrently with the provided simulation script.
-        // Polling order is fixed, so that the order of events written at the same
-        // virtual moment by the script and the agents does not depend on chance.
-        // Projections catch up on what the script wrote before the flow agent acts,
-        // as they would have long done by then in a real deployment
+        // Biased, so that events written at the same virtual moment keep their order,
+        // and projections catch up on the script's writes before the flow agent acts
         tokio::select! {
             biased;
 

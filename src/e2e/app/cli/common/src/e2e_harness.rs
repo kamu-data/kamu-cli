@@ -272,9 +272,8 @@ fn merge_yaml(
     }
 }
 
-/// Merges mappings recursively, so that nested sections of the source (e.g.
-/// `content.flowSystem`) do not wipe out sibling sections of the target (e.g.
-/// `content.database`). Any other source value replaces the target one
+/// Merges mappings recursively, so that a source `content.flowSystem` keeps the
+/// target `content.database`. Any other source value replaces the target one
 fn merge_yaml_values(target: &mut serde_yaml::Value, source: serde_yaml::Value) {
     match (target, source) {
         (

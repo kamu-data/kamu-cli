@@ -419,10 +419,8 @@ treated as 1
 <td><code class="language-json">1</code></td>
 <td>
 
-Flows activated at once, each in its own transaction with a pooled
-connection. Keep it well below the database pool size (e.g. 8 with
-Postgres). `SQLite` has a single connection, so more than 1 only queues
-activations for it. 0 is treated as 1
+Flows activated at once, each holding a pooled connection: e.g. 8 with
+Postgres, well below the pool size, 1 with `SQLite`. 0 is treated as 1
 
 </td>
 </tr>
@@ -432,11 +430,8 @@ activations for it. 0 is treated as 1
 <td><code class="language-json">1</code></td>
 <td>
 
-Outbox consumers handling messages at once, across all producers, each
-in its own transaction with a pooled connection. Messages of a producer
-are still handled in order. Keep it well below the database pool size
-(e.g. 8 with Postgres). `SQLite` has a single connection, so more than 1
-only queues consumers for it. 0 is treated as 1
+Outbox consumers running at once, in order per producer, each holding a
+pooled connection: sized like `flowActivations`. 0 is treated as 1
 
 </td>
 </tr>
@@ -567,10 +562,8 @@ the next flow activation moment regardless of it.
 <td><code class="language-json">null</code></td>
 <td>
 
-Connection pool size, 20 by default. Background agents may hold up to
-`backgroundAgents.concurrency.flowActivations + outboxConsumers`
-connections, plus one each for the task and flow system event agents
-and, with Postgres, one for `LISTEN`, alongside API requests
+Pool size, 20 by default, shared by API requests and background agents:
+their `concurrency` limits plus task, event and `LISTEN` loops
 
 </td>
 </tr>
@@ -631,10 +624,8 @@ and, with Postgres, one for `LISTEN`, alongside API requests
 <td><code class="language-json">null</code></td>
 <td>
 
-Connection pool size, 20 by default. Background agents may hold up to
-`backgroundAgents.concurrency.flowActivations + outboxConsumers`
-connections, plus one each for the task and flow system event agents
-and, with Postgres, one for `LISTEN`, alongside API requests
+Pool size, 20 by default, shared by API requests and background agents:
+their `concurrency` limits plus task, event and `LISTEN` loops
 
 </td>
 </tr>
@@ -695,10 +686,8 @@ and, with Postgres, one for `LISTEN`, alongside API requests
 <td><code class="language-json">null</code></td>
 <td>
 
-Connection pool size, 20 by default. Background agents may hold up to
-`backgroundAgents.concurrency.flowActivations + outboxConsumers`
-connections, plus one each for the task and flow system event agents
-and, with Postgres, one for `LISTEN`, alongside API requests
+Pool size, 20 by default, shared by API requests and background agents:
+their `concurrency` limits plus task, event and `LISTEN` loops
 
 </td>
 </tr>
@@ -1285,10 +1274,8 @@ the resources (for authenticated clients)
 <td><code class="language-json">1</code></td>
 <td>
 
-Scheduling granularity: flow activation times are rounded to it.
-Also the delay before retrying to activate a flow whose activation
-failed. The flow agent does not poll with this period: it wakes up at
-activation moments and when flows get scheduled.
+Scheduling granularity: activation times are rounded to it, and failed
+activations retried after it. Not a polling period
 
 </td>
 </tr>

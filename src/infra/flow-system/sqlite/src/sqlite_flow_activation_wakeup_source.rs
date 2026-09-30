@@ -17,9 +17,8 @@ use wakeup_listener::{HubWakeupListener, WakeupListener};
 
 const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
     name: "flow_activation_scheduled",
-    // Descending scan by primary key finds the latest match within a few rows:
-    // nearly every flow gets scheduled for activation.
-    // A finished task sets an activation time only when a retry is planned.
+    // Scanning back by primary key finds a match within a few rows, as nearly
+    // every flow gets scheduled; finished tasks set a time only for retries
     max_id_query: r#"
         SELECT (
             SELECT event_id FROM flow_events

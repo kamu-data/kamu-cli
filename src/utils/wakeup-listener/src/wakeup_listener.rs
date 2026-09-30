@@ -13,12 +13,8 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Lets an agent sleep until its data *might* have changed, instead of polling.
-/// Serves a single agent: changes since its previous call are never missed,
-/// but wakeups may be spurious.
-///
-/// Also reports the liveness of the agent's loop: a heartbeat is recorded when
-/// the listener is created and around every wait.
+/// Lets an agent sleep until its data *might* have changed, instead of polling:
+/// no change is missed, but wakeups may be spurious. Also records its heartbeat
 #[async_trait::async_trait]
 pub trait WakeupListener: Send + Sync {
     /// Proves the agent's loop alive while it works through a backlog without

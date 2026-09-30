@@ -27,10 +27,8 @@ pub trait FlowAgent: BackgroundAgent {}
 
 #[derive(Debug)]
 pub struct FlowAgentConfig {
-    /// Scheduling granularity: activation times are rounded to it.
-    /// Also the delay before retrying flows whose activation failed.
-    /// Not a polling period: the agent wakes up at activation moments
-    /// and on flow activation signals
+    /// Scheduling granularity: activation times are rounded to it, and failed
+    /// activations retried after it. Not a polling period
     pub awaiting_step: chrono::Duration,
     /// Defines minimal time between 2 runs of the same flow configuration
     pub mandatory_throttling_period: chrono::Duration,

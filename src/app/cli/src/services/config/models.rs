@@ -528,10 +528,8 @@ pub struct RemoteDatabaseConfig {
     pub database_name: String,
     pub host: String,
     pub port: Option<u16>,
-    /// Connection pool size, 20 by default. Background agents may hold up to
-    /// `backgroundAgents.concurrency.flowActivations + outboxConsumers`
-    /// connections, plus one each for the task and flow system event agents
-    /// and, with Postgres, one for `LISTEN`, alongside API requests
+    /// Pool size, 20 by default, shared by API requests and background agents:
+    /// their `concurrency` limits plus task, event and `LISTEN` loops
     pub max_connections: Option<u32>,
     pub max_lifetime_secs: Option<u64>,
     pub acquire_timeout_secs: Option<u64>,
@@ -702,11 +700,8 @@ pub struct UploadsConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Note: defaults suit the CLI with a SQLite target, and match
-// `WakeupListenerConfig::local_default()` and the agents' `local_default()`
-// batch sizes and concurrency, where the reasoning is documented. Postgres
-// targets typically use a higher listening timeout (~60s), larger batches
-// (~100..500) and concurrency (~8).
+// Defaults suit the CLI on SQLite, as the agents' `local_default()` explain.
+// Postgres typically wants ~60s timeouts, ~100..500 batches, ~8 concurrency
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsConfig {
     /// How long agents absorb a burst of change signals before processing
@@ -747,18 +742,13 @@ pub struct BackgroundAgentsBatchingConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsConcurrencyConfig {
-    /// Flows activated at once, each in its own transaction with a pooled
-    /// connection. Keep it well below the database pool size (e.g. 8 with
-    /// Postgres). `SQLite` has a single connection, so more than 1 only queues
-    /// activations for it. 0 is treated as 1
+    /// Flows activated at once, each holding a pooled connection: e.g. 8 with
+    /// Postgres, well below the pool size, 1 with `SQLite`. 0 is treated as 1
     #[config(default = 1)]
     pub flow_activations: usize,
 
-    /// Outbox consumers handling messages at once, across all producers, each
-    /// in its own transaction with a pooled connection. Messages of a producer
-    /// are still handled in order. Keep it well below the database pool size
-    /// (e.g. 8 with Postgres). `SQLite` has a single connection, so more than 1
-    /// only queues consumers for it. 0 is treated as 1
+    /// Outbox consumers running at once, in order per producer, each holding a
+    /// pooled connection: sized like `flowActivations`. 0 is treated as 1
     #[config(default = 1)]
     pub outbox_consumers: usize,
 }
@@ -799,10 +789,8 @@ impl BackgroundAgentsConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct FlowSystemConfig {
-    /// Scheduling granularity: flow activation times are rounded to it.
-    /// Also the delay before retrying to activate a flow whose activation
-    /// failed. The flow agent does not poll with this period: it wakes up at
-    /// activation moments and when flows get scheduled.
+    /// Scheduling granularity: activation times are rounded to it, and failed
+    /// activations retried after it. Not a polling period
     #[config(default = 1)]
     pub awaiting_step_secs: i64,
 

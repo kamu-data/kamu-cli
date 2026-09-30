@@ -13,9 +13,8 @@ use wakeup_listener::WakeupListener;
 
 /// Signals the task agent that new tasks might have been queued
 pub trait TaskQueueWakeupSource: Send + Sync {
-    /// Creates a listener handle for the task agent, which keeps it for its
-    /// lifetime: handles are cheap, but a shared one would lose wakeups.
-    /// Its heartbeat is labelled with the task agent's name
+    /// The agent's own listener handle, kept for its lifetime: a shared one
+    /// would lose wakeups. Its heartbeat is labelled with the agent's name
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 }
 

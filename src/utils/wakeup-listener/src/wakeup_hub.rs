@@ -28,7 +28,7 @@ pub trait WakeupHub: Send + Sync + 'static {
     /// change afterwards. Must be called within a Tokio runtime.
     fn subscribe(&self, channel: Self::Channel) -> Arc<Notify>;
 
-    /// Where listeners report their waits
+    /// Where listeners record heartbeats
     fn metrics(&self) -> &WakeupListenerMetrics;
 }
 

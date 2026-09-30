@@ -168,14 +168,14 @@
       "properties": {
         "flowActivations": {
           "default": 1,
-          "description": "Flows activated at once, each in its own transaction with a pooled\nconnection. Keep it well below the database pool size (e.g. 8 with\nPostgres). `SQLite` has a single connection, so more than 1 only queues\nactivations for it. 0 is treated as 1",
+          "description": "Flows activated at once, each holding a pooled connection: e.g. 8 with\nPostgres, well below the pool size, 1 with `SQLite`. 0 is treated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "outboxConsumers": {
           "default": 1,
-          "description": "Outbox consumers handling messages at once, across all producers, each\nin its own transaction with a pooled connection. Messages of a producer\nare still handled in order. Keep it well below the database pool size\n(e.g. 8 with Postgres). `SQLite` has a single connection, so more than 1\nonly queues consumers for it. 0 is treated as 1",
+          "description": "Outbox consumers running at once, in order per producer, each holding a\npooled connection: sized like `flowActivations`. 0 is treated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -263,7 +263,7 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections, plus one each for the task and flow system event agents\nand, with Postgres, one for `LISTEN`, alongside API requests",
+              "description": "Pool size, 20 by default, shared by API requests and background agents:\ntheir `concurrency` limits plus task, event and `LISTEN` loops",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -322,7 +322,7 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections, plus one each for the task and flow system event agents\nand, with Postgres, one for `LISTEN`, alongside API requests",
+              "description": "Pool size, 20 by default, shared by API requests and background agents:\ntheir `concurrency` limits plus task, event and `LISTEN` loops",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -381,7 +381,7 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections, plus one each for the task and flow system event agents\nand, with Postgres, one for `LISTEN`, alongside API requests",
+              "description": "Pool size, 20 by default, shared by API requests and background agents:\ntheir `concurrency` limits plus task, event and `LISTEN` loops",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -833,7 +833,7 @@
       "properties": {
         "awaitingStepSecs": {
           "default": 1,
-          "description": "Scheduling granularity: flow activation times are rounded to it.\nAlso the delay before retrying to activate a flow whose activation\nfailed. The flow agent does not poll with this period: it wakes up at\nactivation moments and when flows get scheduled.",
+          "description": "Scheduling granularity: activation times are rounded to it, and failed\nactivations retried after it. Not a polling period",
           "format": "int64",
           "type": "integer"
         },
