@@ -2551,6 +2551,26 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
             .unwrap();
         assert_eq!(pending_flows.len(), 1);
         assert_eq!(pending_flows[0], flow_id);
+
+        // Due for activation again once its retry moment comes. Databases keep
+        // fewer subsecond digits, so compare at millisecond precision
+        let retry_at = flow.timing.scheduled_for_activation_at.unwrap();
+        assert_eq!(
+            flow_event_store
+                .nearest_flow_activation_moment()
+                .await
+                .unwrap()
+                .map(|moment| moment.trunc_subsecs(3)),
+            Some(retry_at.trunc_subsecs(3))
+        );
+        assert_eq!(
+            due_flow_ids(flow_event_store.as_ref(), retry_at - Duration::seconds(1)).await,
+            vec![]
+        );
+        assert_eq!(
+            due_flow_ids(flow_event_store.as_ref(), retry_at).await,
+            vec![flow_id]
+        );
     }
 
     // Run the flow for the last retry attempt, and succeeed
@@ -2576,6 +2596,29 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(pending_flows.is_empty());
+
+    // Nor due for activation
+    assert_eq!(
+        flow_event_store
+            .nearest_flow_activation_moment()
+            .await
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        due_flow_ids(flow_event_store.as_ref(), Utc::now() + Duration::hours(1)).await,
+        vec![]
+    );
+}
+
+async fn due_flow_ids(event_store: &dyn FlowEventStore, up_to: DateTime<Utc>) -> Vec<FlowID> {
+    event_store
+        .get_flows_due_for_activation(up_to, None, LARGE_LIMIT)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|due_flow| due_flow.flow_id)
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

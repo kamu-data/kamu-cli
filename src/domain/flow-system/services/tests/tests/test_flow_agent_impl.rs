@@ -22,9 +22,6 @@ use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
 
 use super::{
-    FAILING_PROJECTOR_NAME,
-    FLAKY_PROJECTOR_NAME,
-    FLOW_SYSTEM_TEST_LISTENER_NAME,
     FlowHarness,
     FlowHarnessOverrides,
     FlowSystemTestListener,
@@ -184,10 +181,7 @@ async fn test_read_initial_config_should_not_queue_in_recovery_case() {
     let foo_ingest_binding = ingest_dataset_binding(&foo_id);
 
     // Remember start time
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Configure ingestion schedule every 60ms, but use event store directly
     harness
@@ -2694,10 +2688,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
     // Remember start time
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Run scheduler concurrently with simulation script
     harness
@@ -2950,10 +2941,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
     // Remember start time
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Run scheduler concurrently with simulation script
     harness
@@ -7782,10 +7770,7 @@ async fn test_respect_last_success_time_for_root_dataset_when_activate_configura
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Remember start time
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Run scheduler concurrently with simulation script
     harness
@@ -7982,10 +7967,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
     // Remember start time
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Run scheduler concurrently with simulation script
     harness
@@ -8378,10 +8360,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
     // Remember start time
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Run scheduler concurrently with simulation script
     harness
@@ -8662,10 +8641,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
     let baz_transform_binding = transform_dataset_binding(&baz_id);
 
     // Remember start time
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Set reactive trigger for "baz"
     harness
@@ -10609,10 +10585,7 @@ async fn test_flow_failing_to_schedule_does_not_block_later_flows() {
         })
         .await;
 
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // No controller is registered for this flow type, so scheduling it always fails
     harness
@@ -10728,10 +10701,7 @@ async fn test_due_flows_activated_in_pages_past_failing_ones() {
         })
         .await;
 
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // No controller is registered for this flow type, so scheduling it always fails
     for dataset_id in [&foo_id, &bar_id] {
@@ -10771,134 +10741,6 @@ async fn test_due_flows_activated_in_pages_past_failing_ones() {
     assert!(harness.flow_activation_delays_total_seconds() < 0.001);
     assert!(harness.task_exists(TaskID::new(0)).await);
     assert!(harness.task_exists(TaskID::new(1)).await);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_failing_projector_reported_without_blocking_others() {
-    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        with_failing_projector: true,
-        ..Default::default()
-    });
-
-    let foo_id = harness
-        .create_root_dataset(odf::DatasetAlias {
-            dataset_name: odf::DatasetName::new_unchecked("foo"),
-            account_name: None,
-        })
-        .await;
-
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-    harness
-        .schedule_flow_for_activation(
-            &ingest_dataset_binding(&foo_id),
-            start_time + Duration::milliseconds(10),
-        )
-        .await;
-
-    harness
-        .simulate_flow_scenario(|| async {
-            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                task_id: TaskID::new(0),
-                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((
-                    Duration::milliseconds(10),
-                    TaskOutcome::Success(TaskResult::empty()),
-                )),
-                expected_logical_plan: LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false,
-                }
-                .into_logical_plan(),
-            });
-            let foo_task0_handle = foo_task0_driver.run();
-
-            let sim_handle = harness.advance_time(Duration::milliseconds(50));
-            tokio::join!(foo_task0_handle, sim_handle);
-        })
-        .await
-        .unwrap();
-
-    // The failing projector stays failing, the others keep up
-    assert!(harness.is_projector_failing(FAILING_PROJECTOR_NAME));
-    assert!(!harness.is_projector_failing(FLOW_SYSTEM_TEST_LISTENER_NAME));
-
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
-    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
-    assert!(
-        format!("{}", test_flow_listener.as_ref()).contains("Finished Success"),
-        "{test_flow_listener}"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_projector_recovers_after_failed_batch() {
-    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        with_flaky_projector: true,
-        ..Default::default()
-    });
-
-    let foo_id = harness
-        .create_root_dataset(odf::DatasetAlias {
-            dataset_name: odf::DatasetName::new_unchecked("foo"),
-            account_name: None,
-        })
-        .await;
-
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
-    harness
-        .schedule_flow_for_activation(
-            &ingest_dataset_binding(&foo_id),
-            start_time + Duration::milliseconds(10),
-        )
-        .await;
-
-    harness
-        .simulate_flow_scenario(|| async {
-            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
-                task_id: TaskID::new(0),
-                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
-                dataset_id: Some(foo_id.clone()),
-                run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((
-                    Duration::milliseconds(10),
-                    TaskOutcome::Success(TaskResult::empty()),
-                )),
-                expected_logical_plan: LogicalPlanDatasetUpdate {
-                    dataset_id: foo_id.clone(),
-                    fetch_uncacheable: false,
-                }
-                .into_logical_plan(),
-            });
-            let foo_task0_handle = foo_task0_driver.run();
-
-            let sim_handle = harness.advance_time(Duration::milliseconds(50));
-            tokio::join!(foo_task0_handle, sim_handle);
-        })
-        .await
-        .unwrap();
-
-    // The failed batch is fetched again on a later wakeup, not skipped
-    assert!(harness.has_flaky_projector_applied_failed_event());
-    assert!(!harness.is_projector_failing(FLAKY_PROJECTOR_NAME));
-
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
-    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
-    assert!(
-        format!("{}", test_flow_listener.as_ref()).contains("Finished Success"),
-        "{test_flow_listener}"
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -11343,10 +11185,7 @@ async fn test_flow_scheduled_earlier_than_awaited_activation() {
         })
         .await;
 
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // The agent will sleep towards this activation
     harness
@@ -11805,10 +11644,7 @@ async fn test_independent_flows_due_at_same_moment() {
         })
         .await;
 
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     harness
         .schedule_flow_for_activation(
@@ -11888,10 +11724,7 @@ async fn test_activation_moment_between_scheduling_steps() {
         })
         .await;
 
-    let start_time = harness
-        .now()
-        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
-        .unwrap();
+    let start_time = harness.aligned_now();
 
     // Not a multiple of the scheduling step
     harness

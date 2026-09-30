@@ -12,7 +12,7 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 
 use async_utils::BackgroundAgent;
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use internal_error::InternalError;
@@ -579,6 +579,13 @@ impl FlowHarness {
 
     pub fn now(&self) -> DateTime<Utc> {
         self.fake_system_time_source.now()
+    }
+
+    /// Current time rounded to the scheduling alignment
+    pub fn aligned_now(&self) -> DateTime<Utc> {
+        self.now()
+            .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+            .unwrap()
     }
 
     pub async fn advance_time(&self, time_quantum: Duration) {

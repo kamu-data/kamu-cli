@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use database_common::SqliteTransactionManager;
 use database_common_macros::transactional_method1;
 use dill::{Catalog, CatalogBuilder};
@@ -79,6 +79,23 @@ async fn test_wakes_up_only_when_flow_activation_is_scheduled(sqlite_pool: Sqlit
     assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
     harness.abort_flow(flow_id).await;
     assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
+
+    // Another activation cause keeps the activation time: no reason to wake up
+    let flow_id = harness.new_flow_id().await;
+    harness.initiate_flow(flow_id).await;
+    let activation_at = Utc::now() + TimeDelta::hours(1);
+    harness
+        .schedule_for_activation(flow_id, activation_at)
+        .await;
+    assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
+    harness.add_activation_cause(flow_id).await;
+    assert_matches!(harness.wait_wake().await, WakeHint::Timeout);
+
+    // Rescheduled earlier than the moment the agent may be waiting for
+    harness
+        .schedule_for_activation(flow_id, activation_at - TimeDelta::minutes(30))
+        .await;
+    assert_matches!(harness.wait_wake().await, WakeHint::Signaled);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,6 +177,24 @@ impl SqliteFlowActivationWakeupHarness {
                 flow_id,
                 flow_binding: self.flow_binding.clone(),
                 scheduled_for_activation_at: activation_at,
+            }
+            .into(),
+        )
+        .await;
+    }
+
+    async fn add_activation_cause(&self, flow_id: FlowID) {
+        self.save_event(
+            flow_id,
+            FlowEventActivationCauseAdded {
+                event_time: Utc::now(),
+                flow_id,
+                flow_binding: self.flow_binding.clone(),
+                activation_cause: FlowActivationCause::AutoPolling(
+                    FlowActivationCauseAutoPolling {
+                        activation_time: Utc::now(),
+                    },
+                ),
             }
             .into(),
         )

@@ -75,6 +75,8 @@ kamu_cli_run_api_server_e2e_test!(
           flowSystem:
             awaitingStepSecs: 1
           backgroundAgents:
+            # Long debounce: all triggers land before the flow agent wakes,
+            # so one activation pass sees more due flows than the limit
             minDebounceInterval: 1s
             maxListeningTimeout: 1s
             concurrency:
