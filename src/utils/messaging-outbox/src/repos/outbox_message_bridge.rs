@@ -18,7 +18,7 @@ use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageBoundary, OutboxMessag
 pub trait OutboxMessageBridge: Send + Sync {
     /// Creates a listener handle for the outbox agent, which keeps it for its
     /// lifetime: handles are cheap, but a shared one would lose wakeups.
-    /// Its wait metrics are labelled with the outbox agent's name
+    /// Its heartbeat is labelled with the outbox agent's name
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 
     /// Pushes new message to the outbox

@@ -17,7 +17,7 @@ Recommendation: for ease of reading, use the following format:
 ### Added
 - Prometheus metrics for background agents, with recommended alerts in `docs/internal/metrics.md`:
   - `wakeup_listener_last_heartbeat_timestamp_seconds`: heartbeat of every wakeup-driven agent's loop, recorded by
-    the shared wakeup listener on every wait and processed batch, labelled by agent
+    the shared wakeup listener on start, every wait and every processed batch, labelled by agent
   - task agent: task duration by outcome (also counting finished tasks), queue wait, running task start time
   - flow agent: activations by outcome, activation delay
   - flows: duration and retries of completed flows by outcome (also counting them), aborted flows

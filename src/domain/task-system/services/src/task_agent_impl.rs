@@ -128,22 +128,20 @@ impl TaskAgentImpl {
         // aborted due to server shutdown or crash. Those cancelled meanwhile are
         // finished
 
-        // Total number of running tasks
-        let total_running_tasks = task_event_store.get_count_running_tasks().await?;
-
-        // Process them in pages
-        let mut processed_running_tasks = 0;
-        while processed_running_tasks < total_running_tasks {
-            // Load another page
+        // Process them in pages. Each processed task leaves the running set, so the
+        // next page is always the first one
+        loop {
             use futures::TryStreamExt;
             let running_task_ids: Vec<_> = task_event_store
                 .get_running_tasks(PaginationOpts {
-                    offset: processed_running_tasks,
+                    offset: 0,
                     limit: 100,
                 })
                 .try_collect()
                 .await?;
-            let batch_size = running_task_ids.len();
+            if running_task_ids.is_empty() {
+                break;
+            }
 
             let tasks = Task::load_multi_simple(&running_task_ids, task_event_store.as_ref())
                 .await
@@ -158,8 +156,6 @@ impl TaskAgentImpl {
                     task.save(task_event_store.as_ref()).await.int_err()?;
                 }
             }
-
-            processed_running_tasks += batch_size;
         }
 
         Ok(())

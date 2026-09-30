@@ -392,13 +392,18 @@ Due flows the flow agent loads at once before activating them.
 <td><code>flowSystemEvents</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">20</code></td>
-<td>Flow system events applied to a projection per transaction</td>
+<td>
+
+Flow system events applied to a projection per transaction. 0 is
+treated as 1
+
+</td>
 </tr>
 <tr>
 <td><code>outboxMessages</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">20</code></td>
-<td>Outbox messages relayed per transaction</td>
+<td>Outbox messages relayed per transaction. 0 is treated as 1</td>
 </tr>
 </tbody>
 </table>
@@ -564,7 +569,8 @@ the next flow activation moment regardless of it.
 
 Connection pool size, 20 by default. Background agents may hold up to
 `backgroundAgents.concurrency.flowActivations + outboxConsumers`
-connections alongside API requests
+connections, plus one each for the task and flow system event agents
+and, with Postgres, one for `LISTEN`, alongside API requests
 
 </td>
 </tr>
@@ -627,7 +633,8 @@ connections alongside API requests
 
 Connection pool size, 20 by default. Background agents may hold up to
 `backgroundAgents.concurrency.flowActivations + outboxConsumers`
-connections alongside API requests
+connections, plus one each for the task and flow system event agents
+and, with Postgres, one for `LISTEN`, alongside API requests
 
 </td>
 </tr>
@@ -690,7 +697,8 @@ connections alongside API requests
 
 Connection pool size, 20 by default. Background agents may hold up to
 `backgroundAgents.concurrency.flowActivations + outboxConsumers`
-connections alongside API requests
+connections, plus one each for the task and flow system event agents
+and, with Postgres, one for `LISTEN`, alongside API requests
 
 </td>
 </tr>

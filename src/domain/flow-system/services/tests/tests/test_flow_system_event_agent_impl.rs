@@ -20,6 +20,7 @@ use super::{
     FlowHarness,
     FlowHarnessOverrides,
     FlowSystemTestListener,
+    HeartbeatProbeFlowSystemEventProjector,
     TaskDriverArgs,
 };
 
@@ -142,6 +143,55 @@ async fn test_projector_recovers_after_failed_batch() {
     assert!(
         format!("{}", test_flow_listener.as_ref()).contains("Finished Success"),
         "{test_flow_listener}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_catchup_records_heartbeat_after_every_batch() {
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        flow_system_event_batch_size: Some(1),
+        with_heartbeat_probe_projector: true,
+        ..Default::default()
+    });
+
+    // A backlog of events, drained by the agent's initial catch-up one per
+    // batch, before it ever waits
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    harness
+        .schedule_flow_for_activation(
+            &ingest_dataset_binding(&foo_id),
+            harness.aligned_now() + Duration::milliseconds(10),
+        )
+        .await;
+
+    let probe = harness
+        .catalog
+        .get_one::<HeartbeatProbeFlowSystemEventProjector>()
+        .unwrap();
+
+    tokio::select! {
+        res = harness.flow_system_event_agent.run() => {
+            panic!("Flow system event agent stopped: {res:?}")
+        }
+        () = async {
+            while probe.heartbeats_seen().len() < 2 {
+                tokio::task::yield_now().await;
+            }
+        } => {}
+    }
+
+    // The first is covered by the listener's creation, the rest only by batches
+    let heartbeats_seen = probe.heartbeats_seen();
+    assert!(
+        heartbeats_seen.iter().all(|seen| *seen),
+        "{heartbeats_seen:?}"
     );
 }
 

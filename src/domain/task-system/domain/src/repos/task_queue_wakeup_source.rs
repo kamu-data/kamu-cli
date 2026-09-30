@@ -15,7 +15,7 @@ use wakeup_listener::WakeupListener;
 pub trait TaskQueueWakeupSource: Send + Sync {
     /// Creates a listener handle for the task agent, which keeps it for its
     /// lifetime: handles are cheap, but a shared one would lose wakeups.
-    /// Its wait metrics are labelled with the task agent's name
+    /// Its heartbeat is labelled with the task agent's name
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 }
 

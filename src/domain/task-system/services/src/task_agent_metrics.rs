@@ -41,7 +41,8 @@ impl TaskAgentMetrics {
 
         Self {
             // Split by outcome, as failures and cancellations have timings of their
-            // own; its count doubles as the number of finished tasks
+            // own. Only runs are counted: tasks cancelled while queued, or while
+            // running across a restart, never ran here
             task_duration_seconds: HistogramVec::new(
                 HistogramOpts::new(
                     "task_agent_task_duration_seconds",

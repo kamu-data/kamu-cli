@@ -71,6 +71,9 @@ see [outbox.md](outbox.md), flow projections, task execution).
 pub trait WakeupListener: Send + Sync {
     async fn wait_wake(&self, timeout: Duration, min_debounce_interval: Duration)
         -> Result<WakeHint, InternalError>;
+
+    /// Proves the agent's loop alive between waits (see Monitoring)
+    fn heartbeat(&self);
 }
 
 pub enum WakeHint { Timeout, Signaled }
@@ -243,7 +246,7 @@ Behaviour, and why:
 | --- | --- | --- |
 | Connect / reconnect succeeds | `LISTEN` on all channels, then **signal every subscriber** | Notifications sent while `LISTEN` was not active are lost; subscribers re-check storage. Also makes the first wait after subscribing return `Signaled`. |
 | New subscription | Drop the connection and reconnect with the extended channel set | Avoids cancelling `try_recv` and reusing the connection (sqlx doesn't document it as cancel-safe). Subscriptions only happen at startup; others get one spurious wakeup. |
-| Connection lost (`try_recv` → `Ok(None)`) or other error | Drop the listener, reconnect | `eager_reconnect(false)`: sqlx would otherwise reconnect silently and hide lost notifications. |
+| Connection lost (`try_recv` → `Ok(None)`) or other error | Drop the listener, reconnect after `RECONNECT_RETRY_INTERVAL` (1s) | `eager_reconnect(false)`: sqlx would otherwise reconnect silently and hide lost notifications. The delay keeps a server or proxy that drops sessions at once from making every agent re-check in a tight loop. |
 | Connect fails | Log, retry after `RECONNECT_RETRY_INTERVAL` (1s) | Independent of the debounce, so a short one doesn't flood a database that is down. |
 | Pool closed (`PoolClosed`) | Background task exits | Lets `pool.close()` complete: clean shutdown, and `sqlx::test` closes its pool after each test. |
 | Hub dropped | Background task aborted | The task holds only the shared inner state, so dropping the last hub reference stops it. |
@@ -358,8 +361,9 @@ backgroundAgents:
 - `concurrency.outboxConsumers` — outbox consumers handling messages at once, across all producers,
   each in its own transaction. Messages of one producer are still handled in order: all consumers
   finish message N before any gets N+1. Without a limit, a burst over several producers could
-  demand more connections than the pool has. The two limits, the task agent and API requests all
-  share one pool, so keep their sum in mind when sizing `database.maxConnections` (default `20`).
+  demand more connections than the pool has. The two limits, the task and flow system event agents
+  (one each), the hub's `LISTEN` connection and API requests all share one pool, so keep their sum
+  in mind when sizing `database.maxConnections` (default `20`).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll
   floor `10ms` (`sqlite_polling_hub.rs`).
 
@@ -391,7 +395,8 @@ backgroundAgents:
    `run` (the heartbeat metric comes with it), drain
    everything pending, then
    `wait_wake(max_listening_timeout, min_debounce_interval)` (§2). If the agent processes records in
-   batches, add an entry under `backgroundAgents.batching`.
+   batches, call `wakeup_listener.heartbeat()` after each one (a long catch-up has no waits to
+   beat on), and add an entry under `backgroundAgents.batching`.
 6. **Tests**: a storage test that committed changes of interest wake the listener and irrelevant ones
    don't (see `test_wakes_up_only_when_task_is_queued` for Postgres and SQLite).
 7. Update the inventory in §3.

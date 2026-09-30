@@ -658,8 +658,6 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                         // The outcome might not be final in case of retrying flows.
                         // If the flow is still retrying, await for the result of the next task
                         if flow.outcome.is_some() {
-                            self.completion_metrics.on_flow_finished(&flow);
-
                             // Handle flow failure if it reached a terminal state
                             if message.outcome.is_failure() {
                                 let recoverable = message.outcome.is_recoverable_failure();
@@ -690,6 +688,9 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     .await
                                     .int_err()?;
                             }
+
+                            // Last, as a failure above rolls the completion back
+                            self.completion_metrics.on_flow_finished(&flow);
                         }
                     } else {
                         tracing::info!(

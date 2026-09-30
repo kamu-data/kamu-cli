@@ -82,6 +82,39 @@ async fn test_pre_run_requeues_running_tasks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_pre_run_requeues_running_tasks_across_pages() {
+    let mock_task_planner = MockTaskDefinitionPlanner::new();
+    let mock_task_runner = MockTaskRunner::new();
+
+    let harness = TaskAgentHarness::new(MockOutbox::new(), mock_task_planner, mock_task_runner);
+
+    // More running tasks than a recovery page holds
+    let mut task_ids = Vec::new();
+    for _ in 0..250 {
+        task_ids.push(
+            harness
+                .schedule_probe_task(LogicalPlanProbe::default())
+                .await,
+        );
+        harness.try_take_task().await.unwrap();
+    }
+
+    init_on_startup::run_startup_jobs(&harness.catalog)
+        .await
+        .unwrap();
+
+    for task_id in task_ids {
+        assert_eq!(
+            harness.get_task(task_id).await.status(),
+            TaskStatus::Queued,
+            "{task_id}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_pre_run_finishes_cancelled_running_tasks() {
     let harness = TaskAgentHarness::new(
         TaskAgentHarness::outbox_expecting_cancelled_task(TaskID::new(0)),

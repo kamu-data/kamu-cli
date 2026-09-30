@@ -93,7 +93,15 @@ impl HubInner {
     /// Outer loop: one iteration per connection. Inner loop: routes
     /// notifications until the connection has to be replaced.
     async fn run(self: Arc<Self>) {
+        let mut lost_connection = false;
         loop {
+            // A server or proxy dropping sessions at once must not make every agent
+            // re-check in a tight loop
+            if lost_connection {
+                tokio::time::sleep(RECONNECT_RETRY_INTERVAL).await;
+                lost_connection = false;
+            }
+
             // The snapshot below already covers any pending subscription change.
             // A subscription racing with it leaves a permit, costing one extra reconnect.
             self.subscribers.take_changed();
@@ -135,6 +143,7 @@ impl HubInner {
                         // instead of silently reconnecting and hiding lost notifications.
                         Ok(None) => {
                             tracing::warn!("PgListener connection was lost, reconnecting");
+                            lost_connection = true;
                             break;
                         }
                         Err(sqlx::Error::PoolClosed) => return,
@@ -144,6 +153,7 @@ impl HubInner {
                                 error_msg = %e,
                                 "PgListener error, reconnecting",
                             );
+                            lost_connection = true;
                             break;
                         }
                     },

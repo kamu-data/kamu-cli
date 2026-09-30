@@ -79,12 +79,16 @@ pub(crate) struct FlowHarnessOverrides {
     pub mandatory_throttling_period: Option<Duration>,
     /// Due flows loaded per page by the flow agent
     pub activation_batch_size: Option<usize>,
+    /// Events applied to a projection per transaction
+    pub flow_system_event_batch_size: Option<usize>,
     pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
     pub mock_transform_flow_evaluator: Option<MockTransformFlowEvaluator>,
     /// Registers a projector that fails on every event
     pub with_failing_projector: bool,
     /// Registers a projector that fails on its first event only
     pub with_flaky_projector: bool,
+    /// Registers a projector noting the flow system event agent's heartbeats
+    pub with_heartbeat_probe_projector: bool,
 }
 
 impl FlowHarness {
@@ -120,6 +124,9 @@ impl FlowHarness {
             if overrides.with_flaky_projector {
                 b.add::<FlakyFlowSystemEventProjector>();
             }
+            if overrides.with_heartbeat_probe_projector {
+                b.add::<HeartbeatProbeFlowSystemEventProjector>();
+            }
 
             b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                 messaging_outbox::ConsumerFilter::AllConsumers,
@@ -136,7 +143,9 @@ impl FlowHarness {
                     .unwrap(),
                 concurrency: NonZeroUsize::new(8).unwrap(),
             })
-            .add_value(FlowSystemEventAgentConfig { batch_size: 10 })
+            .add_value(FlowSystemEventAgentConfig {
+                batch_size: overrides.flow_system_event_batch_size.unwrap_or(10),
+            })
             .add_value(WakeupListenerConfig {
                 // In-memory stores used to ignore it: keep test timings unchanged
                 min_debounce_interval: std::time::Duration::ZERO,
@@ -753,6 +762,54 @@ impl FlowSystemEventProjector for FlakyFlowSystemEventProjector {
             return Err(InternalError::new("Projection failed once"));
         }
         state.applied_event_ids.push(e.event_id);
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const HEARTBEAT_PROBE_PROJECTOR_NAME: &str = "HeartbeatProbeFlowSystemEventProjector";
+
+/// On every event, notes whether the flow system event agent's heartbeat was
+/// recorded since the previous one, then resets it
+pub(crate) struct HeartbeatProbeFlowSystemEventProjector {
+    wakeup_metrics: Arc<WakeupListenerMetrics>,
+    heartbeats_seen: Mutex<Vec<bool>>,
+}
+
+#[component(pub)]
+#[interface(dyn FlowSystemEventProjector)]
+#[scope(Singleton)]
+impl HeartbeatProbeFlowSystemEventProjector {
+    pub fn new(wakeup_metrics: Arc<WakeupListenerMetrics>) -> Self {
+        Self {
+            wakeup_metrics,
+            heartbeats_seen: Mutex::new(Vec::new()),
+        }
+    }
+
+    pub fn heartbeats_seen(&self) -> Vec<bool> {
+        self.heartbeats_seen.lock().unwrap().clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl FlowSystemEventProjector for HeartbeatProbeFlowSystemEventProjector {
+    fn name(&self) -> &'static str {
+        HEARTBEAT_PROBE_PROJECTOR_NAME
+    }
+
+    async fn apply(&self, _: &FlowSystemEvent) -> Result<(), InternalError> {
+        let heartbeat = self
+            .wakeup_metrics
+            .last_heartbeat_timestamp_seconds
+            .with_label_values(&[FLOW_SYSTEM_EVENT_AGENT_NAME]);
+
+        self.heartbeats_seen
+            .lock()
+            .unwrap()
+            .push(heartbeat.get() > 0.0);
+        heartbeat.set(0.0);
         Ok(())
     }
 }

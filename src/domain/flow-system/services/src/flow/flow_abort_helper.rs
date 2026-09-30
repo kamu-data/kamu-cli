@@ -40,12 +40,14 @@ impl FlowAbortHelper {
                 // Abort flow itself
                 flow.abort(self.time_source.now()).int_err()?;
                 flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-                self.completion_metrics.on_flow_finished(flow);
 
                 // Cancel associated tasks
                 for task_id in &flow.task_ids {
                     self.task_scheduler.cancel_task(*task_id).await.int_err()?;
                 }
+
+                // Last, as a failure above rolls the abort back
+                self.completion_metrics.on_flow_finished(flow);
             }
             FlowStatus::Finished => {
                 /* Skip, idempotence */

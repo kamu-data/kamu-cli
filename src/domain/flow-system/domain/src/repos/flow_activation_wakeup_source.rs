@@ -16,7 +16,7 @@ use wakeup_listener::WakeupListener;
 pub trait FlowActivationWakeupSource: Send + Sync {
     /// Creates a listener handle for the flow agent, which keeps it for its
     /// lifetime: handles are cheap, but a shared one would lose wakeups.
-    /// Its wait metrics are labelled with the flow agent's name
+    /// Its heartbeat is labelled with the flow agent's name
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 }
 

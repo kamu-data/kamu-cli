@@ -94,14 +94,15 @@ impl TaskScheduler for TaskSchedulerImpl {
             .await
             .int_err()?;
 
-        // Cancelled after it was listed: nothing written yet, so just skip it
+        // Cancelled after it was listed: nothing written yet, so let the caller
+        // retry at once, as other tasks may be queued behind it
         if task.status() != TaskStatus::Queued {
             tracing::info!(
                 %task_id,
                 task_status = ?task.status(),
                 "Skipped taking a task that is no longer queued"
             );
-            return Ok(None);
+            return Err(TakeTaskError::ConcurrentModification { task_id });
         }
 
         task.run(self.time_source.now()).int_err()?;

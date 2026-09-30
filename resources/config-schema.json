@@ -148,14 +148,14 @@
         },
         "flowSystemEvents": {
           "default": 20,
-          "description": "Flow system events applied to a projection per transaction",
+          "description": "Flow system events applied to a projection per transaction. 0 is\ntreated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "outboxMessages": {
           "default": 20,
-          "description": "Outbox messages relayed per transaction",
+          "description": "Outbox messages relayed per transaction. 0 is treated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -263,7 +263,7 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections alongside API requests",
+              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections, plus one each for the task and flow system event agents\nand, with Postgres, one for `LISTEN`, alongside API requests",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -322,7 +322,7 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections alongside API requests",
+              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections, plus one each for the task and flow system event agents\nand, with Postgres, one for `LISTEN`, alongside API requests",
               "format": "uint32",
               "minimum": 0,
               "type": [
@@ -381,7 +381,7 @@
               "type": "string"
             },
             "maxConnections": {
-              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections alongside API requests",
+              "description": "Connection pool size, 20 by default. Background agents may hold up to\n`backgroundAgents.concurrency.flowActivations + outboxConsumers`\nconnections, plus one each for the task and flow system event agents\nand, with Postgres, one for `LISTEN`, alongside API requests",
               "format": "uint32",
               "minimum": 0,
               "type": [

@@ -530,7 +530,8 @@ pub struct RemoteDatabaseConfig {
     pub port: Option<u16>,
     /// Connection pool size, 20 by default. Background agents may hold up to
     /// `backgroundAgents.concurrency.flowActivations + outboxConsumers`
-    /// connections alongside API requests
+    /// connections, plus one each for the task and flow system event agents
+    /// and, with Postgres, one for `LISTEN`, alongside API requests
     pub max_connections: Option<u32>,
     pub max_lifetime_secs: Option<u64>,
     pub acquire_timeout_secs: Option<u64>,
@@ -729,11 +730,12 @@ pub struct BackgroundAgentsConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsBatchingConfig {
-    /// Outbox messages relayed per transaction
+    /// Outbox messages relayed per transaction. 0 is treated as 1
     #[config(default = 20)]
     pub outbox_messages: usize,
 
-    /// Flow system events applied to a projection per transaction
+    /// Flow system events applied to a projection per transaction. 0 is
+    /// treated as 1
     #[config(default = 20)]
     pub flow_system_events: usize,
 
@@ -771,7 +773,7 @@ impl BackgroundAgentsConfig {
 
     pub fn outbox_agent_config(&self) -> messaging_outbox::OutboxAgentConfig {
         messaging_outbox::OutboxAgentConfig {
-            batch_size: self.batching.outbox_messages,
+            batch_size: self.batching.outbox_messages.max(1),
             consumer_concurrency: NonZeroUsize::new(self.concurrency.outbox_consumers)
                 .unwrap_or(NonZeroUsize::MIN),
         }
@@ -779,7 +781,7 @@ impl BackgroundAgentsConfig {
 
     pub fn flow_system_event_agent_config(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
         kamu_flow_system::FlowSystemEventAgentConfig {
-            batch_size: self.batching.flow_system_events,
+            batch_size: self.batching.flow_system_events.max(1),
         }
     }
 

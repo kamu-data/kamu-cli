@@ -419,8 +419,9 @@ backgroundAgents:
   save planning round trips when catching up on a backlog; smaller ones hand the SQLite connection
   back to API requests sooner.
 - `concurrency.outboxConsumers` — consumer tasks running at once, across all producers, each holding
-  a pooled connection. 1 by default for SQLite's single connection; 8 in `production_default()`. It shares the pool with flow activations, the task agent and API requests,
-  so size `database.maxConnections` (default `20`) for their sum.
+  a pooled connection. 1 by default for SQLite's single connection; 8 in `production_default()`. It shares the pool with flow activations, the task and flow system
+  event agents, the Postgres `LISTEN` connection and API requests, so size `database.maxConnections`
+  (default `20`) for their sum.
 
 Prometheus metrics (`OutboxAgentMetrics`), labelled by `producer` and `consumer`:
 

@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use async_utils::BackgroundAgent;
 use database_common::NoOpDatabasePlugin;
 use dill::*;
 use internal_error::InternalError;
@@ -34,6 +35,7 @@ const TEST_PRODUCER_F: &str = "TEST-PRODUCER-F";
 const TEST_PRODUCER_G: &str = "TEST-PRODUCER-G";
 const TEST_PRODUCER_H: &str = "TEST-PRODUCER-H";
 const TEST_PRODUCER_I: &str = "TEST-PRODUCER-I";
+const TEST_PRODUCER_J: &str = "TEST-PRODUCER-J";
 
 const TEST_CONSUMER_A: &str = "TestMessageConsumerA";
 const TEST_CONSUMER_A1: &str = "TestMessageConsumerA1";
@@ -55,6 +57,7 @@ test_message_type!(F);
 test_message_type!(G);
 test_message_type!(H);
 test_message_type!(I);
+test_message_type!(J);
 
 test_message_consumer!(A, A, TEST_PRODUCER_A, TransactionalWrapped, All);
 test_message_consumer!(A, A1, TEST_PRODUCER_A, TransactionalWrapped, Latest);
@@ -142,6 +145,57 @@ tracked_message_consumer!(H, H1, TEST_PRODUCER_H);
 tracked_message_consumer!(H, H2, TEST_PRODUCER_H);
 tracked_message_consumer!(H, H3, TEST_PRODUCER_H);
 tracked_message_consumer!(I, I, TEST_PRODUCER_I);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// On every message, notes whether the outbox agent's heartbeat was recorded
+/// since the previous one, then resets it
+struct TestMessageConsumerJHeartbeatProbe {
+    wakeup_metrics: Arc<WakeupListenerMetrics>,
+    heartbeats_seen: Mutex<Vec<bool>>,
+}
+
+#[component(pub)]
+#[scope(Singleton)]
+#[interface(dyn MessageConsumer)]
+#[interface(dyn MessageConsumerT<TestMessageJ>)]
+#[meta(MessageConsumerMeta {
+    consumer_name: "TestMessageConsumerJHeartbeatProbe",
+    feeding_producers: &[TEST_PRODUCER_J],
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
+    initial_consumer_boundary: InitialConsumerBoundary::All,
+})]
+impl TestMessageConsumerJHeartbeatProbe {
+    fn new(wakeup_metrics: Arc<WakeupListenerMetrics>) -> Self {
+        Self {
+            wakeup_metrics,
+            heartbeats_seen: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn heartbeats_seen(&self) -> Vec<bool> {
+        self.heartbeats_seen.lock().unwrap().clone()
+    }
+}
+
+impl MessageConsumer for TestMessageConsumerJHeartbeatProbe {}
+
+#[async_trait::async_trait]
+impl MessageConsumerT<TestMessageJ> for TestMessageConsumerJHeartbeatProbe {
+    async fn consume_message(&self, _: &Catalog, _: &TestMessageJ) -> Result<(), InternalError> {
+        let heartbeat = self
+            .wakeup_metrics
+            .last_heartbeat_timestamp_seconds
+            .with_label_values(&[OUTBOX_AGENT_NAME]);
+
+        self.heartbeats_seen
+            .lock()
+            .unwrap()
+            .push(heartbeat.get() > 0.0);
+        heartbeat.set(0.0);
+        Ok(())
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1147,6 +1201,42 @@ async fn test_consumers_run_concurrently_below_limit() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_catchup_records_heartbeat_after_every_batch() {
+    let harness = OutboxAgentHeartbeatHarness::new();
+    harness.outbox_agent.run_initialization().await.unwrap();
+
+    // A backlog of one message per batch, all drained by the initial catch-up,
+    // before the agent ever waits
+    for i in 1..=3 {
+        harness
+            .outbox
+            .post_message(
+                TEST_PRODUCER_J,
+                TestMessageJ {
+                    body: format!("j-{i}"),
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    let agent = harness.catalog.get_one::<OutboxAgentImpl>().unwrap();
+    tokio::select! {
+        res = agent.run() => panic!("Outbox agent stopped: {res:?}"),
+        () = async {
+            while harness.probe.heartbeats_seen().len() < 3 {
+                tokio::task::yield_now().await;
+            }
+        } => {}
+    }
+
+    // The first is covered by the listener's creation, the rest only by batches
+    assert_eq!(harness.probe.heartbeats_seen(), [true, true, true]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct BaseOutboxCatalogHarness {
     catalog: Catalog,
 }
@@ -1484,6 +1574,40 @@ impl OutboxAgentConcurrencyHarness {
 
     fn max_in_flight(&self) -> usize {
         self.load.max_in_flight.load(Ordering::SeqCst)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseOutboxAgentHarness, base_harness)]
+struct OutboxAgentHeartbeatHarness {
+    base_harness: BaseOutboxAgentHarness,
+    probe: Arc<TestMessageConsumerJHeartbeatProbe>,
+}
+
+impl OutboxAgentHeartbeatHarness {
+    fn new() -> Self {
+        let base_catalog_harness = BaseOutboxCatalogHarness::new();
+
+        let mut b = CatalogBuilder::new_chained(base_catalog_harness.catalog());
+        b.add::<OutboxAgentImpl>();
+        b.add_value(OutboxAgentConfig {
+            batch_size: 1,
+            ..OutboxAgentConfig::local_default()
+        });
+        b.add_value(WakeupListenerConfig::local_default());
+
+        b.add::<TestMessageConsumerJHeartbeatProbe>();
+
+        register_message_dispatcher::<TestMessageJ>(&mut b, TEST_PRODUCER_J);
+
+        let catalog = b.build();
+        let probe = catalog.get_one().unwrap();
+
+        Self {
+            base_harness: BaseOutboxAgentHarness::from_catalog(catalog),
+            probe,
+        }
     }
 }
 
