@@ -39,17 +39,11 @@ impl ContainerRuntime {
     }
 
     pub(crate) fn new_command(&self) -> Command {
-        Command::new(match self.config.runtime {
-            ContainerRuntimeType::Docker => "docker",
-            ContainerRuntimeType::Podman => "podman",
-        })
+        Command::new(self.config.runtime.to_string())
     }
 
     pub(crate) fn new_command_std(&self) -> std::process::Command {
-        std::process::Command::new(match self.config.runtime {
-            ContainerRuntimeType::Docker => "docker",
-            ContainerRuntimeType::Podman => "podman",
-        })
+        std::process::Command::new(self.config.runtime.to_string())
     }
 
     pub async fn has_image(&self, image: &str) -> Result<bool, ContainerRuntimeError> {

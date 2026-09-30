@@ -36,6 +36,7 @@ use kamu_resources_inmem::{
 };
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -97,6 +98,7 @@ impl BaseResourceServiceHarness {
         if needs_bridge {
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
             b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
+            b.add::<WakeupListenerMetrics>();
         }
 
         b.add::<InMemoryResourceRepository>()

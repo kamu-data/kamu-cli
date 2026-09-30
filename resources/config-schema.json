@@ -139,16 +139,36 @@
     "BackgroundAgentsBatchingConfig": {
       "additionalProperties": false,
       "properties": {
+        "flowActivations": {
+          "default": 20,
+          "description": "Due flows the flow agent loads at once before activating them.\n0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
         "flowSystemEvents": {
           "default": 20,
-          "description": "Flow system events applied to a projection per transaction",
+          "description": "Flow system events applied to a projection per transaction. 0 is\ntreated as 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
         },
         "outboxMessages": {
           "default": 20,
-          "description": "Outbox messages relayed per transaction",
+          "description": "Outbox messages relayed per transaction. 0 is treated as 1",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "BackgroundAgentsConcurrencyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "outboxConsumers": {
+          "default": 1,
+          "description": "Outbox consumers running at once, in order per producer, each holding a\npooled connection: e.g. 8 with Postgres, 1 with `SQLite`. 0 is treated\nas 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -162,15 +182,23 @@
         "batching": {
           "$ref": "#/$defs/BackgroundAgentsBatchingConfig",
           "default": {
+            "flowActivations": 20,
             "flowSystemEvents": 20,
             "outboxMessages": 20
           },
           "description": "Batch sizes of agents processing records in batches"
         },
+        "concurrency": {
+          "$ref": "#/$defs/BackgroundAgentsConcurrencyConfig",
+          "default": {
+            "outboxConsumers": 1
+          },
+          "description": "Concurrency limits of agents processing records in parallel"
+        },
         "maxListeningTimeout": {
           "$ref": "#/$defs/DurationString",
           "default": "2s",
-          "description": "Fallback period to re-check for work if a change signal is missed.\nWith `SQLite` it also paces the polling."
+          "description": "Fallback period to re-check for work if a change signal is missed.\nWith `SQLite` it also paces the polling. The flow agent wakes up at\nthe next flow activation moment regardless of it."
         },
         "minDebounceInterval": {
           "$ref": "#/$defs/DurationString",
@@ -227,12 +255,10 @@
               "type": "string"
             },
             "maxConnections": {
+              "default": 20,
               "format": "uint32",
               "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
+              "type": "integer"
             },
             "maxLifetimeSecs": {
               "format": "uint64",
@@ -285,12 +311,10 @@
               "type": "string"
             },
             "maxConnections": {
+              "default": 20,
               "format": "uint32",
               "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
+              "type": "integer"
             },
             "maxLifetimeSecs": {
               "format": "uint64",
@@ -343,12 +367,10 @@
               "type": "string"
             },
             "maxConnections": {
+              "default": 20,
               "format": "uint32",
               "minimum": 0,
-              "type": [
-                "integer",
-                "null"
-              ]
+              "type": "integer"
             },
             "maxLifetimeSecs": {
               "format": "uint64",
@@ -794,6 +816,7 @@
       "properties": {
         "awaitingStepSecs": {
           "default": 1,
+          "description": "Scheduling granularity: activation times are rounded to it, and failed\nactivations retried after it. Not a polling period",
           "format": "int64",
           "type": "integer"
         },
@@ -803,10 +826,12 @@
           },
           "combine": "merge",
           "default": {},
+          "description": "Retry policies applied by default, by flow type",
           "type": "object"
         },
         "mandatoryThrottlingPeriodSecs": {
           "default": 60,
+          "description": "Minimal time between two runs of the same flow",
           "format": "int64",
           "type": "integer"
         }
@@ -1290,8 +1315,12 @@
       "$ref": "#/$defs/BackgroundAgentsConfig",
       "default": {
         "batching": {
+          "flowActivations": 20,
           "flowSystemEvents": 20,
           "outboxMessages": 20
+        },
+        "concurrency": {
+          "outboxConsumers": 1
         },
         "maxListeningTimeout": "2s",
         "minDebounceInterval": "20ms"

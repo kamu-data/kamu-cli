@@ -31,7 +31,7 @@ impl ResourceContextReporter {
             ResolvedResourceContext::LocalWorkspace => (
                 LOCAL_CONTEXT_NAME.to_string(),
                 "Local".to_string(),
-                Self::scope_label(ResourceContextStoreScope::Workspace).to_string(),
+                ResourceContextStoreScope::Workspace.to_string(),
             ),
             ResolvedResourceContext::RemoteWorkspace { name, .. } => {
                 let scoped_context = self
@@ -42,7 +42,7 @@ impl ResourceContextReporter {
                 (
                     name.clone(),
                     "Remote".to_string(),
-                    Self::scope_label(scoped_context.scope).to_string(),
+                    scoped_context.scope.to_string(),
                 )
             }
         }
@@ -56,13 +56,6 @@ impl ResourceContextReporter {
             console::style(action).dim(),
             console::style(name).bold(),
         );
-    }
-
-    fn scope_label(scope: ResourceContextStoreScope) -> &'static str {
-        match scope {
-            ResourceContextStoreScope::Workspace => "Workspace",
-            ResourceContextStoreScope::User => "User",
-        }
     }
 }
 

@@ -23,6 +23,7 @@ use messaging_outbox::{
 };
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 use crate::test_message_type;
 
@@ -116,6 +117,7 @@ impl TransactionalOutboxHarness {
         b.bind::<dyn Outbox, OutboxTransactionalImpl>();
         b.add::<InMemoryOutboxMessageBridge>();
         b.add::<InMemoryWakeupHub>();
+        b.add::<WakeupListenerMetrics>();
         b.add::<SystemTimeSourceDefault>();
 
         let catalog = b.build();

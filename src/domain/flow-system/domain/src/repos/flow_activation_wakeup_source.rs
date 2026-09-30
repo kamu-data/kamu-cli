@@ -7,13 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use wakeup_listener::WakeupListener;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait FlowAgentLoopSynchronizer: Send + Sync {
-    async fn synchronize_execution_loop(&self) -> Result<(), InternalError>;
+/// Signals the flow agent that a flow might have been scheduled for activation,
+/// possibly earlier than the moment the agent is waiting for
+pub trait FlowActivationWakeupSource: Send + Sync {
+    /// The agent's own listener handle, kept for its lifetime: a shared one
+    /// would lose wakeups. Its heartbeat is labelled with the agent's name
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

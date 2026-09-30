@@ -33,6 +33,7 @@ use kamu_webhooks_services::WebhookSecretGeneratorImpl;
 use messaging_outbox::{Outbox, OutboxImmediateImpl};
 use time_source::SystemTimeSourceDefault;
 use uuid::Uuid;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -117,6 +118,7 @@ impl WebhookRecoveryJobHarness {
         .add::<FlowTriggerServiceImpl>()
         .add::<InMemoryFlowSystemEventBridge>()
         .add::<InMemoryWakeupHub>()
+        .add::<WakeupListenerMetrics>()
         .add::<InMemoryFlowTriggerEventStore>()
         .add::<InMemoryWebhookSubscriptionEventStore>()
         .add::<FakeDatasetEntryService>()

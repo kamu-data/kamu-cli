@@ -18,33 +18,31 @@ use crate::{WakeHint, WakeupHub, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A lightweight handle listening to one channel of a shared [`WakeupHub`]
+/// A lightweight handle listening to one channel of a shared [`WakeupHub`] on
+/// behalf of one named agent
 pub struct HubWakeupListener<H: WakeupHub> {
     hub: Arc<H>,
     channel: H::Channel,
+    agent_name: &'static str,
     // Subscribed lazily, so that only components which actually wait occupy a slot
     slot: OnceLock<Arc<Notify>>,
 }
 
 impl<H: WakeupHub> HubWakeupListener<H> {
-    pub fn new(hub: Arc<H>, channel: H::Channel) -> Self {
+    pub fn new(hub: Arc<H>, channel: H::Channel, agent_name: &'static str) -> Self {
+        // Agents create their listener as their loop starts, so the heartbeat
+        // series exists even while the initial catch-up is still running
+        hub.metrics().record_heartbeat(agent_name);
+
         Self {
             hub,
             channel,
+            agent_name,
             slot: OnceLock::new(),
         }
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
-    async fn wait_wake(
-        &self,
-        timeout: Duration,
-        min_debounce_interval: Duration,
-    ) -> Result<WakeHint, InternalError> {
+    async fn wait_signal(&self, timeout: Duration, min_debounce_interval: Duration) -> WakeHint {
         let deadline = tokio::time::Instant::now() + timeout;
         let slot = self.slot.get_or_init(|| self.hub.subscribe(self.channel));
 
@@ -52,7 +50,7 @@ impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
             .await
             .is_err()
         {
-            return Ok(WakeHint::Timeout);
+            return WakeHint::Timeout;
         }
 
         // Let a burst of signals coalesce into this wakeup
@@ -64,7 +62,30 @@ impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
             let _ = slot.notified().now_or_never();
         }
 
-        Ok(WakeHint::Signaled)
+        WakeHint::Signaled
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl<H: WakeupHub> WakeupListener for HubWakeupListener<H> {
+    fn heartbeat(&self) {
+        self.hub.metrics().record_heartbeat(self.agent_name);
+    }
+
+    async fn wait_wake(
+        &self,
+        timeout: Duration,
+        min_debounce_interval: Duration,
+    ) -> Result<WakeHint, InternalError> {
+        // Reaching the wait proves the agent finished a pass; recorded before and
+        // after, as callers racing the wait against a deadline may drop it early
+        self.heartbeat();
+
+        let hint = self.wait_signal(timeout, min_debounce_interval).await;
+        self.heartbeat();
+        Ok(hint)
     }
 }
 

@@ -14,10 +14,30 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- Prometheus metrics for background agents, with recommended alerts in `docs/internal/metrics.md`:
+  - `wakeup_listener_last_heartbeat_timestamp_seconds`: heartbeat of every wakeup-driven agent's loop, recorded by
+    the shared wakeup listener on start, every wait and every processed batch, labelled by agent
+  - task agent: task duration by outcome (also counting finished tasks), queue wait, running task start time
+  - flow agent: activations by outcome, activation delay
+  - flows: duration and retries of completed flows by outcome (also counting them), aborted flows
+  - flow system event agent: projector failing state
 ### Changed
 - Task agent no longer polls the task queue when idle:
   - Postgres: tasks table notifies the agent via NOTIFY/LISTEN when a task is created or requeued
   - SQLite: incremental listening timeout approach, In-memory: explicit signals
+- Flow agent no longer polls for due flows every `awaitingStepSecs`:
+  - it sleeps until the nearest flow activation moment, and wakes up earlier when a flow gets scheduled
+    (Postgres: NOTIFY/LISTEN on `flows`, SQLite: polling of flow events, In-memory: explicit signals)
+  - `flowSystem.awaitingStepSecs` keeps its meaning of scheduling granularity, and also sets the retry
+    delay for flows whose activation failed
+  - due flows are loaded in pages of `backgroundAgents.batching.flowActivations` (default `20`), and
+    each is activated in its own transaction
+- Outbox consumers handling messages at once, across all producers, are limited by
+  `backgroundAgents.concurrency.outboxConsumers` (default `1` for SQLite, `8` suggested for
+  Postgres); previously unbounded, a burst could exhaust the database connection pool
+- Postgres and MySQL connection pools default to 20 connections (`database.maxConnections`), was 10:
+  with 8 outbox consumers on Postgres, background agents alone may hold up to 12
 - **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
   - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
     the per-agent settings in `outbox`, `flowSystem.flowSystemEventAgent` and `flowSystem.taskAgent`
@@ -32,9 +52,23 @@ Recommendation: for ease of reading, use the following format:
   Postgres listeners share a single `LISTEN` connection via `PostgresNotificationHub`, instead of one each.
   SQLite listeners share a single polling loop via `SqlitePollingHub`, with one connection acquire per tick
   and a common backoff, instead of a polling timer each.
-  In-memory stores signal channels through `InMemoryWakeupHub`, and every consumer creates its own listener
-  handle (`new_wakeup_listener()`), so several consumers can watch the same changes.
+  In-memory stores signal channels through `InMemoryWakeupHub`, and every agent creates its own listener
+  handle (`new_wakeup_listener()`), so several listeners can watch the same changes.
   Architecture is documented in `docs/internal/wakeup-listeners.md`
+### Fixed
+- Flow agent: a flow failing to activate no longer blocks activation of flows scheduled after it,
+  and its partial writes (task, flow events) are rolled back instead of committed
+- In-memory flow system event bridge: a projector that failed to apply a batch of events no longer
+  skips those events on the next attempt
+- GQL: `FlowTimingRecords.firstAttemptScheduledAt` is the time the flow's first task was scheduled,
+  unset while the flow waits. It used to be the first planned activation time, which stays put when
+  a manual run or satisfied batching activates the flow earlier, so run durations counted from it
+  came out too short
+- Task cancellation (e.g. aborting a flow):
+  - a queued task is finished with the `Cancelled` outcome, instead of staying queued forever
+  - a task cancelled while being taken is no longer started, nor stops the task agent
+  - a running task is still stored as running until its run ends, so a restart meanwhile finishes it
+    as `Cancelled` instead of leaving it running forever
 
 ## [0.267.0] - 2026-09-19
 ### Added

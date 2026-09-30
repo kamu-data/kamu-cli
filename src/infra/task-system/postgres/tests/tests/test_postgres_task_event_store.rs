@@ -76,6 +76,14 @@ database_transactional_test!(
     fixture = kamu_task_system_repo_tests::test_event_store_get_running_tasks,
     harness = PostgresTaskSystemEventStoreHarness
 );
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_task_system_repo_tests::test_event_store_task_status_on_cancellation,
+    harness = PostgresTaskSystemEventStoreHarness
+);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(

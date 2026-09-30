@@ -67,13 +67,16 @@ impl SqliteTaskEventStore {
         let last_event = events.last().expect("Non empty event list expected");
 
         let event_task_id: i64 = (last_event.task_id()).try_into().unwrap();
-        let latest_status = last_event.new_status();
+        // The stored status is unknown here: let the row pick the right outcome
+        let status_if_running = TaskEvent::status_after(events, TaskStatus::Running);
+        let status_otherwise = TaskEvent::status_after(events, TaskStatus::Queued);
 
         let affected_rows_count =
             sqlx::query!(
                 r#"
                 UPDATE tasks
-                    SET task_status = $2, last_event_id = $3
+                    SET task_status = CASE WHEN task_status = 'running' THEN $2 ELSE $5 END,
+                        last_event_id = $3
                     WHERE task_id = $1 AND (
                         last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR
                         last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4
@@ -81,9 +84,10 @@ impl SqliteTaskEventStore {
                     RETURNING task_id
                 "#,
                 event_task_id,
-                latest_status,
+                status_if_running,
                 last_event_id,
                 maybe_prev_stored_event_id,
+                status_otherwise,
             )
             .fetch_all(connection_mut)
             .await

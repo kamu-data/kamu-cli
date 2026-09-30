@@ -13,7 +13,13 @@ use std::time::Duration;
 
 use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
 use sqlx::SqlitePool;
-use wakeup_listener::{HubWakeupListener, WakeHint, WakeupListener, WakeupListenerConfig};
+use wakeup_listener::{
+    HubWakeupListener,
+    WakeHint,
+    WakeupListener,
+    WakeupListenerConfig,
+    WakeupListenerMetrics,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +38,7 @@ pub(crate) const BROKEN_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
 
 pub(crate) const SHORT_TIMEOUT: Duration = Duration::from_millis(300);
 pub(crate) const LONG_TIMEOUT: Duration = Duration::from_secs(10);
+const AGENT: &str = "test_agent";
 const DEBOUNCE_INTERVAL: Duration = Duration::from_millis(20);
 // Longer than the tests' timeouts, so that an idle hub backs off far enough to
 // tell a reset backoff apart
@@ -66,8 +73,9 @@ impl SqliteWakeupHarness {
                 min_debounce_interval: DEBOUNCE_INTERVAL,
                 max_listening_timeout: MAX_POLL_INTERVAL,
             }),
+            Arc::new(WakeupListenerMetrics::new()),
         ));
-        let listener = HubWakeupListener::new(hub.clone(), CHANNEL);
+        let listener = HubWakeupListener::new(hub.clone(), CHANNEL, AGENT);
 
         Self {
             sqlite_pool,
@@ -88,7 +96,7 @@ impl SqliteWakeupHarness {
 
     /// Creates another listener on the shared hub, not subscribed yet
     pub(crate) fn new_listener(&self, channel: SqlitePollingChannel) -> Listener {
-        HubWakeupListener::new(self.hub.clone(), channel)
+        HubWakeupListener::new(self.hub.clone(), channel, AGENT)
     }
 
     /// Creates another listener on the shared hub, and subscribes it

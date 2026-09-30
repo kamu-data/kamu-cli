@@ -26,7 +26,9 @@ Small project-specific guidance for coding agents working in this repository.
 
 - Run `cargo fmt` after edits.
 - Run `make clippy` before considering the task finished.
-- Treat Clippy warnings as errors to fix, not to ignore.
+- Treat Clippy warnings as errors to fix, not to ignore. Never silence them with
+  `#[allow(clippy::...)]` or `#[expect(...)]`: a pragma hides the potential problem instead of
+  resolving it. If a lint seems genuinely wrong for a case, ask before suppressing it.
 - Prefer full workspace incremental commands over narrowing by package with `-p`;
   this workspace is usually precompiled and package narrowing is often slower for
   builds, tests, and validation commands.
@@ -72,7 +74,19 @@ cargo nextest run -E 'test(test_name_here)'
 
 - Follow existing Rust style and naming in surrounding code.
 - Prefer inline formatting like `format!("value={value}")`.
-- Prefer checked numeric conversions like `usize::try_from(x).unwrap()` when narrowing types.
+- Import items with `use`; never spell out crate paths inline (`b.add::<wakeup_listener::WakeupListenerMetrics>()`,
+  `kamu_flow_system::FLOW_AGENT_NAME`). Qualify a name only to resolve a clash. Exception: app
+  wiring (`src/app/cli/src/app.rs`, `database.rs`) integrates all crates, so it qualifies
+  components explicitly to show where each comes from.
+- Numeric conversions never use `as`:
+  - lossless ones use `From` (`f64::from(x_u32)`, `i64::from(x_i32)`);
+  - narrowing ones are checked (`usize::try_from(x).unwrap()`, or handle the error);
+  - time spans become floats through `chrono::TimeDelta::as_seconds_f64()` or
+    `std::time::Duration::as_secs_f64()`, not `as f64` on integer milliseconds.
+- Derive enum ↔ string mappings and variant-kind enums with `strum` (`IntoStaticStr`, `Display`,
+  `EnumString`, `EnumDiscriminants`, `EnumIter`) instead of hand-written `match` arms, e.g.
+  `FlowOutcome` → `FlowOutcomeKind`. Keep a manual mapping only when strings are irregular, and pin
+  persisted strings with a test before converting.
 - Respect exact long separator comment style where surrounding files use it.
 - Keep comments concise — one or two lines, never prose poems.
 - Never explain what the code plainly says. If a reader can see it, do not restate it.
@@ -101,6 +115,19 @@ Repo-local skills live in `.agents/skills/`. Load them only when the task matche
 - `.agents/skills/kamu-datafusion-upgrade-workflows`: DataFusion, Arrow, Object Store, Parquet, and related query-engine dependency upgrades.
 - `.agents/skills/kamu-jupyter-demo-release-workflows`: Jupyter demo, rustfs, and multi-platform demo image release workflows.
 
+## Design Documents
+
+Architecture docs live in `docs/internal/`. Read the relevant one before changing that area, and
+update it when the change invalidates what it says:
+
+- `docs/internal/outbox.md`: posting messages, adding message types or consumers, consumption modes,
+  the outbox agent, delivery ordering by transaction ID.
+- `docs/internal/wakeup-listeners.md`: how background agents (outbox, flow system events, task, flow)
+  wake up, Postgres `LISTEN`/`NOTIFY` triggers, SQLite polling, deadline-driven waits.
+- `docs/internal/metrics.md`: every exported Prometheus metric, recommended alerts, adding metrics.
+- `docs/internal/resources-framework.md`: the declarative resources subsystem; its companions
+  `resources-anatomy.md` (authored vs generated fields) and `resources-label-filtering.md`.
+
 Reusable sub-agent role descriptions for Rust build/test delegation live in
 `.claude/agents/rust-builder.md` and `.claude/agents/rust-tester.md`; treat
 those files as the canonical role prompts instead of duplicating them elsewhere.
@@ -109,4 +136,3 @@ those files as the canonical role prompts instead of duplicating them elsewhere.
 
 - Keep this file short and repo-specific.
 - Do not edit `DEVELOPER.md` for agent guidance extraction; it is the stable human developer guide.
-- Keep `.github/copilot-instructions.md` usable for Copilot users that cannot load Codex skills.

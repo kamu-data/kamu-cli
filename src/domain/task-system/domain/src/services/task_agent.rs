@@ -13,6 +13,8 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const TASK_AGENT_NAME: &str = "dev.kamu.domain.task-system.TaskAgent";
+
 #[async_trait::async_trait]
 pub trait TaskAgent: BackgroundAgent {
     /// Runs single task only, blocks until it is available (for tests only!)

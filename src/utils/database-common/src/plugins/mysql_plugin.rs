@@ -72,7 +72,11 @@ impl MySqlPlugin {
                     .max_lifetime_secs
                     .map(Duration::from_secs),
             )
-            .max_connections(db_connection_settings.max_connections.unwrap_or(10))
+            .max_connections(
+                db_connection_settings
+                    .max_connections
+                    .unwrap_or(DatabaseConnectionSettings::DEFAULT_MAX_CONNECTIONS),
+            )
             .acquire_timeout(
                 db_connection_settings
                     .acquire_timeout_secs

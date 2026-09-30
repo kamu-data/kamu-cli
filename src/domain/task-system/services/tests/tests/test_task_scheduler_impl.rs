@@ -15,6 +15,7 @@ use kamu_task_system_inmem::InMemoryTaskEventStore;
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use time_source::SystemTimeSourceStub;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -134,7 +135,11 @@ async fn test_task_cancellation() {
         .unwrap()
         .task_id;
 
-    task_sched.cancel_task(task_id_1).await.unwrap();
+    // Never taken, so cancellation finishes it
+    let task_1 = task_sched.cancel_task(task_id_1).await.unwrap();
+    assert_eq!(task_1.status(), TaskStatus::Finished);
+    assert_eq!(task_1.outcome, Some(TaskOutcome::Cancelled));
+    assert!(task_1.timing.finished_at.is_some());
 
     let maybe_task = task_sched.try_take().await.unwrap();
     assert!(maybe_task.is_some_and(|t| t.task_id == task_id_2));
@@ -147,7 +152,7 @@ async fn test_task_cancellation() {
 
 fn create_task_scheduler() -> impl TaskScheduler {
     let task_event_store = Arc::new(InMemoryTaskEventStore::new(Arc::new(
-        InMemoryWakeupHub::new(),
+        InMemoryWakeupHub::new(Arc::new(WakeupListenerMetrics::new())),
     )));
     let time_source = Arc::new(SystemTimeSourceStub::new());
     TaskSchedulerImpl::new(task_event_store, time_source)

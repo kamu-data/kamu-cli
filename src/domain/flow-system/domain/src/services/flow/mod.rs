@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flow_agent_loop_synchronizer;
 mod flow_agent_test_driver;
 mod flow_controller;
 mod flow_query_service;
 mod flow_run_service;
 
-pub use flow_agent_loop_synchronizer::*;
 pub use flow_agent_test_driver::*;
 pub use flow_controller::*;
 pub use flow_query_service::*;

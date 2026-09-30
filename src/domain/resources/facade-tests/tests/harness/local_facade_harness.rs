@@ -55,6 +55,7 @@ use kamu_resources_inmem::{
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
 use time_source::SystemTimeSourceProvider;
+use wakeup_listener::WakeupListenerMetrics;
 
 use super::facade_harness_trait::{FacadeContractHarness, TestAccount};
 
@@ -158,6 +159,7 @@ impl LocalFacadeHarness {
         if needs_bridge {
             b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
             b.add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>();
+            b.add::<WakeupListenerMetrics>();
         }
 
         // Accounts

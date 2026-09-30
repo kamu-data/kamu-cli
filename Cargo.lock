@@ -3895,6 +3895,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "strum 0.28.0",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
@@ -7593,6 +7594,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -7628,6 +7630,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -8369,6 +8372,7 @@ dependencies = [
  "chrono",
  "database-common",
  "datafusion",
+ "futures",
  "http-common",
  "indoc 2.0.7",
  "kamu-accounts",
@@ -8816,6 +8820,7 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -8913,6 +8918,7 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
+ "kamu-task-system",
  "kamu-wakeup-listener-postgres",
  "opendatafabric",
  "serde",
@@ -8986,8 +8992,11 @@ dependencies = [
  "observability",
  "opendatafabric",
  "pretty_assertions",
+ "prometheus",
  "serde_json",
+ "strum 0.28.0",
  "test-log",
+ "thiserror 2.0.21",
  "time-source",
  "tokio",
  "tracing",
@@ -9009,6 +9018,7 @@ dependencies = [
  "internal-error",
  "kamu-flow-system",
  "kamu-flow-system-repo-tests",
+ "kamu-task-system",
  "kamu-wakeup-listener-sqlite",
  "opendatafabric",
  "serde_json",
@@ -9247,6 +9257,7 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9349,6 +9360,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "uuid",
+ "wakeup-listener",
 ]
 
 [[package]]
@@ -9639,6 +9651,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlx",
+ "strum 0.28.0",
  "thiserror 2.0.21",
  "tokio-stream",
  "uuid",
@@ -9727,7 +9740,9 @@ dependencies = [
  "mockall",
  "observability",
  "opendatafabric",
+ "prometheus",
  "serde_json",
+ "strum 0.28.0",
  "tempfile",
  "test-log",
  "time-source",
@@ -11103,6 +11118,7 @@ version = "0.267.0"
 dependencies = [
  "async-trait",
  "axum",
+ "chrono",
  "dill",
  "http",
  "opentelemetry",
@@ -15939,8 +15955,11 @@ name = "wakeup-listener"
 version = "0.267.0"
 dependencies = [
  "async-trait",
+ "dill",
  "futures",
  "internal-error",
+ "observability",
+ "prometheus",
  "tokio",
 ]
 
@@ -16500,9 +16519,9 @@ dependencies = [
 
 [[package]]
 name = "yoke-derive"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33811428bee40dbceb6d545e95754741d17a6aef9a4849f0fd62e2ba4f412a78"
+checksum = "ec8ebde2db3681e8c9980cc27822030e68752690ddfa9473e739aeb4dbde6d71"
 dependencies = [
  "proc-macro2",
  "quote",

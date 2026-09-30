@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::num::NonZeroUsize;
+use std::sync::{Arc, Mutex};
 
 use async_utils::BackgroundAgent;
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use internal_error::InternalError;
@@ -24,14 +25,20 @@ use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrem
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
-use kamu_task_system::{MESSAGE_PRODUCER_KAMU_TASK_AGENT, TaskProgressMessage};
+use kamu_task_system::{
+    MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+    Task,
+    TaskEventStore,
+    TaskID,
+    TaskProgressMessage,
+};
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 use super::{
     FlowSystemTestListener,
@@ -42,7 +49,6 @@ use super::{
     TaskDriver,
     TaskDriverArgs,
 };
-use crate::tests::FlowAgentTestLoopSynchronizer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,15 +71,24 @@ pub(crate) struct FlowHarness {
     pub flow_system_event_agent: Arc<dyn FlowSystemEventAgent>,
     pub flow_query_service: Arc<dyn FlowQueryService>,
     pub flow_event_store: Arc<dyn FlowEventStore>,
-    pub flow_agent_test_loop_synchronizer: Arc<FlowAgentTestLoopSynchronizer>,
 }
 
 #[derive(Default)]
 pub(crate) struct FlowHarnessOverrides {
     pub awaiting_step: Option<Duration>,
     pub mandatory_throttling_period: Option<Duration>,
+    /// Due flows loaded per page by the flow agent
+    pub activation_batch_size: Option<usize>,
+    /// Events applied to a projection per transaction
+    pub flow_system_event_batch_size: Option<usize>,
     pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
     pub mock_transform_flow_evaluator: Option<MockTransformFlowEvaluator>,
+    /// Registers a projector that fails on every event
+    pub with_failing_projector: bool,
+    /// Registers a projector that fails on its first event only
+    pub with_flaky_projector: bool,
+    /// Registers a projector noting the flow system event agent's heartbeats
+    pub with_heartbeat_probe_projector: bool,
 }
 
 impl FlowHarness {
@@ -103,28 +118,48 @@ impl FlowHarness {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
+            if overrides.with_failing_projector {
+                b.add::<FailingFlowSystemEventProjector>();
+            }
+            if overrides.with_flaky_projector {
+                b.add::<FlakyFlowSystemEventProjector>();
+            }
+            if overrides.with_heartbeat_probe_projector {
+                b.add::<HeartbeatProbeFlowSystemEventProjector>();
+            }
+
             b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                 messaging_outbox::ConsumerFilter::AllConsumers,
             ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<FlowSystemTestListener>()
-            .add::<FlowAgentTestLoopSynchronizer>()
-            .add_value(FlowAgentConfig::new(
+            .add_value(FlowAgentConfig {
                 awaiting_step,
                 mandatory_throttling_period,
-                HashMap::new(),
-            ))
-            .add_value(FlowSystemEventAgentConfig { batch_size: 10 })
+                default_retry_policy_by_flow_type: HashMap::new(),
+            })
+            .add_value(FlowAgentActivationConfig {
+                batch_size: NonZeroUsize::new(overrides.activation_batch_size.unwrap_or(20))
+                    .unwrap(),
+            })
+            .add_value(FlowSystemEventAgentConfig {
+                batch_size: NonZeroUsize::new(overrides.flow_system_event_batch_size.unwrap_or(10))
+                    .unwrap(),
+            })
             .add_value(WakeupListenerConfig {
                 // In-memory stores used to ignore it: keep test timings unchanged
                 min_debounce_interval: std::time::Duration::ZERO,
-                max_listening_timeout: (awaiting_step * 5).to_std().unwrap(),
+                // Scenarios run on virtual time: wall-clock fallback timeouts must never fire,
+                // or they add polls at random moments and reorder same-moment events
+                max_listening_timeout: std::time::Duration::from_hours(1),
             })
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add::<InMemoryFlowProcessState>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
@@ -186,7 +221,6 @@ impl FlowHarness {
             flow_trigger_service: catalog.get_one().unwrap(),
             flow_trigger_event_store: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
-            flow_agent_test_loop_synchronizer: catalog.get_one().unwrap(),
 
             fake_system_time_source,
             catalog,
@@ -361,6 +395,177 @@ impl FlowHarness {
             .unwrap();
     }
 
+    /// Stores a waiting flow scheduled for activation at the given moment,
+    /// bypassing triggers and flow controllers
+    pub async fn schedule_flow_for_activation(
+        &self,
+        flow_binding: &FlowBinding,
+        activation_at: DateTime<Utc>,
+    ) -> FlowID {
+        let now = self.now();
+        let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
+
+        self.flow_event_store
+            .save_events(
+                &flow_id,
+                None,
+                vec![
+                    FlowEventInitiated {
+                        event_time: now,
+                        flow_id,
+                        flow_binding: flow_binding.clone(),
+                        activation_cause: FlowActivationCause::AutoPolling(
+                            FlowActivationCauseAutoPolling {
+                                activation_time: now,
+                            },
+                        ),
+                        config_snapshot: None,
+                        retry_policy: None,
+                    }
+                    .into(),
+                    FlowEventStartConditionUpdated {
+                        event_time: now,
+                        flow_id,
+                        flow_binding: flow_binding.clone(),
+                        start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                            wake_up_at: activation_at,
+                        }),
+                        last_activation_cause_index: 0,
+                    }
+                    .into(),
+                    FlowEventScheduledForActivation {
+                        event_time: now,
+                        flow_id,
+                        flow_binding: flow_binding.clone(),
+                        scheduled_for_activation_at: activation_at,
+                    }
+                    .into(),
+                ],
+            )
+            .await
+            .unwrap();
+
+        flow_id
+    }
+
+    pub async fn task_exists(&self, task_id: TaskID) -> bool {
+        let task_event_store = self.catalog.get_one::<dyn TaskEventStore>().unwrap();
+        Task::try_load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap()
+            .is_some()
+    }
+
+    pub async fn task_cancellation_requested(&self, task_id: TaskID) -> bool {
+        let task_event_store = self.catalog.get_one::<dyn TaskEventStore>().unwrap();
+        Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap()
+            .timing
+            .cancellation_requested_at
+            .is_some()
+    }
+
+    pub fn flow_activations(&self, flow_type: &str, outcome: &str) -> u64 {
+        self.catalog
+            .get_one::<FlowAgentMetrics>()
+            .unwrap()
+            .activations_total
+            .with_label_values(&[flow_type, outcome])
+            .get()
+    }
+
+    pub fn flow_activation_delay_samples(&self) -> u64 {
+        self.catalog
+            .get_one::<FlowAgentMetrics>()
+            .unwrap()
+            .activation_delay_seconds
+            .get_sample_count()
+    }
+
+    pub fn flow_activation_delays_total_seconds(&self) -> f64 {
+        self.catalog
+            .get_one::<FlowAgentMetrics>()
+            .unwrap()
+            .activation_delay_seconds
+            .get_sample_sum()
+    }
+
+    pub fn completed_flows(&self, flow_type: &str, outcome: &str) -> u64 {
+        self.completion_metrics()
+            .flow_duration_seconds
+            .with_label_values(&[flow_type, outcome])
+            .get_sample_count()
+    }
+
+    pub fn assert_completed_flows_duration_seconds(
+        &self,
+        flow_type: &str,
+        outcome: &str,
+        expected: f64,
+    ) {
+        let actual = self
+            .completion_metrics()
+            .flow_duration_seconds
+            .with_label_values(&[flow_type, outcome])
+            .get_sample_sum();
+        assert!((actual - expected).abs() < 0.001, "{actual} != {expected}");
+    }
+
+    /// Completed flows with at most this many retries
+    pub fn completed_flows_retried_at_most(
+        &self,
+        flow_type: &str,
+        outcome: &str,
+        retries: u32,
+    ) -> u64 {
+        use prometheus::core::Metric as _;
+
+        self.completion_metrics()
+            .flow_retries
+            .with_label_values(&[flow_type, outcome])
+            .metric()
+            .get_histogram()
+            .get_bucket()
+            .iter()
+            .find(|bucket| (bucket.upper_bound() - f64::from(retries)).abs() < f64::EPSILON)
+            .expect("retries must be a bucket bound")
+            .cumulative_count()
+    }
+
+    pub fn aborted_flows(&self, flow_type: &str) -> u64 {
+        self.completion_metrics()
+            .flows_aborted_total
+            .with_label_values(&[flow_type])
+            .get()
+    }
+
+    fn completion_metrics(&self) -> Arc<FlowCompletionMetrics> {
+        self.catalog.get_one::<FlowCompletionMetrics>().unwrap()
+    }
+
+    pub fn is_projector_failing(&self, projector_name: &str) -> bool {
+        self.catalog
+            .get_one::<FlowSystemEventAgentMetrics>()
+            .unwrap()
+            .projector_failing
+            .with_label_values(&[projector_name])
+            .get()
+            > 0
+    }
+
+    /// Whether the flaky projector applied the event it failed on at first
+    pub fn has_flaky_projector_applied_failed_event(&self) -> bool {
+        let projector = self
+            .catalog
+            .get_one::<FlakyFlowSystemEventProjector>()
+            .unwrap();
+        let state = projector.state.lock().unwrap();
+        state
+            .failed_event_id
+            .is_some_and(|failed_event_id| state.applied_event_ids.contains(&failed_event_id))
+    }
+
     pub fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {
         TaskDriver::new(
             self.catalog.get_one().unwrap(),
@@ -383,6 +588,13 @@ impl FlowHarness {
 
     pub fn now(&self) -> DateTime<Utc> {
         self.fake_system_time_source.now()
+    }
+
+    /// Current time rounded to the scheduling alignment
+    pub fn aligned_now(&self) -> DateTime<Utc> {
+        self.now()
+            .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+            .unwrap()
     }
 
     pub async fn advance_time(&self, time_quantum: Duration) {
@@ -450,31 +662,33 @@ impl FlowHarness {
         F: FnOnce() -> Fut,
         Fut: std::future::Future<Output = ()>,
     {
-        // Setup test loop synchronizer
-        self.flow_agent
-            .set_loop_synchronizer(self.flow_agent_test_loop_synchronizer.clone())
-            .await
-            .unwrap();
-
         // Ensure flow agent is initialized
         use init_on_startup::InitOnStartup;
         self.flow_agent.run_initialization().await.unwrap();
+
+        // Project what the initialization wrote before the initial snapshot
+        self.flow_system_event_agent
+            .catchup_remaining_events()
+            .await?;
 
         // Create initial snapshot - the state at moment 0 after flow agent loaded
         let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
         test_flow_listener.mark_as_loaded();
         test_flow_listener.make_a_snapshot(self.now());
 
-        // Run scheduler concurrently with the provided simulation script
+        // Biased, so that events written at the same virtual moment keep their order,
+        // and projections catch up on the script's writes before the flow agent acts
         tokio::select! {
-            // Run flow agent
-            res = self.flow_agent.run() => res.int_err(),
+            biased;
+
+            // Run the user-provided simulation script
+            _ = simulation_script() => Ok(()),
 
             // Run flow system event agent
             _  = self.flow_system_event_agent.run() => Ok(()),
 
-            // Run the user-provided simulation script
-            _ = simulation_script() => Ok(())
+            // Run flow agent
+            res = self.flow_agent.run() => res.int_err(),
         }?;
 
         // Catchup remaining events
@@ -482,6 +696,117 @@ impl FlowHarness {
             .catchup_remaining_events()
             .await?;
 
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const FAILING_PROJECTOR_NAME: &str = "FailingFlowSystemEventProjector";
+
+#[component(pub)]
+#[interface(dyn FlowSystemEventProjector)]
+pub(crate) struct FailingFlowSystemEventProjector {}
+
+#[async_trait::async_trait]
+impl FlowSystemEventProjector for FailingFlowSystemEventProjector {
+    fn name(&self) -> &'static str {
+        FAILING_PROJECTOR_NAME
+    }
+
+    async fn apply(&self, _: &FlowSystemEvent) -> Result<(), InternalError> {
+        Err(InternalError::new("Projection failed"))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const FLAKY_PROJECTOR_NAME: &str = "FlakyFlowSystemEventProjector";
+
+#[derive(Default)]
+struct FlakyProjectorState {
+    failed_event_id: Option<EventID>,
+    applied_event_ids: Vec<EventID>,
+}
+
+// Singleton: the agent builds projectors per transaction, and the state must
+// survive between attempts
+pub(crate) struct FlakyFlowSystemEventProjector {
+    state: Mutex<FlakyProjectorState>,
+}
+
+#[component(pub)]
+#[interface(dyn FlowSystemEventProjector)]
+#[scope(Singleton)]
+impl FlakyFlowSystemEventProjector {
+    pub fn new() -> Self {
+        Self {
+            state: Mutex::new(FlakyProjectorState::default()),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl FlowSystemEventProjector for FlakyFlowSystemEventProjector {
+    fn name(&self) -> &'static str {
+        FLAKY_PROJECTOR_NAME
+    }
+
+    async fn apply(&self, e: &FlowSystemEvent) -> Result<(), InternalError> {
+        let mut state = self.state.lock().unwrap();
+        if state.failed_event_id.is_none() {
+            state.failed_event_id = Some(e.event_id);
+            return Err(InternalError::new("Projection failed once"));
+        }
+        state.applied_event_ids.push(e.event_id);
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const HEARTBEAT_PROBE_PROJECTOR_NAME: &str = "HeartbeatProbeFlowSystemEventProjector";
+
+/// On every event, notes whether the flow system event agent's heartbeat was
+/// recorded since the previous one, then resets it
+pub(crate) struct HeartbeatProbeFlowSystemEventProjector {
+    wakeup_metrics: Arc<WakeupListenerMetrics>,
+    heartbeats_seen: Mutex<Vec<bool>>,
+}
+
+#[component(pub)]
+#[interface(dyn FlowSystemEventProjector)]
+#[scope(Singleton)]
+impl HeartbeatProbeFlowSystemEventProjector {
+    pub fn new(wakeup_metrics: Arc<WakeupListenerMetrics>) -> Self {
+        Self {
+            wakeup_metrics,
+            heartbeats_seen: Mutex::new(Vec::new()),
+        }
+    }
+
+    pub fn heartbeats_seen(&self) -> Vec<bool> {
+        self.heartbeats_seen.lock().unwrap().clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl FlowSystemEventProjector for HeartbeatProbeFlowSystemEventProjector {
+    fn name(&self) -> &'static str {
+        HEARTBEAT_PROBE_PROJECTOR_NAME
+    }
+
+    async fn apply(&self, _: &FlowSystemEvent) -> Result<(), InternalError> {
+        let heartbeat = self
+            .wakeup_metrics
+            .last_heartbeat_timestamp_seconds
+            .with_label_values(&[FLOW_SYSTEM_EVENT_AGENT_NAME]);
+
+        self.heartbeats_seen
+            .lock()
+            .unwrap()
+            .push(heartbeat.get() > 0.0);
+        heartbeat.set(0.0);
         Ok(())
     }
 }

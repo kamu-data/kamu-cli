@@ -62,7 +62,7 @@ impl ContextListCommand {
             ));
             col_name.push(LOCAL_CONTEXT_NAME.to_string());
             col_kind.push("Local".to_string());
-            col_scope.push(Self::scope_label(ResourceContextStoreScope::Workspace).to_string());
+            col_scope.push(ResourceContextStoreScope::Workspace.to_string());
             col_status.push("Local".to_string());
             col_url.push("-".to_string());
         }
@@ -80,7 +80,7 @@ impl ContextListCommand {
             ));
             col_name.push(scoped_context.context.name);
             col_kind.push("Remote".to_string());
-            col_scope.push(Self::scope_label(scoped_context.scope).to_string());
+            col_scope.push(scoped_context.scope.to_string());
             col_status.push(status);
             col_url.push(scoped_context.context.backend_url.to_string());
         }
@@ -103,13 +103,6 @@ impl ContextListCommand {
             "*"
         } else {
             ""
-        }
-    }
-
-    pub(crate) fn scope_label(scope: ResourceContextStoreScope) -> &'static str {
-        match scope {
-            ResourceContextStoreScope::Workspace => "Workspace",
-            ResourceContextStoreScope::User => "User",
         }
     }
 

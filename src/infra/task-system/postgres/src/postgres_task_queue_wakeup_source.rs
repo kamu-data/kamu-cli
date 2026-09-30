@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_task_system::TaskQueueWakeupSource;
+use kamu_task_system::{TASK_AGENT_NAME, TaskQueueWakeupSource};
 use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use wakeup_listener::{HubWakeupListener, WakeupListener};
 
@@ -39,6 +39,7 @@ impl TaskQueueWakeupSource for PostgresTaskQueueWakeupSource {
         Box::new(HubWakeupListener::new(
             self.hub.clone(),
             NOTIFY_CHANNEL_NAME,
+            TASK_AGENT_NAME,
         ))
     }
 }

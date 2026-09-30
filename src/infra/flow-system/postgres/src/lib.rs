@@ -11,12 +11,14 @@
 pub use kamu_flow_system as domain;
 
 mod helpers;
+mod postgres_flow_activation_wakeup_source;
 mod postgres_flow_configuration_event_store;
 mod postgres_flow_event_store;
 mod postgres_flow_system_event_bridge;
 mod postgres_flow_trigger_event_store;
 mod process_state;
 
+pub use postgres_flow_activation_wakeup_source::*;
 pub use postgres_flow_configuration_event_store::*;
 pub use postgres_flow_event_store::*;
 pub use postgres_flow_system_event_bridge::*;

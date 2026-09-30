@@ -17,6 +17,7 @@ use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 use crate::{test_message_consumer, test_message_type};
 
@@ -221,6 +222,7 @@ impl DispatchingOutboxHarness {
         b.bind::<dyn Outbox, OutboxDispatchingImpl>();
         b.add::<InMemoryOutboxMessageBridge>();
         b.add::<InMemoryWakeupHub>();
+        b.add::<WakeupListenerMetrics>();
         b.add::<SystemTimeSourceDefault>();
         b.add::<TestMessageConsumerA>();
         b.add::<TestMessageConsumerB>();

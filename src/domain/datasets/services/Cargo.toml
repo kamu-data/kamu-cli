@@ -94,6 +94,7 @@ kamu-search-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 test-utils = { workspace = true }
+wakeup-listener = { workspace = true }
 
 arrow = { version = "58", default-features = false }
 bon = { version = "3", default-features = false }

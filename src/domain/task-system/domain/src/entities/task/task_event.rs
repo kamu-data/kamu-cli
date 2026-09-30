@@ -107,12 +107,26 @@ impl TaskEvent {
         }
     }
 
-    pub fn new_status(&self) -> TaskStatus {
+    /// Status of the task after this event, given its status before it
+    pub fn next_status(&self, current: TaskStatus) -> TaskStatus {
         match self {
             TaskEvent::TaskCreated(_) | TaskEvent::TaskRequeued(_) => TaskStatus::Queued,
             TaskEvent::TaskRunning(_) => TaskStatus::Running,
-            TaskEvent::TaskCancelled(_) | TaskEvent::TaskFinished(_) => TaskStatus::Finished,
+            TaskEvent::TaskFinished(_) => TaskStatus::Finished,
+            // Cancellation finishes a queued task, but cannot interrupt a run:
+            // a running task finishes on its own
+            TaskEvent::TaskCancelled(_) => match current {
+                TaskStatus::Running => TaskStatus::Running,
+                TaskStatus::Queued | TaskStatus::Finished => TaskStatus::Finished,
+            },
         }
+    }
+
+    /// Status of the task after these events, given its status before them
+    pub fn status_after(events: &[TaskEvent], current: TaskStatus) -> TaskStatus {
+        events
+            .iter()
+            .fold(current, |status, event| event.next_status(status))
     }
 }
 

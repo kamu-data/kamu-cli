@@ -16,8 +16,9 @@ use database_common_macros::transactional_method;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
+use tokio::sync::Semaphore;
 use tracing::Instrument as _;
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListener, WakeupListenerConfig};
 
 use crate::*;
 
@@ -64,6 +65,9 @@ impl OutboxAgentImpl {
 
         metrics.init(&routes_static_info.consumers_by_producers);
 
+        // Shared by all producers, so that the limit holds across them
+        let consumer_permits = Arc::new(Semaphore::new(agent_config.consumer_concurrency.get()));
+
         let mut producer_consumption_jobs = Vec::new();
         for (producer_name, consumer_names) in &routes_static_info.consumers_by_producers {
             producer_consumption_jobs.push(ProducerConsumptionJob::new(
@@ -72,6 +76,7 @@ impl OutboxAgentImpl {
                 producer_name.clone(),
                 consumer_names.clone(),
                 metrics.clone(),
+                consumer_permits.clone(),
             ));
         }
 
@@ -115,13 +120,13 @@ impl OutboxAgentImpl {
     }
 
     async fn run_main_relay_loop(&self) -> Result<(), InternalError> {
+        let wakeup_listener = self.outbox_message_bridge.new_wakeup_listener();
+
         // Initial catchup phase to process all existing messages
         // before starting the main loop
-        self.run_until_end_of_queue()
+        self.run_until_end_of_queue(Some(wakeup_listener.as_ref()))
             .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
             .await?;
-
-        let wakeup_listener = self.outbox_message_bridge.new_wakeup_listener();
 
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
@@ -134,16 +139,25 @@ impl OutboxAgentImpl {
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
             // Process tasks while they are available, to make sure we process all messages
-            self.run_until_end_of_queue().await?;
+            self.run_until_end_of_queue(Some(wakeup_listener.as_ref()))
+                .await?;
         }
     }
 
-    async fn run_until_end_of_queue(&self) -> Result<(), InternalError> {
+    /// Given the agent's listener, keeps its heartbeat going between batches
+    async fn run_until_end_of_queue(
+        &self,
+        wakeup_listener: Option<&dyn WakeupListener>,
+    ) -> Result<(), InternalError> {
         loop {
             let processed_consumer_tasks_count = self
                 .run_consumption_iteration()
                 .instrument(tracing::debug_span!("OutboxAgent::tick"))
                 .await?;
+
+            if let Some(wakeup_listener) = wakeup_listener {
+                wakeup_listener.heartbeat();
+            }
 
             if processed_consumer_tasks_count == 0 {
                 break;
@@ -314,7 +328,7 @@ impl OutboxAgentImpl {
             outbox_message_bridge,
             self.metrics.clone(),
             &failed_consumer_names_by_producer,
-            self.agent_config.batch_size,
+            self.agent_config.batch_size.get(),
         );
 
         planner.plan_consumption_tasks_by_producer().await
@@ -342,7 +356,7 @@ impl InitOnStartup for OutboxAgentImpl {
 #[async_trait::async_trait]
 impl BackgroundAgent for OutboxAgentImpl {
     fn agent_name(&self) -> &'static str {
-        "dev.kamu.utils.messaging.OutboxAgent"
+        OUTBOX_AGENT_NAME
     }
 
     async fn run(&self) -> Result<(), InternalError> {
@@ -356,7 +370,7 @@ impl BackgroundAgent for OutboxAgentImpl {
 impl OutboxAgent for OutboxAgentImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
-        self.run_until_end_of_queue().await?;
+        self.run_until_end_of_queue(None).await?;
         Ok(())
     }
 

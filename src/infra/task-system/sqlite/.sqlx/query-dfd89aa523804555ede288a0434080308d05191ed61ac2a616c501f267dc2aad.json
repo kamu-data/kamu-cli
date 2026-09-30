@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                UPDATE tasks\n                    SET task_status = CASE WHEN task_status = 'running' THEN $2 ELSE $5 END,\n                        last_event_id = $3\n                    WHERE task_id = $1 AND (\n                        last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR\n                        last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4\n                    )\n                    RETURNING task_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "dfd89aa523804555ede288a0434080308d05191ed61ac2a616c501f267dc2aad"
+}

@@ -78,6 +78,7 @@ interface "ExpensiveAccountRepository" <<i>>
 interface "ExportService" <<i>>
 interface "FindCollectionEntriesUseCase" <<i>>
 interface "FindVersionedFileVersionUseCase" <<i>>
+interface "FlowActivationWakeupSource" <<i>>
 interface "FlowConfigurationEventStore" <<i>>
 interface "FlowEventStore" <<i>>
 interface "FlowProcessStateQuery" <<i>>
@@ -278,6 +279,7 @@ class "FileUploadLimitConfig" <<singleton>>
 class "FindCollectionEntriesUseCaseImpl"
 class "FindVersionedFileVersionUseCaseImpl"
 class "FlightSqlServiceFactory"
+class "FlowAgentActivationConfig" <<singleton>>
 class "FlowAgentConfig" <<singleton>>
 class "FlowSystemEventAgentConfig" <<singleton>>
 class "GcService"
@@ -426,6 +428,7 @@ class "SqliteDatasetReferenceRepository"
 class "SqliteDatasetStatisticsRepository"
 class "SqliteDidSecretKeyRepository"
 class "SqliteEmbeddingsCacheRepository"
+class "SqliteFlowActivationWakeupSource" <<agnostic>>
 class "SqliteFlowConfigurationEventStore"
 class "SqliteFlowEventStore"
 class "SqliteFlowProcessStateQuery"
@@ -488,6 +491,7 @@ class "VerifyDatasetUseCaseImpl"
 class "ViewCollectionEntriesUseCaseImpl"
 class "ViewVersionedFileHistoryUseCaseImpl"
 class "WakeupListenerConfig" <<singleton>>
+class "WakeupListenerMetrics" <<singleton>>
 class "Web3AuthEip4361NonceServiceImpl"
 class "WebhooksConfig" <<singleton>>
 class "WorkspaceLayout" <<singleton>>
@@ -1123,6 +1127,8 @@ class "WsSmartTransferProtocolClient"
 "FlowProcessStateRepository" <|-- "SqliteFlowProcessStateRepository"
 "SqliteFlowProcessStateRepository"  --> "TransactionRefT"
 "SqliteFlowProcessStateRepository"  --> "SystemTimeSource"
+"FlowActivationWakeupSource" <|-- "SqliteFlowActivationWakeupSource"
+"SqliteFlowActivationWakeupSource"  --> "SqlitePollingHub"
 "FlowConfigurationEventStore" <|-- "SqliteFlowConfigurationEventStore"
 "SqliteFlowConfigurationEventStore"  --> "TransactionRefT"
 "FlowEventStore" <|-- "SqliteFlowEventStore"
@@ -1226,6 +1232,7 @@ class "WsSmartTransferProtocolClient"
 "SqliteTaskQueueWakeupSource"  --> "SqlitePollingHub"
 "SqlitePollingHub"  --> "Pool"
 "SqlitePollingHub"  --> "WakeupListenerConfig"
+"SqlitePollingHub"  --> "WakeupListenerMetrics"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"
 "SqliteWebhookDeliveryRepository"  --> "TransactionRefT"
 "WebhookSubscriptionEventStore" <|-- "SqliteWebhookSubscriptionEventStore"
@@ -1256,4 +1263,5 @@ class "WsSmartTransferProtocolClient"
 "DatasetFactoryImpl"  --> "IpfsGateway"
 "DatasetFactoryImpl" "?" --> "S3Metrics"
 "SystemTimeSource" <|-- "SystemTimeSourceDefault"
+"MetricsProvider" <|-- "WakeupListenerMetrics"
 @enduml

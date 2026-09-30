@@ -93,8 +93,27 @@ impl TaskScheduler for TaskSchedulerImpl {
         let mut task = Task::load(task_id, self.task_event_store.as_ref())
             .await
             .int_err()?;
+
+        // Cancelled after it was listed: nothing written yet, so let the caller
+        // retry at once, as other tasks may be queued behind it
+        if task.status() != TaskStatus::Queued {
+            tracing::info!(
+                %task_id,
+                task_status = ?task.status(),
+                "Skipped taking a task that is no longer queued"
+            );
+            return Err(TakeTaskError::ConcurrentModification { task_id });
+        }
+
         task.run(self.time_source.now()).int_err()?;
-        task.save(self.task_event_store.as_ref()).await.int_err()?;
+        task.save(self.task_event_store.as_ref())
+            .await
+            .map_err(|e| match e {
+                SaveError::ConcurrentModification(_) => {
+                    TakeTaskError::ConcurrentModification { task_id }
+                }
+                e => TakeTaskError::Internal(e.int_err()),
+            })?;
 
         tracing::info!(
             %task_id,

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 
 use chrono::Utc;
@@ -20,7 +21,7 @@ use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tokio::time::{Duration, Instant};
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -193,10 +194,14 @@ impl PostgresOutboxAgentHarness {
         b.add::<PostgresTransactionManager>();
         b.add::<PostgresOutboxMessageBridge>();
         b.add::<PostgresNotificationHub>();
+        b.add::<WakeupListenerMetrics>();
 
         b.add::<OutboxAgentMetrics>();
         b.add::<OutboxAgentImpl>();
-        b.add_value(OutboxAgentConfig { batch_size: 1 });
+        b.add_value(OutboxAgentConfig {
+            batch_size: NonZeroUsize::MIN,
+            ..OutboxAgentConfig::local_default()
+        });
         b.add_value(WakeupListenerConfig {
             min_debounce_interval: Duration::from_millis(1),
             max_listening_timeout: Duration::from_millis(1),

@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
@@ -82,7 +83,14 @@ impl BaseGQLFlowRunsHarness {
 
         b.add_value(dataset_changes_mock)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-            .add_value(FlowAgentConfig::test_default())
+            .add_value(FlowAgentConfig {
+                awaiting_step: Duration::seconds(1),
+                mandatory_throttling_period: Duration::minutes(1),
+                default_retry_policy_by_flow_type: HashMap::new(),
+            })
+            .add_value(FlowAgentActivationConfig {
+                batch_size: NonZeroUsize::new(20).unwrap(),
+            })
             .add_value(FlowSystemEventAgentConfig::local_default())
             .add_value(WakeupListenerConfig::local_default())
             .add::<TaskSchedulerImpl>()

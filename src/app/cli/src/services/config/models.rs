@@ -8,8 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::BTreeMap;
+use std::num::NonZeroUsize;
 use std::path::Path;
 
+use chrono::Duration;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
 use kamu_datasets::SecretsEncryptionConfig;
@@ -527,7 +529,8 @@ pub struct RemoteDatabaseConfig {
     pub database_name: String,
     pub host: String,
     pub port: Option<u16>,
-    pub max_connections: Option<u32>,
+    #[config(default = database_common::DatabaseConnectionSettings::DEFAULT_MAX_CONNECTIONS)]
+    pub max_connections: u32,
     pub max_lifetime_secs: Option<u64>,
     pub acquire_timeout_secs: Option<u64>,
 }
@@ -697,10 +700,8 @@ pub struct UploadsConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Note: defaults suit the CLI with a SQLite target, and match
-// `WakeupListenerConfig::local_default()` and the agents' `local_default()`
-// batch sizes, where the reasoning is documented. Postgres targets typically
-// use a higher listening timeout (~60s) and larger batches (~100..500).
+// Defaults suit the CLI on SQLite, as the agents' `local_default()` explain.
+// Postgres typically wants ~60s timeouts, ~100..500 batches, ~8 concurrency
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsConfig {
     /// How long agents absorb a burst of change signals before processing
@@ -708,24 +709,44 @@ pub struct BackgroundAgentsConfig {
     pub min_debounce_interval: DurationString,
 
     /// Fallback period to re-check for work if a change signal is missed.
-    /// With `SQLite` it also paces the polling.
+    /// With `SQLite` it also paces the polling. The flow agent wakes up at
+    /// the next flow activation moment regardless of it.
     #[config(default_str = "2s")]
     pub max_listening_timeout: DurationString,
 
     /// Batch sizes of agents processing records in batches
     #[config(default)]
     pub batching: BackgroundAgentsBatchingConfig,
+
+    /// Concurrency limits of agents processing records in parallel
+    #[config(default)]
+    pub concurrency: BackgroundAgentsConcurrencyConfig,
 }
 
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsBatchingConfig {
-    /// Outbox messages relayed per transaction
+    /// Outbox messages relayed per transaction. 0 is treated as 1
     #[config(default = 20)]
     pub outbox_messages: usize,
 
-    /// Flow system events applied to a projection per transaction
+    /// Flow system events applied to a projection per transaction. 0 is
+    /// treated as 1
     #[config(default = 20)]
     pub flow_system_events: usize,
+
+    /// Due flows the flow agent loads at once before activating them.
+    /// 0 is treated as 1
+    #[config(default = 20)]
+    pub flow_activations: usize,
+}
+
+#[derive(setty::Config, setty::Default)]
+pub struct BackgroundAgentsConcurrencyConfig {
+    /// Outbox consumers running at once, in order per producer, each holding a
+    /// pooled connection: e.g. 8 with Postgres, 1 with `SQLite`. 0 is treated
+    /// as 1
+    #[config(default = 1)]
+    pub outbox_consumers: usize,
 }
 
 impl BackgroundAgentsConfig {
@@ -738,13 +759,24 @@ impl BackgroundAgentsConfig {
 
     pub fn outbox_agent_config(&self) -> messaging_outbox::OutboxAgentConfig {
         messaging_outbox::OutboxAgentConfig {
-            batch_size: self.batching.outbox_messages,
+            batch_size: NonZeroUsize::new(self.batching.outbox_messages)
+                .unwrap_or(NonZeroUsize::MIN),
+            consumer_concurrency: NonZeroUsize::new(self.concurrency.outbox_consumers)
+                .unwrap_or(NonZeroUsize::MIN),
         }
     }
 
     pub fn flow_system_event_agent_config(&self) -> kamu_flow_system::FlowSystemEventAgentConfig {
         kamu_flow_system::FlowSystemEventAgentConfig {
-            batch_size: self.batching.flow_system_events,
+            batch_size: NonZeroUsize::new(self.batching.flow_system_events)
+                .unwrap_or(NonZeroUsize::MIN),
+        }
+    }
+
+    pub fn flow_agent_activation_config(&self) -> kamu_flow_system::FlowAgentActivationConfig {
+        kamu_flow_system::FlowAgentActivationConfig {
+            batch_size: NonZeroUsize::new(self.batching.flow_activations)
+                .unwrap_or(NonZeroUsize::MIN),
         }
     }
 }
@@ -753,26 +785,31 @@ impl BackgroundAgentsConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct FlowSystemConfig {
+    /// Scheduling granularity: activation times are rounded to it, and failed
+    /// activations retried after it. Not a polling period
     #[config(default = 1)]
     pub awaiting_step_secs: i64,
 
+    /// Minimal time between two runs of the same flow
     #[config(default = 60)]
     pub mandatory_throttling_period_secs: i64,
 
+    /// Retry policies applied by default, by flow type
     #[config(default, combine(merge))]
     pub default_retry_policies: BTreeMap<String, RetryPolicyConfig>,
 }
 
 impl FlowSystemConfig {
     pub fn into_system(&self) -> kamu_flow_system::FlowAgentConfig {
-        kamu_flow_system::FlowAgentConfig::new(
-            chrono::Duration::seconds(self.awaiting_step_secs),
-            chrono::Duration::seconds(self.mandatory_throttling_period_secs),
-            self.default_retry_policies
+        kamu_flow_system::FlowAgentConfig {
+            awaiting_step: Duration::seconds(self.awaiting_step_secs),
+            mandatory_throttling_period: Duration::seconds(self.mandatory_throttling_period_secs),
+            default_retry_policy_by_flow_type: self
+                .default_retry_policies
                 .iter()
                 .map(|(t, policy)| (t.clone(), policy.into_system()))
                 .collect(),
-        )
+        }
     }
 }
 

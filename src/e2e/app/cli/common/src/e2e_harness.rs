@@ -261,17 +261,35 @@ fn merge_yaml(
 ) -> Option<serde_yaml::Value> {
     match (target, source) {
         (Some(mut target), Some(source)) => {
-            let target_mapping = target.as_mapping_mut().unwrap();
-            let serde_yaml::Value::Mapping(source_mapping) = source else {
-                panic!("source is not a mapping: {source:?}")
-            };
+            assert!(source.is_mapping(), "source is not a mapping: {source:?}");
 
-            target_mapping.extend(source_mapping);
+            merge_yaml_values(&mut target, source);
 
             Some(target)
         }
         (target, None) => target,
         (None, generated_kamu_config) => generated_kamu_config,
+    }
+}
+
+/// Merges mappings recursively, so that a source `content.flowSystem` keeps the
+/// target `content.database`. Any other source value replaces the target one
+fn merge_yaml_values(target: &mut serde_yaml::Value, source: serde_yaml::Value) {
+    match (target, source) {
+        (
+            serde_yaml::Value::Mapping(target_mapping),
+            serde_yaml::Value::Mapping(source_mapping),
+        ) => {
+            for (key, source_value) in source_mapping {
+                match target_mapping.get_mut(&key) {
+                    Some(target_value) => merge_yaml_values(target_value, source_value),
+                    None => {
+                        target_mapping.insert(key, source_value);
+                    }
+                }
+            }
+        }
+        (target, source) => *target = source,
     }
 }
 

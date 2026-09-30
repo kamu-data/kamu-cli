@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_utils::BackgroundAgent;
 use database_common::PaginationOpts;
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common_macros::transactional_method2;
 use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use kamu_task_system::*;
@@ -19,6 +19,8 @@ use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
 use wakeup_listener::{WakeupListener, WakeupListenerConfig};
+
+use crate::TaskAgentMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +39,7 @@ pub struct TaskAgentImpl {
     time_source: Arc<dyn SystemTimeSource>,
     wakeup_config: Arc<WakeupListenerConfig>,
     task_queue_wakeup_source: Arc<dyn TaskQueueWakeupSource>,
+    metrics: Arc<TaskAgentMetrics>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +94,10 @@ impl TaskAgentImpl {
         wakeup_listener: &dyn WakeupListener,
     ) -> Result<(), InternalError> {
         let task = self.take_task(wakeup_listener).await?;
+        self.metrics.on_task_started(
+            task.timing.created_at,
+            task.timing.ran_at.unwrap_or_else(|| self.time_source.now()),
+        );
 
         let task_outcome = self
             .run_task(&task)
@@ -100,55 +107,97 @@ impl TaskAgentImpl {
             ))
             .await?;
 
-        self.process_task_outcome(task, task_outcome).await?;
+        let task = self.process_task_outcome(task, task_outcome).await?;
+        if let Some(outcome) = &task.outcome {
+            let now = self.time_source.now();
+            self.metrics.on_task_finished(
+                &task.logical_plan.plan_type,
+                outcome,
+                task.timing.ran_at.unwrap_or(now),
+                task.timing.finished_at.unwrap_or(now),
+            );
+        }
 
         Ok(())
     }
 
-    #[transactional_method1(task_event_store: Arc<dyn TaskEventStore>)]
+    #[transactional_method2(task_event_store: Arc<dyn TaskEventStore>, outbox: Arc<dyn Outbox>)]
     #[tracing::instrument(level = "info", skip_all)]
     async fn recover_running_tasks(&self) -> Result<(), InternalError> {
-        // Recovering tasks means we are re-queuing tasks that started running, but got
-        // aborted due to server shutdown or crash
-
-        // Total number of running tasks
-        let total_running_tasks = task_event_store.get_count_running_tasks().await?;
-
-        // Process them in pages
-        let mut processed_running_tasks = 0;
-        while processed_running_tasks < total_running_tasks {
-            // Load another page
+        // Tasks interrupted by a shutdown or crash are requeued, or finished if
+        // cancelled meanwhile. Each leaves the running set, so re-read page one
+        loop {
             use futures::TryStreamExt;
             let running_task_ids: Vec<_> = task_event_store
                 .get_running_tasks(PaginationOpts {
-                    offset: processed_running_tasks,
+                    offset: 0,
                     limit: 100,
                 })
                 .try_collect()
                 .await?;
-            let batch_size = running_task_ids.len();
+            if running_task_ids.is_empty() {
+                break;
+            }
 
             let tasks = Task::load_multi_simple(&running_task_ids, task_event_store.as_ref())
                 .await
                 .int_err()?;
 
             for mut task in tasks {
-                // Requeue
-                task.requeue(self.time_source.now()).int_err()?;
-                task.save(task_event_store.as_ref()).await.int_err()?;
+                if task.timing.cancellation_requested_at.is_some() {
+                    self.finish_interrupted_cancelled_task(&mut task, &task_event_store, &outbox)
+                        .await?;
+                } else {
+                    task.requeue(self.time_source.now()).int_err()?;
+                    task.save(task_event_store.as_ref()).await.int_err()?;
+                }
             }
-
-            processed_running_tasks += batch_size;
         }
 
         Ok(())
     }
 
+    async fn finish_interrupted_cancelled_task(
+        &self,
+        task: &mut Task,
+        task_event_store: &Arc<dyn TaskEventStore>,
+        outbox: &Arc<dyn Outbox>,
+    ) -> Result<(), InternalError> {
+        let now = self.time_source.now();
+        task.finish(now, TaskOutcome::Cancelled).int_err()?;
+        task.save(task_event_store.as_ref()).await.int_err()?;
+
+        outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+                TaskProgressMessage::finished(
+                    now,
+                    task.task_id,
+                    task.metadata.clone(),
+                    TaskOutcome::Cancelled,
+                ),
+            )
+            .await?;
+
+        tracing::info!(task_id = %task.task_id, "Interrupted cancelled task finished");
+        Ok(())
+    }
+
     async fn take_task(&self, wakeup_listener: &dyn WakeupListener) -> Result<Task, InternalError> {
         loop {
-            let maybe_task = self.take_task_non_blocking().await?;
+            let maybe_task = match self.take_task_non_blocking().await {
+                Ok(maybe_task) => maybe_task,
+                Err(TakeTaskError::ConcurrentModification { task_id }) => {
+                    // Rolled back, and the queue already reflects the change
+                    tracing::info!(%task_id, "Task changed while being taken, retrying");
+                    continue;
+                }
+                Err(TakeTaskError::Internal(e)) => return Err(e),
+            };
 
             if let Some(task) = maybe_task {
+                // Back-to-back tasks leave no room for waits
+                wakeup_listener.heartbeat();
                 return Ok(task);
             }
 
@@ -164,8 +213,8 @@ impl TaskAgentImpl {
     }
 
     #[transactional_method2(task_scheduler: Arc<dyn TaskScheduler>, outbox: Arc<dyn Outbox>)]
-    async fn take_task_non_blocking(&self) -> Result<Option<Task>, InternalError> {
-        let maybe_task = task_scheduler.try_take().await.int_err()?;
+    async fn take_task_non_blocking(&self) -> Result<Option<Task>, TakeTaskError> {
+        let maybe_task = task_scheduler.try_take().await?;
         let Some(task) = maybe_task else {
             return Ok(None);
         };
@@ -245,7 +294,7 @@ impl TaskAgentImpl {
         &self,
         mut task: Task,
         task_outcome: TaskOutcome,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Task, InternalError> {
         // Refresh the task in case it was updated concurrently (e.g. late cancellation)
         task.update(event_store.as_ref()).await.int_err()?;
         task.finish(self.time_source.now(), task_outcome.clone())
@@ -264,7 +313,7 @@ impl TaskAgentImpl {
             )
             .await?;
 
-        Ok(())
+        Ok(task)
     }
 }
 
@@ -273,7 +322,7 @@ impl TaskAgentImpl {
 #[async_trait::async_trait]
 impl BackgroundAgent for TaskAgentImpl {
     fn agent_name(&self) -> &'static str {
-        "dev.kamu.domain.task-system.TaskAgent"
+        TASK_AGENT_NAME
     }
 
     /// Runs the update main loop
@@ -305,6 +354,21 @@ impl TaskAgent for TaskAgentImpl {
 #[async_trait::async_trait]
 impl InitOnStartup for TaskAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        use dill::BuilderExt;
+
+        let catalog = self.catalog.upgrade();
+        let plan_types: Vec<&'static str> = catalog
+            .builders_for::<dyn TaskDefinitionPlanner>()
+            .flat_map(|builder| {
+                builder
+                    .metadata_get_all::<TaskDefinitionPlannerMeta>()
+                    .into_iter()
+                    .map(|meta| meta.logic_plan_type)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        self.metrics.init(plan_types.into_iter());
+
         self.recover_running_tasks().await
     }
 }

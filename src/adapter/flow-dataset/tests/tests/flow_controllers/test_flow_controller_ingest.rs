@@ -23,6 +23,7 @@ use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use odf::dataset::MetadataChainIncrementInterval;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -203,6 +204,7 @@ impl FlowControllerIngestHarness {
             .bind::<dyn FlowRunService, MockFlowRunService>()
             .add::<InMemoryFlowSystemEventBridge>()
             .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add_value(mock_dataset_increment_service)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
             .add_value(mock_flow_sensor_dispatcher)

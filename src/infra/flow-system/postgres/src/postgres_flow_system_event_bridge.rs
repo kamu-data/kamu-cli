@@ -14,6 +14,7 @@ use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     EventID,
+    FLOW_SYSTEM_EVENT_AGENT_NAME,
     FlowSystemEvent,
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
@@ -51,6 +52,7 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         Box::new(HubWakeupListener::new(
             self.hub.clone(),
             NOTIFY_CHANNEL_NAME,
+            FLOW_SYSTEM_EVENT_AGENT_NAME,
         ))
     }
 

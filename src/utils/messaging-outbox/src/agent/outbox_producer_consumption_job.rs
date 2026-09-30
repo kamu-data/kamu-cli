@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use database_common_macros::transactional_method;
 use internal_error::{InternalError, ResultIntoInternal};
+use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use super::{OutboxAgentMetrics, OutboxRoutesStaticInfo, ProducerConsumptionTask};
@@ -37,6 +38,7 @@ pub(crate) struct ProducerConsumptionJob {
     consumer_names: Vec<String>,
     failed_consumer_names: Mutex<HashSet<String>>,
     metrics: Arc<OutboxAgentMetrics>,
+    consumer_permits: Arc<Semaphore>,
 }
 
 impl ProducerConsumptionJob {
@@ -46,6 +48,7 @@ impl ProducerConsumptionJob {
         producer_name: String,
         consumer_names: Vec<String>,
         metrics: Arc<OutboxAgentMetrics>,
+        consumer_permits: Arc<Semaphore>,
     ) -> Self {
         Self {
             catalog,
@@ -54,6 +57,7 @@ impl ProducerConsumptionJob {
             consumer_names,
             metrics,
             failed_consumer_names: Mutex::new(HashSet::new()),
+            consumer_permits,
         }
     }
 
@@ -139,10 +143,18 @@ impl ProducerConsumptionJob {
                 })
                 .collect();
 
-            // Spawn per-consumer message processing tasks as concurrent tokio tasks
+            // Spawn per-consumer message processing tasks as concurrent tokio tasks,
+            // each waiting for a permit before opening its transaction
             let mut join_set = tokio::task::JoinSet::new();
             for consume_message_task in consume_message_tasks {
-                join_set.spawn(consume_message_task.invoke());
+                let consumer_permits = self.consumer_permits.clone();
+                join_set.spawn(async move {
+                    let _permit = consumer_permits
+                        .acquire_owned()
+                        .await
+                        .expect("Consumer permits are never closed");
+                    consume_message_task.invoke().await
+                });
             }
 
             // Report errors and block consumers from advancing to later messages in

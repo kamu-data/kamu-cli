@@ -16,40 +16,36 @@ use serde::{Deserialize, Serialize};
 impl CheapClone for BlockRef {}
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Debug)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Debug,
+    strum::Display,
+    strum::EnumString,
+    strum::AsRefStr,
+    strum::IntoStaticStr,
+)]
+#[strum(
+    serialize_all = "lowercase",
+    parse_err_ty = InternalError,
+    parse_err_fn = invalid_block_ref
+)]
 pub enum BlockRef {
     Head,
 }
 
 impl BlockRef {
-    pub fn as_str(&self) -> &str {
-        match self {
-            BlockRef::Head => "head",
-        }
+    pub fn as_str(&self) -> &'static str {
+        self.into()
     }
 }
 
-impl std::str::FromStr for BlockRef {
-    type Err = InternalError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "head" => Ok(Self::Head),
-            _ => Err(format!("Invalid block reference: {s}").int_err()),
-        }
-    }
-}
-
-impl AsRef<str> for BlockRef {
-    fn as_ref(&self) -> &str {
-        self.as_str()
-    }
-}
-
-impl std::fmt::Display for BlockRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
+fn invalid_block_ref(s: &str) -> InternalError {
+    format!("Invalid block reference: {s}").int_err()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

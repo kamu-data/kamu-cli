@@ -12,21 +12,13 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
 pub enum FlowTriggerStopPolicy {
     AfterConsecutiveFailures {
         failures_count: ConsecutiveFailuresCount,
     },
     Never,
-}
-
-impl FlowTriggerStopPolicy {
-    pub fn kind_to_string(&self) -> &'static str {
-        match self {
-            FlowTriggerStopPolicy::AfterConsecutiveFailures { .. } => "after_consecutive_failures",
-            FlowTriggerStopPolicy::Never => "never",
-        }
-    }
 }
 
 impl Default for FlowTriggerStopPolicy {

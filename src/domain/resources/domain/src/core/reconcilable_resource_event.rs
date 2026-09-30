@@ -16,7 +16,7 @@ use crate::{ResourceHeadersInput, ResourceID, ResourceName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::IntoStaticStr)]
 pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
     Created(ResourceEventCreated<TSpec>),
     HeadersUpdated(ResourceEventHeadersUpdated),
@@ -92,15 +92,7 @@ pub struct ResourceEventReconciliationFailed<TFailureDetails> {
 
 impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
     pub fn typename(&self) -> &'static str {
-        match self {
-            ReconcilableResourceEvent::Created(_) => "Created",
-            ReconcilableResourceEvent::HeadersUpdated(_) => "HeadersUpdated",
-            ReconcilableResourceEvent::SpecUpdated(_) => "SpecUpdated",
-            ReconcilableResourceEvent::Deleted(_) => "Deleted",
-            ReconcilableResourceEvent::ReconciliationStarted(_) => "ReconciliationStarted",
-            ReconcilableResourceEvent::ReconciliationSucceeded(_) => "ReconciliationSucceeded",
-            ReconcilableResourceEvent::ReconciliationFailed(_) => "ReconciliationFailed",
-        }
+        self.into()
     }
 
     pub fn id(&self) -> &ResourceID {

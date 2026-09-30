@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use sqlx::postgres::PgListener;
 use tokio::sync::Notify;
-use wakeup_listener::{WakeupHub, WakeupSubscribers};
+use wakeup_listener::{WakeupHub, WakeupListenerMetrics, WakeupSubscribers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +35,7 @@ pub struct PostgresNotificationHub {
     inner: Arc<HubInner>,
     // Spawned on the first subscription: DI may build the hub outside a runtime
     task: OnceLock<tokio::task::AbortHandle>,
+    metrics: Arc<WakeupListenerMetrics>,
 }
 
 struct HubInner {
@@ -47,13 +48,14 @@ struct HubInner {
 #[dill::component(pub)]
 #[dill::scope(dill::Singleton)]
 impl PostgresNotificationHub {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
+    pub fn new(pool: Arc<sqlx::PgPool>, metrics: Arc<WakeupListenerMetrics>) -> Self {
         Self {
             inner: Arc::new(HubInner {
                 pool,
                 subscribers: WakeupSubscribers::new(),
             }),
             task: OnceLock::new(),
+            metrics,
         }
     }
 }
@@ -68,6 +70,10 @@ impl WakeupHub for PostgresNotificationHub {
         self.task
             .get_or_init(|| tokio::spawn(self.inner.clone().run()).abort_handle());
         slot
+    }
+
+    fn metrics(&self) -> &WakeupListenerMetrics {
+        &self.metrics
     }
 }
 
@@ -87,7 +93,15 @@ impl HubInner {
     /// Outer loop: one iteration per connection. Inner loop: routes
     /// notifications until the connection has to be replaced.
     async fn run(self: Arc<Self>) {
+        let mut lost_connection = false;
         loop {
+            // A server or proxy dropping sessions at once must not make every agent
+            // re-check in a tight loop
+            if lost_connection {
+                tokio::time::sleep(RECONNECT_RETRY_INTERVAL).await;
+                lost_connection = false;
+            }
+
             // The snapshot below already covers any pending subscription change.
             // A subscription racing with it leaves a permit, costing one extra reconnect.
             self.subscribers.take_changed();
@@ -129,6 +143,7 @@ impl HubInner {
                         // instead of silently reconnecting and hiding lost notifications.
                         Ok(None) => {
                             tracing::warn!("PgListener connection was lost, reconnecting");
+                            lost_connection = true;
                             break;
                         }
                         Err(sqlx::Error::PoolClosed) => return,
@@ -138,6 +153,7 @@ impl HubInner {
                                 error_msg = %e,
                                 "PgListener error, reconnecting",
                             );
+                            lost_connection = true;
                             break;
                         }
                     },

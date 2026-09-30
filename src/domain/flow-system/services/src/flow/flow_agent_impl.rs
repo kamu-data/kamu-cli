@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use async_utils::BackgroundAgent;
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use database_common_macros::transactional_method;
+use database_common_macros::{transactional_method, transactional_method1};
 use dill::*;
 use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -25,8 +25,9 @@ use kamu_task_system::*;
 use messaging_outbox::*;
 use time_source::SystemTimeSource;
 use tracing::Instrument as _;
+use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig};
 
-use crate::{FlowAbortHelper, FlowSchedulingServiceImpl};
+use crate::{FlowAbortHelper, FlowAgentMetrics, FlowCompletionMetrics, FlowSchedulingServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,6 +35,11 @@ pub struct FlowAgentImpl {
     catalog: CatalogWeakRef,
     time_source: Arc<dyn SystemTimeSource>,
     agent_config: Arc<FlowAgentConfig>,
+    activation_config: Arc<FlowAgentActivationConfig>,
+    wakeup_config: Arc<WakeupListenerConfig>,
+    flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
+    metrics: Arc<FlowAgentMetrics>,
+    completion_metrics: Arc<FlowCompletionMetrics>,
     state: Arc<Mutex<State>>,
 }
 
@@ -42,7 +48,6 @@ pub struct FlowAgentImpl {
 #[derive(Default)]
 struct State {
     agent_started: bool,
-    loop_synchronizer: Option<Arc<dyn FlowAgentLoopSynchronizer>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,11 +82,21 @@ impl FlowAgentImpl {
         catalog: CatalogWeakRef,
         time_source: Arc<dyn SystemTimeSource>,
         agent_config: Arc<FlowAgentConfig>,
+        activation_config: Arc<FlowAgentActivationConfig>,
+        wakeup_config: Arc<WakeupListenerConfig>,
+        flow_activation_wakeup_source: Arc<dyn FlowActivationWakeupSource>,
+        metrics: Arc<FlowAgentMetrics>,
+        completion_metrics: Arc<FlowCompletionMetrics>,
     ) -> Self {
         Self {
             catalog,
             time_source,
             agent_config,
+            activation_config,
+            wakeup_config,
+            flow_activation_wakeup_source,
+            metrics,
+            completion_metrics,
             state: Arc::new(Mutex::new(State::default())),
         }
     }
@@ -232,94 +247,177 @@ impl FlowAgentImpl {
         Ok(())
     }
 
-    #[transactional_method]
-    async fn tick_current_timeslot(&self) -> Result<(), InternalError> {
-        let flow_event_store = transaction_catalog.get_one::<dyn FlowEventStore>().unwrap();
-
-        // Do we have a timeslot scheduled?
-        let Some(nearest_flow_activation_moment) =
-            flow_event_store.nearest_flow_activation_moment().await?
-        else {
-            return Ok(());
-        };
-
-        // Is it time to execute it yet?
+    async fn activate_due_flows(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+    ) -> Result<(), InternalError> {
+        // Fixed for the pass, so that it ends even while more flows become due
         let current_time = self.time_source.now();
-        if nearest_flow_activation_moment > current_time {
-            return Ok(());
+
+        let mut page_after = None;
+        loop {
+            let page = self
+                .load_flows_due_for_activation(current_time, page_after)
+                .await?;
+            self.activate_flows(page.flows).await;
+            wakeup_listener.heartbeat();
+
+            let Some(next_page_after) = page.next_page_after else {
+                return Ok(());
+            };
+            page_after = Some(next_page_after);
         }
-
-        // Synchronize with other agents if needed
-        self.synchronize_execution_loop().await?;
-
-        self.run_flows_for_timeslot(
-            nearest_flow_activation_moment,
-            flow_event_store,
-            transaction_catalog,
-        )
-        .instrument(observability::tracing::root_span!("FlowAgent::activation"))
-        .await
     }
 
-    async fn synchronize_execution_loop(&self) -> Result<(), InternalError> {
-        if let Some(synchronizer) = {
-            let state = self.state.lock().unwrap();
-            state.loop_synchronizer.clone()
-        } {
-            synchronizer.synchronize_execution_loop().await?;
+    /// Each flow gets its own transaction, so a failure rolls back only its own
+    /// changes and does not hold back the others
+    async fn activate_flows(&self, flows: Vec<(Flow, DateTime<Utc>)>) {
+        for (flow, activation_time) in flows {
+            let flow_id = flow.flow_id;
+            let flow_type = flow.flow_binding.flow_type.clone();
+
+            let result = self
+                .activate_flow(flow, activation_time)
+                .instrument(observability::tracing::root_span!(
+                    "FlowAgent::activation",
+                    %flow_id,
+                    %activation_time
+                ))
+                .await;
+            self.metrics.on_activation(
+                &flow_type,
+                &result,
+                activation_time,
+                self.time_source.now(),
+            );
+
+            match result {
+                Ok(()) => {}
+                Err(ActivateFlowError::ConcurrentModification) => {
+                    // The store is re-read on the next iteration
+                    tracing::info!(
+                        %flow_id,
+                        "Flow activation skipped as the flow changed concurrently"
+                    );
+                }
+                Err(ActivateFlowError::Internal(e)) => {
+                    tracing::error!(
+                        %flow_id,
+                        error = ?e,
+                        error_msg = %e,
+                        "Flow activation failed"
+                    );
+                }
+            }
         }
+    }
+
+    /// Loads a page of due flows. Pages by key rather than from the first due
+    /// flow: flows that failed to activate stay due and would come first
+    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
+    async fn load_flows_due_for_activation(
+        &self,
+        current_time: DateTime<Utc>,
+        page_after: Option<DueFlowActivation>,
+    ) -> Result<DueFlowsPage, InternalError> {
+        let batch_size = self.activation_config.batch_size.get();
+        let due_flows = flow_event_store
+            .get_flows_due_for_activation(current_time, page_after, batch_size)
+            .await?;
+
+        let next_page_after = if due_flows.len() == batch_size {
+            due_flows.last().copied()
+        } else {
+            None
+        };
+
+        let flow_ids: Vec<_> = due_flows.iter().map(|due_flow| due_flow.flow_id).collect();
+        let load_results = Flow::load_multi(&flow_ids, flow_event_store.as_ref())
+            .await
+            .int_err()?;
+
+        // A flow failing to load must not hold back the others
+        let flows = load_results
+            .into_iter()
+            .zip(due_flows)
+            .filter_map(|(load_result, due_flow)| match load_result {
+                Ok(flow) => Some((flow, due_flow.activation_time)),
+                Err(e) => {
+                    tracing::error!(
+                        flow_id = %due_flow.flow_id,
+                        error = ?e,
+                        error_msg = %e,
+                        "Flow due for activation failed to load"
+                    );
+                    None
+                }
+            })
+            .collect();
+
+        Ok(DueFlowsPage {
+            flows,
+            next_page_after,
+        })
+    }
+
+    #[transactional_method1(flow_event_store: Arc<dyn FlowEventStore>)]
+    async fn nearest_flow_activation_moment(&self) -> Result<Option<DateTime<Utc>>, InternalError> {
+        flow_event_store.nearest_flow_activation_moment().await
+    }
+
+    /// Sleeps until the nearest activation moment, or until a flow might have
+    /// been scheduled for activation, whichever comes first
+    async fn wait_for_next_activation(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+    ) -> Result<(), InternalError> {
+        let maybe_nearest_activation_moment = self.nearest_flow_activation_moment().await?;
+
+        let wait_signal = wakeup_listener.wait_wake(
+            self.wakeup_config.max_listening_timeout,
+            self.wakeup_config.min_debounce_interval,
+        );
+
+        let hint = match maybe_nearest_activation_moment {
+            None => wait_signal.await?,
+            Some(nearest_activation_moment) => {
+                let time_left = nearest_activation_moment - self.time_source.now();
+                let sleep_duration = if time_left > chrono::Duration::zero() {
+                    time_left
+                } else {
+                    // Still due right after activating due flows means their activation failed:
+                    // retry them later rather than spin
+                    self.agent_config.awaiting_step
+                };
+
+                // Dropping the signal wait loses nothing, as the store is re-read on
+                // the next pass. The time source measures the deadline, so tests control it
+                tokio::select! {
+                    hint = wait_signal => hint?,
+                    () = self.time_source.sleep(sleep_duration) => WakeHint::Timeout,
+                }
+            }
+        };
+
+        tracing::debug!(
+            ?hint,
+            ?maybe_nearest_activation_moment,
+            "Flow agent woke up with a hint"
+        );
+
         Ok(())
     }
 
-    async fn run_flows_for_timeslot(
+    /// Activates a flow loaded beforehand; if it changed since, the save fails
+    /// as a concurrent modification and the transaction rolls back
+    #[transactional_method]
+    async fn activate_flow(
         &self,
-        activation_moment: DateTime<Utc>,
-        flow_event_store: Arc<dyn FlowEventStore>,
-        transaction_catalog: Catalog,
-    ) -> Result<(), InternalError> {
-        let planned_flow_ids: Vec<_> = flow_event_store
-            .get_flows_scheduled_for_activation_at(activation_moment)
+        mut flow: Flow,
+        activation_time: DateTime<Utc>,
+    ) -> Result<(), ActivateFlowError> {
+        self.schedule_flow_task(transaction_catalog, &mut flow, activation_time)
             .await?;
-
-        let mut planned_task_futures = Vec::new();
-        for planned_flow_id in planned_flow_ids {
-            let transaction_catalog = transaction_catalog.clone();
-            let flow_event_store = flow_event_store.clone();
-
-            planned_task_futures.push(async move {
-                let mut flow = Flow::load(planned_flow_id, flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-
-                if flow.can_schedule() {
-                    self.schedule_flow_task(transaction_catalog, &mut flow, activation_moment)
-                        .await?;
-                } else {
-                    tracing::warn!(
-                        flow_id = %planned_flow_id,
-                        flow_status = %flow.status(),
-                        "Skipped flow scheduling as no longer relevant"
-                    );
-                }
-
-                Ok(())
-            });
-        }
-
-        // TODO: PERF: use tokio-tasks?
-        let results = futures::future::join_all(planned_task_futures).await;
-        results
-            .into_iter()
-            .filter(Result::is_err)
-            .map(|e| e.err().unwrap())
-            .for_each(|e: InternalError| {
-                tracing::error!(
-                    error = ?e,
-                    error_msg = %e,
-                    "Scheduling flow failed"
-                );
-            });
-
         Ok(())
     }
 
@@ -329,7 +427,7 @@ impl FlowAgentImpl {
         target_catalog: Catalog,
         flow: &mut Flow,
         schedule_time: DateTime<Utc>,
-    ) -> Result<TaskID, InternalError> {
+    ) -> Result<TaskID, ActivateFlowError> {
         // Find a controller for this flow type
         let flow_controller =
             get_flow_controller_from_catalog(&target_catalog, &flow.flow_binding.flow_type)?;
@@ -364,7 +462,12 @@ impl FlowAgentImpl {
             .int_err()?;
 
         let flow_event_store = target_catalog.get_one::<dyn FlowEventStore>().unwrap();
-        flow.save(flow_event_store.as_ref()).await.int_err()?;
+        flow.save(flow_event_store.as_ref())
+            .await
+            .map_err(|e| match e {
+                SaveError::ConcurrentModification(_) => ActivateFlowError::ConcurrentModification,
+                e => ActivateFlowError::Internal(e.int_err()),
+            })?;
 
         Ok(task.task_id)
     }
@@ -385,12 +488,23 @@ impl FlowAgentImpl {
 #[async_trait::async_trait]
 impl InitOnStartup for FlowAgentImpl {
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        let catalog = self.catalog.upgrade();
+        let flow_types: Vec<&'static str> = catalog
+            .builders_for::<dyn FlowController>()
+            .flat_map(|builder| {
+                builder
+                    .metadata_get_all::<FlowControllerMeta>()
+                    .into_iter()
+                    .map(|meta| meta.flow_type)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        self.metrics.init(flow_types.iter().copied());
+        self.completion_metrics.init(flow_types.iter().copied());
+
         // Run recovery procedure
         let start_time = self.agent_config.round_time(self.time_source.now())?;
         self.recover_initial_flows_state(start_time).await?;
-
-        // Synchronize with other agents if needed
-        self.synchronize_execution_loop().await?;
 
         // Mark the agent as started
         self.mark_engine_as_started();
@@ -404,21 +518,23 @@ impl InitOnStartup for FlowAgentImpl {
 #[async_trait::async_trait]
 impl BackgroundAgent for FlowAgentImpl {
     fn agent_name(&self) -> &'static str {
-        "dev.kamu.domain.flow-system.FlowAgent"
+        FLOW_AGENT_NAME
     }
 
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
-        // Main scanning loop
+        // Kept across iterations, so that no change is missed between them
+        let wakeup_listener = self.flow_activation_wakeup_source.new_wakeup_listener();
+
         loop {
-            // Run scheduling for current time slot
-            self.tick_current_timeslot()
+            self.activate_due_flows(wakeup_listener.as_ref())
                 .instrument(tracing::debug_span!("FlowAgent::tick"))
                 .await?;
 
-            self.time_source
-                .sleep(self.agent_config.awaiting_step)
-                .await;
+            // The deadline is re-read from the store on every iteration,
+            // so aborted or rescheduled flows need no signal
+            self.wait_for_next_activation(wakeup_listener.as_ref())
+                .await?;
         }
     }
 }
@@ -426,6 +542,26 @@ impl BackgroundAgent for FlowAgentImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowAgent for FlowAgentImpl {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct DueFlowsPage {
+    /// Loaded flows, paired with their activation moments
+    flows: Vec<(Flow, DateTime<Utc>)>,
+    /// Where the next page starts, unless this page was the last one
+    next_page_after: Option<DueFlowActivation>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum ActivateFlowError {
+    #[error("Flow was modified concurrently")]
+    ConcurrentModification,
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -447,18 +583,10 @@ impl FlowAgentTestDriver for FlowAgentImpl {
 
         let task_id = self
             .schedule_flow_task(target_catalog.clone(), &mut flow, schedule_time)
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(task_id)
-    }
-
-    async fn set_loop_synchronizer(
-        &self,
-        synchronizer: Arc<dyn FlowAgentLoopSynchronizer>,
-    ) -> Result<(), InternalError> {
-        let mut state = self.state.lock().unwrap();
-        state.loop_synchronizer = Some(synchronizer);
-        Ok(())
     }
 }
 
@@ -552,6 +680,9 @@ impl MessageConsumerT<TaskProgressMessage> for FlowAgentImpl {
                                     .await
                                     .int_err()?;
                             }
+
+                            // Last, as a failure above rolls the completion back
+                            self.completion_metrics.on_flow_finished(&flow);
                         }
                     } else {
                         tracing::info!(

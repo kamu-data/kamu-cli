@@ -29,7 +29,7 @@ use mockall::predicate::{eq, function};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListenerConfig, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -77,6 +77,80 @@ async fn test_pre_run_requeues_running_tasks() {
     assert_eq!(task_1.status(), TaskStatus::Queued);
     assert_eq!(task_2.status(), TaskStatus::Queued);
     assert_eq!(task_3.status(), TaskStatus::Queued);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pre_run_requeues_running_tasks_across_pages() {
+    let mock_task_planner = MockTaskDefinitionPlanner::new();
+    let mock_task_runner = MockTaskRunner::new();
+
+    let harness = TaskAgentHarness::new(MockOutbox::new(), mock_task_planner, mock_task_runner);
+
+    // More running tasks than a recovery page holds
+    let mut task_ids = Vec::new();
+    for _ in 0..250 {
+        task_ids.push(
+            harness
+                .schedule_probe_task(LogicalPlanProbe::default())
+                .await,
+        );
+        harness.try_take_task().await.unwrap();
+    }
+
+    init_on_startup::run_startup_jobs(&harness.catalog)
+        .await
+        .unwrap();
+
+    for task_id in task_ids {
+        assert_eq!(
+            harness.get_task(task_id).await.status(),
+            TaskStatus::Queued,
+            "{task_id}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pre_run_finishes_cancelled_running_tasks() {
+    let harness = TaskAgentHarness::new(
+        TaskAgentHarness::outbox_expecting_cancelled_task(TaskID::new(0)),
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+
+    let task_id_1 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    let task_id_2 = harness
+        .schedule_probe_task(LogicalPlanProbe::default())
+        .await;
+    assert_eq!(task_id_1, TaskID::new(0));
+
+    // Both running, then the 1st cancelled: its run cannot be interrupted
+    harness.try_take_task().await.unwrap();
+    harness.try_take_task().await.unwrap();
+    harness.cancel_task(task_id_1).await;
+    assert_eq!(
+        harness.get_task(task_id_1).await.status(),
+        TaskStatus::Running
+    );
+
+    // Interrupted by a restart: the cancelled one is finished, the other requeued
+    init_on_startup::run_startup_jobs(&harness.catalog)
+        .await
+        .unwrap();
+
+    let task_1 = harness.get_task(task_id_1).await;
+    assert_eq!(task_1.status(), TaskStatus::Finished);
+    assert_eq!(task_1.outcome, Some(TaskOutcome::Cancelled));
+    assert_eq!(
+        harness.get_task(task_id_2).await.status(),
+        TaskStatus::Queued
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -188,6 +262,52 @@ async fn test_agent_wakes_up_when_task_is_queued() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_task_metrics_track_outcomes_and_running_task() {
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(1));
+
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+    harness
+        .schedule_probe_task(LogicalPlanProbe {
+            busy_time: Some(Duration::from_millis(200)),
+            ..LogicalPlanProbe::default()
+        })
+        .await;
+    harness
+        .schedule_probe_task(LogicalPlanProbe {
+            end_with_outcome: Some(TaskOutcome::Failed(TaskError::empty_recoverable())),
+            ..LogicalPlanProbe::default()
+        })
+        .await;
+    assert!(!harness.is_task_running());
+
+    // The running task is visible while it runs
+    let (run_result, was_task_running) =
+        tokio::join!(harness.task_agent.run_single_task(), async {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            harness.is_task_running()
+        });
+    run_result.unwrap();
+    assert!(was_task_running);
+    assert!(!harness.is_task_running());
+
+    harness.task_agent.run_single_task().await.unwrap();
+
+    assert_eq!(harness.finished_tasks("success"), 1);
+    assert_eq!(harness.finished_tasks("failed"), 1);
+    assert_eq!(harness.finished_tasks("cancelled"), 0);
+    assert_eq!(harness.task_queue_wait_samples(), 2);
+    assert!(!harness.is_task_running());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
 struct TaskAgentHarness {
@@ -195,6 +315,7 @@ struct TaskAgentHarness {
     catalog: Catalog,
     task_agent: Arc<dyn TaskAgent>,
     task_scheduler: Arc<dyn TaskScheduler>,
+    task_agent_metrics: Arc<TaskAgentMetrics>,
 }
 
 impl TaskAgentHarness {
@@ -213,10 +334,12 @@ impl TaskAgentHarness {
 
         let mut b = CatalogBuilder::new();
         b.add::<TaskAgentImpl>()
+            .add::<TaskAgentMetrics>()
             .add::<DidGeneratorDefault>()
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add::<InMemoryTaskQueueWakeupSource>()
             .add_value(mock_outbox)
             .add_value(mock_task_runner)
@@ -263,13 +386,36 @@ impl TaskAgentHarness {
 
         let task_agent = catalog.get_one().unwrap();
         let task_scheduler = catalog.get_one().unwrap();
+        let task_agent_metrics = catalog.get_one().unwrap();
 
         Self {
             _tempdir: tempdir,
             catalog,
             task_agent,
             task_scheduler,
+            task_agent_metrics,
         }
+    }
+
+    fn finished_tasks(&self, outcome: &str) -> u64 {
+        self.task_agent_metrics
+            .task_duration_seconds
+            .with_label_values(&[LogicalPlanProbe::TYPE_ID, outcome])
+            .get_sample_count()
+    }
+
+    fn task_queue_wait_samples(&self) -> u64 {
+        self.task_agent_metrics
+            .task_queue_wait_seconds
+            .get_sample_count()
+    }
+
+    fn is_task_running(&self) -> bool {
+        self.task_agent_metrics
+            .running_task_started_timestamp_seconds
+            .with_label_values(&[MAIN_TASK_EXECUTOR])
+            .get()
+            > 0.0
     }
 
     async fn schedule_probe_task(&self, probe_plan: LogicalPlanProbe) -> TaskID {
@@ -288,6 +434,33 @@ impl TaskAgentHarness {
 
     async fn get_task(&self, task_id: TaskID) -> TaskState {
         self.task_scheduler.get_task(task_id).await.unwrap()
+    }
+
+    async fn cancel_task(&self, task_id: TaskID) {
+        self.task_scheduler.cancel_task(task_id).await.unwrap();
+    }
+
+    fn outbox_expecting_cancelled_task(a_task_id: TaskID) -> MockOutbox {
+        let mut mock_outbox = MockOutbox::new();
+        mock_outbox
+            .expect_post_message_as_json()
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_TASK_AGENT),
+                function(move |message_as_json: &serde_json::Value| {
+                    matches!(
+                        serde_json::from_value::<TaskProgressMessage>(message_as_json.clone()),
+                        Ok(TaskProgressMessage::Finished(TaskProgressMessageFinished {
+                            task_id,
+                            outcome: TaskOutcome::Cancelled,
+                            ..
+                        })) if task_id == a_task_id
+                    )
+                }),
+                eq(1),
+            )
+            .times(1)
+            .returning(|_, _, _| Ok(()));
+        mock_outbox
     }
 
     fn add_outbox_task_expectations(mock_outbox: &mut MockOutbox, a_task_id: TaskID) {

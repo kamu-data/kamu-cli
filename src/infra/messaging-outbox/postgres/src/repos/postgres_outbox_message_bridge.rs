@@ -45,6 +45,7 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
         Box::new(HubWakeupListener::new(
             self.hub.clone(),
             NOTIFY_CHANNEL_NAME,
+            OUTBOX_AGENT_NAME,
         ))
     }
 

@@ -573,6 +573,7 @@ pub fn configure_base_catalog(
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
     b.add::<messaging_outbox::OutboxAgentImpl>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
+    b.add::<wakeup_listener::WakeupListenerMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
@@ -940,6 +941,7 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(config.background_agents.wakeup_listener_config());
     catalog_builder.add_value(config.background_agents.outbox_agent_config());
     catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());
+    catalog_builder.add_value(config.background_agents.flow_agent_activation_config());
     //
 
     // Password hashing mode configuration

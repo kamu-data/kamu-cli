@@ -9,22 +9,36 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use std::num::NonZeroUsize;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
 pub struct OutboxAgentConfig {
-    pub batch_size: usize,
+    /// How many messages are relayed per transaction
+    pub batch_size: NonZeroUsize,
+    /// Consumers handling messages at once, across all producers. Each one
+    /// typically holds a pooled connection while it runs
+    pub consumer_concurrency: NonZeroUsize,
 }
 
 impl OutboxAgentConfig {
-    // Each batch is one transaction, which on Sqlite holds the pool's only
-    // connection: small batches keep API requests from waiting behind a long
-    // catch-up
+    // On Sqlite each batch holds the only connection, so small batches keep API
+    // requests from waiting; concurrent consumers would only queue and time out
     pub fn local_default() -> Self {
-        Self { batch_size: 20 }
+        Self {
+            batch_size: NonZeroUsize::new(20).unwrap(),
+            consumer_concurrency: NonZeroUsize::MIN,
+        }
     }
 
-    // Postgres pools connections, so larger batches mostly save round trips
-    // when catching up on a backlog, e.g. after a restart
+    // Postgres pools connections: larger batches save round trips on a backlog,
+    // and consumers run in parallel, well below the default pool size
     pub fn production_default() -> Self {
-        Self { batch_size: 100 }
+        Self {
+            batch_size: NonZeroUsize::new(100).unwrap(),
+            consumer_concurrency: NonZeroUsize::new(8).unwrap(),
+        }
     }
 }
 

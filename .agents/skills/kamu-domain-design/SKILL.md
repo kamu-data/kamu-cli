@@ -9,6 +9,9 @@ Use this skill for domain-level decisions that are not specific to a storage eng
 
 ## Outbox
 
+Mechanics (wiring new messages and consumers, consumption modes, ordering) are in
+`docs/internal/outbox.md`; this section covers design choices only.
+
 - For outbox events that leave the bounded context, prefer snapshot-style payloads over incremental deltas.
 - In resource change detection flows, optimize around the emission gate: did effective state change?
 - After deciding to emit, re-query current state for the outgoing message.

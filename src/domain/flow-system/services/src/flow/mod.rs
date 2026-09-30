@@ -9,6 +9,8 @@
 
 mod flow_abort_helper;
 mod flow_agent_impl;
+mod flow_agent_metrics;
+mod flow_completion_metrics;
 mod flow_controller_system_gc;
 mod flow_query_service_impl;
 mod flow_run_service_impl;
@@ -17,6 +19,8 @@ mod flow_scheduling_service_impl;
 
 pub(crate) use flow_abort_helper::*;
 pub use flow_agent_impl::*;
+pub use flow_agent_metrics::*;
+pub use flow_completion_metrics::*;
 pub use flow_controller_system_gc::*;
 pub use flow_query_service_impl::*;
 pub use flow_run_service_impl::*;

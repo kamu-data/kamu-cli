@@ -33,7 +33,7 @@ kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
 messaging-outbox = { workspace = true }
-observability = { workspace = true, default-features = false }
+observability = { workspace = true, default-features = false, features = ["prometheus"] }
 odf = { workspace = true }
 time-source = { workspace = true }
 wakeup-listener = { workspace = true }
@@ -44,8 +44,11 @@ chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
 mockall = "0.15"
 futures = "0.3"
+prometheus = { version = "0.14", default-features = false }
 serde_json = { version = "1", default-features = false }
-tokio = { version = "1", default-features = false, features = [] }
+strum = { version = "0.28", features = ["derive"] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+tokio = { version = "1", default-features = false, features = ["macros"] }
 tracing = { version = "0.1", default-features = false }
 
 

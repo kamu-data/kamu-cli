@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::HashSet;
 
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
@@ -913,6 +914,113 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
                 0,2051-01-02T03:04:05Z,2020-01-02T00:00:00Z,C,3500"#
             )
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_many_ingest_flows_at_once(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    // More flows than the activation page size set for this test
+    const NUM_DATASETS: usize = 10;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let mut dataset_ids = Vec::with_capacity(NUM_DATASETS);
+    for i in 0..NUM_DATASETS {
+        let source_dir = temp_dir.path().join(format!("source-{i}"));
+        std::fs::create_dir(&source_dir).unwrap();
+        std::fs::write(
+            source_dir.join("chunk-1.csv"),
+            indoc::formatdoc!(
+                r#"
+                event_time,city,population
+                2020-01-01,A,{i}
+                "#
+            ),
+        )
+        .unwrap();
+
+        let dataset_snapshot = indoc::formatdoc!(
+            r#"
+            kind: DatasetSnapshot
+            version: 1
+            content:
+              name: root-dataset-{i}
+              kind: Root
+              metadata:
+                - kind: SetPollingSource
+                  fetch:
+                    kind: FilesGlob
+                    path: {}
+                  read:
+                    kind: Csv
+                    header: true
+                    schema:
+                      fields:
+                        - name: event_time
+                          type: Timestamp
+                        - name: city
+                          type: String
+                        - name: population
+                          type: Int64
+                  merge:
+                    kind: Ledger
+                    primaryKey:
+                      - event_time
+                      - city
+            "#,
+            source_dir.join("chunk-*.csv").display()
+        )
+        .escape_default()
+        .to_string();
+
+        let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+            .dataset()
+            .create_dataset(&dataset_snapshot)
+            .await;
+        dataset_ids.push(dataset_id);
+    }
+
+    // Trigger all at once: with frozen time, the flows are due at the same moment
+    let flow_api = kamu_api_server_client.flow();
+    let trigger_responses = futures::future::join_all(
+        dataset_ids
+            .iter()
+            .map(|dataset_id| flow_api.trigger_ingest(dataset_id)),
+    )
+    .await;
+    for trigger_response in trigger_responses {
+        assert_matches!(trigger_response, FlowTriggerResponse::Success(_));
+    }
+
+    for dataset_id in &dataset_ids {
+        flow_api.wait(dataset_id, 1).await;
+    }
+
+    // Every flow succeeded with a single task of its own
+    let mut all_task_ids = HashSet::new();
+    for dataset_id in &dataset_ids {
+        let flows = flow_api.list_flows(dataset_id).await;
+        assert_eq!(flows.len(), 1, "{flows:?}");
+
+        let flow = &flows[0];
+        assert_eq!(
+            flow.outcome.as_deref(),
+            Some("FlowSuccessResult"),
+            "{flow:?}"
+        );
+        assert_eq!(flow.task_ids.len(), 1, "{flow:?}");
+        assert!(all_task_ids.insert(flow.task_ids[0].clone()), "{flow:?}");
+    }
+
+    // Every dataset got its own data
+    for (i, dataset_id) in dataset_ids.iter().enumerate() {
+        let data = kamu_api_server_client.dataset().tail_data(dataset_id).await;
+        assert!(data.contains(&format!(",A,{i}")), "{data}");
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

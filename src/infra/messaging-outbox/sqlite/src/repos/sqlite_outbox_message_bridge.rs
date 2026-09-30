@@ -45,7 +45,11 @@ impl SqliteOutboxMessageBridge {
 #[async_trait::async_trait]
 impl OutboxMessageBridge for SqliteOutboxMessageBridge {
     fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
-        Box::new(HubWakeupListener::new(self.hub.clone(), POLLING_CHANNEL))
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            POLLING_CHANNEL,
+            OUTBOX_AGENT_NAME,
+        ))
     }
 
     async fn push_message(

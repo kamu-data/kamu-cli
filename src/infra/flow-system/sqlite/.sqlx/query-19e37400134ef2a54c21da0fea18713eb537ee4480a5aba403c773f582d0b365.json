@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                f.flow_id as flow_id,\n                f.scheduled_for_activation_at as \"activation_time!: DateTime<Utc>\"\n                FROM flows f\n                WHERE\n                    f.scheduled_for_activation_at <= $1 AND\n                    (f.flow_status = 'waiting' OR f.flow_status = 'retrying') AND\n                    ($2 IS NULL OR (f.scheduled_for_activation_at, f.flow_id) > ($2, $3))\n                ORDER BY f.scheduled_for_activation_at, f.flow_id\n                LIMIT $4\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "flow_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "activation_time!: DateTime<Utc>",
+        "ordinal": 1,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "19e37400134ef2a54c21da0fea18713eb537ee4480a5aba403c773f582d0b365"
+}

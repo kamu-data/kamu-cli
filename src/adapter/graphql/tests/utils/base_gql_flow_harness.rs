@@ -13,6 +13,7 @@ use kamu_datasets::*;
 use kamu_flow_system_inmem::*;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use odf::metadata::testing::MetadataFactory;
+use wakeup_listener::WakeupListenerMetrics;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
@@ -50,7 +51,9 @@ impl BaseGQLFlowHarness {
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add::<InMemoryFlowProcessState>();
 
         b.build()

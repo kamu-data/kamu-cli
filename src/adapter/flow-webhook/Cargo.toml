@@ -58,6 +58,7 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-services = { workspace = true }
+wakeup-listener = { workspace = true }
 
 pretty_assertions = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

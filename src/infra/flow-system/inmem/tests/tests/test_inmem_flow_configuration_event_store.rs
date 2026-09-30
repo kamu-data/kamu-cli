@@ -12,6 +12,7 @@ use dill::{Catalog, CatalogBuilder};
 use kamu_flow_system_inmem::*;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,6 +51,7 @@ impl InMemoryFlowConfigurationEventStoreHarness {
         catalog_builder.add::<InMemoryFlowConfigurationEventStore>();
         catalog_builder.add::<InMemoryFlowSystemEventBridge>();
         catalog_builder.add::<InMemoryWakeupHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
         catalog_builder.add::<SystemTimeSourceDefault>();
 
         Self {

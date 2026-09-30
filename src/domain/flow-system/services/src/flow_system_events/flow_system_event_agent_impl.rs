@@ -15,13 +15,16 @@ use dill::Builder;
 use event_sourcing::EventID;
 use internal_error::InternalError;
 use kamu_flow_system::{
+    FLOW_SYSTEM_EVENT_AGENT_NAME,
     FlowSystemEventAgent,
     FlowSystemEventAgentConfig,
     FlowSystemEventBridge,
     FlowSystemEventProjector,
 };
 use tracing::Instrument as _;
-use wakeup_listener::WakeupListenerConfig;
+use wakeup_listener::{WakeupListener, WakeupListenerConfig};
+
+use crate::FlowSystemEventAgentMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,14 +37,16 @@ pub struct FlowSystemEventAgentImpl {
     flow_system_event_bridge: Arc<dyn FlowSystemEventBridge>,
     agent_config: Arc<FlowSystemEventAgentConfig>,
     wakeup_config: Arc<WakeupListenerConfig>,
+    metrics: Arc<FlowSystemEventAgentMetrics>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowSystemEventAgentImpl {
-    /// Applies all pending events to every projector
+    /// Applies all pending events to every projector. Given the agent's
+    /// listener, keeps its heartbeat going between batches
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn apply_pending_events(&self) {
+    async fn apply_pending_events(&self, wakeup_listener: Option<&dyn WakeupListener>) {
         let catalog = self.catalog.upgrade();
 
         // For each projector, apply all existing unprocessed events
@@ -60,7 +65,12 @@ impl FlowSystemEventAgentImpl {
             let mut num_total_processed = 0;
             loop {
                 // Apply a batch of events to the projector
-                match self.apply_batch_to_projector(&builder).await {
+                let result = self.apply_batch_to_projector(&builder).await;
+                if let Some(wakeup_listener) = wakeup_listener {
+                    wakeup_listener.heartbeat();
+                }
+
+                match result {
                     // Success
                     Ok(num_processed) => {
                         tracing::debug!(
@@ -103,13 +113,27 @@ impl FlowSystemEventAgentImpl {
         // Construct projector instance
         let projector = projector_builder.get(&transaction_catalog).unwrap();
 
+        // Recorded before commit, as only the instance knows its name: a failing
+        // commit alone is not reported here
+        let result = self
+            .apply_batch(&transaction_catalog, projector.as_ref())
+            .await;
+        self.metrics.on_projector_batch(projector.name(), &result);
+        result
+    }
+
+    async fn apply_batch(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        projector: &dyn FlowSystemEventProjector,
+    ) -> Result<usize, InternalError> {
         // Try load next batch
         let batch = self
             .flow_system_event_bridge
             .fetch_next_batch(
-                &transaction_catalog,
+                transaction_catalog,
                 projector.name(),
-                self.agent_config.batch_size,
+                self.agent_config.batch_size.get(),
             )
             .await?;
         tracing::debug!(batch_size = batch.len(), "Fetched batch");
@@ -127,7 +151,7 @@ impl FlowSystemEventAgentImpl {
         // Mark projection progress
         let ids: Vec<(EventID, i64)> = batch.iter().map(|e| (e.event_id, e.tx_id)).collect();
         self.flow_system_event_bridge
-            .mark_applied(&transaction_catalog, projector.name(), &ids)
+            .mark_applied(transaction_catalog, projector.name(), &ids)
             .await?;
 
         // Return number of processed events
@@ -140,18 +164,18 @@ impl FlowSystemEventAgentImpl {
 #[async_trait::async_trait]
 impl BackgroundAgent for FlowSystemEventAgentImpl {
     fn agent_name(&self) -> &'static str {
-        "dev.kamu.domain.flow-system.FlowSystemEventAgent"
+        FLOW_SYSTEM_EVENT_AGENT_NAME
     }
 
     async fn run(&self) -> Result<(), internal_error::InternalError> {
+        let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
+
         // On startup, immediately sync all projectors to catch up with existing events
-        self.apply_pending_events()
+        self.apply_pending_events(Some(wakeup_listener.as_ref()))
             .instrument(tracing::info_span!(
                 "FlowSystemEventAgent::initial_catchup_phase"
             ))
             .await;
-
-        let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
 
         // Then enter the infinite main loop
         loop {
@@ -164,7 +188,8 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
                 .await?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-            self.apply_pending_events().await;
+            self.apply_pending_events(Some(wakeup_listener.as_ref()))
+                .await;
         }
     }
 }
@@ -174,7 +199,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
 #[async_trait::async_trait]
 impl FlowSystemEventAgent for FlowSystemEventAgentImpl {
     async fn catchup_remaining_events(&self) -> Result<(), InternalError> {
-        self.apply_pending_events().await;
+        self.apply_pending_events(None).await;
         Ok(())
     }
 }

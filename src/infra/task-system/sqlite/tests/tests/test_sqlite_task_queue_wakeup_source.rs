@@ -20,7 +20,7 @@ use kamu_task_system::*;
 use kamu_task_system_sqlite::{SqliteTaskEventStore, SqliteTaskQueueWakeupSource};
 use kamu_wakeup_listener_sqlite::SqlitePollingHub;
 use sqlx::SqlitePool;
-use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig};
+use wakeup_listener::{WakeHint, WakeupListener, WakeupListenerConfig, WakeupListenerMetrics};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -119,7 +119,13 @@ impl SqliteTaskQueueWakeupHarness {
         catalog_builder.add::<SqliteTaskEventStore>();
         catalog_builder.add::<SqliteTaskQueueWakeupSource>();
         catalog_builder.add::<SqlitePollingHub>();
-        catalog_builder.add_value(WakeupListenerConfig::local_default());
+        catalog_builder.add::<WakeupListenerMetrics>();
+        // Polling backoff capped well below the wait timeout, so a write is
+        // always detected within one wait
+        catalog_builder.add_value(WakeupListenerConfig {
+            min_debounce_interval: Duration::from_millis(20),
+            max_listening_timeout: Duration::from_millis(100),
+        });
 
         let catalog = catalog_builder.build();
 

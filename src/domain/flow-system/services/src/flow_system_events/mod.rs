@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod flow_system_event_agent_impl;
+mod flow_system_event_agent_metrics;
 
 pub use flow_system_event_agent_impl::*;
+pub use flow_system_event_agent_metrics::*;
