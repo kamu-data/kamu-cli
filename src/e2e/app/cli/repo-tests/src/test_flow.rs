@@ -921,7 +921,7 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
 pub async fn test_trigger_many_ingest_flows_at_once(
     mut kamu_api_server_client: KamuApiServerClient,
 ) {
-    // More flows than the activation concurrency limit set for this test
+    // More flows than the activation page size set for this test
     const NUM_DATASETS: usize = 10;
 
     let temp_dir = tempfile::tempdir().unwrap();

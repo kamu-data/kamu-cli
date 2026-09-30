@@ -24,7 +24,6 @@
     &quot;outboxMessages&quot;: 20
   },
   &quot;concurrency&quot;: {
-    &quot;flowActivations&quot;: 1,
     &quot;outboxConsumers&quot;: 1
   },
   &quot;maxListeningTimeout&quot;: &quot;2s&quot;,
@@ -414,24 +413,14 @@ treated as 1
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr>
-<td><code>flowActivations</code></td>
-<td><code>integer</code></td>
-<td><code class="language-json">1</code></td>
-<td>
-
-Flows activated at once, each holding a pooled connection: e.g. 8 with
-Postgres, well below the pool size, 1 with `SQLite`. 0 is treated as 1
-
-</td>
-</tr>
-<tr>
 <td><code>outboxConsumers</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">1</code></td>
 <td>
 
 Outbox consumers running at once, in order per producer, each holding a
-pooled connection: sized like `flowActivations`. 0 is treated as 1
+pooled connection: e.g. 8 with Postgres, 1 with `SQLite`. 0 is treated
+as 1
 
 </td>
 </tr>
@@ -457,7 +446,6 @@ pooled connection: sized like `flowActivations`. 0 is treated as 1
 <td><code>concurrency</code></td>
 <td><a href="#backgroundagentsconcurrencyconfig"><code>BackgroundAgentsConcurrencyConfig</code></a></td>
 <td><pre><code class="language-json">{
-  &quot;flowActivations&quot;: 1,
   &quot;outboxConsumers&quot;: 1
 }</code></pre></td>
 <td>Concurrency limits of agents processing records in parallel</td>
@@ -560,7 +548,7 @@ the next flow activation moment regardless of it.
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">20</code></td>
-<td>Connection pool size</td>
+<td></td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>
@@ -617,7 +605,7 @@ the next flow activation moment regardless of it.
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">20</code></td>
-<td>Connection pool size</td>
+<td></td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>
@@ -674,7 +662,7 @@ the next flow activation moment regardless of it.
 <td><code>maxConnections</code></td>
 <td><code>integer</code></td>
 <td><code class="language-json">20</code></td>
-<td>Connection pool size</td>
+<td></td>
 </tr>
 <tr>
 <td><code>maxLifetimeSecs</code></td>

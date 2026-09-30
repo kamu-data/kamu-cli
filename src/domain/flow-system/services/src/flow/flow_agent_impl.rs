@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use database_common_macros::{transactional_method, transactional_method1};
 use dill::*;
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::InternalError;
 use kamu_datasets::JOB_KAMU_DATASETS_DEPENDENCY_GRAPH_INDEXER;
@@ -270,49 +270,46 @@ impl FlowAgentImpl {
     }
 
     /// Each flow gets its own transaction, so a failure rolls back only its own
-    /// changes. Started in activation order, run concurrently
+    /// changes and does not hold back the others
     async fn activate_flows(&self, flows: Vec<(Flow, DateTime<Utc>)>) {
-        futures::stream::iter(flows)
-            .for_each_concurrent(
-                self.activation_config.concurrency.get(),
-                |(flow, activation_time)| {
-                    let flow_id = flow.flow_id;
-                    let flow_type = flow.flow_binding.flow_type.clone();
-                    async move {
-                        let result = self.activate_flow(flow, activation_time).await;
-                        self.metrics.on_activation(
-                            &flow_type,
-                            &result,
-                            activation_time,
-                            self.time_source.now(),
-                        );
-                        match result {
-                            Ok(()) => {}
-                            Err(ActivateFlowError::ConcurrentModification) => {
-                                // The store is re-read on the next iteration
-                                tracing::info!(
-                                    %flow_id,
-                                    "Flow activation skipped as the flow changed concurrently"
-                                );
-                            }
-                            Err(ActivateFlowError::Internal(e)) => {
-                                tracing::error!(
-                                    %flow_id,
-                                    error = ?e,
-                                    error_msg = %e,
-                                    "Flow activation failed"
-                                );
-                            }
-                        }
-                    }
-                    .instrument(observability::tracing::root_span!(
-                        "FlowAgent::activation",
+        for (flow, activation_time) in flows {
+            let flow_id = flow.flow_id;
+            let flow_type = flow.flow_binding.flow_type.clone();
+
+            let result = self
+                .activate_flow(flow, activation_time)
+                .instrument(observability::tracing::root_span!(
+                    "FlowAgent::activation",
+                    %flow_id,
+                    %activation_time
+                ))
+                .await;
+            self.metrics.on_activation(
+                &flow_type,
+                &result,
+                activation_time,
+                self.time_source.now(),
+            );
+
+            match result {
+                Ok(()) => {}
+                Err(ActivateFlowError::ConcurrentModification) => {
+                    // The store is re-read on the next iteration
+                    tracing::info!(
                         %flow_id,
-                        %activation_time
-                    ))
-                },
-            )
-            .await;
+                        "Flow activation skipped as the flow changed concurrently"
+                    );
+                }
+                Err(ActivateFlowError::Internal(e)) => {
+                    tracing::error!(
+                        %flow_id,
+                        error = ?e,
+                        error_msg = %e,
+                        "Flow activation failed"
+                    );
+                }
+            }
+        }
     }
 
     /// Loads a page of due flows. Pages by key rather than from the first due

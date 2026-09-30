@@ -90,7 +90,6 @@ impl BaseGQLFlowRunsHarness {
             })
             .add_value(FlowAgentActivationConfig {
                 batch_size: NonZeroUsize::new(20).unwrap(),
-                concurrency: NonZeroUsize::new(8).unwrap(),
             })
             .add_value(FlowSystemEventAgentConfig::local_default())
             .add_value(WakeupListenerConfig::local_default())

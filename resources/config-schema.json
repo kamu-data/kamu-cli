@@ -166,16 +166,9 @@
     "BackgroundAgentsConcurrencyConfig": {
       "additionalProperties": false,
       "properties": {
-        "flowActivations": {
-          "default": 1,
-          "description": "Flows activated at once, each holding a pooled connection: e.g. 8 with\nPostgres, well below the pool size, 1 with `SQLite`. 0 is treated as 1",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
         "outboxConsumers": {
           "default": 1,
-          "description": "Outbox consumers running at once, in order per producer, each holding a\npooled connection: sized like `flowActivations`. 0 is treated as 1",
+          "description": "Outbox consumers running at once, in order per producer, each holding a\npooled connection: e.g. 8 with Postgres, 1 with `SQLite`. 0 is treated\nas 1",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -198,7 +191,6 @@
         "concurrency": {
           "$ref": "#/$defs/BackgroundAgentsConcurrencyConfig",
           "default": {
-            "flowActivations": 1,
             "outboxConsumers": 1
           },
           "description": "Concurrency limits of agents processing records in parallel"
@@ -264,7 +256,6 @@
             },
             "maxConnections": {
               "default": 20,
-              "description": "Connection pool size",
               "format": "uint32",
               "minimum": 0,
               "type": "integer"
@@ -321,7 +312,6 @@
             },
             "maxConnections": {
               "default": 20,
-              "description": "Connection pool size",
               "format": "uint32",
               "minimum": 0,
               "type": "integer"
@@ -378,7 +368,6 @@
             },
             "maxConnections": {
               "default": 20,
-              "description": "Connection pool size",
               "format": "uint32",
               "minimum": 0,
               "type": "integer"
@@ -1331,7 +1320,6 @@
           "outboxMessages": 20
         },
         "concurrency": {
-          "flowActivations": 1,
           "outboxConsumers": 1
         },
         "maxListeningTimeout": "2s",

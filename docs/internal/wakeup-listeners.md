@@ -133,10 +133,10 @@ loop {
 - **The sleep uses `SystemTimeSource`**, not a tokio timer, so tests on a fake clock control it.
 - **Cancelling `wait_wake` in `select!` is safe**: a signal it consumed was committed before, and the
   next iteration re-reads storage anyway.
-- **Activations run in pages, concurrently.** A pass pages through flows due by its start time,
+- **Activations run in pages.** A pass pages through flows due by its start time,
   `batching.flowActivations` at a time, each page listed and loaded in one transaction. Each flow is
-  then activated in its own transaction, up to `concurrency.flowActivations` at once, started in
-  `(activation moment, flow ID)` order. Pages continue after the last key seen rather than from the
+  then activated in its own transaction, one by one in `(activation moment, flow ID)` order: an
+  activation is a few writes, and a single task agent runs the resulting tasks anyway. Pages continue after the last key seen rather than from the
   first due flow: failed flows stay due and would otherwise fill every page. A flow changed after loading fails to save as a concurrent
   modification, and only its own transaction (including its new task) rolls back.
 - **Failed activations don't spin.** A flow still due right after a pass failed to activate; it is
@@ -337,7 +337,6 @@ backgroundAgents:
     flowSystemEvents: 20    # FlowSystemEventAgentConfig::batch_size
     flowActivations: 20     # FlowAgentActivationConfig::batch_size
   concurrency:
-    flowActivations: 1      # FlowAgentActivationConfig::concurrency
     outboxConsumers: 1      # OutboxAgentConfig::consumer_concurrency
 ```
 
@@ -355,13 +354,11 @@ backgroundAgents:
   concurrency, not batching).
 - `concurrency` — defaults to 1, as SQLite has a single connection: more would only queue on it,
   and an outbox consumer timing out on it stays failed until restart. Postgres deployments raise
-  both limits (`production_default()`: 8 each).
-- `concurrency.flowActivations` — flows activated at once, each holding a pooled connection for its
-  transaction; keep it well below the Postgres pool size.
+  it (`production_default()`: 8).
 - `concurrency.outboxConsumers` — outbox consumers handling messages at once, across all producers,
   each in its own transaction. Messages of one producer are still handled in order: all consumers
   finish message N before any gets N+1. Without a limit, a burst over several producers could
-  demand more connections than the pool has. The two limits, the task and flow system event agents
+  demand more connections than the pool has. The limit, the flow, task and flow system event agents
   (one each), the hub's `LISTEN` connection and API requests all share one pool, so keep their sum
   in mind when sizing `database.maxConnections` (default `20`).
 - Internal constants: Postgres reconnect retry `1s` (`postgres_notification_hub.rs`), SQLite poll

@@ -742,13 +742,9 @@ pub struct BackgroundAgentsBatchingConfig {
 
 #[derive(setty::Config, setty::Default)]
 pub struct BackgroundAgentsConcurrencyConfig {
-    /// Flows activated at once, each holding a pooled connection: e.g. 8 with
-    /// Postgres, well below the pool size, 1 with `SQLite`. 0 is treated as 1
-    #[config(default = 1)]
-    pub flow_activations: usize,
-
     /// Outbox consumers running at once, in order per producer, each holding a
-    /// pooled connection: sized like `flowActivations`. 0 is treated as 1
+    /// pooled connection: e.g. 8 with Postgres, 1 with `SQLite`. 0 is treated
+    /// as 1
     #[config(default = 1)]
     pub outbox_consumers: usize,
 }
@@ -780,8 +776,6 @@ impl BackgroundAgentsConfig {
     pub fn flow_agent_activation_config(&self) -> kamu_flow_system::FlowAgentActivationConfig {
         kamu_flow_system::FlowAgentActivationConfig {
             batch_size: NonZeroUsize::new(self.batching.flow_activations)
-                .unwrap_or(NonZeroUsize::MIN),
-            concurrency: NonZeroUsize::new(self.concurrency.flow_activations)
                 .unwrap_or(NonZeroUsize::MIN),
         }
     }

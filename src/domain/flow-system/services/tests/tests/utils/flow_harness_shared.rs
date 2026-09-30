@@ -141,7 +141,6 @@ impl FlowHarness {
             .add_value(FlowAgentActivationConfig {
                 batch_size: NonZeroUsize::new(overrides.activation_batch_size.unwrap_or(20))
                     .unwrap(),
-                concurrency: NonZeroUsize::new(8).unwrap(),
             })
             .add_value(FlowSystemEventAgentConfig {
                 batch_size: NonZeroUsize::new(overrides.flow_system_event_batch_size.unwrap_or(10))

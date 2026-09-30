@@ -223,7 +223,7 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | Task failure rate | `sum by (plan_type) (increase(task_agent_task_duration_seconds_count{outcome="failed"}[30m])) / sum by (plan_type) (increase(task_agent_task_duration_seconds_count[30m])) > 0.2` and at least a few failures | Failing ingests / transforms, by kind |
 | Flow failure rate | `sum by (flow_type) (increase(flow_system_flow_duration_seconds_count{outcome="failed"}[30m])) / sum by (flow_type) (increase(flow_system_flow_duration_seconds_count[30m])) > 0.2` and at least a few failures | Failures after retries — what users see. A spike points at configuration or an external dependency |
 | Flow activations failing | `increase(flow_agent_activations_total{outcome="failed"}[15m]) > 0` | A failed flow is retried every `awaitingStepSecs`; a lasting increase means a flow stuck in retries |
-| Scheduler lagging | `histogram_quantile(0.95, rate(flow_agent_activation_delay_seconds_bucket[10m])) > 60`, `for: 15m` | Slow database, exhausted connection pool, or too low `concurrency.flowActivations` |
+| Scheduler lagging | `histogram_quantile(0.95, rate(flow_agent_activation_delay_seconds_bucket[10m])) > 60`, `for: 15m` | Slow database, exhausted connection pool, or a burst of due flows |
 | Task slot saturated | `histogram_quantile(0.95, rate(task_agent_task_queue_wait_seconds_bucket[30m])) > 900`, `for: 30m` | More work than one task slot handles — a capacity signal |
 | Outbox backlog growing | `outbox_messages_pending_total > 1000`, `for: 15m` | Consumers fall behind producers. Units are global message IDs, not messages of this producer: tune per deployment |
 

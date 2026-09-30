@@ -50,27 +50,20 @@ pub struct FlowAgentActivationConfig {
     /// How many due flows are loaded at once, bounding the memory and the
     /// loading transaction of a pass after downtime
     pub batch_size: NonZeroUsize,
-    /// How many due flows are activated at once. Each activation is its own
-    /// transaction, holding a pooled connection until it commits
-    pub concurrency: NonZeroUsize,
 }
 
 impl FlowAgentActivationConfig {
-    // Sqlite has a single connection: concurrent activations would only queue
-    // for it, risking acquire timeouts
+    // Loaded in one transaction, which on Sqlite holds the only connection
     pub fn local_default() -> Self {
         Self {
             batch_size: NonZeroUsize::new(20).unwrap(),
-            concurrency: NonZeroUsize::MIN,
         }
     }
 
-    // Postgres pools connections: activations run in parallel, well below the
-    // default pool size, which API requests and other agents share
+    // Postgres pools connections, so larger pages mostly save round trips
     pub fn production_default() -> Self {
         Self {
             batch_size: NonZeroUsize::new(100).unwrap(),
-            concurrency: NonZeroUsize::new(8).unwrap(),
         }
     }
 }
