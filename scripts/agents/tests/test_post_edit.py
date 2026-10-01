@@ -1,8 +1,16 @@
 import shutil
+import subprocess
 import unittest
 
 from scripts.agents.common import ROOT
 from scripts.agents.post_edit import LICENSE_HEADER, added_lines, check_edit, check_rust_lines, nudges
+
+
+def rustfmt_runs():
+    # A rustup proxy is on PATH even when the toolchain lacks the rustfmt component
+    if not shutil.which("rustfmt"):
+        return False
+    return subprocess.run(["rustfmt", "--version"], cwd=ROOT, capture_output=True).returncode == 0
 
 
 def flagged(line):
@@ -52,7 +60,7 @@ class FileTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.dir, ignore_errors=True)
 
-    @unittest.skipUnless(shutil.which("rustfmt"), "rustfmt not installed")
+    @unittest.skipUnless(rustfmt_runs(), "rustfmt not installed for the pinned toolchain")
     def test_new_file_is_formatted_and_needs_the_license_header(self):
         path = self.dir / "x.rs"
         path.write_text("fn main(){let a=1;}\n")
