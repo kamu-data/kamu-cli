@@ -54,7 +54,7 @@ impl ConfirmDeleteService {
                             CompareChainsResult::LhsAhead { .. } => Some("ahead of"),
                             CompareChainsResult::LhsBehind { .. } => Some("behind"),
                             CompareChainsResult::Divergence { .. } => Some("diverged from"),
-                            _ => None,
+                            CompareChainsResult::Equal => None,
                         };
                         if let Some(status_desc) = maybe_status_desc {
                             out_of_sync.push((remote, status_desc));

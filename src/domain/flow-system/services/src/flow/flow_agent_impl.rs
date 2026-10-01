@@ -466,7 +466,7 @@ impl FlowAgentImpl {
             .await
             .map_err(|e| match e {
                 SaveError::ConcurrentModification(_) => ActivateFlowError::ConcurrentModification,
-                e => ActivateFlowError::Internal(e.int_err()),
+                e @ SaveError::Internal(_) => ActivateFlowError::Internal(e.int_err()),
             })?;
 
         Ok(task.task_id)

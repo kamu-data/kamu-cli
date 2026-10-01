@@ -242,7 +242,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                                         - initial_time)
                                         .num_milliseconds()
                                 ),
-                                _ => format!("{:?}", flow_state.status()),
+                                FlowStatus::Finished => format!("{:?}", flow_state.status()),
                             }
                         )?;
 

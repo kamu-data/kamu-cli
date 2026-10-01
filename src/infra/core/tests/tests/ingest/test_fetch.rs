@@ -1285,7 +1285,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         match res_1 {
             FetchResult::Updated(x) => x.source_state,
-            _ => unreachable!(),
+            FetchResult::UpToDate => unreachable!(),
         }
     };
 
@@ -1340,7 +1340,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         match res_2 {
             FetchResult::Updated(x) => x.source_state,
-            _ => unreachable!(),
+            FetchResult::UpToDate => unreachable!(),
         }
     };
 
@@ -1395,7 +1395,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         match res_3 {
             FetchResult::Updated(x) => x.source_state,
-            _ => unreachable!(),
+            FetchResult::UpToDate => unreachable!(),
         }
     };
 

@@ -112,7 +112,7 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
                     }
                 })
             }
-            _ => false,
+            Definition::Fragment(_) => false,
         });
 
         (

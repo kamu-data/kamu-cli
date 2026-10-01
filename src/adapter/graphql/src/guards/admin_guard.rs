@@ -43,7 +43,9 @@ impl Guard for AdminGuard {
                 }
                 Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))
             }
-            _ => Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE)),
+            CurrentAccountSubject::Anonymous(_) => {
+                Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))
+            }
         }
     }
 }

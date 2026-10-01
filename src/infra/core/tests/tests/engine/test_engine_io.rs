@@ -192,7 +192,7 @@ async fn test_engine_io_common<
         .await
     {
         TransformResult::Updated { new_head, .. } => new_head,
-        v => panic!("Unexpected result: {v:?}"),
+        v @ TransformResult::UpToDate => panic!("Unexpected result: {v:?}"),
     };
 
     use odf::metadata::IntoDataStreamBlock;
@@ -246,7 +246,7 @@ async fn test_engine_io_common<
         .await
     {
         TransformResult::Updated { new_head, .. } => new_head,
-        v => panic!("Unexpected result: {v:?}"),
+        v @ TransformResult::UpToDate => panic!("Unexpected result: {v:?}"),
     };
 
     let block = deriv_stored

@@ -192,7 +192,7 @@ impl CompactionPlannerImpl {
                 ));
                 true
             }
-            _ => false,
+            Ordering::Less => false,
         }
     }
 }

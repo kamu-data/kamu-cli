@@ -112,7 +112,7 @@ impl TaskScheduler for TaskSchedulerImpl {
                 SaveError::ConcurrentModification(_) => {
                     TakeTaskError::ConcurrentModification { task_id }
                 }
-                e => TakeTaskError::Internal(e.int_err()),
+                e @ SaveError::Internal(_) => TakeTaskError::Internal(e.int_err()),
             })?;
 
         tracing::info!(

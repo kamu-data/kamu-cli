@@ -64,7 +64,7 @@ impl WebhookSignerImpl {
             SigningField::Derived(s) if *s == SIGNING_FIELD_AUTHORITY => uri
                 .authority()
                 .map(|a| ((*s).to_string(), format!(": {}", a.as_str()))),
-            _ => None,
+            SigningField::Derived(_) => None,
         }
     }
 

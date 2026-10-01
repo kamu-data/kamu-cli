@@ -97,7 +97,9 @@ where
             Ok(entry) => Ok(entry.owner_id == *account_id),
             Err(err) => match err {
                 GetDatasetEntryError::NotFound(_) => Ok(false),
-                unexpected_error => Err(unexpected_error.int_err().into()),
+                unexpected_error @ GetDatasetEntryError::Internal(_) => {
+                    Err(unexpected_error.int_err().into())
+                }
             },
         }
     }

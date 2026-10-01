@@ -93,6 +93,8 @@ match status {
 - The same applies to predicates: `matches!(status, A | B)` over an enum we own is a hidden
   catch-all when the answer must be decided per variant — write the exhaustive `match`.
 - Error conversions are the most common case (see `kamu-domain-design`, "Error Handling").
+- Clippy enforces the single-variant case (`match_wildcard_for_single_variants`); a `_` covering
+  several variants is not linted yet, so it is on you and on review.
 
 `_` stays legitimate where the compiler cannot enumerate cases or the set is not ours to extend:
 integers, strings and other open domains; `#[non_exhaustive]` enums from other crates (list the

@@ -58,7 +58,7 @@ impl SearchCommand {
                 .is_account_admin(&a.account_handle.did)
                 .await
                 .int_err()?,
-            _ => false,
+            CurrentAccountSubject::Anonymous(_) => false,
         };
 
         let context = kamu_search::SearchContext {
