@@ -102,7 +102,10 @@ impl Projection for TaskState {
                         cancellation_requested_at: None,
                     },
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::TaskRunning(_)
+                | E::TaskRequeued(_)
+                | E::TaskCancelled(_)
+                | E::TaskFinished(_) => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
                 assert_eq!(s.task_id, event.task_id());
@@ -120,7 +123,9 @@ impl Projection for TaskState {
                             })
                         }
 
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        TaskStatus::Queued | TaskStatus::Running | TaskStatus::Finished => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     // Maybe be requeued when running, unless cancellation was requested
@@ -161,7 +166,9 @@ impl Projection for TaskState {
                                 ..s
                             })
                         }
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        TaskStatus::Queued | TaskStatus::Running | TaskStatus::Finished => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     // May finish only if running

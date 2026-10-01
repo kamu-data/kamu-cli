@@ -167,7 +167,9 @@ pub async fn dataset_ingest_handler(
             PushIngestDataError::Execution(PushIngestError::QuotaExceeded(_)) => {
                 ApiError::new_forbidden()
             }
-            e => e.int_err().api_err(),
+            e @ (PushIngestDataError::Planning(_)
+            | PushIngestDataError::Execution(_)
+            | PushIngestDataError::Internal(_)) => e.int_err().api_err(),
         })?;
 
     Ok(())

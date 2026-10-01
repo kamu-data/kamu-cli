@@ -114,6 +114,11 @@ pub fn preprocess_default(
                 continue;
             }
 
+            #[expect(
+                clippy::wildcard_enum_match_arm,
+                reason = "Arrow's DataType is foreign; only integer and string event times need \
+                          conversion"
+            )]
             match field.data_type() {
                 DataType::Int16
                 | DataType::Int32

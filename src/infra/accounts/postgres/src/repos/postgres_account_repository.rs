@@ -76,15 +76,14 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    CreateAccountError::Duplicate(self.convert_unique_constraint_violation(e.as_ref()))
-                } else {
-                    CreateAccountError::Internal(e.int_err())
-                }
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                CreateAccountError::Duplicate(self.convert_unique_constraint_violation(db_err))
+            } else {
+                CreateAccountError::Internal(e.int_err())
             }
-            _ => CreateAccountError::Internal(e.int_err())
         })?;
 
         Ok(())
@@ -124,17 +123,14 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    UpdateAccountError::Duplicate(
-                        self.convert_unique_constraint_violation(e.as_ref()),
-                    )
-                } else {
-                    UpdateAccountError::Internal(e.int_err())
-                }
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                UpdateAccountError::Duplicate(self.convert_unique_constraint_violation(db_err))
+            } else {
+                UpdateAccountError::Internal(e.int_err())
             }
-            _ => UpdateAccountError::Internal(e.int_err()),
         })?;
 
         if update_result.rows_affected() == 0 {
@@ -170,17 +166,14 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    UpdateAccountError::Duplicate(
-                        self.convert_unique_constraint_violation(e.as_ref()),
-                    )
-                } else {
-                    UpdateAccountError::Internal(e.int_err())
-                }
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                UpdateAccountError::Duplicate(self.convert_unique_constraint_violation(db_err))
+            } else {
+                UpdateAccountError::Internal(e.int_err())
             }
-            _ => UpdateAccountError::Internal(e.int_err()),
         })?;
 
         if update_result.rows_affected() == 0 {

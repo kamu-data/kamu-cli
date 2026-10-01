@@ -31,6 +31,10 @@ pub trait RecordsWriter {
         Ok(())
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "ArrowError and io::ErrorKind are foreign; only a broken pipe is tolerated"
+    )]
     fn handle_writer_result(
         &self,
         writer_result: Result<(), ArrowError>,

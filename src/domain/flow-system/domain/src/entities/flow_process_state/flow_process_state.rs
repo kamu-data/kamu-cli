@@ -1643,13 +1643,11 @@ mod tests {
 
         let events = state.take_pending_events();
         assert_eq!(events.len(), 1);
-        match &events[0] {
-            FlowProcessEvent::EffectiveStateChanged(event) => {
-                assert_eq!(event.old_state, FlowProcessEffectiveState::Active);
-                assert_eq!(event.new_state, FlowProcessEffectiveState::PausedManual);
-            }
-            _ => panic!("Expected EffectiveStateChanged event"),
-        }
+        let FlowProcessEvent::EffectiveStateChanged(event) = &events[0] else {
+            panic!("Expected EffectiveStateChanged event");
+        };
+        assert_eq!(event.old_state, FlowProcessEffectiveState::Active);
+        assert_eq!(event.new_state, FlowProcessEffectiveState::PausedManual);
     }
 
     #[test]
@@ -1672,17 +1670,13 @@ mod tests {
         let events = state.take_pending_events();
         assert_eq!(events.len(), 2); // EffectiveStateChanged + AutoStopped
 
-        let auto_stopped_event = events
+        let Some(FlowProcessEvent::AutoStopped(event)) = events
             .iter()
-            .find(|e| matches!(e, FlowProcessEvent::AutoStopped(_)));
-        assert!(auto_stopped_event.is_some());
-
-        match auto_stopped_event.unwrap() {
-            FlowProcessEvent::AutoStopped(event) => {
-                assert_eq!(event.reason, FlowProcessAutoStopReason::StopPolicy);
-            }
-            _ => panic!("Expected AutoStopped event"),
-        }
+            .find(|e| matches!(e, FlowProcessEvent::AutoStopped(_)))
+        else {
+            panic!("Expected AutoStopped event");
+        };
+        assert_eq!(event.reason, FlowProcessAutoStopReason::StopPolicy);
     }
 
     #[test]
@@ -1962,34 +1956,23 @@ mod tests {
         assert_eq!(events.len(), 2); // EffectiveStateChanged + ResumedFromAutoStop
 
         // Find the ResumedFromAutoStop event
-        let resume_event = events
+        let Some(FlowProcessEvent::ResumedFromAutoStop(e)) = events
             .iter()
-            .find(|e| matches!(e, FlowProcessEvent::ResumedFromAutoStop(_)));
-        assert!(
-            resume_event.is_some(),
-            "ResumedFromAutoStop event should be emitted for self-healing"
-        );
-
-        match resume_event.unwrap() {
-            FlowProcessEvent::ResumedFromAutoStop(e) => {
-                assert_eq!(e.event_time, current_time + Duration::minutes(15));
-            }
-            _ => panic!("Expected ResumedFromAutoStop event"),
-        }
+            .find(|e| matches!(e, FlowProcessEvent::ResumedFromAutoStop(_)))
+        else {
+            panic!("ResumedFromAutoStop event should be emitted for self-healing");
+        };
+        assert_eq!(e.event_time, current_time + Duration::minutes(15));
 
         // Verify state change event from StoppedAuto to Active
-        let state_change_event = events
+        let Some(FlowProcessEvent::EffectiveStateChanged(e)) = events
             .iter()
-            .find(|e| matches!(e, FlowProcessEvent::EffectiveStateChanged(_)));
-        assert!(state_change_event.is_some());
-
-        match state_change_event.unwrap() {
-            FlowProcessEvent::EffectiveStateChanged(e) => {
-                assert_eq!(e.old_state, FlowProcessEffectiveState::StoppedAuto);
-                assert_eq!(e.new_state, FlowProcessEffectiveState::Active);
-            }
-            _ => panic!("Expected EffectiveStateChanged event"),
-        }
+            .find(|e| matches!(e, FlowProcessEvent::EffectiveStateChanged(_)))
+        else {
+            panic!("Expected EffectiveStateChanged event");
+        };
+        assert_eq!(e.old_state, FlowProcessEffectiveState::StoppedAuto);
+        assert_eq!(e.new_state, FlowProcessEffectiveState::Active);
 
         // Flow is now healthy and ready for automatic execution again
     }

@@ -621,7 +621,7 @@ impl SimpleTransferProtocol {
                                     e.actual, e.expected, block_sequence_number
                                 )
                             }
-                            _ => format!(
+                            odf::dataset::AppendValidationError::FirstBlockMustBeSeed | odf::dataset::AppendValidationError::AppendingSeedBlockToNonEmptyChain | odf::dataset::AppendValidationError::PrevBlockNotFound(_) | odf::dataset::AppendValidationError::SequenceIntegrity(_) | odf::dataset::AppendValidationError::SystemTimeIsNotMonotonic | odf::dataset::AppendValidationError::WatermarkIsNotMonotonic | odf::dataset::AppendValidationError::OffsetsAreNotSequential(_) | odf::dataset::AppendValidationError::InvalidEvent(_) | odf::dataset::AppendValidationError::NoOpEvent(_) => format!(
                                 "Source metadata chain is logically inconsistent at block \
                                  {block_hash}[{block_sequence_number}]"
                             ),

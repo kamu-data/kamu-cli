@@ -461,7 +461,15 @@ impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
                 self.disabled_push_source_names
                     .insert(disable_push_source.source_name.clone());
             }
-            _ => {
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::SetDataSchema(_) => {
                 unreachable!()
             }
         }
@@ -533,7 +541,15 @@ impl MetadataChainVisitor for SearchActivePollingSourceVisitor {
             MetadataEvent::DisablePollingSource(_) => {
                 // No active one exists
             }
-            _ => unreachable!(),
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::SetDataSchema(_) => unreachable!(),
         }
 
         Ok(Decision::Stop)

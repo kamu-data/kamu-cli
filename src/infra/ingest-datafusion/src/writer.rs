@@ -139,21 +139,20 @@ impl DataWriterDataFusion {
             .iter()
             .find(|f| *f.name() == self.meta.vocab.event_time_column());
 
-        if let Some(event_time_col) = event_time_col {
-            match event_time_col.data_type() {
-                DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _) => {}
-                typ => {
-                    return Err(BadInputSchemaError::new(
-                        format!(
-                            "Event time column '{}' should be either Date or Timestamp, but \
-                             found: {}",
-                            self.meta.vocab.event_time_column(),
-                            typ
-                        ),
-                        df.schema().inner().clone(),
-                    ));
-                }
-            }
+        if let Some(event_time_col) = event_time_col
+            && !matches!(
+                event_time_col.data_type(),
+                DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _)
+            )
+        {
+            return Err(BadInputSchemaError::new(
+                format!(
+                    "Event time column '{}' should be either Date or Timestamp, but found: {}",
+                    self.meta.vocab.event_time_column(),
+                    event_time_col.data_type()
+                ),
+                df.schema().inner().clone(),
+            ));
         }
 
         Ok(())
@@ -169,6 +168,10 @@ impl DataWriterDataFusion {
         let mut noop = true;
 
         for field in df.schema().fields() {
+            #[expect(
+                clippy::wildcard_enum_match_arm,
+                reason = "Arrow's DataType is foreign; only timestamp types need normalizing"
+            )]
             let expr = match field.data_type() {
                 DataType::Timestamp(TimeUnit::Millisecond, Some(tz)) if tz.as_ref() == "UTC" => {
                     col(Column::from_name(field.name()))

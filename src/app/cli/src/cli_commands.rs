@@ -596,7 +596,17 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
                     Some(cli::SystemApiServerSubCommand::GqlQuery(_))
                 )
             }
-            _ => true,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::DebugToken(_)
+            | cli::SystemSubCommand::Depgraph(_)
+            | cli::SystemSubCommand::Decode(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::GenerateToken(_)
+            | cli::SystemSubCommand::Gc(_)
+            | cli::SystemSubCommand::Info(_)
+            | cli::SystemSubCommand::Ipfs(_)
+            | cli::SystemSubCommand::UpgradeWorkspace(_) => true,
         },
         // False for set_watermark option
         cli::Command::Pull(c) => c.set_watermark.is_some(),
@@ -607,7 +617,30 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         | cli::Command::Ui(_)
         | cli::Command::Login(_)
         | cli::Command::Push(_) => false,
-        _ => true,
+        cli::Command::Add(_)
+        | cli::Command::Complete(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Logout(_)
+        | cli::Command::New(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Verify(_)
+        | cli::Command::Version(_) => true,
     }
 }
 
@@ -624,7 +657,11 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
                 None | Some(cli::SystemApiServerSubCommand::GqlQuery(_)) => true,
                 Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => false,
             },
-            _ => true,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::Depgraph(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::Ipfs(_) => true,
         },
         cli::Command::Complete(_)
         | cli::Command::Completions(_)
@@ -635,7 +672,27 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
         | cli::Command::Summary(_)
         | cli::Command::Version(_)
         | cli::Command::Notebook(_) => false,
-        _ => true,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Login(_)
+        | cli::Command::Logout(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Verify(_) => true,
     }
 }
 
@@ -668,10 +725,33 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Info(_)
             | cli::SystemSubCommand::UpgradeWorkspace(_) => false,
-            _ => true,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::Gc(_)
+            | cli::SystemSubCommand::Ipfs(_) => true,
         },
         cli::Command::Login(l) => !l.user,
-        _ => true,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Logout(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Verify(_) => true,
     }
 }
 
@@ -689,22 +769,85 @@ pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
             //       user accounts.
             true
         }
-        _ => false,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::Context(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Login(_)
+        | cli::Command::Logout(_)
+        | cli::Command::New(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
+        | cli::Command::System(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Verify(_)
+        | cli::Command::Version(_) => false,
     }
 }
 
-#[expect(
-    clippy::match_like_matches_macro,
-    reason = "exhaustive match keeps every command's answer explicit"
-)]
 pub fn command_needs_server_components(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
             cli::SystemSubCommand::ApiServer(_) => true,
-            _ => false,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::DebugToken(_)
+            | cli::SystemSubCommand::Depgraph(_)
+            | cli::SystemSubCommand::Decode(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::GenerateToken(_)
+            | cli::SystemSubCommand::Gc(_)
+            | cli::SystemSubCommand::Info(_)
+            | cli::SystemSubCommand::Ipfs(_)
+            | cli::SystemSubCommand::UpgradeWorkspace(_) => false,
         },
         cli::Command::Ui(_) => true,
-        _ => false,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Complete(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::Context(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Login(_)
+        | cli::Command::Logout(_)
+        | cli::Command::New(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Verify(_)
+        | cli::Command::Version(_) => false,
     }
 }
 

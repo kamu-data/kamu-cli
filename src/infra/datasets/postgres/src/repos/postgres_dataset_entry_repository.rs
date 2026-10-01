@@ -382,11 +382,13 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
+        .map_err(|e| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
                 // Although we did check the unique value in SELECT query above, with unlucky
                 // race conditions it's still possible to violate unique constraint
-                let postgres_error_message = e.message();
+                let postgres_error_message = db_err.message();
                 tracing::error!(postgres_error_message);
 
                 if postgres_error_message.contains("idx_dataset_entries_owner_id_dataset_name") {
@@ -394,8 +396,9 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
                 } else {
                     SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into()
                 }
+            } else {
+                SaveDatasetEntryError::Internal(e.int_err())
             }
-            _ => SaveDatasetEntryError::Internal(e.int_err()),
         })?;
 
         Ok(())
@@ -423,11 +426,14 @@ impl DatasetEntryRepository for PostgresDatasetEntryRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
+        .map_err(|e| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
                 DatasetEntryNameCollisionError::new(new_name.clone()).into()
+            } else {
+                UpdateDatasetEntryNameError::Internal(e.int_err())
             }
-            _ => UpdateDatasetEntryNameError::Internal(e.int_err()),
         })?;
 
         if update_result.rows_affected() == 0 {

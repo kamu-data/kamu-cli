@@ -169,9 +169,12 @@ impl AuthenticationServiceImpl {
         validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
         decode::<JWTClaims>(access_token, &self.decoding_key, &validation)
-            .map_err(|e| match *e.kind() {
-                ErrorKind::ExpiredSignature => AccessTokenError::Expired,
-                _ => AccessTokenError::Invalid(Box::new(e)),
+            .map_err(|e| {
+                if matches!(e.kind(), ErrorKind::ExpiredSignature) {
+                    AccessTokenError::Expired
+                } else {
+                    AccessTokenError::Invalid(Box::new(e))
+                }
             })
             .map(AccessTokenType::JWTToken)
     }

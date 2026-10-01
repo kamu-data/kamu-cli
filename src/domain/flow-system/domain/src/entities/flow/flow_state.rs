@@ -144,7 +144,15 @@ impl Projection for FlowState {
                     outcome: None,
                     retry_policy,
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::StartConditionUpdated(_)
+                | E::ConfigSnapshotModified(_)
+                | E::ActivationCauseAdded(_)
+                | E::ScheduledForActivation(_)
+                | E::TaskScheduled(_)
+                | E::TaskRunning(_)
+                | E::TaskFinished(_)
+                | E::Completed(_)
+                | E::Aborted(_) => Err(ProjectionError::new(None, event)),
             },
 
             (Some(s), event) => {

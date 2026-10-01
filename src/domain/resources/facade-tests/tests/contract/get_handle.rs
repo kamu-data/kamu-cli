@@ -304,25 +304,25 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
         .get(vec![wrong_schema_selector.clone()], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
-    match assert_single_batch_problem(result) {
-        ResourceLookupProblem::SchemaMismatch(ResourceSchemaMismatchError {
-            expected_schema,
-            actual_schema,
-            ..
-        }) => {
-            assert_eq!(
-                expected_schema.as_str(),
-                SECRET_SET_SCHEMA_STR,
-                "expected_schema must be the requested schema"
-            );
-            assert_eq!(
-                actual_schema.as_str(),
-                VARIABLE_SET_SCHEMA_STR,
-                "actual_schema must be the stored schema"
-            );
-        }
-        other => panic!("expected SchemaMismatch, got: {other:?}"),
-    }
+    let problem = assert_single_batch_problem(result);
+    let ResourceLookupProblem::SchemaMismatch(ResourceSchemaMismatchError {
+        expected_schema,
+        actual_schema,
+        ..
+    }) = &problem
+    else {
+        panic!("expected SchemaMismatch, got: {problem:?}");
+    };
+    assert_eq!(
+        expected_schema.as_str(),
+        SECRET_SET_SCHEMA_STR,
+        "expected_schema must be the requested schema"
+    );
+    assert_eq!(
+        actual_schema.as_str(),
+        VARIABLE_SET_SCHEMA_STR,
+        "actual_schema must be the stored schema"
+    );
 
     let handle_result = facade
         .get_handles(vec![wrong_schema_selector])

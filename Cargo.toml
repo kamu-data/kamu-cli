@@ -383,6 +383,7 @@ wildcard_imports = "allow"
 
 # clippy::restriction (opt-in, lint by lint)
 allow_attributes_without_reason = "warn"
+wildcard_enum_match_arm = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = -1 }

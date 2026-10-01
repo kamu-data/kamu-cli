@@ -661,7 +661,9 @@ impl ElasticsearchClient {
                 }
                 false
             }
-            _ => false,
+            ElasticsearchClientError::Transport(_)
+            | ElasticsearchClientError::Serialization(_)
+            | ElasticsearchClientError::Compression(_) => false,
         }
     }
 
@@ -693,7 +695,10 @@ impl ElasticsearchClient {
                         .map(|(k, v)| (k.clone(), truncate_arrays(v)))
                         .collect(),
                 ),
-                other => other.clone(),
+                other @ (serde_json::Value::Null
+                | serde_json::Value::Bool(_)
+                | serde_json::Value::Number(_)
+                | serde_json::Value::String(_)) => other.clone(),
             }
         }
 

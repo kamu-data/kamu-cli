@@ -112,7 +112,12 @@ pub(crate) fn get_gql_value_string_property(
         .and_then(|v| match v {
             async_graphql::Value::String(s) => Some(s.as_str()),
             async_graphql::Value::Enum(e) => Some(e.as_str()),
-            _ => None,
+            async_graphql::Value::Null
+            | async_graphql::Value::Number(_)
+            | async_graphql::Value::Boolean(_)
+            | async_graphql::Value::Binary(_)
+            | async_graphql::Value::List(_)
+            | async_graphql::Value::Object(_) => None,
         })
         .map(ToString::to_string)
 }

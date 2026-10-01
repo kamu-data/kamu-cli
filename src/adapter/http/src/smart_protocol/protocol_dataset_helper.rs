@@ -51,7 +51,12 @@ impl From<odf::IterBlocksError> for PrepareDatasetTransferEstimateError {
     fn from(v: odf::IterBlocksError) -> Self {
         match v {
             odf::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
-            _ => Self::Internal(v.int_err()),
+            odf::IterBlocksError::RefNotFound(_)
+            | odf::IterBlocksError::BlockNotFound(_)
+            | odf::IterBlocksError::BlockVersion(_)
+            | odf::IterBlocksError::BlockMalformed(_)
+            | odf::IterBlocksError::Access(_)
+            | odf::IterBlocksError::Internal(_) => Self::Internal(v.int_err()),
         }
     }
 }
@@ -261,7 +266,12 @@ impl From<odf::IterBlocksError> for CollectMissingObjectReferencesFromIntervalEr
     fn from(v: odf::IterBlocksError) -> Self {
         match v {
             odf::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
-            _ => Self::Internal(v.int_err()),
+            odf::IterBlocksError::RefNotFound(_)
+            | odf::IterBlocksError::BlockNotFound(_)
+            | odf::IterBlocksError::BlockVersion(_)
+            | odf::IterBlocksError::BlockMalformed(_)
+            | odf::IterBlocksError::Access(_)
+            | odf::IterBlocksError::Internal(_) => Self::Internal(v.int_err()),
         }
     }
 }

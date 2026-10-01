@@ -163,7 +163,11 @@ impl std::fmt::Display for PrettyCLIError<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.error {
             CLIError::BatchError(batch) => self.write_batch_error(batch, f),
-            _ => self.write_error(f),
+            CLIError::UsageError(_)
+            | CLIError::Aborted
+            | CLIError::Failure { .. }
+            | CLIError::PartialFailure
+            | CLIError::CriticalFailure { .. } => self.write_error(f),
         }
     }
 }

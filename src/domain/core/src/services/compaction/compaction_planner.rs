@@ -153,7 +153,11 @@ impl From<odf::IterBlocksError> for CompactionPlanningError {
         match v {
             odf::IterBlocksError::Access(e) => Self::Access(e),
             odf::IterBlocksError::Internal(e) => Self::Internal(e),
-            _ => CompactionPlanningError::Internal(v.int_err()),
+            odf::IterBlocksError::RefNotFound(_)
+            | odf::IterBlocksError::BlockNotFound(_)
+            | odf::IterBlocksError::BlockVersion(_)
+            | odf::IterBlocksError::BlockMalformed(_)
+            | odf::IterBlocksError::InvalidInterval(_) => Self::Internal(v.int_err()),
         }
     }
 }

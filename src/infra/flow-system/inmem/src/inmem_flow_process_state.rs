@@ -227,7 +227,7 @@ impl InMemoryFlowProcessState {
                     // Tie-breaker 2: Last update event ID
                     a.last_applied_event_id().cmp(&b.last_applied_event_id())
                 }
-                primary_order => primary_order,
+                primary_order @ (Ordering::Less | Ordering::Greater) => primary_order,
             }
         });
     }

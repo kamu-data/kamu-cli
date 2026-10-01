@@ -31,7 +31,7 @@ impl FlowOutcome {
     pub fn try_task_result_as_ref(&self) -> Option<&ts::TaskResult> {
         match self {
             Self::Success(task_result) => Some(task_result),
-            _ => None,
+            Self::Failed(_) | Self::Aborted => None,
         }
     }
 

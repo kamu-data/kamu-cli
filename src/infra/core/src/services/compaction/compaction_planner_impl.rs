@@ -144,7 +144,17 @@ impl CompactionPlannerImpl {
                     }
                     odf::MetadataEvent::Seed(_) => maybe_seed = Some(block_hash),
                     odf::MetadataEvent::ExecuteTransform(_) if keep_metadata_only => {}
-                    event => {
+                    event @ (odf::MetadataEvent::ExecuteTransform(_)
+                    | odf::MetadataEvent::SetPollingSource(_)
+                    | odf::MetadataEvent::SetTransform(_)
+                    | odf::MetadataEvent::SetVocab(_)
+                    | odf::MetadataEvent::SetAttachments(_)
+                    | odf::MetadataEvent::SetInfo(_)
+                    | odf::MetadataEvent::SetLicense(_)
+                    | odf::MetadataEvent::SetDataSchema(_)
+                    | odf::MetadataEvent::AddPushSource(_)
+                    | odf::MetadataEvent::DisablePushSource(_)
+                    | odf::MetadataEvent::DisablePollingSource(_)) => {
                         if let odf::MetadataEvent::SetVocab(set_vocab_event) = event {
                             vocab_event = Some(set_vocab_event);
                         }

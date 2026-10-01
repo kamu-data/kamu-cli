@@ -208,7 +208,7 @@ impl KamuCliApiServerHarness {
 
         let mut kamu = match potential_workspace {
             PotentialWorkspace::NoWorkspace => KamuCliPuppet::new("."),
-            ws => {
+            ws @ (PotentialWorkspace::SingleTenant | PotentialWorkspace::MultiTenant) => {
                 let is_multi_tenant = ws == PotentialWorkspace::MultiTenant;
 
                 KamuCliPuppet::new_workspace_tmp_with(NewWorkspaceOptions {

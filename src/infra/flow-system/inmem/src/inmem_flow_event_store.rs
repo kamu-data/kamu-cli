@@ -143,7 +143,14 @@ impl InMemoryFlowEventStore {
         match event {
             FlowEvent::ScheduledForActivation(_) => true,
             FlowEvent::TaskFinished(e) => e.next_attempt_at.is_some(),
-            _ => false,
+            FlowEvent::Initiated(_)
+            | FlowEvent::StartConditionUpdated(_)
+            | FlowEvent::ConfigSnapshotModified(_)
+            | FlowEvent::ActivationCauseAdded(_)
+            | FlowEvent::TaskScheduled(_)
+            | FlowEvent::TaskRunning(_)
+            | FlowEvent::Completed(_)
+            | FlowEvent::Aborted(_) => false,
         }
     }
 

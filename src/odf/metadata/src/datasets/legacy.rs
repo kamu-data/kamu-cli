@@ -483,7 +483,12 @@ impl DatasetRefAny {
     pub fn id(&self) -> Option<&DatasetID> {
         match self {
             Self::ID(_, id) => Some(id),
-            _ => None,
+            Self::RemoteAlias(..)
+            | Self::LocalAlias(..)
+            | Self::AmbiguousAlias(..)
+            | Self::Url(_)
+            | Self::LocalHandle(_)
+            | Self::RemoteHandle(_) => None,
         }
     }
 
@@ -1098,7 +1103,9 @@ impl TryFrom<DatasetRefRemote> for DatasetPushTarget {
         match value {
             DatasetRefRemote::Alias(remote_alias_ref) => Ok(Self::Alias(remote_alias_ref)),
             DatasetRefRemote::Url(url_ref) => Ok(Self::Url(url_ref.as_ref().clone())),
-            _ => Err(Self::Error::UnsupportedType),
+            DatasetRefRemote::ID(..) | DatasetRefRemote::Handle(_) => {
+                Err(Self::Error::UnsupportedType)
+            }
         }
     }
 }

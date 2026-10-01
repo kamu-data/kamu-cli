@@ -217,7 +217,14 @@ pub(crate) async fn get_transform_input_from_query_input(
                         input_dataset_id: query_input.dataset_id,
                     })
                 }
-                _ => GetTransformInputError::Internal(chain_err.int_err()),
+                odf::IterBlocksError::RefNotFound(_)
+                | odf::IterBlocksError::BlockNotFound(_)
+                | odf::IterBlocksError::BlockVersion(_)
+                | odf::IterBlocksError::BlockMalformed(_)
+                | odf::IterBlocksError::Access(_)
+                | odf::IterBlocksError::Internal(_) => {
+                    GetTransformInputError::Internal(chain_err.int_err())
+                }
             })?
     } else {
         Vec::new()

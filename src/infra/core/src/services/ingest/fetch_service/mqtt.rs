@@ -95,7 +95,9 @@ impl FetchService {
                             total_bytes: TotalBytes::Unknown,
                         });
                     }
-                    event => tracing::debug!(?event, "Received"),
+                    event @ (Event::Incoming(_) | Event::Outgoing(_)) => {
+                        tracing::debug!(?event, "Received");
+                    }
                 }
             } else {
                 break;

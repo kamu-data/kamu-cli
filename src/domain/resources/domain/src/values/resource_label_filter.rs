@@ -38,7 +38,7 @@ impl ResolvedResourceLabelFilter {
         match self {
             Self::True => true,
             Self::And(children) | Self::Or(children) if children.is_empty() => true,
-            _ => false,
+            Self::Eq { .. } | Self::And(_) | Self::Not(_) | Self::Or(_) => false,
         }
     }
 }

@@ -35,10 +35,12 @@ pub fn deserialize_metadata_block(
                 hash: hash.clone(),
                 source: e.into(),
             }),
-            _ => GetBlockError::BlockMalformed(BlockMalformedError {
-                hash: hash.clone(),
-                source: e.into(),
-            }),
+            Error::IoError { .. } | Error::SerdeError { .. } | Error::Validation(_) => {
+                GetBlockError::BlockMalformed(BlockMalformedError {
+                    hash: hash.clone(),
+                    source: e.into(),
+                })
+            }
         })
 }
 

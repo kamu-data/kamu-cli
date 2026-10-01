@@ -456,7 +456,12 @@ impl PrettyIngestProgress {
     fn style_for_stage(&self, stage: PollingIngestStage) -> ProgressStyle {
         match stage {
             PollingIngestStage::Fetch => ProgressStyle::Bar,
-            _ => ProgressStyle::Spinner,
+            PollingIngestStage::CheckCache
+            | PollingIngestStage::Prepare
+            | PollingIngestStage::Read
+            | PollingIngestStage::Preprocess
+            | PollingIngestStage::Merge
+            | PollingIngestStage::Commit => ProgressStyle::Spinner,
         }
     }
 

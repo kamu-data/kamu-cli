@@ -93,13 +93,23 @@ match status {
 - The same applies to predicates: `matches!(status, A | B)` over an enum we own is a hidden
   catch-all when the answer must be decided per variant — write the exhaustive `match`.
 - Error conversions are the most common case (see `kamu-domain-design`, "Error Handling").
-- Clippy enforces the single-variant case (`match_wildcard_for_single_variants`); a `_` covering
-  several variants is not linted yet, so it is on you and on review.
+- Clippy enforces this (`wildcard_enum_match_arm`, `match_wildcard_for_single_variants`), on
+  foreign enums too.
 
-`_` stays legitimate where the compiler cannot enumerate cases or the set is not ours to extend:
-integers, strings and other open domains; `#[non_exhaustive]` enums from other crates (list the
-known variants, then a deliberate fallback); and `if let` / `let else` that intentionally handle
-one shape.
+Code that intentionally handles one shape is not a catch-all — say so with the construct, not a
+`_` arm:
+
+| Situation | Write |
+|---|---|
+| Extract one variant or bail | `let Event::AddData(e) = &block.event else { return None; };` |
+| One guarded shape, otherwise a default | `if let Some(db_err) = e.as_database_error() && db_err.is_unique_violation() { … } else { … }` |
+| A yes/no test on a foreign enum | `matches!(…)`, `==`, or the type's own predicate (`err.is_no_such_key()`, `e.kind() == ErrorKind::NotFound`) |
+| A field shared by a few variants | an accessor that owns the match (`as_data_stream_event()`), or a narrower private enum so impossible cases cannot be expressed |
+
+`_` stays legitimate on integers, strings and other open domains. On a foreign enum where most
+variants are irrelevant (Arrow `DataType`, sqlparser AST, DataFusion errors), keep the `_` and
+mark it with `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]` on the statement or
+function — listing dozens of foreign variants would break on every upgrade.
 
 ### Lint suppressions are the last resort
 
@@ -112,6 +122,11 @@ when the code is right and the lint cannot see why, and always with a reason
 |---|---|
 | `#[expect(lint, reason = "...")]` | Default — it fails once the suppression is no longer needed |
 | `#[allow(lint, reason = "...")]` | Only when the lint fires in some builds but not others (`cfg`/feature-dependent code, macro templates expanded more than once, generated code) |
+
+`make clippy` builds with `--all-targets`, so a lint that fires only outside tests (a field read
+only by a `#[cfg(test)]` module) looks stale there. Before deleting a suppression that `#[expect]`
+reports as unfulfilled, check `cargo clippy --workspace` without `--all-targets`; if it fires
+there, it is cfg-dependent and takes `#[allow]`.
 
 Reasons that hold up: a framework contract (async-graphql resolvers and axum handlers are async,
 dill injects by value, mockall needs a named lifetime), wire or external names, a deliberate test

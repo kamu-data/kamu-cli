@@ -192,7 +192,13 @@ impl FlowDescriptionUpdateResult {
                                                 "Unable to fetch increment. Block is missing: {}",
                                                 e.hash
                                             ),
-                                            _ => "Unable to fetch increment".to_string(),
+                                            GetIncrementError::DatasetNotFound(_)
+                                            | GetIncrementError::RefNotFound(_)
+                                            | GetIncrementError::InvalidInterval(_)
+                                            | GetIncrementError::Access(_)
+                                            | GetIncrementError::Internal(_) => {
+                                                "Unable to fetch increment".to_string()
+                                            }
                                         };
                                         return Ok(Some(Self::Unknown(
                                             FlowDescriptionUpdateResultUnknown {
@@ -241,7 +247,7 @@ impl FlowDescriptionUpdateResult {
                         Ok(None)
                     }
                 },
-                _ => Ok(None),
+                fs::FlowOutcome::Failed(_) | fs::FlowOutcome::Aborted => Ok(None),
             }
         } else {
             Ok(None)
@@ -336,7 +342,7 @@ impl FlowDescriptionDatasetReorganizationResult {
                     }
                 },
 
-                _ => Ok(None),
+                fs::FlowOutcome::Failed(_) | fs::FlowOutcome::Aborted => Ok(None),
             }
         } else {
             Ok(None)
@@ -377,7 +383,7 @@ impl FlowDescriptionResetResult {
                         Ok(None)
                     }
                 },
-                _ => Ok(None),
+                fs::FlowOutcome::Failed(_) | fs::FlowOutcome::Aborted => Ok(None),
             }
         } else {
             Ok(None)

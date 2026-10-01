@@ -122,15 +122,18 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
         let query_result = query_builder.build().execute(connection_mut).await;
         if let Err(e) = query_result {
-            return Err(match e {
-                sqlx::Error::Database(e) if e.is_unique_violation() => {
+            return Err(
+                if let Some(db_err) = e.as_database_error()
+                    && db_err.is_unique_violation()
+                {
                     AddDependencyDuplicateError {
                         downstream_dataset_id: downstream_dataset_id.clone(),
                     }
                     .into()
-                }
-                _ => AddDependenciesError::Internal(e.int_err()),
-            });
+                } else {
+                    AddDependenciesError::Internal(e.int_err())
+                },
+            );
         }
 
         Ok(())

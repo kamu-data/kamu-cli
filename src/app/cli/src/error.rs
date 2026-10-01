@@ -238,7 +238,12 @@ impl From<odf::IterBlocksError> for CLIError {
     fn from(v: odf::IterBlocksError) -> Self {
         match v {
             e @ odf::IterBlocksError::BlockVersion(_) => Self::failure(e),
-            _ => Self::critical(v),
+            odf::IterBlocksError::RefNotFound(_)
+            | odf::IterBlocksError::BlockNotFound(_)
+            | odf::IterBlocksError::BlockMalformed(_)
+            | odf::IterBlocksError::InvalidInterval(_)
+            | odf::IterBlocksError::Access(_)
+            | odf::IterBlocksError::Internal(_) => Self::critical(v),
         }
     }
 }

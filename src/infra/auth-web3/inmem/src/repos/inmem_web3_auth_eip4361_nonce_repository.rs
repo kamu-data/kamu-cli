@@ -82,9 +82,11 @@ impl Web3AuthEip4361NonceRepository for InMemoryWeb3AuthEip4361NonceRepository {
                 entry.remove();
                 Ok(())
             }
-            _ => Err(ConsumeNonceError::NotFound(NonceNotFoundError {
-                wallet: *wallet,
-            })),
+            Entry::Occupied(_) | Entry::Vacant(_) => {
+                Err(ConsumeNonceError::NotFound(NonceNotFoundError {
+                    wallet: *wallet,
+                }))
+            }
         }
     }
 

@@ -166,7 +166,7 @@ fn find_id(value: &Value) -> Option<String> {
             map.values().find_map(find_id)
         }
         Value::Array(items) => items.iter().find_map(find_id),
-        _ => None,
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => None,
     }
 }
 
@@ -180,15 +180,18 @@ pub fn parse_get_views(raw: &str, label: &str) -> Vec<ResourceView> {
     let doc: Value = serde_json::from_str(raw)
         .unwrap_or_else(|e| panic!("`{label}` did not return valid JSON: {e}\n{raw}"));
 
-    match doc {
-        Value::Object(ref map) if map.contains_key("items") => map["items"]
+    if let Value::Object(ref map) = doc
+        && map.contains_key("items")
+    {
+        map["items"]
             .as_array()
             .unwrap_or_else(|| panic!("`{label}` `items` was not an array:\n{raw}"))
             .iter()
             .cloned()
             .map(ResourceView)
-            .collect(),
-        other => vec![ResourceView(other)],
+            .collect()
+    } else {
+        vec![ResourceView(doc)]
     }
 }
 

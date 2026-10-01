@@ -667,7 +667,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                             detail: None,
                         })
                     }
-                    _ => SyncError::Internal(e.int_err()),
+                    PullClientError::OverwriteSeedBlock(_)
+                    | PullClientError::ReadFailed(_)
+                    | PullClientError::WriteFailed(_)
+                    | PullClientError::Internal(_) => SyncError::Internal(e.int_err()),
                 };
                 return Err(e);
             }
@@ -895,7 +898,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(match e {
                     PushClientError::OverwriteSeedBlock(err) => SyncError::OverwriteSeedBlock(err),
-                    e => SyncError::Internal(e.int_err()),
+                    e @ (PushClientError::ReadFailed(_)
+                    | PushClientError::WriteFailed(_)
+                    | PushClientError::InvalidHead(_)
+                    | PushClientError::RefCollision(_)
+                    | PushClientError::NameCollision(_)
+                    | PushClientError::Internal(_)) => SyncError::Internal(e.int_err()),
                 });
             }
         }
@@ -926,7 +934,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 return Err(match e {
                     PushClientError::RefCollision(err) => SyncError::RefCollision(err),
                     PushClientError::NameCollision(err) => SyncError::NameCollision(err),
-                    _ => SyncError::Internal(e.int_err()),
+                    PushClientError::OverwriteSeedBlock(_)
+                    | PushClientError::ReadFailed(_)
+                    | PushClientError::WriteFailed(_)
+                    | PushClientError::InvalidHead(_)
+                    | PushClientError::Internal(_) => SyncError::Internal(e.int_err()),
                 });
             }
         };

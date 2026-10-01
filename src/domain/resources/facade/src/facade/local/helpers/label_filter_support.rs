@@ -141,7 +141,10 @@ fn ensure_no_duplicate_keys(
         .iter()
         .filter_map(|child| match child {
             ResolvedResourceLabelFilter::Eq { key, .. } => Some(key),
-            _ => None,
+            ResolvedResourceLabelFilter::True
+            | ResolvedResourceLabelFilter::And(_)
+            | ResolvedResourceLabelFilter::Not(_)
+            | ResolvedResourceLabelFilter::Or(_) => None,
         })
         .collect();
 

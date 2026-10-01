@@ -1732,15 +1732,12 @@ impl CompactTestHarness {
     // Ensures that there are no odf::metadata::AddData/Executetransform blocks
     async fn check_is_data_slices_exist(&self, dataset_ref: &odf::DatasetRef) -> bool {
         let blocks = self.get_dataset_blocks(dataset_ref).await;
-        for block in &blocks {
-            match block.event {
-                odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_) => {
-                    return true;
-                }
-                _ => (),
-            }
-        }
-        false
+        blocks.iter().any(|block| {
+            matches!(
+                block.event,
+                odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_)
+            )
+        })
     }
 
     fn assert_offset_interval_eq(

@@ -28,9 +28,11 @@ impl SearchServiceImpl {
     ) -> Result<SearchContext<'a>, SearchError> {
         match ctx.security {
             SearchSecurityContext::Unrestricted => Ok(ctx),
-            _ => Err(SearchError::Unauthorized(odf::AccessError::Unauthorized(
-                "Unrestricted security context required".into(),
-            ))),
+            SearchSecurityContext::Restricted { .. } | SearchSecurityContext::Anonymous => {
+                Err(SearchError::Unauthorized(odf::AccessError::Unauthorized(
+                    "Unrestricted security context required".into(),
+                )))
+            }
         }
     }
 }

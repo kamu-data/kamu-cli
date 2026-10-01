@@ -23,6 +23,7 @@ use datafusion::prelude::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
+use odf::metadata::IntoDataStreamEvent;
 
 use crate::EngineConfigDatafusionEmbeddedBatchQueryExt;
 
@@ -267,11 +268,11 @@ impl KamuTable {
                 },
                 Decision::NextOfType(Flag::DATA_BLOCK),
                 |state, _hash, block| {
-                    let new_data = match &block.event {
-                        odf::MetadataEvent::AddData(e) => e.new_data.as_ref(),
-                        odf::MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
-                        _ => unreachable!(),
-                    };
+                    let new_data = block
+                        .event
+                        .as_data_stream_event()
+                        .expect("only data blocks are visited")
+                        .new_data;
                     let Some(slice) = new_data else {
                         return Decision::NextOfType(Flag::DATA_BLOCK);
                     };

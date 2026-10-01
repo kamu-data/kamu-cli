@@ -53,7 +53,7 @@ impl Projection for FlowConfigurationState {
                     status: FlowConfigurationStatus::Active,
                     retry_policy,
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::Modified(_) | E::ScopeRemoved(_) => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
                 assert_eq!(&s.flow_binding, event.flow_binding());

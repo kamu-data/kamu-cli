@@ -792,6 +792,10 @@ fn extract_table_refs_rec_table_factor(
 ) -> Result<(), QueryError> {
     use datafusion::sql::sqlparser::ast::TableFactor;
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "sqlparser's TableFactor is foreign; only tables and subqueries are resolved"
+    )]
     match expr {
         TableFactor::Table { name, .. } => {
             tables.push(name.clone());

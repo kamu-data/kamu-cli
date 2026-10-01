@@ -332,6 +332,10 @@ pub struct IndexVersionMetadata<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[allow(
+    dead_code,
+    reason = "success-variant fields are read only by the cfg(test) module and Debug output"
+)]
 #[derive(Debug)]
 pub enum EntityIndexEnsureOutcome {
     CreatedNew {

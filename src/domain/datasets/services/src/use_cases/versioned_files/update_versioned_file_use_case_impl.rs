@@ -184,7 +184,11 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                 PushIngestDataError::Execution(PushIngestError::QuotaExceeded(e)) => {
                     UpdateVersionFileUseCaseError::QuotaExceeded(e)
                 }
-                err => UpdateVersionFileUseCaseError::Internal(err.int_err()),
+                err @ (PushIngestDataError::Planning(_)
+                | PushIngestDataError::Execution(_)
+                | PushIngestDataError::Internal(_)) => {
+                    UpdateVersionFileUseCaseError::Internal(err.int_err())
+                }
             })?;
 
         match ingest_result {

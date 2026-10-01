@@ -67,18 +67,18 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // Extract the parameter pattern name to ensure it's a simple identifier, and
     // also to avoid surprises when we call the inner function.
     let ctx_ident = match f.sig.inputs.first().unwrap() {
-        FnArg::Typed(pat_ty) => match pat_ty.pat.as_ref() {
-            Pat::Ident(PatIdent { ident, .. }) => ident.clone(),
-            other => {
+        FnArg::Typed(pat_ty) => {
+            let Pat::Ident(PatIdent { ident, .. }) = pat_ty.pat.as_ref() else {
                 return syn::Error::new(
-                    other.span(),
+                    pat_ty.pat.span(),
                     "expected parameter pattern to be an identifier, e.g. `ctx: \
                      Arc<EsTestContext>`",
                 )
                 .to_compile_error()
                 .into();
-            }
-        },
+            };
+            ident.clone()
+        }
         FnArg::Receiver(r) => {
             return syn::Error::new(
                 r.span(),

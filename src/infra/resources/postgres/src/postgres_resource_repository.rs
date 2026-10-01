@@ -108,15 +108,18 @@ impl ResourceRepository for PostgresResourceRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
                 CreateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.headers.account.did.clone(),
                     schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
+            } else {
+                CreateResourceError::Internal(e.int_err())
             }
-            _ => CreateResourceError::Internal(e.int_err()),
         })?;
 
         Ok(())
@@ -242,16 +245,19 @@ impl ResourceRepository for PostgresResourceRepository {
             .build()
             .execute(connection_mut)
             .await
-            .map_err(|e: sqlx::Error| match e {
-                sqlx::Error::Database(e) if e.is_unique_violation() => {
+            .map_err(|e: sqlx::Error| {
+                if let Some(db_err) = e.as_database_error()
+                    && db_err.is_unique_violation()
+                {
                     let resource_snapshot = &resource_updates[0].snapshot;
                     UpdateResourceError::Duplicate(ResourceDuplicateError {
                         account_id: resource_snapshot.headers.account.did.clone(),
                         schema: resource_snapshot.schema.clone(),
                         name: resource_snapshot.headers.name.clone(),
                     })
+                } else {
+                    UpdateResourceError::Internal(e.int_err())
                 }
-                _ => UpdateResourceError::Internal(e.int_err()),
             })?;
 
         if update_result.rows_affected() != u64::try_from(resource_updates.len()).unwrap() {

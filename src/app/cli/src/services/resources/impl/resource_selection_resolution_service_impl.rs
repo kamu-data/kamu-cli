@@ -455,7 +455,12 @@ impl ResourceSelectionResolutionServiceImpl {
                     ExactResourceRef::ById(id) => Some(*id),
                     ExactResourceRef::ByName(_) => None,
                 },
-                _ => None,
+                ResourceSelectionItem::All
+                | ResourceSelectionItem::AllByType { .. }
+                | ResourceSelectionItem::Exact(_)
+                | ResourceSelectionItem::NamePattern { .. }
+                | ResourceSelectionItem::AnyTypeExactRef { .. }
+                | ResourceSelectionItem::AnyTypeNamePattern { .. } => None,
             })
             .collect::<Vec<_>>();
 

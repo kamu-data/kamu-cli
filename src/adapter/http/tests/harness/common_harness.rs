@@ -83,13 +83,13 @@ pub(crate) async fn commit_add_data_event(
             .get_block(&prev_data_block_hash)
             .await
             .unwrap();
-        match prev_data_block.event {
-            odf::MetadataEvent::AddData(add_data) => (
-                Some(add_data.new_data.unwrap().offset_interval.end),
-                Some(add_data.new_checkpoint.unwrap().physical_hash),
-            ),
-            _ => panic!("unexpected data event type"),
-        }
+        let odf::MetadataEvent::AddData(add_data) = prev_data_block.event else {
+            panic!("unexpected data event type");
+        };
+        (
+            Some(add_data.new_data.unwrap().offset_interval.end),
+            Some(add_data.new_checkpoint.unwrap().physical_hash),
+        )
     } else {
         (None, None)
     };

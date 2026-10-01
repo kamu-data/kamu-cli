@@ -60,7 +60,7 @@ impl DataQueries {
                     Err(err) => return DataQueryResult::from_query_error(err),
                 }
             }
-            _ => {
+            QueryDialect::SqlSpark | QueryDialect::SqlFlink | QueryDialect::SqlRisingWave => {
                 return Ok(DataQueryResult::invalid_sql(format!(
                     "Dialect {query_dialect:?} is not yet supported"
                 )));

@@ -91,7 +91,13 @@ impl InMemoryWebhookSubscriptionEventStore {
                 Self::update_subscription_state(state, event);
             }
 
-            _ => Self::update_subscription_state(state, event),
+            WebhookSubscriptionEvent::Enabled(_)
+            | WebhookSubscriptionEvent::Paused(_)
+            | WebhookSubscriptionEvent::Resumed(_)
+            | WebhookSubscriptionEvent::MarkedUnreachable(_)
+            | WebhookSubscriptionEvent::Reactivated(_)
+            | WebhookSubscriptionEvent::SecretRotated(_)
+            | WebhookSubscriptionEvent::Removed(_) => Self::update_subscription_state(state, event),
         }
 
         Ok(())

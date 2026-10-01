@@ -235,12 +235,13 @@ impl MetadataEvent {
         ctx: &Context<'_>,
         event: odf::metadata::MetadataEvent,
     ) -> Result<odf::metadata::MetadataEvent, InternalError> {
-        Ok(match event {
-            odf::metadata::MetadataEvent::SetTransform(v) => {
+        Ok(
+            if let odf::metadata::MetadataEvent::SetTransform(v) = event {
                 SetTransform::with_extended_aliases(ctx, v).await?.into()
-            }
-            _ => event,
-        })
+            } else {
+                event
+            },
+        )
     }
 }
 

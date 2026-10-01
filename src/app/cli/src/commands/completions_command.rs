@@ -41,9 +41,10 @@ impl CompletionsCommand {
         let mut cli = crate::cli::Cli::command();
         let bin_name = cli.get_name().to_owned();
 
-        match self.shell {
-            clap_complete::Shell::Bash => write!(output, "{BASH_COMPLETIONS}")?,
-            _ => clap_complete::generate(self.shell, &mut cli, bin_name, output),
+        if self.shell == clap_complete::Shell::Bash {
+            write!(output, "{BASH_COMPLETIONS}")?;
+        } else {
+            clap_complete::generate(self.shell, &mut cli, bin_name, output);
         }
 
         // Every generator ends in a newline today, so `Stdout`'s line buffer is empty

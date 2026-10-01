@@ -91,9 +91,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Sometimes (in the case of predefined users), we need to know whether the
     // workspace to be created will be multi-tenant or not right away, even before
     // the `kamu init` command itself is processed.
-    let maybe_init_command = match &args.command {
-        Command::Init(c) if c.creates_workspace() => Some(c.clone()),
-        _ => None,
+    let maybe_init_command = if let Command::Init(c) = &args.command
+        && c.creates_workspace()
+    {
+        Some(c.clone())
+    } else {
+        None
     };
     let init_multi_tenant_workspace = matches!(&maybe_init_command, Some(c) if c.multi_tenant);
     let workspace_svc = WorkspaceService::new(

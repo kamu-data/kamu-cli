@@ -45,11 +45,12 @@ impl DidSecretKeyRepository for PostgresDidSecretKeyRepository {
         .await
         .map_err(|e: sqlx::Error| {
             use SaveDidSecretKeyError as E;
-            match e {
-                sqlx::Error::Database(e) if e.is_unique_violation() => {
-                    E::Duplicate(DidSecretKeyDuplicateError::new(entity))
-                }
-                _ => E::Internal(e.int_err()),
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                E::Duplicate(DidSecretKeyDuplicateError::new(entity))
+            } else {
+                E::Internal(e.int_err())
             }
         })?;
 

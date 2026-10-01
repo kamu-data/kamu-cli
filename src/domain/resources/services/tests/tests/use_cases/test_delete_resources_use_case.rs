@@ -199,17 +199,17 @@ async fn test_deleted_message_carries_correct_snapshot_data() {
             let Some(expected_id) = *expected_id else {
                 return false;
             };
-            producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
-                && match serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
-                    .unwrap()
-                {
-                    ResourceLifecycleMessage::Deleted(m) => {
-                        m.resources.len() == 1
-                            && m.resources[0].id == expected_id
-                            && m.resources[0].spec == serde_json::json!({ "value": "res-a" })
-                    }
-                    _ => false,
-                }
+            if producer != MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE {
+                return false;
+            }
+            let ResourceLifecycleMessage::Deleted(m) =
+                serde_json::from_value(message.clone()).unwrap()
+            else {
+                return false;
+            };
+            m.resources.len() == 1
+                && m.resources[0].id == expected_id
+                && m.resources[0].spec == serde_json::json!({ "value": "res-a" })
         })
         .returning(|_, _, _| Ok(()));
 

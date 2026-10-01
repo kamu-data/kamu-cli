@@ -90,7 +90,14 @@ impl Projection for WebhookSubscriptionState {
                     created_at: event_time,
                     secret,
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::Enabled(_)
+                | E::Paused(_)
+                | E::Resumed(_)
+                | E::MarkedUnreachable(_)
+                | E::Reactivated(_)
+                | E::Modified(_)
+                | E::SecretRotated(_)
+                | E::Removed(_) => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
                 assert_eq!(&s.id, event.subscription_id());
@@ -104,7 +111,11 @@ impl Projection for WebhookSubscriptionState {
                             status: WebhookSubscriptionStatus::Enabled,
                             ..s
                         }),
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        WebhookSubscriptionStatus::Paused
+                        | WebhookSubscriptionStatus::Unreachable
+                        | WebhookSubscriptionStatus::Removed => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     E::Paused(_) => match s.status {
@@ -114,7 +125,11 @@ impl Projection for WebhookSubscriptionState {
                                 ..s
                             })
                         }
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        WebhookSubscriptionStatus::Unverified
+                        | WebhookSubscriptionStatus::Unreachable
+                        | WebhookSubscriptionStatus::Removed => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     E::Resumed(_) => match s.status {
@@ -124,7 +139,11 @@ impl Projection for WebhookSubscriptionState {
                                 ..s
                             })
                         }
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        WebhookSubscriptionStatus::Unverified
+                        | WebhookSubscriptionStatus::Unreachable
+                        | WebhookSubscriptionStatus::Removed => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     E::MarkedUnreachable(_) => match s.status {
@@ -134,7 +153,10 @@ impl Projection for WebhookSubscriptionState {
                             status: WebhookSubscriptionStatus::Unreachable,
                             ..s
                         }),
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        WebhookSubscriptionStatus::Unverified
+                        | WebhookSubscriptionStatus::Removed => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     E::Reactivated(_) => match s.status {
@@ -143,7 +165,11 @@ impl Projection for WebhookSubscriptionState {
                             status: WebhookSubscriptionStatus::Enabled,
                             ..s
                         }),
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        WebhookSubscriptionStatus::Unverified
+                        | WebhookSubscriptionStatus::Paused
+                        | WebhookSubscriptionStatus::Removed => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     E::SecretRotated(WebhookSubscriptionEventSecretRotated {

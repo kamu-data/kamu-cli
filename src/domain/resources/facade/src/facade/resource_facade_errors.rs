@@ -127,7 +127,12 @@ impl From<ResourceExtensionResolutionError> for ResourceInvalidLabelFilterError 
             ResourceExtensionResolutionError::DuplicateAfterCanonicalization { .. } => {
                 ResourceLabelFilterProblemCode::DuplicateAfterCanonicalization
             }
-            _ => ResourceLabelFilterProblemCode::ResourceExtensionSchema,
+            ResourceExtensionResolutionError::UnknownUri { .. }
+            | ResourceExtensionResolutionError::KindMismatch { .. }
+            | ResourceExtensionResolutionError::Inapplicable { .. }
+            | ResourceExtensionResolutionError::InvalidValue { .. } => {
+                ResourceLabelFilterProblemCode::ResourceExtensionSchema
+            }
         };
         Self {
             code,

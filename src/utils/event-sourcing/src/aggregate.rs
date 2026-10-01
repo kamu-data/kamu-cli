@@ -209,7 +209,7 @@ where
                             "Aggregate not found",
                         );
                     }
-                    _ => {
+                    LoadError::ProjectionError(_) | LoadError::Internal(_) => {
                         tracing::error!(
                             error = ?err,
                             error_msg = %err,

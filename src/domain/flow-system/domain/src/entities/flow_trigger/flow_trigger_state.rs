@@ -82,7 +82,9 @@ impl Projection for FlowTriggerState {
                     rule,
                     stop_policy,
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::Modified(_) | E::AutoStopped(_) | E::ScopeRemoved(_) => {
+                    Err(ProjectionError::new(None, event))
+                }
             },
             (Some(s), event) => {
                 assert_eq!(&s.flow_binding, event.flow_binding());

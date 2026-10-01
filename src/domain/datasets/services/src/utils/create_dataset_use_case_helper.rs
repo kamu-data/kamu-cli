@@ -249,7 +249,10 @@ impl CreateDatasetUseCaseHelper {
                     }))
                 }
                 odf::dataset::SetChainRefError::Internal(e) => CreateDatasetError::Internal(e),
-                _ => CreateDatasetError::Internal(e.int_err()),
+                odf::dataset::SetChainRefError::BlockNotFound(_)
+                | odf::dataset::SetChainRefError::Access(_) => {
+                    CreateDatasetError::Internal(e.int_err())
+                }
             })
     }
 }

@@ -244,7 +244,12 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestPlanningDecision::Rejected(rejection.into())
             }
-            problem => return Err(map_apply_problem(problem)?),
+            problem @ (Self::ResourceApplyParseManifestProblem(_)
+            | Self::ResourceUnsupportedDescriptorProblem(_)
+            | Self::ResourceAccountResolutionProblem(_)
+            | Self::ResourceInvalidHeaderProblem(_)
+            | Self::ResourceInvalidSpecProblem(_)
+            | Self::Unknown) => return Err(map_apply_problem(problem)?),
         })
     }
 
@@ -275,7 +280,12 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestApplicationDecision::Rejected(rejection.into())
             }
-            problem => return Err(map_apply_problem(problem)?),
+            problem @ (Self::ResourceApplyParseManifestProblem(_)
+            | Self::ResourceUnsupportedDescriptorProblem(_)
+            | Self::ResourceAccountResolutionProblem(_)
+            | Self::ResourceInvalidHeaderProblem(_)
+            | Self::ResourceInvalidSpecProblem(_)
+            | Self::Unknown) => return Err(map_apply_problem(problem)?),
         })
     }
 }
@@ -309,7 +319,8 @@ fn map_apply_problem(
             "Remote apply returned an unrecognized ResourceApplyOutcome variant",
         )),
         // Success and Rejection are handled by the caller — should not reach here
-        _ => Err(InternalError::new(
+        ResourceApplyOutcome::ResourceApplySuccess(_)
+        | ResourceApplyOutcome::ResourceApplyRejection(_) => Err(InternalError::new(
             "map_apply_problem called with non-problem outcome variant",
         )),
     }

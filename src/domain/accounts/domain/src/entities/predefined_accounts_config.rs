@@ -378,7 +378,9 @@ impl AccountConfig {
                         account_name: self.account_name.clone(),
                     });
                 }
-                _ => { /* nothing */ }
+                AccountProvider::Password
+                | AccountProvider::OAuthGitHub
+                | AccountProvider::Web3Wallet => { /* nothing */ }
             }
         }
 

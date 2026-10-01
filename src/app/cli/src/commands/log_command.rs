@@ -72,7 +72,19 @@ impl LogCommand {
                 {
                     true
                 }
-                _ => false,
+                odf::MetadataEvent::AddData(_)
+                | odf::MetadataEvent::ExecuteTransform(_)
+                | odf::MetadataEvent::Seed(_)
+                | odf::MetadataEvent::SetPollingSource(_)
+                | odf::MetadataEvent::SetTransform(_)
+                | odf::MetadataEvent::SetVocab(_)
+                | odf::MetadataEvent::SetAttachments(_)
+                | odf::MetadataEvent::SetInfo(_)
+                | odf::MetadataEvent::SetLicense(_)
+                | odf::MetadataEvent::SetDataSchema(_)
+                | odf::MetadataEvent::AddPushSource(_)
+                | odf::MetadataEvent::DisablePushSource(_)
+                | odf::MetadataEvent::DisablePollingSource(_) => false,
             }
         } else {
             true

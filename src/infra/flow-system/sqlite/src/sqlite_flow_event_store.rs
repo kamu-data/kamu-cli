@@ -148,7 +148,12 @@ impl SqliteFlowEventStore {
                     maybe_scheduled_for_activation_at = None;
                     reset_scheduled_for_activation_at = true;
                 }
-                _ => {
+                FlowEvent::Initiated(_)
+                | FlowEvent::StartConditionUpdated(_)
+                | FlowEvent::ConfigSnapshotModified(_)
+                | FlowEvent::ActivationCauseAdded(_)
+                | FlowEvent::TaskRunning(_)
+                | FlowEvent::Completed(_) => {
                     reset_scheduled_for_activation_at = false;
                 }
             }

@@ -290,15 +290,39 @@ impl Cli {
             Command::Repo(c) => match &c.subcommand {
                 RepoSubCommand::Alias(sc) => match &sc.subcommand {
                     RepoAliasSubCommand::List(ssc) => ssc.output_format,
-                    _ => None,
+                    RepoAliasSubCommand::Add(_) | RepoAliasSubCommand::Delete(_) => None,
                 },
                 RepoSubCommand::List(sc) => sc.output_format,
-                _ => None,
+                RepoSubCommand::Add(_) | RepoSubCommand::Delete(_) => None,
             },
             Command::Search(c) => c.output_format,
             Command::Sql(c) => c.output_format,
             Command::Tail(c) => c.output_format,
-            _ => None,
+            Command::Add(_)
+            | Command::Apply(_)
+            | Command::Complete(_)
+            | Command::Completions(_)
+            | Command::Config(_)
+            | Command::Delete(_)
+            | Command::Export(_)
+            | Command::Get(_)
+            | Command::Ingest(_)
+            | Command::Init(_)
+            | Command::Inspect(_)
+            | Command::Log(_)
+            | Command::Login(_)
+            | Command::Logout(_)
+            | Command::New(_)
+            | Command::Notebook(_)
+            | Command::Pull(_)
+            | Command::Push(_)
+            | Command::Rename(_)
+            | Command::Reset(_)
+            | Command::Summary(_)
+            | Command::System(_)
+            | Command::Ui(_)
+            | Command::Verify(_)
+            | Command::Version(_) => None,
         }
     }
 }

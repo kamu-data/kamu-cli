@@ -251,15 +251,15 @@ impl BaseResourceServiceHarness {
             .expect_post_message_as_json()
             .times(n)
             .withf(move |producer, message, _version| {
-                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
-                    && match serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
-                        .unwrap()
-                    {
-                        ResourceLifecycleMessage::Applied(ref m) => {
-                            outcome.as_ref().is_none_or(|o| &m.outcome == o)
-                        }
-                        _ => false,
-                    }
+                if producer != MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE {
+                    return false;
+                }
+                let ResourceLifecycleMessage::Applied(m) =
+                    serde_json::from_value(message.clone()).unwrap()
+                else {
+                    return false;
+                };
+                outcome.as_ref().is_none_or(|o| &m.outcome == o)
             })
             .returning(|_, _, _| Ok(()));
     }

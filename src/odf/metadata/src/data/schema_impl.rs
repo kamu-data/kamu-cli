@@ -424,9 +424,10 @@ impl DataType {
 
     /// Transforms Option<T> into T, leaving already non-optional types as-is
     pub fn required(self) -> Self {
-        match self {
-            DataType::Option(t) => *t.inner,
-            _ => self,
+        if let DataType::Option(t) = self {
+            *t.inner
+        } else {
+            self
         }
     }
 }

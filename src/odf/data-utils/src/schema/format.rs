@@ -141,11 +141,10 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                     basic_info.repetition()
                 )?;
 
-                match physical_type {
-                    PhysicalType::FIXED_LEN_BYTE_ARRAY => {
-                        write!(self.output, r#", "type": "{physical_type}({type_length})""#)?;
-                    }
-                    _ => write!(self.output, r#", "type": "{physical_type}""#)?,
+                if physical_type == PhysicalType::FIXED_LEN_BYTE_ARRAY {
+                    write!(self.output, r#", "type": "{physical_type}({type_length})""#)?;
+                } else {
+                    write!(self.output, r#", "type": "{physical_type}""#)?;
                 }
 
                 // Also print logical type if it is available
@@ -196,6 +195,10 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
         Ok(())
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Parquet's ConvertedType is foreign; only DECIMAL needs special formatting"
+    )]
     fn format_logical_and_converted(
         logical_type: Option<&LogicalType>,
         converted_type: ConvertedType,

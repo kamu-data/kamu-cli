@@ -303,7 +303,14 @@ impl GetResourceCommand {
             match problem.error {
                 ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
                     if self.ignore_not_found => {}
-                error => return Err(GetResourceError::LookupProblem(error).into()),
+                error @ (ResourceLookupProblem::IDNotFound(_)
+                | ResourceLookupProblem::NameNotFound(_)
+                | ResourceLookupProblem::SchemaMismatch(_)
+                | ResourceLookupProblem::NameMismatch(_)
+                | ResourceLookupProblem::EmptyRef
+                | ResourceLookupProblem::UntypedName) => {
+                    return Err(GetResourceError::LookupProblem(error).into());
+                }
             }
         }
 

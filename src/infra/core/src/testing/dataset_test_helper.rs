@@ -70,9 +70,12 @@ impl DatasetTestHelper {
         let prev_data = resolved_dataset
             .as_metadata_chain()
             .iter_blocks()
-            .filter_map_ok(|(_, b)| match b.event {
-                odf::MetadataEvent::AddData(e) => Some(e),
-                _ => None,
+            .filter_map_ok(|(_, b)| {
+                if let odf::MetadataEvent::AddData(e) = b.event {
+                    Some(e)
+                } else {
+                    None
+                }
             })
             .try_first()
             .await

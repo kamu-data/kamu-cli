@@ -77,6 +77,10 @@ impl AccountID {
     }
 
     /// Reads `AccountID` from canonical byte representation
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Multicodec mirrors an open registry; only key codecs are decodable"
+    )]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DeserializeError<Self>> {
         let (key_type, _) = Multicodec::decode(bytes).map_err(DeserializeError::new_from)?;
 

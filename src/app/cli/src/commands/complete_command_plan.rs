@@ -287,7 +287,10 @@ mod tests {
             .into_iter()
             .filter_map(|c| match c {
                 Completion::Positional(kind) => Some(kind),
-                _ => None,
+                Completion::Subcommands
+                | Completion::OptionValue(_)
+                | Completion::OptionPossibleValues(_)
+                | Completion::OptionNames => None,
             })
             .collect()
     }
@@ -298,7 +301,10 @@ mod tests {
             .into_iter()
             .filter_map(|c| match c {
                 Completion::OptionValue(name) => Some(name),
-                _ => None,
+                Completion::Subcommands
+                | Completion::OptionPossibleValues(_)
+                | Completion::Positional(_)
+                | Completion::OptionNames => None,
             })
             .collect()
     }
