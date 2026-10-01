@@ -164,7 +164,7 @@ pub async fn prepare_dataset_metadata_batch(
         let block_data: &[u8] = &block_bytes;
 
         let mut header = Header::new_gnu();
-        header.set_size(block_bytes.len() as u64);
+        header.set_size(u64::try_from(block_bytes.len()).unwrap());
 
         tarball_builder
             .append_data(

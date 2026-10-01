@@ -394,7 +394,7 @@ impl SyncServiceImpl {
         Ok(SyncResult::Updated {
             old_head: dst_head,
             new_head: src_head,
-            num_blocks: num_blocks as u64,
+            num_blocks: u64::try_from(num_blocks).unwrap(),
         })
     }
 

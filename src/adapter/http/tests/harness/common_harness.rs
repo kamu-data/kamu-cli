@@ -50,7 +50,7 @@ fn create_random_parquet_file(path: PathBuf, offset_interval: &OffsetInterval) -
     let mut column_offset: Vec<u64> = Vec::with_capacity(offset_interval.len());
     for index in 0..offset_interval.len() {
         column_a.push(rand::rng().next_u64());
-        column_offset.push(offset_interval.start + (index as u64));
+        column_offset.push(offset_interval.start + u64::try_from(index).unwrap());
     }
 
     let a: Arc<dyn Array> = Arc::new(UInt64Array::from(column_a));

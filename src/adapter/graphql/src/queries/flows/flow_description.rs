@@ -306,8 +306,8 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 old_num_blocks,
                                 new_num_blocks,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
-                                original_blocks_count: old_num_blocks as u64,
-                                resulting_blocks_count: new_num_blocks as u64,
+                                original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
+                                resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),
                                 new_head: new_head.clone().into(),
                             }))),
                         }
@@ -325,8 +325,8 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 old_num_blocks,
                                 new_num_blocks,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
-                                original_blocks_count: old_num_blocks as u64,
-                                resulting_blocks_count: new_num_blocks as u64,
+                                original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
+                                resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),
                                 new_head: new_head.clone().into(),
                             }))),
                         }

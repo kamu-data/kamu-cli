@@ -38,7 +38,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123_127_986_998);
 
     for i in 0..num_rows {
-        offset.append_value(i as u64);
+        offset.append_value(u64::try_from(i).unwrap());
         op.append_value(rng.random_range(
             odf::metadata::OperationType::Append as u8
                 ..=odf::metadata::OperationType::CorrectTo as u8,

@@ -119,7 +119,7 @@ impl FetchService {
         while let Some(chunk) = response.chunk().await.int_err()? {
             file.write_all(&chunk).await.int_err()?;
 
-            fetched_bytes += chunk.len() as u64;
+            fetched_bytes += u64::try_from(chunk.len()).unwrap();
 
             listener.on_progress(&FetchProgress {
                 fetched_bytes,

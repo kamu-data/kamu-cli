@@ -58,21 +58,12 @@ impl Grammar {
     }
 
     fn match_char(s: &str, c: char) -> Option<(&str, &str)> {
-        if !s.is_empty() && s.as_bytes()[0] == (c as u8) {
-            Some((&s[0..1], &s[1..s.len()]))
-        } else {
-            None
-        }
+        s.starts_with(c).then(|| s.split_at(c.len_utf8()))
     }
 
     fn match_one_of_chars<'a>(s: &'a str, chars: &[char]) -> Option<(&'a str, &'a str)> {
-        if !s.is_empty() {
-            let c = s.as_bytes()[0] as char;
-            if chars.contains(&c) {
-                return Some((&s[0..1], &s[1..s.len()]));
-            }
-        }
-        None
+        let c = s.chars().next()?;
+        chars.contains(&c).then(|| s.split_at(c.len_utf8()))
     }
 
     fn match_str<'a>(s: &'a str, prefix: &str) -> Option<(&'a str, &'a str)> {

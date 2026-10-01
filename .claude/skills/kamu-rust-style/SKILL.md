@@ -50,12 +50,24 @@ fn resolve(id: &odf::DatasetID) -> odf::DatasetAlias { ... }
 ### Numeric conversions never use `as`
 
 `as` silently truncates, wraps or loses precision, and reads the same as a lossless conversion.
+Clippy pedantic enforces it between fixed-width types (`cast_possible_truncation`,
+`cast_sign_loss`, `cast_possible_wrap`, `cast_precision_loss`, `cast_lossless`); casts to and from
+`usize` are on review.
 
 | Conversion | Write |
 |---|---|
-| Lossless | `f64::from(x_u32)`, `i64::from(x_i32)`, `u64::from(x_u32)` |
+| Lossless | `f64::from(x_u32)`, `i64::from(x_i32)`, `u64::from(x_u32)`, `usize::from(x_u8)` |
 | Narrowing | `usize::try_from(x).unwrap()` when overflow is a bug, or handle the error |
+| `usize` ↔ fixed width | `u64::try_from(v.len()).unwrap()` — no `From` exists because the width is platform-defined, and the pedantic lints do not flag `usize as u64`, so review must |
 | Time span to float | `chrono::TimeDelta::as_seconds_f64()`, `std::time::Duration::as_secs_f64()` — not `as f64` on integer milliseconds |
+| `char` ↔ bytes | `char::from(byte)`, `str::starts_with(c)`, `c.len_utf8()` — never `c as u8` |
+
+`as` stays the right tool where nothing is converted:
+
+- enum discriminants: `OperationType::Append as i32`, `{ Multicodec::Sha3_256 as u32 }` in const
+  generics;
+- sqlx type overrides inside `query!` arguments: `entity.entity_type as EntityType`;
+- unsizing coercions: `Arc::new(ds) as Arc<dyn Dataset>`.
 
 ### Enum ↔ string mappings come from `strum`
 
@@ -165,6 +177,7 @@ Do not re-propose these without new evidence.
 | Approach | Why it was rejected |
 |---|---|
 | `x as f64` / `x as usize` "because it is shorter" | Truncation and wrapping are silent; `From`/`try_from` make the intent and the failure mode explicit. |
+| Enabling `clippy::as_conversions` | A survey found ~190 hits, all lossless (discriminants, sqlx overrides, coercions) apart from `usize as u64`, which was fixed by hand: the pedantic `cast_*` lints catch every other lossy cast, so the lint would add dozens of `#[expect]`s for little gain. |
 | Inline crate paths to avoid touching the `use` block | Hides the file's dependencies; the `use` block is where a reader looks for them. |
 | Importing ODF types with `use odf::…` to shorten signatures | Loses the protocol-type marker and invites clashes with Kamu types of the same name. |
 | Hand-written `match` for enum ↔ string | Drifts from the variants; `strum` derives stay in sync. |

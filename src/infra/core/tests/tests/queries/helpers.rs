@@ -113,7 +113,7 @@ pub(crate) async fn create_test_dataset(
         ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
 
         let start_offset = prev_offset.map_or(0, |v| v + 1);
-        let end_offset = start_offset + record_batch.num_rows() as u64 - 1;
+        let end_offset = start_offset + u64::try_from(record_batch.num_rows()).unwrap() - 1;
 
         stored
             .dataset

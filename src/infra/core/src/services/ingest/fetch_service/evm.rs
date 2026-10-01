@@ -217,7 +217,7 @@ impl FetchService {
 
             state = Some(batch.state);
 
-            if coder.len() as u64 >= self.source_config.target_records_per_slice {
+            if u64::try_from(coder.len()).unwrap() >= self.source_config.target_records_per_slice {
                 tracing::info!(
                     target_records_per_slice = self.source_config.target_records_per_slice,
                     num_logs = coder.len(),

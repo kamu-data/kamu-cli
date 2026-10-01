@@ -87,7 +87,7 @@ impl FetchService {
                         let json = std::str::from_utf8(&publish.payload).int_err()?.trim();
                         file.write_all(json.as_bytes()).int_err()?;
 
-                        fetched_bytes += publish.payload.len() as u64 + 1;
+                        fetched_bytes += u64::try_from(publish.payload.len()).unwrap() + 1;
                         fetched_records += 1;
 
                         listener.on_progress(&FetchProgress {

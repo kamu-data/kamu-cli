@@ -225,7 +225,7 @@ impl SimpleTransferProtocol {
         Ok(SyncResult::Updated {
             old_head,
             new_head: src_head,
-            num_blocks: num_blocks as u64,
+            num_blocks: u64::try_from(num_blocks).unwrap(),
         })
     }
 
@@ -511,7 +511,8 @@ impl SimpleTransferProtocol {
         mut stats: SyncStats,
     ) -> Result<(), SyncError> {
         // Update stats estimates based on metadata
-        stats.dst_estimated.metadata_blocks_written += blocks_desc_ordered.len() as u64;
+        stats.dst_estimated.metadata_blocks_written +=
+            u64::try_from(blocks_desc_ordered.len()).unwrap();
 
         use odf::metadata::IntoDataStreamBlock;
         for block in blocks_desc_ordered

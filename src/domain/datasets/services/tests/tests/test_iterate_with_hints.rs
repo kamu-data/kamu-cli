@@ -701,7 +701,7 @@ async fn test_page_boundary_stress_with_many_data_blocks() {
     // Starting from block 153 (150 data + 3 setup blocks) down to block 4
     for (i, (seq_num, event_type)) in iteration_order_1.iter().enumerate() {
         assert_eq!(*event_type, odf::metadata::MetadataEventTypeFlags::ADD_DATA);
-        assert_eq!(*seq_num, 153 - i as u64); // Should be 153, 152, 151, ..., 4
+        assert_eq!(*seq_num, 153 - u64::try_from(i).unwrap()); // Should be 153, 152, 151, ..., 4
     }
 
     // Mix data and key blocks
@@ -727,7 +727,7 @@ async fn test_page_boundary_stress_with_many_data_blocks() {
     // order Starting from block 153 (150 data + 3 setup blocks) down to block 4
     for (i, (seq_num, event_type)) in iteration_order_2.iter().enumerate() {
         if *event_type == odf::metadata::MetadataEventTypeFlags::ADD_DATA {
-            assert_eq!(*seq_num, 153 - i as u64); // Should be 153, 152, 151, ..., 4
+            assert_eq!(*seq_num, 153 - u64::try_from(i).unwrap()); // Should be 153, 152, 151, ..., 4
         } else if *event_type == odf::metadata::MetadataEventTypeFlags::SET_INFO {
             // SET_INFO blocks should be at sequence 3 and 1
             assert!(*seq_num == 1);
@@ -864,7 +864,7 @@ async fn test_iter_blocks_interval_page_caching_stress() {
 
     // Verify all blocks are in descending order
     for (i, (seq_num, _)) in iteration_order.iter().enumerate() {
-        assert_eq!(*seq_num, 153 - i as u64); // Should be 153, 152, 151, ..., 0
+        assert_eq!(*seq_num, 153 - u64::try_from(i).unwrap()); // Should be 153, 152, 151, ..., 0
     }
 
     // First 150 should be ADD_DATA blocks
@@ -912,7 +912,7 @@ async fn test_iter_blocks_interval_with_specific_range() {
 
     // Verify sequence and that all are ADD_DATA
     for (i, (seq_num, event_type)) in iteration_order.iter().enumerate() {
-        assert_eq!(*seq_num, 100 - i as u64); // Should be 100, 99, 98, ..., 51
+        assert_eq!(*seq_num, 100 - u64::try_from(i).unwrap()); // Should be 100, 99, 98, ..., 51
         assert_eq!(*event_type, odf::metadata::MetadataEventTypeFlags::ADD_DATA);
     }
 }
@@ -951,7 +951,7 @@ async fn test_iter_blocks_interval_across_page_boundary() {
 
     // Verify sequence and that all are ADD_DATA
     for (i, (seq_num, event_type)) in iteration_order.iter().enumerate() {
-        assert_eq!(*seq_num, 120 - i as u64); // Should be 120, 119, 118, ..., 81
+        assert_eq!(*seq_num, 120 - u64::try_from(i).unwrap()); // Should be 120, 119, 118, ..., 81
         assert_eq!(*event_type, odf::metadata::MetadataEventTypeFlags::ADD_DATA);
     }
 }
@@ -1062,7 +1062,7 @@ async fn test_iter_blocks_interval_reverse_interval_ignore_missing_tail() {
 
     // Verify sequence and that all are in descending order
     for (i, (seq_num, _event_type)) in iteration_order.iter().enumerate() {
-        assert_eq!(*seq_num, 80 - i as u64); // Should be 80, 79, 78, ..., 0
+        assert_eq!(*seq_num, 80 - u64::try_from(i).unwrap()); // Should be 80, 79, 78, ..., 0
     }
 
     // First block should be at sequence 80

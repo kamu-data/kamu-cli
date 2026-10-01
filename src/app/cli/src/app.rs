@@ -1162,7 +1162,7 @@ fn configure_logging(
     let env_filter = match EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => EnvFilter::new(
-            LOG_LEVELS[(output_config.verbosity_level as usize).clamp(0, LOG_LEVELS.len() - 1)],
+            LOG_LEVELS[usize::from(output_config.verbosity_level).min(LOG_LEVELS.len() - 1)],
         ),
     };
 

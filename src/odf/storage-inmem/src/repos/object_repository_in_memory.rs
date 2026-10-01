@@ -54,7 +54,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         let res = blocks_by_hash.get(hash);
         match res {
-            Some(bytes) => Ok(bytes.len() as u64),
+            Some(bytes) => Ok(u64::try_from(bytes.len()).unwrap()),
             None => Err(GetError::NotFound(ObjectNotFoundError {
                 hash: hash.clone(),
             })),

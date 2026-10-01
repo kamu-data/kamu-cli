@@ -101,7 +101,7 @@ impl DataBatch {
         Ok(DataBatch {
             format,
             content: String::from_utf8(buf).unwrap(),
-            num_records: num_records as u64,
+            num_records: u64::try_from(num_records).unwrap(),
         })
     }
 }

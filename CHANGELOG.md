@@ -27,6 +27,9 @@ Recommendation: for ease of reading, use the following format:
 - Agent guidance consolidated: `AGENTS.md` is the single source of rules, skills moved to `.claude/skills/`
   with `.agents/skills/` symlinks for Codex, and DEVELOPER.md gained an "Agent Harness" section
 - Database migrations are forward-only: `make sqlx-add-migration` no longer creates down migrations
+- Stricter Clippy policy: `match_wildcard_for_single_variants`, `wildcard_enum_match_arm` (no catch-all `_`
+  arms over enums) and `allow_attributes_without_reason` are enforced workspace-wide; lint suppressions are
+  `#[expect]` with a reason (halved in number), and `usize` casts use checked conversions
 
 ## [0.268.1] - 2026-10-01
 ### Fixed

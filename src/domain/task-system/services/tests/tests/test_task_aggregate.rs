@@ -127,7 +127,7 @@ async fn test_task_load_multi() {
 
     for (i, task_res) in tasks.into_iter().enumerate() {
         assert!(task_res.is_ok());
-        let expected_id = TaskID::new(i as u64 + delta);
+        let expected_id = TaskID::new(u64::try_from(i).unwrap() + delta);
         let task = task_res.unwrap();
         assert_eq!(task.task_id, expected_id);
         assert_eq!(task.status(), TaskStatus::Finished);

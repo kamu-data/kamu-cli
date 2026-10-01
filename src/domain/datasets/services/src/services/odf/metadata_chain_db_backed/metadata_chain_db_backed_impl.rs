@@ -547,7 +547,7 @@ where
             self.try_data_block_repo_lookup(|repo, dataset_id| async move {
                 repo.get_data_block_size(&dataset_id, hash)
                     .await
-                    .map(|size_opt| size_opt.map(|size| size as u64))
+                    .map(|size_opt| size_opt.map(|size| u64::try_from(size).unwrap()))
             }),
             self.metadata_chain.get_block_size(hash),
         )
