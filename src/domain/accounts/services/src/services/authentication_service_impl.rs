@@ -46,7 +46,10 @@ pub struct AuthenticationServiceImpl {
 #[dill::interface(dyn AuthenticationService)]
 #[dill::interface(dyn JwtTokenIssuer)]
 impl AuthenticationServiceImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
         account_service: Arc<dyn AccountService>,

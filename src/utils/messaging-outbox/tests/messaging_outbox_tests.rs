@@ -65,7 +65,7 @@ macro_rules! test_message_consumer {
                     }
                 }
 
-                #[allow(dead_code)]
+                #[allow(dead_code, reason = "generated per message type; not every test consumer calls it")]
                 fn get_messages(&self) -> Vec<[<TestMessage $message_type_suffix>]> {
                     let guard = self.state.lock().unwrap();
                     guard.captured_messages.clone()
@@ -119,7 +119,7 @@ macro_rules! test_message_failing_consumer {
                     }
                 }
 
-                #[allow(dead_code)]
+                #[allow(dead_code, reason = "generated per message type; not every test consumer calls it")]
                 fn attempts(&self) -> usize {
                     let guard = self.state.lock().unwrap();
                     guard.attempts

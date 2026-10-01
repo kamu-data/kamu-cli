@@ -156,7 +156,6 @@ impl BaseGQLFlowHarness {
             .unwrap()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     pub fn set_time_delta_trigger(
         &self,
         dataset_id: &odf::DatasetID,
@@ -243,7 +242,6 @@ impl BaseGQLFlowHarness {
         GraphQLQueryRequest::new(mutation_code, Variables::from_value(vars))
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     pub fn set_cron_trigger(
         &self,
         dataset_id: &odf::DatasetID,

@@ -166,10 +166,9 @@ pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {
     assert_eq!(expected.trim(), actual.trim());
 }
 
-#[expect(clippy::needless_pass_by_value)]
-pub fn assert_arrow_schema_eq(schema: &Schema, expected: serde_json::Value) {
+pub fn assert_arrow_schema_eq(schema: &Schema, expected: &serde_json::Value) {
     let actual = serde_json::to_value(schema).unwrap();
-    assert_eq!(expected, actual);
+    assert_eq!(*expected, actual);
 }
 
 pub async fn assert_data_eq(df: DataFrameExt, expected: &str) {

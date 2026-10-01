@@ -1722,8 +1722,7 @@ async fn test_metadata_handler_schema_formats() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DataQueryHarness {
-    #[allow(dead_code)]
-    run_info_dir: tempfile::TempDir,
+    _run_info_dir: tempfile::TempDir,
     server_harness: ServerSideLocalFsHarness,
     root_url: url::Url,
     dataset_handle: odf::DatasetHandle,
@@ -1896,7 +1895,7 @@ impl DataQueryHarness {
             server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
 
         Self {
-            run_info_dir,
+            _run_info_dir: run_info_dir,
             server_harness,
             root_url,
             dataset_handle: create_result.dataset_handle,

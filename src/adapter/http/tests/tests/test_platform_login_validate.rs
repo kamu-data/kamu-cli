@@ -247,8 +247,7 @@ async fn test_validate_without_token_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct PlatformLoginHarness {
-    #[allow(dead_code)]
-    run_info_dir: tempfile::TempDir,
+    _run_info_dir: tempfile::TempDir,
     api_server: TestAPIServer,
     system_time_source_stub: Arc<SystemTimeSourceStub>,
 }
@@ -311,7 +310,7 @@ impl PlatformLoginHarness {
         let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
 
         Self {
-            run_info_dir,
+            _run_info_dir: run_info_dir,
             api_server,
             system_time_source_stub,
         }

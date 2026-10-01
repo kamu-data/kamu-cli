@@ -381,6 +381,9 @@ unused_self = "allow"
 wildcard_imports = "allow"
 
 
+# clippy::restriction (opt-in, lint by lint)
+allow_attributes_without_reason = "warn"
+
 # clippy::cargo
 cargo = { level = "warn", priority = -1 }
 multiple_crate_versions = { level = "allow", priority = 1 }

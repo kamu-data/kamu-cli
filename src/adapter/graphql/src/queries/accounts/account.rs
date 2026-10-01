@@ -237,13 +237,19 @@ impl Account {
     }
 
     /// Access to the access token management
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn access_tokens(&self) -> Result<AccountAccessTokens<'_>> {
         Ok(AccountAccessTokens::new(&self.account_id))
     }
 
     /// Access to account usage statistic
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn usage(&self) -> Result<AccountUsage<'_>> {
         Ok(AccountUsage::new(&self.account_id))
     }

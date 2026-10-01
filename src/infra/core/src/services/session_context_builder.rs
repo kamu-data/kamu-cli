@@ -54,7 +54,10 @@ impl SessionContextBuilder {
                 .unwrap(),
         );
 
-        #[allow(unused_mut)]
+        #[allow(
+            unused_mut,
+            reason = "mutated only when query-extension features register functions"
+        )]
         let mut ctx = SessionContext::new_with_config_rt(config, runtime);
 
         let schema = KamuSchema::prepare(&ctx, self.dataset_registry.clone(), options).await?;

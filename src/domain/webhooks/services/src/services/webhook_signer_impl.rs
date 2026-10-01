@@ -31,7 +31,10 @@ pub struct WebhookSignerImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn WebhookSigner)]
 impl WebhookSignerImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(webhooks_config: Arc<WebhooksConfig>) -> Self {
         Self {
             webhook_secret_encryption_key: webhooks_config

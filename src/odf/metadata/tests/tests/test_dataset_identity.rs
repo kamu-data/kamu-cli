@@ -202,8 +202,11 @@ fn test_local_alias_validation() {
     assert_matches!(DatasetAlias::try_from("invalid_alias"), Err(_));
 }
 
-#[allow(clippy::needless_borrows_for_generic_args)]
 #[test]
+#[expect(
+    clippy::needless_borrows_for_generic_args,
+    reason = "borrows on purpose to exercise conversions from references"
+)]
 fn test_dataset_refs_conversions() {
     fn takes_ref_local<R: Into<DatasetRef>>(_: R) {}
     fn takes_ref_remote<R: Into<DatasetRefRemote>>(_: R) {}

@@ -31,8 +31,6 @@ pub async fn authentication_catalogs(
 }
 
 pub struct AuthenticationCatalogsResult {
-    #[expect(unused)]
-    pub catalog_no_subject: dill::Catalog,
     pub catalog_anonymous: dill::Catalog,
     pub catalog_authorized: dill::Catalog,
 }
@@ -91,7 +89,6 @@ pub async fn authentication_catalogs_ext(
     .unwrap();
 
     AuthenticationCatalogsResult {
-        catalog_no_subject,
         catalog_anonymous,
         catalog_authorized,
     }

@@ -14,7 +14,6 @@ use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt, UploadPre
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::unused_async)]
 pub async fn test_upload(mut kamu_api_server_client: KamuApiServerClient) {
     const DUMMY_FILE_NAME: &str = "dummy.txt";
     const DUMMY_FILE_CONTENT: &str = "It's certainly not a waste of space in the S3 bucket.";

@@ -35,7 +35,6 @@ impl InMemoryFlowProcessState {
         }
     }
 
-    #[allow(clippy::collapsible_if)]
     fn apply_filters<'a>(
         &self,
         state: &'a State,
@@ -45,13 +44,12 @@ impl InMemoryFlowProcessState {
             .list_matching_process_states(&filter.scope)
             .filter(|ps| {
                 // Flow types filter
-                if let Some(types) = filter.for_flow_types {
-                    if !types
+                if let Some(types) = filter.for_flow_types
+                    && !types
                         .iter()
                         .any(|&t| t == ps.flow_binding().flow_type.as_str())
-                    {
-                        return false;
-                    }
+                {
+                    return false;
                 }
 
                 // Effective state filter
@@ -112,10 +110,10 @@ impl InMemoryFlowProcessState {
                 }
 
                 // Minimum consecutive failures filter
-                if let Some(min_failures) = filter.min_consecutive_failures {
-                    if ps.consecutive_failures() < min_failures {
-                        return false;
-                    }
+                if let Some(min_failures) = filter.min_consecutive_failures
+                    && ps.consecutive_failures() < min_failures
+                {
+                    return false;
                 }
 
                 true

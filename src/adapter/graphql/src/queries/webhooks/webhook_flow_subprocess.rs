@@ -25,7 +25,6 @@ pub struct WebhookFlowSubProcess {
 #[Object]
 impl WebhookFlowSubProcess {
     #[graphql(skip)]
-    #[allow(dead_code)]
     pub fn new(
         subscription: &wh::WebhookSubscription,
         parent_dataset_request_state: Option<DatasetRequestStateWithOwner>,
@@ -60,7 +59,10 @@ impl WebhookFlowSubProcess {
         })
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     pub async fn summary(&self) -> Result<FlowProcessSummary> {
         Ok(self.flow_process_state.clone().into())
     }

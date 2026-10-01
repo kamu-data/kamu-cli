@@ -71,7 +71,7 @@ async fn test_data_writer_happy_path() {
     // Check schema of the data
     assert_arrow_schema_eq(
         df.schema().as_arrow(),
-        json!({
+        &json!({
             "fields": [{
                 "name": "offset",
                 "data_type": "Int64",
@@ -173,7 +173,7 @@ async fn test_data_writer_happy_path() {
             .event
             .schema_as_arrow(&odf::metadata::ToArrowSettings::default())
             .unwrap(),
-        json!({
+        &json!({
             "fields": [{
                 "name": "offset",
                 "data_type": "Int64",
@@ -1491,7 +1491,10 @@ async fn test_data_writer_schema_evolution_from_explicit() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-#[expect(deprecated)]
+#[expect(
+    deprecated,
+    reason = "exercises the deprecated legacy format on purpose"
+)]
 async fn test_data_writer_schema_evolution_from_legacy() {
     use ::datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 

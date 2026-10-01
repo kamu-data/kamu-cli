@@ -222,13 +222,11 @@ impl PullCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PullCommand {
-    #[allow(clippy::match_same_arms)]
     async fn run(&self) -> Result<(), CLIError> {
         match (self.refs.len(), self.recursive, self.all, &self.as_name) {
             (0, _, false, _) => Err(CLIError::usage_error("Specify a dataset or pass --all")),
             (0, false, true, None) => Ok(()),
-            (1, false, false, Some(_)) if self.refs.len() == 1 => Ok(()),
-            (1, false, false, None) if self.refs.len() == 1 => Ok(()),
+            (1, false, false, _) if self.refs.len() == 1 => Ok(()),
             (refs, _, false, None) if refs > 0 => Ok(()),
             _ => Err(CLIError::usage_error(
                 "Invalid combination of arguments".to_owned(),

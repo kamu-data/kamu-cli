@@ -73,7 +73,10 @@ impl<'a> DatasetFlowProcesses<'a> {
 
     // TODO: other secondary processes in future
 
-    #[allow(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     pub async fn webhooks(&self) -> Result<WebhookFlowSubProcessGroup<'_>> {
         // Form a subprocess group from those that point to
         // webhooks bound to this dataset

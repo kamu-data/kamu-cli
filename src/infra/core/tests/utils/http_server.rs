@@ -20,8 +20,7 @@ pub struct HttpServer {
     pub container_name: String,
     pub address: String,
     pub host_port: u16,
-    #[allow(dead_code)]
-    container: ContainerProcess,
+    _container: ContainerProcess,
 }
 
 impl HttpServer {
@@ -59,7 +58,7 @@ impl HttpServer {
 
         Self {
             container_name: container.container_name().to_string(),
-            container,
+            _container: container,
             address,
             host_port,
         }

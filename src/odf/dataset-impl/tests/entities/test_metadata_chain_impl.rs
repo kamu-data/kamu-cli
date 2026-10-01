@@ -1073,7 +1073,10 @@ async fn test_append_set_data_schema_evolution() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-#[expect(deprecated)]
+#[expect(
+    deprecated,
+    reason = "exercises the deprecated legacy format on purpose"
+)]
 async fn test_append_set_data_schema_legacy_upgrade_flat() {
     use ::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 
@@ -1189,7 +1192,10 @@ async fn test_append_set_data_schema_legacy_upgrade_flat() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-#[expect(deprecated)]
+#[expect(
+    deprecated,
+    reason = "exercises the deprecated legacy format on purpose"
+)]
 async fn test_append_set_data_schema_legacy_upgrade_nested() {
     use ::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 

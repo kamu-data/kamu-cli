@@ -137,7 +137,10 @@ impl AccountID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(unused)]
+#[expect(
+    unused,
+    reason = "stub until `AccountID::as_bytes` gets a real byte representation (see `Deref` below)"
+)]
 pub struct AccountIDBytes<'a>(&'a AccountID);
 
 impl std::ops::Deref for AccountIDBytes<'_> {

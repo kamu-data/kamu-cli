@@ -215,7 +215,6 @@ pub struct GithubAccessToken {
     pub token_type: String,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 struct GithubAccountInfo {
     pub login: String,
@@ -223,24 +222,13 @@ struct GithubAccountInfo {
     pub name: Option<String>,
     pub email: Option<String>,
     pub avatar_url: Option<String>,
-    pub gravatar_id: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Deserialize)]
 struct GithubEmailInfo {
     pub email: String,
     pub primary: bool,
     pub verified: bool,
-    pub visibility: Option<GithubEmailVisibility>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-enum GithubEmailVisibility {
-    #[serde(rename = "public")]
-    Public,
-    #[serde(rename = "private")]
-    Private,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

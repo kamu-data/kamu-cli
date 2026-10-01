@@ -49,7 +49,10 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn CreateDatasetFromSnapshotUseCase)]
 impl CreateDatasetFromSnapshotUseCaseImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
         system_time_source: Arc<dyn SystemTimeSource>,

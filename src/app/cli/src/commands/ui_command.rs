@@ -7,8 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![allow(unused_imports)]
-#![allow(dead_code)]
+#![allow(
+    unused_imports,
+    reason = "most of this module is used only with the `web-ui` feature"
+)]
+#![allow(
+    dead_code,
+    reason = "most of this module is used only with the `web-ui` feature"
+)]
 
 use std::net::IpAddr;
 use std::str::FromStr;

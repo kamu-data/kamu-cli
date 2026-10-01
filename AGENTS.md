@@ -76,9 +76,10 @@ problem is cost.
 | CLI args, config, HTTP API | `make resources`; review the `resources/` diff |
 | `scripts/agents/`, `.claude/`, `.codex/`, skills, `AGENTS.md`, `CLAUDE.md`, `docs/internal/` | `make lint-harness` |
 
-- Treat Clippy warnings as errors to fix. Never silence them with `#[allow(clippy::...)]` or
-  `#[expect(...)]`: a pragma hides the problem instead of resolving it. If a lint seems genuinely
-  wrong for a case, ask before suppressing it.
+- Treat Clippy warnings as errors to fix. Do not silence them with `#[allow]` / `#[expect]`: a
+  pragma hides the problem instead of resolving it. If a lint seems genuinely wrong for a case,
+  ask before suppressing it; an approved suppression is an `#[expect]` with a `reason` (see the
+  `kamu-rust-style` skill).
 - Keep build, test and lint output available in full. Do not pipe it into `head` or `tail`;
   save long output to a file and read the relevant sections after checking the exit status.
 - `make lint` runs every lint CI runs, plus `lint-sqlx` and `lint-harness`.

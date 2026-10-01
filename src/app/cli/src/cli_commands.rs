@@ -587,7 +587,6 @@ pub fn get_command(
     Ok(command)
 }
 
-#[allow(clippy::match_like_matches_macro)]
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
@@ -694,7 +693,10 @@ pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
     }
 }
 
-#[expect(clippy::match_like_matches_macro)]
+#[expect(
+    clippy::match_like_matches_macro,
+    reason = "exhaustive match keeps every command's answer explicit"
+)]
 pub fn command_needs_server_components(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {

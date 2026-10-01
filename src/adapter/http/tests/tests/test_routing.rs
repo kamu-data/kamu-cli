@@ -50,9 +50,8 @@ use crate::harness::await_client_server_flow;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
 struct RepoFixture {
-    tmp_dir: tempfile::TempDir,
+    _tmp_dir: tempfile::TempDir,
     catalog: dill::Catalog,
     created_dataset: CreateDatasetResult,
 }
@@ -136,7 +135,7 @@ async fn setup_repo() -> RepoFixture {
         .unwrap();
 
     RepoFixture {
-        tmp_dir,
+        _tmp_dir: tmp_dir,
         catalog,
         created_dataset,
     }
@@ -339,10 +338,11 @@ async fn test_routing_dataset_name_case_insensetive() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
+/// Path parameters not named here (the account name, nested route parameters)
+/// are ignored.
+// TODO: Use the account name once DatasetRepository supports multi-tenancy
 #[derive(Debug, Deserialize)]
 struct DatasetByAccountAndName {
-    account_name: odf::AccountName,
     dataset_name: odf::DatasetName,
 }
 
@@ -354,7 +354,6 @@ async fn test_routing_dataset_account_and_name() {
         repo.catalog,
         "/{account_name}/{dataset_name}",
         |Path(p): Path<DatasetByAccountAndName>| {
-            // TODO: Ignoring account name until DatasetRepository supports multi-tenancy
             odf::DatasetAlias::new(None, p.dataset_name).into_local_ref()
         },
     )

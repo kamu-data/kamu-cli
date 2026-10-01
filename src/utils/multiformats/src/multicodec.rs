@@ -14,7 +14,10 @@ use crate::{DeserializeError, Multiformat};
 /// See: <https://github.com/multiformats/multicodec/blob/master/table.csv>
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[allow(non_camel_case_types)]
+#[expect(
+    non_camel_case_types,
+    reason = "variant names mirror the multicodec table"
+)]
 pub enum Multicodec {
     CIDv1 = 0x01,
     Sha2_256 = 0x12,

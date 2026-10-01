@@ -795,16 +795,15 @@ impl From<&DatasetHandleRemote> for DatasetRefAny {
 
 impl std::cmp::Ord for DatasetRefAny {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        #[allow(clippy::type_complexity)]
-        fn tuplify(
-            v: &DatasetRefAny,
-        ) -> (
-            Option<&str>,
-            Option<&str>,
-            Option<&DatasetName>,
-            Option<&DatasetID>,
-            Option<&Url>,
-        ) {
+        type RefParts<'a> = (
+            Option<&'a str>,
+            Option<&'a str>,
+            Option<&'a DatasetName>,
+            Option<&'a DatasetID>,
+            Option<&'a Url>,
+        );
+
+        fn tuplify(v: &DatasetRefAny) -> RefParts<'_> {
             match v {
                 DatasetRefAny::ID(r, id) => {
                     (r.as_ref().map(RepoName::as_str), None, None, Some(id), None)

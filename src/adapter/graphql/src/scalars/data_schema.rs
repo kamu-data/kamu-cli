@@ -103,7 +103,10 @@ impl DataSchema {
         self.format
     }
 
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     pub async fn content(&self) -> Result<String> {
         self.content_impl()
     }

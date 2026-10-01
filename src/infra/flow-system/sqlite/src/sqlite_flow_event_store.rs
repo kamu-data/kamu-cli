@@ -155,7 +155,6 @@ impl SqliteFlowEventStore {
 
             if maybe_scheduled_for_activation_at.is_none() && !reset_scheduled_for_activation_at {
                 #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-                #[allow(dead_code)]
                 pub struct ActivationRow {
                     pub activation_time: Option<DateTime<Utc>>,
                 }
@@ -260,7 +259,6 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 .await?;
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-            #[allow(dead_code)]
             pub struct EventModel {
                 pub event_id: i64,
                 pub event_payload: sqlx::types::JsonValue
@@ -305,7 +303,6 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 .await?;
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-            #[allow(dead_code)]
             pub struct EventModel {
                 pub event_id: i64,
                 pub event_payload: sqlx::types::JsonValue
@@ -457,13 +454,11 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct NewFlow {
     pub flow_id: i64,
 }
 
 #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct RunStatsRow {
     pub last_event_time: DateTime<Utc>,
 }
@@ -561,7 +556,6 @@ impl FlowEventStore for SqliteFlowEventStore {
         let mut tr = self.transaction.lock().await;
 
         #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-        #[allow(dead_code)]
         pub struct ActivationRow {
             pub activation_time: Option<DateTime<Utc>>,
         }

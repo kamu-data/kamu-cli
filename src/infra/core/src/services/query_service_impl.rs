@@ -50,7 +50,6 @@ impl QueryServiceImpl {
     /// Unless state is already provided in the options, this will attempt to
     /// parse the SQL, extract the names of all datasets mentioned in the
     /// query and affix their states in the query options to specific blocks.
-    #[expect(clippy::single_match)]
     #[tracing::instrument(
         level = "info",
         name = QueryServiceImpl_resolve_query_state,
@@ -153,18 +152,14 @@ impl QueryServiceImpl {
             // See: https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs#L78
             let statements = datafusion::sql::parser::DFParser::parse_sql(sql)?;
 
+            // TODO: SEC: Restrict the subset of supported statements
             for stmt in statements {
-                match stmt {
-                    DfStatement::Statement(stmt) => match stmt.as_ref() {
-                        SqlStatement::Query(query) => {
-                            is_restricted_set = true;
-                            needs_schema = true;
-                            extract_table_refs_rec(query, &mut table_refs)?;
-                        }
-                        _ => {}
-                    },
-                    // TODO: SEC: Restrict the subset of supported statements
-                    _ => {}
+                if let DfStatement::Statement(stmt) = stmt
+                    && let SqlStatement::Query(query) = stmt.as_ref()
+                {
+                    is_restricted_set = true;
+                    needs_schema = true;
+                    extract_table_refs_rec(query, &mut table_refs)?;
                 }
             }
 

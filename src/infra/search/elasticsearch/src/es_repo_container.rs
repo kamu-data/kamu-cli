@@ -25,9 +25,8 @@ pub struct ElasticsearchContainerRepository {
     state: tokio::sync::OnceCell<State>,
 }
 
-#[allow(dead_code)]
 struct State {
-    container: container_runtime::ContainerProcess,
+    _container: container_runtime::ContainerProcess,
     inner: ElasticsearchRepository,
 }
 
@@ -101,7 +100,10 @@ impl ElasticsearchContainerRepository {
             }),
         );
 
-        Ok(State { container, inner })
+        Ok(State {
+            _container: container,
+            inner,
+        })
     }
 }
 

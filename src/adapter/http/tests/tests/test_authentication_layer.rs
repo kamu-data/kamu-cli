@@ -151,7 +151,6 @@ const TEST_ENDPOINT: &str = "/foo";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
 struct ServerHarness {
     server_future: Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Unpin>,
     local_addr: SocketAddr,
@@ -214,7 +213,7 @@ impl ServerHarness {
         Url::from_str(format!("http://{}{}", self.local_addr, TEST_ENDPOINT).as_str()).unwrap()
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async, reason = "axum handlers must be async")]
     async fn foo_handler(
         axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     ) -> Result<String, http::StatusCode> {

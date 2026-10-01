@@ -24,7 +24,10 @@ pub struct OutboxImmediateImpl {
 
 #[dill::component(pub)]
 impl OutboxImmediateImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         catalog: dill::Catalog,
         message_dispatchers: Vec<Arc<dyn MessageDispatcher>>,

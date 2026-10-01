@@ -169,7 +169,10 @@ impl AccountMut {
     }
 
     /// Access to the mutable flow configurations of this account
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut<'_>> {
         utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
 
@@ -177,13 +180,19 @@ impl AccountMut {
     }
 
     /// Access to the mutable flow configurations of this account
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn access_tokens(&self) -> Result<AccountAccessTokensMut<'_>> {
         Ok(AccountAccessTokensMut::new(&self.account))
     }
 
     /// Access to the mutable quotas of this account
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn quotas(&self) -> Result<AccountQuotasMut<'_>> {
         Ok(AccountQuotasMut::new(&self.account))
     }

@@ -50,7 +50,10 @@ pub struct CreateAccountUseCaseImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn CreateAccountUseCase)]
 impl CreateAccountUseCaseImpl {
-    #[expect(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     fn new(
         account_service: Arc<dyn AccountService>,
         outbox: Arc<dyn messaging_outbox::Outbox>,

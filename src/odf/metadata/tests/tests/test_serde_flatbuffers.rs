@@ -479,7 +479,10 @@ fn serde_set_data_schema() {
 
 #[cfg(feature = "arrow")]
 #[test]
-#[expect(deprecated)]
+#[expect(
+    deprecated,
+    reason = "exercises the deprecated legacy format on purpose"
+)]
 fn serde_set_data_schema_legacy() {
     use arrow::datatypes::*;
 

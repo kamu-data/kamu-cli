@@ -57,7 +57,6 @@ const CLIENT_ACCOUNT_NAME: &str = "kamu-client";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
 pub(crate) struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,

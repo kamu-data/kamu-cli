@@ -13,7 +13,6 @@ use crate::ProjectionEvent;
 
 /// Projections reconstruct some state from a series of events
 #[async_trait::async_trait]
-#[allow(drop_bounds)]
 pub trait Projection
 where
     Self: Sized + Send + Sync + 'static,

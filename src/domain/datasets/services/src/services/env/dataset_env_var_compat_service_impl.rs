@@ -42,7 +42,10 @@ pub struct DatasetEnvVarCompatServiceImpl {
 #[component(pub)]
 #[interface(dyn DatasetEnvVarService)]
 impl DatasetEnvVarCompatServiceImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         resolver: Arc<dyn DatasetEnvVarSpecResolver>,
         mutation_adapter: Arc<dyn DatasetEnvVarMutationAdapter>,

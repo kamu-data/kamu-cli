@@ -17,7 +17,6 @@ pub struct AdminMut;
 
 #[Object]
 impl AdminMut {
-    #[allow(clippy::unused_async)]
     #[graphql(guard = "AdminGuard::new()")]
     async fn search(&self) -> AdminSearchMut {
         AdminSearchMut

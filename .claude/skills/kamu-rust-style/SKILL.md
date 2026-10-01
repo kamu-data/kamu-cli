@@ -101,6 +101,23 @@ integers, strings and other open domains; `#[non_exhaustive]` enums from other c
 known variants, then a deliberate fallback); and `if let` / `let else` that intentionally handle
 one shape.
 
+### Lint suppressions are the last resort
+
+Fix the cause first: rename a keep-alive field to `_field`, prefix an unused parameter with `_`,
+take a reference, merge identical arms, use a checked conversion, delete dead code. Suppress only
+when the code is right and the lint cannot see why, and always with a reason
+(`clippy::allow_attributes_without_reason` enforces it):
+
+| Use | When |
+|---|---|
+| `#[expect(lint, reason = "...")]` | Default — it fails once the suppression is no longer needed |
+| `#[allow(lint, reason = "...")]` | Only when the lint fires in some builds but not others (`cfg`/feature-dependent code, macro templates expanded more than once, generated code) |
+
+Reasons that hold up: a framework contract (async-graphql resolvers and axum handlers are async,
+dill injects by value, mockall needs a named lifetime), wire or external names, a deliberate test
+of legacy behaviour, a value kept for `Debug` output or debugging. "Shorter" or "consistent with
+siblings" is not a reason. Ask the user before adding a new suppression (AGENTS.md, "Validation").
+
 ### Formatting
 
 Inline captured identifiers: `format!("value={value}")`, not `format!("value={}", value)`.
@@ -137,7 +154,7 @@ Do not re-propose these without new evidence.
 | Importing ODF types with `use odf::…` to shorten signatures | Loses the protocol-type marker and invites clashes with Kamu types of the same name. |
 | Hand-written `match` for enum ↔ string | Drifts from the variants; `strum` derives stay in sync. |
 | Catch-all `_` arm on an enum we own, "to keep the match short" | A new variant silently takes the fallback path instead of failing to compile where a decision is needed. |
-| Silencing a lint with `#[allow]` / `#[expect]` | Hides the problem; fix the cause or ask first (AGENTS.md, "Validation"). |
+| Silencing a lint instead of fixing it, or without a `reason` | Hides the problem; most suppressions removed in the cleanup turned out to be fixable or stale. |
 
 ## What lives elsewhere
 

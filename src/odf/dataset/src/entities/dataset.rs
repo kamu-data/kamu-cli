@@ -8,7 +8,10 @@
 // by the Apache License, Version 2.0.
 
 // NOTE: Workaround for mockall::automock
-#![expect(clippy::ref_option_ref)]
+#![expect(
+    clippy::ref_option_ref,
+    reason = "mockall::automock generates `&Option<&T>` signatures"
+)]
 
 use ::serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};

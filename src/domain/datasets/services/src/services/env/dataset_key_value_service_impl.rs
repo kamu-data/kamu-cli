@@ -33,7 +33,10 @@ pub struct DatasetKeyValueServiceImpl {
 #[component(pub)]
 #[interface(dyn DatasetKeyValueService)]
 impl DatasetKeyValueServiceImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(secrets_encryption_config: Arc<SecretsEncryptionConfig>) -> Self {
         Self {
             secret_encryption_key: SecretString::from(

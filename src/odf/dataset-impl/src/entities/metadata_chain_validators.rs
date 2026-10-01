@@ -377,7 +377,6 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
         &mut self,
         (_, block): HashedMetadataBlockRef,
     ) -> Result<MetadataVisitorDecision, Self::Error> {
-        #[allow(clippy::match_same_arms)]
         match &block.event {
             MetadataEvent::AddPushSource(prev_source) => {
                 if prev_source.source_name == self.new_source.source_name {
@@ -398,7 +397,7 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
                     ))
                 }
             }
-            MetadataEvent::DisablePushSource(_) => {
+            MetadataEvent::DisablePushSource(_) | MetadataEvent::DisablePollingSource(_) => {
                 invalid_event!(
                     self.new_source.clone(),
                     "Source evolution is not yet fully supported",
@@ -410,12 +409,6 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
                     "Cannot add a push source while polling source is still active",
                 );
             }
-            MetadataEvent::DisablePollingSource(_) => {
-                invalid_event!(
-                    self.new_source.clone(),
-                    "Source evolution is not yet fully supported",
-                );
-            }
             _ => unreachable!(),
         }
     }
@@ -423,13 +416,10 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateSetPollingSourceVisitor<'a> {
-    #[expect(unused)]
-    new_source: &'a SetPollingSource,
-}
+pub struct ValidateSetPollingSourceVisitor;
 
-impl<'a> ValidateSetPollingSourceVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
+impl ValidateSetPollingSourceVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
         match &block.event {
             MetadataEvent::SetPollingSource(e) => {
                 // Queries must be normalized
@@ -453,14 +443,14 @@ impl<'a> ValidateSetPollingSourceVisitor<'a> {
                     );
                 }
 
-                Ok(Some(Self { new_source: e }))
+                Ok(Some(Self))
             }
             _ => Ok(None),
         }
     }
 }
 
-impl MetadataChainVisitor for ValidateSetPollingSourceVisitor<'_> {
+impl MetadataChainVisitor for ValidateSetPollingSourceVisitor {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
@@ -907,13 +897,10 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
     }
 
     fn check_allowed_schema_migration_item(diff: &mut DataSchemaDiffItem<'_>) -> bool {
-        #[expect(clippy::match_same_arms)]
         match diff {
-            DataSchemaDiffItem::SchemaAttributesChanged => true,
-            DataSchemaDiffItem::FieldAttributesChanged {
-                field_lhs: _,
-                field_rhs: _,
-            } => true,
+            DataSchemaDiffItem::SchemaAttributesChanged
+            | DataSchemaDiffItem::FieldAttributesChanged { .. }
+            | DataSchemaDiffItem::FieldReordered { .. } => true,
             DataSchemaDiffItem::FieldAdded { field_rhs } => {
                 if field_rhs.is_optional() {
                     // It's OK to introduce a new optional field as this maintains compatibility
@@ -924,7 +911,6 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
                 }
             }
             DataSchemaDiffItem::FieldRemoved { field_lhs: _ } => false,
-            DataSchemaDiffItem::FieldReordered { .. } => true,
             DataSchemaDiffItem::FieldTypeChanged {
                 field_lhs: _,
                 field_rhs: _,
@@ -939,7 +925,10 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
     }
 
     fn check_allowed_schema_migration_type(diff: &mut DataTypeDiffItem<'_>) -> bool {
-        #[expect(clippy::match_same_arms)]
+        #[expect(
+            clippy::match_same_arms,
+            reason = "per-variant TODOs explain why each type change is not allowed yet"
+        )]
         match diff {
             DataTypeDiffItem::Changed { lhs: _, rhs: _ } => false,
             // TODO: Field becoming optional is relaxing the schema and a compatibile change from

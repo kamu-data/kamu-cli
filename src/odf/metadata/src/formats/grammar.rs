@@ -98,7 +98,6 @@ impl Grammar {
         }
     }
 
-    #[allow(dead_code)]
     // Multibase = [a-zA-Z0-9+/=]+
     fn match_multibase(s: &str) -> Option<(&str, &str)> {
         Self::match_predicate(

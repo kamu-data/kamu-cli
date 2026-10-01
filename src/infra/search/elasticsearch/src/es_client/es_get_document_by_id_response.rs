@@ -7,18 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![allow(dead_code)]
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Deserialize)]
 pub struct GetDocumentByIdResponse {
+    #[expect(dead_code, reason = "kept for Debug output when diagnosing responses")]
     #[serde(rename = "_index")]
     pub index: String,
 
+    #[expect(dead_code, reason = "kept for Debug output when diagnosing responses")]
     #[serde(rename = "_id")]
     pub id: String,
 
+    #[expect(dead_code, reason = "kept for Debug output when diagnosing responses")]
     #[serde(rename = "_version")]
     pub version: Option<u64>,
 

@@ -44,9 +44,6 @@ pub(crate) struct CsvFlowProcessRecord {
     #[serde(deserialize_with = "deserialize_optional_datetime")]
     pub last_failure_at: Option<DateTime<Utc>>,
     #[serde(deserialize_with = "deserialize_optional_datetime")]
-    #[allow(dead_code)]
-    pub last_attempt_at: Option<DateTime<Utc>>,
-    #[serde(deserialize_with = "deserialize_optional_datetime")]
     pub next_planned_at: Option<DateTime<Utc>>,
     pub auto_stopped_reason: Option<String>,
     #[serde(deserialize_with = "deserialize_optional_datetime")]

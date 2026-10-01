@@ -416,9 +416,8 @@ impl From<storage::PersistentVolumeRef> for resources::ResourceRef {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl datasets::OffsetInterval {
-    #[allow(clippy::cast_possible_truncation)]
     pub fn len(&self) -> usize {
-        (self.end - self.start + 1) as usize
+        usize::try_from(self.end - self.start + 1).unwrap()
     }
 }
 

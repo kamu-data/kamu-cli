@@ -69,7 +69,10 @@ impl DataSchemaBuilder {
         Self::default()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "builder-style public API takes the vocabulary by value"
+    )]
     pub fn with_changelog_system_fields(
         mut self,
         vocab: DatasetVocabulary,

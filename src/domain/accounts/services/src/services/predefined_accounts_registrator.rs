@@ -45,7 +45,10 @@ pub struct PredefinedAccountsRegistrator {
     requires_transaction: true,
 })]
 impl PredefinedAccountsRegistrator {
-    #[expect(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_service: Arc<dyn AccountService>,

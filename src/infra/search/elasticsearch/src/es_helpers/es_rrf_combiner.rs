@@ -198,12 +198,10 @@ impl ElasticsearchRRFCombiner {
         }
     }
 
-    #[allow(clippy::cast_precision_loss)]
     fn rrf_inc(rank_constant: usize, rank_1_based: usize) -> f64 {
-        // Rank values in search results are typically small (< 1000), so precision loss
-        // is not a concern
-        let rank = rank_constant + rank_1_based;
-        let rank = rank as f64;
+        // Ranks are small (< 1000); saturating keeps the score monotonic regardless
+        let rank = u32::try_from(rank_constant + rank_1_based).unwrap_or(u32::MAX);
+        let rank = f64::from(rank);
         1.0 / rank
     }
 

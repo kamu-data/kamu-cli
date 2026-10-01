@@ -148,11 +148,6 @@ impl BaseGQLDatasetHarness {
         &self.catalog
     }
 
-    #[expect(dead_code)]
-    pub fn schema(&self) -> &kamu_adapter_graphql::Schema {
-        &self.schema
-    }
-
     pub fn logged_account_from_catalog(&self, catalog: &dill::Catalog) -> LoggedAccount {
         let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         if let CurrentAccountSubject::Logged(logged) = current_account_subject.as_ref() {

@@ -13,7 +13,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-#[allow(clippy::enum_variant_names)]
+#[expect(
+    clippy::enum_variant_names,
+    reason = "variant names are part of the serialized smart-protocol messages"
+)]
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum PullPhase {
     InitialRequest,

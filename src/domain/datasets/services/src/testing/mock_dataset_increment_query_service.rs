@@ -17,7 +17,7 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl DatasetIncrementQueryService for DatasetIncrementQueryService {
-        #[allow(clippy::ref_option_ref)]
+        #[allow(clippy::ref_option_ref, reason = "signature mirrors the mocked trait")]
         async fn get_increment_between<'a>(
             &'a self,
             dataset_id: &'a odf::DatasetID,

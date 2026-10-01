@@ -192,7 +192,10 @@ impl Flow {
     }
 
     /// Start condition
-    #[allow(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn start_condition(&self) -> Result<Option<FlowStartCondition>> {
         let maybe_condition = self
             .flow_state
@@ -219,7 +222,10 @@ impl Flow {
     }
 
     /// Associated flow trigger
-    #[allow(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn related_trigger(&self) -> Result<Option<FlowTrigger>, InternalError> {
         Ok(self
             .maybe_related_flow_trigger_state

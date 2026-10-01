@@ -41,7 +41,10 @@ pub fn auto_detect_mode() -> Mode {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "initialization entry points consume their configuration"
+)]
 pub fn dev(cfg: Config) -> Guard {
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new(cfg.default_log_levels.clone()));
@@ -87,7 +90,10 @@ pub fn dev(cfg: Config) -> Guard {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::needless_pass_by_value)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "initialization entry points consume their configuration"
+)]
 pub fn service(cfg: Config) -> Guard {
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new(cfg.default_log_levels.clone()));
@@ -182,7 +188,6 @@ fn init_otel_tracer(cfg: &Config) -> (opentelemetry_sdk::trace::SdkTracer, OtlpG
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[must_use]
-#[allow(dead_code)]
 pub struct Guard {
     pub non_blocking_appender: Option<tracing_appender::non_blocking::WorkerGuard>,
 

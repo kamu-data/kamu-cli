@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{HashSet, LinkedList};
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 use kamu::domain::*;
@@ -156,10 +156,9 @@ impl AddCommand {
         ret
     }
 
-    #[allow(clippy::linkedlist)]
     fn sort_snapshots_in_dependency_order(
         &self,
-        mut snapshots: LinkedList<odf::DatasetSnapshot>,
+        mut snapshots: VecDeque<odf::DatasetSnapshot>,
     ) -> Vec<odf::DatasetSnapshot> {
         let mut ordered = Vec::with_capacity(snapshots.len());
         let mut pending: HashSet<odf::DatasetRef> =

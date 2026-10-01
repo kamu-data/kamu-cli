@@ -125,7 +125,6 @@ pub struct UploadFromPath {
         ("api_key" = []),
     )
 )]
-#[allow(clippy::unused_async)]
 pub async fn file_upload_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
@@ -178,7 +177,6 @@ pub async fn file_upload_post_handler(
         ("api_key" = []),
     )
 )]
-#[allow(clippy::unused_async)]
 pub async fn file_upload_get_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,

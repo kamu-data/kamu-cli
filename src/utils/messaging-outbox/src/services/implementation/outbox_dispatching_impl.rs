@@ -26,7 +26,6 @@ pub struct OutboxDispatchingImpl {
 
 #[dill::component(pub)]
 impl OutboxDispatchingImpl {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         catalog: &dill::Catalog,
         immediate_outbox: Arc<OutboxImmediateImpl>,

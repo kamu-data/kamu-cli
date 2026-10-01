@@ -54,24 +54,24 @@ pub struct LogCommand {
 }
 
 impl LogCommand {
-    #[allow(clippy::match_same_arms)]
     fn filter_block(&self, block: &odf::MetadataBlock) -> bool {
         // Keep in sync with CLI parser
         // TODO: replace with bitfield enum
         if let Some(f) = &self.filter {
             match &block.event {
-                odf::MetadataEvent::AddData(_) if f.contains("data") || f.contains("watermark") => {
-                    true
-                }
-                odf::MetadataEvent::ExecuteTransform(_)
+                odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_)
                     if f.contains("data") || f.contains("watermark") =>
                 {
                     true
                 }
-                odf::MetadataEvent::Seed(_) if f.contains("source") => true,
-                odf::MetadataEvent::SetPollingSource(_) if f.contains("source") => true,
-                odf::MetadataEvent::SetTransform(_) if f.contains("source") => true,
-                odf::MetadataEvent::SetVocab(_) if f.contains("source") => true,
+                odf::MetadataEvent::Seed(_)
+                | odf::MetadataEvent::SetPollingSource(_)
+                | odf::MetadataEvent::SetTransform(_)
+                | odf::MetadataEvent::SetVocab(_)
+                    if f.contains("source") =>
+                {
+                    true
+                }
                 _ => false,
             }
         } else {

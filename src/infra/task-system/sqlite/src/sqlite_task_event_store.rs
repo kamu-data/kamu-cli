@@ -353,7 +353,6 @@ impl TaskEventStore for SqliteTaskEventStore {
         let connection_mut = tr.connection_mut().await?;
 
         #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-        #[allow(dead_code)]
         pub struct NewTask {
             pub task_id: i64,
         }

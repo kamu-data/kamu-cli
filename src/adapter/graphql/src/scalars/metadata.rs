@@ -56,7 +56,10 @@ impl MetadataBlockExtended {
         })
     }
 
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn encoded(
         &self,
         encoding: MetadataManifestFormat,

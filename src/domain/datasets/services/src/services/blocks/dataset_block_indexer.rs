@@ -59,7 +59,10 @@ impl DatasetBlockIndexer {
         // migration stage
 
         // Repository can build a report of unindexed dataset branches (id->blockRef)
-        #[allow(clippy::zero_sized_map_values)]
+        #[expect(
+            clippy::zero_sized_map_values,
+            reason = "repository API returns a map with zero-sized values"
+        )]
         let unindexed_dataset_branches = dataset_key_block_repo
             .list_unindexed_dataset_branches()
             .await?

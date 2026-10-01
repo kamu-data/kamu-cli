@@ -32,7 +32,6 @@ impl ViewDatasetEnvVar {
     }
 
     /// Non secret value of dataset environment variable
-    #[allow(clippy::unused_async)]
     async fn value(&self) -> Option<String> {
         self.env_var.get_non_secret_value()
     }

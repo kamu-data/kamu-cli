@@ -2993,18 +2993,6 @@ impl<'a> DatasetFlowGenerator<'a> {
         flow
     }
 
-    #[allow(dead_code)]
-    async fn abort_flow(&self, flow_id: FlowID) {
-        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-            .await
-            .unwrap();
-        assert_ne!(flow.status(), FlowStatus::Finished);
-
-        flow.abort(Utc::now()).unwrap();
-
-        flow.save(self.flow_event_store.as_ref()).await.unwrap();
-    }
-
     async fn make_waiting_flow_scheduled_for(
         &self,
         flow_type: &str,

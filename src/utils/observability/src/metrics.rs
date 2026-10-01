@@ -62,7 +62,7 @@ pub async fn metrics_handler(axum::Extension(catalog): axum::Extension<dill::Cat
     metrics_handler_raw(axum::Extension(reg.as_ref().clone())).await
 }
 
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async, reason = "axum handlers must be async")]
 pub async fn metrics_handler_raw(
     axum::Extension(reg): axum::Extension<prometheus::Registry>,
 ) -> String {

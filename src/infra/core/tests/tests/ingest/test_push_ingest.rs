@@ -444,7 +444,7 @@ async fn test_ingest_push_schema_stability() {
 
     odf::utils::testing::assert_arrow_schema_eq(
         &schema_in_metadata_as_arrow,
-        json!({
+        &json!({
             "fields": [{
                 "name": "offset",
                 "data_type": "Int64",
@@ -505,7 +505,7 @@ async fn test_ingest_push_schema_stability() {
 
     odf::utils::testing::assert_arrow_schema_eq(
         &schema_on_parquet_read,
-        json!({
+        &json!({
             "fields": [{
                 "name": "offset",
                 "data_type": "Int64",

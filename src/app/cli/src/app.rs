@@ -1210,8 +1210,8 @@ fn configure_logging(
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
     Guards {
-        appender: Some(appender_guard),
-        perfetto: perfetto_guard,
+        _appender: Some(appender_guard),
+        _perfetto: perfetto_guard,
     }
 }
 
@@ -1265,11 +1265,10 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
 #[derive(Default)]
 struct Guards {
-    appender: Option<tracing_appender::non_blocking::WorkerGuard>,
-    perfetto: Option<tracing_perfetto::FlushGuard>,
+    _appender: Option<tracing_appender::non_blocking::WorkerGuard>,
+    _perfetto: Option<tracing_perfetto::FlushGuard>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

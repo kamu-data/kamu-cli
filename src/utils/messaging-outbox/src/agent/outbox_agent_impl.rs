@@ -92,7 +92,10 @@ impl OutboxAgentImpl {
         }
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "receives the list dill injects by value into the constructor"
+    )]
     fn make_static_routes_info(
         catalog: &Catalog,
         message_dispatchers: Vec<Arc<dyn MessageDispatcher>>,

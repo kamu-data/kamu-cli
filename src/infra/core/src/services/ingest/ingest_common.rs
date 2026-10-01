@@ -193,7 +193,10 @@ pub fn new_session_context(
             .unwrap(),
     );
 
-    #[allow(unused_mut)]
+    #[allow(
+        unused_mut,
+        reason = "mutated only when the `ingest-evm` feature registers UDFs"
+    )]
     let mut ctx = SessionContext::new_with_config_rt(config, runtime);
 
     // TODO: As part of the ODF spec we should let people opt-in into various
