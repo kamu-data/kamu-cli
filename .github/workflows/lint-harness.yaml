@@ -1,0 +1,24 @@
+name: lint-harness
+# Unfiltered on purpose: the main build skips documentation-only changes, but skills, AGENTS.md
+# and design docs are exactly what this checks.
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch: { }
+jobs:
+  lint_harness:
+    name: Lint / Agent harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: true
+          cache-on-failure: true
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo tools
+        run: cargo binstall cargo-nextest -y --force --github-token ${{ secrets.GITHUB_TOKEN }}
+      - name: Agent hooks and harness lints
+        run: make lint-harness

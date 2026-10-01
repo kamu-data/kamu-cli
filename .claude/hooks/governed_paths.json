@@ -1,0 +1,42 @@
+{
+  "skills": [
+    { "skill": "kamu-cli-e2e-tests", "paths": ["src/e2e/**"] },
+    { "skill": "kamu-repository-tests", "paths": ["src/infra/*/repo-tests/**"] },
+    {
+      "skill": "kamu-sqlx-database-work",
+      "paths": [
+        "migrations/**",
+        "src/infra/*/postgres/**",
+        "src/infra/*/sqlite/**",
+        "src/infra/*/cache-postgres/**",
+        "src/infra/*/cache-sqlite/**"
+      ]
+    },
+    {
+      "skill": "kamu-graphql-api",
+      "paths": ["src/adapter/graphql/**", "src/adapter/resources-facade-graphql/**"]
+    },
+    { "skill": "kamu-test-harness", "paths": ["src/**/tests/**/*.rs"] },
+    { "skill": "kamu-release-dependency-workflows", "paths": ["CHANGELOG.md"] },
+    {
+      "skill": "kamu-prose-and-comments",
+      "paths": ["AGENTS.md", "CLAUDE.md", "docs/**/*.md", ".claude/skills/**"]
+    },
+    { "skill": "kamu-rust-style", "paths": ["**/*.rs"], "baseline": true }
+  ],
+  "generated": [
+    { "paths": ["resources/schema.gql"], "command": "make resources-graphql-schema" },
+    {
+      "paths": [
+        "resources/openapi.json",
+        "resources/openapi-mt.json",
+        "resources/config-schema.json",
+        "resources/config-reference.md",
+        "resources/cli-reference.md",
+        "resources/di.puml"
+      ],
+      "command": "make resources"
+    },
+    { "paths": ["**/.sqlx/**"], "command": "make sqlx-prepare" }
+  ]
+}

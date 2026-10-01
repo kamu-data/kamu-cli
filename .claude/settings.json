@@ -1,0 +1,77 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.claude_pre_bash",
+            "statusMessage": "Checking command safety",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.claude_pre_edit",
+            "statusMessage": "Checking edit rules",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.claude_post_edit",
+            "statusMessage": "Formatting and checking the edit",
+            "timeout": 90
+          }
+        ]
+      },
+      {
+        "matcher": "Skill|Read|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.claude_post_tool",
+            "statusMessage": "Recording skills and lint runs",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.claude_session_start",
+            "statusMessage": "Loading the harness contract",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.claude_stop",
+            "statusMessage": "Checking for unlinted Rust changes",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

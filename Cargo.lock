@@ -9098,6 +9098,7 @@ dependencies = [
  "reqwest",
  "semver 1.0.28",
  "serde",
+ "serde_json",
  "toml",
 ]
 

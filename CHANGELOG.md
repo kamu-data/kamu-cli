@@ -13,6 +13,21 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Added
+- Agent harness for Claude Code and Codex:
+  - hooks in `scripts/agents/` deny commands that discard uncommitted work and `SQLX_OFFLINE` overrides, ask
+    before commits, pushes and `-p`-scoped cargo builds, refuse hand edits to generated files, require loading
+    the governing skill before editing guarded paths, and run `rustfmt` plus rule checks on edited Rust
+  - new skills: Rust style (required before any `.rs` edit), renaming a concept, adding a bounded context,
+    prose and comments
+  - `make lint-harness` (part of `make lint`, and run by CI on every PR) checks the hooks, skill registration
+    and routing, and documentation links
+### Changed
+- Agent guidance consolidated: `AGENTS.md` is the single source of rules, skills moved to `.claude/skills/`
+  with `.agents/skills/` symlinks for Codex, and DEVELOPER.md gained an "Agent Harness" section
+- Database migrations are forward-only: `make sqlx-add-migration` no longer creates down migrations
+
 ## [0.268.1] - 2026-10-01
 ### Fixed
 - OpenTelemetry stabilization after upgrade

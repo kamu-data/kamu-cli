@@ -42,14 +42,8 @@ cargo nextest run -E 'test(test_apply_resource_use_case)'
 make clippy
 ```
 
-> SQLx query-checking mode comes from `.env` files, not from your shell — don't set `SQLX_OFFLINE`
-> by hand. The root `.env` sets it `true` repo-wide so CI (which has no database) compiles from the
-> committed `.sqlx` cache; `make sqlx-local-setup` starts the DB containers and writes per-crate
-> `.env` files that turn it off, so queries are checked against the real schema. After changing SQL,
-> `make sqlx-prepare` and commit the regenerated `.sqlx`. See
-> [`DEVELOPER.md`](/DEVELOPER.md#build-with-databases).
->
-> Build/check/lint the **whole workspace** — do not scope these commands with `-p <crate>`.
+> Build scope and SQLx mode follow [`AGENTS.md`](/AGENTS.md#hard-rules): whole-workspace builds,
+> never override `SQLX_OFFLINE`, and `make sqlx-prepare` after changing SQL.
 
 ---
 
@@ -1719,9 +1713,6 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 
 ## 17. Extension points & gotchas
 
-- **Don't override SQLx mode on the command line.** It is set by `.env` files — repo-wide offline by
-  default, live per-crate after `make sqlx-local-setup`. Forcing `SQLX_OFFLINE=true` over a local
-  setup checks queries against the stale cache instead of the real schema (see the quick-start note).
 - **Dispatch is by schema.** A missing schema yields
   `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield `Duplicate`.
   Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
@@ -1777,4 +1768,3 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   the scope. Backends therefore never see an expression tree and cannot call the helper at all, so
   widening support means changing it, the scope's pair representation, and the backends — never a
   repository signature, and never the resolver.
-- **Test convention:** use `assert_matches!` directly (never `assert!(matches!(...))`).

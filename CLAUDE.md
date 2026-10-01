@@ -1,37 +1,33 @@
 # CLAUDE.md
 
-This file provides Claude Code-specific guidance. For the full agent guide, read [`AGENTS.md`](AGENTS.md) — it is the canonical source for validation, testing, style, and skill-loading rules.
+Read [`AGENTS.md`](AGENTS.md) — it is the canonical source for every rule: git safety, build scope,
+validation, tests, style, and which skill or document to load for a task. This file only adds what
+is specific to Claude Code.
 
 ## Environment
 
-**Do not pass `SQLX_OFFLINE=true` on the command line.** This checkout runs against a live database: `make sqlx-local-setup` has written per-crate `.env` files (gitignored) with a `DATABASE_URL` and `SQLX_OFFLINE=false`, and the DB containers run under Podman. Setting the variable on the command line overrides that and silently forces query checking against the stale `.sqlx` cache instead of the real schema — which defeats the point of the local setup and hides schema drift.
+The usual local setup here runs against live databases: `make sqlx-local-setup` writes per-crate
+`.env` files (gitignored) with a `DATABASE_URL` and `SQLX_OFFLINE=false`, and the DB containers run
+under Podman. If those `.env` files exist, SQLx queries are checked against the real schema — never
+override `SQLX_OFFLINE` on the command line ([why](AGENTS.md#hard-rules)). If they do not, builds
+use the committed `.sqlx` cache and database-backed tests need the setup first
+([`DEVELOPER.md`](DEVELOPER.md#build-with-databases)).
 
-Just run the plain commands:
+## Hooks
 
-```bash
-cargo build
-cargo nextest run -E 'test(test_name_here)'
-make clippy
-```
+[`.claude/settings.json`](.claude/settings.json) wires the hooks in `scripts/agents/`:
 
-Background: the root [`.env`](.env) sets `SQLX_OFFLINE=true` as the repo-wide default so CI — which has no database service — can compile the postgres crates from the committed `.sqlx` cache. The per-crate `.env` files from `sqlx-local-setup` take precedence over it locally. After changing any SQL, run `make sqlx-prepare` and commit the regenerated `.sqlx`, or CI will fail to build. See [`DEVELOPER.md`](DEVELOPER.md#build-with-databases).
+- a command guard (destructive git forms denied; commit/push/merge/rebase and `-p` builds ask);
+- an edit guard (generated files denied; guarded paths refused until their skill is loaded);
+- a post-edit pass on `.rs` files (`rustfmt`, then checks on the added text);
+- a session-start contract and a stop-time reminder when `.rs` files changed since the last green
+  `make clippy`.
 
-**NEVER use `-p <crate>` (or `--package`) to scope `cargo build`/`check`/`clippy`/`nextest run` to a single crate.** Always build/check/lint the full workspace. This has been requested repeatedly — do not reintroduce `-p` scoping. Narrow *tests* with `-E 'test(...)'`, not with `-p`.
+A refusal names the rule and the fix. Load skills with the `Skill` tool; a subagent loads its own.
+How the harness is built and tested: [`DEVELOPER.md`](DEVELOPER.md#agent-harness).
 
-## Never discard uncommitted work
+## Memory
 
-`git checkout <path>`, `git restore <path>`, `git reset --hard`, `git stash` and `git clean` destroy uncommitted changes irreversibly — there is no undo, and edits made earlier in the session are not recoverable from the transcript. **Do not run them on a file that has uncommitted changes** unless the user explicitly asked to throw those changes away.
-
-This has caused real loss more than once. The usual trigger is using a checkout to "reset" a file after a scripted edit went wrong — which also reverts every unrelated edit already made to that file.
-
-Instead:
-- **A bad edit?** Fix it forward with `Edit`, or rewrite the file with `Write`. Both preserve everything else.
-- **Need a pristine copy to compare against?** `git show HEAD:<path> > /tmp/.../orig.md` — read it without touching the working tree.
-- **Recomputing line offsets after an edit?** Re-read the file; never reset it to make stale offsets valid again.
-- **Genuinely need to discard?** Ask first, and say exactly which changes will be lost.
-
-When a scripted multi-edit is involved, prefer anchored string replacement over line numbers, and assert each anchor matches before writing — line indices go stale the moment an earlier edit lands.
-
-## Skills
-
-Claude Code can load skills via the `Skill` tool. The same skill list from `AGENTS.md` applies — trigger them by topic, not by default.
+Memory is for external context only (see [AGENTS.md](AGENTS.md#memory)). Before saving a memory,
+check whether it is really a rule about this codebase — if so, propose an `AGENTS.md` or skill
+change instead.

@@ -1,0 +1,67 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.codex_session_start",
+            "statusMessage": "Loading the harness contract",
+            "timeout": 30,
+            "additionalContextLimit": 1500
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.codex_pre_bash",
+            "statusMessage": "Checking command safety",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.codex_pre_patch",
+            "statusMessage": "Checking edit rules",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.codex_post_bash",
+            "statusMessage": "Recording skill loads",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.codex_post_patch",
+            "statusMessage": "Formatting and checking the patch",
+            "timeout": 90,
+            "additionalContextLimit": 1000
+          }
+        ]
+      }
+    ]
+  }
+}

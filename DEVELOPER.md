@@ -25,6 +25,7 @@
   - [Major Dependencies Update](#major-dependencies-update)
   - [Building Multi-platform Images](#building-multi-platform-images)
   - [Upgrading Datafusion stack](#upgrading-datafusion-stack)
+- [Agent Harness](#agent-harness)
 - [Tips](#tips)
   - [IDE Configuration](#ide-configuration)
   - [Debugging](#debugging)
@@ -148,8 +149,10 @@ The second step, `make sqlx-local-clean` would reverse `make sqlx-local-setup` b
 
 ### Database migrations
 Any change to the database structure requires writing SQL migration scripts.
+Migrations are forward-only: each is a single `.sql` file, with no down migration.
+`make sqlx-add-migration NAME=<name>` adds one for every database engine at once.
 The scripts are stored in `./migrations/<db-engine>/` folders, and they are unique per database type.
-The migration commands should be launched within database-specific crate folders, such as `./src/database/sqlx-postgres`. Alternatively, you will need to define `DATABASE_URL` variable manually.
+The migration commands should be launched within a database-specific crate folder that `make sqlx-local-setup` wrote a `.env` file into, such as `./src/infra/accounts/postgres` (the full list is `POSTGRES_CRATES` / `SQLITE_CRATES` in the [`Makefile`](./Makefile)). Alternatively, you will need to define `DATABASE_URL` variable manually.
 
 Typical commands to work with migrations include:
 * `sqlx migrate add --source <migrations_dir_path> <description>` to add a new migration
@@ -230,6 +233,8 @@ To run tests for a specific crate, e.g. `opendatafabric` use:
 ```sh
 cargo nextest run -p opendatafabric
 ```
+
+Scoping with `-p` is only cheap for crates with a small dependency tree: with workspace-wide feature unification a `-p` build does not reuse full-workspace artifacts and may recompile heavy dependencies like DataFusion. Prefer filtering a workspace run by test name (`cargo nextest run -E 'test(name)'`). See [`AGENTS.md`](./AGENTS.md#build-scope--p).
 
 #### Troubleshooting: instant failures in unrelated containerized tests
 
@@ -515,6 +520,57 @@ The usual upgrade procedure looks like this:
 6. Ensure `Cargo.lock` does not contain duplicate versions of major crates (or run `cargo deny check --hide-inclusion-graph`)
 7. Follow the steps in `src/utils/datafusion-cli/README.md` to update the SQL shell
 8. Fix any compilation errors and warnings and ensure tests are green
+
+
+## Agent Harness
+Coding agents (Claude Code, Codex) working in this repository are guided by documents and held to them by hooks. This section is for the humans who maintain that machinery; the rules themselves live in [`AGENTS.md`](./AGENTS.md).
+
+| What | Where |
+|---|---|
+| Canonical agent rules, skill and document routing | [`AGENTS.md`](./AGENTS.md) |
+| Claude Code specifics | [`CLAUDE.md`](./CLAUDE.md) |
+| Task procedures (skills) | `.claude/skills/<name>/SKILL.md` |
+| The same skills for Codex | `.agents/skills/<name>` — relative symlinks into `.claude/skills/` |
+| Which paths need which skill; which files are generated | [`.claude/hooks/governed_paths.json`](./.claude/hooks/governed_paths.json) |
+| Hook wiring | [`.claude/settings.json`](./.claude/settings.json), [`.codex/hooks.json`](./.codex/hooks.json) |
+| Hook code and its tests | `scripts/agents/` (Python standard library only), `scripts/agents/tests/` |
+| Consistency lints | `src/utils/repo-tools/tests/lints/agent_harness.rs` |
+| Runtime state (gitignored) | `.claude/state/`, `.codex/state/` |
+
+The hooks require Python 3 and a POSIX host; Rust formatting also requires `rustfmt`.
+Policy and agent instructions are owned by [`AGENTS.md`](./AGENTS.md) and the routed skills.
+
+What the hooks do:
+* **Command guard** — denies commands that discard uncommitted work (`git reset --hard`, `git checkout -- <path>`, `git restore`, `git stash`, `git clean -f`), `SQLX_OFFLINE=...` on the command line, and build/test output piped into `head`/`tail`; asks for approval on `git commit`/`push`/`merge`/`rebase`/`tag` and on `-p`-scoped cargo builds.
+* **Edit guard** — refuses hand edits to generated files (naming the regeneration command) and edits under a guarded path until the session has loaded the governing skill; asks before writes to agent memory.
+* **Post-edit** — runs `rustfmt` on an edited `.rs` file, then checks only the added lines (`assert!(matches!(..))`, lint suppressions, `dbg!`, plan/ticket citations and change narration in comments, license header, dividing lines); reminds about `make sqlx-prepare`, schema regeneration and the e2e SQLite/Postgres lockstep.
+* **Session start** — injects a short contract generated from `governed_paths.json`; after compaction or `/clear` skills must be loaded again.
+* **Stop** (Claude only) — if the session edited Rust and the tree changed since the last green foreground `make clippy`, reminds the agent once to run it.
+
+Limitations — the rules in `AGENTS.md` still apply where the hooks cannot see:
+* Files written through the shell (heredocs, scripts, `sed -i`) bypass the edit guard and post-edit checks.
+* `git checkout <path>` without `--` is indistinguishable from a branch switch and passes the guard.
+* Commands assembled at runtime (variables, generated scripts) are not inspected.
+* Codex hooks cannot ask: its adapters deny `-p` builds outright and leave commit approval to `AGENTS.md`.
+
+For Codex, trust the project and review the repository hook definitions with `/hooks`; new or
+changed definitions are skipped until trusted, and hooks must be enabled in the Codex configuration.
+
+Typical changes:
+* **Add a skill:** create `.claude/skills/<name>/SKILL.md` with `name` and `description` front matter, `ln -s ../../.claude/skills/<name> .agents/skills/<name>`, and add a row to the skills table in `AGENTS.md`.
+* **Guard a path with a skill:** add the glob to the skill's rule in `governed_paths.json` **and** to the "Guarded paths" column in `AGENTS.md` — a lint keeps the two identical, including order (the first matching rule wins). A rule with `"baseline": true` applies in addition to the first match — `kamu-rust-style` on every `.rs` file is one.
+* **Add a design doc:** put it in `docs/internal/` and add a row to the documents table in `AGENTS.md`.
+* **Change a hook rule:** edit the policy module in `scripts/agents/` and add a case to its test.
+
+Before pushing changes to any of the above, run:
+```sh
+make lint-harness
+```
+It runs the hook tests, including Codex handlers invoked from a nested directory with JSON on
+stdin, and the repository lints (skills declared, routed and symlinked; guarded paths in sync;
+documentation links and anchors resolve; every design doc routed). The handler tests exercise
+policy and payload handling without a model request; they do not verify Codex trust decisions or
+runtime event dispatch. CI runs the same target on every pull request, including documentation-only ones.
 
 
 ## Tips

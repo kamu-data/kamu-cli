@@ -7,5 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod agent_harness;
 mod dividing_lines;
 mod license_header;

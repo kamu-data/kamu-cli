@@ -1,6 +1,6 @@
 # Contract Test Coverage Matrix
 
-Each RF scenario from the original plan is listed with its status.
+Each `RF-*` contract scenario is listed with its status. Test code and comments may cite these IDs; keep this map in sync when adding or renumbering scenarios.
 
 | RF ID | File | Status | Description | Notes |
 |---|---|---|---|---|

@@ -43,7 +43,18 @@ KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 ###############################################################################
 
 .PHONY: lint
-lint: lint-rustfmt lint-repo lint-deps clippy lint-openapi lint-sqlx
+lint: lint-rustfmt lint-harness lint-deps clippy lint-openapi lint-sqlx
+
+
+# Agent hook tests (Python stdlib, no build needed)
+.PHONY: test-harness
+test-harness:
+	python3 -m unittest discover -s scripts/agents/tests -t .
+
+
+# Agent harness: hook tests plus the repo lints that keep skills, AGENTS.md, hook policy and doc links consistent
+.PHONY: lint-harness
+lint-harness: test-harness lint-repo
 
 
 .PHONY: lint-rustfmt
@@ -168,7 +179,7 @@ sqlx-prepare-sqlite:
 .PHONY: sqlx-add-migration
 sqlx-add-migration:
 	@@echo "Migration name: $${NAME:?Usage: make sqlx-add-migration NAME=new_table}"
-	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add -r $$NAME --source $(dir) );)
+	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add $$NAME --source $(dir) );)
 
 ###############################################################################
 # Elasticsearch

@@ -8,6 +8,14 @@ target/
 .env
 /kamu.sqlite.db*
 .local/
-.codex
+.codex/*
+!.codex/hooks.json
 .claude/settings.local.json
+.claude/state/
 .spec
+# Python (agent hooks in scripts/agents)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
