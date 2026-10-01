@@ -53,6 +53,9 @@ jobs:
         run: make lint-openapi
       - name: clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
+      # Features used only by downstream (e.g. kamu-node) are not compiled by the workspace build
+      - name: Check observability with all features
+        run: cargo check -p observability --all-features
 
   lint_codegen:
     name: Lint / Codegen

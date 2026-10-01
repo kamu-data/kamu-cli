@@ -13,6 +13,11 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [0.268.1] - 2026-10-01
+### Fixed
+- OpenTelemetry stabilization after upgrade
+- CI: compile `observability` with all features to catch breakages in downstream-only features like `opentelemetry`
+
 ## [0.268.0] - 2026-09-30
 ### Added
 - Prometheus metrics for background agents, with recommended alerts in `docs/internal/metrics.md`:
