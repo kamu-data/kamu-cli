@@ -145,6 +145,43 @@ impl TransformTestHarness {
         ResolvedDataset::from_stored(&stored, &alias)
     }
 
+    async fn new_root_with_push_source(&self, alias: &odf::DatasetAlias) -> ResolvedDataset {
+        let stored = create_test_dataset_from_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            MetadataFactory::dataset_snapshot()
+                .name(alias.clone())
+                .kind(odf::DatasetKind::Root)
+                .push_event(
+                    MetadataFactory::add_push_source()
+                        .read(odf::metadata::ReadStepCsv {
+                            header: Some(true),
+                            schema: Some(odf::schema::DataSchema::new(vec![
+                                odf::schema::DataField::timestamp_millis_utc("date"),
+                                odf::schema::DataField::string("city"),
+                                odf::schema::DataField::i64("population"),
+                            ])),
+                            ..odf::metadata::ReadStepCsv::default()
+                        })
+                        .merge(odf::metadata::MergeStrategyLedger {
+                            primary_key: vec!["date".to_string(), "city".to_string()],
+                        })
+                        .build(),
+                )
+                .push_event(odf::metadata::SetVocab {
+                    event_time_column: Some("date".to_string()),
+                    ..Default::default()
+                })
+                .build(),
+            self.did_generator.generate_dataset_id().0,
+            self.system_time_source.now(),
+        )
+        .await
+        .unwrap();
+
+        ResolvedDataset::from_stored(&stored, alias)
+    }
+
     async fn new_deriv(
         &self,
         name: &str,
@@ -239,6 +276,26 @@ impl TransformTestHarness {
         )
     }
 
+    async fn append_info_block(&self, target: ResolvedDataset) -> odf::Multihash {
+        let chain = target.as_metadata_chain();
+        let head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
+        let head_block = chain.get_block(&head).await.unwrap();
+
+        chain
+            .append(
+                MetadataFactory::metadata_block(
+                    MetadataFactory::set_info()
+                        .description("Updated description")
+                        .build(),
+                )
+                .prev(&head, head_block.sequence_number)
+                .build(),
+                odf::dataset::AppendOpts::default(),
+            )
+            .await
+            .unwrap()
+    }
+
     async fn ingest_data(&self, data_str: String, target: ResolvedDataset) {
         let data = std::io::Cursor::new(data_str);
 
@@ -258,6 +315,38 @@ impl TransformTestHarness {
             )
             .await
             .unwrap();
+    }
+
+    /// Creates a root dataset with the given ingest batches and a derivative
+    /// that has transformed all of them and is up to date
+    async fn new_root_and_synced_deriv(
+        &self,
+        root_batches: &[&str],
+    ) -> (ResolvedDataset, ResolvedDataset) {
+        let root_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let root_target = self.new_root_with_push_source(&root_alias).await;
+        for batch in root_batches {
+            self.ingest_data((*batch).to_string(), root_target.clone())
+                .await;
+        }
+
+        let (deriv_target, _) = self
+            .new_deriv(
+                "bar",
+                std::slice::from_ref(&root_alias),
+                self.system_time_source.now(),
+            )
+            .await;
+
+        let transform_result = self
+            .transform(deriv_target.clone(), TransformOptions::default())
+            .await;
+        assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
+
+        let status = self.evaluate_transform_status(deriv_target.clone()).await;
+        assert_matches!(status, TransformStatus::UpToDate);
+
+        (root_target, deriv_target)
     }
 
     async fn evaluate_transform_status(&self, target: ResolvedDataset) -> TransformStatus {
@@ -326,9 +415,25 @@ impl TransformTestHarness {
     }
 
     async fn compact(&self, target: ResolvedDataset) {
+        self.compact_with_options(target, CompactionOptions::default())
+            .await;
+    }
+
+    async fn reset_to_metadata(&self, target: ResolvedDataset) {
+        self.compact_with_options(
+            target,
+            CompactionOptions {
+                keep_metadata_only: true,
+                ..CompactionOptions::default()
+            },
+        )
+        .await;
+    }
+
+    async fn compact_with_options(&self, target: ResolvedDataset, options: CompactionOptions) {
         let compaction_plan = self
             .compaction_planner
-            .plan_compaction(target.clone(), CompactionOptions::default(), None)
+            .plan_compaction(target.clone(), options, None)
             .await
             .unwrap();
 
@@ -357,6 +462,14 @@ impl TransformTestHarness {
                 .await
                 .unwrap();
         }
+    }
+
+    fn assert_requests_equivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
+        // Operation IDs are randomly generated, so ignoring them for this check
+        rhs.operation_id.clone_from(&lhs.operation_id);
+
+        assert_eq!(lhs.inputs, rhs.inputs);
+        assert_eq!(*lhs, rhs);
     }
 }
 
@@ -691,9 +804,9 @@ async fn test_get_verification_plan_one_to_one() {
         deriv_chain.get_block(&deriv_head_t6).await.unwrap()
     );
 
-    assert_requests_equivalent(&operation.steps[0].request, deriv_req_t2);
-    assert_requests_equivalent(&operation.steps[1].request, deriv_req_t4);
-    assert_requests_equivalent(&operation.steps[2].request, deriv_req_t6);
+    TransformTestHarness::assert_requests_equivalent(&operation.steps[0].request, deriv_req_t2);
+    TransformTestHarness::assert_requests_equivalent(&operation.steps[1].request, deriv_req_t4);
+    TransformTestHarness::assert_requests_equivalent(&operation.steps[2].request, deriv_req_t6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -704,41 +817,7 @@ async fn test_transform_with_compaction_retry() {
         mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
     );
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-
-    let foo_stored = create_test_dataset_from_snapshot(
-        harness.dataset_registry.as_ref(),
-        harness.dataset_storage_unit_writer.as_ref(),
-        MetadataFactory::dataset_snapshot()
-            .name(foo_alias.clone())
-            .kind(odf::DatasetKind::Root)
-            .push_event(
-                MetadataFactory::add_push_source()
-                    .read(odf::metadata::ReadStepCsv {
-                        header: Some(true),
-                        schema: Some(odf::schema::DataSchema::new(vec![
-                            odf::schema::DataField::timestamp_millis_utc("date"),
-                            odf::schema::DataField::string("city"),
-                            odf::schema::DataField::i64("population"),
-                        ])),
-                        ..odf::metadata::ReadStepCsv::default()
-                    })
-                    .merge(odf::metadata::MergeStrategyLedger {
-                        primary_key: vec!["date".to_string(), "city".to_string()],
-                    })
-                    .build(),
-            )
-            .push_event(odf::metadata::SetVocab {
-                event_time_column: Some("date".to_string()),
-                ..Default::default()
-            })
-            .build(),
-        harness.did_generator.generate_dataset_id().0,
-        harness.system_time_source.now(),
-    )
-    .await
-    .unwrap();
-
-    let foo_target = ResolvedDataset::from_stored(&foo_stored, &foo_alias);
+    let foo_target = harness.new_root_with_push_source(&foo_alias).await;
 
     let data_str = indoc!(
         "
@@ -1031,12 +1110,174 @@ async fn test_transform_status() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn assert_requests_equivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
-    // Operation IDs are randomly generated, so ignoring them for this check
-    rhs.operation_id.clone_from(&lhs.operation_id);
+#[test_log::test(tokio::test)]
+async fn test_transform_status_input_reset_to_metadata() {
+    let harness = TransformTestHarness::new_custom(
+        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
+    );
 
-    assert_eq!(lhs.inputs, rhs.inputs);
-    assert_eq!(*lhs, rhs);
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-01,A,1000
+        2020-01-02,B,2000
+        2020-01-03,C,3000
+        "
+    );
+    let (root_target, deriv_target) = harness.new_root_and_synced_deriv(&[data_str]).await;
+
+    harness.reset_to_metadata(root_target.clone()).await;
+
+    let status = harness.evaluate_transform_status(deriv_target).await;
+    assert_matches!(
+        status,
+        TransformStatus::InputBreakingChange { breaking_inputs }
+        if breaking_inputs.len() == 1 && breaking_inputs[0].dataset_id == *root_target.get_id()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_status_input_reset_and_same_offset() {
+    let harness = TransformTestHarness::new_custom(
+        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
+    );
+
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-01,A,1000
+        2020-01-02,B,2000
+        2020-01-03,C,3000
+        "
+    );
+    let (root_target, deriv_target) = harness.new_root_and_synced_deriv(&[data_str]).await;
+
+    harness.reset_to_metadata(root_target.clone()).await;
+
+    // Different records, but the same last offset as before the reset
+    let data_str = indoc!(
+        "
+        date,city,population
+        2021-01-01,X,100
+        2021-01-02,Y,200
+        2021-01-03,Z,300
+        "
+    );
+    harness
+        .ingest_data(data_str.to_string(), root_target.clone())
+        .await;
+
+    let status = harness.evaluate_transform_status(deriv_target).await;
+    assert_matches!(
+        status,
+        TransformStatus::InputBreakingChange { breaking_inputs }
+        if breaking_inputs.len() == 1 && breaking_inputs[0].dataset_id == *root_target.get_id()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_status_input_reset_and_smaller_offset() {
+    let harness = TransformTestHarness::new_custom(
+        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
+    );
+
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-01,A,1000
+        2020-01-02,B,2000
+        2020-01-03,C,3000
+        "
+    );
+    let (root_target, deriv_target) = harness.new_root_and_synced_deriv(&[data_str]).await;
+
+    harness.reset_to_metadata(root_target.clone()).await;
+
+    // Fewer records than before the reset, so the last offset goes backwards
+    let data_str = indoc!(
+        "
+        date,city,population
+        2021-01-01,X,100
+        2021-01-02,Y,200
+        "
+    );
+    harness
+        .ingest_data(data_str.to_string(), root_target.clone())
+        .await;
+
+    let status = harness.evaluate_transform_status(deriv_target).await;
+    assert_matches!(
+        status,
+        TransformStatus::InputBreakingChange { breaking_inputs }
+        if breaking_inputs.len() == 1 && breaking_inputs[0].dataset_id == *root_target.get_id()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_status_input_hard_compacted() {
+    let harness = TransformTestHarness::new_custom(
+        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
+    );
+
+    let data_str_1 = indoc!(
+        "
+        date,city,population
+        2020-01-01,A,1000
+        2020-01-02,B,2000
+        2020-01-03,C,3000
+        "
+    );
+    let data_str_2 = indoc!(
+        "
+        date,city,population
+        2020-01-04,A,4000
+        2020-01-05,B,5000
+        2020-01-06,C,6000
+        "
+    );
+    let (root_target, deriv_target) = harness
+        .new_root_and_synced_deriv(&[data_str_1, data_str_2])
+        .await;
+
+    // Same records and last offset, but the blocks are rewritten
+    harness.compact(root_target.clone()).await;
+
+    let status = harness.evaluate_transform_status(deriv_target).await;
+    assert_matches!(
+        status,
+        TransformStatus::InputBreakingChange { breaking_inputs }
+        if breaking_inputs.len() == 1 && breaking_inputs[0].dataset_id == *root_target.get_id()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_status_input_metadata_only_advance() {
+    let harness = TransformTestHarness::new_custom(
+        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
+    );
+
+    let data_str = indoc!(
+        "
+        date,city,population
+        2020-01-01,A,1000
+        2020-01-02,B,2000
+        2020-01-03,C,3000
+        "
+    );
+    let (root_target, deriv_target) = harness.new_root_and_synced_deriv(&[data_str]).await;
+
+    harness.append_info_block(root_target).await;
+
+    let status = harness.evaluate_transform_status(deriv_target).await;
+    assert_matches!(status, TransformStatus::UpToDate);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

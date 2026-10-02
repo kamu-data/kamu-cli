@@ -1431,6 +1431,184 @@ pub async fn test_trigger_flow_reset_metadata_only(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_transform_trigger_recovers_from_input_reset_to_metadata(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    // Derived dataset is in sync with the root, no trigger is set yet
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_transform(&derivative_dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client
+        .flow()
+        .wait(&derivative_dataset_id, 1)
+        .await;
+
+    // Root history is rewritten while the derived dataset is not watching
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_reset_to_metadata_only(&root_dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
+
+    kamu_api_server_client
+        .flow()
+        .set_reactive_transform_trigger(&derivative_dataset_id, "RECOVER")
+        .await;
+    kamu_api_server_client
+        .flow()
+        .wait(&derivative_dataset_id, 2)
+        .await;
+
+    // Root has no data left, so nothing is transformed after the reset
+    pretty_assertions::assert_eq!(
+        vec![
+            "FlowDescriptionDatasetResetToMetadata",
+            "FlowDescriptionDatasetExecuteTransform",
+        ],
+        kamu_api_server_client
+            .flow()
+            .list_flows(&derivative_dataset_id)
+            .await
+            .into_iter()
+            .map(|flow| flow.description)
+            .collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(
+        "",
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&derivative_dataset_id)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_transform_trigger_recovers_from_input_reset_with_new_data(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let root_dataset_alias = odf::DatasetAlias::new(None, DATASET_ROOT_PLAYER_NAME.clone());
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    // Derived dataset is in sync with the root, no trigger is set yet
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_transform(&derivative_dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client
+        .flow()
+        .wait(&derivative_dataset_id, 1)
+        .await;
+
+    // Root history is rewritten with different records reaching the same offset
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_reset_to_metadata_only(&root_dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &root_dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
+        )
+        .await;
+
+    kamu_api_server_client
+        .flow()
+        .set_reactive_transform_trigger(&derivative_dataset_id, "RECOVER")
+        .await;
+    kamu_api_server_client
+        .flow()
+        .wait(&derivative_dataset_id, 3)
+        .await;
+
+    pretty_assertions::assert_eq!(
+        vec![
+            "FlowDescriptionDatasetExecuteTransform",
+            "FlowDescriptionDatasetResetToMetadata",
+            "FlowDescriptionDatasetExecuteTransform",
+        ],
+        kamu_api_server_client
+            .flow()
+            .list_flows(&derivative_dataset_id)
+            .await
+            .into_iter()
+            .map(|flow| flow.description)
+            .collect::<Vec<_>>()
+    );
+
+    // Derived data is rebuilt from the new root records only
+    let derivative_dataset_query = indoc::indoc!(
+        r#"
+        SELECT match_time,
+               place,
+               match_id,
+               player_id,
+               score
+        FROM 'leaderboard'
+        ORDER BY place
+        "#
+    );
+    assert_matches!(
+        kamu_api_server_client.odf_query().query(derivative_dataset_query).await,
+        Ok(result)
+            if result == indoc::indoc!(
+                r#"
+                match_time,place,match_id,player_id,score
+                2000-01-02T00:00:00Z,1,2,Charlie,90
+                2000-01-02T00:00:00Z,2,2,Alice,70"#
+            )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServerClient) {
     let temp_dir = tempfile::tempdir().unwrap();
 

@@ -1725,12 +1725,12 @@ async fn test_manual_trigger_reset_to_metadata() {
 
 #[test_log::test(tokio::test)]
 async fn test_reset_trigger_derivatives_reactively() {
-    // foo.bar: evaluated after enabling trigger
+    // foo.bar: evaluated after enabling trigger and after reset to metadata
     // foo.baz: evaluated after enabling trigger
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     mock_transform_flow_evaluator
         .expect_evaluate_transform_status()
-        .times(2)
+        .times(3)
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
@@ -2046,12 +2046,12 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
     let max_slice_size = 1_000_000u64;
     let max_slice_records = 1000u64;
 
-    // foo.bar: evaluated after enabling trigger
+    // foo.bar: evaluated after enabling trigger and after reset to metadata
     // foo.baz: evaluated after enabling trigger
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     mock_transform_flow_evaluator
         .expect_evaluate_transform_status()
-        .times(2)
+        .times(3)
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
@@ -2269,12 +2269,12 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
 
 #[test_log::test(tokio::test)]
 async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
-    // foo.bar: evaluated after enabling trigger
-    // foo.bar.baz: evaluated after enabling trigger
+    // foo.bar: evaluated after enabling trigger and after reset to metadata
+    // foo.bar.baz: evaluated after enabling trigger and after reset to metadata
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     mock_transform_flow_evaluator
         .expect_evaluate_transform_status()
-        .times(2)
+        .times(4)
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {

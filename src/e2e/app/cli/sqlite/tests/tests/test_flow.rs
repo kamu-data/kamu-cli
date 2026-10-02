@@ -114,6 +114,38 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_transform_trigger_recovers_from_input_reset_to_metadata,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_transform_trigger_recovers_from_input_reset_with_new_data,
+    // No frozen time: the rebuild transform is throttled after the first one, and a frozen clock
+    // never reaches the end of the throttling period
+    options = Options::default().with_kamu_config(indoc::indoc!(
+        r#"
+        kind: CLIConfig
+        version: 1
+        content:
+          flowSystem:
+            awaitingStepSecs: 1
+            mandatoryThrottlingPeriodSecs: 5
+          backgroundAgents:
+            maxListeningTimeout: 1s
+        "#
+    )),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::test_flow_planning_failure,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, datafusion"

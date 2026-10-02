@@ -30,6 +30,10 @@ Recommendation: for ease of reading, use the following format:
 - Stricter Clippy policy: `match_wildcard_for_single_variants`, `wildcard_enum_match_arm` (no catch-all `_`
   arms over enums) and `allow_attributes_without_reason` are enforced workspace-wide; lint suppressions are
   `#[expect]` with a reason (halved in number), and `usize` casts use checked conversions
+### Fixed
+- Flows: enabling a transform trigger now detects inputs whose history was rewritten while the trigger was off
+  (reset, reset to metadata, compaction), instead of treating the derived dataset as up to date. With recovery
+  enabled for breaking changes, the derived dataset is reset to metadata and then rebuilt from its inputs.
 
 ## [0.268.1] - 2026-10-01
 ### Fixed

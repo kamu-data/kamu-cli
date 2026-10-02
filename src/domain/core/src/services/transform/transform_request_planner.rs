@@ -104,6 +104,11 @@ pub enum TransformStatus {
     NewInputDataAvailable {
         input_advancements: Vec<odf::metadata::ExecuteTransformInput>,
     },
+    /// The history of at least one input was rewritten: its head no longer
+    /// descends from the block the last transform consumed.
+    InputBreakingChange {
+        breaking_inputs: Vec<odf::metadata::ExecuteTransformInput>,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
