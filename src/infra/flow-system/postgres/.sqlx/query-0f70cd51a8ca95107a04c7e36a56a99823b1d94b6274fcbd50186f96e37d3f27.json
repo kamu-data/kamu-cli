@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT MAX(event_id) AS \"last_event_id?: i64\"\n                FROM flow_trigger_events\n                WHERE flow_type = $1 AND scope_data = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_event_id?: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0f70cd51a8ca95107a04c7e36a56a99823b1d94b6274fcbd50186f96e37d3f27"
+}

@@ -743,8 +743,8 @@ and `base_gql_flow_runs_harness.rs`.
 | Store | Postgres table(s) | Notes |
 | --- | --- | --- |
 | `FlowEventStore` | `flow_events`, `flows` | `flows` is a denormalized row per flow: type, scope, initiator, status, `last_event_id`, `scheduled_for_activation_at` |
-| `FlowTriggerEventStore` | `flow_trigger_events` | keyed by flow type + scope |
-| `FlowConfigurationEventStore` | `flow_configuration_events` | keyed by flow type + scope |
+| `FlowTriggerEventStore` | `flow_trigger_events` | keyed by flow type + scope; the first event of each saved batch stores the event it was based on (`prev_event_id`, 0 for none), unique per binding, so concurrent writers collide |
+| `FlowConfigurationEventStore` | `flow_configuration_events` | keyed by flow type + scope; the first event of each saved batch stores the event it was based on (`prev_event_id`, 0 for none), unique per binding, so concurrent writers collide |
 | `FlowSystemEventBridge` | view `flow_system_events`, `flow_system_projected_offsets` | union of the three event tables; per-projector watermark |
 | `FlowProcessStateRepository` / `Query` | `flow_process_states` | one row per binding, guarded by the last applied event ID |
 
@@ -819,7 +819,6 @@ Each is stated by the code as written; the consequence column is derived from it
 | Area | Code | Consequence |
 | --- | --- | --- |
 | Cause deduplication | `FlowActivationCause::is_unique_vs` returns on the first `ResourceUpdate` it compares against | a new `ResourceUpdate` cause is compared with the first existing `ResourceUpdate` only |
-| Trigger and configuration stores | Postgres and SQLite `save_events` ignore the expected previous event ID (marked TODO) | concurrent writes are not detected |
 | Active trigger query | `stream_all_active_flow_bindings` and `has_active_triggers_for_scopes` filter on the old event type `FlowTriggerEventDatasetRemoved` and pick the latest event by `event_time` | harmless, since they then require an unpaused `Created`/`Modified` |
 | Deleted configurations | `find_configuration` returns configurations in `Deleted` status | callers must check the status |
 | Configuration message | `FlowConfigurationUpdatedMessage` has a dispatcher but no producer, and no consumer outside tests | dead code |

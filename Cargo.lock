@@ -7343,6 +7343,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
  "tracing",
  "url",
  "uuid",
@@ -9244,6 +9245,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
  "uuid",
 ]
 

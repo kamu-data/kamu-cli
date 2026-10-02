@@ -113,30 +113,53 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
     async fn save_events(
         &self,
         flow_binding: &FlowBinding,
-        _prev_stored_event_id: Option<EventID>, // TODO: detecting concurrent modifications
+        maybe_prev_stored_event_id: Option<EventID>,
         events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         if events.is_empty() {
             return Err(SaveEventsError::NothingToSave);
         }
 
+        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
+        // Rejects an expected event that is not the binding's last one. Two writers
+        // based on the same event both pass it and collide on the unique index over
+        // `prev_event_id` instead
+        let last_stored_event_id = sqlx::query_scalar!(
+            r#"
+            SELECT MAX(event_id) AS "last_event_id?: i64"
+                FROM flow_configuration_events
+                WHERE flow_type = $1 AND scope_data = $2
+            "#,
+            flow_binding.flow_type.as_str(),
+            scope_data_json,
+        )
+        .fetch_one(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        if last_stored_event_id != maybe_prev_stored_event_id.map(EventID::into_inner) {
+            return Err(SaveEventsError::concurrent_modification());
+        }
+
         let mut query_builder = QueryBuilder::<Postgres>::new(
             r#"
-            INSERT INTO flow_configuration_events (flow_type, scope_data, event_type, event_time, event_payload)
+            INSERT INTO flow_configuration_events (flow_type, scope_data, event_type, event_time, event_payload, prev_event_id)
             "#,
         );
 
-        let scope_data_json = serde_json::to_value(&flow_binding.scope).int_err()?;
+        let batch_prev_event_id = maybe_prev_stored_event_id.map_or(0, EventID::into_inner);
 
-        query_builder.push_values(events, |mut b, event| {
+        query_builder.push_values(events.into_iter().enumerate(), |mut b, (i, event)| {
             b.push_bind(flow_binding.flow_type.as_str());
             b.push_bind(&scope_data_json);
             b.push_bind(event.typename());
             b.push_bind(event.event_time());
             b.push_bind(serde_json::to_value(event).unwrap());
+            b.push_bind((i == 0).then_some(batch_prev_event_id));
         });
 
         query_builder.push("RETURNING event_id");
@@ -146,11 +169,17 @@ impl EventStore<FlowConfigurationState> for PostgresFlowConfigurationEventStore 
             event_id: i64,
         }
 
-        let rows = query_builder
+        let rows = match query_builder
             .build_query_as::<ResultRow>()
             .fetch_all(connection_mut)
             .await
-            .int_err()?;
+        {
+            Ok(rows) => rows,
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(SaveEventsError::concurrent_modification());
+            }
+            Err(e) => return Err(SaveEventsError::Internal(e.int_err())),
+        };
         let last_event_id = rows.last().unwrap().event_id;
 
         Ok(EventID::new(last_event_id))
