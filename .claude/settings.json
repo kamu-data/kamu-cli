@@ -37,6 +37,17 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.claude_post_bash",
+            "statusMessage": "Formatting and checking changed files",
+            "timeout": 90
+          }
+        ]
+      },
+      {
         "matcher": "Skill|Read|Bash",
         "hooks": [
           {

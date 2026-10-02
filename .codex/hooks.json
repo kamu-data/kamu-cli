@@ -45,8 +45,9 @@
           {
             "type": "command",
             "command": "cd \"$(git rev-parse --show-toplevel)\" && python3 -m scripts.agents.codex_post_bash",
-            "statusMessage": "Recording skill loads",
-            "timeout": 30
+            "statusMessage": "Recording skill loads and checking changed files",
+            "timeout": 90,
+            "additionalContextLimit": 1000
           }
         ]
       },

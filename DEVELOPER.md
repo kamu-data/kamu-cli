@@ -544,11 +544,12 @@ What the hooks do:
 * **Command guard** — denies commands that discard uncommitted work (`git reset --hard`, `git checkout -- <path>`, `git restore`, `git stash`, `git clean -f`), `SQLX_OFFLINE=...` on the command line, and build/test output piped into `head`/`tail`; asks for approval on `git commit`/`push`/`merge`/`rebase`/`tag` and on `-p`-scoped cargo builds.
 * **Edit guard** — refuses hand edits to generated files (naming the regeneration command) and edits under a guarded path until the session has loaded the governing skill; asks before writes to agent memory.
 * **Post-edit** — runs `rustfmt` on an edited `.rs` file, then checks only the added lines (`assert!(matches!(..))`, lint suppressions, `dbg!`, plan/ticket citations and change narration in comments, license header, dividing lines); reminds about `make sqlx-prepare`, schema regeneration and the e2e SQLite/Postgres lockstep.
+* **Post-shell** — the same pass over every file a shell command changed (`sed -i`, heredocs, scripts), judged against its committed version. The changed files are found by fingerprinting the working tree before and after the command; files brought in by git commands that rewrite the tree (`switch`, `pull`, `stash`, `rebase`, ...) are left alone. A guarded path changed without its skill gets a reminder.
 * **Session start** — injects a short contract generated from `governed_paths.json`; after compaction or `/clear` skills must be loaded again.
 * **Stop** (Claude only) — if the session edited Rust and the tree changed since the last green foreground `make clippy`, reminds the agent once to run it.
 
 Limitations — the rules in `AGENTS.md` still apply where the hooks cannot see:
-* Files written through the shell (heredocs, scripts, `sed -i`) bypass the edit guard and post-edit checks.
+* Files written through the shell are only checked after the command, and the edit guard cannot refuse them: a guarded path written that way gets a reminder instead of a refusal, and a hand-edited generated file is not told apart from a regenerated one. A command run in the background is compared when it is handed off, not when it finishes.
 * `git checkout <path>` without `--` is indistinguishable from a branch switch and passes the guard.
 * Commands assembled at runtime (variables, generated scripts) are not inspected.
 * Codex hooks cannot ask: its adapters deny `-p` builds outright and leave commit approval to `AGENTS.md`.

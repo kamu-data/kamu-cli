@@ -173,13 +173,20 @@ def unwrap(argv: list[str], env: dict[str, str]) -> list[str]:
     return argv
 
 
-def judge_git(args: list[str]) -> Verdict | None:
+def git_subcommand(args: list[str]) -> tuple[str, list[str]] | None:
+    """Split `git`'s arguments into the subcommand and its own arguments, past global options."""
     i = 0
     while i < len(args) and args[i].startswith("-"):
         i += 2 if args[i] in {"-C", "-c", "--git-dir", "--work-tree", "--namespace"} else 1
     if i >= len(args):
         return None
-    sub, rest = args[i], args[i + 1 :]
+    return args[i], args[i + 1 :]
+
+
+def judge_git(args: list[str]) -> Verdict | None:
+    if (invocation := git_subcommand(args)) is None:
+        return None
+    sub, rest = invocation
     flags = set(rest)
 
     def short(letter: str) -> bool:
