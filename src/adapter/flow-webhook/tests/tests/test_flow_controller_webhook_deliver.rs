@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::Utc;
+use internal_error::InternalError;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, FLOW_TYPE_DATASET_INGEST};
 use kamu_adapter_flow_webhook::*;
@@ -207,6 +209,76 @@ async fn test_delivery_logical_plan_breaking() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_delivery_logical_plan_unsupported_event_type() {
+    let harness = FlowControllerWebhookDeliverHarness::new();
+
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    harness.register_dataset(&foo_dataset_id);
+
+    let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
+    let event_type = WebhookEventType::try_new("DATASET.UNKNOWN").unwrap();
+
+    let new_head = odf::Multihash::from_digest_sha3_256(b"new_head");
+
+    let delivery_flow = harness
+        .make_delivery_flow_new_data(
+            FlowID::new(1),
+            subscription_id,
+            &event_type,
+            &foo_dataset_id,
+            None,
+            vec![&new_head],
+        )
+        .await;
+
+    assert_matches!(
+        harness.try_build_task_logical_plan(&delivery_flow).await,
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_delivery_logical_plan_non_dataset_resource_update() {
+    let harness = FlowControllerWebhookDeliverHarness::new();
+
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    harness.register_dataset(&foo_dataset_id);
+
+    let delivery_flow = harness
+        .make_delivery_flow_with_update(&foo_dataset_id, "other-resource", &foo_dataset_id)
+        .await;
+
+    assert_matches!(
+        harness.try_build_task_logical_plan(&delivery_flow).await,
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_delivery_logical_plan_update_of_other_dataset() {
+    let harness = FlowControllerWebhookDeliverHarness::new();
+
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let bar_dataset_id = odf::DatasetID::new_seeded_ed25519(b"bar");
+    harness.register_dataset(&foo_dataset_id);
+
+    let delivery_flow = harness
+        .make_delivery_flow_with_update(&foo_dataset_id, DATASET_RESOURCE_TYPE, &bar_dataset_id)
+        .await;
+
+    assert_matches!(
+        harness.try_build_task_logical_plan(&delivery_flow).await,
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_delivery_propagate_success_causes_no_interaction() {
     let harness = FlowControllerWebhookDeliverHarness::new();
 
@@ -383,11 +455,51 @@ impl FlowControllerWebhookDeliverHarness {
         flow.into()
     }
 
+    /// A `DATASET.REF.UPDATED` delivery flow for `scope_dataset_id`, activated
+    /// by an update of `resource_type` that reports `updated_dataset_id`
+    async fn make_delivery_flow_with_update(
+        &self,
+        scope_dataset_id: &odf::DatasetID,
+        resource_type: &str,
+        updated_dataset_id: &odf::DatasetID,
+    ) -> FlowState {
+        let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
+        let event_type = WebhookEventTypeCatalog::dataset_ref_updated();
+        let new_head = odf::Multihash::from_digest_sha3_256(b"new_head");
+
+        let mut flow = Flow::new(
+            Utc::now(),
+            FlowID::new(1),
+            webhook_deliver_binding(subscription_id, &event_type, Some(scope_dataset_id)),
+            FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
+                activation_time: Utc::now(),
+                changes: ResourceChanges::Breaking,
+                resource_type: resource_type.to_string(),
+                details: json!({
+                    "dataset_id": updated_dataset_id.to_string(),
+                    "new_head": new_head.to_string(),
+                    "old_head_maybe": null,
+                    "source": {
+                        "ExternallyDetectedChange": serde_json::Value::Null,
+                    }
+                }),
+            }),
+            None,
+            None,
+        );
+        flow.save(self.flow_event_store.as_ref()).await.unwrap();
+        flow.into()
+    }
+
     async fn build_task_logical_plan(&self, flow_state: &FlowState) -> LogicalPlan {
-        self.controller
-            .build_task_logical_plan(flow_state)
-            .await
-            .unwrap()
+        self.try_build_task_logical_plan(flow_state).await.unwrap()
+    }
+
+    async fn try_build_task_logical_plan(
+        &self,
+        flow_state: &FlowState,
+    ) -> Result<LogicalPlan, InternalError> {
+        self.controller.build_task_logical_plan(flow_state).await
     }
 
     async fn propagate_success(&self, flow_state: &FlowState) {

@@ -822,7 +822,6 @@ Each is stated by the code as written; the consequence column is derived from it
 | Active trigger query | `stream_all_active_flow_bindings` and `has_active_triggers_for_scopes` filter on the old event type `FlowTriggerEventDatasetRemoved` and pick the latest event by `event_time` | harmless, since they then require an unpaused `Created`/`Modified` |
 | Deleted configurations | `find_configuration` returns configurations in `Deleted` status | callers must check the status |
 | Configuration message | `FlowConfigurationUpdatedMessage` has a dispatcher but no producer, and no consumer outside tests | dead code |
-| Webhook payload | `assert_eq!` on dataset and resource type; `panic!` for any event type other than `DATASET.REF.UPDATED` | a malformed flow panics while its plan is built |
 
 ### Suspected, not reproduced
 

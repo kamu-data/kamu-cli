@@ -64,7 +64,9 @@ impl FlowControllerWebhookDeliver {
             self.build_dataset_ref_updated_payload(flow, input_dataset_id)
                 .await
         } else {
-            panic!("FlowControllerWebhookDeliver does not support event type: {event_type}");
+            Err(InternalError::new(format!(
+                "FlowControllerWebhookDeliver does not support event type: {event_type}"
+            )))
         }
     }
 
@@ -93,15 +95,23 @@ impl FlowControllerWebhookDeliver {
         // Scan activation causes for the flow, look for dataset updates only
         for activation_cause in &flow.activation_causes {
             if let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause {
-                assert_eq!(update.resource_type, DATASET_RESOURCE_TYPE);
+                if update.resource_type != DATASET_RESOURCE_TYPE {
+                    return Err(InternalError::new(format!(
+                        "Unexpected resource type in webhook activation cause: {}",
+                        update.resource_type
+                    )));
+                }
                 let dataset_update_details =
                     serde_json::from_value::<DatasetResourceUpdateDetails>(update.details.clone())
                         .int_err()?;
 
-                assert_eq!(
-                    &dataset_update_details.dataset_id, input_dataset_id,
-                    "Dataset ID in update details does not match input dataset ID"
-                );
+                if &dataset_update_details.dataset_id != input_dataset_id {
+                    return Err(InternalError::new(format!(
+                        "Dataset ID in update details {} does not match input dataset ID \
+                         {input_dataset_id}",
+                        dataset_update_details.dataset_id
+                    )));
+                }
 
                 if let Some(summary) = &mut summary {
                     summary.new_head = dataset_update_details.new_head;
