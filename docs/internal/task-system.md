@@ -363,7 +363,7 @@ or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync a
 | --- | --- | --- | --- |
 | Update → ingest | `PollingIngestService` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Update → transform | `TransformExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Update → sync | `SyncService` | the sync itself, CAS on the destination head it read | one for the whole sync |
+| Update → sync | `SyncService` | the sync itself: the simple protocol CAS on the destination head it read, smart pull on the previous-block link unless forced | one around the call in the runner; the protocol appends and sets `HEAD` in transactions of its own |
 | Hard compact / reset to metadata | `CompactionExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Reset | — (existing block) | `ResetExecutor`, **no** CAS at execution | one for the whole reset |
 
@@ -402,12 +402,12 @@ failure.
 
 - **Ingest** — `PollingIngestService::ingest` runs one iteration: check cache, fetch (resuming from
   a savepoint), prepare, read, preprocess, merge and commit `SetDataSchema` / `AddData` blocks.
-  Reading and merging run on embedded DataFusion in-process; only a `preprocess` step on a
-  non-DataFusion engine provisions a container. A source with no `SetPollingSource` yields
-  `UpToDate`; an uncacheable source that already has data yields `UpToDate { uncacheable }` unless
-  `fetch_uncacheable` is set. `Updated { has_more }` means the source has more to fetch: the task
-  does not loop, and the ingest flow controller schedules the next iteration if its config sets
-  `fetch_next_iteration`.
+  Reading and merging run on embedded DataFusion in-process; a container is provisioned only for a
+  `container` fetch step or a `preprocess` step on a non-DataFusion engine. A source with no
+  `SetPollingSource` yields `UpToDate`; an uncacheable source that already has data yields
+  `UpToDate { uncacheable }` unless `fetch_uncacheable` is set. `Updated { has_more }` means the
+  source has more to fetch: the task does not loop, and the ingest flow controller schedules the
+  next iteration if its config sets `fetch_next_iteration`.
 - **Transform** — `TransformElaborationService::elaborate_transform` computes each input's
   unprocessed slices and watermarks. `UpToDate` ends the task with an empty success. Otherwise
   `TransformExecutor::execute_transform` provisions the engine named by the transform — always a
@@ -558,8 +558,8 @@ and `TaskQueueWakeupSource`.
 | --- | --- |
 | `new_task_id` | allocate an ID before the first event |
 | `try_get_queued_task` | earliest `Queued` task by `task_id` |
-| `get_running_tasks` / `get_count_running_tasks` | startup recovery |
-| `get_tasks_by_dataset` / `get_count_tasks_by_dataset` | per-dataset listing; exercised only by tests |
+| `get_running_tasks` | startup recovery |
+| `get_count_running_tasks`, `get_tasks_by_dataset` / `get_count_tasks_by_dataset` | exercised only by tests |
 
 ### Postgres and SQLite
 

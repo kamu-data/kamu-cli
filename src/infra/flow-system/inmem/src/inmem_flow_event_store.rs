@@ -423,7 +423,11 @@ impl FlowEventStore for InMemoryFlowEventStore {
 
         let pending_filter = FlowFilters {
             by_flow_types: Some(vec![flow_binding.flow_type.clone()]),
-            by_flow_statuses: Some(vec![FlowStatus::Waiting, FlowStatus::Running]),
+            by_flow_statuses: Some(vec![
+                FlowStatus::Waiting,
+                FlowStatus::Running,
+                FlowStatus::Retrying,
+            ]),
             by_initiator: None,
         };
 

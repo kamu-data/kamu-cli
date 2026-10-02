@@ -80,9 +80,9 @@ Rules that the patterns rely on:
 - **The compare must be in the clause Postgres re-checks.** A writer blocked on a row lock
   re-evaluates the `UPDATE`'s own `WHERE` against the committed row, never a CTE or subquery,
   which keep the statement snapshot. A compare-and-set inside a CTE only is a lost update.
-- **Never order by event ID to decide what is "last".** IDs come from a sequence and commit out of
-  order across transactions. Compare the exact expected ID, and let the row or index serialize
-  writers. A `SELECT MAX(event_id)` before the insert may stay as input validation (an expected ID
+- **Never use the highest event ID as the concurrency check.** IDs come from a sequence and commit
+  out of order across transactions. Compare the exact expected ID, and let the row or index
+  serialize writers. A `SELECT MAX(event_id)` before the insert may stay as input validation (an expected ID
   that was never last), never as the concurrency guard.
 - **Adding `prev_event_id` to an existing table needs a backfill** that chains each old event to its
   predecessor (`LAG(...) OVER (PARTITION BY key ORDER BY id)`, 0 for the first), so the index also

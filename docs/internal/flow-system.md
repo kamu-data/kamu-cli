@@ -1,7 +1,7 @@
 # Flow System — Architecture
 
 > **Status:** in production; decides when work runs, and hands each run to the
-> [task system](task-system.md). Known defects and open suspicions are listed in
+> [task system](task-system.md). Behaviour that surprises newcomers is listed in
 > [§15](#15-gotchas).
 > Type names and paths below are drawn from source — when they drift, treat the source as canonical
 > and update this page.
@@ -272,7 +272,7 @@ sequenceDiagram
     TS-->>FA: TaskProgressMessage::Running → flow.on_task_running
     TS-->>FA: TaskProgressMessage::Finished → flow.on_task_finished
     alt recoverable failure, retries left
-        FA->>FA: Retrying, ScheduledForActivation(next_attempt_at)<br/>(activated again like any due flow)
+        FA->>FA: Retrying: TaskFinished carries next_attempt_at<br/>(activated again like any due flow)
     else final outcome
         FA->>FA: Completed
         opt success with a non-empty result
@@ -324,16 +324,17 @@ A binding may not start more often than `FlowAgentConfig::mandatory_throttling_p
 ([§9](#9-flow-process-state)), floored at the activation time. If the boundary pushes the activation
 later, the start condition becomes `Throttling { interval, wake_up_at, shifted_from }`.
 
-Trigger times passed in by manual and automatic runs, trigger messages and startup recovery are
-rounded to `awaiting_step` (`flowSystem.awaitingStepSecs`, default 1 s); times computed from them
-(schedule ticks, retry delays, batching deadlines, throttling boundaries) are not.
+Manual runs, trigger messages and startup recovery round their activation time to `awaiting_step`
+(`flowSystem.awaitingStepSecs`, default 1 s). Automatic runs round only the event time they are
+given; their scheduling time is the first cause's time, which callers pass unrounded. Times computed
+from these (schedule ticks, retry delays, batching deadlines, throttling boundaries) are not rounded.
 
 ### Deciding the activation time
 
 | Context | New flow | Pending flow |
 | --- | --- | --- |
 | Schedule | `max(boundary, schedule.next_activation_time(now, last_attempt))`; condition `Schedule` or `Throttling` | moved earlier only if the boundary is before the planned time |
-| None (manual, late causes) | `max(boundary, activation_time)` | moved earlier if the boundary is before the planned time; a forced configuration replaces the snapshot |
+| None (manual, late causes) | `max(boundary, activation_time)` | moved earlier if the boundary is before the planned time, and only then a forced configuration replaces the snapshot |
 | Reactive | batching evaluation, below | re-evaluated only if it still waits on a `Reactive` condition |
 
 `Schedule::TimeDelta { every }` gives `max(now, last_attempt + every)`, or `now` when the binding
@@ -516,7 +517,7 @@ flowchart TD
     end
     M -- "batch was not empty" --> F
     M -- "empty batch" --> NEXT{"more projectors?"}
-    TX -- error --> ERR["log, flow_system_event_projector_failing = 1,<br/>retry on next wakeup"]
+    TX -- "fetch, apply or mark error" --> ERR["log, flow_system_event_projector_failing = 1,<br/>retry on next wakeup; a failed commit is only logged"]
     ERR --> NEXT
     NEXT -- yes --> P
     NEXT -- no --> W
@@ -585,7 +586,7 @@ per effective state and the worst failure streak).
 | `dev.kamu.flow.dataset.ingest` | `FlowControllerIngest` | dataset | `FlowConfigRuleIngest` (`IngestRule`): `fetch_uncacheable`, `fetch_next_iteration` | `LogicalPlanDatasetUpdate` | — |
 | `dev.kamu.flow.dataset.transform` | `FlowControllerTransform` | dataset | — | `LogicalPlanDatasetUpdate { fetch_uncacheable: false }` | `DerivedDatasetFlowSensor` |
 | `dev.kamu.flow.dataset.compact` | `FlowControllerCompact` | dataset | `FlowConfigRuleCompact` (`CompactionRule`): max slice size and records, both > 0 | `LogicalPlanDatasetHardCompact` (limits `None` without a rule) | — |
-| `dev.kamu.flow.dataset.reset` | `FlowControllerReset` | dataset | `FlowConfigRuleReset` (`ResetRule`): new and old head — **required** | `LogicalPlanDatasetReset` | — |
+| `dev.kamu.flow.dataset.reset` | `FlowControllerReset` | dataset | `FlowConfigRuleReset` (`ResetRule`): optional new and old heads; the rule itself is **required** | `LogicalPlanDatasetReset` | — |
 | `dev.kamu.flow.dataset.reset_to_metadata` | `FlowControllerResetToMetadata` | dataset | — | `LogicalPlanDatasetResetToMetadata` | — |
 | `dev.kamu.flow.webhook.deliver` | `FlowControllerWebhookDeliver` | webhook subscription | — | `LogicalPlanWebhookDeliver` | `DatasetUpdatedWebhookSensor` |
 | `dev.kamu.flow.system.gc` | `FlowControllerSystemGC` | system | — | `LogicalPlanProbe` (a 20 s placeholder) | — |
@@ -804,7 +805,8 @@ triggers), which is what lets the bridge merge them into one ordered stream.
 `save_events` on the flow store updates the `flows` row in the same statement as the optimistic
 check (`last_event_id` must match), maintaining `scheduled_for_activation_at` from
 `ScheduledForActivation` and `TaskFinished.next_attempt_at` and clearing it on `TaskScheduled` and
-`Aborted`. Updating that column is what fires the flow agent's wakeup on Postgres.
+`Aborted`. Setting that column to a new non-null value is what fires the flow agent's wakeup on
+Postgres.
 
 Wakeup channels and their SQLite polling equivalents are in
 [wakeup-listeners.md](wakeup-listeners.md#3-inventory).
