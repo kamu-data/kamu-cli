@@ -160,6 +160,7 @@ Do not re-propose these without new evidence.
 | A separate per-aggregate table only to hold `last_event_id` for an events-only aggregate | Adds a table per aggregate; `prev_event_id` with a unique index on the events table does the same job. |
 | `SELECT MAX(event_id)` before or after the insert as the only check | Two in-flight transactions both pass: neither sees the other's uncommitted rows. |
 | Compare-and-set on `last_event_id` inside a CTE | The CTE keeps the statement snapshot; a writer blocked on the row lock re-checks only the outer `WHERE` and overwrites the other update. |
+| `pg_visible_in_snapshot(tx_id, ...)` as the guard of a `(tx_id, id)` delivery cursor | Delivers a newer transaction while an older one is in flight, so the cursor passes the older ID and its rows are skipped forever; read below `pg_snapshot_xmin(pg_current_snapshot())` ([outbox.md](../../../docs/internal/outbox.md#reading-below-the-oldest-running-transaction)). |
 
 ## What lives elsewhere
 

@@ -524,8 +524,9 @@ flowchart TD
     NEXT -- no --> W
 ```
 
-On Postgres the watermark is a `(tx_id, event_id)` pair and only events visible in the current
-snapshot are read — the same scheme as the outbox ([outbox.md](outbox.md#6-ordering--delivery-guarantees)).
+On Postgres the watermark is a `(tx_id, event_id)` pair and only events of transactions older than
+every running one are read — the same scheme as the outbox, including the short re-check while
+events are held back ([outbox.md](outbox.md#reading-below-the-oldest-running-transaction)).
 SQLite orders by event ID alone. `FlowProcessStateProjector` is the only projector.
 
 ### State

@@ -119,6 +119,14 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
         Ok(events)
     }
 
+    async fn has_held_back_events(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+    ) -> Result<bool, InternalError> {
+        // One connection: no transaction runs while another reads
+        Ok(false)
+    }
+
     /// Mark these events as applied for this projector (idempotent).
     #[tracing::instrument(level = "debug", skip_all, fields(projector_name))]
     async fn mark_applied(

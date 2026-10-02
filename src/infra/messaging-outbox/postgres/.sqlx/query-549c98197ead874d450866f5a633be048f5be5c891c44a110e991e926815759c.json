@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT EXISTS (\n                SELECT 1\n                FROM outbox_messages\n                WHERE\n                    producer_name = ANY($1)\n                    AND tx_id >= pg_snapshot_xmin(pg_current_snapshot())\n                    AND pg_visible_in_snapshot(tx_id, pg_current_snapshot())\n            ) AS \"has_held_back_messages!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "has_held_back_messages!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "549c98197ead874d450866f5a633be048f5be5c891c44a110e991e926815759c"
+}

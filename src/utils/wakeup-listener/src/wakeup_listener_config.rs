@@ -12,6 +12,13 @@ use std::time::Duration;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Timing shared by all agents waiting on a [`crate::WakeupListener`]
+/// Re-check period while committed rows are held back for an older running
+/// transaction: its commit may raise no wakeup, so the listening timeout would
+/// be far too long a wait
+pub const HELD_BACK_RECHECK_INTERVAL: Duration = Duration::from_millis(20);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct WakeupListenerConfig {
     /// How long to absorb a burst of signals after the first one

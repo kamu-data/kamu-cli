@@ -210,6 +210,14 @@ impl OutboxMessageBridge for InMemoryOutboxMessageBridge {
         Ok(boundaries)
     }
 
+    async fn has_held_back_messages(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+        _producer_names: &[&str],
+    ) -> Result<bool, InternalError> {
+        Ok(false)
+    }
+
     async fn mark_consumed(
         &self,
         _: &dill::Catalog,
