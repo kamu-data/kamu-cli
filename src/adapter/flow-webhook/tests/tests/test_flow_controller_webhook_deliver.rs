@@ -55,7 +55,11 @@ async fn test_delivery_register_sensor() {
 
     harness
         .controller
-        .ensure_flow_sensor(&delivery_binding, Utc::now(), ReactiveRule::empty())
+        .ensure_flow_sensor(
+            &delivery_binding,
+            FlowSensorActivation::CatchUp(Utc::now()),
+            ReactiveRule::empty(),
+        )
         .await
         .unwrap();
 }

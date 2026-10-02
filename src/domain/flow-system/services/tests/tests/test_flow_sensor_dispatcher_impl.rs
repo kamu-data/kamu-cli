@@ -77,7 +77,11 @@ impl FlowSensorDispatcherHarness {
             sensitized_by: Mutex::new(Vec::new()),
         });
         self.dispatcher
-            .register_sensor(&self.catalog, Utc::now(), sensor.clone())
+            .register_sensor(
+                &self.catalog,
+                FlowSensorActivation::CatchUp(Utc::now()),
+                sensor.clone(),
+            )
             .await
             .unwrap();
         sensor

@@ -42,6 +42,20 @@ pub trait FlowSensor: Send + Sync + Any {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// How a sensor treats input changes it has not seen when it is registered
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowSensorActivation {
+    /// Reacts to input changes since the last run of its binding, via
+    /// [`FlowSensor::on_activated`]
+    CatchUp(DateTime<Utc>),
+
+    /// Comes back after a restart while its binding has a pending flow, which
+    /// already holds the input changes seen before; nothing to catch up on
+    Restore,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum FlowSensorSensitizationError {
     #[error("Flow binding unexpected: {binding:?}")]

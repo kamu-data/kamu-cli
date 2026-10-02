@@ -156,7 +156,7 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
     async fn ensure_flow_sensor(
         &self,
         flow_binding: &fs::FlowBinding,
-        activation_time: DateTime<Utc>,
+        activation: fs::FlowSensorActivation,
         reactive_rule: fs::ReactiveRule,
     ) -> Result<(), InternalError> {
         let subscription_scope = FlowScopeSubscription::new(&flow_binding.scope);
@@ -184,7 +184,7 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
             ));
 
             self.flow_sensor_dispatcher
-                .register_sensor(&self.catalog, activation_time, sensor)
+                .register_sensor(&self.catalog, activation, sensor)
                 .await?;
         } else {
             tracing::error!(

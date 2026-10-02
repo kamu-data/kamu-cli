@@ -124,6 +124,7 @@ impl FlowAgentImpl {
         // Restore auto polling flows:
         //   - read active triggers
         //   - automatically trigger flows, if they are not waiting already
+        //   - restore sensors of reactive triggers that have a waiting flow
         self.restore_auto_polling_flows_from_triggers(&transaction_catalog, start_time)
             .await?;
 
@@ -228,19 +229,32 @@ impl FlowAgentImpl {
             .into_iter()
             .chain(non_schedule_triggers.into_iter())
         {
-            // Do not re-trigger the flow that has already triggered
             let maybe_pending_flow_id = flow_event_store
                 .try_get_pending_flow(&enabled_trigger.flow_binding)
                 .await?;
-            if maybe_pending_flow_id.is_none() {
-                scheduling_service
-                    .activate_flow_trigger(
-                        target_catalog,
-                        start_time,
-                        &enabled_trigger.flow_binding,
-                        enabled_trigger.rule,
-                    )
-                    .await?;
+            match (maybe_pending_flow_id, enabled_trigger.rule) {
+                (None, rule) => {
+                    scheduling_service
+                        .activate_flow_trigger(
+                            target_catalog,
+                            start_time,
+                            &enabled_trigger.flow_binding,
+                            rule,
+                        )
+                        .await?;
+                }
+                // Only the sensor starts the next reactive flow, so it must come back
+                (Some(_), FlowTriggerRule::Reactive(reactive_rule)) => {
+                    scheduling_service
+                        .restore_flow_sensor(
+                            target_catalog,
+                            &enabled_trigger.flow_binding,
+                            reactive_rule,
+                        )
+                        .await?;
+                }
+                // The next scheduled flow is planned when the pending one completes
+                (Some(_), FlowTriggerRule::Schedule(_)) => {}
             }
         }
 

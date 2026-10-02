@@ -48,7 +48,11 @@ async fn test_transform_register_sensor() {
 
     harness
         .controller
-        .ensure_flow_sensor(&transform_binding, Utc::now(), ReactiveRule::empty())
+        .ensure_flow_sensor(
+            &transform_binding,
+            FlowSensorActivation::CatchUp(Utc::now()),
+            ReactiveRule::empty(),
+        )
         .await
         .unwrap();
 }

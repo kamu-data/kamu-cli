@@ -205,6 +205,10 @@ impl FlowHarness {
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
             );
+            register_message_dispatcher::<DatasetExternallyChangedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+            );
 
             b.build()
         };
@@ -318,6 +322,31 @@ impl FlowHarness {
             .post_message(
                 MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
                 DatasetLifecycleMessage::deleted(self.now(), dataset_id.clone()),
+            )
+            .await
+            .unwrap();
+    }
+
+    /// After `run_since_start` of virtual time, announces new data pushed into
+    /// the dataset over HTTP, as the outbox would deliver it
+    pub async fn issue_dataset_ingested_over_http(
+        &self,
+        run_since_start: Duration,
+        dataset_id: &odf::DatasetID,
+        prev_block_hash: &odf::Multihash,
+        new_block_hash: &odf::Multihash,
+    ) {
+        self.fake_system_time_source.sleep(run_since_start).await;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
+                DatasetExternallyChangedMessage::ingest_http(
+                    dataset_id,
+                    None,
+                    Some(prev_block_hash),
+                    new_block_hash,
+                ),
             )
             .await
             .unwrap();

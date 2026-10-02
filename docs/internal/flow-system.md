@@ -372,9 +372,18 @@ at the rounded current time:
 
 1. **Waiting flows** with a `Reactive` start condition are re-evaluated with an `AutoPolling` cause,
    so batching deadlines that passed during downtime fire.
-2. **Enabled triggers** — schedule triggers first, so roots update before derived datasets — are
-   activated unless their binding already has a pending flow. For schedules this enqueues a flow;
-   for reactive rules it registers the sensor (whose `on_activated` catches up on missed input).
+2. **Enabled triggers** — schedule triggers first, so roots update before derived datasets:
+
+   | Pending flow | Schedule | Reactive |
+   | --- | --- | --- |
+   | none | activated: a flow is enqueued | activated: the sensor is registered with `FlowSensorActivation::CatchUp`, so `on_activated` catches up on missed input |
+   | exists | nothing; its completion plans the next one | the sensor is registered with `FlowSensorActivation::Restore`, skipping `on_activated`: the pending flow already holds the input seen before the restart |
+
+   `Restore` relies on startup order: every startup job finishes before any background agent
+   starts, so the outbox delivers messages written before or during downtime (task results,
+   `DatasetExternallyChangedMessage` from pushes) only once restored sensors exist; a change that
+   arrives while the pending flow has a task becomes a late cause. An input change that posts no
+   message is invisible to sensors at any time; only a `CatchUp` activation notices it.
 
 Trigger messages arriving before recovery finished are ignored; recovery reads the current state
 instead.
@@ -442,7 +451,7 @@ is sensitive to.
 
 | Operation | Called by |
 | --- | --- |
-| `register_sensor` (fails if the scope already has one), then `sensor.on_activated` | `FlowController::ensure_flow_sensor`, on reactive trigger activation |
+| `register_sensor` (fails if the scope already has one), then `sensor.on_activated` unless restoring | `FlowController::ensure_flow_sensor`, on reactive trigger activation and startup recovery |
 | `find_sensor` + `update_rule` | `ensure_flow_sensor` when the sensor exists |
 | `unregister_sensor` | trigger deactivation |
 | `refresh_sensor_dependencies` | `DatasetDependenciesMessage::Updated` |
@@ -451,8 +460,8 @@ is sensitive to.
 Dispatch routes **by the input scope only**: every sensor sensitive to a dataset scope hears about
 every success on that dataset — ingest, transform, compaction, reset, external push.
 
-Sensors live only in memory. They are rebuilt when triggers are activated at startup (see
-[§7](#startup-recovery)) or later through trigger messages.
+Sensors live only in memory. They are rebuilt at startup for every enabled reactive trigger (see
+[§7](#startup-recovery)) and later through trigger messages.
 
 ### Sensors
 
@@ -858,7 +867,6 @@ Hypotheses from combining several code paths; each needs a test before it is tre
 
 | Area | Reasoning |
 | --- | --- |
-| Sensors after restart | Sensors are registered only by trigger activation, and restart recovery skips bindings that already have a pending flow. A reactive binding with a pending flow at restart would come back without a sensor until its trigger is touched |
 | Projection order | Postgres delivers events in `(tx_id, event_id)` order, while process state rejects any event ID not above the last applied one for the binding. Two transactions touching one binding that commit in the opposite order of their event IDs would fail the projector's batch on every retry |
 
 ---
