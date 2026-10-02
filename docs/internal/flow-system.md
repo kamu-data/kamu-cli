@@ -89,7 +89,6 @@ after too many failures and schedules the next periodic run.
   - [14. Recipe: a new flow type](#14-recipe-a-new-flow-type)
   - [15. Gotchas](#15-gotchas)
     - [Behaviour by design](#behaviour-by-design)
-    - [Defects visible in the code](#defects-visible-in-the-code)
     - [Suspected, not reproduced](#suspected-not-reproduced)
   - [16. File/crate reference map](#16-filecrate-reference-map)
 
@@ -839,8 +838,8 @@ Wakeup channels and their SQLite polling equivalents are in
 
 ## 15. Gotchas
 
-Three kinds of entries, kept apart on purpose. None of the defects below is tracked by an issue or
-pinned by a test yet; when one is, link it here, and remove the row once it is fixed.
+Two kinds of entries, kept apart on purpose. When a suspected defect is tracked by an issue or
+pinned by a test, link it here, and remove the row once it is fixed.
 
 ### Behaviour by design
 
@@ -848,19 +847,11 @@ pinned by a test yet; when one is, link it here, and remove the row once it is f
 | --- | --- |
 | Throttling input | Throttling reads `last_attempt_at` from the asynchronous projection; if the projector lags or is stuck, throttling uses stale data |
 | Continuation depends on the projector | A stuck flow-system event agent stops periodic flows, late-cause flows and auto-stop, while flows already scheduled still run |
-| Configuration changes | Pending flows keep their snapshot and retry policy; only a forced configuration merged into the pending flow replaces the snapshot ([§4](#state)) |
+| Configuration changes | Pending flows keep their snapshot and retry policy; only a forced configuration merged into the pending flow replaces the snapshot ([§4](#state)). Applying changes to pending flows is planned in [#1415](https://github.com/kamu-data/kamu-cli/issues/1415); `FlowConfigurationUpdatedMessage` is registered for it, but nothing produces or consumes it yet |
 | Late causes | Dropped when a flow ends unsuccessfully with its trigger stopped, or is aborted ([§5](#5-life-of-a-flow)) |
 | Unconfigured bindings | Without a trigger, failures are not counted and nothing auto-stops |
 | Manual cancel | Cancelling a flow pauses the binding's schedule trigger as a user pause |
 | Scope-removed triggers | Modifying a removed trigger revives it, so that a scope re-added with the same ID works again. `set_trigger` and `resume_flow_trigger` do not check liveness; callers that must not revive a trigger have to check |
-
-### Defects visible in the code
-
-Each is stated by the code as written; the consequence column is derived from it.
-
-| Area | Code | Consequence |
-| --- | --- | --- |
-| Configuration message | `FlowConfigurationUpdatedMessage` has a dispatcher but no producer, and no consumer outside tests | dead code |
 
 ### Suspected, not reproduced
 

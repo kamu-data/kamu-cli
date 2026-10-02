@@ -19,7 +19,11 @@ const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents a message indicating that a flow's configuration has been updated
+/// Represents a message indicating that a flow's configuration has been
+/// updated.
+///
+/// Not produced yet: reserved for applying configuration changes to pending
+/// flows.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowConfigurationUpdatedMessage {
     /// The time at which the event was recorded
