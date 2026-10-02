@@ -44,22 +44,54 @@ after too many failures and schedules the next periodic run.
 
 ## Table of contents
 
-- [1. Purpose \& scope](#1-purpose--scope)
-- [2. Concepts](#2-concepts)
-- [3. Layers and crates](#3-layers-and-crates)
-- [4. The flow aggregate](#4-the-flow-aggregate)
-- [5. Life of a flow](#5-life-of-a-flow)
-- [6. Scheduling](#6-scheduling)
-- [7. The flow agent](#7-the-flow-agent)
-- [8. Sensors and propagation](#8-sensors-and-propagation)
-- [9. Flow process state](#9-flow-process-state)
-- [10. Flow types](#10-flow-types)
-- [11. Scope removal and external events](#11-scope-removal-and-external-events)
-- [12. GraphQL API](#12-graphql-api)
-- [13. Storage](#13-storage)
-- [14. Recipe: a new flow type](#14-recipe-a-new-flow-type)
-- [15. Gotchas](#15-gotchas)
-- [16. File/crate reference map](#16-filecrate-reference-map)
+- [Flow System — Architecture](#flow-system--architecture)
+  - [Agent / newcomer quick-start](#agent--newcomer-quick-start)
+  - [Table of contents](#table-of-contents)
+  - [1. Purpose \& scope](#1-purpose--scope)
+  - [2. Concepts](#2-concepts)
+  - [3. Layers and crates](#3-layers-and-crates)
+  - [4. The flow aggregate](#4-the-flow-aggregate)
+    - [State](#state)
+    - [Events](#events)
+    - [Activation causes](#activation-causes)
+  - [5. Life of a flow](#5-life-of-a-flow)
+  - [6. Scheduling](#6-scheduling)
+    - [Throttling](#throttling)
+    - [Deciding the activation time](#deciding-the-activation-time)
+    - [Reactive batching](#reactive-batching)
+  - [7. The flow agent](#7-the-flow-agent)
+    - [Startup recovery](#startup-recovery)
+    - [Main loop](#main-loop)
+    - [Activation](#activation)
+    - [Consumed messages](#consumed-messages)
+    - [Run, cancel, query](#run-cancel-query)
+  - [8. Sensors and propagation](#8-sensors-and-propagation)
+    - [Dispatcher](#dispatcher)
+    - [Sensors](#sensors)
+    - [Propagation](#propagation)
+  - [9. Flow process state](#9-flow-process-state)
+    - [The event stream and its agent](#the-event-stream-and-its-agent)
+    - [State](#state-1)
+    - [Projector reactions](#projector-reactions)
+    - [Queries](#queries)
+  - [10. Flow types](#10-flow-types)
+    - [Webhook delivery](#webhook-delivery)
+  - [11. Scope removal and external events](#11-scope-removal-and-external-events)
+    - [Scope removal](#scope-removal)
+    - [Changes made outside flows](#changes-made-outside-flows)
+  - [12. GraphQL API](#12-graphql-api)
+    - [Flow types in the schema](#flow-types-in-the-schema)
+    - [Queries](#queries-1)
+    - [Mutations](#mutations)
+    - [Types](#types)
+    - [Things to know](#things-to-know)
+  - [13. Storage](#13-storage)
+  - [14. Recipe: a new flow type](#14-recipe-a-new-flow-type)
+  - [15. Gotchas](#15-gotchas)
+    - [Behaviour by design](#behaviour-by-design)
+    - [Defects visible in the code](#defects-visible-in-the-code)
+    - [Suspected, not reproduced](#suspected-not-reproduced)
+  - [16. File/crate reference map](#16-filecrate-reference-map)
 
 ---
 
@@ -818,7 +850,6 @@ Each is stated by the code as written; the consequence column is derived from it
 
 | Area | Code | Consequence |
 | --- | --- | --- |
-| Cause deduplication | `FlowActivationCause::is_unique_vs` returns on the first `ResourceUpdate` it compares against | a new `ResourceUpdate` cause is compared with the first existing `ResourceUpdate` only |
 | Active trigger query | `stream_all_active_flow_bindings` and `has_active_triggers_for_scopes` filter on the old event type `FlowTriggerEventDatasetRemoved` and pick the latest event by `event_time` | harmless, since they then require an unpaused `Created`/`Modified` |
 | Deleted configurations | `find_configuration` returns configurations in `Deleted` status | callers must check the status |
 | Configuration message | `FlowConfigurationUpdatedMessage` has a dispatcher but no producer, and no consumer outside tests | dead code |

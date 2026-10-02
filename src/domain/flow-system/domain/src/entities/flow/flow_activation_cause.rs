@@ -53,10 +53,11 @@ impl FlowActivationCause {
                 }
                 // If both are auto-polling, they are the same, one cause is enough
                 (Self::AutoPolling(_), Self::AutoPolling(_)) => return false,
-                // If both are dataset updates, compare the structures, but any key attribute
-                // difference means it's unique
-                (Self::ResourceUpdate(this), Self::ResourceUpdate(existing)) => {
-                    return this.details != existing.details || this.changes != existing.changes;
+                // If both are resource updates, they are the same when all key attributes match
+                (Self::ResourceUpdate(this), Self::ResourceUpdate(existing))
+                    if this.details == existing.details && this.changes == existing.changes =>
+                {
+                    return false;
                 }
                 _ => { /* Continue comparing */ }
             }
@@ -144,6 +145,43 @@ impl std::ops::AddAssign for ResourceDataChanges {
                 Some(rhs_watermark) => Some(std::cmp::max(self_watermark, rhs_watermark)),
             },
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use serde_json::json;
+
+    use crate::{FlowActivationCause, FlowActivationCauseResourceUpdate, ResourceChanges};
+
+    fn resource_update(new_head: &str) -> FlowActivationCause {
+        FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
+            activation_time: Utc::now(),
+            changes: ResourceChanges::Breaking,
+            resource_type: "test-resource".to_string(),
+            details: json!({ "new_head": new_head }),
+        })
+    }
+
+    #[test]
+    fn test_resource_update_unique_vs_different_updates() {
+        let existing = [resource_update("a"), resource_update("b")];
+        assert!(resource_update("c").is_unique_vs(&existing));
+    }
+
+    #[test]
+    fn test_resource_update_duplicate_of_first_update() {
+        let existing = [resource_update("a"), resource_update("b")];
+        assert!(!resource_update("a").is_unique_vs(&existing));
+    }
+
+    #[test]
+    fn test_resource_update_duplicate_of_later_update() {
+        let existing = [resource_update("a"), resource_update("b")];
+        assert!(!resource_update("b").is_unique_vs(&existing));
     }
 }
 
