@@ -227,12 +227,11 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
                         event_type,
                         event_payload
                     FROM flow_trigger_events
-                    ORDER BY flow_type, scope_data, event_time DESC
+                    ORDER BY flow_type, scope_data, event_id DESC
                 )
                 SELECT flow_type, scope_data
                 FROM latest_events
-                WHERE event_type != 'FlowTriggerEventDatasetRemoved'
-                AND (
+                WHERE (
                     (event_type = 'FlowTriggerEventCreated' AND (event_payload #>> '{Created,paused}') = 'false')
                     OR
                     (event_type = 'FlowTriggerEventModified' AND (event_payload #>> '{Modified,paused}') = 'false')
@@ -319,10 +318,9 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
                     FROM flow_trigger_events
                     WHERE
                         scope_data = ANY($1)
-                    ORDER BY flow_type, scope_data, event_time DESC
+                    ORDER BY flow_type, scope_data, event_id DESC
                 ) AS latest_events
-                WHERE event_type != 'FlowTriggerEventDatasetRemoved'
-                AND (
+                WHERE (
                     (event_type = 'FlowTriggerEventCreated' AND (event_payload#>>'{Created,paused}') = 'false') OR
                     (event_type = 'FlowTriggerEventModified' AND (event_payload#>>'{Modified,paused}') = 'false')
                 )

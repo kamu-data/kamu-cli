@@ -230,14 +230,14 @@ impl FlowConfigurationEventStore for SqliteFlowConfigurationEventStore {
                         event_payload,
                         ROW_NUMBER() OVER (
                             PARTITION BY flow_type, scope_data
-                            ORDER BY event_time DESC
+                            ORDER BY event_id DESC
                         ) AS row_num
                     FROM flow_configuration_events
                 )
                 SELECT flow_type, scope_data as "scope_data: String"
                 FROM latest_events
                 WHERE row_num = 1
-                AND event_type != 'FlowConfigurationEventDatasetRemoved'
+                AND event_type != 'FlowConfigurationEventScopeRemoved'
                 "#,
             )
             .fetch(connection_mut)

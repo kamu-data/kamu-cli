@@ -49,6 +49,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_existing_bindings_exclude_removed_scopes,
+    harness = InMemoryFlowConfigurationEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryFlowConfigurationEventStoreHarness {
     catalog: Catalog,
 }

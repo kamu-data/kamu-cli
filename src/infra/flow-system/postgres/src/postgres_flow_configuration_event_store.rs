@@ -227,11 +227,11 @@ impl FlowConfigurationEventStore for PostgresFlowConfigurationEventStore {
                         event_type,
                         event_payload
                     FROM flow_configuration_events
-                    ORDER BY flow_type, scope_data, event_time DESC
+                    ORDER BY flow_type, scope_data, event_id DESC
                 )
                 SELECT flow_type, scope_data
                 FROM latest_events
-                WHERE event_type != 'FlowConfigurationEventDatasetRemoved'
+                WHERE event_type != 'FlowConfigurationEventScopeRemoved'
                 "#,
             )
             .fetch(connection_mut)

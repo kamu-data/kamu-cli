@@ -241,14 +241,13 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                         event_payload,
                         ROW_NUMBER() OVER (
                             PARTITION BY flow_type, scope_data
-                            ORDER BY event_time DESC
+                            ORDER BY event_id DESC
                         ) AS row_num
                     FROM flow_trigger_events
                 )
                 SELECT flow_type, scope_data as "scope_data: _"
                 FROM latest_events
                 WHERE row_num = 1
-                AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
                     (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)
                     OR
@@ -332,13 +331,12 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                         event_payload,
                         ROW_NUMBER() OVER (
                             PARTITION BY flow_type, scope_data
-                            ORDER BY event_time DESC
+                            ORDER BY event_id DESC
                         ) AS row_num
                     FROM flow_trigger_events
                 ) AS latest_events
                 WHERE row_num = 1
                 AND scope_data IN ({})
-                AND event_type != 'FlowTriggerEventDatasetRemoved'
                 AND (
                     (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)
                     OR

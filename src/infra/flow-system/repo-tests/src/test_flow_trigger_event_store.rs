@@ -612,3 +612,52 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_latest_event_is_last_saved(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
+
+    // Paused by the last saved event, even though its time is earlier
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let flow_binding = ingest_dataset_binding(&dataset_id);
+    event_store
+        .save_events(
+            &flow_binding,
+            None,
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now(),
+                    flow_binding: flow_binding.clone(),
+                    paused: false,
+                    rule: dummy_schedule(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
+                }
+                .into(),
+                FlowTriggerEventModified {
+                    event_time: Utc::now() - Duration::seconds(10),
+                    flow_binding: flow_binding.clone(),
+                    paused: true,
+                    rule: dummy_schedule(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let all_active_bindings = event_store
+        .stream_all_active_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(all_active_bindings, []);
+
+    assert!(
+        !event_store
+            .has_active_triggers_for_scopes(&[flow_binding.scope])
+            .await
+            .unwrap()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
