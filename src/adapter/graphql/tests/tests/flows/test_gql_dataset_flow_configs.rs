@@ -233,6 +233,49 @@ async fn test_compaction_config_validation() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_retry_policy_validation() {
+    let harness = FlowConfigHarness::make().await;
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let create_root_result = harness.create_root_dataset(foo_alias).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = harness
+        .set_ingest_config(
+            &create_root_result.dataset_handle.id,
+            false,
+            false,
+            Some(value!({
+                "maxAttempts": 3,
+                "minDelay": { "every": 1_000_000, "unit": "WEEKS" },
+                "backoffType": "FIXED",
+            })),
+        )
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+    assert_eq!(
+        response.data,
+        value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "configs": {
+                                "setIngestConfig": {
+                                    "__typename": "FlowInvalidConfigInputError",
+                                    "message": "Retry policy minimum delay must not exceed 4294967295 seconds",
+                                }
+                            }
+                        }
+                    }
+                }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_incorrect_dataset_kinds_for_flow_type() {
     let harness = FlowConfigHarness::make().await;
 

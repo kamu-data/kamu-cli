@@ -824,7 +824,6 @@ Each is stated by the code as written; the consequence column is derived from it
 | Deleted configurations | `find_configuration` returns configurations in `Deleted` status | callers must check the status |
 | Configuration message | `FlowConfigurationUpdatedMessage` has a dispatcher but no producer, and no consumer outside tests | dead code |
 | Webhook payload | `assert_eq!` on dataset and resource type; `panic!` for any event type other than `DATASET.REF.UPDATED` | a malformed flow panics while its plan is built |
-| Retry policy | `ExponentialWithJitter` computes `rand % min_delay_seconds` | panics when the minimum delay is 0 |
 
 ### Suspected, not reproduced
 
