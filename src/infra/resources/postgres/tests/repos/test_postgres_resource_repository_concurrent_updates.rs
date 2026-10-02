@@ -30,7 +30,6 @@ use sqlx::{PgPool, Postgres};
 
 #[test_group::group(database, postgres)]
 #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
-#[ignore = "Reproduces a lost update between concurrent transactions, not fixed yet"]
 async fn test_update_resource_in_concurrent_transactions(pg_pool: PgPool) {
     let harness = ConcurrentResourceUpdatesHarness::new(pg_pool);
 

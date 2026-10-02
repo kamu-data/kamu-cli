@@ -236,6 +236,12 @@ impl ResourceRepository for PostgresResourceRepository {
                 last_event_id = u.last_event_id
             FROM matched_resource_updates AS u
             WHERE r.resource_id = u.resource_id
+              -- Repeated outside the CTE: a write blocked on the row lock re-checks only
+              -- this clause against the committed row, never the CTE snapshot
+              AND (
+                  r.last_event_id IS NULL AND u.expected_last_event_id IS NULL OR
+                  r.last_event_id = u.expected_last_event_id
+              )
               AND (SELECT COUNT(*) FROM matched_resource_updates) =
             "#,
         );
