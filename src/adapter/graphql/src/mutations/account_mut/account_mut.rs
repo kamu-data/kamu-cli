@@ -38,7 +38,8 @@ impl AccountMut {
         )
     }
 
-    /// Update account name
+    /// Update account name.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_rename, skip_all)]
     pub async fn rename(
         &self,
@@ -66,7 +67,8 @@ impl AccountMut {
         }
     }
 
-    /// Update account email
+    /// Update account email.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_update_email, skip_all)]
     pub async fn update_email(
         &self,
@@ -95,7 +97,8 @@ impl AccountMut {
         }
     }
 
-    /// Reset password for a selected account. Allowed only for admin users
+    /// Reset password for a selected account.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all)]
     async fn modify_password(
         &self,
@@ -121,7 +124,8 @@ impl AccountMut {
         }
     }
 
-    /// Change password with confirmation
+    /// Change password with confirmation.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_modify_password_with_confirmation, skip_all)]
     async fn modify_password_with_confirmation(
         &self,
@@ -151,7 +155,8 @@ impl AccountMut {
         }
     }
 
-    /// Delete a selected account. Allowed only for admin users
+    /// Delete a selected account.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
         // This operation is not allowed in single-tenant mode
@@ -168,7 +173,8 @@ impl AccountMut {
         }
     }
 
-    /// Access to the mutable flow configurations of this account
+    /// Access to the mutable flow configurations of this account.
+    /// Available only to the account itself.
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -179,16 +185,20 @@ impl AccountMut {
         Ok(AccountFlowsMut::new(&self.account))
     }
 
-    /// Access to the mutable flow configurations of this account
+    /// Access to the access token management of this account.
+    /// Available only to the account itself.
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
     )]
-    async fn access_tokens(&self) -> Result<AccountAccessTokensMut<'_>> {
+    async fn access_tokens(&self, ctx: &Context<'_>) -> Result<AccountAccessTokensMut<'_>> {
+        utils::check_logged_account_id_match(ctx, &self.account.id)?;
+
         Ok(AccountAccessTokensMut::new(&self.account))
     }
 
-    /// Access to the mutable quotas of this account
+    /// Access to the mutable quotas of this account.
+    /// Changes are allowed only to administrators.
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"

@@ -237,7 +237,7 @@ async fn test_account_attributes() {
                     "displayName": DEFAULT_ACCOUNT_NAME_STR,
                     "accountType": "USER",
                     "avatarUrl": None::<Option<&str>>,
-                    "isAdmin": false,
+                    "isAdmin": null,
                 }
             }
         })
@@ -1201,10 +1201,7 @@ async fn test_revoke_access_token() {
 
     assert!(res.is_err());
     assert_eq!(res.errors.len(), 1);
-    assert_eq!(
-        res.errors[0].message,
-        "Access token access error".to_string()
-    );
+    assert_eq!(res.errors[0].message, "Account access error".to_string());
 
     let mutation_request =
         revoke_access_token_request(&TEST_ACCOUNT_ID.to_string(), &created_token_id.to_string());

@@ -10,12 +10,13 @@
 use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
+use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{DatasetAction, SecretsEncryptionConfig};
 use kamu_task_system as ts;
 
 use crate::data_loader::{AccountEntityDataLoader, DatasetHandleDataLoader};
-use crate::prelude::{AccessTokenID, AccountID};
+use crate::prelude::AccessTokenID;
 use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,13 +145,50 @@ pub(crate) fn ensure_secrets_encryption_enabled(ctx: &Context<'_>) -> Result<(),
 
 pub(crate) fn check_logged_account_id_match(
     ctx: &Context<'_>,
-    account_id: &AccountID,
+    account_id: &odf::AccountID,
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
-        && logged_account.account_handle.did == **account_id
+        && logged_account.account_handle.did == *account_id
     {
+        return Ok(());
+    }
+
+    Err(GqlError::gql_extended("Account access error", |eev| {
+        eev.set("account_id", account_id.to_string());
+    }))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn is_logged_account_id_match_or_admin(
+    ctx: &Context<'_>,
+    account_id: &odf::AccountID,
+) -> Result<bool, InternalError> {
+    let (current_account_subject, rebac_service) =
+        from_catalog_n!(ctx, CurrentAccountSubject, dyn RebacService);
+
+    let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() else {
+        return Ok(false);
+    };
+
+    let logged_account_id = &logged_account.account_handle.did;
+    if logged_account_id == account_id {
+        return Ok(true);
+    }
+
+    rebac_service
+        .is_account_admin(logged_account_id)
+        .await
+        .int_err()
+}
+
+pub(crate) async fn check_logged_account_id_match_or_admin(
+    ctx: &Context<'_>,
+    account_id: &odf::AccountID,
+) -> Result<(), GqlError> {
+    if is_logged_account_id_match_or_admin(ctx, account_id).await? {
         return Ok(());
     }
 

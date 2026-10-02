@@ -9,6 +9,7 @@
 
 use async_graphql::value;
 use kamu::MetadataQueryServiceImpl;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::*;
 use kamu_flow_system_inmem::*;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
@@ -19,7 +20,7 @@ use crate::utils::{
     BaseGQLDatasetHarness,
     GraphQLQueryRequest,
     PredefinedAccountOpts,
-    authentication_catalogs,
+    authentication_catalogs_ext,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,20 +28,28 @@ use crate::utils::{
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 pub struct BaseGQLFlowHarness {
     base_gql_harness: BaseGQLDatasetHarness,
+    catalog_no_subject: dill::Catalog,
     pub catalog_anonymous: dill::Catalog,
     pub catalog_authorized: dill::Catalog,
 }
 
 impl BaseGQLFlowHarness {
     pub async fn new(base_gql_harness: BaseGQLDatasetHarness, catalog: dill::Catalog) -> Self {
-        let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&catalog, PredefinedAccountOpts::default()).await;
+        let auth_catalogs =
+            authentication_catalogs_ext(&catalog, None, PredefinedAccountOpts::default()).await;
 
         Self {
             base_gql_harness,
-            catalog_anonymous,
-            catalog_authorized,
+            catalog_no_subject: auth_catalogs.catalog_no_subject,
+            catalog_anonymous: auth_catalogs.catalog_anonymous,
+            catalog_authorized: auth_catalogs.catalog_authorized,
         }
+    }
+
+    pub fn catalog_for_subject(&self, subject: CurrentAccountSubject) -> dill::Catalog {
+        dill::CatalogBuilder::new_chained(&self.catalog_no_subject)
+            .add_value(subject)
+            .build()
     }
 
     pub fn make_base_gql_flow_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {

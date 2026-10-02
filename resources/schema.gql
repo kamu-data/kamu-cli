@@ -29,55 +29,69 @@ scalar AccessTokenID
 
 type Account {
 	"""
-	Unique and stable identifier of this account
+	Unique and stable identifier of this account.
+	Visible to everyone.
 	"""
 	id: AccountID!
 	"""
-	Symbolic account name
+	Symbolic account name.
+	Visible to everyone.
 	"""
 	accountName: AccountName!
 	"""
-	Account name to display
+	Account name to display.
+	Visible to everyone.
 	"""
 	displayName: AccountDisplayName!
 	"""
-	Account type
+	Account type.
+	Visible to everyone.
 	"""
 	accountType: AccountType!
 	"""
-	Account provider
+	Account provider.
+	Visible to everyone.
 	"""
 	accountProvider: AccountProvider!
 	"""
-	Email address
+	Email address.
+	Available only to the account itself.
 	"""
 	email: String!
 	"""
-	Avatar URL
+	Avatar URL.
+	Visible to everyone.
 	"""
 	avatarUrl: Url
 	"""
-	Indicates the administrator status
+	Indicates the administrator status.
+	Visible only to the account itself and to administrators, `null` for
+	everyone else.
 	"""
-	isAdmin: Boolean!
+	isAdmin: Boolean
 	"""
-	Access to the flow configurations of this account
+	Access to the flow configurations of this account.
+	Available only to the account itself and to administrators.
 	"""
 	flows: AccountFlows!
 	"""
-	Access to the access token management
+	Access to the access token management.
+	Available only to the account itself.
 	"""
 	accessTokens: AccountAccessTokens!
 	"""
-	Access to account usage statistic
+	Access to account usage statistic.
+	Available only to the account itself and to administrators.
 	"""
 	usage: AccountUsage!
 	"""
-	Returns datasets belonging to this account
+	Returns datasets belonging to this account.
+	Lists only the datasets the caller is allowed to read.
 	"""
 	ownedDatasets(page: Int, perPage: Int): DatasetConnection!
 	"""
-	Returns account quotas
+	Returns account quotas.
+	Available only to the account itself and to administrators.
 	"""
 	quotas: AccountQuotas!
 }
@@ -230,35 +244,43 @@ type AccountMut {
 	"""
 	account: Account!
 	"""
-	Update account name
+	Update account name.
+	Allowed only to the account itself and to administrators.
 	"""
 	rename(newName: AccountName!): RenameAccountResult!
 	"""
-	Update account email
+	Update account email.
+	Allowed only to the account itself and to administrators.
 	"""
 	updateEmail(newEmail: Email!): UpdateEmailResult!
 	"""
-	Reset password for a selected account. Allowed only for admin users
+	Reset password for a selected account.
+	Allowed only to the account itself and to administrators.
 	"""
 	modifyPassword(password: AccountPassword!): ModifyPasswordResult!
 	"""
-	Change password with confirmation
+	Change password with confirmation.
+	Allowed only to the account itself and to administrators.
 	"""
 	modifyPasswordWithConfirmation(oldPassword: AccountPassword!, newPassword: AccountPassword!): ModifyPasswordResult!
 	"""
-	Delete a selected account. Allowed only for admin users
+	Delete a selected account.
+	Allowed only to the account itself and to administrators.
 	"""
 	delete: DeleteAccountResult!
 	"""
-	Access to the mutable flow configurations of this account
+	Access to the mutable flow configurations of this account.
+	Available only to the account itself.
 	"""
 	flows: AccountFlowsMut!
 	"""
-	Access to the mutable flow configurations of this account
+	Access to the access token management of this account.
+	Available only to the account itself.
 	"""
 	accessTokens: AccountAccessTokensMut!
 	"""
-	Access to the mutable quotas of this account
+	Access to the mutable quotas of this account.
+	Changes are allowed only to administrators.
 	"""
 	quotas: AccountQuotasMut!
 }

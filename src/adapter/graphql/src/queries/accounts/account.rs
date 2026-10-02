@@ -166,24 +166,28 @@ impl Account {
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Account {
-    /// Unique and stable identifier of this account
+    /// Unique and stable identifier of this account.
+    /// Visible to everyone.
     async fn id(&self) -> &AccountID<'_> {
         &self.account_id
     }
 
-    /// Symbolic account name
+    /// Symbolic account name.
+    /// Visible to everyone.
     async fn account_name(&self) -> &AccountName<'_> {
         &self.account_name
     }
 
-    /// Account name to display
+    /// Account name to display.
+    /// Visible to everyone.
     async fn display_name<'a>(&'a self, ctx: &Context<'_>) -> Result<AccountDisplayName<'a>> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok((&full_account_info.display_name).into())
     }
 
-    /// Account type
+    /// Account type.
+    /// Visible to everyone.
     async fn account_type(&self, ctx: &Context<'_>) -> Result<AccountType> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
@@ -193,7 +197,8 @@ impl Account {
         })
     }
 
-    /// Account provider
+    /// Account provider.
+    /// Visible to everyone.
     async fn account_provider(&self, ctx: &Context<'_>) -> Result<AccountProvider> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
@@ -203,7 +208,8 @@ impl Account {
         Ok(provider.into())
     }
 
-    /// Email address
+    /// Email address.
+    /// Available only to the account itself.
     async fn email(&self, ctx: &Context<'_>) -> Result<&str> {
         utils::check_logged_account_id_match(ctx, &self.account_id)?;
 
@@ -212,49 +218,64 @@ impl Account {
         Ok(full_account_info.email.as_ref())
     }
 
-    /// Avatar URL
+    /// Avatar URL.
+    /// Visible to everyone.
     async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<Url>> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(&full_account_info.avatar_url)
     }
 
-    /// Indicates the administrator status
-    async fn is_admin(&self, ctx: &Context<'_>) -> Result<bool> {
+    /// Indicates the administrator status.
+    /// Visible only to the account itself and to administrators, `null` for
+    /// everyone else.
+    async fn is_admin(&self, ctx: &Context<'_>) -> Result<Option<bool>> {
+        if !utils::is_logged_account_id_match_or_admin(ctx, &self.account_id).await? {
+            return Ok(None);
+        }
+
         let rebac_service = from_catalog_n!(ctx, dyn RebacService);
 
-        Ok(rebac_service
-            .is_account_admin(&self.account_id)
-            .await
-            .int_err()?)
+        Ok(Some(
+            rebac_service
+                .is_account_admin(&self.account_id)
+                .await
+                .int_err()?,
+        ))
     }
 
-    /// Access to the flow configurations of this account
+    /// Access to the flow configurations of this account.
+    /// Available only to the account itself and to administrators.
     async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlows<'_>> {
+        utils::check_logged_account_id_match_or_admin(ctx, &self.account_id).await?;
+
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(AccountFlows::new(full_account_info))
     }
 
-    /// Access to the access token management
+    /// Access to the access token management.
+    /// Available only to the account itself.
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
     )]
-    async fn access_tokens(&self) -> Result<AccountAccessTokens<'_>> {
+    async fn access_tokens(&self, ctx: &Context<'_>) -> Result<AccountAccessTokens<'_>> {
+        utils::check_logged_account_id_match(ctx, &self.account_id)?;
+
         Ok(AccountAccessTokens::new(&self.account_id))
     }
 
-    /// Access to account usage statistic
-    #[expect(
-        clippy::unused_async,
-        reason = "async-graphql resolvers are async by framework contract"
-    )]
-    async fn usage(&self) -> Result<AccountUsage<'_>> {
+    /// Access to account usage statistic.
+    /// Available only to the account itself and to administrators.
+    async fn usage(&self, ctx: &Context<'_>) -> Result<AccountUsage<'_>> {
+        utils::check_logged_account_id_match_or_admin(ctx, &self.account_id).await?;
+
         Ok(AccountUsage::new(&self.account_id))
     }
 
-    /// Returns datasets belonging to this account
+    /// Returns datasets belonging to this account.
+    /// Lists only the datasets the caller is allowed to read.
     #[tracing::instrument(level = "info", name = Account_owned_datasets, skip_all)]
     async fn owned_datasets(
         &self,
@@ -295,9 +316,12 @@ impl Account {
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
     }
 
-    /// Returns account quotas
+    /// Returns account quotas.
+    /// Available only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = Account_quotas, skip_all)]
     async fn quotas(&self, ctx: &Context<'_>) -> Result<AccountQuotas<'_>> {
+        utils::check_logged_account_id_match_or_admin(ctx, &self.account_id).await?;
+
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(AccountQuotas::new(full_account_info))
