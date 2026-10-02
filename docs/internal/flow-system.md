@@ -818,7 +818,6 @@ Each is stated by the code as written; the consequence column is derived from it
 
 | Area | Code | Consequence |
 | --- | --- | --- |
-| Sensor removal | `unregister_sensor` removes the input-index entry keyed by the sensor's own scope instead of the emptied one | can drop routing for other sensors listening to that scope |
 | Cause deduplication | `FlowActivationCause::is_unique_vs` returns on the first `ResourceUpdate` it compares against | a new `ResourceUpdate` cause is compared with the first existing `ResourceUpdate` only |
 | Trigger and configuration stores | Postgres and SQLite `save_events` ignore the expected previous event ID (marked TODO) | concurrent writes are not detected |
 | Active trigger query | `stream_all_active_flow_bindings` and `has_active_triggers_for_scopes` filter on the old event type `FlowTriggerEventDatasetRemoved` and pick the latest event by `event_time` | harmless, since they then require an unpaused `Created`/`Modified` |
