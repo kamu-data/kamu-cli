@@ -131,7 +131,12 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
                 continue;
             }
 
-            active_bindings.push(flow_binding.clone());
+            match event {
+                FlowConfigurationEvent::Created(_) | FlowConfigurationEvent::Modified(_) => {
+                    active_bindings.push(flow_binding.clone());
+                }
+                FlowConfigurationEvent::ScopeRemoved(_) => {}
+            }
         }
 
         // Convert into stream

@@ -61,7 +61,17 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         let ingest_config_rule: afs::FlowConfigRuleIngest = ingest_config_input.into();
         let configuration_rule = ingest_config_rule.into_flow_config();
 
-        let retry_policy: Option<fs::RetryPolicy> = retry_policy_input.map(Into::into);
+        let retry_policy = match retry_policy_input
+            .map(fs::RetryPolicy::try_from)
+            .transpose()
+        {
+            Ok(retry_policy) => retry_policy,
+            Err(e) => {
+                return Ok(SetFlowConfigResult::FlowInvalidConfigInput(
+                    FlowInvalidConfigInputError { reason: e },
+                ));
+            }
+        };
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
@@ -115,7 +125,17 @@ impl<'a> DatasetFlowConfigsMut<'a> {
                 }
             };
         let configuration_rule = compact_config_rule.into_flow_config();
-        let retry_policy: Option<fs::RetryPolicy> = retry_policy_input.map(Into::into);
+        let retry_policy = match retry_policy_input
+            .map(fs::RetryPolicy::try_from)
+            .transpose()
+        {
+            Ok(retry_policy) => retry_policy,
+            Err(e) => {
+                return Ok(SetFlowConfigResult::FlowInvalidConfigInput(
+                    FlowInvalidConfigInputError { reason: e },
+                ));
+            }
+        };
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 

@@ -10,6 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 
 use async_utils::BackgroundAgent;
 use database_common_macros::transactional_method;
@@ -18,7 +19,7 @@ use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use tokio::sync::Semaphore;
 use tracing::Instrument as _;
-use wakeup_listener::{WakeupListener, WakeupListenerConfig};
+use wakeup_listener::{HELD_BACK_RECHECK_INTERVAL, WakeupListener, WakeupListenerConfig};
 
 use crate::*;
 
@@ -135,7 +136,7 @@ impl OutboxAgentImpl {
             // Wait for push or timeout - let the store handle the backoff strategy
             let hint = wakeup_listener
                 .wait_wake(
-                    self.wakeup_config.max_listening_timeout,
+                    self.listening_timeout().await,
                     self.wakeup_config.min_debounce_interval,
                 )
                 .await?;
@@ -316,6 +317,46 @@ impl OutboxAgentImpl {
         Ok(processed_consumer_tasks_counter.load(Ordering::Relaxed))
     }
 
+    /// How long to wait for a wakeup: briefly while committed messages are held
+    /// back, since the commit that releases them may raise no wakeup
+    async fn listening_timeout(&self) -> Duration {
+        match self.has_held_back_messages().await {
+            Ok(true) => HELD_BACK_RECHECK_INTERVAL,
+            Ok(false) => self.wakeup_config.max_listening_timeout,
+            Err(e) => {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Checking for held back messages failed"
+                );
+                self.wakeup_config.max_listening_timeout
+            }
+        }
+    }
+
+    /// Only producers this agent still delivers count: messages of a producer
+    /// without consumers, or whose consumers all fail, are not worth waiting
+    /// for
+    #[transactional_method]
+    async fn has_held_back_messages(&self) -> Result<bool, InternalError> {
+        let delivered_producer_names: Vec<&str> = self
+            .producer_consumption_jobs
+            .iter()
+            .filter(|job| !job.all_consumers_failing())
+            .map(ProducerConsumptionJob::get_producer_name)
+            .collect();
+        if delivered_producer_names.is_empty() {
+            return Ok(false);
+        }
+
+        let outbox_message_bridge = transaction_catalog
+            .get_one::<dyn OutboxMessageBridge>()
+            .unwrap();
+        outbox_message_bridge
+            .has_held_back_messages(&transaction_catalog, &delivered_producer_names)
+            .await
+    }
+
     #[transactional_method]
     async fn prepare_consumption_iteration(
         &self,
@@ -373,8 +414,16 @@ impl BackgroundAgent for OutboxAgentImpl {
 impl OutboxAgent for OutboxAgentImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
-        self.run_until_end_of_queue(None).await?;
-        Ok(())
+        loop {
+            self.run_until_end_of_queue(None).await?;
+
+            if !self.has_held_back_messages().await? {
+                return Ok(());
+            }
+
+            tracing::debug!("Committed messages wait for an older transaction to end");
+            tokio::time::sleep(HELD_BACK_RECHECK_INTERVAL).await;
+        }
     }
 
     // To be used by tests only!

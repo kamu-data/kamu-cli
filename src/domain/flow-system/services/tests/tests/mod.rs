@@ -10,6 +10,7 @@
 mod test_flow_agent_impl;
 mod test_flow_configuration_service_impl;
 mod test_flow_process_state_projector;
+mod test_flow_sensor_dispatcher_impl;
 mod test_flow_system_event_agent_impl;
 mod test_flow_trigger_service_impl;
 

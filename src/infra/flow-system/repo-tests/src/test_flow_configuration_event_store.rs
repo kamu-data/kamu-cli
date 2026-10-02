@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
+use std::assert_matches;
+use std::collections::HashSet;
+
+use chrono::{Duration, Utc};
 use dill::Catalog;
 use futures::TryStreamExt;
 use kamu_adapter_flow_dataset::{FlowConfigRuleCompact, ingest_dataset_binding};
@@ -300,6 +303,191 @@ pub async fn test_event_store_get_events_with_windowing(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(&events[..], [event_2.into()]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
+    let event_store = catalog
+        .get_one::<dyn FlowConfigurationEventStore>()
+        .unwrap();
+
+    let flow_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let other_flow_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+
+    let rule = || {
+        FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config()
+    };
+    let created = |flow_binding: &FlowBinding| -> FlowConfigurationEvent {
+        FlowConfigurationEventCreated {
+            event_time: Utc::now(),
+            flow_binding: flow_binding.clone(),
+            rule: rule(),
+            retry_policy: None,
+        }
+        .into()
+    };
+    let modified = |flow_binding: &FlowBinding| -> FlowConfigurationEvent {
+        FlowConfigurationEventModified {
+            event_time: Utc::now(),
+            flow_binding: flow_binding.clone(),
+            rule: rule(),
+            retry_policy: None,
+        }
+        .into()
+    };
+
+    // Nothing stored yet, but a previous event is expected
+    let res = event_store
+        .save_events(
+            &flow_binding,
+            Some(EventID::new(15)),
+            vec![created(&flow_binding)],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    let created_event_id = event_store
+        .save_events(&flow_binding, None, vec![created(&flow_binding)])
+        .await
+        .unwrap();
+
+    // Events stored, but none expected
+    let res = event_store
+        .save_events(&flow_binding, None, vec![modified(&flow_binding)])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Other bindings are independent
+    let other_event_id = event_store
+        .save_events(
+            &other_flow_binding,
+            None,
+            vec![created(&other_flow_binding)],
+        )
+        .await
+        .unwrap();
+
+    event_store
+        .save_events(
+            &flow_binding,
+            Some(created_event_id),
+            vec![modified(&flow_binding)],
+        )
+        .await
+        .unwrap();
+
+    // The expected event is no longer the last one
+    let res = event_store
+        .save_events(
+            &flow_binding,
+            Some(created_event_id),
+            vec![modified(&flow_binding)],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // The expected event belongs to another binding
+    let res = event_store
+        .save_events(
+            &flow_binding,
+            Some(other_event_id),
+            vec![modified(&flow_binding)],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    assert_eq!(3, event_store.total_events_stored().await.unwrap());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_existing_bindings_exclude_removed_scopes(catalog: &Catalog) {
+    let event_store = catalog
+        .get_one::<dyn FlowConfigurationEventStore>()
+        .unwrap();
+
+    let rule = FlowConfigRuleCompact::try_new(100_000, 1000)
+        .unwrap()
+        .into_flow_config();
+
+    let created = |flow_binding: &FlowBinding| -> FlowConfigurationEvent {
+        FlowConfigurationEventCreated {
+            event_time: Utc::now(),
+            flow_binding: flow_binding.clone(),
+            rule: rule.clone(),
+            retry_policy: None,
+        }
+        .into()
+    };
+    let modified = |flow_binding: &FlowBinding| -> FlowConfigurationEvent {
+        FlowConfigurationEventModified {
+            event_time: Utc::now(),
+            flow_binding: flow_binding.clone(),
+            rule: rule.clone(),
+            retry_policy: None,
+        }
+        .into()
+    };
+    let scope_removed = |flow_binding: &FlowBinding, event_time| -> FlowConfigurationEvent {
+        FlowConfigurationEventScopeRemoved {
+            event_time,
+            flow_binding: flow_binding.clone(),
+        }
+        .into()
+    };
+
+    let existing_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"existing"));
+    let removed_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"removed"));
+    let readded_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"readded"));
+    let removed_earlier_time_binding =
+        ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"removed_earlier_time"));
+
+    for (flow_binding, events) in [
+        (&existing_binding, vec![created(&existing_binding)]),
+        (
+            &removed_binding,
+            vec![
+                created(&removed_binding),
+                scope_removed(&removed_binding, Utc::now()),
+            ],
+        ),
+        (
+            &readded_binding,
+            vec![
+                created(&readded_binding),
+                scope_removed(&readded_binding, Utc::now()),
+                modified(&readded_binding),
+            ],
+        ),
+        (
+            &removed_earlier_time_binding,
+            vec![
+                created(&removed_earlier_time_binding),
+                scope_removed(
+                    &removed_earlier_time_binding,
+                    Utc::now() - Duration::seconds(10),
+                ),
+            ],
+        ),
+    ] {
+        event_store
+            .save_events(flow_binding, None, events)
+            .await
+            .unwrap();
+    }
+
+    let all_bindings = event_store
+        .stream_all_existing_flow_bindings()
+        .try_collect::<HashSet<_>>()
+        .await
+        .unwrap();
+    assert_eq!(
+        all_bindings,
+        HashSet::from([existing_binding, readded_binding])
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

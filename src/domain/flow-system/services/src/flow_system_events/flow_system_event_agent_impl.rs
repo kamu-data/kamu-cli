@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_utils::BackgroundAgent;
 use database_common_macros::transactional_method;
@@ -22,7 +23,7 @@ use kamu_flow_system::{
     FlowSystemEventProjector,
 };
 use tracing::Instrument as _;
-use wakeup_listener::{WakeupListener, WakeupListenerConfig};
+use wakeup_listener::{HELD_BACK_RECHECK_INTERVAL, WakeupListener, WakeupListenerConfig};
 
 use crate::FlowSystemEventAgentMetrics;
 
@@ -104,6 +105,30 @@ impl FlowSystemEventAgentImpl {
         }
     }
 
+    /// How long to wait for a wakeup: briefly while committed events are held
+    /// back, since the commit that releases them may raise no wakeup
+    async fn listening_timeout(&self) -> Duration {
+        match self.has_held_back_events().await {
+            Ok(true) => HELD_BACK_RECHECK_INTERVAL,
+            Ok(false) => self.wakeup_config.max_listening_timeout,
+            Err(e) => {
+                tracing::error!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Checking for held back events failed"
+                );
+                self.wakeup_config.max_listening_timeout
+            }
+        }
+    }
+
+    #[transactional_method]
+    async fn has_held_back_events(&self) -> Result<bool, InternalError> {
+        self.flow_system_event_bridge
+            .has_held_back_events(&transaction_catalog)
+            .await
+    }
+
     #[transactional_method]
     #[tracing::instrument(level = "debug", skip_all, fields(projector = builder.instance_type().name))]
     async fn apply_batch_to_projector(
@@ -182,7 +207,7 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
             // Wait for push or timeout - let the store handle the backoff strategy
             let hint = wakeup_listener
                 .wait_wake(
-                    self.wakeup_config.max_listening_timeout,
+                    self.listening_timeout().await,
                     self.wakeup_config.min_debounce_interval,
                 )
                 .await?;

@@ -105,7 +105,13 @@ loop {
 ```
 
 Because of invariant 2, a change committed while the agent was processing is not lost: it is either
-seen by `process_until_empty` or reported by the next `wait_wake`. The agent creates its handle once,
+seen by `process_until_empty` or reported by the next `wait_wake`.
+
+On Postgres the outbox and flow-system event agents read only rows of transactions older than every
+running one, so a committed row can be held back until an older transaction ends — and that commit
+may raise no signal. While rows are held back, these two agents wait `HELD_BACK_RECHECK_INTERVAL`
+(20 ms) instead of `max_listening_timeout`
+([outbox.md](outbox.md#reading-below-the-oldest-running-transaction)). The agent creates its handle once,
 before the loop, and keeps it: a handle created per iteration would be correct too, but its first wait
 always reports a spurious change (see below).
 
@@ -391,8 +397,9 @@ backgroundAgents:
 5. **Agent loop**: inject `Arc<WakeupListenerConfig>`, create the handle once at the start of
    `run` (the heartbeat metric comes with it), drain
    everything pending, then
-   `wait_wake(max_listening_timeout, min_debounce_interval)` (§2). If the agent processes records in
-   batches, call `wakeup_listener.heartbeat()` after each one (a long catch-up has no waits to
+   `wait_wake(max_listening_timeout, min_debounce_interval)` (§2); if it reads Postgres rows below
+   the oldest running transaction, wait `HELD_BACK_RECHECK_INTERVAL` instead while rows are held back
+   (§2). If the agent processes records in batches, call `wakeup_listener.heartbeat()` after each one (a long catch-up has no waits to
    beat on), and add an entry under `backgroundAgents.batching`.
 6. **Tests**: a storage test that committed changes of interest wake the listener and irrelevant ones
    don't (see `test_wakes_up_only_when_task_is_queued` for Postgres and SQLite).

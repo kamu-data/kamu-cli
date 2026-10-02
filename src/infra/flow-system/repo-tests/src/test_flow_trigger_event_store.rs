@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use chrono::{Duration, Utc};
 use dill::Catalog;
 use futures::TryStreamExt;
@@ -515,6 +517,147 @@ pub async fn test_has_active_trigger_for_datasets(catalog: &Catalog) {
         .await
     );
     assert!(!test(event_store.as_ref(), &[]).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
+
+    let flow_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let other_flow_binding = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+
+    let created = |flow_binding: &FlowBinding| -> FlowTriggerEvent {
+        FlowTriggerEventCreated {
+            event_time: Utc::now(),
+            flow_binding: flow_binding.clone(),
+            paused: false,
+            rule: dummy_schedule(),
+            stop_policy: FlowTriggerStopPolicy::default(),
+        }
+        .into()
+    };
+    let modified = |flow_binding: &FlowBinding| -> FlowTriggerEvent {
+        FlowTriggerEventModified {
+            event_time: Utc::now(),
+            flow_binding: flow_binding.clone(),
+            paused: true,
+            rule: dummy_schedule(),
+            stop_policy: FlowTriggerStopPolicy::default(),
+        }
+        .into()
+    };
+
+    // Nothing stored yet, but a previous event is expected
+    let res = event_store
+        .save_events(
+            &flow_binding,
+            Some(EventID::new(15)),
+            vec![created(&flow_binding)],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    let created_event_id = event_store
+        .save_events(&flow_binding, None, vec![created(&flow_binding)])
+        .await
+        .unwrap();
+
+    // Events stored, but none expected
+    let res = event_store
+        .save_events(&flow_binding, None, vec![modified(&flow_binding)])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Other bindings are independent
+    let other_event_id = event_store
+        .save_events(
+            &other_flow_binding,
+            None,
+            vec![created(&other_flow_binding)],
+        )
+        .await
+        .unwrap();
+
+    event_store
+        .save_events(
+            &flow_binding,
+            Some(created_event_id),
+            vec![modified(&flow_binding)],
+        )
+        .await
+        .unwrap();
+
+    // The expected event is no longer the last one
+    let res = event_store
+        .save_events(
+            &flow_binding,
+            Some(created_event_id),
+            vec![modified(&flow_binding)],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // The expected event belongs to another binding
+    let res = event_store
+        .save_events(
+            &flow_binding,
+            Some(other_event_id),
+            vec![modified(&flow_binding)],
+        )
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    assert_eq!(3, event_store.total_events_stored().await.unwrap());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_latest_event_is_last_saved(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
+
+    // Paused by the last saved event, even though its time is earlier
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let flow_binding = ingest_dataset_binding(&dataset_id);
+    event_store
+        .save_events(
+            &flow_binding,
+            None,
+            vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now(),
+                    flow_binding: flow_binding.clone(),
+                    paused: false,
+                    rule: dummy_schedule(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
+                }
+                .into(),
+                FlowTriggerEventModified {
+                    event_time: Utc::now() - Duration::seconds(10),
+                    flow_binding: flow_binding.clone(),
+                    paused: true,
+                    rule: dummy_schedule(),
+                    stop_policy: FlowTriggerStopPolicy::default(),
+                }
+                .into(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let all_active_bindings = event_store
+        .stream_all_active_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(all_active_bindings, []);
+
+    assert!(
+        !event_store
+            .has_active_triggers_for_scopes(&[flow_binding.scope])
+            .await
+            .unwrap()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

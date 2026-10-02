@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod test_postgres_flow_activation_wakeup_source;
+mod test_postgres_flow_binding_concurrent_writes;
 mod test_postgres_flow_configuration_event_store;
 mod test_postgres_flow_event_store;
 mod test_postgres_flow_process_state;
+mod test_postgres_flow_system_event_bridge;
 mod test_postgres_flow_trigger_event_store;

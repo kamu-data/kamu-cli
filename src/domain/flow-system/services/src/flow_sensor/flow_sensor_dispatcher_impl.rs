@@ -10,7 +10,6 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     FlowActivationCause,
@@ -18,6 +17,7 @@ use kamu_flow_system::{
     FlowScope,
     FlowScopeRemovalHandler,
     FlowSensor,
+    FlowSensorActivation,
     FlowSensorDispatcher,
 };
 
@@ -48,6 +48,25 @@ struct State {
     sensitive_to_by_output_scope: HashMap<FlowScope, HashSet<FlowScope>>,
 }
 
+impl State {
+    fn remove_sensor(&mut self, flow_scope: &FlowScope) {
+        self.sensors.remove(flow_scope);
+
+        let Some(sensitive_to_scopes) = self.sensitive_to_by_output_scope.remove(flow_scope) else {
+            return;
+        };
+
+        for input_scope in sensitive_to_scopes {
+            if let Some(sensor_set) = self.sensitive_scopes_by_input_scope.get_mut(&input_scope) {
+                sensor_set.remove(flow_scope);
+                if sensor_set.is_empty() {
+                    self.sensitive_scopes_by_input_scope.remove(&input_scope);
+                }
+            }
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -60,7 +79,7 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
     async fn register_sensor(
         &self,
         catalog: &dill::Catalog,
-        activation_time: DateTime<Utc>,
+        activation: FlowSensorActivation,
         flow_sensor: Arc<dyn FlowSensor>,
     ) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
@@ -97,34 +116,19 @@ impl FlowSensorDispatcher for FlowSensorDispatcherImpl {
         // Store the sensor
         state.sensors.insert(flow_scope, flow_sensor.clone());
 
-        // Notify the sensor that it has been activated
-        flow_sensor.on_activated(catalog, activation_time).await?;
+        match activation {
+            FlowSensorActivation::CatchUp(activation_time) => {
+                flow_sensor.on_activated(catalog, activation_time).await?;
+            }
+            FlowSensorActivation::Restore => {}
+        }
 
         Ok(())
     }
 
     async fn unregister_sensor(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
-
-        // Try to remove the sensor - if it exists, clean up its scope mappings
-        state.sensors.remove(flow_scope);
-
-        // Get scopes this sensor was interested in from the removed sensor
-        if let Some(sensitive_to_scopes) = state.sensitive_to_by_output_scope.remove(flow_scope) {
-            // Remove sensor from mappings
-            for sensitive_to_scope in sensitive_to_scopes {
-                if let Some(sensor_set) = state
-                    .sensitive_scopes_by_input_scope
-                    .get_mut(&sensitive_to_scope)
-                {
-                    sensor_set.remove(flow_scope);
-                    if sensor_set.is_empty() {
-                        state.sensitive_scopes_by_input_scope.remove(flow_scope);
-                    }
-                }
-            }
-        }
-
+        state.remove_sensor(flow_scope);
         Ok(())
     }
 
@@ -238,25 +242,7 @@ impl FlowScopeRemovalHandler for FlowSensorDispatcherImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(flow_scope = ?flow_scope))]
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let mut state = self.state.write().await;
-
-        // Remove the sensor associated with this flow scope, if it exists
-        state.sensors.remove(flow_scope);
-
-        // Clean up this sensor's associations with all scopes
-        if let Some(sensitive_to_scopes) = state.sensitive_to_by_output_scope.remove(flow_scope) {
-            for other_scope in sensitive_to_scopes {
-                if let Some(sensor_set) =
-                    state.sensitive_scopes_by_input_scope.get_mut(&other_scope)
-                {
-                    sensor_set.remove(flow_scope);
-                    // Clean up empty sets
-                    if sensor_set.is_empty() {
-                        state.sensitive_scopes_by_input_scope.remove(&other_scope);
-                    }
-                }
-            }
-        }
-
+        state.remove_sensor(flow_scope);
         Ok(())
     }
 }

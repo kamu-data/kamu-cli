@@ -29,6 +29,13 @@ pub trait FlowSystemEventBridge: Send + Sync {
         batch_size: usize,
     ) -> Result<Vec<FlowSystemEvent>, InternalError>;
 
+    /// Whether committed events exist that fetches do not return yet, because a
+    /// transaction that started earlier is still running
+    async fn has_held_back_events(
+        &self,
+        transaction_catalog: &dill::Catalog,
+    ) -> Result<bool, InternalError>;
+
     /// Mark these events as applied for this projector (should be idempotent!).
     async fn mark_applied(
         &self,

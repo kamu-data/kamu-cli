@@ -43,7 +43,11 @@ impl FlowSchedulingServiceImpl {
                 let flow_controller =
                     get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
                 flow_controller
-                    .ensure_flow_sensor(flow_binding, activation_time, *reactive_rule)
+                    .ensure_flow_sensor(
+                        flow_binding,
+                        FlowSensorActivation::CatchUp(activation_time),
+                        *reactive_rule,
+                    )
                     .await
                     .int_err()?;
             }
@@ -56,6 +60,24 @@ impl FlowSchedulingServiceImpl {
         }
 
         Ok(())
+    }
+
+    /// Brings back the sensor of a reactive binding whose pending flow outlived
+    /// a restart, without catching up on inputs the pending flow already holds
+    pub(crate) async fn restore_flow_sensor(
+        &self,
+        target_catalog: &dill::Catalog,
+        flow_binding: &FlowBinding,
+        reactive_rule: ReactiveRule,
+    ) -> Result<(), InternalError> {
+        tracing::trace!(?flow_binding, ?reactive_rule, "Restoring flow sensor");
+
+        let flow_controller =
+            get_flow_controller_from_catalog(target_catalog, &flow_binding.flow_type)?;
+        flow_controller
+            .ensure_flow_sensor(flow_binding, FlowSensorActivation::Restore, reactive_rule)
+            .await
+            .int_err()
     }
 
     pub(crate) async fn schedule_auto_polling_flow(

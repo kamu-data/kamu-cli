@@ -48,7 +48,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_binding, self.event_store.as_ref()).await?;
-        Ok(maybe_flow_configuration.map(Into::into))
+        Ok(maybe_flow_configuration
+            .filter(|flow_configuration| flow_configuration.is_active())
+            .map(Into::into))
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]

@@ -60,6 +60,16 @@ pub trait OutboxMessageBridge: Send + Sync {
         transaction_catalog: &dill::Catalog,
     ) -> Result<Vec<OutboxMessageConsumptionBoundary>, InternalError>;
 
+    /// Whether committed messages of these producers exist that the fetches do
+    /// not return yet, because a transaction that started earlier is still
+    /// running. They become readable once it ends, so a caller draining the
+    /// queue should wait for them
+    async fn has_held_back_messages(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        producer_names: &[&str],
+    ) -> Result<bool, InternalError>;
+
     /// Mark this message boundary as consumed for this producer-consumer pair
     async fn mark_consumed(
         &self,

@@ -280,6 +280,16 @@ impl OutboxMessageBridge for FailOnceOnMarkConsumedOutboxMessageBridge {
             .await
     }
 
+    async fn has_held_back_messages(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        producer_names: &[&str],
+    ) -> Result<bool, InternalError> {
+        self.inner
+            .has_held_back_messages(transaction_catalog, producer_names)
+            .await
+    }
+
     async fn mark_consumed(
         &self,
         transaction_catalog: &Catalog,

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT EXISTS (\n                SELECT 1\n                FROM flow_system_events\n                WHERE\n                    tx_id >= pg_snapshot_xmin(pg_current_snapshot())\n                    AND pg_visible_in_snapshot(tx_id, pg_current_snapshot())\n            ) AS \"has_held_back_events!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "has_held_back_events!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3dfb7487f7c2f9a64dfb64de265f18f3ac908b7aed481a93a775f6f43e48715b"
+}

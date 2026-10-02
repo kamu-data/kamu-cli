@@ -24,6 +24,8 @@ Recommendation: for ease of reading, use the following format:
   - `make lint-harness` (part of `make lint`, and run by CI on every PR) checks the hooks, skill registration
     and routing, and documentation links
 ### Changed
+- Outbox and flow-system event delivery on Postgres wait for older in-flight transactions to commit before
+  moving past them, so a long transaction delays delivery instead of risking a skipped message
 - Agent guidance consolidated: `AGENTS.md` is the single source of rules, skills moved to `.claude/skills/`
   with `.agents/skills/` symlinks for Codex, and DEVELOPER.md gained an "Agent Harness" section
 - Database migrations are forward-only: `make sqlx-add-migration` no longer creates down migrations
@@ -34,6 +36,17 @@ Recommendation: for ease of reading, use the following format:
 - Flows: enabling a transform trigger now detects inputs whose history was rewritten while the trigger was off
   (reset, reset to metadata, compaction), instead of treating the derived dataset as up to date. With recovery
   enabled for breaking changes, the derived dataset is reset to metadata and then rebuilt from its inputs.
+- Concurrent modifications of flow triggers, flow configurations, account quotas and resources are detected
+  instead of one writer silently overwriting the other
+- Outbox and flow-system events of a transaction that commits after a later one no longer go undelivered
+- Reactive flow triggers whose flow was pending at restart react to input changes again
+- Flow configurations of a deleted dataset are no longer returned, and a dataset re-added with the same ID can
+  be configured again
+- Resource update activation causes are deduplicated against all earlier causes of a flow, not only the first
+- Retry policies with a zero minimum delay or very long delays no longer panic; GraphQL rejects a minimum delay
+  over `u32::MAX` seconds with a validation error
+- Webhook delivery flows return an error instead of panicking on an unsupported event type or payload
+- Unregistering a flow sensor no longer drops the routing of downstream sensors that listened to it
 
 ## [0.268.1] - 2026-10-01
 ### Fixed

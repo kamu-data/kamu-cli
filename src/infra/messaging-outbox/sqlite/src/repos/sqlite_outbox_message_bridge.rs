@@ -249,6 +249,15 @@ impl OutboxMessageBridge for SqliteOutboxMessageBridge {
         Ok(consumptions)
     }
 
+    async fn has_held_back_messages(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+        _producer_names: &[&str],
+    ) -> Result<bool, InternalError> {
+        // One connection: no transaction runs while another reads
+        Ok(false)
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(producer_name, consumer_name, boundary = ?boundary))]
     async fn mark_consumed(
         &self,

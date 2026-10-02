@@ -50,16 +50,23 @@ pub struct FlowRetryPolicyInput {
     pub backoff_type: FlowRetryBackoffType,
 }
 
-impl From<FlowRetryPolicyInput> for kamu_flow_system::RetryPolicy {
-    fn from(value: FlowRetryPolicyInput) -> Self {
-        let duration: chrono::Duration = value.min_delay.into();
-        let min_delay_seconds = duration.num_seconds();
+impl TryFrom<FlowRetryPolicyInput> for kamu_flow_system::RetryPolicy {
+    type Error = String;
 
-        Self {
+    fn try_from(value: FlowRetryPolicyInput) -> std::result::Result<Self, Self::Error> {
+        let duration: chrono::Duration = value.min_delay.into();
+        let min_delay_seconds = u32::try_from(duration.num_seconds()).map_err(|_| {
+            format!(
+                "Retry policy minimum delay must not exceed {} seconds",
+                u32::MAX
+            )
+        })?;
+
+        Ok(Self {
             max_attempts: value.max_attempts,
-            min_delay_seconds: u32::try_from(min_delay_seconds).unwrap(),
+            min_delay_seconds,
             backoff_type: value.backoff_type.into(),
-        }
+        })
     }
 }
 

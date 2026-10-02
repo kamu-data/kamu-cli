@@ -11954,5 +11954,407 @@ async fn test_abort_flow_waiting_in_throttling() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
+    let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
+    mock_transform_flow_evaluator
+        .expect_evaluate_transform_status()
+        .returning(|_| Ok(TransformStatus::UpToDate));
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
+            MetadataChainIncrementInterval {
+                num_blocks: 1,
+                num_records: 3,
+                updated_watermark: None,
+            },
+        )),
+        ..Default::default()
+    });
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let bar_id = harness
+        .create_derived_dataset(
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+
+    // Triggers set before the restart
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            ingest_dataset_binding(&foo_id),
+            FlowTriggerRule::Schedule(Duration::milliseconds(80).into()),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    let bar_transform_binding = transform_dataset_binding(&bar_id);
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            bar_transform_binding.clone(),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_buffering(1, Duration::seconds(1)).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    // "bar" had a pending flow when the server went down
+    let bar_flow_id = harness
+        .schedule_flow_for_activation(
+            &bar_transform_binding,
+            harness.now() + Duration::milliseconds(50),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: "foo" start running at 10ms, finish at 20ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            // Task 1: the pending "bar" flow, start running at 60ms, finish at 70ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(
+                    METADATA_TASK_FLOW_ID,
+                    bar_flow_id.to_string(),
+                )]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(60),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
+
+            // Task 2: "foo" start running at 110ms, finish at 120ms with new data
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Success(
+                        TaskResultDatasetUpdate {
+                            pull_result: PullResult::Updated {
+                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                                has_more: false,
+                            },
+                            data_increment: None,
+                        }
+                        .into_task_result(),
+                    ),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
+
+            let main_handle = harness.advance_time(Duration::milliseconds(150));
+
+            tokio::join!(task0_handle, task1_handle, task2_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling
+
+            #1: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 1 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 1 Running(task=0)
+
+            #3: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 1 Finished Success
+
+            #4: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=50ms)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
+                Flow ID = 1 Finished Success
+
+            #5: +50ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Executor(task=1, since=50ms)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
+                Flow ID = 1 Finished Success
+
+            #6: +60ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Running(task=1)
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
+                Flow ID = 1 Finished Success
+
+            #7: +70ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
+                Flow ID = 1 Finished Success
+
+            #8: +100ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=100ms)
+                Flow ID = 1 Finished Success
+
+            #9: +110ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Running(task=2)
+                Flow ID = 1 Finished Success
+
+            #10: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Finished Success
+                Flow ID = 1 Finished Success
+
+            #11: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Waiting Input(foo) Batching(3/1, until=1120ms)
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Finished Success
+                Flow ID = 1 Finished Success
+
+            #12: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Waiting Input(foo) Batching(3/1, until=1120ms) Activating(at=120ms)
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Finished Success
+                Flow ID = 1 Finished Success
+
+            #13: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Waiting Input(foo) Batching(3/1, until=1120ms) Activating(at=120ms)
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
+                Flow ID = 2 Finished Success
+                Flow ID = 1 Finished Success
+
+            #14: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Waiting Input(foo) Executor(task=3, since=120ms)
+                Flow ID = 0 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
+                Flow ID = 2 Finished Success
+                Flow ID = 1 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_restored_sensor_hears_input_change_delivered_after_restart() {
+    let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
+    mock_transform_flow_evaluator
+        .expect_evaluate_transform_status()
+        .returning(|_| Ok(TransformStatus::UpToDate));
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
+        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
+            MetadataChainIncrementInterval {
+                num_blocks: 1,
+                num_records: 3,
+                updated_watermark: None,
+            },
+        )),
+        ..Default::default()
+    });
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+
+    let bar_id = harness
+        .create_derived_dataset(
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+
+    let bar_transform_binding = transform_dataset_binding(&bar_id);
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            bar_transform_binding.clone(),
+            FlowTriggerRule::Reactive(ReactiveRule::new(
+                BatchingRule::try_buffering(1, Duration::seconds(1)).unwrap(),
+                BreakingChangeRule::NoAction,
+            )),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    // "bar" had a pending flow when the server went down, due right away
+    let bar_flow_id = harness
+        .schedule_flow_for_activation(&bar_transform_binding, harness.now())
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    let foo_old_head = odf::Multihash::from_digest_sha3_256(b"foo-old-slice");
+    let foo_pushed_head = odf::Multihash::from_digest_sha3_256(b"foo-pushed-slice");
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: the pending "bar" flow, start running at 10ms, finish at 40ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(
+                    METADATA_TASK_FLOW_ID,
+                    bar_flow_id.to_string(),
+                )]),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(30),
+                    TaskOutcome::Success(TaskResult::empty()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: bar_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            // "foo" was pushed to while the server was down; the outbox delivers
+            // that while the "bar" task runs
+            let push_handle = harness.issue_dataset_ingested_over_http(
+                Duration::milliseconds(20),
+                &foo_id,
+                &foo_old_head,
+                &foo_pushed_head,
+            );
+
+            let main_handle = harness.advance_time(Duration::milliseconds(60));
+
+            tokio::join!(task0_handle, push_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+
+            #1: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Running(task=0)
+
+            #3: +40ms:
+              "bar" ExecuteTransform:
+                Flow ID = 0 Finished Success
+
+            #4: +40ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting HttpIngest Throttling(for=20ms, wakeup=60ms, shifted=20ms)
+                Flow ID = 0 Finished Success
+
+            #5: +60ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Waiting HttpIngest Executor(task=1, since=60ms)
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO next:
 //  - derived more than 1 level

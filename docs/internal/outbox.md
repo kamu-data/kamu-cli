@@ -281,8 +281,9 @@ initial boundary: `Latest` → the producer's latest visible message, `All` (or 
 ### 5.2 Main loop
 
 ```text
-run():  drain  → loop { wait_wake(maxListeningTimeout, minDebounceInterval); drain }
+run():  drain  → loop { wait_wake(held back ? 20ms : maxListeningTimeout, minDebounceInterval); drain }
 drain:  loop { n = consumption_iteration(); if n == 0 break }
+run_while_has_tasks(): loop { drain; if !has_held_back_messages() break; sleep(20ms) }
 ```
 
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel
@@ -290,6 +291,14 @@ Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel
 after commands that need it, and the HTTP E2E middleware after every successful mutating request,
 so E2E tests observe consumers' effects synchronously. A `run_lock` keeps these entrances from
 overlapping with the main loop.
+
+`run_while_has_tasks()` does not stop at the first empty iteration. Committed messages can be held
+back while an older transaction runs ([§6](#reading-below-the-oldest-running-transaction)), anywhere
+on the Postgres cluster; the caller is about to exit or answer, so it must not leave them behind.
+After draining, it asks `OutboxMessageBridge::has_held_back_messages` and, while the answer is yes,
+waits 20 ms and drains again. Only producers the agent still delivers are asked about — those with
+at least one consumer that is not failing: any other held-back message would make the caller wait
+for an unrelated transaction for nothing.
 
 ### 5.3 One iteration
 
@@ -371,14 +380,29 @@ tx 226815: messages 7007–7008
 the boundary to record is `(226815, 7008)`; recording `(226813, 7018)` would re-deliver the
 messages of transactions 226814 and 226815 (see `impl Ord for OutboxMessageBoundary`).
 
-### Deviation from the article
+### Reading below the oldest running transaction
 
-The article reads only transactions older than every running one
-(`tx_id < pg_snapshot_xmin(pg_current_snapshot())`). Our bridges filter by visibility instead
-(`pg_visible_in_snapshot(tx_id, pg_current_snapshot())`), so that unrelated long transactions do not
-hold delivery back. The trade-off: a message from an older transaction that commits after a newer one
-was already delivered sorts below the consumer's boundary and is skipped. The Postgres agent test
-does not cover this interleaving.
+As in the article, the bridges read only rows of transactions older than every running one:
+`tx_id < pg_snapshot_xmin(pg_current_snapshot())`, plus the reader's own rows
+(`pg_current_xact_id_if_assigned()`, which does not give a read-only reader a transaction ID of its
+own). A transaction that started writing earlier may still commit, and once the boundary has passed
+its ID its rows would sort below it and never be read. The cost: any long transaction on the cluster,
+related or not, holds delivery back until it ends; it delays, never loses.
+
+Its commit may raise no wakeup, when it wrote to no table with a notification trigger. So after
+catching up, each Postgres reader asks whether committed rows are held back
+(`OutboxMessageBridge::has_held_back_messages`, `FlowSystemEventBridge::has_held_back_events`) and,
+if so, re-checks after `HELD_BACK_RECHECK_INTERVAL` (20 ms) instead of `maxListeningTimeout`:
+
+| Reader | Waits while rows are held back |
+| --- | --- |
+| Outbox and flow-system event agent main loops | the next wakeup or `HELD_BACK_RECHECK_INTERVAL` |
+| `run_while_has_tasks()` (CLI, E2E middleware) | `HELD_BACK_RECHECK_INTERVAL`, then drains again, until none are held back |
+
+| Rejected guard | Why |
+| --- | --- |
+| `pg_visible_in_snapshot(tx_id, pg_current_snapshot())` | Lets a newer committed transaction through while an older one is in flight; the boundary passes the older ID and its rows are skipped forever. `test_later_transaction_waits_for_earlier_in_flight_one` (flow-system Postgres tests) pins this |
+| `pg_current_xact_id()` for the reader's own rows | Assigns a transaction ID to a read-only reader, which then holds delivery back for the whole cluster while it is open |
 
 ---
 

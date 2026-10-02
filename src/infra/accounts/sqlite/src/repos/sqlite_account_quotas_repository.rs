@@ -197,6 +197,9 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
             .await
             .map_err(ErrorIntoInternal::int_err)?;
 
+        // Rejects an expected event that is not the quota's last one. Two writers
+        // based on the same event both pass it and collide on the unique index over
+        // `prev_event_id` instead
         Self::map_save_error(maybe_prev_stored_event_id, last_id)?;
 
         use odf::metadata::AsStackString;
@@ -206,6 +209,7 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
         let account_id_str = account_id.as_str();
         let quota_type_str = quota_type.as_str();
         let mut last_event_id = None;
+        let mut prev_event_id = Some(maybe_prev_stored_event_id.map_or(0, EventID::into_inner));
 
         for event in events {
             let payload = serde_json::to_string(&event)
@@ -214,6 +218,8 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
             let event_type = event.typename().to_string();
             let event_time = event.event_time();
 
+            let event_prev_event_id = prev_event_id.take();
+
             let inserted: i64 = sqlx::query_scalar!(
                 r#"
                 INSERT INTO account_quota_events (
@@ -221,9 +227,10 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
                     quota_type,
                     event_type,
                     event_payload,
-                    event_time
+                    event_time,
+                    prev_event_id
                 )
-                VALUES (?1, ?2, ?3, ?4, ?5)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6)
                 RETURNING id
                 "#,
                 account_id_str,
@@ -231,11 +238,19 @@ impl EventStore<AccountQuotaState> for SqliteAccountQuotaEventStore {
                 event_type,
                 payload,
                 event_time,
+                event_prev_event_id,
             )
             .fetch_one(&mut *connection_mut)
             .await
-            .int_err()
-            .map_err(SaveEventsError::Internal)?;
+            .map_err(|e| {
+                if let Some(db_err) = e.as_database_error()
+                    && db_err.is_unique_violation()
+                {
+                    SaveEventsError::concurrent_modification()
+                } else {
+                    SaveEventsError::Internal(e.int_err())
+                }
+            })?;
 
             last_event_id = Some(EventID::new(inserted));
         }
