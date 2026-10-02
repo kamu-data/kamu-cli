@@ -173,6 +173,50 @@ pub(crate) async fn get_transform_query_input(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Collects the input blocks the next transform would consume: from the
+/// input's new head back to, but excluding, the block consumed by the last
+/// transform. Fails with `InvalidInputInterval` when the new head no longer
+/// descends from that block, i.e. the input history was rewritten.
+pub(crate) async fn collect_unprocessed_input_blocks(
+    query_input: &odf::metadata::ExecuteTransformInput,
+    input_chain: &dyn odf::MetadataChain,
+) -> Result<Vec<(odf::Multihash, odf::MetadataBlock)>, CollectUnprocessedInputBlocksError> {
+    let Some(new_block_hash) = &query_input.new_block_hash else {
+        return Ok(Vec::new());
+    };
+
+    use futures::TryStreamExt;
+    input_chain
+        .iter_blocks_interval(
+            new_block_hash.into(),
+            query_input.prev_block_hash.as_ref().map(Into::into),
+            false,
+        )
+        .try_collect()
+        .await
+        .map_err(|chain_err| match chain_err {
+            odf::IterBlocksError::InvalidInterval(err) => {
+                CollectUnprocessedInputBlocksError::InvalidInputInterval(
+                    InvalidInputIntervalError {
+                        head: err.head,
+                        tail: err.tail,
+                        input_dataset_id: query_input.dataset_id.clone(),
+                    },
+                )
+            }
+            odf::IterBlocksError::RefNotFound(_)
+            | odf::IterBlocksError::BlockNotFound(_)
+            | odf::IterBlocksError::BlockVersion(_)
+            | odf::IterBlocksError::BlockMalformed(_)
+            | odf::IterBlocksError::Access(_)
+            | odf::IterBlocksError::Internal(_) => {
+                CollectUnprocessedInputBlocksError::Internal(chain_err.int_err())
+            }
+        })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn get_transform_input_from_query_input(
     query_input: odf::metadata::ExecuteTransformInput,
     alias: String,
@@ -199,36 +243,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         })?;
 
     // Collect unprocessed input blocks
-    use futures::TryStreamExt;
-    let blocks_unprocessed = if let Some(new_block_hash) = &query_input.new_block_hash {
-        input_chain
-            .iter_blocks_interval(
-                new_block_hash.into(),
-                query_input.prev_block_hash.as_ref().map(Into::into),
-                false,
-            )
-            .try_collect()
-            .await
-            .map_err(|chain_err| match chain_err {
-                odf::IterBlocksError::InvalidInterval(err) => {
-                    GetTransformInputError::InvalidInputInterval(InvalidInputIntervalError {
-                        head: err.head,
-                        tail: err.tail,
-                        input_dataset_id: query_input.dataset_id,
-                    })
-                }
-                odf::IterBlocksError::RefNotFound(_)
-                | odf::IterBlocksError::BlockNotFound(_)
-                | odf::IterBlocksError::BlockVersion(_)
-                | odf::IterBlocksError::BlockMalformed(_)
-                | odf::IterBlocksError::Access(_)
-                | odf::IterBlocksError::Internal(_) => {
-                    GetTransformInputError::Internal(chain_err.int_err())
-                }
-            })?
-    } else {
-        Vec::new()
-    };
+    let blocks_unprocessed = collect_unprocessed_input_blocks(&query_input, input_chain).await?;
 
     use odf::metadata::IntoDataStreamBlock;
     let mut data_slices = Vec::new();
@@ -337,6 +352,35 @@ impl From<GetTransformQueryInputError> for TransformElaborateError {
     fn from(value: GetTransformQueryInputError) -> Self {
         match value {
             GetTransformQueryInputError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub(crate) enum CollectUnprocessedInputBlocksError {
+    #[error(transparent)]
+    InvalidInputInterval(
+        #[from]
+        #[backtrace]
+        InvalidInputIntervalError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<CollectUnprocessedInputBlocksError> for GetTransformInputError {
+    fn from(value: CollectUnprocessedInputBlocksError) -> Self {
+        match value {
+            CollectUnprocessedInputBlocksError::InvalidInputInterval(e) => {
+                Self::InvalidInputInterval(e)
+            }
+            CollectUnprocessedInputBlocksError::Internal(e) => Self::Internal(e),
         }
     }
 }

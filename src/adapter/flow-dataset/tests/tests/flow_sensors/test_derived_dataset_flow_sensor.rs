@@ -169,6 +169,71 @@ async fn test_sensor_activation_new_data() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_sensor_activation_breaking_change_ignored() {
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
+
+    // No flow run expectations: any triggered flow fails the test
+    let harness = DerivedDatasetFlowSensorHarness::new(DerivedDatasetFlowSensorHarnessOverrides {
+        mock_transform_flow_evaluator: Some(
+            DerivedDatasetFlowSensorHarness::mock_evaluator_with_breaking_input(&foo_id, &bar_id),
+        ),
+        ..Default::default()
+    });
+    harness
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
+        .await;
+
+    // Default reactive rule is NoAction
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor(&foo_id);
+
+    sensor
+        .on_activated(&harness.catalog, Utc::now())
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_sensor_activation_breaking_change_recovered() {
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
+
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    DerivedDatasetFlowSensorHarness::add_metadata_only_reset_trigger_expectation(
+        &mut mock_flow_run_service,
+        &foo_id,
+    );
+
+    let harness = DerivedDatasetFlowSensorHarness::new(DerivedDatasetFlowSensorHarnessOverrides {
+        mock_transform_flow_evaluator: Some(
+            DerivedDatasetFlowSensorHarness::mock_evaluator_with_breaking_input(&foo_id, &bar_id),
+        ),
+        mock_flow_run_service: Some(mock_flow_run_service),
+        ..Default::default()
+    });
+    harness
+        .declare_dependency(&foo_id, std::slice::from_ref(&bar_id), &[])
+        .await;
+
+    let sensor = DerivedDatasetFlowSensorHarness::create_sensor_with_reactive_rule(
+        &foo_id,
+        ReactiveRule {
+            for_new_data: BatchingRule::Immediate,
+            for_breaking_change: BreakingChangeRule::Recover,
+        },
+    );
+
+    sensor
+        .on_activated(&harness.catalog, Utc::now())
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_sensor_sensitization_wrong_dataset() {
     let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
@@ -382,6 +447,32 @@ impl DerivedDatasetFlowSensorHarness {
         DerivedDatasetFlowSensor::new(dataset_id, reactive_rule)
     }
 
+    fn mock_evaluator_with_breaking_input(
+        dataset_id: &odf::DatasetID,
+        input_dataset_id: &odf::DatasetID,
+    ) -> MockTransformFlowEvaluator {
+        let dataset_id = dataset_id.clone();
+        let input_dataset_id = input_dataset_id.clone();
+
+        let mut mock = MockTransformFlowEvaluator::new();
+        mock.expect_evaluate_transform_status()
+            .withf(move |id| id == &dataset_id)
+            .returning(move |_| {
+                Ok(kamu_core::TransformStatus::InputBreakingChange {
+                    breaking_inputs: vec![odf::metadata::ExecuteTransformInput {
+                        dataset_id: input_dataset_id.clone(),
+                        prev_block_hash: Some(odf::Multihash::from_digest_sha3_256(
+                            b"bar_old_head",
+                        )),
+                        new_block_hash: Some(odf::Multihash::from_digest_sha3_256(b"bar_new_head")),
+                        prev_offset: Some(10),
+                        new_offset: Some(5),
+                    }],
+                })
+            });
+        mock
+    }
+
     fn make_input_activation_cause(
         dataset_id: &odf::DatasetID,
         changes: ResourceChanges,
@@ -484,6 +575,7 @@ impl DerivedDatasetFlowSensorHarness {
                     dataset_scope.dataset_id() == dataset_id_clone_1
                 },
             )
+            .times(1)
             .returning(move |_, _, _, _, _| {
                 let now = Utc::now();
 

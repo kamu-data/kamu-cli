@@ -17,6 +17,7 @@ use crate::{FlowActivationCause, FlowBinding, FlowScope, ReactiveRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowSensor: Send + Sync + Any {
     fn flow_scope(&self) -> &FlowScope;

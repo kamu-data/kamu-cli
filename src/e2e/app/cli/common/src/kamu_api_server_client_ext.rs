@@ -1630,6 +1630,52 @@ impl FlowApi<'_> {
             .await
     }
 
+    pub async fn set_reactive_transform_trigger(
+        &self,
+        dataset_id: &odf::DatasetID,
+        for_breaking_change: &str,
+    ) {
+        let mutation = indoc::indoc!(
+            r#"
+            mutation {
+              datasets {
+                byId(datasetId: "<dataset_id>") {
+                  flows {
+                    triggers {
+                      setTrigger(
+                        datasetFlowType: EXECUTE_TRANSFORM,
+                        triggerRuleInput: {
+                          reactive: {
+                            forNewData: { immediate: { dummy: false } },
+                            forBreakingChange: <for_breaking_change>
+                          }
+                        },
+                        triggerStopPolicyInput: {
+                          afterConsecutiveFailures: { maxFailures: 1 }
+                        }
+                      ) {
+                        message
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )
+        .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+        .replace("<for_breaking_change>", for_breaking_change);
+
+        let response = self.client.graphql_api_call(&mutation, None).await.data();
+
+        pretty_assertions::assert_eq!(
+            "Success",
+            response["datasets"]["byId"]["flows"]["triggers"]["setTrigger"]["message"]
+                .as_str()
+                .unwrap()
+        );
+    }
+
     // Method to wait for a flow to finish
     // Args:
     // - dataset_id: The ID of the dataset to check
@@ -1705,6 +1751,9 @@ impl FlowApi<'_> {
                                 edges {
                                   node {
                                     flowId
+                                    description {
+                                      __typename
+                                    }
                                     status
                                     taskIds
                                     outcome {
@@ -1735,6 +1784,10 @@ impl FlowApi<'_> {
                 let node = &edge["node"];
                 FlowSummary {
                     flow_id: node["flowId"].as_str().unwrap().to_owned(),
+                    description: node["description"]["__typename"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned(),
                     status: node["status"].as_str().unwrap().to_owned(),
                     outcome: node["outcome"]["__typename"]
                         .as_str()
@@ -1762,6 +1815,8 @@ pub enum FlowTriggerResponse {
 #[derive(Debug)]
 pub struct FlowSummary {
     pub flow_id: String,
+    /// GraphQL type name of the flow description, identifying the flow type
+    pub description: String,
     pub status: String,
     /// GraphQL type name of the outcome, if the flow finished
     pub outcome: Option<String>,
