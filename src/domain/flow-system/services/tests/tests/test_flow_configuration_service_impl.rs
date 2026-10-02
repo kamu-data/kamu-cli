@@ -231,6 +231,81 @@ async fn test_dataset_deleted() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_find_after_dataset_deleted() {
+    let harness = FlowConfigurationHarness::new();
+
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let foo_ingest_binding = ingest_dataset_binding(&foo_id);
+    let foo_ingest_config = FlowConfigRuleIngest {
+        fetch_uncacheable: true,
+        fetch_next_iteration: false,
+    }
+    .into_flow_config();
+
+    harness
+        .set_dataset_flow_config(foo_ingest_binding.clone(), foo_ingest_config, None)
+        .await;
+    assert_matches!(
+        harness.find_configuration(&foo_ingest_binding).await,
+        Some(_)
+    );
+
+    harness.issue_dataset_deleted(&foo_id).await;
+
+    assert_matches!(harness.find_configuration(&foo_ingest_binding).await, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_configure_again_after_dataset_deleted() {
+    let harness = FlowConfigurationHarness::new();
+
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let foo_compaction_binding = compaction_dataset_binding(&foo_id);
+    let foo_compaction_config = FlowConfigRuleCompact::try_new(1, 2)
+        .unwrap()
+        .into_flow_config();
+
+    harness
+        .set_dataset_flow_config(foo_compaction_binding.clone(), foo_compaction_config, None)
+        .await;
+
+    harness.issue_dataset_deleted(&foo_id).await;
+
+    // A dataset with the same ID is re-added and configured again
+    let foo_compaction_config_2 = FlowConfigRuleCompact::try_new(2, 3)
+        .unwrap()
+        .into_flow_config();
+
+    harness
+        .set_dataset_flow_config(
+            foo_compaction_binding.clone(),
+            foo_compaction_config_2.clone(),
+            None,
+        )
+        .await;
+
+    let configs = harness.list_active_configurations().await;
+    assert_eq!(1, configs.len());
+    harness.expect_dataset_flow_config(
+        &configs,
+        &foo_compaction_binding,
+        &foo_compaction_config_2,
+        None,
+    );
+    assert_matches!(
+        harness.find_configuration(&foo_compaction_binding).await,
+        Some(FlowConfigurationState {
+            status: FlowConfigurationStatus::Active,
+            ..
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct FlowConfigurationHarness {
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_configuration_event_store: Arc<dyn FlowConfigurationEventStore>,
@@ -292,6 +367,16 @@ impl FlowConfigurationHarness {
             res.insert(active_config.flow_binding.clone(), active_config);
         }
         res
+    }
+
+    async fn find_configuration(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Option<FlowConfigurationState> {
+        self.flow_configuration_service
+            .find_configuration(flow_binding)
+            .await
+            .unwrap()
     }
 
     async fn set_dataset_flow_config(
