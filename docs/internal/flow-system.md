@@ -89,7 +89,6 @@ after too many failures and schedules the next periodic run.
   - [14. Recipe: a new flow type](#14-recipe-a-new-flow-type)
   - [15. Gotchas](#15-gotchas)
     - [Behaviour by design](#behaviour-by-design)
-    - [Suspected, not reproduced](#suspected-not-reproduced)
   - [16. File/crate reference map](#16-filecrate-reference-map)
 
 ---
@@ -838,9 +837,6 @@ Wakeup channels and their SQLite polling equivalents are in
 
 ## 15. Gotchas
 
-Two kinds of entries, kept apart on purpose. When a suspected defect is tracked by an issue or
-pinned by a test, link it here, and remove the row once it is fixed.
-
 ### Behaviour by design
 
 | Area | What happens |
@@ -852,14 +848,6 @@ pinned by a test, link it here, and remove the row once it is fixed.
 | Unconfigured bindings | Without a trigger, failures are not counted and nothing auto-stops |
 | Manual cancel | Cancelling a flow pauses the binding's schedule trigger as a user pause |
 | Scope-removed triggers | Modifying a removed trigger revives it, so that a scope re-added with the same ID works again. `set_trigger` and `resume_flow_trigger` do not check liveness; callers that must not revive a trigger have to check |
-
-### Suspected, not reproduced
-
-Hypotheses from combining several code paths; each needs a test before it is treated as a defect.
-
-| Area | Reasoning |
-| --- | --- |
-| Projection order | Postgres delivers events in `(tx_id, event_id)` order, while process state rejects any event ID not above the last applied one for the binding. Two transactions touching one binding that commit in the opposite order of their event IDs would fail the projector's batch on every retry |
 
 ---
 
