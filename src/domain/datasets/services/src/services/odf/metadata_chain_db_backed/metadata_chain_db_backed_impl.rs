@@ -509,6 +509,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl<TMetadataChain> odf::MetadataChain for MetadataChainDatabaseBackedImpl<TMetadataChain>
 where
@@ -648,28 +649,33 @@ where
         })
     }
 
+    #[tracing::instrument(
+        name = MetadataChainDatabaseBackedImpl_append
+        level = "debug",
+        skip_all,
+    )]
     async fn append<'a>(
         &'a self,
         block: odf::MetadataBlock,
         opts: odf::dataset::AppendOpts<'a>,
     ) -> Result<odf::Multihash, odf::dataset::AppendError> {
-        // Classify the block type
         let block_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
 
-        // Key block
         if block_flags.has_key_block_flags() {
-            // If there is anything cached for key blocks, we must reset it
+            tracing::debug!("Clearing the key blocks cache");
             let mut write_guard = self.state.write().unwrap();
             write_guard.cached_key_blocks = None;
-
-        // Data block
         } else if block_flags.has_data_flags() {
-            // If there is anything cached for data blocks, we must reset it
+            tracing::debug!("Clearing the data blocks cache");
             let mut write_guard = self.state.write().unwrap();
             write_guard.cached_data_blocks = None;
         }
 
         // Append the block to the underlying chain
+        //
+        // FIXME: Currently results in all validation visitors in the underlying chain
+        // bypassing DB metadata storate layer and fetching all scanning all blocks from
+        // the raw storage
         self.metadata_chain.append(block, opts).await
     }
 
@@ -767,6 +773,11 @@ where
         Ok(Some((prev_block_hash.clone(), block)))
     }
 
+    #[tracing::instrument(
+        name = MetadataChainDatabaseBackedImpl_detach_from_transaction,
+        level = "debug",
+        skip_all,
+    )]
     fn detach_from_transaction(&self) {
         // Pass over to the next level chain
         self.metadata_chain.detach_from_transaction();

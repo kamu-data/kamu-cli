@@ -23,8 +23,14 @@ pub struct PostgresDatasetDataBlockRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_has_data_blocks_for_ref
+        level = "debug",
+        skip_all,
+    )]
     async fn has_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
@@ -45,6 +51,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         Ok(result.is_some())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_contains_data_block
+        level = "debug",
+        skip_all,
+    )]
     async fn contains_data_block(
         &self,
         dataset_id: &odf::DatasetID,
@@ -65,6 +76,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         Ok(result.is_some())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_get_data_block
+        level = "debug",
+        skip_all,
+    )]
     async fn get_data_block(
         &self,
         dataset_id: &odf::DatasetID,
@@ -99,6 +115,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         }))
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_get_data_block_size
+        level = "debug",
+        skip_all,
+    )]
     async fn get_data_block_size(
         &self,
         dataset_id: &odf::DatasetID,
@@ -119,6 +140,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         Ok(result.flatten().map(|size| usize::try_from(size).unwrap()))
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_get_page_of_data_blocks
+        level = "debug",
+        skip_all,
+    )]
     async fn get_page_of_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,
@@ -168,6 +194,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
             .collect())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_get_all_data_blocks
+        level = "debug",
+        skip_all,
+    )]
     async fn get_all_data_blocks(
         &self,
         dataset_id: &odf::DatasetID,
@@ -209,6 +240,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
             .collect())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_save_data_blocks_batch
+        level = "debug",
+        skip_all,
+    )]
     async fn save_data_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
@@ -277,6 +313,11 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         Ok(())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetDataBlockRepository_delete_all_data_blocks_for_ref
+        level = "debug",
+        skip_all,
+    )]
     async fn delete_all_data_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,

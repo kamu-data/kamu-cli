@@ -106,11 +106,17 @@ impl PushIngestPlannerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PushIngestPlanner for PushIngestPlannerImpl {
     /// Uses or auto-creates push source definition in metadata to plan
     /// ingestion
-    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?source_name, ?opts))]
+    #[tracing::instrument(
+        name = PushIngestPlannerImpl_plan_ingest
+        level = "debug",
+        skip_all,
+        fields(target=%target.get_handle(), ?source_name, ?opts)
+    )]
     async fn plan_ingest(
         &self,
         target: ResolvedDataset,

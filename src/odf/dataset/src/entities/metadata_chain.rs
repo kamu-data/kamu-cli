@@ -156,6 +156,12 @@ pub trait MetadataChainExt: MetadataChain {
     /// Returns amount of records and blocks between blocks and latest watermark
     /// in a given range
     // TODO: PERF: Avoid multiple passes over metadata chain
+    #[tracing::instrument(
+        name = "MetadataChain::get_increment_for_interval",
+        level = "debug",
+        skip_all,
+        fields(?old_head, ?new_head),
+    )]
     async fn get_increment_for_interval<'a>(
         &'a self,
         old_head: Option<&Multihash>,
@@ -347,7 +353,12 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// Extended version of [`MetadataChainExt::accept_by_interval()`] method,
     /// allowing more flexible configuration.
-    #[tracing::instrument(level = "debug", skip_all, fields(?head_hash, ?tail_hash))]
+    #[tracing::instrument(
+        name = "MetadataChain::accept_by_interval_ext",
+        level = "debug",
+        skip_all,
+        fields(?head_hash, ?tail_hash),
+    )]
     async fn accept_by_interval_ext<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],

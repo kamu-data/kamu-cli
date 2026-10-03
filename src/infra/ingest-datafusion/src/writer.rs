@@ -49,6 +49,7 @@ pub struct DataWriterDataFusion {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl DataWriterDataFusion {
     pub async fn from_metadata_chain(
         ctx: SessionContext,
@@ -551,7 +552,7 @@ impl DataWriterDataFusion {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?path))]
+    #[tracing::instrument(name = DataWriterDataFusion_write_output, level = "debug", skip_all, fields(?path))]
     async fn write_output(
         &self,
         path: PathBuf,
@@ -713,7 +714,7 @@ impl DataWriterDataFusion {
 
     /// Reads output file back to collect sizes of all linked objects, verifying
     /// referential integrity at the same time
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = DataWriterDataFusion_compute_linked_objects_summary, level = "info", skip_all)]
     async fn compute_linked_objects_summary(
         &self,
         path: &Path,
@@ -934,9 +935,10 @@ impl DataWriterDataFusion {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl DataWriter for DataWriterDataFusion {
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = DataWriterDataFusion_write, level = "info", skip_all)]
     async fn write(
         &mut self,
         new_data: Option<DataFrameExt>,
@@ -947,7 +949,7 @@ impl DataWriter for DataWriterDataFusion {
         Ok(commit)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = DataWriterDataFusion_write_watermark, level = "info", skip_all)]
     async fn write_watermark(
         &mut self,
         new_watermark: DateTime<Utc>,
@@ -980,7 +982,7 @@ impl DataWriter for DataWriterDataFusion {
         Ok(commit)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = DataWriterDataFusion_stage, level = "info", skip_all)]
     async fn stage(
         &self,
         new_data: Option<DataFrameExt>,
@@ -1136,7 +1138,7 @@ impl DataWriter for DataWriterDataFusion {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = DataWriterDataFusion_commit, level = "info", skip_all)]
     async fn commit(
         &mut self,
         staged: StageDataResult,

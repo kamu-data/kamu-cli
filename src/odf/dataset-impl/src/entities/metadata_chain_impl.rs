@@ -94,6 +94,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl<MetaBlockRepo, MetaRefRepo> MetadataChain for MetadataChainImpl<MetaBlockRepo, MetaRefRepo>
 where
@@ -194,6 +195,11 @@ where
         ))
     }
 
+    #[tracing::instrument(
+        name = MetadataChainImpl_append,
+        level = "debug",
+        skip_all,
+    )]
     async fn append<'a>(
         &'a self,
         block: MetadataBlock,

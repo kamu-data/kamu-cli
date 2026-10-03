@@ -8660,6 +8660,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "cheap-clone",
+ "common-macros",
  "database-common",
  "database-common-macros",
  "dill",
@@ -8977,6 +8978,7 @@ version = "0.268.1"
 dependencies = [
  "async-trait",
  "chrono",
+ "common-macros",
  "criterion",
  "datafusion",
  "file-utils",

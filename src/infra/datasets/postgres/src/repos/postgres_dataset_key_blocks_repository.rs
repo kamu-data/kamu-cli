@@ -23,8 +23,14 @@ pub struct PostgresDatasetKeyBlockRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
+    #[tracing::instrument(
+        name = PostgresDatasetKeyBlockRepository_list_unindexed_dataset_branches
+        level = "debug",
+        skip_all,
+    )]
     async fn list_unindexed_dataset_branches(
         &self,
     ) -> Result<Vec<(odf::DatasetID, odf::BlockRef)>, InternalError> {
@@ -56,6 +62,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .collect())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetKeyBlockRepository_has_key_blocks_for_ref
+        level = "debug",
+        skip_all,
+    )]
     async fn has_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,
@@ -76,6 +87,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         Ok(result.is_some())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetKeyBlockRepository_get_all_key_blocks
+        level = "debug",
+        skip_all,
+    )]
     async fn get_all_key_blocks(
         &self,
         dataset_id: &odf::DatasetID,
@@ -117,6 +133,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .collect())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetKeyBlockRepository_match_datasets_having_key_blocks
+        level = "debug",
+        skip_all,
+    )]
     async fn match_datasets_having_key_blocks(
         &self,
         dataset_ids: &[odf::DatasetID],
@@ -173,6 +194,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
             .collect())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetKeyBlockRepository_save_key_blocks_batch
+        level = "debug",
+        skip_all,
+    )]
     async fn save_key_blocks_batch(
         &self,
         dataset_id: &odf::DatasetID,
@@ -241,6 +267,11 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
         Ok(())
     }
 
+    #[tracing::instrument(
+        name = PostgresDatasetKeyBlockRepository_delete_all_key_blocks_for_ref
+        level = "debug",
+        skip_all,
+    )]
     async fn delete_all_key_blocks_for_ref(
         &self,
         dataset_id: &odf::DatasetID,

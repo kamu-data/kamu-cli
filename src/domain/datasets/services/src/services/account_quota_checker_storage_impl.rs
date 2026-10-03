@@ -37,8 +37,14 @@ impl AccountQuotaCheckerStorageImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl AccountQuotaStorageChecker for AccountQuotaCheckerStorageImpl {
+    #[tracing::instrument(
+        name = AccountQuotaCheckerStorageImpl_ensure_within_quota,
+        level = "debug",
+        skip_all,
+    )]
     async fn ensure_within_quota(
         &self,
         account_id: &odf::AccountID,
