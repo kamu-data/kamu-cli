@@ -28,6 +28,7 @@ pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
     DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
@@ -52,6 +53,11 @@ where
         }
     }
 
+    #[tracing::instrument(
+        name = DatasetImpl_prepare_objects,
+        level = "info",
+        skip_all,
+    )]
     async fn prepare_objects(
         &self,
         offset_interval: Option<OffsetInterval>,
@@ -120,6 +126,11 @@ where
         Ok((data_slice, checkpoint))
     }
 
+    #[tracing::instrument(
+        name = DatasetImpl_commit_objects,
+        level = "info",
+        skip_all,
+    )]
     async fn commit_objects(
         &self,
         data_slice: Option<&DataSlice>,
@@ -163,6 +174,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait]
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> Dataset
     for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
@@ -180,6 +192,11 @@ where
     /// Helper function to append a generic event to metadata chain.
     ///
     /// Warning: Don't use when synchronizing blocks from another dataset.
+    #[tracing::instrument(
+        name = DatasetImpl_commit_event,
+        level = "info",
+        skip_all,
+    )]
     async fn commit_event<'a>(
         &self,
         event: MetadataEvent,
@@ -271,6 +288,11 @@ where
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
+    #[tracing::instrument(
+        name = DatasetImpl_commit_add_data,
+        level = "info",
+        skip_all,
+    )]
     async fn commit_add_data<'a>(
         &self,
         params: AddDataParams,
@@ -320,6 +342,11 @@ where
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
+    #[tracing::instrument(
+        name = DatasetImpl_commit_execute_transform,
+        level = "info",
+        skip_all,
+    )]
     async fn commit_execute_transform<'a>(
         &self,
         execute_transform: ExecuteTransformParams,
@@ -349,6 +376,11 @@ where
         .await
     }
 
+    #[tracing::instrument(
+        name = DatasetImpl_prepare_execute_transform,
+        level = "info",
+        skip_all,
+    )]
     async fn prepare_execute_transform<'a>(
         &self,
         params: ExecuteTransformParams,

@@ -287,7 +287,7 @@ where
     /// Same as [`Aggregate::load()`] but with extra control knobs
     #[tracing::instrument(
         level = "debug",
-        name = "load",
+        name = "Aggregate::load",
         skip_all,
         fields(
             agg_type = %std::any::type_name::<Proj>(),

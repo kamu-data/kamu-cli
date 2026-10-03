@@ -40,6 +40,7 @@ pub struct PushIngestExecutorImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl PushIngestExecutorImpl {
     async fn ensure_quota(
         &self,
@@ -115,6 +116,7 @@ impl PushIngestExecutorImpl {
     }
 
     #[tracing::instrument(
+        name = PushIngestExecutorImpl_do_ingest_inner,
         level = "info",
         skip_all,
         fields(
@@ -215,7 +217,7 @@ impl PushIngestExecutorImpl {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(name = PushIngestExecutorImpl_maybe_fetch, level = "info", skip_all)]
     async fn maybe_fetch(
         &self,
         source: DataSource,
@@ -373,9 +375,15 @@ impl PushIngestExecutorImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PushIngestExecutor for PushIngestExecutorImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?data_source))]
+    #[tracing::instrument(
+        name = PushIngestExecutorImpl_execute_ingest,
+        level = "info",
+        skip_all,
+        fields(target=%target.get_handle(), ?data_source),
+    )]
     async fn execute_ingest(
         &self,
         target: ResolvedDataset,

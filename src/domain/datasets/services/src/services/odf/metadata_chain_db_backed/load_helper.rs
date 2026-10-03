@@ -11,6 +11,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tracing::instrument(level = "debug", skip_all)]
 pub(crate) async fn load_data_blocks_from_repository(
     data_block_repository: &dyn kamu_datasets::DatasetDataBlockRepository,
     dataset_id: &odf::DatasetID,

@@ -53,7 +53,13 @@ pub struct DependencyGraphImmediateListener {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[common_macros::method_names_consts]
 impl DependencyGraphImmediateListener {
+    #[tracing::instrument(
+        name = DependencyGraphImmediateListener_handle_dataset_key_blocks_appended_message,
+        level = "debug",
+        skip_all,
+    )]
     async fn handle_dataset_key_blocks_appended_message(
         &self,
         message: &DatasetKeyBlocksMessageAppended,
@@ -82,6 +88,11 @@ impl DependencyGraphImmediateListener {
         Ok(())
     }
 
+    #[tracing::instrument(
+        name = DependencyGraphImmediateListener_handle_derived_dependency_updates,
+        level = "debug",
+        skip_all,
+    )]
     async fn handle_derived_dependency_updates(
         &self,
         target: ResolvedDataset,
