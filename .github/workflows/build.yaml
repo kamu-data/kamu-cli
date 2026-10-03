@@ -185,10 +185,11 @@ jobs:
           - 9300:9300
     steps:
       - name: Setup IPFS
-        uses: ibnesayeed/setup-ipfs@master
         if: matrix.ipfs
+        uses: ipfs/download-ipfs-distribution-action@v2
         with:
-          ipfs_version: "0.19"
+          name: kubo
+          version: v0.43.1
 
       - name: Maximize build space
         if: matrix.maximize-space
