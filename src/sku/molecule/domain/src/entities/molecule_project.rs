@@ -93,6 +93,34 @@ impl MoleculeProject {
             announcements_dataset_id: payload.odf_announcements_dataset_id,
         })
     }
+
+    pub fn from_search_index_json(
+        ocl_id: String,
+        record: serde_json::Value,
+    ) -> Result<Self, InternalError> {
+        #[derive(serde::Deserialize)]
+        struct ProjectRecord {
+            event_time: DateTime<Utc>,
+            system_time: DateTime<Utc>,
+            symbol: Symbol,
+            project_account_id: odf::AccountID,
+            odf_data_room_dataset_id: odf::DatasetID,
+            odf_announcements_dataset_id: odf::DatasetID,
+        }
+
+        let ocl_id = OclId::try_new(ocl_id).int_err()?;
+        let record = serde_json::from_value::<ProjectRecord>(record).int_err()?;
+
+        Ok(Self {
+            system_time: record.system_time,
+            event_time: record.event_time,
+            ocl_id,
+            symbol: record.symbol,
+            account_id: record.project_account_id,
+            data_room_dataset_id: record.odf_data_room_dataset_id,
+            announcements_dataset_id: record.odf_announcements_dataset_id,
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

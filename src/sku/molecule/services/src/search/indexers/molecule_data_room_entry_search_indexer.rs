@@ -20,6 +20,7 @@ use kamu_molecule_domain::{
     MoleculeVersionedFileEntry,
     MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
+    MoleculeViewProjectsMode,
     MoleculeViewProjectsUseCase,
     OclId,
     molecule_data_room_entry_search_schema as data_room_entry_schema,
@@ -139,7 +140,11 @@ pub(crate) async fn index_data_room_entries(
     // Load all projects for the organization account
     let projects_listing = dependencies
         .molecule_view_projects_uc
-        .execute(organization_account, None)
+        .execute(
+            organization_account,
+            MoleculeViewProjectsMode::LatestSource,
+            None,
+        )
         .await
         .int_err()?;
 

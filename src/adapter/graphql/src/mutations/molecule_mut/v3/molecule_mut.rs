@@ -135,8 +135,15 @@ impl MoleculeMutV3 {
 
         let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
 
+        // Mutations always lookup against the source dataset to ensure
+        // strong consistency with concurrent writes (the ES projection
+        // may lag behind recent commits).
         let maybe_project_entity = find_project_uc
-            .execute(&molecule_subject, ocl_id.into())
+            .execute(
+                &molecule_subject,
+                MoleculeViewProjectsMode::LatestSource,
+                ocl_id.into(),
+            )
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),

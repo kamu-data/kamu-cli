@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetDatasetError, MoleculeProject, OclId};
+use crate::{MoleculeGetDatasetError, MoleculeProject, MoleculeViewProjectsMode, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,6 +19,7 @@ pub trait MoleculeFindProjectUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        mode: MoleculeViewProjectsMode,
         ocl_id: OclId,
     ) -> Result<Option<MoleculeProject>, MoleculeFindProjectError>;
 }

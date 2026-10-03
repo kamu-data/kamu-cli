@@ -14,6 +14,7 @@ use crate::{
     MoleculeViewGlobalAnnouncementsMode,
     MoleculeViewProjectActivitiesMode,
     MoleculeViewProjectAnnouncementsMode,
+    MoleculeViewProjectsMode,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,6 +40,14 @@ impl MoleculeConfig {
             MoleculeViewDataRoomEntriesMode::LatestProjection
         } else {
             MoleculeViewDataRoomEntriesMode::LatestSource
+        }
+    }
+
+    pub fn view_projects_mode(&self) -> MoleculeViewProjectsMode {
+        if self.enable_reads_from_projections {
+            MoleculeViewProjectsMode::LatestProjection
+        } else {
+            MoleculeViewProjectsMode::LatestSource
         }
     }
 

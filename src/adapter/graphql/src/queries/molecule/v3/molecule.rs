@@ -24,6 +24,7 @@ use kamu_molecule_domain::{
     MoleculeViewGlobalActivitiesError,
     MoleculeViewGlobalActivitiesUseCase,
     MoleculeViewProjectsError,
+    MoleculeViewProjectsMode,
     MoleculeViewProjectsUseCase,
 };
 
@@ -55,10 +56,15 @@ impl MoleculeV3 {
     ) -> Result<MoleculeProjectListing> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let view_projects_uc = from_catalog_n!(ctx, dyn MoleculeViewProjectsUseCase);
+        let (view_projects_uc, molecule_config) =
+            from_catalog_n!(ctx, dyn MoleculeViewProjectsUseCase, MoleculeConfig);
 
         let listing = view_projects_uc
-            .execute(&molecule_subject, pagination)
+            .execute(
+                &molecule_subject,
+                molecule_config.view_projects_mode(),
+                pagination,
+            )
             .await
             .map_err(|e| match e {
                 MoleculeViewProjectsError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
@@ -72,9 +78,10 @@ impl MoleculeV3 {
     async fn get_molecule_projects_mapping(
         molecule_subject: &kamu_accounts::LoggedAccount,
         molecule_view_projects_uc: &dyn MoleculeViewProjectsUseCase,
+        mode: MoleculeViewProjectsMode,
     ) -> Result<HashMap<kamu_molecule_domain::OclId, Arc<MoleculeProject>>, GqlError> {
         let listing = molecule_view_projects_uc
-            .execute(molecule_subject, None)
+            .execute(molecule_subject, mode, None)
             .await
             .map_err(|e| -> GqlError {
                 use MoleculeViewProjectsError as E;
@@ -117,10 +124,15 @@ impl MoleculeV3 {
     ) -> Result<Option<MoleculeProject>> {
         let molecule_subject = molecule_subject(ctx)?;
 
-        let find_project_uc = from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase);
+        let (find_project_uc, molecule_config) =
+            from_catalog_n!(ctx, dyn MoleculeFindProjectUseCase, MoleculeConfig);
 
         let maybe_project_entity = find_project_uc
-            .execute(&molecule_subject, ocl_id.into())
+            .execute(
+                &molecule_subject,
+                molecule_config.view_projects_mode(),
+                ocl_id.into(),
+            )
             .await
             .map_err(|e| match e {
                 MoleculeFindProjectError::NoProjectsDataset(e) => GqlError::Gql(e.into()),
@@ -202,6 +214,7 @@ impl MoleculeV3 {
         let projects_mapping = Self::get_molecule_projects_mapping(
             &molecule_subject,
             molecule_view_projects_uc.as_ref(),
+            molecule_config.view_projects_mode(),
         )
         .await?;
 
@@ -296,6 +309,7 @@ impl MoleculeV3 {
         let projects_mapping = Self::get_molecule_projects_mapping(
             &molecule_subject,
             molecule_view_projects_uc.as_ref(),
+            molecule_config.view_projects_mode(),
         )
         .await?;
 

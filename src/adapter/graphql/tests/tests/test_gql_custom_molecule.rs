@@ -797,6 +797,8 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         }),
     );
 
+    harness.synchronize_agents().await;
+
     // Read back the project entry by `oclId`
     let res = harness
         .execute_authorized_query(
@@ -985,6 +987,8 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         json!(true),
     );
 
+    harness.synchronize_agents().await;
+
     // Both projects appear in the list
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(LIST_PROJECTS))
@@ -1091,6 +1095,8 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
     assert!(res_json["molecule"]["v3"]["disableProject"].is_null());
     pretty_assertions::assert_eq!(disable_error, format!("Project [{ocl_id}] not found"));
 
+    harness.synchronize_agents().await;
+
     // Project is no longer visible in the listing
     let res = GraphQLQueryRequest::new(
         indoc!(
@@ -1144,6 +1150,8 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
     // it should be two blocks longer than initial (one disable and one enable
     // operations)
     pretty_assertions::assert_eq!(post_enable_chain_len, initial_chain_len + 2);
+
+    harness.synchronize_agents().await;
 
     let res = GraphQLQueryRequest::new(
         indoc!(
@@ -4748,6 +4756,8 @@ async fn test_molecule_announcements_operations(
         }
         "#
     );
+
+    harness.synchronize_agents().await;
 
     pretty_assertions::assert_eq!(
         GraphQLQueryRequest::new(

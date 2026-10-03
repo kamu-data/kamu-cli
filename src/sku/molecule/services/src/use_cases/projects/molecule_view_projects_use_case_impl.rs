@@ -10,10 +10,11 @@
 use std::sync::Arc;
 
 use database_common::PaginationOpts;
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
-use kamu_molecule_domain::*;
+use kamu_molecule_domain::{molecule_project_search_schema as project_schema, *};
+use kamu_search::*;
 
 use crate::MoleculeProjectsService;
 
@@ -22,16 +23,15 @@ use crate::MoleculeProjectsService;
 #[dill::component]
 #[dill::interface(dyn MoleculeViewProjectsUseCase)]
 pub struct MoleculeViewProjectsUseCaseImpl {
+    catalog: dill::Catalog,
     projects_service: Arc<dyn MoleculeProjectsService>,
+    search_service: Arc<dyn SearchService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
-    #[tracing::instrument(level = "debug", name = MoleculeViewProjectsUseCaseImpl_execute, skip_all, fields(?pagination))]
-    async fn execute(
+impl MoleculeViewProjectsUseCaseImpl {
+    async fn projects_from_source(
         &self,
         molecule_subject: &LoggedAccount,
         pagination: Option<PaginationOpts>,
@@ -97,6 +97,68 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
             list: projects,
             total_count,
         })
+    }
+
+    async fn projects_from_search(
+        &self,
+        molecule_subject: &LoggedAccount,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
+        let ctx = SearchContext {
+            catalog: &self.catalog,
+            security: SearchSecurityContext::Restricted {
+                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+            },
+        };
+
+        let search_results = self
+            .search_service
+            .listing_search(
+                ctx,
+                ListingSearchRequest {
+                    entity_schemas: vec![project_schema::SCHEMA_NAME],
+                    source: SearchRequestSourceSpec::All,
+                    filter: None,
+                    sort: sort!(project_schema::fields::SYMBOL, asc),
+                    page: pagination.into(),
+                },
+            )
+            .await
+            .int_err()?;
+
+        Ok(MoleculeProjectListing {
+            total_count: usize::try_from(search_results.total_hits.unwrap_or_default()).unwrap(),
+            list: search_results
+                .hits
+                .into_iter()
+                .map(|hit| MoleculeProject::from_search_index_json(hit.id, hit.source))
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
+    #[tracing::instrument(level = "debug", name = MoleculeViewProjectsUseCaseImpl_execute, skip_all, fields(?mode, ?pagination))]
+    async fn execute(
+        &self,
+        molecule_subject: &LoggedAccount,
+        mode: MoleculeViewProjectsMode,
+        pagination: Option<PaginationOpts>,
+    ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError> {
+        match mode {
+            MoleculeViewProjectsMode::LatestSource => {
+                self.projects_from_source(molecule_subject, pagination)
+                    .await
+            }
+            MoleculeViewProjectsMode::LatestProjection => {
+                self.projects_from_search(molecule_subject, pagination)
+                    .await
+            }
+        }
     }
 }
 

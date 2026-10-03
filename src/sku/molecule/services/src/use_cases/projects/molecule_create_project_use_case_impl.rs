@@ -192,13 +192,16 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .await
             .int_err()?;
 
+        let data_room_dataset_id = data_room_create_res.dataset_handle.id;
+        let announcements_dataset_id = announcements_create_res.dataset_handle.id;
+
         // Add project entry
         let project_payload = MoleculeProjectPayloadRecord {
             ocl_id: ocl_id.clone(),
             symbol: symbol.clone(),
             odf_account_id: project_account.id.clone(),
-            odf_data_room_dataset_id: data_room_create_res.dataset_handle.id,
-            odf_announcements_dataset_id: announcements_create_res.dataset_handle.id,
+            odf_data_room_dataset_id: data_room_dataset_id.clone(),
+            odf_announcements_dataset_id: announcements_dataset_id.clone(),
         };
 
         let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
@@ -233,6 +236,8 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                             project_account.id,
                             ocl_id,
                             symbol,
+                            data_room_dataset_id,
+                            announcements_dataset_id,
                         ),
                     )
                     .await

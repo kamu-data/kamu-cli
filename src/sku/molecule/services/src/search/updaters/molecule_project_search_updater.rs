@@ -57,6 +57,8 @@ impl MoleculeProjectSearchUpdater {
             &created_message.ocl_id,
             &created_message.symbol,
             &created_message.project_account_id,
+            &created_message.data_room_dataset_id,
+            &created_message.announcements_dataset_id,
             created_message.event_time,
             created_message.system_time,
         );

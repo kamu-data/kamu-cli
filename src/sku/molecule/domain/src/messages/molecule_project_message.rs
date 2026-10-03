@@ -14,7 +14,7 @@ use crate::{OclId, Symbol};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const MOLECULE_PROJECT_MESSAGE_OUTBOX_VERSION: u32 = 2;
+const MOLECULE_PROJECT_MESSAGE_OUTBOX_VERSION: u32 = 3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,6 +41,8 @@ impl MoleculeProjectMessage {
         project_account_id: odf::AccountID,
         ocl_id: OclId,
         symbol: Symbol,
+        data_room_dataset_id: odf::DatasetID,
+        announcements_dataset_id: odf::DatasetID,
     ) -> Self {
         Self::Created(MoleculeProjectMessageCreated {
             event_time,
@@ -49,6 +51,8 @@ impl MoleculeProjectMessage {
             project_account_id,
             ocl_id,
             symbol,
+            data_room_dataset_id,
+            announcements_dataset_id,
         })
     }
 
@@ -138,6 +142,8 @@ pub struct MoleculeProjectMessageCreated {
     pub project_account_id: odf::AccountID,
     pub ocl_id: OclId,
     pub symbol: Symbol,
+    pub data_room_dataset_id: odf::DatasetID,
+    pub announcements_dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -20,8 +20,17 @@ pub trait MoleculeViewProjectsUseCase: Send + Sync {
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
+        mode: MoleculeViewProjectsMode,
         pagination: Option<PaginationOpts>,
     ) -> Result<MoleculeProjectListing, MoleculeViewProjectsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub enum MoleculeViewProjectsMode {
+    LatestProjection,
+    LatestSource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

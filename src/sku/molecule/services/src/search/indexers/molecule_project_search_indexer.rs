@@ -12,6 +12,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::LoggedAccount;
 use kamu_molecule_domain::{
     MoleculeProject,
+    MoleculeViewProjectsMode,
     MoleculeViewProjectsUseCase,
     OclId,
     Symbol,
@@ -39,6 +40,8 @@ pub(crate) fn index_project_from_entity(
         project_schema::fields::SYMBOL: project.symbol.as_ref(),
         molecule_schema::fields::OCL_ID: project.ocl_id.as_ref(),
         project_schema::fields::PROJECT_ACCOUNT_ID: project.account_id,
+        project_schema::fields::DATA_ROOM_DATASET_ID: project.data_room_dataset_id,
+        project_schema::fields::ANNOUNCEMENTS_DATASET_ID: project.announcements_dataset_id,
         kamu_search::fields::IS_BANNED: false,
         kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
         kamu_search::fields::PRINCIPAL_IDS: [molecule_account_id],
@@ -52,6 +55,8 @@ pub(crate) fn index_project_from_parts(
     ocl_id: &OclId,
     symbol: &Symbol,
     account_id: &odf::AccountID,
+    data_room_dataset_id: &odf::DatasetID,
+    announcements_dataset_id: &odf::DatasetID,
     event_time: DateTime<Utc>,
     system_time: DateTime<Utc>,
 ) -> serde_json::Value {
@@ -62,6 +67,8 @@ pub(crate) fn index_project_from_parts(
         project_schema::fields::SYMBOL: symbol,
         molecule_schema::fields::OCL_ID: ocl_id,
         project_schema::fields::PROJECT_ACCOUNT_ID: account_id,
+        project_schema::fields::DATA_ROOM_DATASET_ID: data_room_dataset_id,
+        project_schema::fields::ANNOUNCEMENTS_DATASET_ID: announcements_dataset_id,
         kamu_search::fields::IS_BANNED: false,
         kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
         kamu_search::fields::PRINCIPAL_IDS: vec![ molecule_account_id.to_string() ],
@@ -106,7 +113,11 @@ pub(crate) async fn index_projects(
 
     // Load all projects for the organization account
     let projects_listing = molecule_view_projects_uc
-        .execute(organization_account, None)
+        .execute(
+            organization_account,
+            MoleculeViewProjectsMode::LatestSource,
+            None,
+        )
         .await
         .int_err()?;
 
