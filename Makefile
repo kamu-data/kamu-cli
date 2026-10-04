@@ -38,6 +38,9 @@ MIGRATION_DIRS := ./migrations/postgres ./migrations/sqlite
 
 KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 
+# Keep in sync with `services.postgres.image` in `.github/workflows/build.yaml`
+POSTGRES_IMAGE ?= postgres:18
+
 ###############################################################################
 # Lint
 ###############################################################################
@@ -115,6 +118,7 @@ lint-fix:
 define Setup_EnvFile
 echo "DATABASE_URL=$(1)://root:root@localhost:$(2)/kamu" > $(3)/.env;
 echo "SQLX_OFFLINE=false" >> $(3)/.env;
+echo "KAMU_POSTGRES_IMAGE=$(POSTGRES_IMAGE)" >> $(3)/.env;
 endef
 
 define Setup_EnvFile_Sqlite
@@ -127,9 +131,9 @@ sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-sqlite
 
 .PHONY: sqlx-local-setup-postgres
 sqlx-local-setup-postgres:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) pull postgres:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull $(POSTGRES_IMAGE)
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
-	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d $(POSTGRES_IMAGE)
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
@@ -582,6 +586,11 @@ resources-cli-reference:
 .PHONY: resources-graphql-schema
 resources-graphql-schema:
 	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-adapter-graphql -E 'test(update_graphql_schema)'
+
+.PHONY: resources-db-schema
+resources-db-schema:
+	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-cli-e2e-sqlite -E 'test(dump_sqlite_schema)'
+	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-cli-e2e-postgres -E 'test(dump_postgres_schema)'
 
 
 ###############################################################################

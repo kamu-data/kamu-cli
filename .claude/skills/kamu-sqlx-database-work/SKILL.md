@@ -140,6 +140,8 @@ After adding one, touch `src/utils/database-common/src/plugins/{postgres,sqlite}
 running e2e tests, or a stale binary fails on the missing schema; if the SQLite migrator still runs
 the old set, do a clean build.
 
+Before committing the migration run `make resources-db-schema` to update the final schema snapshots in `/resources/db` directory.
+
 ## Validation
 
 - `make lint` includes SQLx cache validation through `make lint-sqlx`.

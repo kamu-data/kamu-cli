@@ -154,6 +154,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     services:
       postgres:
+        # Keep in sync with `POSTGRES_IMAGE` in `Makefile`
         image: ${{ matrix.database && 'postgres:18' || '' }}
         env:
           POSTGRES_USER: root
@@ -219,6 +220,8 @@ jobs:
         run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "${{ matrix.container-runtime }}" } } }' > ~/.kamuconfig
           echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
+          echo "KAMU_CONTAINER_RUNTIME_TYPE_DB=docker" >> $GITHUB_ENV
+          echo "KAMU_POSTGRES_IMAGE=postgres:18" >> $GITHUB_ENV
 
       - name: Build
         run: |

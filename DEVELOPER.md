@@ -6,6 +6,7 @@
   - [Working with Elasticsearch](#working-with-elasticsearch)
   - [Run Linters](#run-linters)
   - [Run Tests](#run-tests)
+    - [Troubleshooting: instant failures in unrelated containerized tests](#troubleshooting-instant-failures-in-unrelated-containerized-tests)
   - [Build Speed Tweaks (Optional)](#build-speed-tweaks-optional)
     - [Artifact reuse (shared target dir)](#artifact-reuse-shared-target-dir)
     - [Artifact reuse (sscache)](#artifact-reuse-sscache)
@@ -158,6 +159,8 @@ Typical commands to work with migrations include:
 * `sqlx migrate add --source <migrations_dir_path> <description>` to add a new migration
 * `sqlx migrate run --source <migrations_dir_path>` to apply migrations to the database
 * `sqlx migrate info --source <migrations_dir_path> ` to print information about currently applied migration within the database
+
+After you are happy with your migration run `make resources-db-schema` to update the final schema snapshots in `/resources/db` directory.
 
 
 ### Working with Elasticsearch

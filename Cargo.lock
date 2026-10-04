@@ -8361,9 +8361,12 @@ dependencies = [
 name = "kamu-cli-e2e-sqlite"
 version = "0.268.1"
 dependencies = [
+ "database-common",
+ "dill",
  "indoc 2.0.7",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
+ "tempfile",
  "test-group",
  "test-log",
  "tokio",
