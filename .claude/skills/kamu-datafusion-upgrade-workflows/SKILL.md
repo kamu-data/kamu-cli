@@ -30,7 +30,7 @@ by step; if it and this skill disagree, `DEVELOPER.md` wins and this skill gets 
 5. **SQL shell.** Follow `src/utils/datafusion-cli/README.md`. The crate is copied from upstream
    under Apache 2.0, so it is exempt from the BSL license-header lint.
 6. **Fix forward.** Fix compilation errors without `#[allow]`/`#[expect]`, then run targeted
-   tests for query, transform and SQL-shell paths, then `cargo fmt` and `make clippy`.
+   tests for query, transform and SQL-shell paths, then the AGENTS.md "Validation" steps.
 
 ## What lives elsewhere
 

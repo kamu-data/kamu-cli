@@ -34,7 +34,8 @@ Each step names the skill to load and what proves the step is done.
 | 15 | **E2E** (if user-visible through the CLI): scenarios in `src/e2e/app/cli/repo-tests`, wired in sqlite and postgres in lockstep | `src/e2e/app/cli/` | `kamu-cli-e2e-tests` | SQLite permutation green |
 | 16 | **Docs**: add a `docs/internal/<ctx>.md` when the context has non-obvious mechanics, and route it in AGENTS.md | `docs/internal/`, `AGENTS.md` | `kamu-prose-and-comments` | `make lint-harness` |
 
-Finish with `cargo fmt`, `make clippy`, and — since new DB crates were added — `make lint-sqlx`.
+Finish with the AGENTS.md "Validation" steps plus `make lint-sqlx`, since new DB crates were
+added.
 
 ## Traps
 

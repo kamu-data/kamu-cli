@@ -6,8 +6,9 @@ description: Rust coding style for Kamu CLI — imports and paths, exhaustive ma
 # Kamu Rust Style
 
 Follow the style of the surrounding code first; the rules below settle what surrounding code
-leaves open. `rustfmt` (run by the post-edit hook and `cargo fmt`) owns layout, and `make clippy`
-owns what lints can see. This skill owns the rest.
+leaves open. Layout belongs to the formatters — `rustfmt` for Rust, `cargo sort` and `taplo` for
+`Cargo.toml` — which the post-edit hook and `make fmt` both run. `make clippy` owns what lints can
+see. This skill owns the rest.
 
 ## Rules
 

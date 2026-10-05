@@ -1,4 +1,4 @@
-"""Checks run after an agent edits files: format Rust, then judge only the text it added.
+"""Checks run after an agent edits files: format Rust and Cargo.toml, then judge only the text it added.
 
 Only added lines are judged, so existing code that predates a rule never blocks an
 unrelated edit. A failed check exits 2: the edit already landed, and the message tells the
@@ -8,6 +8,7 @@ agent which rule it broke and how to fix it forward.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -80,6 +81,21 @@ def rustfmt(path: Path) -> str | None:
     return None if result.returncode == 0 else result.stderr.strip()[:600]
 
 
+def format_manifest(path: Path) -> str | None:
+    """Sort and format one Cargo.toml as `make fmt` does; return why it could not, or None."""
+    missing = [tool for tool in ("cargo-sort", "taplo") if not shutil.which(tool)]
+    if missing:
+        return f"{', '.join(missing)} not installed"
+    for command in (["cargo", "sort", "-g", "-n", str(path.parent)], ["taplo", "fmt", str(path)]):
+        try:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return str(e)
+        if result.returncode != 0:
+            return result.stderr.strip()[:600]
+    return None
+
+
 def nudges(rel: str, added: list[str]) -> list[str]:
     out = []
     text = "\n".join(added)
@@ -113,6 +129,9 @@ def check_edit(path_str: str, old: str | None, new: str) -> tuple[list[str], lis
             notes.append(f"rustfmt could not format {rel}: {err}")
         problems += check_rust_lines(rel, added)
         problems += check_license(rel, path)
+    if path.name == "Cargo.toml" and path.exists():
+        if err := format_manifest(path):
+            notes.append(f"could not format {rel} ({err}): run `make fmt`")
     return problems, notes
 
 

@@ -20,7 +20,7 @@ use the committed `.sqlx` cache and database-backed tests need the setup first
 - a command guard (destructive git forms denied; commit/push/merge/rebase and `-p` builds ask);
 - an edit guard (generated files denied; guarded paths refused until their skill is loaded);
 - a post-edit pass on `.rs` files, whether an edit or a shell command wrote them (`rustfmt`, then
-  checks on the added text);
+  checks on the added text), and on `Cargo.toml` files (`cargo sort`, then `taplo fmt`);
 - a session-start contract and a stop-time reminder when `.rs` files changed since the last green
   `make clippy`.
 

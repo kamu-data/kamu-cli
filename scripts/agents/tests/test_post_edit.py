@@ -51,7 +51,7 @@ class AddedTextTest(unittest.TestCase):
 
 
 class FileTest(unittest.TestCase):
-    """Uses a gitignored scratch directory inside the repository; requires rustfmt."""
+    """Uses a gitignored scratch directory inside the repository; requires rustfmt, cargo-sort and taplo."""
 
     def setUp(self):
         self.dir = ROOT / ".claude" / "state" / "test-post-edit"
@@ -71,6 +71,15 @@ class FileTest(unittest.TestCase):
         path.write_text(LICENSE_HEADER + "\n\nfn main() {}\n")
         problems, _ = check_edit(str(path), None, path.read_text())
         self.assertEqual(problems, [])
+
+    @unittest.skipUnless(shutil.which("cargo-sort") and shutil.which("taplo"), "cargo-sort or taplo not installed")
+    def test_manifest_is_sorted_and_formatted(self):
+        path = self.dir / "Cargo.toml"
+        path.write_text('[package]\nname = "x"\n\n[dependencies]\nzeta = "1"\nalpha   =   "1"\n')
+        problems, notes = check_edit(str(path), None, path.read_text())
+        self.assertEqual((problems, notes), ([], []))
+        self.assertLess(path.read_text().index("alpha"), path.read_text().index("zeta"))
+        self.assertIn('alpha = "1"', path.read_text())
 
     def test_paths_outside_the_repository_are_ignored(self):
         self.assertEqual(check_edit("/tmp/elsewhere.rs", None, "dbg!(x);"), ([], []))

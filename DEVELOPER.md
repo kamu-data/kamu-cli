@@ -189,12 +189,18 @@ Healthy instance of Elasticsearch is required to execute Elasticsearch-related t
 This test group is included into the full test suite as well.
 
 ### Run Linters
-Use the following command:
+To format Rust code and all `Cargo.toml` files in place:
+```sh
+make fmt
+```
+
+To run the linters, use the following command:
 ```sh
 make lint
 ```
 This will do a number of highly useful checks:
 * Rust formatting check
+* `Cargo.toml` sorting and formatting check (`cargo sort`, `taplo`)
 * License headers check
 * Dependencies check: detecting issues with existing dependencies, detecting unused dependencies
 * Rust coding practices checks (`clippy`)
@@ -542,13 +548,13 @@ Coding agents (Claude Code, Codex) working in this repository are guided by docu
 | Consistency lints | `src/utils/repo-tools/tests/lints/agent_harness.rs` |
 | Runtime state (gitignored) | `.claude/state/`, `.codex/state/` |
 
-The hooks require Python 3 and a POSIX host; Rust formatting also requires `rustfmt`.
+The hooks require Python 3 and a POSIX host; formatting also requires `rustfmt` for Rust and `cargo-sort` and `taplo` for `Cargo.toml`.
 Policy and agent instructions are owned by [`AGENTS.md`](./AGENTS.md) and the routed skills.
 
 What the hooks do:
 * **Command guard** — denies commands that discard uncommitted work (`git reset --hard`, `git checkout -- <path>`, `git restore`, `git stash`, `git clean -f`), `SQLX_OFFLINE=...` on the command line, and build/test output piped into `head`/`tail`; asks for approval on `git commit`/`push`/`merge`/`rebase`/`tag` and on `-p`-scoped cargo builds.
 * **Edit guard** — refuses hand edits to generated files (naming the regeneration command) and edits under a guarded path until the session has loaded the governing skill; asks before writes to agent memory.
-* **Post-edit** — runs `rustfmt` on an edited `.rs` file, then checks only the added lines (`assert!(matches!(..))`, lint suppressions, `dbg!`, plan/ticket citations and change narration in comments, license header, dividing lines); reminds about `make sqlx-prepare`, schema regeneration and the e2e SQLite/Postgres lockstep.
+* **Post-edit** — runs `rustfmt` on an edited `.rs` file, then checks only the added lines (`assert!(matches!(..))`, lint suppressions, `dbg!`, plan/ticket citations and change narration in comments, license header, dividing lines); runs `cargo sort` and `taplo fmt` on an edited `Cargo.toml`, or asks for `make fmt` when either tool is missing; reminds about `make sqlx-prepare`, schema regeneration and the e2e SQLite/Postgres lockstep.
 * **Post-shell** — the same pass over every file a shell command changed (`sed -i`, heredocs, scripts), judged against its committed version. The changed files are found by fingerprinting the working tree before and after the command; files brought in by git commands that rewrite the tree (`switch`, `pull`, `stash`, `rebase`, ...) are left alone. A guarded path changed without its skill gets a reminder.
 * **Session start** — injects a short contract generated from `governed_paths.json`; after compaction or `/clear` skills must be loaded again.
 * **Stop** (Claude only) — if the session edited Rust and the tree changed since the last green foreground `make clippy`, reminds the agent once to run it.
