@@ -1,0 +1,23 @@
+include = ["**/Cargo.toml"]
+exclude = ["target/**/Cargo.toml"]
+
+[formatting]
+align_entries = false
+array_auto_expand = true
+array_auto_collapse = false
+array_trailing_comma = true
+compact_arrays = true
+compact_inline_tables = false
+column_width = 120
+allowed_blank_lines = 2
+reorder_keys = false # delegate to cargo-sort
+reorder_arrays = true
+indent_string = "    "
+
+# Expand arrays
+# TODO: Do not expand empty arrays when this is supported
+[[rule]]
+keys = ["features", "dependencies", "dev-dependencies", "workspace.package"]
+
+[rule.formatting]
+column_width = 1

@@ -42,22 +42,26 @@ KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 POSTGRES_IMAGE ?= postgres:18
 
 ###############################################################################
+# Formatting
+###############################################################################
+
+.PHONY: fmt
+fmt:
+	cargo fmt --all
+	cargo sort -g -w -n
+	taplo fmt
+
+###############################################################################
 # Lint
 ###############################################################################
 
 .PHONY: lint
-lint: lint-rustfmt lint-harness lint-deps clippy lint-openapi lint-sqlx
+lint: lint-rustfmt lint-cargo-toml lint-repo lint-harness lint-deps clippy lint-openapi lint-sqlx
 
 
-# Agent hook tests (Python stdlib, no build needed)
-.PHONY: test-harness
-test-harness:
-	python3 -m unittest discover -s scripts/agents/tests -t .
-
-
-# Agent harness: hook tests plus the repo lints that keep skills, AGENTS.md, hook policy and doc links consistent
 .PHONY: lint-harness
-lint-harness: test-harness lint-repo
+lint-harness:
+	python3 -m unittest discover -s scripts/agents/tests -t .
 
 
 .PHONY: lint-rustfmt
@@ -101,15 +105,23 @@ lint-openapi:
 lint-udeps:
 	cargo udeps --all-targets
 
+
+.PHONY: lint-cargo-toml
+lint-cargo-toml:
+	cargo sort -g -w -n -c
+	taplo fmt --check
+
 ###############################################################################
 # Lint (with fixes)
 ###############################################################################
 
-.PHONY: lint-fix
-lint-fix:
+.PHONY: lint-fix-сlippy
+lint-fix-сlippy:
 	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
-	cargo fmt --all
 
+
+.PHONY: lint-fix
+lint-fix: lint-fix-сlippy fmt
 
 ###############################################################################
 # Sqlx Local Setup (create databases for local work)
