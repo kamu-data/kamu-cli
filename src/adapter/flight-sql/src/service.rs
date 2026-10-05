@@ -67,6 +67,7 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::DFSchema;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::{DataFrame, SessionContext};
+use kamu_core::read_only_sql_options;
 use prost::Message;
 use prost::bytes::Bytes;
 use tonic::codegen::tokio_stream::Stream;
@@ -437,7 +438,7 @@ impl KamuFlightSqlService {
 
     async fn prepare_statement(query: &str, ctx: &SessionContext) -> Result<LogicalPlan, Status> {
         let plan = ctx
-            .sql(query)
+            .sql_with_options(query, read_only_sql_options())
             .await
             .and_then(DataFrame::into_optimized_plan)
             .map_err(|e| Status::internal(format!("Error building plan: {e}")))?;

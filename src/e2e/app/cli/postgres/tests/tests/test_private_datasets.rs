@@ -212,3 +212,15 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::private_datasets::test_a_public_dataset_closed_to_anonymous_is_hidden_from_anonymous_rest_calls,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_today_as_frozen_system_time()
+        .with_kamu_config(PRIVATE_DATESET_WITH_ALLOWED_ANONYMOUS_WORKSPACE_KAMU_CONFIG),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use kamu_auth_rebac::AccountToDatasetRelation;
+use kamu_auth_rebac::{AccountToDatasetRelation, DatasetProperties};
 use oso::PolarClass;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,16 +27,19 @@ pub struct DatasetResource {
     #[polar(attribute)]
     pub allows_public_read: bool,
     #[polar(attribute)]
+    pub allows_anonymous_read: bool,
+    #[polar(attribute)]
     pub authorized_users: HashMap<String, &'static str>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetResource {
-    pub fn new(owner_account_id: &odf::AccountID, allows_public_read: bool) -> Self {
+    pub fn new(owner_account_id: &odf::AccountID, properties: &DatasetProperties) -> Self {
         Self {
             owner_account_id: owner_account_id.to_string(),
-            allows_public_read,
+            allows_public_read: properties.allows_public_read,
+            allows_anonymous_read: properties.allows_anonymous_read,
             authorized_users: HashMap::new(),
         }
     }
@@ -62,9 +65,11 @@ impl std::fmt::Display for DatasetResource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Dataset(owner_account_id='{}', allows_public_read={}, num_authorizations={})",
+            "Dataset(owner_account_id='{}', allows_public_read={}, allows_anonymous_read={}, \
+             num_authorizations={})",
             self.owner_account_id,
             self.allows_public_read,
+            self.allows_anonymous_read,
             self.authorized_users.len(),
         )
     }

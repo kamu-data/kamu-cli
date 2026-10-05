@@ -121,3 +121,39 @@ async fn test_parse_ddl_datafusion_with_reserved_keyword() {
 
     assert_matches!(*err, ParserError::ParserError(msg) if msg ==  *"Argument 'key TEXT' is invalid or a reserved keyword");
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_parse_ddl_datafusion_rejects_injected_query() {
+    let ctx = datafusion::prelude::SessionContext::new();
+
+    for ddl in [
+        "a INT) AS SELECT 'x' AS b, 1 AS c --",
+        "a INT); CREATE EXTERNAL TABLE y STORED AS CSV LOCATION '/etc/passwd' --",
+        "a INT) AS (SELECT 1 AS a) --",
+    ] {
+        let result = opendatafabric_data_utils::schema::parse::parse_ddl_to_datafusion_schema(
+            &ctx, ddl, false,
+        )
+        .await;
+
+        assert!(result.is_err(), "Injected DDL `{ddl}` produced: {result:?}");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_parse_ddl_to_odf_schema_rejects_invalid_ddl() {
+    for ddl in [
+        "a INT) AS (SELECT 1 AS a) --",
+        "a INT); DROP TABLE y --",
+        "a INT,,",
+        "a INT) garbage (",
+    ] {
+        let result = opendatafabric_data_utils::schema::parse::parse_ddl_to_odf_schema(ddl);
+
+        assert!(result.is_err(), "Invalid DDL `{ddl}` produced: {result:?}");
+    }
+}

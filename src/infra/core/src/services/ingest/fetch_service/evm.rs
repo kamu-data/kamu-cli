@@ -155,7 +155,10 @@ impl FetchService {
         };
 
         // Extract the filter out of the plan
-        let df = ctx.sql(&sql).await.int_err()?;
+        let df = ctx
+            .sql_with_options(&sql, read_only_sql_options())
+            .await
+            .int_err()?;
         let plan = df.create_physical_plan().await.int_err()?;
 
         let plan_str = datafusion::physical_plan::get_plan_string(&plan).join("\n");

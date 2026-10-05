@@ -159,7 +159,7 @@ impl QueryServiceImpl {
             // See: https://github.com/apache/datafusion/blob/main/datafusion-examples/examples/remote_catalog.rs#L78
             let statements = datafusion::sql::parser::DFParser::parse_sql(sql)?;
 
-            // TODO: SEC: Restrict the subset of supported statements
+            // Non-query statements are rejected later by `read_only_sql_options()`
             for stmt in statements {
                 if let DfStatement::Statement(stmt) = stmt
                     && let SqlStatement::Query(query) = stmt.as_ref()
@@ -669,7 +669,9 @@ impl QueryService for QueryServiceImpl {
         tracing::info!(?state, ?new_options, "Resolved SQL query state");
 
         let ctx = self.session_context(new_options).await?;
-        let df = ctx.sql(statement).await?;
+        let df = ctx
+            .sql_with_options(statement, read_only_sql_options())
+            .await?;
 
         Ok(QueryResponse {
             df: df.into(),

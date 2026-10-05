@@ -434,12 +434,83 @@ async fn test_data_query_error_sql_missing_function() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_rejects_copy_to_file() {
+    let harness = GraphQLDataHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let target_path = harness.temp_dir().join("pwn.csv");
+
+    let res = harness
+        .execute_anonymous_sql_query(&format!(
+            "COPY (SELECT 'x' AS a) TO '{}' STORED AS CSV",
+            target_path.display()
+        ))
+        .await;
+
+    assert!(
+        !target_path.exists(),
+        "COPY wrote {}",
+        target_path.display()
+    );
+    pretty_assertions::assert_eq!(
+        json!({
+            "__typename": "DataQueryResultError",
+            "errorMessage": "DML not supported: COPY",
+            "errorKind": "INVALID_SQL",
+        }),
+        res,
+    );
+    assert!(
+        !target_path.exists(),
+        "COPY wrote {}",
+        target_path.display()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_rejects_create_external_table() {
+    let harness = GraphQLDataHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let secret_path = harness.temp_dir().join("secret.csv");
+    std::fs::write(&secret_path, "password\nhunter2\n").unwrap();
+
+    let res = harness
+        .execute_anonymous_sql_query(&format!(
+            "CREATE EXTERNAL TABLE leak STORED AS CSV LOCATION '{}' OPTIONS ('format.has_header' \
+             'true')",
+            secret_path.display()
+        ))
+        .await;
+
+    pretty_assertions::assert_eq!(
+        json!({
+            "__typename": "DataQueryResultError",
+            "errorMessage": "DDL not supported: CreateExternalTable",
+            "errorKind": "INVALID_SQL",
+        }),
+        res,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct GraphQLDataHarness {
     base_gql_harness: BaseGQLDatasetHarness,
+    catalog_anonymous: dill::Catalog,
     catalog_authorized: dill::Catalog,
 }
 
@@ -466,7 +537,7 @@ impl GraphQLDataHarness {
             b.build()
         };
 
-        let (_catalog_anonymous, catalog_authorized) = authentication_catalogs(
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(
             &catalog,
             PredefinedAccountOpts {
                 is_admin: false,
@@ -477,6 +548,7 @@ impl GraphQLDataHarness {
 
         Self {
             base_gql_harness,
+            catalog_anonymous,
             catalog_authorized,
         }
     }
@@ -569,6 +641,36 @@ impl GraphQLDataHarness {
             )
             .await
             .unwrap();
+    }
+
+    /// Runs a `DataFusion` SQL query as an anonymous caller and returns the
+    /// `data.query` result object
+    pub async fn execute_anonymous_sql_query(&self, sql: &str) -> serde_json::Value {
+        let res = self
+            .execute_query(
+                async_graphql::Request::new(indoc::indoc!(
+                    r#"
+                    query ($sql: String!) {
+                        data {
+                            query(query: $sql, queryDialect: SQL_DATA_FUSION) {
+                                __typename
+                                ... on DataQueryResultError {
+                                    errorMessage
+                                    errorKind
+                                }
+                            }
+                        }
+                    }
+                    "#
+                ))
+                .variables(async_graphql::Variables::from_json(json!({ "sql": sql }))),
+                &self.catalog_anonymous,
+            )
+            .await;
+        assert!(res.is_ok(), "{res:?}");
+
+        let mut json = serde_json::to_value(&res.data).unwrap();
+        json["data"]["query"].take()
     }
 
     pub async fn create_test_dataset(&self, account_name: Option<odf::AccountName>) {

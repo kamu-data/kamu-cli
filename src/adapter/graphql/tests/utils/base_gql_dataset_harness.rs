@@ -17,6 +17,7 @@ use kamu_accounts_services::{
     UpdateAccountUseCaseImpl,
 };
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
+use kamu_auth_rebac::{DatasetPropertyName, RebacService};
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
@@ -156,6 +157,24 @@ impl BaseGQLDatasetHarness {
         } else {
             panic!("Expected logged current user");
         }
+    }
+
+    /// Opens or closes a public dataset to anonymous readers, as the owner's
+    /// `setVisibility(public: { anonymousAvailable })` does. `catalog` must
+    /// provide `RebacService`.
+    pub async fn set_anonymous_read(
+        &self,
+        catalog: &dill::Catalog,
+        dataset_id: &odf::DatasetID,
+        allows: bool,
+    ) {
+        let (name, value) = DatasetPropertyName::allows_anonymous_read(allows);
+        catalog
+            .get_one::<dyn RebacService>()
+            .unwrap()
+            .set_dataset_property(dataset_id, name, &value)
+            .await
+            .unwrap();
     }
 
     pub async fn execute_query(

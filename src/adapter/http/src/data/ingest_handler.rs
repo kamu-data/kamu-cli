@@ -16,6 +16,7 @@ use http::HeaderMap;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_core::engine::EngineError;
 use kamu_core::services::upload_service::{
     UploadService,
     UploadTokenBase64Json,
@@ -164,6 +165,9 @@ pub async fn dataset_ingest_handler(
             PushIngestDataError::Execution(PushIngestError::ReadError(e)) => {
                 ApiError::bad_request(e)
             }
+            PushIngestDataError::Execution(PushIngestError::EngineError(
+                EngineError::InvalidQuery(e),
+            )) => ApiError::bad_request(e),
             PushIngestDataError::Execution(PushIngestError::QuotaExceeded(_)) => {
                 ApiError::new_forbidden()
             }

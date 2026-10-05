@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod access_matrix;
 mod auth_utils;
 mod base_gql_dataset_harness;
 mod base_gql_flow_harness;
@@ -14,6 +15,7 @@ mod base_gql_flow_runs_harness;
 mod base_gql_resource_harness;
 mod gql_query_request;
 
+pub use access_matrix::*;
 pub use auth_utils::*;
 pub use base_gql_dataset_harness::*;
 pub use base_gql_flow_harness::*;

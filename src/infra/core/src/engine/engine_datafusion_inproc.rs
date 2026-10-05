@@ -12,6 +12,7 @@ use std::sync::Arc;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::engine::*;
+use kamu_core::read_only_sql_options;
 use kamu_datasets::ResolvedDatasetsMap;
 
 /// An in-process engine using Apache Arrow Datafusion framework.
@@ -43,7 +44,12 @@ impl EngineDatafusionInproc {
             "Creating view for a query",
         );
 
-        let logical_plan = match ctx.state().create_logical_plan(query).await {
+        let logical_plan = match ctx
+            .state()
+            .create_logical_plan(query)
+            .await
+            .and_then(|plan| read_only_sql_options().verify_plan(&plan).map(|()| plan))
+        {
             Ok(plan) => plan,
             Err(error) => {
                 tracing::error!(

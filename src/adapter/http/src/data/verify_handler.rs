@@ -175,11 +175,15 @@ async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyRespon
     let query_result = match query_handler::query_handler_impl(catalog, data_request).await {
         Ok(Json(v)) => Ok(v),
         Err(err) => match err.source().unwrap().downcast_ref::<QueryError>() {
-            Some(QueryError::DatasetNotFound(err)) => {
-                return Ok(VerifyResponse::from(DatasetNotFound::new(
-                    err.dataset_ref.id().unwrap().clone(),
-                )));
-            }
+            // `to_table()` reports datasets referenced by alias, which carry no ID
+            Some(QueryError::DatasetNotFound(not_found)) => match not_found.dataset_ref.id() {
+                Some(dataset_id) => {
+                    return Ok(VerifyResponse::from(DatasetNotFound::new(
+                        dataset_id.clone(),
+                    )));
+                }
+                None => Err(err),
+            },
             Some(QueryError::DatasetBlockNotFound(err)) => {
                 return Ok(VerifyResponse::from(DatasetBlockNotFound::new(
                     err.dataset_id.clone(),

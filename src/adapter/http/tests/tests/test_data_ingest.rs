@@ -608,9 +608,56 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_invalid_preprocess_query() {
+    let harness = DataIngestHarness::new().await;
+
+    let target_path = harness.temp_dir.path().join("pwn.csv");
+
+    let unknown_column = harness
+        .create_dataset_with_preprocess("unknown-column", "select foo from input")
+        .await;
+    let copy_to_file = harness
+        .create_dataset_with_preprocess(
+            "copy-to-file",
+            &format!(
+                "COPY (SELECT * FROM input) TO '{}' STORED AS CSV",
+                target_path.display()
+            ),
+        )
+        .await;
+
+    let unknown_column_url = harness.dataset_http_url(&unknown_column.dataset_handle.alias);
+    let copy_to_file_url = harness.dataset_http_url(&copy_to_file.dataset_handle.alias);
+
+    let client = async move {
+        for dataset_url in [unknown_column_url, copy_to_file_url] {
+            let res = DataIngestHarness::push_ingest_ndjson(&dataset_url, r#"{"city": "A"}"#).await;
+
+            pretty_assertions::assert_eq!(
+                http::StatusCode::BAD_REQUEST,
+                res.status(),
+                "{dataset_url}"
+            );
+        }
+
+        assert!(
+            !target_path.exists(),
+            "COPY wrote {}",
+            target_path.display()
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DataIngestHarness {
     pub server_harness: ServerSideLocalFsHarness,
     pub system_time: DateTime<Utc>,
+    pub temp_dir: tempfile::TempDir,
 }
 
 impl DataIngestHarness {
@@ -639,6 +686,7 @@ impl DataIngestHarness {
         Self {
             server_harness,
             system_time,
+            temp_dir: tempfile::tempdir().unwrap(),
         }
     }
 
@@ -687,6 +735,54 @@ impl DataIngestHarness {
                 },
                 Default::default(),
             )
+            .await
+            .unwrap()
+    }
+
+    async fn create_dataset_with_preprocess(&self, name: &str, query: &str) -> CreateDatasetResult {
+        self.server_harness
+            .cli_create_dataset_from_snapshot_use_case()
+            .execute(
+                odf::DatasetSnapshot {
+                    name: odf::DatasetAlias::new(
+                        self.server_harness.operating_account_name(),
+                        odf::DatasetName::new_unchecked(name),
+                    ),
+                    kind: odf::DatasetKind::Root,
+                    metadata: vec![
+                        odf::metadata::AddPushSource {
+                            source_name: "source1".to_string(),
+                            read: odf::metadata::ReadStepNdJson::default().into(),
+                            preprocess: Some(
+                                odf::metadata::TransformSql {
+                                    engine: "datafusion".to_string(),
+                                    version: None,
+                                    temporal_tables: None,
+                                    query: Some(query.to_string()),
+                                    queries: None,
+                                }
+                                .into(),
+                            ),
+                            merge: odf::metadata::MergeStrategy::Append(
+                                odf::metadata::MergeStrategyAppend {},
+                            ),
+                        }
+                        .into(),
+                    ],
+                },
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
+    async fn push_ingest_ndjson(dataset_url: &Url, body: &str) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(format!("{dataset_url}/ingest"))
+            .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
+            .header("Content-Type", "application/x-ndjson")
+            .body(body.to_string())
+            .send()
             .await
             .unwrap()
     }
