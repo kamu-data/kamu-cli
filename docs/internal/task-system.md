@@ -363,13 +363,13 @@ or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync a
 | --- | --- | --- | --- |
 | Update → ingest | `PollingIngestService` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Update → transform | `TransformExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Update → sync | `SyncService` | the sync itself: the simple protocol CAS on the destination head it read, smart pull on the previous-block link unless forced | one around the call in the runner; the protocol appends and sets `HEAD` in transactions of its own |
+| Update → sync | `SyncService` | the sync itself ([dataset-sync.md](dataset-sync.md#11-committing-validation-and-errors)) | one around the call in the runner; the protocol appends and sets `HEAD` in transactions of its own |
 | Hard compact / reset to metadata | `CompactionExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Reset | — (existing block) | `ResetExecutor`, **no** CAS at execution | one for the whole reset |
 
 On DB-backed datasets `set_ref` goes through `DatasetReferenceServiceImpl::set_reference`, which
-posts `DatasetReferenceMessage::Updated` in the same transaction; dataset statistics, search
-indexing and the storage-level ref file all catch up from that message, not from the task.
+posts `DatasetReferenceMessage::Updated` in the same transaction; the read models catch up from
+that message, not from the task ([dataset-reset.md](dataset-reset.md#7-after-a-history-rewrite)).
 
 A detached dataset (see [§6](#6-transactions)) can still be read but panics on `set_ref`, which is
 why every runner that moves `HEAD` re-resolves the dataset first.
@@ -384,13 +384,8 @@ fetch_uncacheable }`. The dataset decides what "update" means.
 1. `DatasetEnvVarResolver::resolve_effective_env_vars` merges the variable and secret sets
    targeting the dataset into one map for the ingest.
 2. `PullRequestPlanner::build_pull_plan(PullRequest::local(id), non-recursive)` builds a
-   single-node pull plan and yields one `PullPlanIterationJob`:
-
-   | Dataset | Job | Holds |
-   | --- | --- | --- |
-   | root, no pull alias | `Ingest(PullIngestItem)` | target + `DataWriterMetadataState` read from `HEAD` now |
-   | derivative | `Transform(PullTransformItem)` | target + `TransformPreliminaryPlan` (preliminary request, resolved inputs) |
-   | has a remote pull alias | `Sync(PullSyncItem)` | `SyncRequest` with source and destination refs |
+   single-node pull plan and yields one `PullPlanIterationJob`: `Ingest`, `Transform` or `Sync`,
+   chosen as described in [dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs).
 
 3. The job is detached from the transaction and stored in `TaskDefinitionDatasetUpdate` with the
    `PullOptions`.
@@ -438,28 +433,23 @@ counts and the new watermark, which the flow controller uses for triggering down
 
 ### 7.2 Hard compaction and reset to metadata
 
-Both run the compaction services and differ only in `CompactionOptions::keep_metadata_only`.
+Both run the compaction services and differ only in `CompactionOptions::keep_metadata_only`:
+`false` for hard compaction (root datasets only), `true` for reset to metadata (any kind). What the
+planner and executor do is owned by
+[dataset-hard-compaction.md](dataset-hard-compaction.md#5-planning); what reset to metadata keeps,
+by [dataset-reset.md](dataset-reset.md#6-reset-to-metadata).
 
 **Planning** (`HardCompactDatasetTaskPlanner` / `ResetToMetadataDatasetTaskPlanner`, one
-transaction): `CompactionPlanner::plan_compaction` walks the chain from `HEAD` back to the seed and
-builds a `CompactionPlan`: the seed, the old head and block count, and a list of batches. Runs of
-consecutive `AddData` blocks become `CompactedBatch`es, bounded by `max_slice_size` /
-`max_slice_records` from the logical plan (planner defaults when absent); every other metadata
-event closes the batch and is carried over as a `SingleBlock`.
+transaction): resolves the dataset, calls `CompactionPlanner::plan_compaction` with the limits from
+the logical plan (planner defaults when absent; reset to metadata passes none, and they do not
+matter when no data is kept), and stores the detached dataset and the `CompactionPlan` in the
+definition. A planning error, `InvalidDatasetKind` included, becomes an internal error.
 
-| | Hard compaction | Reset to metadata |
-| --- | --- | --- |
-| `keep_metadata_only` | `false` | `true` |
-| `AddData` | merged into fewer, larger slices | dropped |
-| `ExecuteTransform` | kept | dropped |
-| Allowed datasets | root only (`InvalidDatasetKind` otherwise) | root and derivative |
-
-**Running**: `CompactionExecutor::execute` returns `NothingToDo` if the plan would not reduce the
-block count. Otherwise it merges each batch's data files into new Parquet files with DataFusion
-and rebuilds the chain on top of the seed, writing blocks without moving `HEAD`. The runner then
+**Running**: `CompactionExecutor::execute` runs outside any transaction. On `Success` the runner
 moves `HEAD` by CAS and returns `TaskResultDatasetHardCompact` / `TaskResultDatasetResetToMetadata`
 carrying the `CompactionResult` (`Success { old_head, new_head, old_num_blocks, new_num_blocks }`
-or `NothingToDo`). Any executor error is a recoverable empty failure.
+or `NothingToDo`). Any executor error is a recoverable empty failure; a lost `HEAD` CAS is returned
+from the runner as an internal error, which the task agent also records as a recoverable failure.
 
 Compaction rewrites history, so derivative datasets that consumed the old blocks can no longer
 continue incrementally; that is what `InputDatasetCompacted` in [§7.1](#71-update-dataset)
@@ -467,19 +457,20 @@ reports.
 
 ### 7.3 Reset
 
-**Planning** (`ResetDatasetTaskPlanner`, one transaction): `ResetPlanner::plan_reset` defaults
-`new_head` to the seed block, reads the current `HEAD`, and fails with `OldHeadMismatch` if the
-plan's `old_head` is given and differs. The resulting `ResetPlan { old_head, new_head }` and the
-dataset handle form the definition.
+**Planning** (`ResetDatasetTaskPlanner`, one transaction): calls `ResetPlanner::plan_reset` with
+the new and old heads from the logical plan
+([dataset-reset.md](dataset-reset.md#5-reset-to-a-block)). The resulting
+`ResetPlan { old_head, new_head }` and the dataset handle form the definition. A planning error,
+`OldHeadMismatch` included, becomes an internal error.
 
 **Running** (`ResetDatasetTaskRunner`, one transaction around the whole run): re-resolves the
-dataset and calls `ResetExecutor::execute`, which sets `HEAD` to `new_head` with
-`validate_block_present` but **without** `check_ref_is`. The `old_head` check therefore happens
-only at planning time; a `HEAD` change between planning and running is not detected.
+dataset and calls `ResetExecutor::execute`. The executor does not compare against the planned
+head, so the `old_head` check happens only at planning time; a `HEAD` change between planning and
+running is not detected.
 
 | Error | Becomes |
 | --- | --- |
-| `SetReferenceFailed(BlockNotFound)` — the target block is not in the chain | typed `TaskErrorDatasetReset::ResetHeadNotFound`, unrecoverable |
+| `SetReferenceFailed(BlockNotFound)` — the target block is not in the dataset's block store | typed `TaskErrorDatasetReset::ResetHeadNotFound`, unrecoverable |
 | other `SetReferenceFailed`, `Internal` | empty, recoverable |
 
 The success result is `TaskResultDatasetReset { reset_result: ResetResult { old_head, new_head } }`.
@@ -490,27 +481,18 @@ The success result is `TaskResultDatasetReset { reset_result: ResetResult { old_
 type and payload from the logical plan into `TaskDefinitionWebhookDeliver`, adding the task ID.
 
 **Running**: `DeliverWebhookTaskRunner` generates a fresh `WebhookDeliveryID` and calls
-`WebhookDeliveryWorker::deliver_webhook`
-(`src/domain/webhooks/services/src/services/webhook_delivery_worker_impl.rs`), which opens its own
-transactions:
-
-1. **Prepare** (transaction): load the `WebhookSubscription`, build headers — content type,
-   RFC 9421 content digest and signature with the subscription secret, delivery, subscription and
-   event-type headers — and record a `WebhookDelivery` with the request.
-2. **Send** (no transaction): `WebhookSender::send_webhook`.
-3. **Record response** (transaction): store the response on the delivery.
-4. A non-2xx status is an `UnsuccessfulResponse` error.
+`WebhookDeliveryWorker::deliver_webhook`, which signs, sends and records the delivery in its own
+transactions ([webhooks.md](webhooks.md#6-delivery)).
 
 | Error | Becomes |
 | --- | --- |
 | `UnsuccessfulResponse`, `FailedToConnect`, `ConnectionTimeout` | typed `TaskErrorWebhookDelivery`, **recoverable**, carrying the target URL |
 | internal errors | empty, recoverable |
 
-Every delivery failure is recoverable, so the flow retries it as a new task; the delivery worker
+Every delivery failure is recoverable, so the flow retries it as a new task when its retry policy
+allows ([flow-system.md](flow-system.md#webhook-delivery)); the delivery worker
 itself never retries and never changes the subscription. Marking a subscription unreachable after
-repeated failures is the flow system's job: the webhook flow trigger has a stop policy of
-`AfterConsecutiveFailures`, and when it stops automatically, `FlowWebhooksEventBridge` calls
-`MarkWebhookSubscriptionUnreachableUseCase`.
+repeated failures is the flow system's job ([flow-system.md](flow-system.md#webhook-delivery)).
 
 ### 7.5 Probe
 

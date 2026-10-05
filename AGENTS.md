@@ -165,6 +165,13 @@ change invalidates what it says.
 | Exported Prometheus metrics, recommended alerts, adding metrics | [`docs/internal/metrics.md`](docs/internal/metrics.md) |
 | Task scheduling and execution, the task agent, planners and runners, new task types | [`docs/internal/task-system.md`](docs/internal/task-system.md) |
 | Flows, triggers, configurations, scheduling, sensors, flow process state, new flow types | [`docs/internal/flow-system.md`](docs/internal/flow-system.md) |
+| Root dataset ingest: polling and push sources, fetch steps, savepoints, the DataFusion data writer, merge strategies | [`docs/internal/root-dataset-ingest.md`](docs/internal/root-dataset-ingest.md) |
+| Dataset pull: `kamu pull` flags, pull planning and depth ordering, iteration execution, authorization, how the update task reuses the planner | [`docs/internal/dataset-pull.md`](docs/internal/dataset-pull.md) |
+| Dataset sync: `SyncService`, Simple and Smart Transfer Protocols (client and server), `kamu push`, remote repositories and aliases, IPFS | [`docs/internal/dataset-sync.md`](docs/internal/dataset-sync.md) |
+| Derived dataset transform: transform planning and elaboration, engine provisioning and containers, diverged inputs, transform replay in verification | [`docs/internal/derived-dataset-transform.md`](docs/internal/derived-dataset-transform.md) |
+| Hard compaction: `kamu system compact`, the compaction planner and executor, merged slices, what is (not) deleted | [`docs/internal/dataset-hard-compaction.md`](docs/internal/dataset-hard-compaction.md) |
+| Dataset reset: `kamu reset`, reset to a block, reset to metadata, how block indexes, statistics, search and the dependency graph react to any history rewrite | [`docs/internal/dataset-reset.md`](docs/internal/dataset-reset.md) |
+| Webhooks: subscriptions and their statuses, secrets, delivery signing and payload, the receiver contract, how subscriptions drive flow triggers | [`docs/internal/webhooks.md`](docs/internal/webhooks.md) |
 | The declarative resources subsystem | [`docs/internal/resources-framework.md`](docs/internal/resources-framework.md) |
 | Authored vs generated fields of a resource | [`docs/internal/resources-anatomy.md`](docs/internal/resources-anatomy.md) |
 | Resource label selectors and filtering | [`docs/internal/resources-label-filtering.md`](docs/internal/resources-label-filtering.md) |
@@ -186,6 +193,7 @@ change invalidates what it says.
 | `resources/schema.gql` | Generated — `make resources-graphql-schema`. |
 | `resources/openapi*.json`, `resources/config-*`, `resources/cli-reference.md`, `resources/di.puml` | Generated — `make resources`. |
 | `**/.sqlx/` | Generated — `make sqlx-prepare`. |
+| `.spec/` | Gitignored local working material; nothing else tracked links to or cites it. |
 
 ## Memory
 

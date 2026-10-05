@@ -484,7 +484,7 @@ source is `UpstreamFlow` and dispatch it with their own binding as input:
 | Transform | `Updated` → `NewData`; `UpToDate` → nothing |
 | Compact | `Success` → `Breaking`; `NothingToDo` → nothing |
 | Reset | head changed → `Breaking` |
-| Reset to metadata | `Success` → `Breaking` |
+| Reset to metadata | `Success` → `Breaking`, then re-activates the dataset's own sensor, so a derivative with a reactive trigger schedules its rebuild from its inputs immediately, under that trigger's batching rule, instead of waiting for the next input change |
 
 Breaking changes therefore cascade: with `Recover`, each downstream dataset resets to metadata in
 turn, which dispatches `Breaking` again. With `NoAction`, the downstream transform will next fail
@@ -601,13 +601,14 @@ The webhook deliver flow is entirely driven by flow-system machinery:
 - **Setup.** `FlowWebhooksEventBridge` reacts to the subscription enabling the `DATASET.REF.UPDATED`
   event by setting a reactive trigger (`BatchingRule::immediate()`, `BreakingChangeRule::Recover`,
   stop policy `AfterConsecutiveFailures(webhooks.maxConsecutiveFailures)`); disabling pauses it.
-  `WebhookTriggerStartupRecoveryJob` reconciles triggers with subscription statuses on startup.
-- **Payload.** Built when the flow is activated, from all its `ResourceUpdate` causes:
-  `WebhookDatasetRefUpdatedPayload { version: 2, dataset_id, owner_account_id, block_ref: "head",
-  new_hash, old_hash?, is_breaking_change }`, old hash from the first cause, new hash from the
-  last. A batch of updates is one delivery.
-- **Failure.** Delivery errors are recoverable task errors ([task-system.md](task-system.md#74-webhook-delivery)),
-  so the retry policy applies; after the stop policy's consecutive failures the trigger is
+  `WebhookTriggerStartupRecoveryJob` reconciles triggers with subscription statuses on startup
+  ([webhooks.md](webhooks.md#8-flow-integration)).
+- **Payload.** Built by `build_task_logical_plan` from all the flow's `ResourceUpdate` causes, so a
+  batch of updates is one delivery; its shape is in [webhooks.md](webhooks.md#payload).
+- **Failure.** Delivery errors are recoverable task errors
+  ([task-system.md](task-system.md#74-webhook-delivery)), retried only under a default retry policy
+  for the flow type (`flowSystem.defaultRetryPolicies`, empty unless configured), since webhook
+  bindings have no configuration; after the stop policy's consecutive failures the trigger is
   auto-stopped, and `FlowWebhooksEventBridge`, seeing `StoppedAutomatically` on a subscription
   scope, marks the subscription unreachable.
 
@@ -619,7 +620,9 @@ The webhook deliver flow is entirely driven by flow-system machinery:
 
 When a dataset is deleted (`DatasetLifecycleMessage::Deleted`, via `FlowDatasetsEventBridge`) or a
 webhook subscription is deleted (via `FlowWebhooksEventBridge`, once per event type), every
-`FlowScopeRemovalHandler` is called for the scope:
+`FlowScopeRemovalHandler` is called for the scope. Handlers match the scope exactly, so a deleted
+dataset's webhook subscription scopes are not covered
+([webhooks.md](webhooks.md#8-flow-integration)):
 
 | Handler | Effect |
 | --- | --- |
