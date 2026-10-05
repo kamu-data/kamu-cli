@@ -25,11 +25,15 @@ doctest = false
 wakeup-listener = { workspace = true }
 
 dill = { version = "0.17", default-features = false }
-tokio = { version = "1", default-features = false, features = ["sync"] }
+tokio = { version = "1", default-features = false, features = [
+    "sync",
+] }
 
 
 [dev-dependencies]
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 tokio = { version = "1", default-features = false, features = [
     "macros",
     "rt",

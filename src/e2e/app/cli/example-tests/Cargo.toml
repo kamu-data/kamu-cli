@@ -22,7 +22,8 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
 
 [dependencies]
@@ -32,5 +33,5 @@ pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",
 ] }
-test-group = { version = "1" }
 serde_json = { version = "1", default-features = false }
+test-group = { version = "1" }

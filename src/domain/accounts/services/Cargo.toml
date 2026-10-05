@@ -22,8 +22,11 @@ doctest = false
 
 
 [features]
-default = []
-testing = ["dep:mockall"]
+default = [
+]
+testing = [
+    "dep:mockall",
+]
 
 
 [dependencies]
@@ -48,7 +51,9 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
 futures = "0.3"
-jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto"] }
+jsonwebtoken = { version = "11", default-features = false, features = [
+    "rust_crypto",
+] }
 secrecy = "0.10"
 serde = "1"
 serde_json = "1"
@@ -86,5 +91,7 @@ pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",
 ] }
 regex = { version = "1", default-features = false }
-test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

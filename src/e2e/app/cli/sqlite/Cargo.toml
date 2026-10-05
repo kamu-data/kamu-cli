@@ -34,5 +34,8 @@ dill = { version = "0.17", default-features = false }
 indoc = "2"
 tempfile = { version = "3" }
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }

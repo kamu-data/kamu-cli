@@ -39,13 +39,15 @@ tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
-test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
     "macros",
     "migrate",
+    "runtime-tokio",
     "sqlite",
+] }
+test-group = { version = "1" }
+test-log = { version = "0.2", features = [
+    "trace",
 ] }
 tokio = { version = "1", default-features = false, features = [
     "macros",

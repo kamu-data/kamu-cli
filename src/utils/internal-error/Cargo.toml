@@ -22,4 +22,6 @@ doctest = false
 
 
 [dependencies]
-thiserror = { version = "2", default-features = false, features = ["std"] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }

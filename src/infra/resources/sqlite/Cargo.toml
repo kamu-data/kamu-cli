@@ -24,26 +24,34 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 event-sourcing = { workspace = true }
-kamu-resources = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }
-odf = { workspace = true, features = ["sqlx-sqlite"] }
+kamu-resources = { workspace = true, features = [
+    "sqlx",
+] }
+odf = { workspace = true, features = [
+    "sqlx-sqlite",
+] }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
 futures = "0.3"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = [
+    "derive",
+] }
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+    "chrono",
     "json",
     "macros",
+    "runtime-tokio",
     "sqlite",
-    "chrono",
     "uuid",
 ] }
-uuid = { version = "1", default-features = false, features = ["v4"] }
+uuid = { version = "1", default-features = false, features = [
+    "v4",
+] }
 
 
 [dev-dependencies]
@@ -52,4 +60,6 @@ kamu-accounts-sqlite = { workspace = true }
 kamu-resources-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

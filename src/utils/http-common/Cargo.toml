@@ -31,11 +31,12 @@ http = { version = "1", default-features = false }
 serde = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false }
 tracing = { version = "0.1", default-features = false }
-utoipa = { version = "5", default-features = false, features = [] }
+utoipa = { version = "5", default-features = false, features = [
+] }
 
 [dev-dependencies]
-strum = { version = "0.28", default-features = false, features = [
-    "std",
-    "derive",
-] }
 serde_json = { version = "1", default-features = false }
+strum = { version = "0.28", default-features = false, features = [
+    "derive",
+    "std",
+] }

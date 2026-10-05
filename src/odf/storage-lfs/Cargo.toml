@@ -42,6 +42,8 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf-storage = { workspace = true, features = ["testing"] }
+odf-storage = { workspace = true, features = [
+    "testing",
+] }
 
 tempfile = "3"

@@ -24,7 +24,9 @@ doctest = false
 [dev-dependencies]
 database-common = { workspace = true }
 init-on-startup = { workspace = true }
-kamu-accounts = { workspace = true, features = ["testing"] }
+kamu-accounts = { workspace = true, features = [
+    "testing",
+] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
@@ -36,13 +38,13 @@ kamu-configuration = { workspace = true }
 kamu-configuration-inmem = { workspace = true }
 kamu-configuration-services = { workspace = true }
 kamu-datasets = { workspace = true }
+kamu-messaging-outbox-inmem = { workspace = true }
 kamu-resources = { workspace = true }
 kamu-resources-facade = { workspace = true }
 kamu-resources-inmem = { workspace = true }
 kamu-resources-services = { workspace = true }
-messaging-outbox = { workspace = true }
-kamu-messaging-outbox-inmem = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
+messaging-outbox = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
 wakeup-listener = { workspace = true }
@@ -51,20 +53,26 @@ async-graphql = { version = "7", default-features = false, features = [
     "chrono",
     "url",
 ] }
-dill = { version = "0.17", default-features = false }
-indoc = "2"
-strum = { version = "0.28", default-features = false, features = ["derive"] }
 async-graphql-axum = "7"
 async-trait = { version = "0.1", default-features = false }
 axum = { version = "0.8" }
+dill = { version = "0.17", default-features = false }
+indoc = "2"
 pretty_assertions = { version = "1" }
 serde_json = { version = "1" }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
-test-log = { version = "0.2", features = ["trace"] }
+strum = { version = "0.28", default-features = false, features = [
+    "derive",
+] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 tokio = { version = "1", default-features = false, features = [
-    "rt-multi-thread",
     "macros",
     "net",
+    "rt-multi-thread",
 ] }
 url = { version = "2", default-features = false }
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = [
+    "v4",
+] }

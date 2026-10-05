@@ -33,7 +33,9 @@ kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
 messaging-outbox = { workspace = true }
-observability = { workspace = true, default-features = false, features = ["prometheus"] }
+observability = { workspace = true, default-features = false, features = [
+    "prometheus",
+] }
 odf = { workspace = true }
 time-source = { workspace = true }
 wakeup-listener = { workspace = true }
@@ -42,36 +44,55 @@ async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
-mockall = "0.15"
 futures = "0.3"
+mockall = "0.15"
 prometheus = { version = "0.14", default-features = false }
 serde_json = { version = "1", default-features = false }
-strum = { version = "0.28", features = ["derive"] }
-thiserror = { version = "2", default-features = false, features = ["std"] }
-tokio = { version = "1", default-features = false, features = ["macros"] }
+strum = { version = "0.28", features = [
+    "derive",
+] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+] }
 tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
 kamu-accounts = { workspace = true }
-kamu-adapter-flow-dataset = { workspace = true, features = ["testing"] }
+kamu-adapter-flow-dataset = { workspace = true, features = [
+    "testing",
+] }
 kamu-adapter-flow-webhook = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true, features = ["testing"] }
-kamu-flow-system = { workspace = true, features = ["testing"] }
+kamu-datasets-services = { workspace = true, features = [
+    "testing",
+] }
+kamu-flow-system = { workspace = true, features = [
+    "testing",
+] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
-odf = { workspace = true, features = ["testing"] }
+odf = { workspace = true, features = [
+    "testing",
+] }
 
 cron = { version = "0.17", default-features = false }
 indoc = "2"
 mockall = "0.15"
 pretty_assertions = "1"
 serde_json = { version = "1", default-features = false }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }

@@ -22,9 +22,14 @@ doctest = false
 
 
 [features]
-default = []
-sqlx = ["dep:sqlx"]
-testing = ["dep:mockall"]
+default = [
+]
+sqlx = [
+    "dep:sqlx",
+]
+testing = [
+    "dep:mockall",
+]
 
 
 [dependencies]
@@ -37,17 +42,28 @@ messaging-outbox = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-chrono = { version = "0.4", default-features = false, features = ["serde"] }
-serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", default-features = false, features = [
+    "serde",
+] }
+mockall = { version = "0.15", default-features = false, optional = true }
+serde = { version = "1.0", features = [
+    "derive",
+] }
 serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
-strum = { version = "0.28", default-features = false, features = ["derive"] }
-thiserror = { version = "2", default-features = false, features = ["std"] }
-mockall = { version = "0.15", default-features = false, optional = true }
+strum = { version = "0.28", default-features = false, features = [
+    "derive",
+] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false }
-uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
+uuid = { version = "1", default-features = false, features = [
+    "serde",
+    "v4",
+] }
 
 # Optional
 sqlx = { optional = true, version = "0.8", default-features = false, features = [

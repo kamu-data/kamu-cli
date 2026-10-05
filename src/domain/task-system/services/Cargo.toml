@@ -27,11 +27,13 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-messaging-outbox = { workspace = true }
-observability = { workspace = true, features = ["prometheus"] }
-time-source = { workspace = true }
 kamu-task-system = { workspace = true }
+messaging-outbox = { workspace = true }
+observability = { workspace = true, features = [
+    "prometheus",
+] }
 odf = { workspace = true }
+time-source = { workspace = true }
 wakeup-listener = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
@@ -40,23 +42,30 @@ dill = { version = "0.17", default-features = false }
 futures = "0.3"
 prometheus = { version = "0.14", default-features = false }
 serde_json = "1"
-strum = { version = "0.28", features = ["derive"] }
+strum = { version = "0.28", features = [
+    "derive",
+] }
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu = { workspace = true }
-kamu-accounts = { workspace = true, features = ["testing"] }
+kamu-accounts = { workspace = true, features = [
+    "testing",
+] }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
-kamu-datasets-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
-odf = { workspace = true, default-features = true, features = ["testing"]}
-
+odf = { workspace = true, default-features = true, features = [
+    "testing",
+] }
 
 chrono = { version = "0.4", default-features = false }
 mockall = "0.15"
 tempfile = "3"
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

@@ -23,10 +23,15 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
-observability = { workspace = true, features = ["prometheus"] }
+observability = { workspace = true, features = [
+    "prometheus",
+] }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 prometheus = { version = "0.14", default-features = false }
-tokio = { version = "1", default-features = false, features = ["sync", "time"] }
+tokio = { version = "1", default-features = false, features = [
+    "sync",
+    "time",
+] }

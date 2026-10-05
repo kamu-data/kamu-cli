@@ -35,6 +35,8 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf-storage = { workspace = true, features = ["testing"] }
+odf-storage = { workspace = true, features = [
+    "testing",
+] }
 
 tokio = { version = "1", default-features = false }

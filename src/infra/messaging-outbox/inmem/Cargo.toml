@@ -22,9 +22,9 @@ doctest = false
 
 
 [dependencies]
-messaging-outbox = { workspace = true }
 internal-error = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
+messaging-outbox = { workspace = true }
 wakeup-listener = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
@@ -37,5 +37,7 @@ database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 tokio = { version = "1", default-features = false }

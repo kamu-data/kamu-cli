@@ -28,8 +28,8 @@ wakeup-listener = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.17", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
     "postgres",
+    "runtime-tokio",
 ] }
 tokio = { version = "1", default-features = false, features = [
     "macros",
@@ -41,13 +41,15 @@ tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
-test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
     "macros",
     "migrate",
     "postgres",
+    "runtime-tokio",
+] }
+test-group = { version = "1" }
+test-log = { version = "0.2", features = [
+    "trace",
 ] }
 tokio = { version = "1", default-features = false, features = [
     "macros",

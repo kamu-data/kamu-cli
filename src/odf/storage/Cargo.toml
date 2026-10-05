@@ -21,7 +21,9 @@ workspace = true
 doctest = false
 
 [features]
-testing = ["dep:pretty_assertions"]
+testing = [
+    "dep:pretty_assertions",
+]
 
 
 [dependencies]
@@ -32,10 +34,14 @@ random-strings = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = [
+    "serde",
+] }
 dashmap = { version = "6", default-features = false }
 http = { version = "1" }
-thiserror = { version = "2", default-features = false, features = ["std"] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
 url = { version = "2", default-features = false }
 
 pretty_assertions = { optional = true, version = "1" }

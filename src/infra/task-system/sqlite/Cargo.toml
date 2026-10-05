@@ -23,9 +23,9 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-odf = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-wakeup-listener-sqlite = { workspace = true }
+odf = { workspace = true }
 wakeup-listener = { workspace = true }
 
 async-stream = "0.3"
@@ -35,11 +35,11 @@ dill = { version = "0.17", default-features = false }
 futures = "0.3"
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+    "chrono",
     "json",
     "macros",
+    "runtime-tokio",
     "sqlite",
-    "chrono",
 ] }
 
 
@@ -48,6 +48,8 @@ database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 kamu-task-system-repo-tests = { workspace = true }
 
-test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 tracing = { version = "0.1" }
