@@ -10,6 +10,7 @@
 use std::path::PathBuf;
 
 use database_common::{DatabaseConnectionSettings, SqlitePlugin};
+use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,21 +28,21 @@ async fn dump_sqlite_schema() {
     .await
     .expect("Failed to initialize SQLite database");
 
-    drop(catalog);
+    let pool = catalog.get_one::<SqlitePool>().unwrap();
 
-    let output = std::process::Command::new("sqlite3")
-        .arg(&db_path)
-        .arg(".schema")
-        .output()
-        .expect("Failed to run sqlite3");
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name",
+    )
+    .fetch_all(pool.as_ref())
+    .await
+    .expect("Failed to query sqlite_master");
 
-    assert!(
-        output.status.success(),
-        "sqlite3 .schema failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    let raw = rows
+        .into_iter()
+        .map(|(sql,)| sql)
+        .collect::<Vec<_>>()
+        .join(";\n\n");
 
-    let raw = String::from_utf8(output.stdout).expect("sqlite3 output is not UTF-8");
     let schema_ddl = normalize_schema(&raw);
 
     let mut out_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -54,10 +55,9 @@ async fn dump_sqlite_schema() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn normalize_schema(ddl: &str) -> String {
-    // sqlite3 .schema preserves the DDL verbatim from sqlite_master, but older and
-    // newer SQLite versions differ in whether they store "CREATE TABLE IF NOT
-    // EXISTS" or "CREATE TABLE" for the same migration SQL. Normalize to the
-    // plain form for a stable output across versions.
+    // sqlite_master stores DDL verbatim, but older and newer SQLite versions
+    // differ in whether they store "CREATE TABLE IF NOT EXISTS" or "CREATE TABLE"
+    // for the same migration SQL. Normalize to the plain form for stable output.
     ddl.replace("CREATE TABLE IF NOT EXISTS ", "CREATE TABLE ")
 }
 

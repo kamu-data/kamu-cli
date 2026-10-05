@@ -601,8 +601,7 @@ resources-graphql-schema:
 
 .PHONY: resources-db-schema
 resources-db-schema:
-	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-cli-e2e-sqlite -E 'test(dump_sqlite_schema)'
-	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-cli-e2e-postgres -E 'test(dump_postgres_schema)'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(dump_sqlite_schema) | test(dump_postgres_schema)'
 
 
 ###############################################################################

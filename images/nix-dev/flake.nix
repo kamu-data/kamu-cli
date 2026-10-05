@@ -29,7 +29,6 @@
             pkgs.protoc-gen-tonic
             pkgs.postgresql
             pkgs.python3
-            pkgs.sqlite
           ];
         };
       });

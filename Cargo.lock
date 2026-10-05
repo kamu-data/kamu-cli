@@ -8366,6 +8366,7 @@ dependencies = [
  "indoc 2.0.7",
  "kamu-cli-e2e-common",
  "kamu-cli-e2e-repo-tests",
+ "sqlx",
  "tempfile",
  "test-group",
  "test-log",

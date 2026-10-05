@@ -32,6 +32,9 @@ kamu-cli-e2e-repo-tests = { workspace = true, default-features = false }
 
 dill = { version = "0.17", default-features = false }
 indoc = "2"
+sqlx = { version = "0.8", default-features = false, features = [
+    "sqlite",
+] }
 tempfile = { version = "3" }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = [
