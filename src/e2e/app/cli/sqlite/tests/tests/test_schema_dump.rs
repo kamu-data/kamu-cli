@@ -30,12 +30,11 @@ async fn dump_sqlite_schema() {
 
     let pool = catalog.get_one::<SqlitePool>().unwrap();
 
-    let rows: Vec<(String,)> = sqlx::query_as(
-        "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name",
-    )
-    .fetch_all(pool.as_ref())
-    .await
-    .expect("Failed to query sqlite_master");
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type, name")
+            .fetch_all(pool.as_ref())
+            .await
+            .expect("Failed to query sqlite_master");
 
     let raw = rows
         .into_iter()
