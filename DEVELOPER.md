@@ -45,6 +45,7 @@ Prerequisites:
 * Tools used by tests
   * Install [`jq`](https://stedolan.github.io/jq) - used to query and format JSON files
   * Install [`kubo`](https://docs.ipfs.io/install/command-line/#official-distributions) (formerly known as `go-ipfs`) - for IPFS-related tests
+  * Install the `sqlite3` CLI (e.g. `apt install sqlite3` / `dnf install sqlite`) - used by `make resources-db-schema` to dump the SQLite schema
 * Code generation tools (optional - needed if you will be updating schemas)
   * Install [`flatc`](https://github.com/google/flatbuffers)
   * Install [`protoc`](https://github.com/protocolbuffers/protobuf) followed by:
