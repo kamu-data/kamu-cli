@@ -57,42 +57,31 @@ impl FlowDownstreamLink {
             .map(|flow_state| (flow_state.flow_id, flow_state))
             .collect::<HashMap<_, _>>();
 
-        let mut partial_links = Vec::with_capacity(links.len());
+        // A missing flow is already logged by the query service
+        let linked_flow_states = links
+            .into_iter()
+            .filter_map(|link| {
+                let flow_state = flow_states_by_id.remove(&link.downstream_flow_id)?;
+                Some((link, flow_state))
+            })
+            .collect::<Vec<_>>();
+
+        // Resolved together, so that the dataset loader batches the lookups
+        let accesses = futures::future::try_join_all(
+            linked_flow_states
+                .iter()
+                .map(|(_, flow_state)| Self::resolve_access(ctx, flow_state)),
+        )
+        .await?;
+
+        let mut partial_links = Vec::with_capacity(linked_flow_states.len());
         let mut visible_flow_states = Vec::new();
 
-        for link in links {
-            // A missing flow is already logged by the query service
-            let Some(flow_state) = flow_states_by_id.remove(&link.downstream_flow_id) else {
-                continue;
-            };
-
-            let dataset_id =
-                afs::FlowScopeDataset::maybe_dataset_id_in_scope(&flow_state.flow_binding.scope);
-
-            let (dataset, is_flow_visible) = match &dataset_id {
-                Some(dataset_id) => {
-                    match Dataset::try_from_ref(ctx, &dataset_id.as_local_ref()).await? {
-                        Some(dataset) => {
-                            let is_flow_visible =
-                                Self::is_flow_visible(ctx, &dataset, &flow_state).await?;
-                            (
-                                Some(DatasetAccessResult::accessible(dataset)),
-                                is_flow_visible,
-                            )
-                        }
-                        None => (
-                            Some(DatasetAccessResult::not_accessible(dataset_id.clone())),
-                            false,
-                        ),
-                    }
-                }
-                None => (None, false),
-            };
-
-            partial_links.push((link, dataset_id, dataset, is_flow_visible));
-            if is_flow_visible {
+        for ((link, flow_state), access) in linked_flow_states.into_iter().zip(accesses) {
+            if access.is_flow_visible {
                 visible_flow_states.push(flow_state);
             }
+            partial_links.push((link, access));
         }
 
         let mut visible_flows = Flow::build_batch(visible_flow_states, ctx)
@@ -101,18 +90,51 @@ impl FlowDownstreamLink {
 
         Ok(partial_links
             .into_iter()
-            .map(|(link, dataset_id, dataset, is_flow_visible)| Self {
+            .map(|(link, access)| Self {
                 flow_id: link.downstream_flow_id.into(),
                 activated_at: link.activated_at,
-                dataset_id: dataset_id.map(Into::into),
-                dataset,
-                flow: if is_flow_visible {
+                dataset_id: access.dataset_id.map(Into::into),
+                dataset: access.dataset,
+                flow: if access.is_flow_visible {
                     visible_flows.next()
                 } else {
                     None
                 },
             })
             .collect())
+    }
+
+    async fn resolve_access(
+        ctx: &Context<'_>,
+        flow_state: &fs::FlowState,
+    ) -> Result<DownstreamFlowAccess> {
+        let Some(dataset_id) =
+            afs::FlowScopeDataset::maybe_dataset_id_in_scope(&flow_state.flow_binding.scope)
+        else {
+            return Ok(DownstreamFlowAccess {
+                dataset_id: None,
+                dataset: None,
+                is_flow_visible: false,
+            });
+        };
+
+        let (dataset, is_flow_visible) =
+            match Dataset::try_from_ref(ctx, &dataset_id.as_local_ref()).await? {
+                Some(dataset) => {
+                    let is_flow_visible = Self::is_flow_visible(ctx, &dataset, flow_state).await?;
+                    (DatasetAccessResult::accessible(dataset), is_flow_visible)
+                }
+                None => (
+                    DatasetAccessResult::not_accessible(dataset_id.clone()),
+                    false,
+                ),
+            };
+
+        Ok(DownstreamFlowAccess {
+            dataset_id: Some(dataset_id),
+            dataset: Some(dataset),
+            is_flow_visible,
+        })
     }
 
     /// Webhook flows expose the delivery target, which only maintainers see
@@ -130,6 +152,16 @@ impl FlowDownstreamLink {
             _ => false,
         })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The downstream flow's dataset as the caller may see it, and whether the
+/// caller may see the flow itself
+struct DownstreamFlowAccess {
+    dataset_id: Option<odf::DatasetID>,
+    dataset: Option<DatasetAccessResult<'static>>,
+    is_flow_visible: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
