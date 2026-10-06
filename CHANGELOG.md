@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.269.0] - 2026-10-06
 ### Added
 - Agent harness for Claude Code and Codex:
   - hooks in `scripts/agents/` deny commands that discard uncommitted work and `SQLX_OFFLINE` overrides, ask
