@@ -17,7 +17,8 @@ use kamu::TransformRequestPlannerImpl;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_flow_webhook::webhook_deliver_binding;
 use kamu_core::TenancyConfig;
-use kamu_datasets::DatasetIncrementQueryService;
+use kamu_datasets::{DatasetIncrementQueryService, DeleteDatasetUseCase};
+use kamu_datasets_services::DeleteDatasetUseCaseImpl;
 use kamu_datasets_services::testing::{
     FakeDependencyGraphIndexer,
     MockDatasetIncrementQueryService,
@@ -57,8 +58,15 @@ impl BaseGQLFlowRunsHarness {
     }
 
     pub async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
+        Self::with_tenancy(TenancyConfig::SingleTenant, overrides).await
+    }
+
+    pub async fn with_tenancy(
+        tenancy_config: TenancyConfig,
+        overrides: FlowRunsHarnessOverrides,
+    ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(TenancyConfig::SingleTenant)
+            .tenancy_config(tenancy_config)
             .outbox_provider(messaging_outbox::OutboxProvider::Immediate {
                 force_immediate: true,
             })
@@ -97,7 +105,8 @@ impl BaseGQLFlowRunsHarness {
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryTaskQueueWakeupSource>()
             .add::<TransformRequestPlannerImpl>()
-            .add::<FakeDependencyGraphIndexer>();
+            .add::<FakeDependencyGraphIndexer>()
+            .add::<DeleteDatasetUseCaseImpl>();
 
         b.add::<InMemoryWebhookSubscriptionEventStore>()
             .add_value(WebhooksConfig::default());
@@ -578,21 +587,32 @@ impl BaseGQLFlowRunsHarness {
         dataset_id: &odf::DatasetID,
         subscription_id: WebhookSubscriptionID,
     ) -> FlowID {
-        let flow_run_service = self
-            .catalog_authorized
-            .get_one::<dyn FlowRunService>()
-            .unwrap();
-
         let flow_binding = webhook_deliver_binding(
             subscription_id,
             &WebhookEventTypeCatalog::dataset_ref_updated(),
             Some(dataset_id),
         );
 
+        self.run_flow_activated_by_upstream(&flow_binding, dataset_id, FlowID::new(1))
+            .await
+    }
+
+    /// Runs a flow the way a successful upstream flow activates it
+    pub async fn run_flow_activated_by_upstream(
+        &self,
+        flow_binding: &FlowBinding,
+        upstream_dataset_id: &odf::DatasetID,
+        upstream_flow_id: FlowID,
+    ) -> FlowID {
+        let flow_run_service = self
+            .catalog_authorized
+            .get_one::<dyn FlowRunService>()
+            .unwrap();
+
         let flow_state = flow_run_service
             .run_flow_automatically(
                 Utc::now(),
-                &flow_binding,
+                flow_binding,
                 vec![FlowActivationCause::ResourceUpdate(
                     FlowActivationCauseResourceUpdate {
                         activation_time: Utc::now(),
@@ -603,10 +623,10 @@ impl BaseGQLFlowRunsHarness {
                             new_watermark: None,
                         }),
                         details: serde_json::to_value(DatasetResourceUpdateDetails {
-                            dataset_id: dataset_id.clone(),
+                            dataset_id: upstream_dataset_id.clone(),
                             source: DatasetUpdateSource::UpstreamFlow {
                                 flow_type: FLOW_TYPE_DATASET_INGEST.to_string(),
-                                flow_id: FlowID::new(1),
+                                flow_id: upstream_flow_id,
                                 maybe_flow_config_snapshot: None,
                             },
                             new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
@@ -624,13 +644,38 @@ impl BaseGQLFlowRunsHarness {
         flow_state.flow_id
     }
 
+    /// Applies flow system events to projections, such as activation links
+    pub async fn catchup_flow_system_events(&self) {
+        self.catalog_authorized
+            .get_one::<dyn FlowSystemEventAgent>()
+            .unwrap()
+            .catchup_remaining_events()
+            .await
+            .unwrap();
+    }
+
+    pub async fn delete_dataset(&self, dataset_handle: &odf::DatasetHandle) {
+        let delete_dataset = self
+            .catalog_authorized
+            .get_one::<dyn DeleteDatasetUseCase>()
+            .unwrap();
+
+        let plan = delete_dataset
+            .plan_delete(vec![dataset_handle.clone()], false)
+            .await
+            .unwrap()
+            .into_executable_plan(false)
+            .unwrap();
+        delete_dataset.execute_plan(plan).await.unwrap();
+    }
+
     /// Manually trigger a flow without a trigger configured
     pub async fn manually_trigger_flow(
         &self,
         dataset_id: &odf::DatasetID,
         flow_type: &str,
         task_outcome: TaskOutcome,
-    ) {
+    ) -> FlowID {
         use chrono::Utc;
         use kamu_adapter_flow_dataset as afs;
         use kamu_flow_system as fs;
@@ -661,6 +706,8 @@ impl BaseGQLFlowRunsHarness {
 
         self.mimic_flow_run_with_outcome(flow_state.flow_id.to_string().as_str(), task_outcome)
             .await;
+
+        flow_state.flow_id
     }
 
     pub async fn mimic_flow_run_with_outcome(

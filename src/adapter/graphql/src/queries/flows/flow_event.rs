@@ -12,7 +12,7 @@ use event_sourcing as evs;
 use kamu_flow_system as fs;
 use kamu_task_system as ts;
 
-use super::{FlowActivationCause, FlowStartCondition};
+use super::{FlowActivationCause, FlowDownstreamLink, FlowStartCondition};
 use crate::prelude::*;
 use crate::queries::Task;
 use crate::utils;
@@ -257,17 +257,29 @@ impl FlowEventTaskChanged {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
+#[graphql(complex)]
 pub struct FlowEventCompleted {
     event_id: EventID,
     event_time: DateTime<Utc>,
+    #[graphql(skip)]
+    flow_id: fs::FlowID,
 }
 
+#[ComplexObject]
 impl FlowEventCompleted {
+    #[graphql(skip)]
     fn new(event_id: evs::EventID, event: &fs::FlowEventCompleted) -> Self {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
+            flow_id: event.flow_id,
         }
+    }
+
+    /// Flows activated by this flow's completion. Filled asynchronously, so
+    /// the list may lag briefly behind the completion
+    async fn downstream_flows(&self, ctx: &Context<'_>) -> Result<Vec<FlowDownstreamLink>> {
+        FlowDownstreamLink::build_list(ctx, self.flow_id).await
     }
 }
 

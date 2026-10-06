@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use chrono::prelude::*;
 use kamu_core::ServerUrlConfig;
 use kamu_datasets::DatasetAction;
@@ -44,6 +46,15 @@ impl Dataset {
             dataset_request_state: DatasetRequestState::new(resolved_dataset.get_handle().clone())
                 .with_owner(owner),
         }
+    }
+
+    pub(crate) async fn allowed_dataset_actions(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<&HashSet<DatasetAction>> {
+        self.dataset_request_state
+            .allowed_dataset_actions(ctx)
+            .await
     }
 
     pub(crate) async fn as_versioned_file_impl(

@@ -2339,6 +2339,11 @@ type Flow {
 	"""
 	history: [FlowEvent!]!
 	"""
+	Flows activated by this flow's completion. Filled asynchronously, so
+	the list may lag briefly behind the completion
+	"""
+	downstreamFlows: [FlowDownstreamLink!]!
+	"""
 	A user, who initiated the flow run. None for system-initiated flows
 	"""
 	initiator: Account
@@ -2580,6 +2585,33 @@ type FlowDescriptionWebhookDeliver {
 	eventType: String!
 }
 
+"""
+A flow that was activated by the completion of another flow
+"""
+type FlowDownstreamLink {
+	"""
+	Downstream flow ID
+	"""
+	flowId: FlowID!
+	"""
+	When the downstream flow received the activation
+	"""
+	activatedAt: DateTime!
+	"""
+	Dataset the downstream flow belongs to, if any
+	"""
+	datasetId: DatasetID
+	"""
+	Null only when `datasetId` is null
+	"""
+	dataset: DatasetAccessResult
+	"""
+	Null unless the caller may see the downstream flow: Read on its
+	dataset, and Maintain for webhook deliveries
+	"""
+	flow: Flow
+}
+
 type FlowEdge {
 	node: Flow!
 }
@@ -2603,6 +2635,11 @@ type FlowEventActivationCauseAdded implements FlowEvent {
 type FlowEventCompleted implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
+	"""
+	Flows activated by this flow's completion. Filled asynchronously, so
+	the list may lag briefly behind the completion
+	"""
+	downstreamFlows: [FlowDownstreamLink!]!
 }
 
 type FlowEventInitiated implements FlowEvent {
