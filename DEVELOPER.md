@@ -582,7 +582,8 @@ It runs the hook tests, including Codex handlers invoked from a nested directory
 stdin, and the repository lints (skills declared, routed and symlinked; guarded paths in sync;
 documentation links and anchors resolve; every design doc routed). The handler tests exercise
 policy and payload handling without a model request; they do not verify Codex trust decisions or
-runtime event dispatch. CI runs the same target on every pull request, including documentation-only ones.
+runtime event dispatch. CI runs the same target on pull requests that touch any of the files above,
+including documentation-only ones; code changes get the repository lints from the build workflow.
 
 
 ## Tips

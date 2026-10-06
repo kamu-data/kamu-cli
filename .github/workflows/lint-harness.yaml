@@ -1,11 +1,24 @@
 name: lint-harness
-# Unfiltered on purpose: the main build skips documentation-only changes, but skills, AGENTS.md
-# and design docs are exactly what this checks.
+# Only harness files: code changes run the same repository lints through the build workflow's
+# test suite, and that workflow skips the documentation-only changes this one exists for.
 on:
   push:
     branches:
       - master
+    paths: &harness_paths
+      - ".github/workflows/lint-harness.yaml"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "DEVELOPER.md"
+      - "Makefile"
+      - ".agents/**"
+      - ".claude/**"
+      - ".codex/**"
+      - "docs/internal/**"
+      - "scripts/agents/**"
+      - "src/utils/repo-tools/**"
   pull_request:
+    paths: *harness_paths
   workflow_dispatch: { }
 jobs:
   lint_harness:
