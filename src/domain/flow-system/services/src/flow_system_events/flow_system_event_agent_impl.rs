@@ -105,6 +105,16 @@ impl FlowSystemEventAgentImpl {
         }
     }
 
+    /// Applies pending events and returns how long to wait for the next wakeup.
+    /// Held back events are checked before applying: a commit that releases
+    /// them after the check is either seen by the applying, or happens while
+    /// the check still holds
+    async fn catch_up(&self, wakeup_listener: &dyn WakeupListener) -> Duration {
+        let listening_timeout = self.listening_timeout().await;
+        self.apply_pending_events(Some(wakeup_listener)).await;
+        listening_timeout
+    }
+
     /// How long to wait for a wakeup: briefly while committed events are held
     /// back, since the commit that releases them may raise no wakeup
     async fn listening_timeout(&self) -> Duration {
@@ -196,7 +206,8 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
         let wakeup_listener = self.flow_system_event_bridge.new_wakeup_listener();
 
         // On startup, immediately sync all projectors to catch up with existing events
-        self.apply_pending_events(Some(wakeup_listener.as_ref()))
+        let mut listening_timeout = self
+            .catch_up(wakeup_listener.as_ref())
             .instrument(tracing::info_span!(
                 "FlowSystemEventAgent::initial_catchup_phase"
             ))
@@ -206,15 +217,11 @@ impl BackgroundAgent for FlowSystemEventAgentImpl {
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
             let hint = wakeup_listener
-                .wait_wake(
-                    self.listening_timeout().await,
-                    self.wakeup_config.min_debounce_interval,
-                )
+                .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval)
                 .await?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
-            self.apply_pending_events(Some(wakeup_listener.as_ref()))
-                .await;
+            listening_timeout = self.catch_up(wakeup_listener.as_ref()).await;
         }
     }
 }

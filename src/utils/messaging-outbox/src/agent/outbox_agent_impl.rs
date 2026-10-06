@@ -128,24 +128,34 @@ impl OutboxAgentImpl {
 
         // Initial catchup phase to process all existing messages
         // before starting the main loop
-        self.run_until_end_of_queue(Some(wakeup_listener.as_ref()))
+        let mut listening_timeout = self
+            .catch_up(wakeup_listener.as_ref())
             .instrument(tracing::debug_span!("OutboxAgent::initial_catchup_phase"))
             .await?;
 
         loop {
             // Wait for push or timeout - let the store handle the backoff strategy
             let hint = wakeup_listener
-                .wait_wake(
-                    self.listening_timeout().await,
-                    self.wakeup_config.min_debounce_interval,
-                )
+                .wait_wake(listening_timeout, self.wakeup_config.min_debounce_interval)
                 .await?;
             tracing::debug!(hint = ?hint, "Agent woke up with a hint");
 
             // Process tasks while they are available, to make sure we process all messages
-            self.run_until_end_of_queue(Some(wakeup_listener.as_ref()))
-                .await?;
+            listening_timeout = self.catch_up(wakeup_listener.as_ref()).await?;
         }
+    }
+
+    /// Processes the queue to its end and returns how long to wait for the next
+    /// wakeup. Held back messages are checked before processing: a commit that
+    /// releases them after the check is either seen by the processing, or
+    /// happens while the check still holds
+    async fn catch_up(
+        &self,
+        wakeup_listener: &dyn WakeupListener,
+    ) -> Result<Duration, InternalError> {
+        let listening_timeout = self.listening_timeout().await;
+        self.run_until_end_of_queue(Some(wakeup_listener)).await?;
+        Ok(listening_timeout)
     }
 
     /// Given the agent's listener, keeps its heartbeat going between batches
@@ -415,9 +425,13 @@ impl OutboxAgent for OutboxAgentImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn run_while_has_tasks(&self) -> Result<(), InternalError> {
         loop {
+            // Checked before processing, as in the main loop: checked after, it
+            // would miss a release landing in between and leave its messages
+            let has_held_back_messages = self.has_held_back_messages().await?;
+
             self.run_until_end_of_queue(None).await?;
 
-            if !self.has_held_back_messages().await? {
+            if !has_held_back_messages {
                 return Ok(());
             }
 

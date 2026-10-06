@@ -281,9 +281,10 @@ initial boundary: `Latest` → the producer's latest visible message, `All` (or 
 ### 5.2 Main loop
 
 ```text
-run():  drain  → loop { wait_wake(held back ? 20ms : maxListeningTimeout, minDebounceInterval); drain }
+run():  t = catch_up → loop { wait_wake(t, minDebounceInterval); t = catch_up }
+catch_up: held = has_held_back_messages(); drain; return held ? 20ms : maxListeningTimeout
 drain:  loop { n = consumption_iteration(); if n == 0 break }
-run_while_has_tasks(): loop { drain; if !has_held_back_messages() break; sleep(20ms) }
+run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held break; sleep(20ms) }
 ```
 
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel
@@ -295,8 +296,8 @@ overlapping with the main loop.
 `run_while_has_tasks()` does not stop at the first empty iteration. Committed messages can be held
 back while an older transaction runs ([§6](#reading-below-the-oldest-running-transaction)), anywhere
 on the Postgres cluster; the caller is about to exit or answer, so it must not leave them behind.
-After draining, it asks `OutboxMessageBridge::has_held_back_messages` and, while the answer is yes,
-waits 20 ms and drains again. Only producers the agent still delivers are asked about — those with
+Before each drain, it asks `OutboxMessageBridge::has_held_back_messages` and, while the answer is
+yes, waits 20 ms and drains again. Only producers the agent still delivers are asked about — those with
 at least one consumer that is not failing: any other held-back message would make the caller wait
 for an unrelated transaction for nothing.
 
@@ -389,10 +390,12 @@ own). A transaction that started writing earlier may still commit, and once the 
 its ID its rows would sort below it and never be read. The cost: any long transaction on the cluster,
 related or not, holds delivery back until it ends; it delays, never loses.
 
-Its commit may raise no wakeup, when it wrote to no table with a notification trigger. So after
+Its commit may raise no wakeup, when it wrote to no table with a notification trigger. So before
 catching up, each Postgres reader asks whether committed rows are held back
 (`OutboxMessageBridge::has_held_back_messages`, `FlowSystemEventBridge::has_held_back_events`) and,
-if so, re-checks after `HELD_BACK_RECHECK_INTERVAL` (20 ms) instead of `maxListeningTimeout`:
+if so, re-checks after `HELD_BACK_RECHECK_INTERVAL` (20 ms) instead of `maxListeningTimeout`. Asking
+before is what makes it safe: an older transaction that ends after the question either ends before
+the catch-up reads, which then delivers the released rows, or leaves the answer yes:
 
 | Reader | Waits while rows are held back |
 | --- | --- |
@@ -403,6 +406,7 @@ if so, re-checks after `HELD_BACK_RECHECK_INTERVAL` (20 ms) instead of `maxListe
 | --- | --- |
 | `pg_visible_in_snapshot(tx_id, pg_current_snapshot())` | Lets a newer committed transaction through while an older one is in flight; the boundary passes the older ID and its rows are skipped forever. `test_later_transaction_waits_for_earlier_in_flight_one` (flow-system Postgres tests) pins this |
 | `pg_current_xact_id()` for the reader's own rows | Assigns a transaction ID to a read-only reader, which then holds delivery back for the whole cluster while it is open |
+| Asking about held-back rows after catching up | An older transaction ending between the two finds the rows unread and no longer held back; the reader then waits `maxListeningTimeout` with deliverable rows. `test_main_loop_delivers_held_back_message_without_a_wakeup` (outbox Postgres tests) caught it |
 
 ---
 
