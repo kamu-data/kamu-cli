@@ -53,6 +53,23 @@ pub const MULTITENANT_KAMU_CONFIG_WITH_RESTRICTED_ANONYMOUS: &str = indoc::indoc
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Lets scenarios that wait for flows, including reactive downstream ones,
+/// finish within seconds
+pub const KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      flowSystem:
+        awaitingStepSecs: 1
+        mandatoryThrottlingPeriodSecs: 5
+      backgroundAgents:
+        maxListeningTimeout: 1s
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Default, PartialEq)]
 enum PotentialWorkspace {
     NoWorkspace,

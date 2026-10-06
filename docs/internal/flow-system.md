@@ -23,7 +23,8 @@ recoverable and the retry policy allows, and on success lets the controller **pr
 typically to **sensors** that start flows of downstream datasets or webhook deliveries. A second
 background agent replays all flow, trigger and configuration events into a per-binding **flow
 process state** (healthy, failing, paused, auto-stopped); that projector also auto-stops triggers
-after too many failures and schedules the next periodic run.
+after too many failures and schedules the next periodic run. The same agent records **activation
+links** from each upstream flow to the downstream flows it started.
 
 **Where to start reading, by intent:**
 
@@ -74,6 +75,7 @@ after too many failures and schedules the next periodic run.
     - [State](#state-1)
     - [Projector reactions](#projector-reactions)
     - [Queries](#queries)
+    - [Flow activation links](#flow-activation-links)
   - [10. Flow types](#10-flow-types)
     - [Webhook delivery](#webhook-delivery)
   - [11. Scope removal and external events](#11-scope-removal-and-external-events)
@@ -126,6 +128,7 @@ Covered elsewhere:
 | Flow controller | `dyn FlowController` + `FlowControllerMeta` | Per-type plug-in: builds the task plan, propagates success, owns sensors |
 | Sensor | `dyn FlowSensor` | In-memory listener for one scope, reacting to successes in the scopes it depends on |
 | Process state | `FlowProcessState` | Per-binding health projection: effective state, failures, last/next run |
+| Activation link | `FlowActivationLink` | An upstream flow whose success activated a downstream flow, which took that activation on |
 
 The scope is opaque to the domain crates; adapters define the scope kinds and query helpers
 (`FlowScopeDataset`, `FlowScopeSubscription`).
@@ -143,9 +146,9 @@ flowchart TD
         TRAITS["FlowController · FlowSensorDispatcher · event stores<br/>FlowSystemEventBridge · service traits"]
     end
 
-    SVC["kamu-flow-system-services<br/>FlowAgentImpl, scheduling, trigger/config/run/query services,<br/>sensor dispatcher, abort helper, FlowSystemEventAgentImpl,<br/>FlowProcessStateProjector, system GC controller"]
-    INFRA["kamu-flow-system-{inmem,postgres,sqlite}<br/>event stores, process-state repository,<br/>event bridge, wakeup sources"]
-    ADP["kamu-adapter-flow-dataset · kamu-adapter-flow-webhook<br/>controllers, sensors, config rules, scopes, event bridges"]
+    SVC["kamu-flow-system-services<br/>FlowAgentImpl, scheduling, trigger/config/run/query services,<br/>sensor dispatcher, abort helper, FlowSystemEventAgentImpl,<br/>FlowProcessStateProjector, FlowActivationLinkProjector,<br/>system GC controller"]
+    INFRA["kamu-flow-system-{inmem,postgres,sqlite}<br/>event stores, process-state and activation-link<br/>repositories, event bridge, wakeup sources"]
+    ADP["kamu-adapter-flow-dataset · kamu-adapter-flow-webhook<br/>controllers, sensors, config rules, scopes, event bridges,<br/>upstream flow extractor"]
     TASKS["task system"]
 
     API -- "FlowTriggerService, FlowConfigurationService,<br/>FlowRunService, FlowQueryService, FlowProcessStateQuery" --> DOMAIN
@@ -240,6 +243,12 @@ stateDiagram-v2
 rewritten: compaction, reset, force push). For datasets, `details` is
 `DatasetResourceUpdateDetails`: dataset ID, old and new head, and a `DatasetUpdateSource`
 (`UpstreamFlow`, `HttpIngest`, `SmartProtocolPush`, `ExternallyDetectedChange`).
+
+A cause with the `UpstreamFlow` source points back at the flow that produced the change. The
+reverse direction, from a flow to the flows it activated, is kept as **activation links**
+([§9](#flow-activation-links)). A flow processes only its `activation_causes`, so only those are
+linked: a late cause is linked through the flow it moves to on completion, or not at all when it
+is dropped.
 
 ---
 
@@ -434,7 +443,8 @@ task) and, if the binding has an active schedule, **pauses** the trigger as a us
 
 `FlowQueryServiceImpl` is a thin read wrapper over `FlowEventStore`: list all flows with an order,
 list scoped flows with filters (type, status, initiator) and order, list initiators, filter scopes
-that have flows, get one flow.
+that have flows, get one flow or several by ID (missing ones are skipped with a warning). It also
+returns a flow's downstream activation links from `FlowActivationLinkRepository`.
 
 ---
 
@@ -526,7 +536,9 @@ flowchart TD
 On Postgres the watermark is a `(tx_id, event_id)` pair and only events of transactions older than
 every running one are read — the same scheme as the outbox, including the short re-check while
 events are held back ([outbox.md](outbox.md#reading-below-the-oldest-running-transaction)).
-SQLite orders by event ID alone. `FlowProcessStateProjector` is the only projector.
+SQLite orders by event ID alone. Two projectors run, each with its own watermark:
+`FlowProcessStateProjector`, described below, and `FlowActivationLinkProjector`
+([Flow activation links](#flow-activation-links)).
 
 ### State
 
@@ -576,6 +588,39 @@ flow-system event agent running. Its writes produce new events that come back th
 (filter by scope query, flow types, effective states, last-attempt window, last failure, next planned window, minimum failures;
 ordered by last attempt, next planned, last failure, failures, state or type) and `rollup` (counts
 per effective state and the worst failure streak).
+
+### Flow activation links
+
+A link `(upstream_flow_id, downstream_flow_id, activated_at)` says that a downstream flow was
+activated by an upstream flow's success and took that activation on as one of its own causes, not a
+late one. The link stays whatever the downstream flow's outcome, including an abort. It lets a
+finished flow list the flows it started. Links are many-to-many: one success fans out to every
+sensitive sensor ([§8](#sensors)), and reactive batching merges causes from several upstream flows
+into one flow. Propagation runs in the transaction that completes the upstream flow, so every link
+belongs to an upstream `Completed`.
+
+`FlowActivationLinkProjector` (`services/src/flow_activation_links/`) reads only `Initiated` and
+`ActivationCauseAdded` flow events; it skips the others without deserializing them.
+
+| Event | Link when |
+| --- | --- |
+| `Initiated` | its cause names an upstream flow |
+| `ActivationCauseAdded` | its cause names an upstream flow and is among the flow's `activation_causes`, not its late causes. A cause never moves between the two lists, so the projector checks the flow's latest state |
+
+The upstream flow ID comes from the `FlowActivationCauseUpstreamExtractor` registered for the
+cause's resource type; `DatasetResourceUpstreamFlowExtractor` (flow-dataset) returns it for the
+`UpstreamFlow` source. Webhook deliveries carry the same dataset cause and need no extractor of
+their own. Saving keeps the first link of a pair, so a replay changes nothing. A cause of an
+unknown resource type, unreadable details, or a flow that cannot be loaded is skipped with a log
+entry, so one bad event never blocks the projector; only internal errors make it retry the batch.
+
+**Backfill.** The migration `*_flow_activation_links_backfill.sql` (both engines) derives links
+from the stored flow events with the same rules in SQL, then seeds the projector's watermark at
+the newest event, so the projector starts there without a replay. That SQL encodes today's serde
+shape of `FlowEvent`, `FlowActivationCause` and `DatasetUpdateSource`;
+`FlowActivationLinksBackfillScenario` in `kamu-flow-system-repo-tests` pins it against events
+written by the real event store. The projector's name is persisted with that watermark and must
+not change.
 
 ---
 
@@ -633,6 +678,9 @@ dataset's webhook subscription scopes are not covered
 | `FlowProcessStateProjector` | deletes the scope's process states |
 
 Handler order is unspecified; each must be self-sufficient.
+
+Activation links have no handler: the scope's flows and their events stay, and so do the links to
+and from them. GraphQL hides what the caller can no longer read ([§12](#types)).
 
 ### Changes made outside flows
 
@@ -757,8 +805,9 @@ errors become GraphQL errors.
 | `FlowStatus` | `scalars/flow_scalars.rs` | `WAITING`, `RUNNING`, `RETRYING`, `FINISHED` |
 | `FlowDescription` union | `queries/flows/flow_description.rs` | per scope and flow type: polling ingest, push ingest, transform, hard compaction, reset, reset to metadata, unknown; system GC; webhook deliver (target URL, label, event type). Successful task results appear here ([task-system.md](task-system.md#11-graphql-api)) |
 | `FlowOutcome` union | `queries/flows/flow_outcome.rs` | `Success`, `Failed { reason: TaskFailureReason }`, `Aborted` |
-| `FlowEvent` interface | `queries/flows/flow_event.rs` | one per domain event; `TaskScheduled`, `TaskRunning` and `TaskFinished` fold into `FlowEventTaskChanged { taskStatus, nextAttemptAt, task }` |
-| `FlowActivationCause` union | `queries/flows/flow_activation_cause.rs` | `Manual { initiator }`, `AutoPolling`, `DatasetUpdate { dataset, source }`, `IterationFinished` |
+| `FlowEvent` interface | `queries/flows/flow_event.rs` | one per domain event; `TaskScheduled`, `TaskRunning` and `TaskFinished` fold into `FlowEventTaskChanged { taskStatus, nextAttemptAt, task }`; `FlowEventCompleted.downstreamFlows` lists the flows the completion activated |
+| `FlowDownstreamLink` | `queries/flows/flow_downstream_link.rs` | an activation link ([§9](#flow-activation-links)), also reachable as `Flow.downstreamFlows`: `flowId`, `activatedAt`, `datasetId` from the downstream scope, `dataset` as a `DatasetAccessResult` (`NotAccessible { id }` when deleted or unreadable), and `flow`, null unless the caller can read the dataset — and, for a webhook delivery, which exposes the target URL, maintain it |
+| `FlowActivationCause` union | `queries/flows/flow_activation_cause.rs` | `Manual { initiator }`, `AutoPolling`, `DatasetUpdate { datasetId, dataset, source }`, `IterationFinished`; `dataset` is null when deleted or unreadable |
 | `FlowStartCondition` union | `queries/flows/flow_start_condition.rs` | `Schedule`, `Throttling`, `Reactive` (batching rule, deadline, accumulated records, watermark change), `Executor { taskId }` |
 | `FlowTrigger`, `FlowTriggerRuleInput`, `FlowTriggerStopPolicyInput` | `scalars/flow_trigger.rs` | schedule (`timeDelta` or `cron5ComponentExpression`) or reactive (`forNewData`: `immediate` / `buffering`; `forBreakingChange`: `NO_ACTION` / `RECOVER`); stop policy `never` / `afterConsecutiveFailures` |
 | `FlowConfiguration`, `FlowConfigRule`, config inputs | `scalars/flow_configuration.rs` | ingest, compaction, reset (`custom { newHeadHash }` or `toSeed`, plus `oldHeadHash`) |
@@ -770,9 +819,12 @@ may do: `canView` (logged in with read access) and `canRun` (maintain access).
 
 ### Things to know
 
-- **Unknown values panic.** `decode_dataset_flow_type` on an unknown flow type string, `FlowConfigRule`
-  conversion on an unknown rule type, and activation-cause rendering on a non-dataset resource type
-  all panic instead of returning an error.
+- **Unknown values panic.** `decode_dataset_flow_type` on an unknown flow type string and
+  `FlowConfigRule` conversion on an unknown rule type panic instead of returning an error;
+  activation-cause rendering on a non-dataset resource type returns an internal error.
+- **Downstream links lag.** They come from an asynchronous projection, so right after a flow
+  completes its `downstreamFlows` may still be empty. Batch loading is per flow: avoid the field in
+  list fragments.
 - **A new flow type needs schema work**: an enum value or a process-type filter, a description
   variant, and, if it has a configuration, input and output types.
 
@@ -791,6 +843,7 @@ and `base_gql_flow_runs_harness.rs`.
 | `FlowConfigurationEventStore` | `flow_configuration_events` | keyed by flow type + scope; the first event of each saved batch stores the event it was based on (`prev_event_id`, 0 for none), unique per binding, so concurrent writers collide |
 | `FlowSystemEventBridge` | view `flow_system_events`, `flow_system_projected_offsets` | union of the three event tables; per-projector watermark |
 | `FlowProcessStateRepository` / `Query` | `flow_process_states` | one row per binding, guarded by the last applied event ID |
+| `FlowActivationLinkRepository` | `flow_activation_links` | keyed by (upstream, downstream) flow IDs; no foreign keys, never deleted |
 
 The three event tables draw IDs from one sequence (on SQLite, a shared counter maintained by
 triggers), which is what lets the bridge merge them into one ordered stream.
@@ -832,6 +885,9 @@ Wakeup channels and their SQLite polling equivalents are in
    re-registered on every restart and every trigger change.
 7. **Scope removal**: make sure something calls the `FlowScopeRemovalHandler`s when the scope's
    owner is deleted.
+   If its successes reach sensors as `ResourceUpdate` causes of a **new resource type**, register a
+   `FlowActivationCauseUpstreamExtractor` for that type, or its downstream flows get no activation
+   links ([§9](#flow-activation-links)).
 8. **GraphQL**: expose the type, its description, configuration inputs and run mutation
    ([§12](#12-graphql-api)).
 9. **Default retry policy** for the type, if wanted, in `flowSystem.defaultRetryPolicies`.
@@ -848,6 +904,7 @@ Wakeup channels and their SQLite polling equivalents are in
 | --- | --- |
 | Throttling input | Throttling reads `last_attempt_at` from the asynchronous projection; if the projector lags or is stuck, throttling uses stale data |
 | Continuation depends on the projector | A stuck flow-system event agent stops periodic flows, late-cause flows and auto-stop, while flows already scheduled still run |
+| Activation links lag | Links appear only after the projector applies the downstream flow's events; a stuck projector leaves `downstreamFlows` incomplete |
 | Configuration changes | Pending flows keep their snapshot and retry policy; only a forced configuration merged into the pending flow replaces the snapshot ([§4](#state)). Applying changes to pending flows is planned in [#1415](https://github.com/kamu-data/kamu-cli/issues/1415); `FlowConfigurationUpdatedMessage` is registered for it, but nothing produces or consumes it yet |
 | Late causes | Dropped when a flow ends unsuccessfully with its trigger stopped, or is aborted ([§5](#5-life-of-a-flow)) |
 | Unconfigured bindings | Without a trigger, failures are not counted and nothing auto-stops |
@@ -870,9 +927,10 @@ Wakeup channels and their SQLite polling equivalents are in
 | Flow agent, scheduling, run/query, abort, GC controller, metrics | `src/domain/flow-system/services/src/flow/` |
 | Trigger and configuration services | `src/domain/flow-system/services/src/flow_trigger/`, `.../flow_configuration/` |
 | Sensor dispatcher | `src/domain/flow-system/services/src/flow_sensor/` |
-| Flow-system event agent, projector | `src/domain/flow-system/services/src/flow_system_events/`, `.../flow_process/` |
+| Flow-system event agent, projectors | `src/domain/flow-system/services/src/flow_system_events/`, `.../flow_process/`, `.../flow_activation_links/` |
+| Activation link entity, repository, upstream extractor trait | `.../entities/flow/flow_activation_link.rs`, `.../repos/flow_activation_link_repository.rs`, `.../services/flow/flow_activation_cause_upstream_extractor.rs` |
 | Storage per backend | `src/infra/flow-system/{inmem,postgres,sqlite}/src/` |
-| Dataset controllers, sensor, config rules, scope, event bridge | `src/adapter/flow-dataset/src/` |
+| Dataset controllers, sensor, config rules, scope, event bridge, upstream flow extractor | `src/adapter/flow-dataset/src/` |
 | Webhook controller, sensor, scope, payload, bridge, recovery job | `src/adapter/flow-webhook/src/` |
 | GraphQL queries, mutations, types | `src/adapter/graphql/src/queries/{flows,datasets/dataset_flow_*,accounts/account_flow_*}`, `src/adapter/graphql/src/mutations/flows_mut/`, `src/adapter/graphql/src/scalars/flow_*.rs` |
 | Schema | `migrations/{postgres,sqlite}/*flow*` |

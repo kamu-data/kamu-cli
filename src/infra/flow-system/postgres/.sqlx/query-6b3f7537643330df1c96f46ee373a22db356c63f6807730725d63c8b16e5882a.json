@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                upstream_flow_id,\n                downstream_flow_id,\n                activated_at AS \"activated_at: DateTime<Utc>\"\n            FROM flow_activation_links\n            WHERE upstream_flow_id = ANY($1)\n            ORDER BY upstream_flow_id, activated_at, downstream_flow_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "upstream_flow_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "downstream_flow_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "activated_at: DateTime<Utc>",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6b3f7537643330df1c96f46ee373a22db356c63f6807730725d63c8b16e5882a"
+}

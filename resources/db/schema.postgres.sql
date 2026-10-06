@@ -590,6 +590,17 @@ CREATE TABLE public.embeddings_cache (
 
 
 --
+-- Name: flow_activation_links; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.flow_activation_links (
+    upstream_flow_id bigint NOT NULL,
+    downstream_flow_id bigint NOT NULL,
+    activated_at timestamp with time zone NOT NULL
+);
+
+
+--
 -- Name: flow_system_event_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1053,6 +1064,14 @@ ALTER TABLE ONLY public.embedding_models
 
 ALTER TABLE ONLY public.embeddings_cache
     ADD CONSTRAINT embeddings_cache_pkey PRIMARY KEY (model_id, input_hash);
+
+
+--
+-- Name: flow_activation_links flow_activation_links_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.flow_activation_links
+    ADD CONSTRAINT flow_activation_links_pkey PRIMARY KEY (upstream_flow_id, downstream_flow_id);
 
 
 --

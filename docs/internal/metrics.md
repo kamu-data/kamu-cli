@@ -107,8 +107,9 @@ their retries (or on an unrecoverable error) — the failures users see.
 | --- | --- | --- | --- |
 | `flow_system_event_projector_failing` | gauge | `projector` | `1` while the last attempt to apply a batch of flow system events to the projection failed. The batch is retried on every wakeup; until one succeeds, the projection makes no progress |
 
-`projector` is `FlowSystemEventProjector::name()`, e.g.
-`dev.kamu.domain.flow-system.FlowProcessStateProjector`.
+`projector` is `FlowSystemEventProjector::name()`:
+`dev.kamu.domain.flow-system.FlowProcessStateProjector` or
+`dev.kamu.domain.flow-system.FlowActivationLinkProjector`.
 
 ### Outbox agent
 
@@ -212,7 +213,7 @@ Thresholds are starting points; tune them to the deployment (longest normal inge
 | --- | --- | --- |
 | Task stuck | `task_agent_running_task_started_timestamp_seconds > 0 and time() - task_agent_running_task_started_timestamp_seconds > 7200` | Fires per `executor`. An executor runs one task at a time: a stuck task blocks every flow waiting for it. Set above the p99 of `task_agent_task_duration_seconds{outcome="success"}` |
 | Agent loop hung | `time() - wakeup_listener_last_heartbeat_timestamp_seconds{agent!="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout>`, and for the task agent `time() - wakeup_listener_last_heartbeat_timestamp_seconds{agent="dev.kamu.domain.task-system.TaskAgent"} > 5 * <maxListeningTimeout> unless on() (max(task_agent_running_task_started_timestamp_seconds) > 0)`, `for: 2m` | Agents beat on every wait and batch; no heartbeat means the loop is blocked, even while draining a backlog. A task agent running a task does not beat, and "Task stuck" covers it. `for` rides over the gap between back-to-back tasks and over slow batches |
-| Projector failing | `flow_system_event_projector_failing > 0`, `for: 5m` | The projection is stuck on a batch: flow process states (UI, stop policies) go stale. `for` rides over transient errors, as every wakeup retries |
+| Projector failing | `flow_system_event_projector_failing > 0`, `for: 5m` | The projection is stuck on a batch: flow process states (UI, stop policies) or downstream flow links go stale, depending on `projector`. `for` rides over transient errors, as every wakeup retries |
 | Outbox consumer failed | `outbox_failed_consumers_total > 0` | The consumer stopped until restart; its producer's messages pile up for it |
 | Metrics missing | `absent(wakeup_listener_last_heartbeat_timestamp_seconds)`, `for: 10m` | Scraping or wiring is broken — every other alert is silently off. `for` rides over startup, as the series appears once an agent's loop starts |
 

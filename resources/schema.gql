@@ -1265,6 +1265,24 @@ type Dataset {
 	asCollection: Collection
 }
 
+"""
+A dataset the caller may read, or only its ID when the dataset is missing
+or not readable by the caller
+"""
+interface DatasetAccessResult {
+	message: String!
+}
+
+type DatasetAccessResultAccessible implements DatasetAccessResult {
+	dataset: Dataset!
+	message: String!
+}
+
+type DatasetAccessResultNotAccessible implements DatasetAccessResult {
+	id: DatasetID!
+	message: String!
+}
+
 enum DatasetAccessRole {
 	"""
 	Role opening the possibility for read-only access
@@ -1549,11 +1567,11 @@ type DatasetMetadata {
 	"""
 	Current upstream dependencies of a dataset
 	"""
-	currentUpstreamDependencies: [DependencyDatasetResult!]!
+	currentUpstreamDependencies: [DatasetAccessResult!]!
 	"""
 	Current downstream dependencies of a dataset
 	"""
-	currentDownstreamDependencies: [DependencyDatasetResult!]!
+	currentDownstreamDependencies: [DatasetAccessResult!]!
 	"""
 	Current polling source used by the root dataset
 	"""
@@ -1925,20 +1943,6 @@ type DeleteResultDanglingReference implements DeleteResult {
 
 type DeleteResultSuccess implements DeleteResult {
 	deletedDataset: DatasetAlias!
-	message: String!
-}
-
-interface DependencyDatasetResult {
-	message: String!
-}
-
-type DependencyDatasetResultAccessible implements DependencyDatasetResult {
-	dataset: Dataset!
-	message: String!
-}
-
-type DependencyDatasetResultNotAccessible implements DependencyDatasetResult {
-	id: DatasetID!
 	message: String!
 }
 
@@ -2335,6 +2339,11 @@ type Flow {
 	"""
 	history: [FlowEvent!]!
 	"""
+	Flows activated by this flow's completion. Filled asynchronously, so
+	the list may lag briefly behind the completion
+	"""
+	downstreamFlows: [FlowDownstreamLink!]!
+	"""
 	A user, who initiated the flow run. None for system-initiated flows
 	"""
 	initiator: Account
@@ -2371,7 +2380,11 @@ type FlowActivationCauseAutoPolling {
 }
 
 type FlowActivationCauseDatasetUpdate {
-	dataset: Dataset!
+	datasetId: DatasetID!
+	"""
+	Null when the dataset was deleted or is not readable by the caller
+	"""
+	dataset: Dataset
 	source: FlowActivationCauseDatasetUpdateSource!
 }
 
@@ -2572,6 +2585,33 @@ type FlowDescriptionWebhookDeliver {
 	eventType: String!
 }
 
+"""
+A flow that was activated by the completion of another flow
+"""
+type FlowDownstreamLink {
+	"""
+	Downstream flow ID
+	"""
+	flowId: FlowID!
+	"""
+	When the downstream flow received the activation
+	"""
+	activatedAt: DateTime!
+	"""
+	Dataset the downstream flow belongs to, if any
+	"""
+	datasetId: DatasetID
+	"""
+	Null only when `datasetId` is null
+	"""
+	dataset: DatasetAccessResult
+	"""
+	Null unless the caller may see the downstream flow: Read on its
+	dataset, and Maintain for webhook deliveries
+	"""
+	flow: Flow
+}
+
 type FlowEdge {
 	node: Flow!
 }
@@ -2595,6 +2635,11 @@ type FlowEventActivationCauseAdded implements FlowEvent {
 type FlowEventCompleted implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
+	"""
+	Flows activated by this flow's completion. Filled asynchronously, so
+	the list may lag briefly behind the completion
+	"""
+	downstreamFlows: [FlowDownstreamLink!]!
 }
 
 type FlowEventInitiated implements FlowEvent {

@@ -10,6 +10,7 @@
 mod flow;
 mod flow_activation_cause;
 mod flow_description;
+mod flow_downstream_link;
 mod flow_event;
 mod flow_ordering;
 mod flow_outcome;
@@ -18,6 +19,7 @@ mod flow_start_condition;
 
 pub(crate) use flow::*;
 pub(crate) use flow_activation_cause::*;
+pub(crate) use flow_downstream_link::*;
 pub(crate) use flow_event::*;
 pub(crate) use flow_ordering::*;
 pub(crate) use flow_outcome::*;

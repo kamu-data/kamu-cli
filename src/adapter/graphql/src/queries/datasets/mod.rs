@@ -9,6 +9,7 @@
 
 mod adapters;
 mod dataset;
+mod dataset_access_result;
 mod dataset_collaboration;
 mod dataset_data;
 mod dataset_endpoints;
@@ -28,6 +29,7 @@ mod metadata_chain;
 
 pub(crate) use adapters::*;
 pub(crate) use dataset::*;
+pub(crate) use dataset_access_result::*;
 pub(crate) use dataset_collaboration::*;
 pub(crate) use dataset_data::*;
 pub(crate) use dataset_endpoints::*;

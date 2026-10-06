@@ -63,7 +63,8 @@ impl BaseGQLFlowHarness {
             .add::<InMemoryFlowActivationWakeupSource>()
             .add::<InMemoryWakeupHub>()
             .add::<WakeupListenerMetrics>()
-            .add::<InMemoryFlowProcessState>();
+            .add::<InMemoryFlowProcessState>()
+            .add::<InMemoryFlowActivationLinkRepository>();
 
         b.build()
     }

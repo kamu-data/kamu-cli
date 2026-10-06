@@ -12,7 +12,6 @@ use kamu_adapter_flow_dataset::{
     DatasetResourceUpdateDetails,
     DatasetUpdateSource,
 };
-use kamu_datasets::DatasetRegistry;
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
@@ -32,7 +31,7 @@ impl FlowActivationCause {
     pub async fn build(
         activation_cause: &fs::FlowActivationCause,
         ctx: &Context<'_>,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<Self> {
         Ok(match activation_cause {
             fs::FlowActivationCause::Manual(manual) => {
                 let initiator =
@@ -46,28 +45,22 @@ impl FlowActivationCause {
                 Self::IterationFinished(iteration_finished.clone().into())
             }
             fs::FlowActivationCause::ResourceUpdate(update) => {
-                assert!(
-                    update.resource_type == DATASET_RESOURCE_TYPE,
-                    "Unexpected resource type: {}",
-                    update.resource_type
-                );
+                if update.resource_type != DATASET_RESOURCE_TYPE {
+                    return Err(GqlError::Internal(InternalError::new(format!(
+                        "Unexpected resource type in flow activation cause: {}",
+                        update.resource_type
+                    ))));
+                }
 
                 let update_dataset_details: DatasetResourceUpdateDetails =
                     serde_json::from_value(update.details.clone()).int_err()?;
 
-                let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
+                let dataset_id = update_dataset_details.dataset_id;
+                let dataset = Dataset::try_from_ref(ctx, &dataset_id.as_local_ref()).await?;
 
-                let hdl = dataset_registry
-                    .resolve_dataset_handle_by_ref(
-                        &update_dataset_details.dataset_id.as_local_ref(),
-                    )
-                    .await
-                    .int_err()?;
-                let account = Account::from_dataset_alias(ctx, &hdl.alias)
-                    .await?
-                    .expect("Account must exist");
                 Self::DatasetUpdate(FlowActivationCauseDatasetUpdate {
-                    dataset: Dataset::new_access_checked(account, hdl),
+                    dataset_id: dataset_id.into(),
+                    dataset,
                     source: match update_dataset_details.source {
                         DatasetUpdateSource::UpstreamFlow { flow_id, .. } => {
                             FlowActivationCauseDatasetUpdateSource::UpstreamFlow(
@@ -133,7 +126,9 @@ impl From<fs::FlowActivationCauseIterationFinished> for FlowActivationCauseItera
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseDatasetUpdate {
-    dataset: Dataset,
+    dataset_id: DatasetID<'static>,
+    /// Null when the dataset was deleted or is not readable by the caller
+    dataset: Option<Dataset>,
     source: FlowActivationCauseDatasetUpdateSource,
 }
 

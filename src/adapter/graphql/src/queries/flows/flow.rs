@@ -13,7 +13,7 @@ use kamu_adapter_flow_dataset as afs;
 use kamu_flow_system as fs;
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
-use super::{FlowActivationCause, FlowEvent, FlowOutcome, FlowStartCondition};
+use super::{FlowActivationCause, FlowDownstreamLink, FlowEvent, FlowOutcome, FlowStartCondition};
 use crate::prelude::*;
 use crate::queries::Account;
 
@@ -170,6 +170,13 @@ impl Flow {
         Ok(history)
     }
 
+    /// Flows activated by this flow's completion. Filled asynchronously, so
+    /// the list may lag briefly behind the completion
+    #[tracing::instrument(level = "info", name = Flow_downstream_flows, skip_all)]
+    async fn downstream_flows(&self, ctx: &Context<'_>) -> Result<Vec<FlowDownstreamLink>> {
+        FlowDownstreamLink::build_list(ctx, self.flow_state.flow_id).await
+    }
+
     /// A user, who initiated the flow run. None for system-initiated flows
     async fn initiator(&self, ctx: &Context<'_>) -> Result<Option<Account>> {
         let maybe_initiator = self
@@ -184,10 +191,7 @@ impl Flow {
     }
 
     /// Primary flow activation cause
-    async fn primary_activation_cause(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<FlowActivationCause, InternalError> {
+    async fn primary_activation_cause(&self, ctx: &Context<'_>) -> Result<FlowActivationCause> {
         FlowActivationCause::build(self.flow_state.primary_activation_cause(), ctx).await
     }
 

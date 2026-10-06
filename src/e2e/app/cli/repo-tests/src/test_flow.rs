@@ -17,6 +17,7 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    FlowDownstreamSummary,
     FlowTriggerResponse,
     KamuApiServerClient,
     KamuApiServerClientExt,
@@ -1828,6 +1829,138 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
           ),
         )
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_flow_lists_reactive_transform_downstream(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    let root_dataset_snapshot = indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: root-dataset
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch:
+                kind: FilesGlob
+                path: {}
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  fields:
+                    - name: event_time
+                      type: Timestamp
+                    - name: city
+                      type: String
+                    - name: population
+                      type: Int64
+              merge:
+                kind: Ledger
+                primaryKey:
+                  - event_time
+                  - city
+        "#,
+        temp_dir.path().join("chunk-*.csv").display()
+    )
+    .escape_default()
+    .to_string();
+
+    let derived_dataset_snapshot = indoc::indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: derived-dataset
+          kind: Derivative
+          metadata:
+            - kind: SetTransform
+              inputs:
+                - datasetRef: root-dataset
+                  alias: root
+              transform:
+                kind: Sql
+                engine: datafusion
+                queries:
+                  - query: |
+                      SELECT event_time, city, population FROM root
+        "#
+    )
+    .escape_default()
+    .to_string();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&root_dataset_snapshot)
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derived_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&derived_dataset_snapshot)
+        .await;
+
+    kamu_api_server_client
+        .flow()
+        .set_reactive_transform_trigger(&derived_dataset_id, "RECOVER")
+        .await;
+
+    std::fs::write(
+        temp_dir.path().join("chunk-1.csv"),
+        indoc::indoc!(
+            r#"
+            event_time,city,population
+            2020-01-01,A,1000
+            "#
+        ),
+    )
+    .unwrap();
+
+    let FlowTriggerResponse::Success(ingest_flow_id) = kamu_api_server_client
+        .flow()
+        .trigger_ingest(&root_dataset_id)
+        .await
+    else {
+        panic!("ingest flow must be triggered");
+    };
+
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
+    kamu_api_server_client
+        .flow()
+        .wait(&derived_dataset_id, 1)
+        .await;
+
+    let transform_flows = kamu_api_server_client
+        .flow()
+        .list_flows(&derived_dataset_id)
+        .await;
+
+    pretty_assertions::assert_eq!(
+        vec![FlowDownstreamSummary {
+            flow_id: transform_flows[0].flow_id.clone(),
+            dataset_id: Some(derived_dataset_id.as_did_str().to_string()),
+            description: Some("FlowDescriptionDatasetExecuteTransform".to_owned()),
+        }],
+        kamu_api_server_client
+            .flow()
+            .downstream_flows(&root_dataset_id, ingest_flow_id, 1)
+            .await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
