@@ -420,6 +420,14 @@ CREATE TABLE embeddings_cache (
     PRIMARY KEY (model_id, input_hash)
 );
 
+CREATE TABLE flow_activation_links (
+    upstream_flow_id   INTEGER     NOT NULL,
+    downstream_flow_id INTEGER     NOT NULL,
+    activated_at       TIMESTAMPTZ NOT NULL,
+
+    PRIMARY KEY (upstream_flow_id, downstream_flow_id)
+);
+
 CREATE TABLE flow_configuration_events (
     event_id INTEGER PRIMARY KEY NOT NULL,
     flow_type VARCHAR(100) NOT NULL,

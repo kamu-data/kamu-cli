@@ -9,18 +9,22 @@
 
 use internal_error::InternalError;
 
-use crate::FlowSystemEvent;
+use crate::{FlowActivationLink, FlowID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait FlowSystemEventProjector: Send + Sync {
-    /// Stable name; used as key in the `flow_system_projected_offsets` table.
-    fn name(&self) -> &'static str;
+pub trait FlowActivationLinkRepository: Send + Sync {
+    /// Stores a link. Idempotent: an existing pair of flows keeps its original
+    /// link unchanged.
+    async fn save_link(&self, link: &FlowActivationLink) -> Result<(), InternalError>;
 
-    /// Apply a *single* event using the open transaction.
-    /// Must be idempotent: safe to re-run for the same event id.
-    async fn apply(&self, e: &FlowSystemEvent) -> Result<(), InternalError>;
+    /// Links leaving any of the given upstream flows, ordered by upstream flow,
+    /// activation time, then downstream flow
+    async fn get_downstream_links(
+        &self,
+        upstream_flow_ids: &[FlowID],
+    ) -> Result<Vec<FlowActivationLink>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

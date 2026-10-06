@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod flow_activation_cause;
+mod flow_activation_link;
 mod flow_event;
 mod flow_id;
 mod flow_outcome;
@@ -16,6 +17,7 @@ mod flow_state;
 mod flow_status;
 
 pub use flow_activation_cause::*;
+pub use flow_activation_link::*;
 pub use flow_event::*;
 pub use flow_id::*;
 pub use flow_outcome::*;

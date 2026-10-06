@@ -7,20 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use chrono::{DateTime, Utc};
 
-use crate::FlowSystemEvent;
+use crate::FlowID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait FlowSystemEventProjector: Send + Sync {
-    /// Stable name; used as key in the `flow_system_projected_offsets` table.
-    fn name(&self) -> &'static str;
-
-    /// Apply a *single* event using the open transaction.
-    /// Must be idempotent: safe to re-run for the same event id.
-    async fn apply(&self, e: &FlowSystemEvent) -> Result<(), InternalError>;
+/// An upstream flow whose result activated a downstream flow, which then
+/// processed that activation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowActivationLink {
+    pub upstream_flow_id: FlowID,
+    pub downstream_flow_id: FlowID,
+    /// When the activation reached the downstream flow
+    pub activated_at: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

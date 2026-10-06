@@ -132,6 +132,7 @@ pub fn configure_database_components(
             b.add::<kamu_flow_system_postgres::PostgresFlowSystemEventBridge>();
             b.add::<kamu_flow_system_postgres::PostgresFlowProcessStateRepository>();
             b.add::<kamu_flow_system_postgres::PostgresFlowProcessStateQuery>();
+            b.add::<kamu_flow_system_postgres::PostgresFlowActivationLinkRepository>();
             b.add::<kamu_flow_system_postgres::PostgresFlowActivationWakeupSource>();
 
             b.add::<kamu_task_system_postgres::PostgresTaskEventStore>();
@@ -178,6 +179,7 @@ pub fn configure_database_components(
             b.add::<kamu_flow_system_sqlite::SqliteFlowSystemEventBridge>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowProcessStateRepository>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowProcessStateQuery>();
+            b.add::<kamu_flow_system_sqlite::SqliteFlowActivationLinkRepository>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowActivationWakeupSource>();
 
             b.add::<kamu_task_system_sqlite::SqliteTaskEventStore>();
@@ -220,6 +222,7 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
     b.add::<kamu_flow_system_inmem::InMemoryFlowEventStore>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowSystemEventBridge>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowProcessState>();
+    b.add::<kamu_flow_system_inmem::InMemoryFlowActivationLinkRepository>();
     b.add::<kamu_flow_system_inmem::InMemoryFlowActivationWakeupSource>();
 
     b.add::<kamu_task_system_inmem::InMemoryTaskEventStore>();

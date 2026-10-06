@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO flow_activation_links (upstream_flow_id, downstream_flow_id, activated_at)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (upstream_flow_id, downstream_flow_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3b807832d3200317d98c4d86a296e7e0156f3879e960507a31fc8be7102bf3e6"
+}
