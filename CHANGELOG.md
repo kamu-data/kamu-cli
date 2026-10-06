@@ -23,6 +23,9 @@ Recommendation: for ease of reading, use the following format:
     prose and comments
   - `make lint-harness` (part of `make lint`, and run by CI on every PR) checks the hooks, skill registration
     and routing, and documentation links
+- Flows: GraphQL lists the flows a completed flow started downstream (`FlowEventCompleted.downstreamFlows`,
+  `Flow.downstreamFlows`), including history recorded before this release. Datasets the caller cannot read
+  show only their ID, and webhook deliveries are shown only to dataset maintainers
 ### Changed
 - Outbox and flow-system event delivery on Postgres wait for older in-flight transactions to commit before
   moving past them, so a long transaction delays delivery instead of risking a skipped message
@@ -32,12 +35,18 @@ Recommendation: for ease of reading, use the following format:
 - Stricter Clippy policy: `match_wildcard_for_single_variants`, `wildcard_enum_match_arm` (no catch-all `_`
   arms over enums) and `allow_attributes_without_reason` are enforced workspace-wide; lint suppressions are
   `#[expect]` with a reason (halved in number), and `usize` casts use checked conversions
+- GraphQL (breaking): `FlowActivationCauseDatasetUpdate.dataset` is nullable, null when the dataset was
+  deleted or is not readable by the caller; the new `datasetId` is always set. `DependencyDatasetResult`
+  and its variants are renamed to `DatasetAccessResult`, `DatasetAccessResultAccessible` and
+  `DatasetAccessResultNotAccessible`, with the same fields
 ### Fixed
 - Flows: enabling a transform trigger now detects inputs whose history was rewritten while the trigger was off
   (reset, reset to metadata, compaction), instead of treating the derived dataset as up to date. With recovery
   enabled for breaking changes, the derived dataset is reset to metadata and then rebuilt from its inputs.
 - Concurrent modifications of flow triggers, flow configurations, account quotas and resources are detected
   instead of one writer silently overwriting the other
+- Flows: the history of a flow activated by a now-deleted upstream dataset no longer fails to load, and it no
+  longer reveals upstream datasets the caller cannot read
 - Outbox and flow-system events of a transaction that commits after a later one no longer go undelivered
 - Reactive flow triggers whose flow was pending at restart react to input changes again
 - Flow configurations of a deleted dataset are no longer returned, and a dataset re-added with the same ID can
