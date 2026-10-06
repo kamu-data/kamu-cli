@@ -1802,9 +1802,87 @@ impl FlowApi<'_> {
             })
             .collect()
     }
+
+    /// Waits until the flow lists `expected_count` downstream flows: links are
+    /// filled asynchronously after the flow completes
+    pub async fn downstream_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+        flow_id: FlowID,
+        expected_count: usize,
+    ) -> Vec<FlowDownstreamSummary> {
+        let query = indoc::indoc!(
+            r#"
+            query {
+              datasets {
+                byId(datasetId: "<dataset_id>") {
+                  flows {
+                    runs {
+                      getFlow(flowId: "<flow_id>") {
+                        ... on GetFlowSuccess {
+                          flow {
+                            downstreamFlows {
+                              flowId
+                              datasetId
+                              flow {
+                                description {
+                                  __typename
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )
+        .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+        .replace("<flow_id>", &flow_id.to_string());
+
+        let retry_strategy = FixedInterval::from_millis(500).take(60); // 30s
+
+        Retry::start(retry_strategy, || async {
+            let response = self.client.graphql_api_call(&query, None).await.data();
+
+            let downstream_flows = response["datasets"]["byId"]["flows"]["runs"]["getFlow"]["flow"]
+                ["downstreamFlows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|link| FlowDownstreamSummary {
+                    flow_id: link["flowId"].as_str().unwrap().to_owned(),
+                    dataset_id: link["datasetId"].as_str().map(ToOwned::to_owned),
+                    description: link["flow"]["description"]["__typename"]
+                        .as_str()
+                        .map(ToOwned::to_owned),
+                })
+                .collect::<Vec<_>>();
+
+            if downstream_flows.len() < expected_count {
+                Err(())
+            } else {
+                Ok(downstream_flows)
+            }
+        })
+        .await
+        .unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct FlowDownstreamSummary {
+    pub flow_id: String,
+    pub dataset_id: Option<String>,
+    /// GraphQL type name of the flow description, if the caller may see the
+    /// flow
+    pub description: Option<String>,
+}
 
 #[derive(Debug)]
 pub enum FlowTriggerResponse {

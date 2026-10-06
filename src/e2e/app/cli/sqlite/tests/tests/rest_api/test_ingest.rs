@@ -15,18 +15,7 @@ kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
     fixture =
         kamu_cli_e2e_repo_tests::rest_api::test_ingest_dataset_trigger_dependent_datasets_update,
-    options = Options::default().with_kamu_config(indoc::indoc!(
-        r#"
-        kind: CLIConfig
-        version: 1
-        content:
-          flowSystem:
-            awaitingStepSecs: 1
-            mandatoryThrottlingPeriodSecs: 5
-          backgroundAgents:
-            maxListeningTimeout: 1s
-        "#
-    )),
+    options = Options::default().with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
