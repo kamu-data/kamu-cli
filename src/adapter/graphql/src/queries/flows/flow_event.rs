@@ -49,7 +49,7 @@ impl FlowEvent {
         event: fs::FlowEvent,
         flow_state: &fs::FlowState,
         ctx: &Context<'_>,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<Self> {
         Ok(match event {
             fs::FlowEvent::Initiated(e) => {
                 Self::Initiated(FlowEventInitiated::build(event_id, e, ctx).await?)
@@ -117,7 +117,7 @@ impl FlowEventInitiated {
         event_id: evs::EventID,
         event: fs::FlowEventInitiated,
         ctx: &Context<'_>,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<Self> {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
@@ -163,7 +163,7 @@ impl FlowEventActivationCauseAdded {
         event_id: evs::EventID,
         event: fs::FlowEventActivationCauseAdded,
         ctx: &Context<'_>,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<Self> {
         Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,

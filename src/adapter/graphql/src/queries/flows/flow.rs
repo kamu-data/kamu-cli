@@ -184,10 +184,7 @@ impl Flow {
     }
 
     /// Primary flow activation cause
-    async fn primary_activation_cause(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<FlowActivationCause, InternalError> {
+    async fn primary_activation_cause(&self, ctx: &Context<'_>) -> Result<FlowActivationCause> {
         FlowActivationCause::build(self.flow_state.primary_activation_cause(), ctx).await
     }
 

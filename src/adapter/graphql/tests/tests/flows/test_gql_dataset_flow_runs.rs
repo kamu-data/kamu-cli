@@ -3317,6 +3317,7 @@ async fn test_history_of_completed_transform_flow() {
                                             "eventId": "3",
                                             "activationCause": {
                                                 "__typename": "FlowActivationCauseDatasetUpdate",
+                                                "datasetId": foo_result.dataset_handle.id.to_string(),
                                                 "dataset": {
                                                     "id": foo_result.dataset_handle.id.to_string(),
                                                     "name": "foo"
@@ -3331,6 +3332,7 @@ async fn test_history_of_completed_transform_flow() {
                                             "eventId": "4",
                                             "activationCause": {
                                                 "__typename": "FlowActivationCauseDatasetUpdate",
+                                                "datasetId": foo_result.dataset_handle.id.to_string(),
                                                 "dataset": {
                                                     "id": foo_result.dataset_handle.id.to_string(),
                                                     "name": "foo"
@@ -3382,6 +3384,115 @@ async fn test_history_of_completed_transform_flow() {
                                             "__typename": "FlowEventCompleted",
                                             "eventId": "9",
                                         }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_history_with_activation_cause_of_missing_dataset() {
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dataset_changes_mock: None,
+    })
+    .await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    harness.create_root_dataset(foo_alias.clone()).await;
+
+    let bar_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let bar_result = harness
+        .create_derived_dataset(bar_alias, &[foo_alias])
+        .await;
+
+    let response = harness
+        .trigger_transform_flow_mutation(&bar_result.dataset_handle.id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    let response_json = response.data.into_json().unwrap();
+    let flow_id =
+        harness.extract_flow_id_from_trigger_response(&response_json, "triggerTransformFlow");
+
+    // Same as a deleted upstream: the cause outlives the dataset it names
+    let missing_dataset_id = odf::DatasetID::new_seeded_ed25519(b"missing");
+    harness
+        .mimic_flow_secondary_activation_cause(
+            flow_id,
+            FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
+                activation_time: Utc::now(),
+                resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                changes: ResourceChanges::NewData(ResourceDataChanges {
+                    blocks_added: 1,
+                    records_added: 5,
+                    new_watermark: None,
+                }),
+                details: serde_json::to_value(DatasetResourceUpdateDetails {
+                    dataset_id: missing_dataset_id.clone(),
+                    source: DatasetUpdateSource::UpstreamFlow {
+                        flow_type: FLOW_TYPE_DATASET_INGEST.to_string(),
+                        flow_id: FlowID::new(5),
+                        maybe_flow_config_snapshot: None,
+                    },
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    old_head_maybe: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                })
+                .unwrap(),
+            }),
+        )
+        .await;
+
+    let response = harness
+        .flow_history_query(&bar_result.dataset_handle.id, flow_id)
+        .execute(&schema, &harness.catalog_authorized)
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response.errors);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "getFlow": {
+                                "__typename": "GetFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "history": [
+                                        {
+                                            "__typename": "FlowEventInitiated",
+                                            "eventId": "1",
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseManual"
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventScheduledForActivation",
+                                            "eventId": "2",
+                                        },
+                                        {
+                                            "__typename": "FlowEventActivationCauseAdded",
+                                            "eventId": "3",
+                                            "activationCause": {
+                                                "__typename": "FlowActivationCauseDatasetUpdate",
+                                                "datasetId": missing_dataset_id.to_string(),
+                                                "dataset": null,
+                                                "source": {
+                                                    "__typename": "FlowActivationCauseDatasetUpdateSourceUpstreamFlow",
+                                                    "flowId": "5"
+                                                }
+                                            }
+                                        },
                                     ]
                                 }
                             }
@@ -4791,6 +4902,7 @@ impl FlowRunsHarness {
                                                     activationCause {
                                                         __typename
                                                         ... on FlowActivationCauseDatasetUpdate {
+                                                            datasetId
                                                             dataset {
                                                                 id
                                                                 name

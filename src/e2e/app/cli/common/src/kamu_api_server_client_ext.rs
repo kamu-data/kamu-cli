@@ -1040,26 +1040,26 @@ impl DatasetApi<'_> {
                           metadata {
                             currentUpstreamDependencies {
                               __typename
-                              ... on DependencyDatasetResultAccessible {
+                              ... on DatasetAccessResultAccessible {
                                 dataset {
                                   id
                                   alias
                                 }
                               }
-                              ... on DependencyDatasetResultNotAccessible {
+                              ... on DatasetAccessResultNotAccessible {
                                 id
                                 message
                               }
                             }
                             currentDownstreamDependencies {
                               __typename
-                              ... on DependencyDatasetResultAccessible {
+                              ... on DatasetAccessResultAccessible {
                                 dataset {
                                   id
                                   alias
                                 }
                               }
-                              ... on DependencyDatasetResultNotAccessible {
+                              ... on DatasetAccessResultNotAccessible {
                                 id
                                 message
                               }
@@ -1086,14 +1086,14 @@ impl DatasetApi<'_> {
             let typename = dependency["__typename"].as_str().unwrap();
 
             match typename {
-                "DependencyDatasetResultAccessible" => {
+                "DatasetAccessResultAccessible" => {
                     let dataset = dependency["dataset"].take();
 
                     DatasetDependency::Resolved(
                         serde_json::from_value::<ResolvedDatasetDependency>(dataset).unwrap(),
                     )
                 }
-                "DependencyDatasetResultNotAccessible" => DatasetDependency::Unresolved(
+                "DatasetAccessResultNotAccessible" => DatasetDependency::Unresolved(
                     serde_json::from_value::<UnresolvedDatasetDependency>(dependency.take())
                         .unwrap(),
                 ),
