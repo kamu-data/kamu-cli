@@ -13,8 +13,8 @@ use crate::FlowID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An upstream flow whose result activated a downstream flow, which then
-/// processed that activation
+/// An upstream flow whose result activated a downstream flow, which took that
+/// activation on as one of its own causes, whatever its outcome
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowActivationLink {
     pub upstream_flow_id: FlowID,

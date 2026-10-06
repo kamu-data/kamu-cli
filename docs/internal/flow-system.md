@@ -128,7 +128,7 @@ Covered elsewhere:
 | Flow controller | `dyn FlowController` + `FlowControllerMeta` | Per-type plug-in: builds the task plan, propagates success, owns sensors |
 | Sensor | `dyn FlowSensor` | In-memory listener for one scope, reacting to successes in the scopes it depends on |
 | Process state | `FlowProcessState` | Per-binding health projection: effective state, failures, last/next run |
-| Activation link | `FlowActivationLink` | An upstream flow whose success activated a downstream flow, which processed that activation |
+| Activation link | `FlowActivationLink` | An upstream flow whose success activated a downstream flow, which took that activation on |
 
 The scope is opaque to the domain crates; adapters define the scope kinds and query helpers
 (`FlowScopeDataset`, `FlowScopeSubscription`).
@@ -592,11 +592,12 @@ per effective state and the worst failure streak).
 ### Flow activation links
 
 A link `(upstream_flow_id, downstream_flow_id, activated_at)` says that a downstream flow was
-activated by an upstream flow's success and processed that activation. It lets a finished flow list
-the flows it started. Links are many-to-many: one success fans out to every sensitive sensor
-([§8](#sensors)), and reactive batching merges causes from several upstream flows into one flow.
-Propagation runs in the transaction that completes the upstream flow, so every link belongs to an
-upstream `Completed`.
+activated by an upstream flow's success and took that activation on as one of its own causes, not a
+late one. The link stays whatever the downstream flow's outcome, including an abort. It lets a
+finished flow list the flows it started. Links are many-to-many: one success fans out to every
+sensitive sensor ([§8](#sensors)), and reactive batching merges causes from several upstream flows
+into one flow. Propagation runs in the transaction that completes the upstream flow, so every link
+belongs to an upstream `Completed`.
 
 `FlowActivationLinkProjector` (`services/src/flow_activation_links/`) reads only `Initiated` and
 `ActivationCauseAdded` flow events; it skips the others without deserializing them.
