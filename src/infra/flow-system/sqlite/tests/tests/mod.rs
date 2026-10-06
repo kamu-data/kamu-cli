@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_sqlite_flow_activation_link_repository;
+mod test_sqlite_flow_activation_links_backfill;
 mod test_sqlite_flow_activation_wakeup_source;
 mod test_sqlite_flow_configuration_event_store;
 mod test_sqlite_flow_event_store;

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_postgres_flow_activation_link_repository;
+mod test_postgres_flow_activation_links_backfill;
 mod test_postgres_flow_activation_wakeup_source;
 mod test_postgres_flow_binding_concurrent_writes;
 mod test_postgres_flow_configuration_event_store;

@@ -161,6 +161,7 @@ impl FlowHarness {
             .add::<InMemoryWakeupHub>()
             .add::<WakeupListenerMetrics>()
             .add::<InMemoryFlowProcessState>()
+            .add::<InMemoryFlowActivationLinkRepository>()
             .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_value(mock_dataset_changes)
@@ -571,6 +572,23 @@ impl FlowHarness {
 
     fn completion_metrics(&self) -> Arc<FlowCompletionMetrics> {
         self.catalog.get_one::<FlowCompletionMetrics>().unwrap()
+    }
+
+    /// Every projected activation link, rendered by the test listener
+    pub async fn activation_links_report(&self) -> String {
+        let test_flow_listener = self.catalog.get_one::<FlowSystemTestListener>().unwrap();
+
+        let mut links = Vec::new();
+        for flow_id in test_flow_listener.flow_ids() {
+            links.extend(
+                self.flow_query_service
+                    .get_downstream_links(flow_id)
+                    .await
+                    .unwrap(),
+            );
+        }
+
+        test_flow_listener.display_activation_links(&links)
     }
 
     pub fn is_projector_failing(&self, projector_name: &str) -> bool {

@@ -1368,6 +1368,16 @@ async fn test_ingest_flow_with_multiple_iterations() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 2
+            "foo" Ingest Flow ID = 1 => "bar" ExecuteTransform Flow ID = 4
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1719,6 +1729,8 @@ async fn test_manual_trigger_reset_to_metadata() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!("", harness.activation_links_report().await);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1942,6 +1954,15 @@ async fn test_reset_trigger_derivatives_reactively() {
           "#
         ),
         format!("{}", test_flow_listener.as_ref())
+    );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Reset Flow ID = 0 => "foo_bar" ResetToMetadata Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
     );
 }
 
@@ -2263,6 +2284,15 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
         ),
         format!("{}", test_flow_listener.as_ref()),
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" HardCompaction Flow ID = 0 => "foo_bar" ResetToMetadata Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2529,6 +2559,16 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" ResetToMetadata Flow ID = 0 => "foo_bar" ResetToMetadata Flow ID = 1
+            "foo_bar" ResetToMetadata Flow ID = 1 => "foo_bar_baz" ResetToMetadata Flow ID = 2
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2644,6 +2684,8 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!("", harness.activation_links_report().await);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3813,6 +3855,15 @@ async fn test_derived_dataset_triggered_after_input_change() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 1 => "bar" ExecuteTransform Flow ID = 2
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4134,6 +4185,15 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
             "#
         ),
         format!("{}", test_flow_listener.as_ref())
+    );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 2 => "bar" ExecuteTransform Flow ID = 3
+            "#
+        ),
+        harness.activation_links_report().await
     );
 }
 
@@ -4854,6 +4914,18 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "baz" ExecuteTransform Flow ID = 2
+            "bar" Ingest Flow ID = 1 => "baz" ExecuteTransform Flow ID = 5
+            "foo" Ingest Flow ID = 3 => "baz" ExecuteTransform Flow ID = 5
+            "bar" Ingest Flow ID = 4 => "baz" ExecuteTransform Flow ID = 7
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5452,6 +5524,18 @@ async fn test_batching_condition_records_reached() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 1
+            "foo" Ingest Flow ID = 2 => "bar" ExecuteTransform Flow ID = 1
+            "foo" Ingest Flow ID = 3 => "bar" ExecuteTransform Flow ID = 4
+            "foo" Ingest Flow ID = 5 => "bar" ExecuteTransform Flow ID = 4
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5773,6 +5857,16 @@ async fn test_batching_condition_timeout() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 1
+            "foo" Ingest Flow ID = 2 => "bar" ExecuteTransform Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6092,6 +6186,16 @@ async fn test_batching_condition_watermark() {
         "#
         ),
         format!("{}", test_flow_listener.as_ref())
+    );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 1
+            "foo" Ingest Flow ID = 2 => "bar" ExecuteTransform Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
     );
 }
 
@@ -6795,6 +6899,19 @@ async fn test_batching_condition_with_2_inputs() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "baz" ExecuteTransform Flow ID = 2
+            "bar" Ingest Flow ID = 1 => "baz" ExecuteTransform Flow ID = 2
+            "foo" Ingest Flow ID = 3 => "baz" ExecuteTransform Flow ID = 2
+            "bar" Ingest Flow ID = 4 => "baz" ExecuteTransform Flow ID = 2
+            "foo" Ingest Flow ID = 5 => "baz" ExecuteTransform Flow ID = 2
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -7131,6 +7248,8 @@ async fn test_list_all_datasets_with_flow() {
         .collect();
 
     pretty_assertions::assert_eq!([bar_id], *all_datasets_with_flow);
+
+    pretty_assertions::assert_eq!("", harness.activation_links_report().await);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -7739,6 +7858,16 @@ async fn test_abort_flow_after_task_finishes() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 1
+            "foo" Ingest Flow ID = 3 => "bar" ExecuteTransform Flow ID = 4
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -8249,6 +8378,15 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -8599,6 +8737,15 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -8898,6 +9045,8 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!("", harness.activation_links_report().await);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10111,6 +10260,15 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 1 => "bar" ExecuteTransform Flow ID = 2
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -11170,6 +11328,16 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
     let transform_flow_type = transform_dataset_binding(&bar_id).flow_type;
     assert_eq!(harness.completed_flows(&transform_flow_type, "success"), 1);
     harness.assert_completed_flows_duration_seconds(&transform_flow_type, "success", 0.02);
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "bar" ExecuteTransform Flow ID = 1
+            "foo" Ingest Flow ID = 2 => "bar" ExecuteTransform Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -12215,6 +12383,15 @@ async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 2 => "bar" ExecuteTransform Flow ID = 3
+            "#
+        ),
+        harness.activation_links_report().await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -12352,6 +12529,8 @@ async fn test_restored_sensor_hears_input_change_delivered_after_restart() {
         ),
         format!("{}", test_flow_listener.as_ref())
     );
+
+    pretty_assertions::assert_eq!("", harness.activation_links_report().await);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

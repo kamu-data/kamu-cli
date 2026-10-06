@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_flow_activation_link_projector;
 mod test_flow_agent_impl;
 mod test_flow_configuration_service_impl;
 mod test_flow_process_state_projector;

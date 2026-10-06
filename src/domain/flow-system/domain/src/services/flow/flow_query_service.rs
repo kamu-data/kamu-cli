@@ -12,7 +12,15 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{FlowFilters, FlowID, FlowOrder, FlowScope, FlowScopeQuery, FlowState};
+use crate::{
+    FlowActivationLink,
+    FlowFilters,
+    FlowID,
+    FlowOrder,
+    FlowScope,
+    FlowScopeQuery,
+    FlowState,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,6 +59,15 @@ pub trait FlowQueryService: Sync + Send {
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
+
+    /// Returns current states of the given flows that exist, in input order
+    async fn get_flows(&self, flow_ids: &[FlowID]) -> Result<Vec<FlowState>, InternalError>;
+
+    /// Returns links to the flows that the given flow has activated
+    async fn get_downstream_links(
+        &self,
+        upstream_flow_id: FlowID,
+    ) -> Result<Vec<FlowActivationLink>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

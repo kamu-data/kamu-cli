@@ -7,5 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_dataset_resource_upstream_flow_extractor;
-mod test_flow_datasets_event_bridge;
+mod flow_activation_link_projector;
+
+pub use flow_activation_link_projector::*;

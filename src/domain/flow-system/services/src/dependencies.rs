@@ -24,6 +24,7 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<FlowSchedulingServiceImpl>();
 
     catalog_builder.add::<FlowProcessStateProjector>();
+    catalog_builder.add::<FlowActivationLinkProjector>();
 
     catalog_builder.add::<FlowAgentImpl>();
     catalog_builder.add::<FlowAgentMetrics>();
