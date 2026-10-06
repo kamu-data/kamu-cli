@@ -47,6 +47,12 @@ class BashEditsTest(unittest.TestCase):
             self.assertIsNone(take_pending(state, "abandoned"))
             self.assertEqual(take_pending(state, "call-2"), {})
 
+    def test_regenerated_files_are_not_judged(self):
+        with mock.patch.object(bash_edits, "check_edit", return_value=([], [])) as check:
+            bash_edits.check_changed(["resources/schema.gql", "src/app/cli/src/app.rs"], "s/main",
+                                     Path(tempfile.mkdtemp()) / "skills.json", "{skill}")
+        self.assertEqual([call.args[0] for call in check.call_args_list], ["src/app/cli/src/app.rs"])
+
     def test_snapshot_covers_tracked_and_untracked_files_but_not_ignored_ones(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

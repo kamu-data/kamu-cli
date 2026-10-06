@@ -10,7 +10,7 @@ import hashlib
 import subprocess
 
 from scripts.agents.common import ROOT, locked_state, now
-from scripts.agents.command_policy import lex, segments
+from scripts.agents.command_policy import drop_redirects, lex, segments
 
 STATE = ROOT / ".claude" / "state" / "clippy.json"
 PATHSPEC = ["*.rs", "*Cargo.toml", "Cargo.lock"]
@@ -43,7 +43,8 @@ def is_whole_clippy_run(command: str) -> bool:
         return False
     if len(parts) != 1 or parts[0][1]:
         return False
-    argv = parts[0][0]
+    # Output saved to a file is still the whole run
+    argv = drop_redirects(parts[0][0])
     return argv in (["make", "clippy"], ["make", "lint"])
 
 

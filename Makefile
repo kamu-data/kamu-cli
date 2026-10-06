@@ -59,8 +59,9 @@ fmt:
 lint: lint-rustfmt lint-cargo-toml lint-repo lint-harness lint-deps clippy lint-openapi lint-sqlx
 
 
+# Includes every repo lint: the agent harness lints live in kamu-repo-tools
 .PHONY: lint-harness
-lint-harness:
+lint-harness: lint-repo
 	python3 -m unittest discover -s scripts/agents/tests -t .
 
 

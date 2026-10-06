@@ -41,6 +41,7 @@ class StopReminderTest(unittest.TestCase):
     def test_only_a_bare_make_clippy_counts_as_green(self):
         self.assertTrue(clippy_ledger.is_whole_clippy_run("make clippy"))
         self.assertTrue(clippy_ledger.is_whole_clippy_run("make lint"))
+        self.assertTrue(clippy_ledger.is_whole_clippy_run("make clippy > /tmp/clippy.log 2>&1"))
         self.assertFalse(clippy_ledger.is_whole_clippy_run("make clippy | grep warning"))
         self.assertFalse(clippy_ledger.is_whole_clippy_run("make clippy || true"))
         self.assertFalse(clippy_ledger.is_whole_clippy_run("cargo clippy"))

@@ -111,10 +111,14 @@ def is_generated(rel: str) -> bool:
 def check_changed(paths: list[str], reader: str, skills_state: Path, load_with: str) -> tuple[list[str], list[str]]:
     """Return (problems that block, context notes) for the files a command changed.
 
-    Each file is judged against its committed version, as a whole-file write is.
+    Each file is judged against its committed version, as a whole-file write is. Generated files
+    are skipped: their text is the generator's. Only the edit tools refuse hand edits to them; a
+    shell command that edits one by hand is not caught here.
     """
     problems, notes = [], []
     for rel in paths:
+        if is_generated(rel):
+            continue
         try:
             content = (ROOT / rel).read_text()
         except (OSError, UnicodeDecodeError):

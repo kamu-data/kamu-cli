@@ -81,6 +81,12 @@ class LedgerTest(unittest.TestCase):
         self.assertEqual(skills_read_by("sed -n 1,80p .claude/skills/kamu-dill-di/SKILL.md"), {"kamu-dill-di"})
         self.assertEqual(skills_read_by("sed -i s/a/b/ .claude/skills/kamu-dill-di/SKILL.md"), set())
         self.assertEqual(skills_read_by("ls .claude/skills/kamu-dill-di/SKILL.md"), set())
+        self.assertEqual(skills_read_by("cat .claude/skills/kamu-dill-di/SKILL.md > /tmp/copy"), {"kamu-dill-di"})
+        self.assertEqual(skills_read_by("cat < .claude/skills/kamu-dill-di/SKILL.md"), {"kamu-dill-di"})
+
+    def test_writing_a_skill_through_a_redirect_is_not_a_load(self):
+        self.assertEqual(skills_read_by("cat > .claude/skills/kamu-dill-di/SKILL.md <<'EOF'\n# x\nEOF"), set())
+        self.assertEqual(skills_read_by("cat header.md >> .agents/skills/kamu-dill-di/SKILL.md"), set())
 
 
 if __name__ == "__main__":

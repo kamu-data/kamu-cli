@@ -45,6 +45,26 @@ def skill_from_path(path: str) -> str | None:
     return m.group(1) if m else None
 
 
+def drop_output_redirects(argv: list[str]) -> list[str]:
+    """Remove output redirections with their targets, but keep input ones' targets: `cat > SKILL.md`
+    authors a skill, while `cat < SKILL.md` reads it."""
+    out: list[str] = []
+    skip = False
+    for tok in argv:
+        if skip:
+            skip = False
+        elif set(tok) <= set("<>&") and ">" in tok:
+            if out and out[-1].isdigit():
+                out.pop()
+            skip = True
+        elif set(tok) <= set("<&") and "<" in tok:
+            if out and out[-1].isdigit():
+                out.pop()
+        else:
+            out.append(tok)
+    return out
+
+
 def skills_read_by(command: str) -> set[str]:
     """Skills whose SKILL.md a shell command reads (Codex's way of loading one)."""
     try:
@@ -52,7 +72,8 @@ def skills_read_by(command: str) -> set[str]:
     except ValueError:
         return set()
     found = set()
-    for argv, _ in segments(tokens):
+    for raw, _ in segments(tokens):
+        argv = drop_output_redirects(raw)
         if argv and argv[0].rsplit("/", 1)[-1] in READERS and not (argv[0] == "sed" and "-i" in argv):
             found |= {s for a in argv[1:] if (s := skill_from_path(a))}
     return found
