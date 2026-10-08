@@ -247,6 +247,8 @@ pub enum SyncError {
     #[error(transparent)]
     DatasetsDiverged(#[from] DatasetsDivergedError),
     #[error(transparent)]
+    DatasetIdMismatch(#[from] DatasetIdMismatchError),
+    #[error(transparent)]
     DestinationAhead(#[from] DestinationAheadError),
     #[error(transparent)]
     InvalidInterval(#[from] odf::dataset::InvalidIntervalError),
@@ -348,6 +350,18 @@ impl std::fmt::Display for DatasetsDivergedError {
 pub struct DatasetsDivergedErrorDetail {
     pub uncommon_blocks_in_src: u64,
     pub uncommon_blocks_in_dst: u64,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[error(
+    "Source and destination are different datasets, source ID is {src_dataset_id}, destination ID \
+     is {dst_dataset_id}"
+)]
+pub struct DatasetIdMismatchError {
+    pub src_dataset_id: odf::DatasetID,
+    pub dst_dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

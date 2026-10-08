@@ -96,6 +96,94 @@ async fn test_different_seeds() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_different_dataset_ids() {
+    let lhs_chain = init_chain();
+    let rhs_chain = init_chain();
+
+    let lhs_dataset_id = odf::DatasetID::new_seeded_ed25519(b"lhs");
+    let rhs_dataset_id = odf::DatasetID::new_seeded_ed25519(b"rhs");
+
+    let lhs_block_seed = MetadataFactory::metadata_block(
+        MetadataFactory::seed(odf::DatasetKind::Root)
+            .id(lhs_dataset_id.clone())
+            .build(),
+    )
+    .build();
+    let rhs_block_seed = MetadataFactory::metadata_block(
+        MetadataFactory::seed(odf::DatasetKind::Root)
+            .id(rhs_dataset_id.clone())
+            .build(),
+    )
+    .build();
+    push_block(&lhs_chain, lhs_block_seed).await;
+    push_block(&rhs_chain, rhs_block_seed).await;
+
+    assert_eq!(
+        CompareChainsResult::DifferentDatasets {
+            lhs_dataset_id: lhs_dataset_id.clone(),
+            rhs_dataset_id: rhs_dataset_id.clone(),
+        },
+        compare_chains(&lhs_chain, &rhs_chain).await
+    );
+    assert_eq!(
+        CompareChainsResult::DifferentDatasets {
+            lhs_dataset_id: rhs_dataset_id,
+            rhs_dataset_id: lhs_dataset_id,
+        },
+        compare_chains(&rhs_chain, &lhs_chain).await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_different_dataset_ids_different_length() {
+    let lhs_chain = init_chain();
+    let rhs_chain = init_chain();
+
+    let lhs_dataset_id = odf::DatasetID::new_seeded_ed25519(b"lhs");
+    let rhs_dataset_id = odf::DatasetID::new_seeded_ed25519(b"rhs");
+
+    let lhs_block_seed = MetadataFactory::metadata_block(
+        MetadataFactory::seed(odf::DatasetKind::Root)
+            .id(lhs_dataset_id.clone())
+            .build(),
+    )
+    .build();
+    let lhs_seed_hash = push_block(&lhs_chain, lhs_block_seed).await;
+    let lhs_block_schema =
+        MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+            .prev(&lhs_seed_hash, 0)
+            .build();
+    push_block(&lhs_chain, lhs_block_schema).await;
+
+    let rhs_block_seed = MetadataFactory::metadata_block(
+        MetadataFactory::seed(odf::DatasetKind::Root)
+            .id(rhs_dataset_id.clone())
+            .build(),
+    )
+    .build();
+    push_block(&rhs_chain, rhs_block_seed).await;
+
+    assert_eq!(
+        CompareChainsResult::DifferentDatasets {
+            lhs_dataset_id: lhs_dataset_id.clone(),
+            rhs_dataset_id: rhs_dataset_id.clone(),
+        },
+        compare_chains(&lhs_chain, &rhs_chain).await
+    );
+    assert_eq!(
+        CompareChainsResult::DifferentDatasets {
+            lhs_dataset_id: rhs_dataset_id,
+            rhs_dataset_id: lhs_dataset_id,
+        },
+        compare_chains(&rhs_chain, &lhs_chain).await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_seed_only_in_first() {
     let lhs_chain = init_chain();
     let rhs_chain = init_chain();

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+
 use kamu::domain::*;
 
 use crate::harness::{ClientSideHarness, ServerSideHarness, await_client_server_flow};
@@ -225,6 +227,39 @@ pub(crate) async fn test_smart_pull_existing_advanced_dataset_fails<
 
         // TODO: try expecting better error message
         assert!(pull_responses[0].result.is_err());
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn test_smart_pull_existing_different_dataset_fails<
+    TServerHarness: ServerSideHarness,
+>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPullExistingDifferentDatasetFailsScenario::prepare(a_client_harness, a_server_harness)
+            .await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+    let client_handle = async {
+        let pull_responses = scenario
+            .client_harness
+            .pull_datasets(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .await;
+
+        assert_matches!(
+            &pull_responses[0].result,
+            Err(PullError::SyncError(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                src_dataset_id,
+                dst_dataset_id,
+            })))
+            if *src_dataset_id == scenario.server_dataset_id
+                && *dst_dataset_id == scenario.client_dataset_id
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
