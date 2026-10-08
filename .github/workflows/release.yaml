@@ -47,7 +47,7 @@ jobs:
             use-cross: true
             features: ingest-ftp,web-ui
           - name: MacOS / aarch64
-            runs-on: macos-14
+            runs-on: macos-15
             target: aarch64-apple-darwin
             use-cross: false
             features: ingest-ftp,web-ui
