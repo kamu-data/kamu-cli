@@ -27,6 +27,12 @@ use kamu::{
 };
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_core::{DidGenerator, FileUploadLimitConfig, MockDidGenerator};
 use kamu_datasets::{
     ContentArgs,
@@ -189,6 +195,10 @@ impl UpdateVersionFileCaseHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(kamu_datasets_services::QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
             .add::<QueryServiceImpl>()
             .add::<SessionContextBuilder>()
             .add_value(FileUploadLimitConfig::new_in_bytes(24))

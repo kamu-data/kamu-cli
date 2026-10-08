@@ -53,11 +53,38 @@ pub struct QuotaExceededError {
 
 #[async_trait::async_trait]
 pub trait AccountQuotaStorageChecker: Sync + Send {
+    /// Returns the storage limit of the account in bytes, or `None` when the
+    /// account's storage is unlimited.
+    async fn get_storage_limit(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<u64>, GetStorageLimitError>;
+
     async fn ensure_within_quota(
         &self,
         account_id: &odf::AccountID,
         incoming_bytes: u64,
     ) -> Result<(), QuotaError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetStorageLimitError {
+    #[error("Quota not configured")]
+    NotConfigured,
+
+    #[error(transparent)]
+    Internal(#[from] internal_error::InternalError),
+}
+
+impl From<GetStorageLimitError> for QuotaError {
+    fn from(e: GetStorageLimitError) -> Self {
+        match e {
+            GetStorageLimitError::NotConfigured => Self::NotConfigured,
+            GetStorageLimitError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
