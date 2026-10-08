@@ -322,25 +322,27 @@ pub(crate) async fn test_smart_push_existing_different_dataset_fails<
 
     let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
-        let push_responses = scenario
-            .client_harness
-            .push_dataset(
-                scenario.client_dataset_ref,
-                scenario.server_dataset_ref.try_into().unwrap(),
-                false,
-                odf::DatasetVisibility::Private,
-            )
-            .await;
+        for force in [false, true] {
+            let push_responses = scenario
+                .client_harness
+                .push_dataset(
+                    scenario.client_dataset_ref.clone(),
+                    scenario.server_dataset_ref.clone().try_into().unwrap(),
+                    force,
+                    odf::DatasetVisibility::Private,
+                )
+                .await;
 
-        assert_matches!(
-            &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
-                src_dataset_id,
-                dst_dataset_id,
-            })))
-            if *src_dataset_id == scenario.client_dataset_id
-                && *dst_dataset_id == scenario.server_dataset_id
-        );
+            assert_matches!(
+                &push_responses[0].result,
+                Err(PushError::SyncError(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                    src_dataset_id,
+                    dst_dataset_id,
+                })))
+                if *src_dataset_id == scenario.client_dataset_id
+                    && *dst_dataset_id == scenario.server_dataset_id
+            );
+        }
     };
 
     await_client_server_flow!(api_server_handle, client_handle);

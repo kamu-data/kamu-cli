@@ -30,7 +30,7 @@ Recommendation: for ease of reading, use the following format:
   register/update"; a migration repairs the stored account and legacy env-var resource IDs
 - Pulling or pushing into an existing dataset that has a different ID now fails with "Source and destination
   are different datasets" and both IDs, instead of a misleading divergence or invalid interval error;
-  `--force` no longer replaces such a dataset over non-smart protocols
+  `--force` now refuses such a dataset before transferring anything
 
 ## [0.269.0] - 2026-10-06
 ### Added

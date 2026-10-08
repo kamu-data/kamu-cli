@@ -505,44 +505,52 @@ impl WsSmartTransferProtocolClient {
             })
     }
 
-    // The destination head is missing from the source chain. Unless the datasets
-    // differ entirely, this means the chains diverged.
-    async fn map_push_invalid_interval_error(
+    /// Compares the ID of a remote source with the local destination's.
+    /// Returns `None` when they match or the remote ID is unavailable.
+    async fn find_pull_dataset_id_mismatch(
+        http_src_url: &Url,
+        maybe_access_token: Option<&str>,
+        dst: &ResolvedDataset,
+    ) -> Option<DatasetIdMismatchError> {
+        let src_dataset_id = try_fetch_remote_dataset_id(http_src_url, maybe_access_token).await?;
+        let dst_dataset_id = &dst.get_handle().id;
+
+        (src_dataset_id != *dst_dataset_id).then(|| DatasetIdMismatchError {
+            src_dataset_id,
+            dst_dataset_id: dst_dataset_id.clone(),
+        })
+    }
+
+    /// Compares the ID of a local source with the remote destination's.
+    /// Returns `None` when they match or either ID is unavailable.
+    async fn find_push_dataset_id_mismatch(
         &self,
         src: &dyn odf::Dataset,
         http_dst_url: &Url,
-        e: odf::dataset::InvalidIntervalError,
-    ) -> SyncError {
+    ) -> Option<DatasetIdMismatchError> {
         use odf::dataset::MetadataChainExt;
-        let maybe_src_dataset_id = match src
+        let src_dataset_id = match src
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchSeedVisitor::new())
             .await
         {
-            Ok(seed_visitor) => seed_visitor.into_event().map(|seed| seed.dataset_id),
+            Ok(seed_visitor) => seed_visitor.into_event()?.dataset_id,
             Err(err) => {
                 tracing::debug!(error = ?err, "Failed to read source dataset seed");
-                None
+                return None;
             }
         };
 
-        if let Some(src_dataset_id) = maybe_src_dataset_id {
-            let maybe_access_token = self
-                .dataset_credential_resolver
-                .resolve_odf_dataset_access_token(http_dst_url);
+        let maybe_access_token = self
+            .dataset_credential_resolver
+            .resolve_odf_dataset_access_token(http_dst_url);
+        let dst_dataset_id =
+            try_fetch_remote_dataset_id(http_dst_url, maybe_access_token.as_deref()).await?;
 
-            if let Some(dst_dataset_id) =
-                try_fetch_remote_dataset_id(http_dst_url, maybe_access_token.as_deref()).await
-                && dst_dataset_id != src_dataset_id
-            {
-                return SyncError::DatasetIdMismatch(DatasetIdMismatchError {
-                    src_dataset_id,
-                    dst_dataset_id,
-                });
-            }
-        }
-
-        SyncError::InvalidInterval(e)
+        (src_dataset_id != dst_dataset_id).then_some(DatasetIdMismatchError {
+            src_dataset_id,
+            dst_dataset_id,
+        })
     }
 
     fn generate_ws_url(http_base_url: &Url, additional_path_segment: &str) -> Url {
@@ -644,6 +652,21 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         let maybe_access_token = self
             .dataset_credential_resolver
             .resolve_odf_dataset_access_token(http_src_url);
+
+        // A forced pull skips the head check that would otherwise reveal a
+        // different dataset, so compare the IDs before transferring anything
+        if transfer_options.force_update_if_diverged
+            && let Some(dst) = dst
+            && let Some(mismatch) = Self::find_pull_dataset_id_mismatch(
+                http_src_url,
+                maybe_access_token.as_deref(),
+                dst,
+            )
+            .await
+        {
+            return Err(mismatch.into());
+        }
+
         let pull_url = Self::generate_ws_url(http_src_url, "pull");
 
         tracing::debug!(
@@ -705,17 +728,14 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                         // The server could not find our head in its chain. Unless the
                         // datasets differ entirely, this means the chains diverged.
                         if let Some(dst) = dst
-                            && let Some(src_dataset_id) = try_fetch_remote_dataset_id(
+                            && let Some(mismatch) = Self::find_pull_dataset_id_mismatch(
                                 http_src_url,
                                 maybe_access_token.as_deref(),
+                                dst,
                             )
                             .await
-                            && src_dataset_id != dst.get_handle().id
                         {
-                            SyncError::DatasetIdMismatch(DatasetIdMismatchError {
-                                src_dataset_id,
-                                dst_dataset_id: dst.get_handle().id.clone(),
-                            })
+                            mismatch.into()
                         } else {
                             SyncError::DatasetsDiverged(DatasetsDivergedError {
                                 src_head: e.head,
@@ -873,6 +893,17 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
+        // A forced push skips the head check that would otherwise reveal a
+        // different dataset, so compare the IDs before transferring anything
+        if transfer_options.force_update_if_diverged
+            && dst_head.is_some()
+            && let Some(mismatch) = self
+                .find_push_dataset_id_mismatch(src.as_ref(), http_dst_url)
+                .await
+        {
+            return Err(mismatch.into());
+        }
+
         let transfer_plan = match prepare_dataset_transfer_plan(
             src.as_metadata_chain(),
             &src_head,
@@ -883,9 +914,17 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         {
             Ok(transfer_plan) => transfer_plan,
             Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
-                return Err(self
-                    .map_push_invalid_interval_error(src.as_ref(), http_dst_url, e)
-                    .await);
+                // The destination head is missing from the source chain. Unless the
+                // datasets differ entirely, this means the chains diverged.
+                return Err(
+                    match self
+                        .find_push_dataset_id_mismatch(src.as_ref(), http_dst_url)
+                        .await
+                    {
+                        Some(mismatch) => mismatch.into(),
+                        None => SyncError::InvalidInterval(e),
+                    },
+                );
             }
             Err(PrepareDatasetTransferEstimateError::Internal(e)) => {
                 return Err(SyncError::Internal(e));
