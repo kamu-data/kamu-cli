@@ -118,9 +118,9 @@ tracing = "0.1"
 url = { version = "2", features = [
     "serde",
 ] }
-utoipa = { version = "5", default-features = false, features = [
+utoipa = { version = "6", default-features = false, features = [
 ] }
-utoipa-axum = { version = "0.2", default-features = false, features = [
+utoipa-axum = { version = "0.3", default-features = false, features = [
 ] }
 uuid = { version = "1", default-features = false, features = [
     "v4",

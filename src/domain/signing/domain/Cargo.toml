@@ -49,7 +49,7 @@ setty = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false }
 
 # Optional
-utoipa = { optional = true, version = "5", default-features = false, features = [
+utoipa = { optional = true, version = "6", default-features = false, features = [
 ] }
 
 [dev-dependencies]

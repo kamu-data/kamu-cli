@@ -69,7 +69,7 @@ schemars = { optional = true, version = "1", default-features = false, features 
     "derive",
 ] }
 serde_json = { optional = true, version = "1", default-features = false }
-utoipa = { optional = true, version = "5", default-features = false, features = [
+utoipa = { optional = true, version = "6", default-features = false, features = [
 ] }
 
 

@@ -134,7 +134,7 @@ tonic = { optional = true, version = "0.14", default-features = false, features 
     "transport",
 ] }
 tonic-prost = { optional = true, version = "0.14", default-features = false }
-utoipa = { optional = true, version = "5", default-features = false, features = [
+utoipa = { optional = true, version = "6", default-features = false, features = [
     "macros",
 ] }
 

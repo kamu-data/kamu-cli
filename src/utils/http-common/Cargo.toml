@@ -31,7 +31,7 @@ http = { version = "1", default-features = false }
 serde = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false }
 tracing = { version = "0.1", default-features = false }
-utoipa = { version = "5", default-features = false, features = [
+utoipa = { version = "6", default-features = false, features = [
 ] }
 
 [dev-dependencies]

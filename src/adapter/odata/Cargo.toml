@@ -43,9 +43,9 @@ dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 http = "1"
 tracing = "0.1"
-utoipa = { version = "5", default-features = false, features = [
+utoipa = { version = "6", default-features = false, features = [
 ] }
-utoipa-axum = { version = "0.2", default-features = false, features = [
+utoipa-axum = { version = "0.3", default-features = false, features = [
 ] }
 
 

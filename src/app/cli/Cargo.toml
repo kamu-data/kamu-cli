@@ -300,7 +300,7 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
 ] }
 url = "2"
 urlencoding = "2"
-utoipa-axum = { version = "0.2", default-features = true, features = [
+utoipa-axum = { version = "0.3", default-features = true, features = [
 ] }
 uuid = { version = "1", default-features = false }
 webbrowser = "1" # For opening URLs in default system browser
