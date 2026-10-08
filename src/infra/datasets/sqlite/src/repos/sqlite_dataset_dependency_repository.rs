@@ -13,7 +13,6 @@ use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use sqlx::{QueryBuilder, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,18 +108,26 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = QueryBuilder::<Sqlite>::new(
+        let downstream_dataset_id_str = downstream_dataset_id.as_did_str().to_string();
+        let upstream_dataset_ids_json = serde_json::to_string(
+            &new_upstream_dataset_ids
+                .iter()
+                .map(|id| id.as_did_str().to_string())
+                .collect::<Vec<_>>(),
+        )
+        .int_err()?;
+
+        let query_result = sqlx::query!(
             r#"
             INSERT INTO dataset_dependencies(downstream_dataset_id, upstream_dataset_id)
+            SELECT $1, value
+            FROM json_each($2)
             "#,
-        );
-
-        query_builder.push_values(new_upstream_dataset_ids, |mut b, upsteam_dataset_id| {
-            b.push_bind(downstream_dataset_id.as_did_str().to_string());
-            b.push_bind(upsteam_dataset_id.as_did_str().to_string());
-        });
-
-        let query_result = query_builder.build().execute(connection_mut).await;
+            downstream_dataset_id_str,
+            upstream_dataset_ids_json,
+        )
+        .execute(connection_mut)
+        .await;
         if let Err(e) = query_result {
             return Err(
                 if let Some(db_err) = e.as_database_error()

@@ -141,6 +141,49 @@ pub async fn test_save_data_blocks_batch(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_save_data_blocks_large_batch(catalog: &Catalog) {
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-large-batch");
+    let dataset_name = odf::DatasetName::new_unchecked("large-batch-ds");
+
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &test_account_name,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
+
+    // 6000 rows of 6 columns exceed SQLite's limit of 32766 bound parameters
+    let blocks = (1..=6000).map(make_add_data_block).collect::<Vec<_>>();
+
+    let repo = catalog.get_one::<dyn DatasetDataBlockRepository>().unwrap();
+    repo.save_data_blocks_batch(&dataset_id, &odf::BlockRef::Head, &blocks)
+        .await
+        .unwrap();
+
+    let saved = repo
+        .get_all_data_blocks(&dataset_id, &odf::BlockRef::Head)
+        .await
+        .unwrap();
+
+    assert_eq!(saved.len(), blocks.len());
+    for (saved, expected) in saved.iter().zip(&blocks) {
+        assert_eq!(saved.sequence_number, expected.sequence_number);
+        assert_eq!(saved.event_kind, expected.event_kind);
+        assert_eq!(saved.block_hash, expected.block_hash);
+        assert_eq!(
+            saved.block_payload.as_ref(),
+            expected.block_payload.as_ref()
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_save_data_blocks_batch_duplicate_sequence_number(catalog: &Catalog) {
     let (test_account_id, test_account_name) = init_test_account(catalog).await;
 

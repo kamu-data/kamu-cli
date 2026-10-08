@@ -10,11 +10,17 @@
 use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    sqlite_datetime_text,
+    sqlite_generate_placeholders_list,
+};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::{QueryBuilder, Sqlite};
+use serde_json::json;
+use sqlx::Sqlite;
 
 use crate::helpers::*;
 
@@ -217,26 +223,38 @@ impl SqliteFlowEventStore {
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
         events: &[FlowEvent],
     ) -> Result<EventID, SaveEventsError> {
-        let mut query_builder = QueryBuilder::<sqlx::Sqlite>::new(
-            r#"
-            INSERT INTO flow_events (flow_id, event_time, event_type, event_payload)
-            "#,
-        );
-
-        query_builder.push_values(events, |mut b, event| {
-            let event_flow_id: i64 = (event.flow_id()).try_into().unwrap();
-            b.push_bind(event_flow_id);
-            b.push_bind(event.event_time());
-            b.push_bind(event.typename());
-            b.push_bind(serde_json::to_value(event).unwrap());
-        });
+        let events_json = serde_json::to_string(
+            &events
+                .iter()
+                .map(|event| {
+                    let event_flow_id: i64 = event.flow_id().try_into().unwrap();
+                    Ok(json!({
+                        "flow_id": event_flow_id,
+                        "event_time": sqlite_datetime_text(&event.event_time()),
+                        "event_type": event.typename(),
+                        "event_payload": serde_json::to_value(event).int_err()?.to_string(),
+                    }))
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        )
+        .int_err()?;
 
         let connection_mut = tr.connection_mut().await?;
-        query_builder
-            .build()
-            .fetch_all(connection_mut)
-            .await
-            .int_err()?;
+        sqlx::query!(
+            r#"
+            INSERT INTO flow_events (flow_id, event_time, event_type, event_payload)
+            SELECT value ->> 'flow_id',
+                   value ->> 'event_time',
+                   value ->> 'event_type',
+                   value ->> 'event_payload'
+            FROM json_each($1)
+            ORDER BY key
+            "#,
+            events_json,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
 
         let connection_mut = tr.connection_mut().await?;
         let actual_last_event_id =

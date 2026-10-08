@@ -40,6 +40,8 @@ cheap-clone = { version = "0.3", default-features = false, features = [
 chrono = { version = "0.4" }
 dill = { version = "0.17", default-features = false }
 futures = "0.3"
+hex = "0.4"
+serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
     "chrono",
     "macros",

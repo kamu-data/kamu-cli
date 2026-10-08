@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{EventModel, TransactionRefT};
+use database_common::{EventModel, TransactionRefT, sqlite_datetime_text};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::{QueryBuilder, Sqlite};
+use serde_json::json;
+use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -153,25 +154,45 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
             return Err(SaveEventsError::concurrent_modification());
         }
 
-        let mut query_builder = QueryBuilder::<Sqlite>::new(
-            r#"
-            INSERT INTO flow_configuration_events (flow_type, scope_data, event_type, event_time, event_payload, prev_event_id)
-            "#,
-        );
-
         let batch_prev_event_id = maybe_prev_stored_event_id.map_or(0, EventID::into_inner);
 
-        query_builder.push_values(events.into_iter().enumerate(), |mut b, (i, event)| {
-            b.push_bind(flow_type);
-            b.push_bind(&scope_json_str);
-            b.push_bind(event.typename());
-            b.push_bind(event.event_time());
-            b.push_bind(serde_json::to_value(event).unwrap());
-            b.push_bind((i == 0).then_some(batch_prev_event_id));
-        });
+        let events_json = serde_json::to_string(
+            &events
+                .into_iter()
+                .enumerate()
+                .map(|(i, event)| {
+                    Ok(json!({
+                        "event_type": event.typename(),
+                        "event_time": sqlite_datetime_text(&event.event_time()),
+                        "event_payload": serde_json::to_value(&event).int_err()?.to_string(),
+                        "prev_event_id": (i == 0).then_some(batch_prev_event_id),
+                    }))
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        )
+        .int_err()?;
 
         let connection_mut = tr.connection_mut().await?;
-        match query_builder.build().execute(connection_mut).await {
+        let insert_result = sqlx::query!(
+            r#"
+            INSERT INTO flow_configuration_events (flow_type, scope_data, event_type, event_time, event_payload, prev_event_id)
+            SELECT $1,
+                   $2,
+                   value ->> 'event_type',
+                   value ->> 'event_time',
+                   value ->> 'event_payload',
+                   value ->> 'prev_event_id'
+            FROM json_each($3)
+            ORDER BY key
+            "#,
+            flow_type,
+            scope_json_str,
+            events_json,
+        )
+        .execute(connection_mut)
+        .await;
+
+        match insert_result {
             Ok(_) => {}
             Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
                 return Err(SaveEventsError::concurrent_modification());

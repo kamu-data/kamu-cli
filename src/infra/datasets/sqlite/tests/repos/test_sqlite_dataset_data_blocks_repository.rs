@@ -35,6 +35,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = dataset_data_blocks_repo::test_save_data_blocks_large_batch,
+    harness = SqliteDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = dataset_data_blocks_repo::test_save_data_blocks_batch_duplicate_sequence_number,
     harness = SqliteDatasetDataBlockRepositoryHarness
 );

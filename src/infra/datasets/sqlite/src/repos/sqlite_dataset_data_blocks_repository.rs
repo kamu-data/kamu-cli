@@ -16,6 +16,8 @@ use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
 
+use super::helpers::dataset_blocks_json;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
@@ -265,52 +267,54 @@ impl DatasetDataBlockRepository for SqliteDatasetDataBlockRepository {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
-        let mut builder = sqlx::QueryBuilder::new(
-            "INSERT INTO dataset_data_blocks (
-                dataset_id,
-                block_ref_name,
-                event_type,
-                sequence_number,
-                block_hash_bin,
-                block_payload
-            ) ",
-        );
+        let blocks_json = dataset_blocks_json(blocks)?;
+        let dataset_id_str = dataset_id.to_string();
+        let block_ref_str = block_ref.as_str();
 
-        builder.push_values(blocks, |mut b, block| {
-            b.push_bind(dataset_id.to_string())
-                .push_bind(block_ref.as_str())
-                .push_bind(block.event_kind.to_string())
-                .push_bind(i64::try_from(block.sequence_number).unwrap())
-                .push_bind(block.block_hash.digest())
-                .push_bind(block.block_payload.as_ref());
-        });
-
-        builder
-            .build()
-            .execute(conn)
-            .await
-            .map_err(|e| match e.as_database_error() {
-                Some(db_err) if db_err.is_unique_violation() => {
-                    tracing::warn!(
-                        "Unique constraint violation while batch inserting key blocks: {}",
-                        db_err.message()
-                    );
-                    DatasetDataBlockSaveError::DuplicateSequenceNumber(
-                        // We can't know which block caused it in batch insert
-                        blocks.iter().map(|b| b.sequence_number).collect(),
-                    )
-                }
-                Some(db_err) if db_err.is_foreign_key_violation() => {
-                    tracing::warn!(
-                        "Foreign key constraint failed while batch inserting key blocks: {}",
-                        db_err.message()
-                    );
-                    DatasetDataBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
-                        dataset_id: dataset_id.clone(),
-                    })
-                }
-                _ => e.int_err().into(),
-            })?;
+        sqlx::query!(
+            r#"
+            INSERT INTO dataset_data_blocks (dataset_id,
+                                 block_ref_name,
+                                 event_type,
+                                 sequence_number,
+                                 block_hash_bin,
+                                 block_payload)
+            SELECT $1,
+                   $2,
+                   value ->> 'event_type',
+                   value ->> 'sequence_number',
+                   unhex(value ->> 'block_hash_bin'),
+                   unhex(value ->> 'block_payload')
+            FROM json_each($3)
+            "#,
+            dataset_id_str,
+            block_ref_str,
+            blocks_json,
+        )
+        .execute(conn)
+        .await
+        .map_err(|e| match e.as_database_error() {
+            Some(db_err) if db_err.is_unique_violation() => {
+                tracing::warn!(
+                    "Unique constraint violation while batch inserting data blocks: {}",
+                    db_err.message()
+                );
+                DatasetDataBlockSaveError::DuplicateSequenceNumber(
+                    // We can't know which block caused it in batch insert
+                    blocks.iter().map(|b| b.sequence_number).collect(),
+                )
+            }
+            Some(db_err) if db_err.is_foreign_key_violation() => {
+                tracing::warn!(
+                    "Foreign key constraint failed while batch inserting data blocks: {}",
+                    db_err.message()
+                );
+                DatasetDataBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
+                    dataset_id: dataset_id.clone(),
+                })
+            }
+            _ => e.int_err().into(),
+        })?;
 
         Ok(())
     }

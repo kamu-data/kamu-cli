@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                DELETE\n                FROM dataset_entries\n                WHERE dataset_id IN (SELECT value FROM json_each($1))\n                RETURNING dataset_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "dataset_id",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c0e551cad3b31fa48cd2fc7e922e451b30808cebfbc9bc2542623e8e4cbadb81"
+}

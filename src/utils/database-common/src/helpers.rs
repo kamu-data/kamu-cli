@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Display;
 use std::num::NonZeroUsize;
+
+use chrono::{DateTime, SecondsFormat, TimeZone};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SQLite
@@ -83,6 +86,38 @@ fn test_sqlite_generate_placeholders_tuple_list_2() {
         f(3, NonZeroUsize::new(1).unwrap())
     );
     pretty_assertions::assert_eq!("($3,$4),($5,$6)", f(2, NonZeroUsize::new(3).unwrap()));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Formats a timestamp as the exact text `sqlx` stores for a bound
+/// `DateTime` in `SQLite`.
+///
+/// Bulk inserts that pass rows as one JSON parameter (`json_each($1)`) must
+/// format timestamps with this, not with `serde`: `serde` writes `Z` where
+/// `sqlx` writes `+00:00`, and text comparisons on the column would break.
+pub fn sqlite_datetime_text<Tz>(dt: &DateTime<Tz>) -> String
+where
+    Tz: TimeZone,
+    Tz::Offset: Display,
+{
+    dt.to_rfc3339_opts(SecondsFormat::AutoSi, false)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_sqlite_datetime_text() {
+    use chrono::{TimeDelta, Utc};
+
+    let dt = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
+    pretty_assertions::assert_eq!("2024-01-02T03:04:05+00:00", sqlite_datetime_text(&dt));
+
+    let dt = dt + TimeDelta::microseconds(123_456);
+    pretty_assertions::assert_eq!(
+        "2024-01-02T03:04:05.123456+00:00",
+        sqlite_datetime_text(&dt)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

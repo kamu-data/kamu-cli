@@ -10,11 +10,17 @@
 use std::num::NonZeroUsize;
 
 use chrono::Utc;
-use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    sqlite_datetime_text,
+    sqlite_generate_placeholders_list,
+};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
-use sqlx::{FromRow, QueryBuilder, Sqlite};
+use serde_json::json;
+use sqlx::Sqlite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -110,34 +116,40 @@ impl SqliteTaskEventStore {
     ) -> Result<EventID, SaveEventsError> {
         let connection_mut = tr.connection_mut().await?;
 
-        #[derive(FromRow)]
-        struct ResultRow {
-            event_id: i64,
-        }
+        let events_json = serde_json::to_string(
+            &events
+                .iter()
+                .map(|event| {
+                    let event_task_id: i64 = event.task_id().try_into().unwrap();
+                    Ok(json!({
+                        "task_id": event_task_id,
+                        "event_time": sqlite_datetime_text(&event.event_time()),
+                        "event_type": event.typename(),
+                        "event_payload": serde_json::to_value(event).int_err()?.to_string(),
+                    }))
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        )
+        .int_err()?;
 
-        let mut query_builder = QueryBuilder::<sqlx::Sqlite>::new(
+        let event_ids = sqlx::query_scalar!(
             r#"
             INSERT INTO task_events (task_id, event_time, event_type, event_payload)
+            SELECT value ->> 'task_id',
+                   value ->> 'event_time',
+                   value ->> 'event_type',
+                   value ->> 'event_payload'
+            FROM json_each($1)
+            ORDER BY key
+            RETURNING event_id
             "#,
-        );
+            events_json,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
 
-        query_builder.push_values(events, |mut b, event| {
-            let event_task_id: i64 = event.task_id().try_into().unwrap();
-            b.push_bind(event_task_id);
-            b.push_bind(event.event_time());
-            b.push_bind(event.typename());
-            b.push_bind(serde_json::to_value(event).unwrap());
-        });
-
-        query_builder.push("RETURNING event_id");
-
-        let rows = query_builder
-            .build_query_as::<ResultRow>()
-            .fetch_all(connection_mut)
-            .await
-            .int_err()?;
-
-        let last_event_id = rows.last().unwrap().event_id;
+        let last_event_id = event_ids.into_iter().max().unwrap();
         Ok(EventID::new(last_event_id))
     }
 }

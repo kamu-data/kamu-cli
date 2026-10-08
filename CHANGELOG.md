@@ -14,8 +14,12 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Changed
+- SQLite bulk writes (ReBAC relations, dataset blocks and dependencies, flow and task events) are checked at
+  compile time
 ### Fixed
 - Flaky GraphQL flow process card ordering test
+- SQLite: indexing more than ~5,400 new blocks of a dataset at once failed with "too many SQL variables"
 
 ## [0.269.0] - 2026-10-06
 ### Added

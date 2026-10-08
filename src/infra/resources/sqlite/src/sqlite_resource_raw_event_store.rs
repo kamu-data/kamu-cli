@@ -56,7 +56,7 @@ struct EventRow {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SqliteResourceRawEventStore {
-    // Sqlite has a limit of 999 parameters per query
+    // Keeps each insert well below SQLite's limit of 32766 bound parameters
     const MAX_EVENTS_PER_INSERT: usize = 100;
 
     async fn save_event_rows(

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO dataset_key_blocks (dataset_id,\n                                 block_ref_name,\n                                 event_type,\n                                 sequence_number,\n                                 block_hash_bin,\n                                 block_payload)\n            SELECT $1,\n                   $2,\n                   value ->> 'event_type',\n                   value ->> 'sequence_number',\n                   unhex(value ->> 'block_hash_bin'),\n                   unhex(value ->> 'block_payload')\n            FROM json_each($3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "818864677da126b24e30f29d9c2a43ffb95a980f1a147b97a1e0788a86aa440e"
+}

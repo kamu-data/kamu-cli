@@ -99,8 +99,11 @@ def format_manifest(path: Path) -> str | None:
 def nudges(rel: str, added: list[str]) -> list[str]:
     out = []
     text = "\n".join(added)
-    if rel.startswith("migrations/") or (re.search(r"/(postgres|sqlite|cache-postgres|cache-sqlite)/", rel) and re.search(r"query(_as|_scalar)?!", text)):
+    crate = re.match(r"(.*?/(?:postgres|sqlite|cache-postgres|cache-sqlite))/", rel)
+    if rel.startswith("migrations/"):
         out.append("SQL changed: run `make sqlx-prepare` and keep the regenerated `.sqlx/` files.")
+    elif crate and re.search(r"query(_as|_scalar)?!", text):
+        out.append(f"SQL changed: run `(cd {crate.group(1)} && cargo sqlx prepare)` and keep the regenerated `.sqlx/` files.")
     if rel.startswith("src/adapter/graphql/src/"):
         out.append("GraphQL changed: run `make resources-graphql-schema` and review the `resources/schema.gql` diff.")
     m = re.match(r"src/e2e/app/cli/(postgres|sqlite)/", rel)

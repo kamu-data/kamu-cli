@@ -53,11 +53,35 @@ let ids: Vec<uuid::Uuid> = queries.iter().map(|q| *q.id.as_ref()).collect();
 let kinds: Vec<String> = queries.iter().map(|q| q.kind.clone()).collect();
 ```
 
-### SQLite and dynamic QueryBuilder
+### SQLite bulk writes: one JSON parameter
 
-SQLite does not have `UNNEST` or a type-safe array unpacking equivalent. Using `json_each()` is fragile because SQLite stores UUIDs as blobs while `json_each` returns text, causing type mismatch in comparisons. For multi-key filtering in SQLite, keep the dynamic `QueryBuilder` with `OR` chains — it is the appropriate approach.
+SQLite has no `UNNEST`. For multi-row `INSERT`/`DELETE` over string and integer columns, pass the
+rows as one JSON array and unpack it with `json_each($1)` inside `sqlx::query!`, so the statement
+is checked at compile time and has no bound-parameter limit:
 
-Dynamic `QueryBuilder` is also necessary in SQLite for variable-row bulk `INSERT ... VALUES` (e.g. chunked inserts). Do not try to eliminate this usage.
+```sql
+INSERT INTO flow_events (flow_id, event_time, event_type, event_payload)
+SELECT value ->> 'flow_id', value ->> 'event_time', value ->> 'event_type', value ->> 'event_payload'
+FROM json_each($1)
+ORDER BY key
+```
+
+- Name the JSON keys after the columns; `query!` does not check them, NOT NULL constraints and
+  the repository tests do.
+- `ORDER BY key` when IDs are assigned on insert, so they follow the batch order.
+- Timestamps: format with `database_common::sqlite_datetime_text`, the text `sqlx` itself stores.
+- JSON payload columns: embed the serialized text as a string and read it with `->>`; a nested
+  JSON value is re-rendered by SQLite.
+- Blob columns: hex-encode and wrap in `unhex(...)`.
+- UUID columns are excluded (see "Rejected approaches"): keep the dynamic `QueryBuilder` there.
+
+Multi-key reads (`WHERE ... IN (...)` lists, `OR` chains) still use the dynamic `QueryBuilder` or
+placeholder helpers; with UUID keys they must.
+
+The JSON form is slower than `QueryBuilder`: at 1000+ rows about 1.2–1.4× for text rows and 3×
+with blob payloads; at a few rows the gap is tens to hundreds of microseconds (up to 2× with
+blobs). SQLite serves single-tenant CLI and edge deployments where batches stay small, so
+compile-time checking wins there.
 
 ## Concurrent Modifications in Event Stores
 
@@ -108,11 +132,14 @@ make sqlx-local-setup
 
 This starts local DB containers, applies migrations, and writes crate-local `.env` files with `DATABASE_URL` and SQLx offline disabled.
 
-After SQL or schema changes:
+After SQL changes, prepare only the crates whose queries changed:
 
 ```sh
-make sqlx-prepare
+(cd src/infra/<domain>/sqlite && cargo sqlx prepare)
 ```
+
+After schema changes, or when unsure which crates are affected, prepare all of them with
+`make sqlx-prepare` (or `make sqlx-prepare-postgres` / `make sqlx-prepare-sqlite`).
 
 Commit updated `.sqlx` offline data when it changes.
 
@@ -145,7 +172,7 @@ Before committing the migration run `make resources-db-schema` to update the fin
 ## Validation
 
 - `make lint` includes SQLx cache validation through `make lint-sqlx`.
-- If modifying SQLx queries, run `make sqlx-prepare` before final validation.
+- If modifying SQLx queries, prepare the affected crates (see "Local SQLx Setup") before final validation.
 - If sandboxing blocks DB access, rerun the relevant command with the needed permissions instead of changing the workflow.
 
 ## Rejected approaches
@@ -155,7 +182,8 @@ Do not re-propose these without new evidence.
 | Approach | Why it was rejected |
 |---|---|
 | Dynamic `OR` chains via `QueryBuilder` in Postgres | Not checked at compile time by `query!`; the static `UNNEST` form is. |
-| `json_each()` to emulate `UNNEST` in SQLite | SQLite stores UUIDs as blobs, `json_each` yields text; comparisons silently mismatch. |
+| `json_each()` over UUID columns in SQLite | `sqlx` binds `uuid::Uuid` as a blob, `json_each` yields text; comparisons silently mismatch. |
+| Per-row `query!` in a loop for SQLite bulk writes | Measured 4–5× slower than one multi-row statement: each `execute` is a round-trip to the SQLite worker thread. |
 | Down (reversible) migrations | Migrations are forward-only (AGENTS.md). |
 | Forcing `SQLX_OFFLINE` from the shell | Checks queries against a stale cache and hides schema drift (AGENTS.md, "Hard rules"). |
 | Advisory locks (`pg_advisory_xact_lock`) to serialize writers of an aggregate | Not used in this system; concurrency detection is optimistic only. |

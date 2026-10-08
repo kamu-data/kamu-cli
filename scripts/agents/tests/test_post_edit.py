@@ -44,7 +44,8 @@ class AddedTextTest(unittest.TestCase):
 
     def test_nudges_name_the_follow_up_command(self):
         self.assertIn("sqlx-prepare", nudges("migrations/postgres/x.sql", ["CREATE TABLE x ();"])[0])
-        self.assertIn("sqlx-prepare", nudges("src/infra/accounts/postgres/src/r.rs", ["sqlx::query!(\"x\")"])[0])
+        self.assertIn("(cd src/infra/accounts/postgres && cargo sqlx prepare)",
+                      nudges("src/infra/accounts/postgres/src/r.rs", ["sqlx::query!(\"x\")"])[0])
         self.assertEqual(nudges("src/infra/accounts/postgres/src/r.rs", ["let a = 1;"]), [])
         self.assertIn("schema.gql", nudges("src/adapter/graphql/src/root.rs", ["x"])[0])
         self.assertIn("src/e2e/app/cli/sqlite/", nudges("src/e2e/app/cli/postgres/tests/x.rs", ["x"])[0])

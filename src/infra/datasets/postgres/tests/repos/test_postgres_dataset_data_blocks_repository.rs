@@ -35,6 +35,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = dataset_data_blocks_repo::test_save_data_blocks_large_batch,
+    harness = PostgresDatasetDataBlockRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = dataset_data_blocks_repo::test_save_data_blocks_batch_duplicate_sequence_number,
     harness = PostgresDatasetDataBlockRepositoryHarness
 );

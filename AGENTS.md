@@ -72,7 +72,7 @@ problem is cost.
 |---|---|
 | Any `.rs` file | `cargo fmt` (a hook also runs `rustfmt` per edited file), then `make clippy` |
 | Any `Cargo.toml` | `make fmt` (`cargo fmt`, `cargo sort`, `taplo fmt`; a hook also sorts and formats each edited manifest) |
-| SQLx queries or `migrations/` | `make sqlx-prepare` and keep the regenerated `.sqlx/` files |
+| SQLx queries or `migrations/` | `cargo sqlx prepare` in each changed DB crate (`make sqlx-prepare` after migrations) and keep the regenerated `.sqlx/` files |
 | GraphQL types or resolvers | `make resources-graphql-schema`; review the `resources/schema.gql` diff |
 | CLI args, config, HTTP API | `make resources`; review the `resources/` diff |
 | `scripts/agents/`, `.claude/`, `.codex/`, skills, `AGENTS.md`, `CLAUDE.md`, `docs/internal/` | `make lint-harness` |

@@ -498,33 +498,30 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
             let connection_mut = tr.connection_mut().await?;
 
-            let mut query_builder = sqlx::QueryBuilder::<_>::new(
+            let dataset_ids_json = serde_json::to_string(
+                &dataset_ids
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>(),
+            )
+            .int_err()?;
+
+            let deleted_dataset_ids = sqlx::query_scalar!(
                 r#"
                 DELETE
                 FROM dataset_entries
-                WHERE dataset_id IN (
+                WHERE dataset_id IN (SELECT value FROM json_each($1))
+                RETURNING dataset_id
                 "#,
-            );
-            let mut separated = query_builder.separated(", ");
-            for dataset_id in dataset_ids {
-                separated.push_bind(dataset_id.to_string());
-            }
-            separated.push_unseparated(") RETURNING dataset_id");
+                dataset_ids_json,
+            )
+            .fetch_all(&mut *connection_mut)
+            .await
+            .int_err()?;
 
-            let deleted_dataset_id_rows = query_builder
-                .build()
-                .fetch_all(&mut *connection_mut)
-                .await
-                .int_err()?;
-
-            deleted_dataset_id_rows
-                .into_iter()
-                .map(|row| {
-                    use sqlx::Row;
-
-                    let dataset_id = row.try_get::<String, _>("dataset_id").int_err()?;
-                    odf::DatasetID::from_did_str(&dataset_id).int_err()
-                })
+            deleted_dataset_ids
+                .iter()
+                .map(|dataset_id| odf::DatasetID::from_did_str(dataset_id).int_err())
                 .collect::<Result<Vec<_>, _>>()?
         };
 
