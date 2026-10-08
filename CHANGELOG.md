@@ -24,6 +24,10 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when the account's
   storage is unlimited
 ### Fixed
+- Running an older kamu in a workspace whose database was migrated by a newer version no longer crashes with
+  "Migration failed: VersionMissing"; it reports the schema versions and asks to upgrade kamu
+- A workspace with a newer layout version than the running kamu now asks to upgrade kamu, instead of suggesting
+  `kamu system upgrade-workspace`
 - Flaky GraphQL flow process card ordering test
 - SQLite: indexing more than ~5,400 new blocks of a dataset at once failed with "too many SQL variables"
 - SQLite: workspaces created before v0.267.0 failed to start with "One or more predefined accounts failed to

@@ -280,7 +280,9 @@ pub fn build_db_connection_settings(raw_db_config: &DatabaseConfig) -> DatabaseC
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalog, InternalError> {
+pub async fn connect_database_initially(
+    base_catalog: &Catalog,
+) -> Result<Catalog, DatabaseInitError> {
     let db_connection_settings = base_catalog
         .get_one::<DatabaseConnectionSettings>()
         .unwrap();
@@ -291,16 +293,14 @@ pub async fn connect_database_initially(base_catalog: &Catalog) -> Result<Catalo
     let db_credentials = db_password_provider.provide_credentials().await?;
 
     match db_connection_settings.provider {
-        DatabaseProvider::Postgres => PostgresPlugin::catalog_with_connected_pool(
+        DatabaseProvider::Postgres => Ok(PostgresPlugin::catalog_with_connected_pool(
             base_catalog,
             &db_connection_settings,
             db_credentials.as_ref(),
         )
-        .int_err(),
+        .int_err()?),
         DatabaseProvider::Sqlite => {
-            SqlitePlugin::catalog_with_connected_pool(base_catalog, &db_connection_settings)
-                .await
-                .int_err()
+            SqlitePlugin::catalog_with_connected_pool(base_catalog, &db_connection_settings).await
         }
     }
 }

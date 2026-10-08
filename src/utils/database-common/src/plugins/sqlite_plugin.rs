@@ -8,8 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::SqlitePool;
-use sqlx::migrate::Migrator;
+use sqlx::migrate::{MigrateError, Migrator};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
 use crate::*;
@@ -37,21 +38,57 @@ impl SqlitePlugin {
     pub async fn catalog_with_connected_pool(
         base_catalog: &Catalog,
         db_connection_settings: &DatabaseConnectionSettings,
-    ) -> Result<Catalog, DatabaseError> {
+    ) -> Result<Catalog, DatabaseInitError> {
         let sqlite_pool = Self::open_sqlite_pool(db_connection_settings);
 
-        SQLITE_MIGRATOR
-            .run(&sqlite_pool)
-            .await
-            .expect("Migration failed");
+        Self::run_migrations(&sqlite_pool).await?;
 
         // Do not accumulate changes related to migrations and save them to the database
         // immediately
-        Self::force_wal_checkpoints_save(&sqlite_pool).await?;
+        Self::force_wal_checkpoints_save(&sqlite_pool)
+            .await
+            .int_err()?;
 
         Ok(CatalogBuilder::new_chained(base_catalog)
             .add_value(sqlite_pool)
             .build())
+    }
+
+    async fn run_migrations(sqlite_pool: &SqlitePool) -> Result<(), DatabaseInitError> {
+        let Err(err) = SQLITE_MIGRATOR.run(sqlite_pool).await else {
+            return Ok(());
+        };
+
+        // sqlx validates applied migrations before applying any, so a schema written by
+        // a newer build is reported here and left untouched
+        let latest_known_version = Self::latest_known_migration_version();
+        if let MigrateError::VersionMissing(missing_version) = err
+            && missing_version > latest_known_version
+        {
+            // A runtime query: `_sqlx_migrations` belongs to sqlx, and this crate has no
+            // compile-time checked schema
+            let latest_applied_version: i64 =
+                sqlx::query_scalar("SELECT MAX(version) FROM _sqlx_migrations")
+                    .fetch_one(sqlite_pool)
+                    .await
+                    .int_err()?;
+
+            return Err(DatabaseSchemaTooNewError {
+                latest_applied_version,
+                latest_known_version,
+            }
+            .into());
+        }
+
+        Err(err.int_err().into())
+    }
+
+    fn latest_known_migration_version() -> i64 {
+        SQLITE_MIGRATOR
+            .iter()
+            .map(|migration| migration.version)
+            .max()
+            .unwrap_or_default()
     }
 
     #[tracing::instrument(level = "info", skip_all)]

@@ -11,6 +11,7 @@ use std::backtrace::Backtrace;
 use std::fmt::Display;
 use std::path::PathBuf;
 
+use database_common::DatabaseInitError;
 use graphql_http::GraphqlHttpRequestError;
 use internal_error::{BoxedError, InternalError};
 use kamu::domain::engine::normalize_logs;
@@ -177,6 +178,18 @@ impl From<MultiTenantRefUnexpectedError> for CLIError {
 impl From<WriterError> for CLIError {
     fn from(e: WriterError) -> Self {
         Self::failure(e)
+    }
+}
+
+impl From<DatabaseInitError> for CLIError {
+    fn from(v: DatabaseInitError) -> Self {
+        match v {
+            DatabaseInitError::SchemaTooNew(e) => Self::usage_error_from(WorkspaceDatabaseTooNew {
+                schema_version: e.latest_applied_version,
+                supported_version: e.latest_known_version,
+            }),
+            DatabaseInitError::Internal(e) => Self::critical(e),
+        }
     }
 }
 
@@ -484,6 +497,16 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
     "Workspace needs to be upgraded before continuing - please run `kamu system upgrade-workspace`"
 )]
 pub struct WorkspaceUpgradeRequired;
+
+#[derive(Debug, Error)]
+#[error(
+    "Workspace database was created by a newer version of kamu (schema version {schema_version}, \
+     this version supports up to {supported_version}) - please upgrade kamu to the latest version"
+)]
+pub struct WorkspaceDatabaseTooNew {
+    pub schema_version: i64,
+    pub supported_version: i64,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
