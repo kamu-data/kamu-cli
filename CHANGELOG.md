@@ -28,6 +28,10 @@ Recommendation: for ease of reading, use the following format:
   "Migration failed: VersionMissing"; it reports the schema versions and asks to upgrade kamu
 - A workspace with a newer layout version than the running kamu now asks to upgrade kamu, instead of suggesting
   `kamu system upgrade-workspace`
+- API server: an internal server error caused by a panic now reaches browser clients as a 500 response
+  instead of a failed request without details; the Web UI server now handles panics the same way
+- GraphQL: `CollectionProjection.entries(maxDepth)` above 64 returns an error instead of crashing the
+  request; the argument description now explains that depth is counted from the root
 - Flaky GraphQL flow process card ordering test
 - SQLite: indexing more than ~5,400 new blocks of a dataset at once failed with "too many SQL variables"
 - SQLite: workspaces created before v0.267.0 failed to start with "One or more predefined accounts failed to

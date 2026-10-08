@@ -715,6 +715,65 @@ async fn test_collection_path_prefix_and_max_depth() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_collection_max_depth_limit() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .build()
+        .await;
+
+    let linked = harness.create_root_dataset("foo").await.dataset_handle.id;
+    let did = harness.create_collection("x", None).await;
+
+    harness
+        .update_entries(
+            &did,
+            json!([
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/a/b",
+                            "ref": linked,
+                        }
+                    }
+                },
+            ]),
+        )
+        .await;
+
+    assert_eq!(
+        harness
+            .list_entries_ext(&did, None, Some(COLLECTION_ENTRIES_MAX_DEPTH_LIMIT))
+            .await,
+        json!([
+            {
+                "path": "/a/b",
+                "ref": linked,
+                "extraData": {},
+            }
+        ])
+    );
+
+    assert_eq!(
+        harness
+            .list_entries_ext_error(&did, None, Some(COLLECTION_ENTRIES_MAX_DEPTH_LIMIT + 1))
+            .await,
+        "Max depth 65 exceeds the limit of 64"
+    );
+
+    assert_eq!(
+        harness
+            .list_entries_ext_error(&did, None, Some(usize::MAX))
+            .await,
+        "Invalid value for argument \"maxDepth\", expected type \"Int\""
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_collection_entry_search() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -1187,9 +1246,38 @@ impl GraphQLDatasetsHarness {
         max_depth: Option<usize>,
     ) -> serde_json::Value {
         let res = self
-            .execute_authorized_query(
-                async_graphql::Request::new(indoc!(
-                    r#"
+            .list_entries_ext_response(did, path_prefix, max_depth)
+            .await;
+
+        assert!(res.is_ok(), "{res:#?}");
+        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["latest"]["entries"]
+            ["nodes"]
+            .clone()
+    }
+
+    pub async fn list_entries_ext_error(
+        &self,
+        did: &odf::DatasetID,
+        path_prefix: Option<&str>,
+        max_depth: Option<usize>,
+    ) -> String {
+        let res = self
+            .list_entries_ext_response(did, path_prefix, max_depth)
+            .await;
+
+        assert_eq!(res.errors.len(), 1, "{res:#?}");
+        res.errors[0].message.clone()
+    }
+
+    async fn list_entries_ext_response(
+        &self,
+        did: &odf::DatasetID,
+        path_prefix: Option<&str>,
+        max_depth: Option<usize>,
+    ) -> async_graphql::Response {
+        self.execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
                     query ($datasetId: DatasetID!, $pathPrefix: String, $maxDepth: Int) {
                         datasets {
                             byId(datasetId: $datasetId) {
@@ -1208,19 +1296,14 @@ impl GraphQLDatasetsHarness {
                         }
                     }
                     "#
-                ))
-                .variables(async_graphql::Variables::from_json(json!({
-                    "datasetId": did,
-                    "pathPrefix": path_prefix.unwrap_or(""),
-                    "maxDepth": max_depth,
-                }))),
-            )
-            .await;
-
-        assert!(res.is_ok(), "{res:#?}");
-        res.data.into_json().unwrap()["datasets"]["byId"]["asCollection"]["latest"]["entries"]
-            ["nodes"]
-            .clone()
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": did,
+                "pathPrefix": path_prefix.unwrap_or(""),
+                "maxDepth": max_depth,
+            }))),
+        )
+        .await
     }
 
     pub fn add_entry_request(

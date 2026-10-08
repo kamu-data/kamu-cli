@@ -13,10 +13,12 @@ use database_common::PaginationOpts;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
+    COLLECTION_ENTRIES_MAX_DEPTH_LIMIT,
     CollectionEntry,
     CollectionEntryListing,
     CollectionPath,
     ExtraDataFieldsFilter,
+    MaxDepthTooLargeError,
     ReadCheckedDataset,
     ViewCollectionEntriesError,
     ViewCollectionEntriesUseCase,
@@ -51,6 +53,16 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
         pagination: Option<PaginationOpts>,
     ) -> Result<CollectionEntryListing, ViewCollectionEntriesError> {
         use datafusion::logical_expr::{col, lit};
+
+        if let Some(max_depth) = max_depth
+            && max_depth > COLLECTION_ENTRIES_MAX_DEPTH_LIMIT
+        {
+            return Err(MaxDepthTooLargeError {
+                max_depth,
+                limit: COLLECTION_ENTRIES_MAX_DEPTH_LIMIT,
+            }
+            .into());
+        }
 
         let df = self
             .query_svc
@@ -103,6 +115,8 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
         // Filter by max depth
         // TODO: PERF: This implementation is quite inefficient.
         let df = if let Some(max_depth) = max_depth {
+            // `substr_index` keeps everything before the N-th `/`, and paths start with `/`
+            let path_segments_to_keep = i64::try_from(max_depth + 1).int_err()?;
             let sort_expr = col("path").sort(true, false);
 
             let aggr_exprs = df
@@ -124,7 +138,7 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
                     datafusion::functions::unicode::substr_index().call(vec![
                         col("path"),
                         lit("/"),
-                        lit(i64::try_from(max_depth + 1).unwrap()),
+                        lit(path_segments_to_keep),
                     ]),
                 )
                 .int_err()?;

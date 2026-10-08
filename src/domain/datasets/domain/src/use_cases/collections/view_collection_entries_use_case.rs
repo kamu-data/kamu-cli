@@ -15,6 +15,11 @@ use crate::{CollectionEntry, CollectionPath, ReadCheckedDataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Upper bound for the `max_depth` argument of [`ViewCollectionEntriesUseCase`]
+pub const COLLECTION_ENTRIES_MAX_DEPTH_LIMIT: usize = 64;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 pub trait ViewCollectionEntriesUseCase: Send + Sync {
     async fn execute(
@@ -74,6 +79,9 @@ pub enum ViewCollectionEntriesError {
     UnknownExtraDataFieldFilterNames(#[from] UnknownExtraDataFieldFilterNamesError),
 
     #[error(transparent)]
+    MaxDepthTooLarge(#[from] MaxDepthTooLargeError),
+
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -84,6 +92,13 @@ pub enum ViewCollectionEntriesError {
 )]
 pub struct UnknownExtraDataFieldFilterNamesError {
     pub field_names: Vec<String>,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Max depth {max_depth} exceeds the limit of {limit}")]
+pub struct MaxDepthTooLargeError {
+    pub max_depth: usize,
+    pub limit: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
