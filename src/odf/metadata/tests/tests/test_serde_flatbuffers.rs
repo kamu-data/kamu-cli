@@ -423,7 +423,7 @@ fn test_serializer_stability() {
             .write_manifest(&wrap_into_block(event))
             .unwrap();
 
-        let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+        let hash_actual = hex::encode(sha3::Sha3_256::digest(&buffer));
 
         assert_eq!(hash_actual, hash_expected, "Case {i}");
     }
@@ -461,7 +461,7 @@ fn serde_set_data_schema() {
 
     assert_eq!(expected_block, actual_block);
 
-    let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+    let hash_actual = hex::encode(sha3::Sha3_256::digest(&buffer));
     let hash_expected = "80865248519d55fa04598e24ba42884728efe70956e640dca4df5ec8043c69ca";
 
     assert_eq!(hash_actual, hash_expected);
@@ -505,7 +505,7 @@ fn serde_set_data_schema_legacy() {
 
     assert_eq!(expected_block, actual_block);
 
-    let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+    let hash_actual = hex::encode(sha3::Sha3_256::digest(&buffer));
     let hash_expected = "a7e79d088ca7bac689f12d71ae64b93e7bab62a7db2fec83ea89e9bf90dd89ed";
 
     assert_eq!(hash_actual, hash_expected);

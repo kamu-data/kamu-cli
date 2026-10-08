@@ -41,7 +41,7 @@ futures = "0.3"
 http = { version = "1", default-features = false }
 like = { version = "0.3", default-features = false }
 prost = { version = "0.14", default-features = false }
-rand = { version = "0.9", default-features = false }
+rand = { version = "0.10", default-features = false }
 tokio = { version = "1", default-features = false, features = [
 ] }
 tonic = { version = "0.14", default-features = false }

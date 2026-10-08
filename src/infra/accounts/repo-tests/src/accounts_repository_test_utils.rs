@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use argon2::Argon2;
+use argon2::{Argon2, PasswordHash, PasswordHasher};
 use chrono::{SubsecRound, Utc};
 use email_utils::Email;
 use kamu_accounts::{Account, AccountType};
-use password_hash::rand_core::OsRng;
-use password_hash::{PasswordHash, PasswordHasher, SaltString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,15 +36,9 @@ pub(crate) fn make_test_account(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn generate_salt() -> SaltString {
-    SaltString::generate(&mut OsRng)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn make_password_hash<'a>(raw_password: &str, salt: &'a SaltString) -> PasswordHash<'a> {
+pub(crate) fn make_password_hash(raw_password: &str) -> PasswordHash {
     let argon2 = Argon2::default();
-    argon2.hash_password(raw_password.as_bytes(), salt).unwrap()
+    argon2.hash_password(raw_password.as_bytes()).unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

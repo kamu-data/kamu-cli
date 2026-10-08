@@ -29,7 +29,7 @@ odf-storage = { workspace = true }
 
 async-trait = "0.1"
 bytes = { version = "1", default-features = false }
-sha3 = "0.10"
+sha3 = "0.12"
 tracing = "0.1"
 url = { version = "2", default-features = false }
 

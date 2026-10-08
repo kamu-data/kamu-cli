@@ -26,7 +26,7 @@ pub(crate) const PROTOCOL_TRANSFER_SUBDIRS: [&str; 4] = ["blocks", "checkpoints"
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_random_file(path: PathBuf) -> OwnedFile {
-    use rand::RngCore;
+    use rand::Rng;
 
     let mut data = [0u8; 32];
     rand::rng().fill_bytes(&mut data);
@@ -39,7 +39,7 @@ fn create_random_file(path: PathBuf) -> OwnedFile {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn create_random_parquet_file(path: PathBuf, offset_interval: &OffsetInterval) -> OwnedFile {
-    use rand::RngCore;
+    use rand::Rng;
 
     let schema = Arc::new(Schema::new(vec![
         Field::new("offset", DataType::UInt64, false),

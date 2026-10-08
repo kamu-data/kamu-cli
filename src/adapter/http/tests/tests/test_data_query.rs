@@ -571,8 +571,7 @@ async fn test_data_verify_handler() {
                 "ok": false,
                 "error": {
                     "kind": "InvalidRequest::BadSignature",
-                    "message": "The commitment is invalid and cannot be disputed: \
-                                Verification equation was not satisfied",
+                    "message": "The commitment is invalid and cannot be disputed: signature error",
                 }
             }),
             res.json::<serde_json::Value>().await.unwrap()

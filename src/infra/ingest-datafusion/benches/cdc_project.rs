@@ -13,7 +13,7 @@ use std::sync::Arc;
 use criterion::{Criterion, criterion_group, criterion_main};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 async fn setup(tempdir: &Path, num_rows: usize) -> String {
     use datafusion::arrow::array;

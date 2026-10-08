@@ -74,7 +74,7 @@ criterion = { version = "0.8", features = [
 ] }
 indoc = "2"
 pretty_assertions = "1"
-rand = "0.9"
+rand = "0.10"
 tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = [

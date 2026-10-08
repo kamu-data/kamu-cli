@@ -162,9 +162,7 @@ async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyRespon
     let signature = request.proof.proof_value;
     if let Err(err) = did.verify(&query::to_canonical_json(&request.commitment), &signature) {
         return Ok(VerifyResponse::from(InvalidRequestBadSignature::new(
-            &err.source()
-                .map(std::string::ToString::to_string)
-                .unwrap_or_default(),
+            &err.to_string(),
         )));
     }
 

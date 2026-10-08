@@ -29,8 +29,7 @@
 //! implement JWE encryption, and this narrow profile is small and
 //! well-specified.
 
-use aes_gcm::aead::generic_array::GenericArray;
-use aes_gcm::aead::{AeadCore, AeadInPlace, KeyInit, OsRng};
+use aes_gcm::aead::{AeadInOut, Generate, KeyInit, Nonce, Tag};
 use aes_gcm::{Aes256Gcm, Key};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64URL;
@@ -55,16 +54,20 @@ pub const JWE_KEY_LEN: usize = 32;
 /// Encrypt `plaintext` into a compact JWE token (`alg=dir`, `enc=A256GCM`)
 /// using the supplied 32-byte content-encryption key.
 pub fn encrypt_compact(key: &[u8; JWE_KEY_LEN], plaintext: &[u8]) -> Result<String, JweError> {
-    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
+    let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(*key));
 
     // The protected header base64url is the AAD (RFC 7516 §5.1 step 14).
     let encoded_header = BASE64URL.encode(PROTECTED_HEADER_JSON.as_bytes());
 
-    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let nonce = Nonce::<Aes256Gcm>::generate();
 
     let mut buffer = plaintext.to_vec();
     let tag = cipher
-        .encrypt_in_place_detached(&nonce, encoded_header.as_bytes(), &mut buffer)
+        .encrypt_inout_detached(
+            &nonce,
+            encoded_header.as_bytes(),
+            buffer.as_mut_slice().into(),
+        )
         .map_err(|_| JweError::Encryption)?;
 
     Ok(format!(
@@ -170,15 +173,19 @@ pub fn decrypt_compact(key: &[u8; JWE_KEY_LEN], token: &str) -> Result<Vec<u8>, 
         } => (encoded_header, iv, ciphertext, tag),
     };
 
-    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
+    // `check_segments()` has already validated the IV and tag lengths
+    let iv = Nonce::<Aes256Gcm>::try_from(iv.as_slice()).map_err(|_| JweError::Malformed)?;
+    let tag = Tag::<Aes256Gcm>::try_from(tag.as_slice()).map_err(|_| JweError::Malformed)?;
+
+    let cipher = Aes256Gcm::new(&Key::<Aes256Gcm>::from(*key));
 
     cipher
-        .decrypt_in_place_detached(
-            GenericArray::from_slice(&iv),
+        .decrypt_inout_detached(
+            &iv,
             // AAD is the *encoded* header, verbatim, as it appeared in the token.
             encoded_header.as_bytes(),
-            &mut ciphertext,
-            GenericArray::from_slice(&tag),
+            ciphertext.as_mut_slice().into(),
+            &tag,
         )
         .map_err(|_| JweError::Decryption)?;
 

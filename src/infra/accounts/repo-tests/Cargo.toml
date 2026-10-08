@@ -32,15 +32,14 @@ odf = { workspace = true, default-features = false, features = [
     "testing",
 ] }
 
-argon2 = { version = "0.5" }
+argon2 = { version = "0.6" }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
 futures = "0.3"
-password-hash = { version = "0.5", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",
 ] }
-rand = "0.9"
+rand = "0.10"
 url = { version = "2", default-features = false }
 uuid = "1"

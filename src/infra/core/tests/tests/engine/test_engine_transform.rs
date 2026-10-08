@@ -147,7 +147,7 @@ impl DatasetHelper {
 
         // Write a dummy checkpoint
         let new_checkpoint_hash = {
-            use rand::RngCore;
+            use rand::Rng;
             let mut checkpoint_data = [0u8; 128];
             rand::rng().fill_bytes(&mut checkpoint_data);
 

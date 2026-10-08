@@ -56,4 +56,4 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
 [dev-dependencies]
 pretty_assertions = { version = "1", default-features = false, features = [
 ] }
-rstest = { version = "0.26", default-features = false }
+rstest = { version = "0.27", default-features = false }

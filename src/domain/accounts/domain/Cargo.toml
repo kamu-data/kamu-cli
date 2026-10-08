@@ -60,7 +60,7 @@ nutype = { version = "0.8", default-features = false, features = [
     "new_unchecked",
     "serde",
 ] }
-rand = "0.9"
+rand = "0.10"
 reusable = "0.1"
 schemars = { version = "1", default-features = false, features = [
     "derive",
@@ -97,5 +97,5 @@ constcat = { version = "0.6", default-features = false, features = [
 pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",
 ] }
-rstest = { version = "0.26", default-features = false, features = [
+rstest = { version = "0.27", default-features = false, features = [
 ] }

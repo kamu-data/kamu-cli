@@ -10,7 +10,7 @@
 use std::convert::TryFrom;
 
 use digest::Digest;
-use rand::Rng;
+use rand::RngExt;
 
 use crate::datasets::*;
 

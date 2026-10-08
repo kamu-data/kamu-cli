@@ -11,7 +11,7 @@
 
 use chrono::{DateTime, Utc};
 use jsonwebtoken::TokenData;
-use rand::{self, Rng};
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;

@@ -24,15 +24,14 @@ doctest = false
 [dependencies]
 internal-error = { workspace = true }
 
-aes-gcm = { version = "0.10.3" }
-argon2 = { version = "0.5" }
+aes-gcm = { version = "0.11.1" }
+argon2 = { version = "0.6" }
 base64 = { version = "0.23", default-features = false, features = [
     "std",
 ] }
 hex = { version = "0.4", default-features = false, features = [
     "std",
 ] }
-password-hash = { version = "0.5", default-features = false }
 thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }

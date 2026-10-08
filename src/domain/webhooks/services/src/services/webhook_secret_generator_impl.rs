@@ -40,7 +40,7 @@ impl WebhookSecretGeneratorImpl {
 
 impl WebhookSecretGenerator for WebhookSecretGeneratorImpl {
     fn generate_secret(&self) -> Result<WebhookSubscriptionSecret, EncryptionError> {
-        use rand::RngCore;
+        use rand::Rng;
 
         let mut bytes = [0u8; 32]; // 32 bytes = 256 bits
         rand::rng().fill_bytes(&mut bytes);

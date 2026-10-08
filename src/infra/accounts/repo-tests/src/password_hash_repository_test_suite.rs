@@ -17,7 +17,7 @@ use kamu_accounts::{
     PasswordHashRepository,
 };
 
-use crate::{generate_salt, make_password_hash, make_test_account};
+use crate::{make_password_hash, make_test_account};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,11 +66,8 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
     const PASSWORD_WASYA: &str = "password_wasya";
     const PASSWORD_PETYA: &str = "password_petya";
 
-    let salt_wasya = generate_salt();
-    let salt_petya = generate_salt();
-
-    let hash_wasya = make_password_hash(PASSWORD_WASYA, &salt_wasya);
-    let hash_petya = make_password_hash(PASSWORD_PETYA, &salt_petya);
+    let hash_wasya = make_password_hash(PASSWORD_WASYA);
+    let hash_petya = make_password_hash(PASSWORD_PETYA);
 
     assert_matches!(
         password_hash_repo
@@ -148,8 +145,7 @@ pub async fn test_modify_password(catalog: &Catalog) {
     assert_matches!(account_repo.save_account(&account_petya).await, Ok(_));
 
     let password_petya = "password_petya";
-    let salt = generate_salt();
-    let hash_petya = make_password_hash(password_petya, &salt);
+    let hash_petya = make_password_hash(password_petya);
 
     assert_matches!(
         password_hash_repo
@@ -174,8 +170,7 @@ pub async fn test_modify_password(catalog: &Catalog) {
     );
 
     let password_petya = "new_password_petya";
-    let salt = generate_salt();
-    let new_hash_petya = make_password_hash(password_petya, &salt);
+    let new_hash_petya = make_password_hash(password_petya);
 
     assert_matches!(
         password_hash_repo

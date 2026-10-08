@@ -129,7 +129,7 @@ pub struct FileTestHelper {}
 
 impl FileTestHelper {
     pub fn create_random_file(path: &Path, data_size: usize) -> usize {
-        use rand::RngCore;
+        use rand::Rng;
 
         let mut data = vec![0u8; data_size];
         rand::rng().fill_bytes(&mut data);

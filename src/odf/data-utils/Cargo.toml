@@ -38,19 +38,19 @@ odf-metadata = { workspace = true, features = [
 ] }
 
 arrow = { version = "59", default-features = false }
-arrow-digest = { version = "59", default-features = false }
+arrow-digest = { version = "59.1", default-features = false }
 arrow-json = { version = "59", default-features = false }
 arrow-schema = { version = "59", default-features = false, features = [
     "serde",
 ] }
 async-trait = "0.1"
-digest = "0.10"
+digest = "0.11"
 hex = "0.4"
 parquet = { version = "59", default-features = false }
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
-sha3 = "0.10"
+sha3 = "0.12"
 thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }

@@ -39,27 +39,23 @@ base64 = { version = "0.23", default-features = false, features = [
 ] }
 bs58 = { version = "0.5", default-features = false, features = [
 ] }
-digest = { version = "0.10", default-features = false, features = [
+digest = { version = "0.11", default-features = false, features = [
 ] }
-ed25519-dalek = { version = "2", default-features = false, features = [
+ed25519-dalek = { version = "3", default-features = false, features = [
     "fast",
     "rand_core",
-    "std",
     "zeroize",
 ] }
 hex = { version = "0.4", default-features = false, features = [
 ] }
-rand = { version = "0.9", default-features = false, features = [
-    "small_rng",
+rand = { version = "0.10", default-features = false, features = [
     "std",
     "std_rng",
-] }
-rand_core = { version = "0.6", default-features = false, features = [
-    "getrandom",
+    "sys_rng",
 ] }
 serde = { version = "1", default-features = false, features = [
 ] }
-sha3 = { version = "0.10", default-features = false, features = [
+sha3 = { version = "0.12", default-features = false, features = [
 ] }
 thiserror = { version = "2", default-features = false, features = [
     "std",

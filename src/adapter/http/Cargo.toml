@@ -155,7 +155,7 @@ test-utils = { workspace = true }
 mockall = "0.15"
 paste = "1"
 pretty_assertions = { version = "1" }
-rand = "0.9"
+rand = "0.10"
 tempfile = "3"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = [

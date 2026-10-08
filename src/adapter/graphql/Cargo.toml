@@ -96,7 +96,7 @@ setty = { version = "1", default-features = false, features = [
     "types-bytesize",
     "types-duration-string",
 ] }
-sha3 = "0.10"
+sha3 = "0.12"
 strum = { version = "0.28", default-features = false, features = [
     "derive",
 ] }
