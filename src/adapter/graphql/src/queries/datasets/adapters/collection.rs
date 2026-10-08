@@ -136,12 +136,14 @@ impl CollectionProjection<'_> {
         #[graphql(desc = "Return only entries whose path starts with this prefix")]
         path_prefix: Option<CollectionPath<'static>>,
         #[graphql(
-            desc = "Return only a single entry after reaching a certain path depth. For example \
-                    given enties `/a, /b, /dir/c, /dir/d` at depth 1 it will return `/a, /b`, \
-                    /dir/b` - the first two as actual entries at depth 1, and the last one as an \
-                    indicator that there is one or more entries under `/dir`. Using the \
-                    combination of `pathPrefix` and `maxDepth` you can walk entries as a \
-                    directory hierarchy."
+            desc = "Return only a single entry after reaching a certain path depth. Depth is \
+                    counted from the root, not from `pathPrefix`: `/a` is at depth 1, `/dir/c` at \
+                    depth 2. For example given entries `/a, /b, /dir/c, /dir/d` at depth 1 it \
+                    will return `/a, /b, /dir/c` - the first two as actual entries at depth 1, \
+                    and the last one as an indicator that there is one or more entries under \
+                    `/dir`. Using the combination of `pathPrefix` and `maxDepth` you can walk \
+                    entries as a directory hierarchy, e.g. `pathPrefix: \"/dir/\", maxDepth: 2` \
+                    lists the children of `/dir`. Must not exceed 64."
         )]
         max_depth: Option<usize>,
         page: Option<usize>,
@@ -171,6 +173,7 @@ impl CollectionProjection<'_> {
                         // We do not use the filter
                         unreachable!()
                     }
+                    E::MaxDepthTooLarge(e) => GqlError::gql(e.to_string()),
                     E::Internal(_) => e.int_err().into(),
                 }
             })?;

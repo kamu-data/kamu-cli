@@ -185,6 +185,9 @@ impl APIServer {
 
         router = router
             .layer(kamu_adapter_http::AuthenticationLayer::new())
+            // Must stay inside the CORS layer: otherwise the 500 response lacks CORS headers and
+            // browsers report it as a network failure
+            .layer(CatchPanicLayer::custom(panic_handler))
             .layer(
                 tower_http::cors::CorsLayer::new()
                     .allow_origin(tower_http::cors::Any)
@@ -192,7 +195,6 @@ impl APIServer {
                     .allow_headers(tower_http::cors::Any),
             )
             .layer(observability::axum::http_layer())
-            .layer(CatchPanicLayer::custom(panic_handler))
             // Note: Healthcheck, metrics, and OpenAPI routes are placed before the tracing layer
             // (layers execute bottom-up) to avoid spam in logs
             .route(
