@@ -7219,6 +7219,7 @@ dependencies = [
  "kamu-accounts-inmem",
  "kamu-accounts-services",
  "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
  "kamu-core",
  "kamu-datafusion-udf",

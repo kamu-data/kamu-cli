@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{Account, AccountQuotaService, GetAccountQuotaError, QuotaType};
-use kamu_datasets_services::QuotaDefaultsConfig;
+use kamu_accounts::{Account, AccountQuotaStorageChecker, GetStorageLimitError};
 
 use crate::prelude::*;
 
@@ -63,28 +62,24 @@ impl<'a> AccountQuotasUsageStorage<'a> {
         Self { account }
     }
 
-    /// Total bytes limit for this account.
-    pub async fn limit_total_bytes(&self, ctx: &Context<'_>) -> Result<u64> {
-        let (quota_service, quota_defaults) =
-            from_catalog_n!(ctx, dyn AccountQuotaService, QuotaDefaultsConfig);
+    /// Total bytes limit for this account, or `null` when the storage of this
+    /// account is unlimited.
+    pub async fn limit_total_bytes(&self, ctx: &Context<'_>) -> Result<Option<u64>> {
+        let quota_checker = from_catalog_n!(ctx, dyn AccountQuotaStorageChecker);
 
-        match quota_service
-            .get_account_quota(&self.account.id, QuotaType::storage_space())
+        quota_checker
+            .get_storage_limit(&self.account.id)
             .await
-        {
-            Ok(quota) => Ok(quota.quota_payload.value),
-            Err(GetAccountQuotaError::NotFound(_)) => Ok(quota_defaults.storage),
-            Err(e) => Err(map_get_quota_error(e)),
-        }
+            .map_err(map_get_storage_limit_error)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_get_quota_error(e: GetAccountQuotaError) -> GqlError {
+fn map_get_storage_limit_error(e: GetStorageLimitError) -> GqlError {
     match e {
-        GetAccountQuotaError::NotFound(_) => GqlError::gql("Account quota not configured"),
-        GetAccountQuotaError::Internal(inner) => inner.into(),
+        GetStorageLimitError::NotConfigured => GqlError::gql("Account quota not configured"),
+        GetStorageLimitError::Internal(inner) => inner.into(),
     }
 }
 

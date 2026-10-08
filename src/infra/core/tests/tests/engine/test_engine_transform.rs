@@ -23,6 +23,12 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
@@ -286,6 +292,10 @@ impl TestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()

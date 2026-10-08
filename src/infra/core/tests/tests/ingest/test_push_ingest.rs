@@ -20,6 +20,12 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
@@ -1363,6 +1369,10 @@ impl IngestTestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())

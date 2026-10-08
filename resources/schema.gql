@@ -318,9 +318,10 @@ type AccountQuotasUsage {
 
 type AccountQuotasUsageStorage {
 	"""
-	Total bytes limit for this account.
+	Total bytes limit for this account, or `null` when the storage of this
+	account is unlimited.
 	"""
-	limitTotalBytes: Int!
+	limitTotalBytes: Int
 }
 
 """
