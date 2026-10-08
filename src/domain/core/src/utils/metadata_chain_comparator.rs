@@ -84,7 +84,7 @@ impl MetadataChainComparator {
             // If numbers are equal, it's a guaranteed divergence, as we've checked blocks
             // for equality above
             Ordering::Equal => {
-                let last_common_sequence_number = Self::find_common_ancestor_sequence_number(
+                let common_ancestor = Self::find_common_ancestor(
                     &lhs_chain,
                     lhs_head,
                     lhs_sequence_number,
@@ -97,7 +97,7 @@ impl MetadataChainComparator {
                 Ok(Self::describe_divergence(
                     lhs_sequence_number,
                     rhs_sequence_number,
-                    last_common_sequence_number,
+                    common_ancestor,
                 ))
             }
             // Source ahead
@@ -118,13 +118,13 @@ impl MetadataChainComparator {
                             lhs_ahead_blocks: ahead_blocks,
                         })
                     }
-                    CommonAncestorCheck::Failure {
-                        common_ancestor_sequence_number: last_common_sequence_number,
-                    } => Ok(Self::describe_divergence(
-                        lhs_sequence_number,
-                        rhs_sequence_number,
-                        last_common_sequence_number,
-                    )),
+                    CommonAncestorCheck::Failure { common_ancestor } => {
+                        Ok(Self::describe_divergence(
+                            lhs_sequence_number,
+                            rhs_sequence_number,
+                            common_ancestor,
+                        ))
+                    }
                 }
             }
             // Destination ahead
@@ -145,13 +145,14 @@ impl MetadataChainComparator {
                             rhs_ahead_blocks: ahead_blocks,
                         })
                     }
-                    CommonAncestorCheck::Failure {
-                        common_ancestor_sequence_number: last_common_sequence_number,
-                    } => Ok(Self::describe_divergence(
-                        lhs_sequence_number,
-                        rhs_sequence_number,
-                        last_common_sequence_number,
-                    )),
+                    CommonAncestorCheck::Failure { common_ancestor } => {
+                        // The check above ran with the chains swapped
+                        Ok(Self::describe_divergence(
+                            lhs_sequence_number,
+                            rhs_sequence_number,
+                            common_ancestor.into_swapped(),
+                        ))
+                    }
                 }
             }
         }
@@ -182,7 +183,7 @@ impl MetadataChainComparator {
         if let Some(boundary_block_prev_hash) = boundary_block_prev_hash
             && boundary_block_prev_hash != expected_common_ancestor_hash
         {
-            let common_ancestor_sequence_number = Self::find_common_ancestor_sequence_number(
+            let common_ancestor = Self::find_common_ancestor(
                 ahead_chain,
                 boundary_block_prev_hash,
                 ahead_sequence_number - ahead_size,
@@ -191,9 +192,7 @@ impl MetadataChainComparator {
                 expected_common_sequence_number,
             )
             .await?;
-            Ok(CommonAncestorCheck::Failure {
-                common_ancestor_sequence_number,
-            })
+            Ok(CommonAncestorCheck::Failure { common_ancestor })
         } else {
             Ok(CommonAncestorCheck::Success { ahead_blocks })
         }
@@ -202,29 +201,37 @@ impl MetadataChainComparator {
     fn describe_divergence(
         lhs_sequence_number: u64,
         rhs_sequence_number: u64,
-        last_common_sequence_number: Option<u64>,
+        common_ancestor: CommonAncestor,
     ) -> CompareChainsResult {
-        if let Some(last_common_sequence_number) = last_common_sequence_number {
-            CompareChainsResult::Divergence {
+        match common_ancestor {
+            CommonAncestor::Found {
+                last_common_sequence_number,
+            } => CompareChainsResult::Divergence {
                 uncommon_blocks_in_lhs: lhs_sequence_number - last_common_sequence_number,
                 uncommon_blocks_in_rhs: rhs_sequence_number - last_common_sequence_number,
-            }
-        } else {
-            CompareChainsResult::Divergence {
+            },
+            CommonAncestor::NotFound => CompareChainsResult::Divergence {
                 uncommon_blocks_in_lhs: lhs_sequence_number + 1,
                 uncommon_blocks_in_rhs: rhs_sequence_number + 1,
-            }
+            },
+            CommonAncestor::DifferentDatasets {
+                lhs_dataset_id,
+                rhs_dataset_id,
+            } => CompareChainsResult::DifferentDatasets {
+                lhs_dataset_id,
+                rhs_dataset_id,
+            },
         }
     }
 
-    async fn find_common_ancestor_sequence_number(
+    async fn find_common_ancestor(
         lhs_chain: &MetadataChainWithStats<'_>,
         lhs_head: &odf::Multihash,
         lhs_start_block_sequence_number: u64,
         rhs_chain: &MetadataChainWithStats<'_>,
         rhs_head: &odf::Multihash,
         rhs_start_block_sequence_number: u64,
-    ) -> Result<Option<u64>, CompareChainsError> {
+    ) -> Result<CommonAncestor, CompareChainsError> {
         if lhs_start_block_sequence_number > rhs_start_block_sequence_number {
             lhs_chain.expecting_to_read_blocks(
                 lhs_start_block_sequence_number - rhs_start_block_sequence_number,
@@ -261,14 +268,26 @@ impl MetadataChainComparator {
             lhs_chain.expecting_to_read_blocks(1);
             rhs_chain.expecting_to_read_blocks(1);
 
-            let (lhs_block_hash, _) = lhs_stream.try_next().await.int_err()?.unwrap();
-            let (rhs_block_hash, _) = rhs_stream.try_next().await.int_err()?.unwrap();
+            let (lhs_block_hash, lhs_block) = lhs_stream.try_next().await.int_err()?.unwrap();
+            let (rhs_block_hash, rhs_block) = rhs_stream.try_next().await.int_err()?.unwrap();
 
             if lhs_block_hash == rhs_block_hash {
-                return Ok(Some(curr_block_sequence_number));
+                return Ok(CommonAncestor::Found {
+                    last_common_sequence_number: curr_block_sequence_number,
+                });
             }
             if curr_block_sequence_number == 0 {
-                return Ok(None);
+                // Both blocks are seeds here
+                if let odf::MetadataEvent::Seed(lhs_seed) = lhs_block.event
+                    && let odf::MetadataEvent::Seed(rhs_seed) = rhs_block.event
+                    && lhs_seed.dataset_id != rhs_seed.dataset_id
+                {
+                    return Ok(CommonAncestor::DifferentDatasets {
+                        lhs_dataset_id: lhs_seed.dataset_id,
+                        rhs_dataset_id: rhs_seed.dataset_id,
+                    });
+                }
+                return Ok(CommonAncestor::NotFound);
             }
             curr_block_sequence_number -= 1;
         }
@@ -290,6 +309,11 @@ pub enum CompareChainsResult {
         uncommon_blocks_in_lhs: u64,
         uncommon_blocks_in_rhs: u64,
     },
+    /// Chains share no history and start from seeds with different dataset IDs
+    DifferentDatasets {
+        lhs_dataset_id: odf::DatasetID,
+        rhs_dataset_id: odf::DatasetID,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -300,8 +324,35 @@ enum CommonAncestorCheck {
         ahead_blocks: Vec<odf::dataset::HashedMetadataBlockBytesWithHeader>,
     },
     Failure {
-        common_ancestor_sequence_number: Option<u64>,
+        common_ancestor: CommonAncestor,
     },
+}
+
+#[derive(Debug)]
+enum CommonAncestor {
+    Found {
+        last_common_sequence_number: u64,
+    },
+    NotFound,
+    DifferentDatasets {
+        lhs_dataset_id: odf::DatasetID,
+        rhs_dataset_id: odf::DatasetID,
+    },
+}
+
+impl CommonAncestor {
+    fn into_swapped(self) -> Self {
+        match self {
+            found_or_not @ (Self::Found { .. } | Self::NotFound) => found_or_not,
+            Self::DifferentDatasets {
+                lhs_dataset_id,
+                rhs_dataset_id,
+            } => Self::DifferentDatasets {
+                lhs_dataset_id: rhs_dataset_id,
+                rhs_dataset_id: lhs_dataset_id,
+            },
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

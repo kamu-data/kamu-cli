@@ -41,6 +41,7 @@ use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
 use crate::smart_protocol::protocol_dataset_helper::*;
+use crate::smart_protocol::remote_dataset_id::try_fetch_remote_dataset_id;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -504,6 +505,54 @@ impl WsSmartTransferProtocolClient {
             })
     }
 
+    /// Compares the ID of a remote source with the local destination's.
+    /// Returns `None` when they match or the remote ID is unavailable.
+    async fn find_pull_dataset_id_mismatch(
+        http_src_url: &Url,
+        maybe_access_token: Option<&str>,
+        dst: &ResolvedDataset,
+    ) -> Option<DatasetIdMismatchError> {
+        let src_dataset_id = try_fetch_remote_dataset_id(http_src_url, maybe_access_token).await?;
+        let dst_dataset_id = &dst.get_handle().id;
+
+        (src_dataset_id != *dst_dataset_id).then(|| DatasetIdMismatchError {
+            src_dataset_id,
+            dst_dataset_id: dst_dataset_id.clone(),
+        })
+    }
+
+    /// Compares the ID of a local source with the remote destination's.
+    /// Returns `None` when they match or either ID is unavailable.
+    async fn find_push_dataset_id_mismatch(
+        &self,
+        src: &dyn odf::Dataset,
+        http_dst_url: &Url,
+    ) -> Option<DatasetIdMismatchError> {
+        use odf::dataset::MetadataChainExt;
+        let src_dataset_id = match src
+            .as_metadata_chain()
+            .accept_one(odf::dataset::SearchSeedVisitor::new())
+            .await
+        {
+            Ok(seed_visitor) => seed_visitor.into_event()?.dataset_id,
+            Err(err) => {
+                tracing::debug!(error = ?err, "Failed to read source dataset seed");
+                return None;
+            }
+        };
+
+        let maybe_access_token = self
+            .dataset_credential_resolver
+            .resolve_odf_dataset_access_token(http_dst_url);
+        let dst_dataset_id =
+            try_fetch_remote_dataset_id(http_dst_url, maybe_access_token.as_deref()).await?;
+
+        (src_dataset_id != dst_dataset_id).then_some(DatasetIdMismatchError {
+            src_dataset_id,
+            dst_dataset_id,
+        })
+    }
+
     fn generate_ws_url(http_base_url: &Url, additional_path_segment: &str) -> Url {
         let mut url = http_base_url.join(additional_path_segment).unwrap();
         let new_scheme = if url.scheme() == "https" { "wss" } else { "ws" };
@@ -603,6 +652,21 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         let maybe_access_token = self
             .dataset_credential_resolver
             .resolve_odf_dataset_access_token(http_src_url);
+
+        // A forced pull skips the head check that would otherwise reveal a
+        // different dataset, so compare the IDs before transferring anything
+        if transfer_options.force_update_if_diverged
+            && let Some(dst) = dst
+            && let Some(mismatch) = Self::find_pull_dataset_id_mismatch(
+                http_src_url,
+                maybe_access_token.as_deref(),
+                dst,
+            )
+            .await
+        {
+            return Err(mismatch.into());
+        }
+
         let pull_url = Self::generate_ws_url(http_src_url, "pull");
 
         tracing::debug!(
@@ -616,7 +680,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             OdfSmtpVersion::name(),
             http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
         );
-        if let Some(access_token) = maybe_access_token {
+        if let Some(access_token) = &maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
                 http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
@@ -661,11 +725,24 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 tracing::debug!("Pull process aborted with error: {}", e);
                 let e = match e {
                     PullClientError::InvalidInterval(e) => {
-                        SyncError::DatasetsDiverged(DatasetsDivergedError {
-                            src_head: e.head,
-                            dst_head: e.tail,
-                            detail: None,
-                        })
+                        // The server could not find our head in its chain. Unless the
+                        // datasets differ entirely, this means the chains diverged.
+                        if let Some(dst) = dst
+                            && let Some(mismatch) = Self::find_pull_dataset_id_mismatch(
+                                http_src_url,
+                                maybe_access_token.as_deref(),
+                                dst,
+                            )
+                            .await
+                        {
+                            mismatch.into()
+                        } else {
+                            SyncError::DatasetsDiverged(DatasetsDivergedError {
+                                src_head: e.head,
+                                dst_head: e.tail,
+                                detail: None,
+                            })
+                        }
                     }
                     PullClientError::OverwriteSeedBlock(_)
                     | PullClientError::ReadFailed(_)
@@ -816,19 +893,43 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
-        let transfer_plan = prepare_dataset_transfer_plan(
+        // A forced push skips the head check that would otherwise reveal a
+        // different dataset, so compare the IDs before transferring anything
+        if transfer_options.force_update_if_diverged
+            && dst_head.is_some()
+            && let Some(mismatch) = self
+                .find_push_dataset_id_mismatch(src.as_ref(), http_dst_url)
+                .await
+        {
+            return Err(mismatch.into());
+        }
+
+        let transfer_plan = match prepare_dataset_transfer_plan(
             src.as_metadata_chain(),
             &src_head,
             dst_head,
             transfer_options.force_update_if_diverged,
         )
         .await
-        .map_err(|e| match e {
-            PrepareDatasetTransferEstimateError::InvalidInterval(e) => {
-                SyncError::InvalidInterval(e)
+        {
+            Ok(transfer_plan) => transfer_plan,
+            Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
+                // The destination head is missing from the source chain. Unless the
+                // datasets differ entirely, this means the chains diverged.
+                return Err(
+                    match self
+                        .find_push_dataset_id_mismatch(src.as_ref(), http_dst_url)
+                        .await
+                    {
+                        Some(mismatch) => mismatch.into(),
+                        None => SyncError::InvalidInterval(e),
+                    },
+                );
             }
-            PrepareDatasetTransferEstimateError::Internal(e) => SyncError::Internal(e),
-        })?;
+            Err(PrepareDatasetTransferEstimateError::Internal(e)) => {
+                return Err(SyncError::Internal(e));
+            }
+        };
 
         let num_blocks = transfer_plan.num_blocks;
         if num_blocks == 0 {

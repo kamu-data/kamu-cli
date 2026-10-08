@@ -146,10 +146,22 @@ impl SimpleTransferProtocol {
                     }));
                 }
             }
+            CompareChainsResult::DifferentDatasets {
+                lhs_dataset_id: src_dataset_id,
+                rhs_dataset_id: dst_dataset_id,
+            } => {
+                // Even a forced sync must not replace a dataset with another one
+                return Err(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                    src_dataset_id,
+                    dst_dataset_id,
+                }));
+            }
         }
 
         let blocks_desc_ordered = match chains_comparison {
-            CompareChainsResult::Equal => unreachable!(),
+            CompareChainsResult::Equal | CompareChainsResult::DifferentDatasets { .. } => {
+                unreachable!()
+            }
             CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: src_ahead_blocks,
             } => src_ahead_blocks,

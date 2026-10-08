@@ -71,6 +71,13 @@ test_client_server_local_fs_harness_permutations!(
 
 test_client_server_local_fs_harness_permutations!(
     test_smart_push_shared,
+    test_smart_push_existing_different_dataset_fails
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_local_fs_harness_permutations!(
+    test_smart_push_shared,
     test_smart_push_aborted_write_of_new_rewrite_succeeds
 );
 

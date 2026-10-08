@@ -100,11 +100,12 @@ impl From<Result<comp::CompareChainsResult, StatusCheckError>> for CompareChains
                     message: CompareChainsStatus::Ahead,
                 })
             }
-            Ok(comp::CompareChainsResult::Divergence { .. }) => {
-                CompareChainsResult::Status(CompareChainsResultStatus {
-                    message: CompareChainsStatus::Diverged,
-                })
-            }
+            Ok(
+                comp::CompareChainsResult::Divergence { .. }
+                | comp::CompareChainsResult::DifferentDatasets { .. },
+            ) => CompareChainsResult::Status(CompareChainsResultStatus {
+                message: CompareChainsStatus::Diverged,
+            }),
             Err(e) => CompareChainsResult::Error(CompareChainsResultError {
                 reason: CompareChainsResultReason {
                     message: e.to_string(),
