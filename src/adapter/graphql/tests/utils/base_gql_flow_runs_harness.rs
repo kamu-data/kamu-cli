@@ -30,6 +30,7 @@ use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
+use time_source::SystemTimeSource;
 use wakeup_listener::WakeupListenerConfig;
 
 use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness, GraphQLQueryRequest};
@@ -611,11 +612,11 @@ impl BaseGQLFlowRunsHarness {
 
         let flow_state = flow_run_service
             .run_flow_automatically(
-                Utc::now(),
+                self.now(),
                 flow_binding,
                 vec![FlowActivationCause::ResourceUpdate(
                     FlowActivationCauseResourceUpdate {
-                        activation_time: Utc::now(),
+                        activation_time: self.now(),
                         resource_type: DATASET_RESOURCE_TYPE.to_string(),
                         changes: ResourceChanges::NewData(ResourceDataChanges {
                             blocks_added: 1,
@@ -676,7 +677,6 @@ impl BaseGQLFlowRunsHarness {
         flow_type: &str,
         task_outcome: TaskOutcome,
     ) -> FlowID {
-        use chrono::Utc;
         use kamu_adapter_flow_dataset as afs;
         use kamu_flow_system as fs;
 
@@ -693,7 +693,7 @@ impl BaseGQLFlowRunsHarness {
 
         let account_id = self.logged_account_id();
 
-        let current_time = Utc::now();
+        let current_time = self.now();
         let flow_state = flow_run_service
             .run_flow_manually(
                 current_time,
@@ -710,12 +710,21 @@ impl BaseGQLFlowRunsHarness {
         flow_state.flow_id
     }
 
+    /// Current time from the catalog's clock, so stubbed-time harnesses stay
+    /// deterministic
+    fn now(&self) -> DateTime<Utc> {
+        self.catalog_authorized
+            .get_one::<dyn SystemTimeSource>()
+            .unwrap()
+            .now()
+    }
+
     pub async fn mimic_flow_run_with_outcome(
         &self,
         flow_id: &str,
         task_outcome: TaskOutcome,
     ) -> TaskID {
-        let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+        let schedule_time = self.now().duration_round(Duration::seconds(1)).unwrap();
         let flow_task_id = self.mimic_flow_scheduled(flow_id, schedule_time).await;
         let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
@@ -769,7 +778,7 @@ impl BaseGQLFlowRunsHarness {
         .await
         .unwrap();
 
-        flow.add_activation_cause_if_unique(Utc::now(), activation_cause)
+        flow.add_activation_cause_if_unique(self.now(), activation_cause)
             .unwrap();
         flow.save(flow_event_store.as_ref()).await.unwrap();
     }

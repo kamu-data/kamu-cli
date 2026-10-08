@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- Flaky GraphQL flow process card ordering test
+
 ## [0.269.0] - 2026-10-06
 ### Added
 - Agent harness for Claude Code and Codex:
