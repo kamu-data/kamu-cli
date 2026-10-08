@@ -109,6 +109,51 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(num_queries = queries.len()))]
+    fn get_events_multi(
+        &self,
+        queries: &[FlowBinding],
+    ) -> MultiEventStream<'_, FlowBinding, FlowTriggerEvent> {
+        let queries = queries.to_vec();
+        let flow_types: Vec<String> = queries.iter().map(|b| b.flow_type.clone()).collect();
+        let scopes_json: Vec<serde_json::Value> = queries
+            .iter()
+            .map(|b| serde_json::to_value(&b.scope).unwrap())
+            .collect();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT q.idx AS "idx!", e.event_id, e.event_payload
+                FROM flow_trigger_events e
+                    JOIN UNNEST($1::text[], $2::jsonb[]) WITH ORDINALITY AS q(flow_type, scope_data, idx)
+                        ON e.flow_type = q.flow_type AND e.scope_data = q.scope_data
+                ORDER BY e.event_id
+                "#,
+                &flow_types,
+                &scopes_json,
+            ).try_map(|event_row| {
+                let event = serde_json::from_value::<FlowTriggerEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((event_row.idx, EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((idx, event_id, event)) = query_stream.try_next().await? {
+                // Ordinality is 1-based
+                let query_index = usize::try_from(idx - 1).unwrap();
+                yield Ok((queries[query_index].clone(), event_id, event));
+            }
+        })
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn save_events(
         &self,
@@ -185,6 +230,116 @@ impl EventStore<FlowTriggerState> for PostgresFlowTriggerEventStore {
         Ok(EventID::new(last_event_id))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(num_items = items.len()))]
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<FlowBinding, FlowTriggerEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        validate_multi_save_items(&items)?;
+
+        let item_flow_types: Vec<String> = items
+            .iter()
+            .map(|item| item.query.flow_type.clone())
+            .collect();
+        let item_scopes_json: Vec<serde_json::Value> = items
+            .iter()
+            .map(|item| serde_json::to_value(&item.query.scope))
+            .collect::<Result<_, _>>()
+            .int_err()?;
+
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        // Rejects an expected event that is not the binding's last one. Two writers
+        // based on the same event both pass it and collide on the unique index over
+        // `prev_event_id` instead
+        let last_stored_event_ids = sqlx::query!(
+            r#"
+            SELECT q.idx AS "idx!", MAX(e.event_id) AS "last_event_id?: i64"
+                FROM UNNEST($1::text[], $2::jsonb[]) WITH ORDINALITY AS q(flow_type, scope_data, idx)
+                    LEFT JOIN flow_trigger_events e
+                        ON e.flow_type = q.flow_type AND e.scope_data = q.scope_data
+                GROUP BY q.idx
+            "#,
+            &item_flow_types,
+            &item_scopes_json,
+        )
+        .fetch_all(&mut *connection_mut)
+        .await
+        .int_err()?;
+
+        for row in last_stored_event_ids {
+            let item = &items[usize::try_from(row.idx - 1).unwrap()];
+            if row.last_event_id != item.maybe_prev_stored_event_id.map(EventID::into_inner) {
+                return Err(SaveEventsError::concurrent_modification());
+            }
+        }
+
+        let num_total_events = items.iter().map(|item| item.events.len()).sum();
+        let mut flow_types = Vec::with_capacity(num_total_events);
+        let mut scopes_json = Vec::with_capacity(num_total_events);
+        let mut event_types = Vec::with_capacity(num_total_events);
+        let mut event_times = Vec::with_capacity(num_total_events);
+        let mut event_payloads = Vec::with_capacity(num_total_events);
+        let mut prev_event_ids = Vec::with_capacity(num_total_events);
+        let mut item_event_counts = Vec::with_capacity(items.len());
+
+        for (item, (flow_type, scope_json)) in items
+            .into_iter()
+            .zip(item_flow_types.into_iter().zip(item_scopes_json))
+        {
+            let batch_prev_event_id = item
+                .maybe_prev_stored_event_id
+                .map_or(0, EventID::into_inner);
+            item_event_counts.push(item.events.len());
+
+            for (i, event) in item.events.into_iter().enumerate() {
+                flow_types.push(flow_type.clone());
+                scopes_json.push(scope_json.clone());
+                event_types.push(event.typename().to_string());
+                event_times.push(event.event_time());
+                event_payloads.push(serde_json::to_value(event).int_err()?);
+                prev_event_ids.push((i == 0).then_some(batch_prev_event_id));
+            }
+        }
+
+        let insert_result = sqlx::query_scalar!(
+            r#"
+            INSERT INTO flow_trigger_events (flow_type, scope_data, event_type, event_time, event_payload, prev_event_id)
+            SELECT flow_type, scope_data, event_type, event_time, event_payload, prev_event_id
+                FROM UNNEST($1::text[], $2::jsonb[], $3::text[], $4::timestamptz[], $5::jsonb[], $6::bigint[])
+                    WITH ORDINALITY AS e(flow_type, scope_data, event_type, event_time, event_payload, prev_event_id, row_num)
+                ORDER BY row_num
+            RETURNING event_id
+            "#,
+            &flow_types,
+            &scopes_json,
+            &event_types,
+            &event_times,
+            &event_payloads,
+            &prev_event_ids as _,
+        )
+        .fetch_all(connection_mut)
+        .await;
+
+        let inserted_event_ids = match insert_result {
+            Ok(event_ids) => event_ids,
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(SaveEventsError::concurrent_modification());
+            }
+            Err(e) => return Err(SaveEventsError::Internal(e.int_err())),
+        };
+
+        Ok(last_event_ids_per_item(
+            inserted_event_ids,
+            item_event_counts,
+        )?)
+    }
+
     #[tracing::instrument(level = "debug", skip_all)]
     async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -251,25 +406,29 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scope))]
-    async fn all_trigger_bindings_for_scope(
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_scopes))]
+    async fn all_trigger_bindings_for_scopes(
         &self,
-        flow_scope: &FlowScope,
+        flow_scopes: &[FlowScope],
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
 
-        let scope_json = serde_json::to_value(flow_scope).int_err()?;
+        let scopes_json = flow_scopes
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<Result<Vec<_>, _>>()
+            .int_err()?;
 
         let flow_bindings = sqlx::query!(
             r#"
             SELECT DISTINCT flow_type, scope_data
                 FROM flow_trigger_events
-                WHERE scope_data = $1
+                WHERE scope_data = ANY($1)
                     AND event_type = 'FlowTriggerEventCreated'
             "#,
-            scope_json,
+            &scopes_json,
         )
         .fetch_all(connection_mut)
         .await

@@ -46,6 +46,20 @@ async fn test_configuration_creation_in_concurrent_transactions(pg_pool: PgPool)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(database, postgres)]
+#[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
+async fn test_bulk_trigger_creation_in_concurrent_transactions(pg_pool: PgPool) {
+    let harness = ConcurrentTransactionsHarness::new(pg_pool);
+
+    let res = harness
+        .create_triggers_in_bulk_in_racing_transactions()
+        .await;
+
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ConcurrentTransactionsHarness {
     pg_pool: PgPool,
     flow_binding: FlowBinding,
@@ -86,6 +100,53 @@ impl ConcurrentTransactionsHarness {
         .await
     }
 
+    /// The second transaction saves a binding of its own next to the one both
+    /// transactions create
+    async fn create_triggers_in_bulk_in_racing_transactions(
+        &self,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        let make_item = |flow_binding: &FlowBinding| SaveEventsItem {
+            query: flow_binding.clone(),
+            maybe_prev_stored_event_id: None,
+            events: vec![
+                FlowTriggerEventCreated {
+                    event_time: Utc::now(),
+                    flow_binding: flow_binding.clone(),
+                    paused: false,
+                    rule: FlowTriggerRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
+                        every: chrono::Duration::seconds(5),
+                    })),
+                    stop_policy: FlowTriggerStopPolicy::default(),
+                }
+                .into(),
+            ],
+        };
+
+        let shared_item = make_item(&self.flow_binding);
+        let own_item = make_item(&FlowBinding::new(
+            "dev.kamu.flow.test.other",
+            FlowScope::make_system_scope(),
+        ));
+
+        let mut is_first = true;
+        self.save_in_racing_transactions(move |catalog| {
+            let items = if is_first {
+                vec![shared_item.clone()]
+            } else {
+                vec![own_item.clone(), shared_item.clone()]
+            };
+            is_first = false;
+            async move {
+                catalog
+                    .get_one::<dyn FlowTriggerEventStore>()
+                    .unwrap()
+                    .save_events_multi(items)
+                    .await
+            }
+        })
+        .await
+    }
+
     async fn create_configuration_in_racing_transactions(
         &self,
     ) -> Result<EventID, SaveEventsError> {
@@ -117,10 +178,14 @@ impl ConcurrentTransactionsHarness {
 
     /// Runs `save` in two transactions. The first commits while the second is
     /// in flight; returns the result of the second.
-    async fn save_in_racing_transactions<F, Fut>(&self, save: F) -> Result<EventID, SaveEventsError>
+    async fn save_in_racing_transactions<F, Fut, T>(
+        &self,
+        mut save: F,
+    ) -> Result<T, SaveEventsError>
     where
-        F: Fn(Catalog) -> Fut,
-        Fut: Future<Output = Result<EventID, SaveEventsError>> + Send + 'static,
+        F: FnMut(Catalog) -> Fut,
+        Fut: Future<Output = Result<T, SaveEventsError>> + Send + 'static,
+        T: Send + 'static,
     {
         let first_transaction = TransactionRefT::<Postgres>::new(self.pg_pool.clone());
         let second_transaction = TransactionRefT::<Postgres>::new(self.pg_pool.clone());

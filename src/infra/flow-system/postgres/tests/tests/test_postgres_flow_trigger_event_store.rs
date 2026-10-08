@@ -67,6 +67,30 @@ database_transactional_test!(
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_event_store_get_events_multi,
+    harness = PostgresFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_event_store_save_events_multi,
+    harness = PostgresFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_event_store_save_events_multi_rejects_invalid_items,
+    harness = PostgresFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresFlowTriggerEventStoreHarness {
     catalog: Catalog,
 }

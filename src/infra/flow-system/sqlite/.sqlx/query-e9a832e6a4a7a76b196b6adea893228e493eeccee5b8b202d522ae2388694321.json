@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO flow_configuration_events (flow_type, scope_data, event_type, event_time, event_payload, prev_event_id)\n            SELECT value ->> 'flow_type',\n                   value ->> 'scope_data',\n                   value ->> 'event_type',\n                   value ->> 'event_time',\n                   value ->> 'event_payload',\n                   value ->> 'prev_event_id'\n            FROM json_each($1)\n            ORDER BY key\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "e9a832e6a4a7a76b196b6adea893228e493eeccee5b8b202d522ae2388694321"
+}

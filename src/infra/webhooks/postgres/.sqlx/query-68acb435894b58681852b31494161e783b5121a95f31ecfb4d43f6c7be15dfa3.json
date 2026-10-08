@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE webhook_subscriptions\n                    SET status = u.status,\n                        label = CASE WHEN u.label_changed THEN u.label ELSE webhook_subscriptions.label END,\n                        event_types = CASE\n                            WHEN u.event_types_changed THEN ARRAY(SELECT jsonb_array_elements_text(u.event_types))\n                            ELSE webhook_subscriptions.event_types\n                        END\n                    FROM UNNEST(\n                        $1::uuid[],\n                        $2::webhook_subscription_status[],\n                        $3::bool[],\n                        $4::text[],\n                        $5::bool[],\n                        $6::jsonb[]\n                    ) AS u(id, status, label_changed, label, event_types_changed, event_types)\n                    WHERE webhook_subscriptions.id = u.id\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        {
+          "Custom": {
+            "name": "webhook_subscription_status[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "webhook_subscription_status",
+                  "kind": {
+                    "Enum": [
+                      "UNVERIFIED",
+                      "ENABLED",
+                      "PAUSED",
+                      "UNREACHABLE",
+                      "REMOVED"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "BoolArray",
+        "TextArray",
+        "BoolArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "68acb435894b58681852b31494161e783b5121a95f31ecfb4d43f6c7be15dfa3"
+}

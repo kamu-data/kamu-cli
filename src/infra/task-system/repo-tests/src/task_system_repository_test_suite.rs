@@ -487,6 +487,101 @@ pub async fn test_event_store_concurrent_modification(catalog: &Catalog) {
     assert_matches!(res, Ok(_));
 }
 
+pub async fn test_event_store_save_events_multi(catalog: &Catalog) {
+    let harness = TaskEventStoreTestSuiteHarness::new(catalog);
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let running_task_id = harness.create_task().await;
+    harness
+        .save(running_task_id, vec![harness.running(running_task_id)])
+        .await;
+    let queued_task_id = harness.create_task().await;
+    let new_task_id = harness.new_task_id().await;
+
+    // Existing tasks next to a new one
+    let last_event_ids = harness
+        .save_multi(vec![
+            (running_task_id, vec![harness.requeued(running_task_id)]),
+            (
+                new_task_id,
+                vec![
+                    harness.created(new_task_id, Some(&dataset_id)),
+                    harness.running(new_task_id),
+                ],
+            ),
+            (queued_task_id, vec![harness.running(queued_task_id)]),
+        ])
+        .await;
+
+    assert_eq!(harness.total_events().await, 7);
+    assert_eq!(
+        last_event_ids,
+        [
+            harness.stored_last_event_id(running_task_id).await,
+            harness.stored_last_event_id(new_task_id).await,
+            harness.stored_last_event_id(queued_task_id).await,
+        ]
+    );
+
+    // Statuses and the dataset index follow the saved events
+    assert_eq!(harness.queued_task().await, Some(running_task_id));
+    assert_eq!(
+        harness.running_task_ids().await,
+        [queued_task_id, new_task_id]
+    );
+    assert_eq!(
+        harness
+            .dataset_task_ids(&dataset_id, PaginationOpts::from_max_results(100))
+            .await,
+        [new_task_id]
+    );
+
+    // The returned IDs are valid expectations for the next save
+    harness
+        .save(
+            new_task_id,
+            vec![harness.finished(new_task_id, TaskOutcome::Success(TaskResult::empty()))],
+        )
+        .await;
+    assert_eq!(harness.running_task_ids().await, [queued_task_id]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_save_events_multi_concurrent_modification(catalog: &Catalog) {
+    let harness = TaskEventStoreTestSuiteHarness::new(catalog);
+
+    let task_id = harness.create_task().await;
+    let new_task_id = harness.new_task_id().await;
+
+    // A created task, but a previous event is expected
+    let res = harness
+        .try_save_multi(vec![
+            (
+                task_id,
+                Some(EventID::new(1)),
+                vec![harness.running(task_id)],
+            ),
+            (
+                new_task_id,
+                Some(EventID::new(15)),
+                vec![harness.created(new_task_id, None)],
+            ),
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Something stored, but no expectation
+    let res = harness
+        .try_save_multi(vec![
+            (new_task_id, None, vec![harness.created(new_task_id, None)]),
+            (task_id, None, vec![harness.running(task_id)]),
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -538,6 +633,58 @@ impl TaskEventStoreTestSuiteHarness {
         self.event_store
             .save_events(&task_id, maybe_prev_stored_event_id, events)
             .await
+    }
+
+    /// Saves events of several tasks at once, each after the ones this harness
+    /// saved before for the task
+    async fn save_multi(&self, task_events: Vec<(TaskID, Vec<TaskEvent>)>) -> Vec<EventID> {
+        let items: Vec<_> = {
+            let last_event_ids = self.last_event_ids.lock().unwrap();
+            task_events
+                .into_iter()
+                .map(|(task_id, events)| (task_id, last_event_ids.get(&task_id).copied(), events))
+                .collect()
+        };
+
+        let task_ids: Vec<TaskID> = items.iter().map(|(task_id, _, _)| *task_id).collect();
+        let saved_event_ids = self.try_save_multi(items).await.unwrap();
+
+        let mut last_event_ids = self.last_event_ids.lock().unwrap();
+        for (task_id, last_event_id) in task_ids.into_iter().zip(&saved_event_ids) {
+            last_event_ids.insert(task_id, *last_event_id);
+        }
+
+        saved_event_ids
+    }
+
+    async fn try_save_multi(
+        &self,
+        items: Vec<(TaskID, Option<EventID>, Vec<TaskEvent>)>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        self.event_store
+            .save_events_multi(
+                items
+                    .into_iter()
+                    .map(
+                        |(task_id, maybe_prev_stored_event_id, events)| SaveEventsItem {
+                            query: task_id,
+                            maybe_prev_stored_event_id,
+                            events,
+                        },
+                    )
+                    .collect(),
+            )
+            .await
+    }
+
+    async fn stored_last_event_id(&self, task_id: TaskID) -> EventID {
+        let events: Vec<_> = self
+            .event_store
+            .get_events(&task_id, GetEventsOpts::default())
+            .try_collect()
+            .await
+            .unwrap();
+        events.last().unwrap().0
     }
 
     async fn total_events(&self) -> usize {

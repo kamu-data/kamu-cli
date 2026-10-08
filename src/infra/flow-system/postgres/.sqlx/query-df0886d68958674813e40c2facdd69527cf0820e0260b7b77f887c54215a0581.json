@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT q.idx AS \"idx!\", e.event_id, e.event_payload\n                FROM flow_configuration_events e\n                    JOIN UNNEST($1::text[], $2::jsonb[]) WITH ORDINALITY AS q(flow_type, scope_data, idx)\n                        ON e.flow_type = q.flow_type AND e.scope_data = q.scope_data\n                ORDER BY e.event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "idx!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "event_payload",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "df0886d68958674813e40c2facdd69527cf0820e0260b7b77f887c54215a0581"
+}

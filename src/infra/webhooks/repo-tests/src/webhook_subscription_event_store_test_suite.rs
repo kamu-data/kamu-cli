@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::HashSet;
 
 use futures::TryStreamExt;
 use kamu_webhooks::*;
@@ -747,6 +748,199 @@ pub async fn test_removed_subscription_filters_out(catalog: &dill::Catalog) {
         )
         .await;
     assert_matches!(res, Ok(ids) if ids.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_save_multiple_subscriptions_at_once(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
+
+    let new_subscription = |label: &str, event_types: Vec<WebhookEventType>| {
+        WebhookSubscription::new(
+            WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
+            Url::parse("https://example.com").unwrap(),
+            WebhookSubscriptionLabel::try_new(label).unwrap(),
+            Some(dataset_id.clone()),
+            event_types,
+            WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
+        )
+    };
+
+    let mut modified_subscription =
+        new_subscription("label-a", vec![WebhookEventTypeCatalog::test()]);
+    modified_subscription.enable().unwrap();
+    modified_subscription
+        .save(event_store.as_ref())
+        .await
+        .unwrap();
+
+    let mut removed_subscription = new_subscription(
+        "label-c",
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+    );
+    removed_subscription
+        .save(event_store.as_ref())
+        .await
+        .unwrap();
+
+    let mut created_subscription = new_subscription(
+        "label-b",
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+    );
+    created_subscription.enable().unwrap();
+
+    modified_subscription
+        .modify(
+            Url::parse("https://example.com/modified").unwrap(),
+            WebhookSubscriptionLabel::try_new("label-a-modified").unwrap(),
+            vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        )
+        .unwrap();
+    removed_subscription.remove().unwrap();
+
+    // Existing subscriptions next to a new one
+    let mut subscriptions = vec![
+        modified_subscription,
+        created_subscription,
+        removed_subscription,
+    ];
+    WebhookSubscription::save_multi(&mut subscriptions, event_store.as_ref())
+        .await
+        .unwrap();
+
+    let [
+        modified_subscription,
+        created_subscription,
+        removed_subscription,
+    ] = &mut subscriptions[..]
+    else {
+        unreachable!()
+    };
+
+    // Saved aggregates know their last stored events
+    for subscription in [
+        &*modified_subscription,
+        &*created_subscription,
+        &*removed_subscription,
+    ] {
+        let reloaded = WebhookSubscription::load(subscription.id(), event_store.as_ref())
+            .await
+            .unwrap();
+        assert_eq!(
+            reloaded.last_stored_event_id(),
+            subscription.last_stored_event_id()
+        );
+    }
+
+    // Labels, event types and statuses follow the saved events
+    let res = event_store
+        .find_subscription_id_by_dataset_and_label(
+            &dataset_id,
+            &WebhookSubscriptionLabel::try_new("label-a").unwrap(),
+        )
+        .await;
+    assert_matches!(res, Ok(None));
+
+    let res = event_store
+        .find_subscription_id_by_dataset_and_label(
+            &dataset_id,
+            &WebhookSubscriptionLabel::try_new("label-a-modified").unwrap(),
+        )
+        .await;
+    assert_matches!(res, Ok(Some(id)) if id == modified_subscription.id());
+
+    let enabled_ids: HashSet<_> = event_store
+        .list_enabled_subscription_ids_by_dataset_and_event_type(
+            &dataset_id,
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect();
+    assert_eq!(
+        enabled_ids,
+        HashSet::from([modified_subscription.id(), created_subscription.id()])
+    );
+
+    let res = event_store
+        .count_subscriptions_by_dataset(&dataset_id)
+        .await;
+    assert_matches!(res, Ok(2));
+
+    // The aggregates can be saved again
+    created_subscription.pause().unwrap();
+    created_subscription
+        .save(event_store.as_ref())
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_save_multiple_subscriptions_concurrent_modification(catalog: &dill::Catalog) {
+    let event_store = catalog
+        .get_one::<dyn WebhookSubscriptionEventStore>()
+        .unwrap();
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"dummy");
+
+    let mut subscription = WebhookSubscription::new(
+        WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
+        Url::parse("https://example.com").unwrap(),
+        WebhookSubscriptionLabel::try_new("label-a").unwrap(),
+        Some(dataset_id.clone()),
+        vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
+    );
+    subscription.save(event_store.as_ref()).await.unwrap();
+
+    let load_stale_renamed = || async {
+        let mut stale_subscription =
+            WebhookSubscription::load(subscription.id(), event_store.as_ref())
+                .await
+                .unwrap();
+        stale_subscription
+            .modify(
+                Url::parse("https://example.com").unwrap(),
+                WebhookSubscriptionLabel::try_new("label-z").unwrap(),
+                vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+            )
+            .unwrap();
+        stale_subscription
+    };
+    let mut stale_subscription = load_stale_renamed().await;
+    let mut subscriptions = vec![load_stale_renamed().await];
+
+    subscription.enable().unwrap();
+    subscription.save(event_store.as_ref()).await.unwrap();
+
+    let res = stale_subscription.save(event_store.as_ref()).await;
+    assert_matches!(res, Err(SaveError::ConcurrentModification(_)));
+
+    let res = WebhookSubscription::save_multi(&mut subscriptions, event_store.as_ref()).await;
+    assert_matches!(res, Err(SaveError::ConcurrentModification(_)));
+
+    // Rejected saves leave the label lookup intact
+    let res = event_store
+        .find_subscription_id_by_dataset_and_label(
+            &dataset_id,
+            &WebhookSubscriptionLabel::try_new("label-a").unwrap(),
+        )
+        .await;
+    assert_matches!(res, Ok(Some(id)) if id == subscription.id());
+
+    let res = event_store
+        .find_subscription_id_by_dataset_and_label(
+            &dataset_id,
+            &WebhookSubscriptionLabel::try_new("label-z").unwrap(),
+        )
+        .await;
+    assert_matches!(res, Ok(None));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

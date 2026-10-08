@@ -9,8 +9,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, sqlx::Type)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, sqlx::Type, strum::IntoStaticStr)]
 #[sqlx(type_name = "task_status_type", rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
 pub enum TaskStatus {
     /// Task is waiting for capacity to be allocated to it
     Queued,

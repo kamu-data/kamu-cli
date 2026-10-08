@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT DISTINCT flow_type, scope_data as \"scope_data: String\"\n                FROM flow_trigger_events\n                WHERE scope_data = $1\n                    AND event_type = 'FlowTriggerEventCreated'\n            ",
+  "query": "\n            SELECT DISTINCT flow_type, scope_data as \"scope_data: String\"\n                FROM flow_trigger_events\n                WHERE scope_data IN (SELECT value FROM json_each($1))\n                    AND event_type = 'FlowTriggerEventCreated'\n            ",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "fc3c7fa2a3e4310819db3c812e7c4a0a1cb933538208b7a72d5ed4d4184dd4a1"
+  "hash": "87885b70cfeb7605b152dbfe6912988bdbb7cd0bb0cdf45967292497730cde47"
 }

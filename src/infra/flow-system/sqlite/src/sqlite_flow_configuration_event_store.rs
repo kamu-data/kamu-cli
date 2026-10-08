@@ -14,6 +14,8 @@ use kamu_flow_system::*;
 use serde_json::json;
 use sqlx::Sqlite;
 
+use crate::helpers::{flow_bindings_to_json, global_counter_event_ids_per_item};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
@@ -116,6 +118,46 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(num_queries = queries.len()))]
+    fn get_events_multi(
+        &self,
+        queries: &[FlowBinding],
+    ) -> MultiEventStream<'_, FlowBinding, FlowConfigurationEvent> {
+        let queries = queries.to_vec();
+        let bindings_json = flow_bindings_to_json(&queries).unwrap();
+
+        Box::pin(async_stream::stream! {
+            let mut tr = self.transaction.lock().await;
+            let connection_mut = tr
+                .connection_mut()
+                .await?;
+
+            let mut query_stream = sqlx::query!(
+                r#"
+                SELECT q.value ->> 'idx' AS "idx!: i64", e.event_id, e.event_payload AS "event_payload: sqlx::types::JsonValue"
+                FROM flow_configuration_events e
+                    JOIN json_each($1) q
+                        ON e.flow_type = q.value ->> 'flow_type' AND e.scope_data = q.value ->> 'scope_data'
+                ORDER BY e.event_id
+                "#,
+                bindings_json,
+            )
+            .try_map(|event_row| {
+                let event = serde_json::from_value::<FlowConfigurationEvent>(event_row.event_payload)
+                    .map_err(|e| sqlx::Error::Decode(Box::new(e)))?;
+
+                Ok((event_row.idx, EventID::new(event_row.event_id), event))
+            })
+            .fetch(connection_mut)
+            .map_err(|e| GetEventsError::Internal(e.int_err()));
+
+            while let Some((idx, event_id, event)) = query_stream.try_next().await? {
+                let query_index = usize::try_from(idx).unwrap();
+                yield Ok((queries[query_index].clone(), event_id, event));
+            }
+        })
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_binding))]
     async fn save_events(
         &self,
@@ -208,6 +250,118 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
                 .int_err()?;
 
         Ok(EventID::new(actual_last_event_id))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(num_items = items.len()))]
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<FlowBinding, FlowConfigurationEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        validate_multi_save_items(&items)?;
+
+        let item_bindings: Vec<FlowBinding> = items.iter().map(|item| item.query.clone()).collect();
+        let bindings_json = flow_bindings_to_json(&item_bindings)?;
+
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+        // Rejects an expected event that is not the binding's last one. Two writers
+        // based on the same event both pass it and collide on the unique index over
+        // `prev_event_id` instead
+        let last_stored_event_ids = sqlx::query!(
+            r#"
+            SELECT q.value ->> 'idx' AS "idx!: i64", MAX(e.event_id) AS "last_event_id?: i64"
+                FROM json_each($1) q
+                    LEFT JOIN flow_configuration_events e
+                        ON e.flow_type = q.value ->> 'flow_type' AND e.scope_data = q.value ->> 'scope_data'
+                GROUP BY q.value ->> 'idx'
+            "#,
+            bindings_json,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        for row in last_stored_event_ids {
+            let item = &items[usize::try_from(row.idx).unwrap()];
+            if row.last_event_id != item.maybe_prev_stored_event_id.map(EventID::into_inner) {
+                return Err(SaveEventsError::concurrent_modification());
+            }
+        }
+
+        let mut events_json = Vec::new();
+        let mut item_event_counts = Vec::with_capacity(items.len());
+
+        for item in items {
+            let scope_json = serde_json::to_value(&item.query.scope).int_err()?;
+            let scope_json_str = canonical_json::to_string(&scope_json).unwrap();
+            let batch_prev_event_id = item
+                .maybe_prev_stored_event_id
+                .map_or(0, EventID::into_inner);
+            item_event_counts.push(i64::try_from(item.events.len()).unwrap());
+
+            for (i, event) in item.events.into_iter().enumerate() {
+                events_json.push(json!({
+                    "flow_type": item.query.flow_type,
+                    "scope_data": scope_json_str,
+                    "event_type": event.typename(),
+                    "event_time": sqlite_datetime_text(&event.event_time()),
+                    "event_payload": serde_json::to_value(&event).int_err()?.to_string(),
+                    "prev_event_id": (i == 0).then_some(batch_prev_event_id),
+                }));
+            }
+        }
+
+        let events_json = serde_json::to_string(&events_json).int_err()?;
+
+        // Event IDs are assigned by triggers from the global counter, one per inserted
+        // row in insertion order
+        let connection_mut = tr.connection_mut().await?;
+        let counter_before =
+            sqlx::query_scalar!("SELECT val FROM flow_event_global_counter WHERE name = 'global'")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
+
+        let connection_mut = tr.connection_mut().await?;
+        let insert_result = sqlx::query!(
+            r#"
+            INSERT INTO flow_configuration_events (flow_type, scope_data, event_type, event_time, event_payload, prev_event_id)
+            SELECT value ->> 'flow_type',
+                   value ->> 'scope_data',
+                   value ->> 'event_type',
+                   value ->> 'event_time',
+                   value ->> 'event_payload',
+                   value ->> 'prev_event_id'
+            FROM json_each($1)
+            ORDER BY key
+            "#,
+            events_json,
+        )
+        .execute(connection_mut)
+        .await;
+
+        match insert_result {
+            Ok(_) => {}
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(SaveEventsError::concurrent_modification());
+            }
+            Err(e) => return Err(SaveEventsError::Internal(e.int_err())),
+        }
+
+        let connection_mut = tr.connection_mut().await?;
+        let counter_after =
+            sqlx::query_scalar!("SELECT val FROM flow_event_global_counter WHERE name = 'global'")
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?;
+
+        global_counter_event_ids_per_item(counter_before, counter_after, &item_event_counts)
+            .map_err(SaveEventsError::Internal)
     }
 
     #[tracing::instrument(level = "debug", skip_all)]

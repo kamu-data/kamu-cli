@@ -291,6 +291,151 @@ impl EventStore<TaskState> for PostgresTaskEventStore {
         Ok(last_event_id)
     }
 
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<TaskID, TaskEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        validate_multi_save_items(&items)?;
+
+        let num_total_events = items.iter().map(|item| item.events.len()).sum();
+
+        let mut new_task_ids = Vec::new();
+        let mut new_task_dataset_ids = Vec::new();
+
+        let mut item_task_ids = Vec::with_capacity(items.len());
+        let mut item_prev_event_ids = Vec::with_capacity(items.len());
+        let mut item_statuses_if_running = Vec::with_capacity(items.len());
+        let mut item_statuses_otherwise = Vec::with_capacity(items.len());
+        let mut item_event_counts = Vec::with_capacity(items.len());
+
+        let mut event_task_ids = Vec::with_capacity(num_total_events);
+        let mut event_times = Vec::with_capacity(num_total_events);
+        let mut event_types = Vec::with_capacity(num_total_events);
+        let mut event_payloads = Vec::with_capacity(num_total_events);
+
+        for item in &items {
+            let task_id: i64 = item.query.try_into().unwrap();
+
+            // Newly created tasks must be registered before their events
+            let first_event = item.events.first().expect("Non empty event list expected");
+            if let TaskEvent::TaskCreated(e) = first_event {
+                assert_eq!(item.query, e.task_id);
+
+                // When creating a task, there is no way something was already stored
+                if item.maybe_prev_stored_event_id.is_some() {
+                    return Err(SaveEventsError::concurrent_modification());
+                }
+
+                new_task_ids.push(task_id);
+                new_task_dataset_ids.push(
+                    e.logical_plan
+                        .dataset_id()
+                        .as_ref()
+                        .map(ToString::to_string),
+                );
+            }
+
+            item_task_ids.push(task_id);
+            item_prev_event_ids.push(item.maybe_prev_stored_event_id.map(EventID::into_inner));
+            // The stored status is unknown here: let the row pick the right outcome
+            item_statuses_if_running
+                .push(TaskEvent::status_after(&item.events, TaskStatus::Running));
+            item_statuses_otherwise.push(TaskEvent::status_after(&item.events, TaskStatus::Queued));
+            item_event_counts.push(item.events.len());
+
+            for event in &item.events {
+                event_task_ids.push(task_id);
+                event_times.push(event.event_time());
+                event_types.push(event.typename());
+                event_payloads.push(serde_json::to_value(event).int_err()?);
+            }
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        if !new_task_ids.is_empty() {
+            let connection_mut = tr.connection_mut().await?;
+            sqlx::query!(
+                r#"
+                INSERT INTO tasks (task_id, dataset_id, task_status, last_event_id)
+                    SELECT task_id, dataset_id, 'queued'::task_status_type, NULL
+                        FROM UNNEST($1::bigint[], $2::text[]) AS t(task_id, dataset_id)
+                "#,
+                &new_task_ids,
+                &new_task_dataset_ids as _,
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+        }
+
+        let connection_mut = tr.connection_mut().await?;
+        let inserted_event_ids = sqlx::query_scalar!(
+            r#"
+            INSERT INTO task_events (task_id, event_time, event_type, event_payload)
+                SELECT task_id, event_time, event_type, event_payload
+                    FROM UNNEST($1::bigint[], $2::timestamptz[], $3::text[], $4::jsonb[])
+                        WITH ORDINALITY AS e(task_id, event_time, event_type, event_payload, row_num)
+                    ORDER BY row_num
+                RETURNING event_id
+            "#,
+            &event_task_ids,
+            &event_times,
+            &event_types as _,
+            &event_payloads,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let last_event_ids = last_event_ids_per_item(inserted_event_ids, item_event_counts)?;
+        let item_last_event_ids: Vec<i64> = last_event_ids
+            .iter()
+            .copied()
+            .map(EventID::into_inner)
+            .collect();
+
+        // Update denormalized task records: latest status and stored event.
+        // A previously stored event id that does not match the expected one
+        // leaves its row untouched, which means a concurrent modification
+        let connection_mut = tr.connection_mut().await?;
+        let updated_rows_count = sqlx::query!(
+            r#"
+            UPDATE tasks
+                SET task_status = CASE
+                        WHEN tasks.task_status = 'running'::task_status_type
+                            THEN u.status_if_running
+                        ELSE u.status_otherwise
+                    END,
+                    last_event_id = u.last_event_id
+                FROM UNNEST($1::bigint[], $2::bigint[], $3::bigint[], $4::task_status_type[], $5::task_status_type[])
+                    AS u(task_id, prev_event_id, last_event_id, status_if_running, status_otherwise)
+                WHERE tasks.task_id = u.task_id
+                    AND tasks.last_event_id IS NOT DISTINCT FROM u.prev_event_id
+                RETURNING tasks.task_id
+            "#,
+            &item_task_ids,
+            &item_prev_event_ids as _,
+            &item_last_event_ids,
+            &item_statuses_if_running as &[TaskStatus],
+            &item_statuses_otherwise as &[TaskStatus],
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?
+        .len();
+
+        if updated_rows_count != item_task_ids.len() {
+            return Err(SaveEventsError::concurrent_modification());
+        }
+
+        Ok(last_event_ids)
+    }
+
     async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;

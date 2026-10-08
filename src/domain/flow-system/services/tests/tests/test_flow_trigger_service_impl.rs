@@ -206,6 +206,60 @@ async fn test_pause_resume_all_dataset_flows() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_pause_resume_flows_of_several_datasets() {
+    let harness = FlowTriggerHarness::new();
+
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
+    let baz_id = odf::DatasetID::new_seeded_ed25519(b"baz");
+
+    let trigger = FlowTriggerRule::Schedule(Duration::weeks(1).into());
+    let binding_foo_ingest = ingest_dataset_binding(&foo_id);
+    let binding_foo_compaction = compaction_dataset_binding(&foo_id);
+    let binding_bar_ingest = ingest_dataset_binding(&bar_id);
+    let binding_baz_ingest = ingest_dataset_binding(&baz_id);
+    for binding in [
+        &binding_foo_ingest,
+        &binding_foo_compaction,
+        &binding_bar_ingest,
+        &binding_baz_ingest,
+    ] {
+        harness
+            .set_flow_trigger(binding.clone(), trigger.clone())
+            .await;
+    }
+
+    // One trigger is paused already
+    harness.pause_flow(&binding_foo_ingest).await;
+    assert_eq!(5, harness.trigger_events_count());
+
+    // Pausing the flows of 2 datasets announces only the triggers that changed
+    harness.pause_datasets_flows(&[&foo_id, &bar_id]).await;
+
+    let triggers = harness.list_enabled_triggers().await;
+    assert_eq!(1, triggers.len());
+    harness.expect_flow_trigger(&triggers, &binding_baz_ingest, &trigger);
+    assert_eq!(7, harness.trigger_events_count());
+
+    // Resuming them brings all 3 triggers back
+    harness.resume_datasets_flows(&[&foo_id, &bar_id]).await;
+
+    let triggers = harness.list_enabled_triggers().await;
+    assert_eq!(4, triggers.len());
+    for binding in [
+        &binding_foo_ingest,
+        &binding_foo_compaction,
+        &binding_bar_ingest,
+        &binding_baz_ingest,
+    ] {
+        harness.expect_flow_trigger(&triggers, binding, &trigger);
+    }
+    assert_eq!(10, harness.trigger_events_count());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_pause_resume_individual_system_flows() {
     let harness = FlowTriggerHarness::new();
     assert!(harness.list_enabled_triggers().await.is_empty());
@@ -448,6 +502,28 @@ impl FlowTriggerHarness {
 
     async fn resume_all_dataset_flows(&self, dataset_id: &odf::DatasetID) {
         let lookup_scopes = vec![FlowScopeDataset::make_scope(dataset_id)];
+        self.flow_trigger_service
+            .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
+            .await
+            .unwrap();
+    }
+
+    async fn pause_datasets_flows(&self, dataset_ids: &[&odf::DatasetID]) {
+        let lookup_scopes: Vec<_> = dataset_ids
+            .iter()
+            .map(|dataset_id| FlowScopeDataset::make_scope(dataset_id))
+            .collect();
+        self.flow_trigger_service
+            .pause_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
+            .await
+            .unwrap();
+    }
+
+    async fn resume_datasets_flows(&self, dataset_ids: &[&odf::DatasetID]) {
+        let lookup_scopes: Vec<_> = dataset_ids
+            .iter()
+            .map(|dataset_id| FlowScopeDataset::make_scope(dataset_id))
+            .collect();
         self.flow_trigger_service
             .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
             .await

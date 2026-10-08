@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO flow_trigger_events (flow_type, scope_data, event_type, event_time, event_payload, prev_event_id)\n            SELECT flow_type, scope_data, event_type, event_time, event_payload, prev_event_id\n                FROM UNNEST($1::text[], $2::jsonb[], $3::text[], $4::timestamptz[], $5::jsonb[], $6::bigint[])\n                    WITH ORDINALITY AS e(flow_type, scope_data, event_type, event_time, event_payload, prev_event_id, row_num)\n                ORDER BY row_num\n            RETURNING event_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "JsonbArray",
+        "TextArray",
+        "TimestamptzArray",
+        "JsonbArray",
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "da9f1347d10c6f9be70af6c80500ecd2431cdb4e90feb4bf0e63d62276518037"
+}

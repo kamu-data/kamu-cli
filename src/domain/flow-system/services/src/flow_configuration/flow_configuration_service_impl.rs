@@ -128,23 +128,27 @@ impl FlowScopeRemovalHandler for FlowConfigurationServiceImpl {
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let flow_bindings = self.event_store.all_bindings_for_scope(flow_scope).await?;
 
-        for flow_binding in flow_bindings {
-            let maybe_flow_configuration =
-                FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
-                    .await
-                    .int_err()?;
+        let now = self.time_source.now();
 
-            if let Some(mut flow_configuration) = maybe_flow_configuration {
-                flow_configuration
-                    .notify_scope_removed(self.time_source.now())
-                    .int_err()?;
-
-                flow_configuration
-                    .save(self.event_store.as_ref())
-                    .await
-                    .int_err()?;
+        let mut flow_configurations = Vec::with_capacity(flow_bindings.len());
+        for load_result in
+            FlowConfiguration::try_load_multi(&flow_bindings, self.event_store.as_ref()).await
+        {
+            match load_result {
+                Ok(mut flow_configuration) => {
+                    flow_configuration.notify_scope_removed(now).int_err()?;
+                    flow_configurations.push(flow_configuration);
+                }
+                Err(LoadError::NotFound(_)) => {}
+                Err(e @ (LoadError::ProjectionError(_) | LoadError::Internal(_))) => {
+                    return Err(e.int_err());
+                }
             }
         }
+
+        FlowConfiguration::save_multi(&mut flow_configurations, self.event_store.as_ref())
+            .await
+            .int_err()?;
 
         Ok(())
     }

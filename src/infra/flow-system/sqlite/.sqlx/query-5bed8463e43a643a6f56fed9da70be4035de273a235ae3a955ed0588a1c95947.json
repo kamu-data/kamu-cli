@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT q.value ->> 'idx' AS \"idx!: i64\", e.event_id, e.event_payload AS \"event_payload: sqlx::types::JsonValue\"\n                FROM flow_configuration_events e\n                    JOIN json_each($1) q\n                        ON e.flow_type = q.value ->> 'flow_type' AND e.scope_data = q.value ->> 'scope_data'\n                ORDER BY e.event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "idx!: i64",
+        "ordinal": 0,
+        "type_info": "Null"
+      },
+      {
+        "name": "event_id",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "event_payload: sqlx::types::JsonValue",
+        "ordinal": 2,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "5bed8463e43a643a6f56fed9da70be4035de273a235ae3a955ed0588a1c95947"
+}

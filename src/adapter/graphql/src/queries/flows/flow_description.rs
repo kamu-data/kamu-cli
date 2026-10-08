@@ -39,6 +39,7 @@ use kamu_flow_system::{FLOW_SCOPE_TYPE_SYSTEM, FLOW_TYPE_SYSTEM_GC};
 use kamu_task_system as ts;
 
 use crate::prelude::*;
+use crate::queries::load_webhook_subscriptions_by_ids;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -396,6 +397,8 @@ impl FlowDescriptionResetResult {
 pub struct FlowDescriptionBuilder {
     polling_sources_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetPollingSource>,
     transforms_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetTransform>,
+    webhook_subscriptions_by_id:
+        HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>,
 }
 
 impl FlowDescriptionBuilder {
@@ -404,6 +407,8 @@ impl FlowDescriptionBuilder {
         flow_states: &[fs::FlowState],
     ) -> Result<Self, InternalError> {
         let unique_dataset_ids = FlowDescriptionBuilder::collect_unique_dataset_ids(flow_states);
+        let unique_subscription_ids =
+            FlowDescriptionBuilder::collect_unique_subscription_ids(flow_states);
 
         Ok(Self {
             polling_sources_by_dataset_id: HashMap::from_iter(
@@ -417,7 +422,27 @@ impl FlowDescriptionBuilder {
                 FlowDescriptionBuilder::detect_datasets_with_transforms(ctx, &unique_dataset_ids)
                     .await?,
             ),
+            webhook_subscriptions_by_id: load_webhook_subscriptions_by_ids(
+                ctx,
+                &unique_subscription_ids,
+            )
+            .await?,
         })
+    }
+
+    fn collect_unique_subscription_ids(
+        flow_states: &[fs::FlowState],
+    ) -> Vec<kamu_webhooks::WebhookSubscriptionID> {
+        flow_states
+            .iter()
+            .filter_map(|flow_state| {
+                FlowScopeSubscription::maybe_subscription_id_in_scope(
+                    &flow_state.flow_binding.scope,
+                )
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
     }
 
     fn collect_unique_dataset_ids(flow_states: &[fs::FlowState]) -> Vec<odf::DatasetID> {
@@ -529,8 +554,7 @@ impl FlowDescriptionBuilder {
             FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
                 let subscription_id =
                     FlowScopeSubscription::new(&flow_state.flow_binding.scope).subscription_id();
-                self.webhook_flow_description(ctx, flow_state, flow_type, subscription_id)
-                    .await?
+                self.webhook_flow_description(flow_state, flow_type, subscription_id)?
             }
 
             FLOW_SCOPE_TYPE_SYSTEM => {
@@ -550,25 +574,17 @@ impl FlowDescriptionBuilder {
         })
     }
 
-    async fn webhook_flow_description(
+    fn webhook_flow_description(
         &self,
-        ctx: &Context<'_>,
         flow_state: &fs::FlowState,
         flow_type: &str,
         subscription_id: kamu_webhooks::WebhookSubscriptionID,
     ) -> Result<FlowDescription> {
         match flow_type {
             FLOW_TYPE_WEBHOOK_DELIVER => {
-                let webhook_subscription_query_svc =
-                    from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionQueryService);
-
-                let subscription = webhook_subscription_query_svc
-                    .find_webhook_subscription(
-                        subscription_id,
-                        kamu_webhooks::WebhookSubscriptionQueryMode::IncludingRemoved,
-                    )
-                    .await
-                    .int_err()?
+                let subscription = self
+                    .webhook_subscriptions_by_id
+                    .get(&subscription_id)
                     .ok_or_else(|| {
                         GqlError::Internal(InternalError::new(format!(
                             "Webhook subscription not found: {subscription_id}",

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::Mutex;
 
 use event_sourcing::*;
@@ -112,6 +113,20 @@ async fn test_aggregate_load_multi() {
             .last_stored_event_id(),
         Some(EventID::new(1))
     );
+}
+
+#[tokio::test]
+async fn test_aggregate_load_multi_rejects_duplicate_queries() {
+    let store = CalcEventStore::new(vec![CalcEvents::Add(10), CalcEvents::Sub(6)]);
+
+    let results = Calc::try_load_multi(&[(), ()], &store).await;
+    assert_eq!(results.len(), 2);
+    for result in results {
+        assert_matches!(result, Err(LoadError::Internal(_)));
+    }
+
+    let res = Calc::load_multi(&[(), ()], &store).await;
+    assert_matches!(res, Err(GetEventsError::Internal(_)));
 }
 
 #[tokio::test]

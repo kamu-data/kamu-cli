@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE webhook_subscriptions\n                SET last_event_id = u.last_event_id\n                FROM UNNEST($1::uuid[], $2::bigint[], $3::bigint[])\n                    AS u(id, prev_event_id, last_event_id)\n                WHERE webhook_subscriptions.id = u.id\n                    AND webhook_subscriptions.last_event_id IS NOT DISTINCT FROM u.prev_event_id\n                RETURNING webhook_subscriptions.id, webhook_subscriptions.status AS \"status: WebhookSubscriptionStatus\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "status: WebhookSubscriptionStatus",
+        "type_info": {
+          "Custom": {
+            "name": "webhook_subscription_status",
+            "kind": {
+              "Enum": [
+                "UNVERIFIED",
+                "ENABLED",
+                "PAUSED",
+                "UNREACHABLE",
+                "REMOVED"
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int8Array",
+        "Int8Array"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "fffc1801aa599312998f91e097eb1c93dbbec30de686c22c4c173ac147848ada"
+}

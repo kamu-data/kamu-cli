@@ -25,6 +25,11 @@ pub struct InMemoryWebhookSubscriptionEventStore {
 #[derive(Default)]
 struct State {
     events: Vec<WebhookSubscriptionEvent>,
+    indexes: Indexes,
+}
+
+#[derive(Default, Clone)]
+struct Indexes {
     webhook_subscriptions_by_dataset: HashMap<odf::DatasetID, Vec<WebhookSubscriptionID>>,
     webhook_subscription_data: HashMap<WebhookSubscriptionID, WebhookSubscriptionState>,
 }
@@ -55,16 +60,44 @@ impl InMemoryWebhookSubscriptionEventStore {
         }
     }
 
+    /// Rejects events that would break the indexes, such as a duplicate label,
+    /// without changing them
+    fn check_index_updates(
+        &self,
+        events: &[WebhookSubscriptionEvent],
+    ) -> Result<(), InternalError> {
+        let state = self.inner.as_state();
+        let mut indexes = state.lock().unwrap().indexes.clone();
+        for event in events {
+            Self::update_index(&mut indexes, event)?;
+        }
+        Ok(())
+    }
+
+    /// Indexes are changed only once the save passed the concurrent
+    /// modification check, as a rejected save must leave them intact
+    fn apply_index_updates(
+        &self,
+        events: &[WebhookSubscriptionEvent],
+    ) -> Result<(), InternalError> {
+        let state = self.inner.as_state();
+        let mut g = state.lock().unwrap();
+        for event in events {
+            Self::update_index(&mut g.indexes, event)?;
+        }
+        Ok(())
+    }
+
     fn update_index(
-        state: &mut State,
+        indexes: &mut Indexes,
         event: &WebhookSubscriptionEvent,
     ) -> Result<(), InternalError> {
         match event {
             WebhookSubscriptionEvent::Created(e) => {
                 if let Some(dataset_id) = &e.dataset_id {
-                    Self::check_unique_label_within_dataset(state, dataset_id, &e.label)?;
+                    Self::check_unique_label_within_dataset(indexes, dataset_id, &e.label)?;
 
-                    state
+                    indexes
                         .webhook_subscriptions_by_dataset
                         .entry(dataset_id.clone())
                         .or_default()
@@ -74,21 +107,22 @@ impl InMemoryWebhookSubscriptionEventStore {
                 let subscription_state =
                     WebhookSubscriptionState::apply(None, event.clone()).unwrap();
 
-                state
+                indexes
                     .webhook_subscription_data
                     .insert(e.subscription_id, subscription_state);
             }
 
             WebhookSubscriptionEvent::Modified(e) => {
-                if let Some(subscription) =
-                    state.webhook_subscription_data.get(event.subscription_id())
+                if let Some(subscription) = indexes
+                    .webhook_subscription_data
+                    .get(event.subscription_id())
                     && let Some(dataset_id) = subscription.dataset_id()
                     && subscription.label() != &e.new_label
                 {
                     // Check if the new label is unique for the dataset
-                    Self::check_unique_label_within_dataset(state, dataset_id, &e.new_label)?;
+                    Self::check_unique_label_within_dataset(indexes, dataset_id, &e.new_label)?;
                 }
-                Self::update_subscription_state(state, event);
+                Self::update_subscription_state(indexes, event);
             }
 
             WebhookSubscriptionEvent::Enabled(_)
@@ -97,14 +131,16 @@ impl InMemoryWebhookSubscriptionEventStore {
             | WebhookSubscriptionEvent::MarkedUnreachable(_)
             | WebhookSubscriptionEvent::Reactivated(_)
             | WebhookSubscriptionEvent::SecretRotated(_)
-            | WebhookSubscriptionEvent::Removed(_) => Self::update_subscription_state(state, event),
+            | WebhookSubscriptionEvent::Removed(_) => {
+                Self::update_subscription_state(indexes, event);
+            }
         }
 
         Ok(())
     }
 
     fn check_unique_label_within_dataset(
-        state: &State,
+        indexes: &Indexes,
         dataset_id: &odf::DatasetID,
         label: &WebhookSubscriptionLabel,
     ) -> Result<(), InternalError> {
@@ -112,9 +148,9 @@ impl InMemoryWebhookSubscriptionEventStore {
             return Ok(());
         }
 
-        if let Some(ids) = state.webhook_subscriptions_by_dataset.get(dataset_id)
+        if let Some(ids) = indexes.webhook_subscriptions_by_dataset.get(dataset_id)
             && ids.iter().any(|id| {
-                state
+                indexes
                     .webhook_subscription_data
                     .get(id)
                     .map(|subscription| subscription.label() == label)
@@ -140,8 +176,8 @@ impl InMemoryWebhookSubscriptionEventStore {
         Ok(())
     }
 
-    fn update_subscription_state(state: &mut State, event: &WebhookSubscriptionEvent) {
-        if let Some(subscription_state) = state
+    fn update_subscription_state(indexes: &mut Indexes, event: &WebhookSubscriptionEvent) {
+        if let Some(subscription_state) = indexes
             .webhook_subscription_data
             .get_mut(event.subscription_id())
         {
@@ -151,7 +187,7 @@ impl InMemoryWebhookSubscriptionEventStore {
 
             if subscription_state.status() == WebhookSubscriptionStatus::Removed
                 && let Some(dataset_id) = subscription_state.dataset_id()
-                && let Some(ids) = state.webhook_subscriptions_by_dataset.get_mut(dataset_id)
+                && let Some(ids) = indexes.webhook_subscriptions_by_dataset.get_mut(dataset_id)
             {
                 ids.retain(|id| id != event.subscription_id());
             }
@@ -185,6 +221,13 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
         self.inner.get_events(subscription_id, opts)
     }
 
+    fn get_events_multi(
+        &self,
+        queries: &[WebhookSubscriptionID],
+    ) -> MultiEventStream<'_, WebhookSubscriptionID, WebhookSubscriptionEvent> {
+        self.inner.get_events_multi(queries)
+    }
+
     async fn save_events(
         &self,
         subscription_id: &WebhookSubscriptionID,
@@ -195,17 +238,40 @@ impl EventStore<WebhookSubscriptionState> for InMemoryWebhookSubscriptionEventSt
             return Err(SaveEventsError::NothingToSave);
         }
 
-        {
-            let state = self.inner.as_state();
-            let mut g = state.lock().unwrap();
-            for event in &events {
-                Self::update_index(&mut g, event)?;
-            }
+        self.check_index_updates(&events)?;
+
+        let last_event_id = self
+            .inner
+            .save_events(subscription_id, maybe_prev_stored_event_id, events.clone())
+            .await?;
+
+        self.apply_index_updates(&events)?;
+
+        Ok(last_event_id)
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<WebhookSubscriptionID, WebhookSubscriptionEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
         }
 
-        self.inner
-            .save_events(subscription_id, maybe_prev_stored_event_id, events)
-            .await
+        validate_multi_save_items(&items)?;
+
+        let events: Vec<_> = items
+            .iter()
+            .flat_map(|item| item.events.iter().cloned())
+            .collect();
+
+        self.check_index_updates(&events)?;
+
+        let last_event_ids = self.inner.save_events_multi(items).await?;
+
+        self.apply_index_updates(&events)?;
+
+        Ok(last_event_ids)
     }
 }
 
@@ -219,7 +285,8 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
     ) -> Result<usize, CountWebhookSubscriptionsError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.webhook_subscriptions_by_dataset
+        Ok(g.indexes
+            .webhook_subscriptions_by_dataset
             .get(dataset_id)
             .map(Vec::len)
             .unwrap_or_default())
@@ -231,7 +298,8 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
     ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.webhook_subscriptions_by_dataset
+        Ok(g.indexes
+            .webhook_subscriptions_by_dataset
             .get(dataset_id)
             .cloned()
             .unwrap_or_default())
@@ -242,7 +310,8 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
     ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.webhook_subscription_data
+        Ok(g.indexes
+            .webhook_subscription_data
             .iter()
             .filter_map(|(id, data)| {
                 (data.status() != WebhookSubscriptionStatus::Removed).then_some(*id)
@@ -257,19 +326,21 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
     ) -> Result<Option<WebhookSubscriptionID>, FindWebhookSubscriptionError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        let maybe_subscription_id =
-            g.webhook_subscriptions_by_dataset
-                .get(dataset_id)
-                .and_then(|ids| {
-                    ids.iter()
-                        .find(|id| {
-                            g.webhook_subscription_data
-                                .get(id)
-                                .map(|subscription| subscription.label() == label)
-                                .unwrap_or(false)
-                        })
-                        .copied()
-                });
+        let maybe_subscription_id = g
+            .indexes
+            .webhook_subscriptions_by_dataset
+            .get(dataset_id)
+            .and_then(|ids| {
+                ids.iter()
+                    .find(|id| {
+                        g.indexes
+                            .webhook_subscription_data
+                            .get(id)
+                            .map(|subscription| subscription.label() == label)
+                            .unwrap_or(false)
+                    })
+                    .copied()
+            });
         Ok(maybe_subscription_id)
     }
 
@@ -280,24 +351,26 @@ impl WebhookSubscriptionEventStore for InMemoryWebhookSubscriptionEventStore {
     ) -> Result<Vec<WebhookSubscriptionID>, ListWebhookSubscriptionsError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        let maybe_subscription_ids =
-            g.webhook_subscriptions_by_dataset
-                .get(dataset_id)
-                .and_then(|ids| {
-                    ids.iter()
-                        .filter(|id| {
-                            g.webhook_subscription_data
-                                .get(id)
-                                .map(|data| {
-                                    data.status() == WebhookSubscriptionStatus::Enabled
-                                        && data.event_types().contains(event_type)
-                                })
-                                .unwrap_or(false)
-                        })
-                        .copied()
-                        .collect::<Vec<_>>()
-                        .into()
-                });
+        let maybe_subscription_ids = g
+            .indexes
+            .webhook_subscriptions_by_dataset
+            .get(dataset_id)
+            .and_then(|ids| {
+                ids.iter()
+                    .filter(|id| {
+                        g.indexes
+                            .webhook_subscription_data
+                            .get(id)
+                            .map(|data| {
+                                data.status() == WebhookSubscriptionStatus::Enabled
+                                    && data.event_types().contains(event_type)
+                            })
+                            .unwrap_or(false)
+                    })
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .into()
+            });
         Ok(maybe_subscription_ids.unwrap_or_default())
     }
 }

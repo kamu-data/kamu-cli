@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
+use std::{assert_matches, slice};
 
 use chrono::{Duration, Utc};
 use dill::Catalog;
@@ -47,13 +47,13 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert_eq!(events, []);
 
     let bindings = event_store
-        .all_trigger_bindings_for_scope(&flow_binding.scope)
+        .all_trigger_bindings_for_scopes(slice::from_ref(&flow_binding.scope))
         .await
         .unwrap();
     assert_eq!(bindings, []);
 
     let system_bindings = event_store
-        .all_trigger_bindings_for_scope(&FlowScope::make_system_scope())
+        .all_trigger_bindings_for_scopes(&[FlowScope::make_system_scope()])
         .await
         .unwrap();
     assert_eq!(system_bindings, []);
@@ -164,22 +164,35 @@ pub async fn test_event_store_get_streams(catalog: &Catalog) {
     assert_eq!(&events[..], [event_3.into()]);
 
     let bindings = event_store
-        .all_trigger_bindings_for_scope(&flow_binding_1.scope)
+        .all_trigger_bindings_for_scopes(slice::from_ref(&flow_binding_1.scope))
         .await
         .unwrap();
     assert_eq!(bindings, vec![flow_binding_1.clone()]);
 
     let bindings = event_store
-        .all_trigger_bindings_for_scope(&flow_binding_2.scope)
+        .all_trigger_bindings_for_scopes(slice::from_ref(&flow_binding_2.scope))
         .await
         .unwrap();
     assert_eq!(bindings, vec![flow_binding_2.clone()]);
 
     let bindings = event_store
-        .all_trigger_bindings_for_scope(&flow_binding_3.scope)
+        .all_trigger_bindings_for_scopes(slice::from_ref(&flow_binding_3.scope))
         .await
         .unwrap();
     assert_eq!(bindings, vec![flow_binding_3.clone()]);
+
+    let mut bindings = event_store
+        .all_trigger_bindings_for_scopes(&[
+            flow_binding_1.scope.clone(),
+            flow_binding_3.scope.clone(),
+        ])
+        .await
+        .unwrap();
+    bindings.sort_by(|a, b| a.flow_type.cmp(&b.flow_type));
+    assert_eq!(
+        bindings,
+        vec![flow_binding_1.clone(), flow_binding_3.clone()]
+    );
 
     let all_active_bindings = event_store
         .stream_all_active_flow_bindings()
@@ -658,6 +671,238 @@ pub async fn test_latest_event_is_last_saved(catalog: &Catalog) {
             .await
             .unwrap()
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_get_events_multi(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
+
+    let flow_binding_1 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let flow_binding_2 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
+
+    let event_1_1 = created_event(&flow_binding_1);
+    let event_1_2 = modified_event(&flow_binding_1, true);
+    let event_2 = created_event(&flow_binding_2);
+
+    event_store
+        .save_events(
+            &flow_binding_1,
+            None,
+            vec![event_1_1.clone(), event_1_2.clone()],
+        )
+        .await
+        .unwrap();
+    event_store
+        .save_events(&flow_binding_2, None, vec![event_2.clone()])
+        .await
+        .unwrap();
+
+    let events: Vec<_> = event_store
+        .get_events_multi(&[
+            flow_binding_3.clone(),
+            flow_binding_2.clone(),
+            flow_binding_1.clone(),
+        ])
+        .try_collect()
+        .await
+        .unwrap();
+
+    let event_ids: Vec<_> = events.iter().map(|(_, event_id, _)| *event_id).collect();
+    assert!(event_ids.is_sorted());
+
+    let events: Vec<_> = events
+        .into_iter()
+        .map(|(flow_binding, _, event)| (flow_binding, event))
+        .collect();
+    assert_eq!(
+        events,
+        [
+            (flow_binding_1.clone(), event_1_1),
+            (flow_binding_1, event_1_2),
+            (flow_binding_2, event_2),
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_save_events_multi(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
+
+    let flow_binding_1 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let flow_binding_2 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
+
+    let created_event_id_1 = event_store
+        .save_events(&flow_binding_1, None, vec![created_event(&flow_binding_1)])
+        .await
+        .unwrap();
+
+    // An existing binding next to new ones
+    let last_event_ids = event_store
+        .save_events_multi(vec![
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: Some(created_event_id_1),
+                events: vec![modified_event(&flow_binding_1, true)],
+            },
+            SaveEventsItem {
+                query: flow_binding_2.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![
+                    created_event(&flow_binding_2),
+                    modified_event(&flow_binding_2, true),
+                ],
+            },
+            SaveEventsItem {
+                query: flow_binding_3.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![created_event(&flow_binding_3)],
+            },
+        ])
+        .await
+        .unwrap();
+
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 5);
+
+    // Returned IDs follow the input order and match the stored last events
+    let mut stored_last_event_ids = Vec::new();
+    for flow_binding in [&flow_binding_1, &flow_binding_2, &flow_binding_3] {
+        let events: Vec<_> = event_store
+            .get_events(flow_binding, GetEventsOpts::default())
+            .try_collect()
+            .await
+            .unwrap();
+        stored_last_event_ids.push(events.last().unwrap().0);
+    }
+    assert_eq!(last_event_ids, stored_last_event_ids);
+
+    // The returned IDs are valid expectations for the next save
+    event_store
+        .save_events(
+            &flow_binding_2,
+            Some(last_event_ids[1]),
+            vec![modified_event(&flow_binding_2, false)],
+        )
+        .await
+        .unwrap();
+
+    let active_bindings = event_store
+        .stream_all_active_flow_bindings()
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+    assert_eq!(active_bindings.len(), 2);
+    assert!(active_bindings.contains(&flow_binding_2));
+    assert!(active_bindings.contains(&flow_binding_3));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_save_events_multi_rejects_invalid_items(catalog: &Catalog) {
+    let event_store = catalog.get_one::<dyn FlowTriggerEventStore>().unwrap();
+
+    let flow_binding_1 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let flow_binding_2 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+
+    let created_event_id_1 = event_store
+        .save_events(&flow_binding_1, None, vec![created_event(&flow_binding_1)])
+        .await
+        .unwrap();
+    event_store
+        .save_events(
+            &flow_binding_1,
+            Some(created_event_id_1),
+            vec![modified_event(&flow_binding_1, true)],
+        )
+        .await
+        .unwrap();
+
+    let new_item_2 = || SaveEventsItem {
+        query: flow_binding_2.clone(),
+        maybe_prev_stored_event_id: None,
+        events: vec![created_event(&flow_binding_2)],
+    };
+
+    // One stale item rejects the whole batch
+    let res = event_store
+        .save_events_multi(vec![
+            new_item_2(),
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: Some(created_event_id_1),
+                events: vec![modified_event(&flow_binding_1, false)],
+            },
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Events are stored, but none expected
+    let res = event_store
+        .save_events_multi(vec![
+            new_item_2(),
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![created_event(&flow_binding_1)],
+            },
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // An item without events
+    let res = event_store
+        .save_events_multi(vec![
+            new_item_2(),
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![],
+            },
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::NothingToSave));
+
+    // The same binding twice
+    let res = event_store
+        .save_events_multi(vec![new_item_2(), new_item_2()])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::Internal(_)));
+
+    // Nothing of the rejected batches was stored
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 2);
+    let events: Vec<_> = event_store
+        .get_events(&flow_binding_2, GetEventsOpts::default())
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(events, []);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn created_event(flow_binding: &FlowBinding) -> FlowTriggerEvent {
+    FlowTriggerEventCreated {
+        event_time: Utc::now(),
+        flow_binding: flow_binding.clone(),
+        paused: false,
+        rule: dummy_schedule(),
+        stop_policy: FlowTriggerStopPolicy::default(),
+    }
+    .into()
+}
+
+fn modified_event(flow_binding: &FlowBinding, paused: bool) -> FlowTriggerEvent {
+    FlowTriggerEventModified {
+        event_time: Utc::now(),
+        flow_binding: flow_binding.clone(),
+        paused,
+        rule: dummy_schedule(),
+        stop_policy: FlowTriggerStopPolicy::default(),
+    }
+    .into()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO webhook_subscription_events (subscription_id, created_at, event_type, event_payload)\n                SELECT subscription_id, created_at, event_type, event_payload\n                    FROM UNNEST($1::uuid[], $2::timestamptz[], $3::text[], $4::jsonb[])\n                        WITH ORDINALITY AS e(subscription_id, created_at, event_type, event_payload, row_num)\n                    ORDER BY row_num\n                RETURNING event_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TimestamptzArray",
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d5214f3af79a2f0d8b99cf32f04ec44245b92b2d670da322407d0aa217ea766b"
+}

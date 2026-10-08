@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use database_common::TransactionRefT;
 use dill::*;
 use futures::TryStreamExt;
@@ -391,6 +393,224 @@ impl EventStore<WebhookSubscriptionState> for PostgresWebhookSubscriptionEventSt
         Ok(last_event_id)
     }
 
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<WebhookSubscriptionID, WebhookSubscriptionEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        validate_multi_save_items(&items)?;
+
+        let num_total_events = items.iter().map(|item| item.events.len()).sum();
+
+        let mut new_subscription_ids = Vec::new();
+        let mut new_subscription_dataset_ids = Vec::new();
+        let mut new_subscription_event_types = Vec::new();
+        let mut new_subscription_labels = Vec::new();
+
+        let mut item_subscription_ids = Vec::with_capacity(items.len());
+        let mut item_prev_event_ids = Vec::with_capacity(items.len());
+        let mut item_event_counts = Vec::with_capacity(items.len());
+
+        let mut event_subscription_ids = Vec::with_capacity(num_total_events);
+        let mut event_times = Vec::with_capacity(num_total_events);
+        let mut event_types = Vec::with_capacity(num_total_events);
+        let mut event_payloads = Vec::with_capacity(num_total_events);
+
+        for item in &items {
+            let subscription_id: uuid::Uuid = *item.query.as_ref();
+
+            // Newly created subscriptions must be registered before their events
+            let first_event = item.events.first().expect("Non empty event list expected");
+            if let WebhookSubscriptionEvent::Created(e) = first_event {
+                assert_eq!(item.query, e.subscription_id);
+
+                // When creating a subscription, there is no way something was already stored
+                if item.maybe_prev_stored_event_id.is_some() {
+                    return Err(SaveEventsError::concurrent_modification());
+                }
+
+                new_subscription_ids.push(subscription_id);
+                new_subscription_dataset_ids.push(e.dataset_id.as_ref().map(ToString::to_string));
+                new_subscription_event_types.push(event_types_to_json(&e.event_types));
+                new_subscription_labels.push(label_to_column(&e.label));
+            }
+
+            item_subscription_ids.push(subscription_id);
+            item_prev_event_ids.push(item.maybe_prev_stored_event_id.map(EventID::into_inner));
+            item_event_counts.push(item.events.len());
+
+            for event in &item.events {
+                event_subscription_ids.push(subscription_id);
+                event_times.push(event.event_time());
+                event_types.push(event.typename());
+                event_payloads.push(serde_json::to_value(event).int_err()?);
+            }
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        if !new_subscription_ids.is_empty() {
+            let connection_mut = tr.connection_mut().await?;
+            sqlx::query!(
+                r#"
+                INSERT INTO webhook_subscriptions (id, dataset_id, event_types, status, label)
+                    SELECT
+                        u.id,
+                        u.dataset_id,
+                        ARRAY(SELECT jsonb_array_elements_text(u.event_types)),
+                        'UNVERIFIED'::webhook_subscription_status,
+                        u.label
+                    FROM UNNEST($1::uuid[], $2::text[], $3::jsonb[], $4::text[])
+                        AS u(id, dataset_id, event_types, label)
+                "#,
+                &new_subscription_ids,
+                &new_subscription_dataset_ids as _,
+                &new_subscription_event_types,
+                &new_subscription_labels as _,
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+        }
+
+        let connection_mut = tr.connection_mut().await?;
+        let inserted_event_ids = sqlx::query_scalar!(
+            r#"
+            INSERT INTO webhook_subscription_events (subscription_id, created_at, event_type, event_payload)
+                SELECT subscription_id, created_at, event_type, event_payload
+                    FROM UNNEST($1::uuid[], $2::timestamptz[], $3::text[], $4::jsonb[])
+                        WITH ORDINALITY AS e(subscription_id, created_at, event_type, event_payload, row_num)
+                    ORDER BY row_num
+                RETURNING event_id
+            "#,
+            &event_subscription_ids,
+            &event_times,
+            &event_types as _,
+            &event_payloads,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let last_event_ids = last_event_ids_per_item(inserted_event_ids, item_event_counts)?;
+        let item_last_event_ids: Vec<i64> = last_event_ids
+            .iter()
+            .copied()
+            .map(EventID::into_inner)
+            .collect();
+
+        // A previously stored event id that does not match the expected one
+        // leaves its row untouched, which means a concurrent modification
+        let connection_mut = tr.connection_mut().await?;
+        let updated_rows = sqlx::query!(
+            r#"
+            UPDATE webhook_subscriptions
+                SET last_event_id = u.last_event_id
+                FROM UNNEST($1::uuid[], $2::bigint[], $3::bigint[])
+                    AS u(id, prev_event_id, last_event_id)
+                WHERE webhook_subscriptions.id = u.id
+                    AND webhook_subscriptions.last_event_id IS NOT DISTINCT FROM u.prev_event_id
+                RETURNING webhook_subscriptions.id, webhook_subscriptions.status AS "status: WebhookSubscriptionStatus"
+            "#,
+            &item_subscription_ids,
+            &item_prev_event_ids as _,
+            &item_last_event_ids,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        if updated_rows.len() != items.len() {
+            return Err(SaveEventsError::concurrent_modification());
+        }
+
+        // Update the rest of denormalized subscription records
+        let stored_statuses: HashMap<uuid::Uuid, WebhookSubscriptionStatus> = updated_rows
+            .into_iter()
+            .map(|row| (row.id, row.status))
+            .collect();
+
+        let mut changed_subscription_ids = Vec::new();
+        let mut changed_statuses = Vec::new();
+        let mut changed_label_flags = Vec::new();
+        let mut changed_labels = Vec::new();
+        let mut changed_event_types_flags = Vec::new();
+        let mut changed_event_types = Vec::new();
+
+        for (item, subscription_id) in items.iter().zip(&item_subscription_ids) {
+            let stored_status = stored_statuses[subscription_id];
+            let new_status = item
+                .events
+                .iter()
+                .fold(stored_status, |status, event| event.new_status(status));
+
+            let maybe_modified = item.events.iter().rev().find_map(|event| match event {
+                WebhookSubscriptionEvent::Modified(e) => Some(e),
+                WebhookSubscriptionEvent::Created(_)
+                | WebhookSubscriptionEvent::Enabled(_)
+                | WebhookSubscriptionEvent::Paused(_)
+                | WebhookSubscriptionEvent::Resumed(_)
+                | WebhookSubscriptionEvent::MarkedUnreachable(_)
+                | WebhookSubscriptionEvent::Reactivated(_)
+                | WebhookSubscriptionEvent::SecretRotated(_)
+                | WebhookSubscriptionEvent::Removed(_) => None,
+            });
+
+            if new_status == stored_status && maybe_modified.is_none() {
+                continue;
+            }
+
+            changed_subscription_ids.push(*subscription_id);
+            changed_statuses.push(new_status);
+            changed_label_flags.push(maybe_modified.is_some());
+            changed_labels.push(maybe_modified.and_then(|e| label_to_column(&e.new_label)));
+            changed_event_types_flags.push(maybe_modified.is_some());
+            changed_event_types.push(
+                maybe_modified.map_or(serde_json::Value::Array(vec![]), |e| {
+                    event_types_to_json(&e.new_event_types)
+                }),
+            );
+        }
+
+        if !changed_subscription_ids.is_empty() {
+            let connection_mut = tr.connection_mut().await?;
+            sqlx::query!(
+                r#"
+                UPDATE webhook_subscriptions
+                    SET status = u.status,
+                        label = CASE WHEN u.label_changed THEN u.label ELSE webhook_subscriptions.label END,
+                        event_types = CASE
+                            WHEN u.event_types_changed THEN ARRAY(SELECT jsonb_array_elements_text(u.event_types))
+                            ELSE webhook_subscriptions.event_types
+                        END
+                    FROM UNNEST(
+                        $1::uuid[],
+                        $2::webhook_subscription_status[],
+                        $3::bool[],
+                        $4::text[],
+                        $5::bool[],
+                        $6::jsonb[]
+                    ) AS u(id, status, label_changed, label, event_types_changed, event_types)
+                    WHERE webhook_subscriptions.id = u.id
+                "#,
+                &changed_subscription_ids,
+                &changed_statuses as &[WebhookSubscriptionStatus],
+                &changed_label_flags,
+                &changed_labels as _,
+                &changed_event_types_flags,
+                &changed_event_types,
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+        }
+
+        Ok(last_event_ids)
+    }
+
     async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -544,6 +764,26 @@ impl WebhookSubscriptionEventStore for PostgresWebhookSubscriptionEventStore {
             .into_iter()
             .map(|record| WebhookSubscriptionID::new(record.id))
             .collect())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn event_types_to_json(event_types: &[WebhookEventType]) -> serde_json::Value {
+    serde_json::Value::Array(
+        event_types
+            .iter()
+            .map(|t| serde_json::Value::String(t.as_ref().to_string()))
+            .collect(),
+    )
+}
+
+/// Empty labels are stored as NULL
+fn label_to_column(label: &WebhookSubscriptionLabel) -> Option<String> {
+    if label.as_ref().is_empty() {
+        None
+    } else {
+        Some(label.as_ref().to_string())
     }
 }
 

@@ -491,3 +491,234 @@ pub async fn test_existing_bindings_exclude_removed_scopes(catalog: &Catalog) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_get_events_multi(catalog: &Catalog) {
+    let event_store = catalog
+        .get_one::<dyn FlowConfigurationEventStore>()
+        .unwrap();
+
+    let flow_binding_1 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let flow_binding_2 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
+
+    let event_1_1 = created_event(&flow_binding_1);
+    let event_1_2 = modified_event(&flow_binding_1);
+    let event_2 = created_event(&flow_binding_2);
+
+    event_store
+        .save_events(
+            &flow_binding_1,
+            None,
+            vec![event_1_1.clone(), event_1_2.clone()],
+        )
+        .await
+        .unwrap();
+    event_store
+        .save_events(&flow_binding_2, None, vec![event_2.clone()])
+        .await
+        .unwrap();
+
+    let events: Vec<_> = event_store
+        .get_events_multi(&[
+            flow_binding_3.clone(),
+            flow_binding_2.clone(),
+            flow_binding_1.clone(),
+        ])
+        .try_collect()
+        .await
+        .unwrap();
+
+    let event_ids: Vec<_> = events.iter().map(|(_, event_id, _)| *event_id).collect();
+    assert!(event_ids.is_sorted());
+
+    let events: Vec<_> = events
+        .into_iter()
+        .map(|(flow_binding, _, event)| (flow_binding, event))
+        .collect();
+    assert_eq!(
+        events,
+        [
+            (flow_binding_1.clone(), event_1_1),
+            (flow_binding_1, event_1_2),
+            (flow_binding_2, event_2),
+        ]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_save_events_multi(catalog: &Catalog) {
+    let event_store = catalog
+        .get_one::<dyn FlowConfigurationEventStore>()
+        .unwrap();
+
+    let flow_binding_1 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let flow_binding_2 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+    let flow_binding_3 = FlowBinding::new(FLOW_TYPE_SYSTEM_GC, FlowScope::make_system_scope());
+
+    let created_event_id_1 = event_store
+        .save_events(&flow_binding_1, None, vec![created_event(&flow_binding_1)])
+        .await
+        .unwrap();
+
+    // An existing binding next to new ones
+    let last_event_ids = event_store
+        .save_events_multi(vec![
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: Some(created_event_id_1),
+                events: vec![modified_event(&flow_binding_1)],
+            },
+            SaveEventsItem {
+                query: flow_binding_2.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![
+                    created_event(&flow_binding_2),
+                    modified_event(&flow_binding_2),
+                ],
+            },
+            SaveEventsItem {
+                query: flow_binding_3.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![created_event(&flow_binding_3)],
+            },
+        ])
+        .await
+        .unwrap();
+
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 5);
+
+    // Returned IDs follow the input order and match the stored last events
+    let mut stored_last_event_ids = Vec::new();
+    for flow_binding in [&flow_binding_1, &flow_binding_2, &flow_binding_3] {
+        let events: Vec<_> = event_store
+            .get_events(flow_binding, GetEventsOpts::default())
+            .try_collect()
+            .await
+            .unwrap();
+        stored_last_event_ids.push(events.last().unwrap().0);
+    }
+    assert_eq!(last_event_ids, stored_last_event_ids);
+
+    // The returned IDs are valid expectations for the next save
+    event_store
+        .save_events(
+            &flow_binding_2,
+            Some(last_event_ids[1]),
+            vec![modified_event(&flow_binding_2)],
+        )
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_event_store_save_events_multi_rejects_invalid_items(catalog: &Catalog) {
+    let event_store = catalog
+        .get_one::<dyn FlowConfigurationEventStore>()
+        .unwrap();
+
+    let flow_binding_1 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"foo"));
+    let flow_binding_2 = ingest_dataset_binding(&odf::DatasetID::new_seeded_ed25519(b"bar"));
+
+    let created_event_id_1 = event_store
+        .save_events(&flow_binding_1, None, vec![created_event(&flow_binding_1)])
+        .await
+        .unwrap();
+    event_store
+        .save_events(
+            &flow_binding_1,
+            Some(created_event_id_1),
+            vec![modified_event(&flow_binding_1)],
+        )
+        .await
+        .unwrap();
+
+    let new_item_2 = || SaveEventsItem {
+        query: flow_binding_2.clone(),
+        maybe_prev_stored_event_id: None,
+        events: vec![created_event(&flow_binding_2)],
+    };
+
+    // One stale item rejects the whole batch
+    let res = event_store
+        .save_events_multi(vec![
+            new_item_2(),
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: Some(created_event_id_1),
+                events: vec![modified_event(&flow_binding_1)],
+            },
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // Events are stored, but none expected
+    let res = event_store
+        .save_events_multi(vec![
+            new_item_2(),
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![created_event(&flow_binding_1)],
+            },
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::ConcurrentModification(_)));
+
+    // An item without events
+    let res = event_store
+        .save_events_multi(vec![
+            new_item_2(),
+            SaveEventsItem {
+                query: flow_binding_1.clone(),
+                maybe_prev_stored_event_id: None,
+                events: vec![],
+            },
+        ])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::NothingToSave));
+
+    // The same binding twice
+    let res = event_store
+        .save_events_multi(vec![new_item_2(), new_item_2()])
+        .await;
+    assert_matches!(res, Err(SaveEventsError::Internal(_)));
+
+    // Nothing of the rejected batches was stored
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 2);
+    let events: Vec<_> = event_store
+        .get_events(&flow_binding_2, GetEventsOpts::default())
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(events, []);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn created_event(flow_binding: &FlowBinding) -> FlowConfigurationEvent {
+    FlowConfigurationEventCreated {
+        event_time: Utc::now(),
+        flow_binding: flow_binding.clone(),
+        rule: FlowConfigRuleCompact::try_new(100_000, 1000)
+            .unwrap()
+            .into_flow_config(),
+        retry_policy: None,
+    }
+    .into()
+}
+
+fn modified_event(flow_binding: &FlowBinding) -> FlowConfigurationEvent {
+    FlowConfigurationEventModified {
+        event_time: Utc::now(),
+        flow_binding: flow_binding.clone(),
+        rule: FlowConfigRuleCompact::try_new(200_000, 2000)
+            .unwrap()
+            .into_flow_config(),
+        retry_policy: None,
+    }
+    .into()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

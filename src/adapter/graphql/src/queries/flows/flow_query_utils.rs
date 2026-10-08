@@ -166,26 +166,57 @@ pub(crate) async fn build_webhook_id_subscription_mapping_from_processes_listing
         .into_iter()
         .collect::<Vec<_>>();
 
-    if unique_subscription_ids.is_empty() {
+    let subscriptions_by_id =
+        load_webhook_subscriptions_by_ids(ctx, &unique_subscription_ids).await?;
+
+    if let Some(missing_subscription_id) = unique_subscription_ids
+        .iter()
+        .find(|id| !subscriptions_by_id.contains_key(id))
+    {
+        return Err(GqlError::Internal(InternalError::new(format!(
+            "Webhook subscription not found: {missing_subscription_id}",
+        ))));
+    }
+
+    Ok(subscriptions_by_id)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Loads webhook subscriptions in bulk, including removed ones; missing ones
+/// are left out of the result
+pub(crate) async fn load_webhook_subscriptions_by_ids(
+    ctx: &Context<'_>,
+    subscription_ids: &[kamu_webhooks::WebhookSubscriptionID],
+) -> Result<
+    HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>,
+    InternalError,
+> {
+    if subscription_ids.is_empty() {
         return Ok(HashMap::new());
     }
 
-    // Load related subscriptions
     let webhook_subscription_event_store =
         from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionEventStore);
 
-    let subscriptions = kamu_webhooks::WebhookSubscription::load_multi_simple(
-        &unique_subscription_ids,
+    let mut subscriptions_by_id = HashMap::with_capacity(subscription_ids.len());
+    for load_result in kamu_webhooks::WebhookSubscription::try_load_multi(
+        subscription_ids,
         webhook_subscription_event_store.as_ref(),
     )
     .await
-    .int_err()?;
-
-    // Organize subscriptions by id
-    let subscriptions_by_id = subscriptions
-        .into_iter()
-        .map(|s| (s.id(), s))
-        .collect::<HashMap<_, _>>();
+    {
+        match load_result {
+            Ok(subscription) => {
+                subscriptions_by_id.insert(subscription.id(), subscription);
+            }
+            Err(kamu_webhooks::LoadError::NotFound(_)) => {}
+            Err(
+                e @ (kamu_webhooks::LoadError::ProjectionError(_)
+                | kamu_webhooks::LoadError::Internal(_)),
+            ) => return Err(e.int_err()),
+        }
+    }
 
     Ok(subscriptions_by_id)
 }

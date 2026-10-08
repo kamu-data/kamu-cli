@@ -9647,6 +9647,7 @@ dependencies = [
  "sqlx",
  "test-group",
  "test-log",
+ "tokio",
  "tracing",
  "wakeup-listener",
 ]

@@ -95,6 +95,23 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_save_events_multi,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_task_system_repo_tests::test_event_store_save_events_multi_concurrent_modification,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryTaskSystemEventStoreHarness {
     catalog: Catalog,
 }

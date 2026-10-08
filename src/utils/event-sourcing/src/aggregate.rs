@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 
 use internal_error::{ErrorIntoInternal, InternalError};
@@ -169,6 +169,13 @@ where
     {
         use tokio_stream::StreamExt;
 
+        if let Err(err) = ensure_unique_queries(queries) {
+            return queries
+                .iter()
+                .map(|_| Err(LoadError::Internal(err.clone().int_err())))
+                .collect();
+        }
+
         let mut event_stream = event_store.get_events_multi(queries);
         let mut agg_results: HashMap<Proj::Query, Result<Self, LoadError<Proj>>> = HashMap::new();
 
@@ -244,6 +251,8 @@ where
         event_store: &Store,
     ) -> Result<Vec<Result<Self, LoadError<Proj>>>, GetEventsError> {
         use tokio_stream::StreamExt;
+
+        ensure_unique_queries(queries).map_err(|err| GetEventsError::Internal(err.int_err()))?;
 
         let mut event_stream = event_store.get_events_multi(queries);
         let mut agg_results: HashMap<Proj::Query, Result<Self, LoadError<Proj>>> = HashMap::new();
@@ -698,6 +707,31 @@ impl From<SaveEventsError> for SaveError {
             SaveEventsError::Internal(err) => Self::Internal(err),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A multi-load sees the events of each query once, so a query repeated in the
+/// input cannot be served
+fn ensure_unique_queries<Query>(queries: &[Query]) -> Result<(), DuplicateQueryError>
+where
+    Query: std::hash::Hash + Eq + std::fmt::Debug,
+{
+    let mut seen_queries = HashSet::with_capacity(queries.len());
+    for query in queries {
+        if !seen_queries.insert(query) {
+            return Err(DuplicateQueryError {
+                query: format!("{query:?}"),
+            });
+        }
+    }
+    Ok(())
+}
+
+#[derive(thiserror::Error, Debug, Clone)]
+#[error("Duplicate query in multi-load: {query}")]
+pub struct DuplicateQueryError {
+    pub query: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -359,6 +359,10 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
         self.inner.get_events(query, opts)
     }
 
+    fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<'_, FlowID, FlowEvent> {
+        self.inner.get_events_multi(queries)
+    }
+
     async fn save_events(
         &self,
         query: &FlowID,
@@ -403,6 +407,57 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
         // Return the global event ID as the result of this operation,
         // ignore local event ID in the inner store
         Ok(global_event_id)
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<FlowID, FlowEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Prepare data for FlowSystemEventStore - a merged stream per item
+        let merge_event_data_per_item: Vec<_> = items
+            .iter()
+            .map(|item| {
+                FlowEventDataHelper::prepare_merge_event_data(&item.events, FlowEvent::event_time)
+            })
+            .collect();
+
+        let events: Vec<FlowEvent> = items
+            .iter()
+            .flat_map(|item| item.events.iter().cloned())
+            .collect();
+        let schedules_activation = events.iter().any(Self::schedules_activation);
+
+        // Save events to this store, all or nothing
+        self.inner.save_events_multi(items).await?;
+
+        // Update in-memory indexes only once the save passed the concurrent
+        // modification check, as a rejected save must leave them intact
+        {
+            let state = self.inner.as_state();
+            let mut g = state.lock().unwrap();
+            for event in &events {
+                Self::update_index(&mut g, event);
+            }
+        }
+
+        // Save merged events to FlowSystemEventStore, returning global event IDs
+        let global_event_ids = merge_event_data_per_item
+            .iter()
+            .map(|merge_event_data| {
+                self.flow_system_event_store
+                    .save_events(FlowSystemEventSourceType::Flow, merge_event_data)
+            })
+            .collect();
+
+        if schedules_activation {
+            self.wakeup_hub.signal(FLOW_ACTIVATION_SCHEDULED_CHANNEL);
+        }
+
+        Ok(global_event_ids)
     }
 }
 

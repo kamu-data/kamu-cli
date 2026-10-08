@@ -78,6 +78,13 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
         self.inner.get_events(query, opts)
     }
 
+    fn get_events_multi(
+        &self,
+        queries: &[FlowBinding],
+    ) -> MultiEventStream<'_, FlowBinding, FlowTriggerEvent> {
+        self.inner.get_events_multi(queries)
+    }
+
     async fn save_events(
         &self,
         query: &FlowBinding,
@@ -106,6 +113,38 @@ impl EventStore<FlowTriggerState> for InMemoryFlowTriggerEventStore {
         // Return the global event ID as the result of this operation,
         // ignore local event ID in the inner store
         Ok(global_event_id)
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<FlowBinding, FlowTriggerEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Prepare data for FlowSystemEventStore - a merged stream per item
+        let merge_event_data_per_item: Vec<_> = items
+            .iter()
+            .map(|item| {
+                FlowEventDataHelper::prepare_merge_event_data(
+                    &item.events,
+                    FlowTriggerEvent::event_time,
+                )
+            })
+            .collect();
+
+        // Save events to this store, all or nothing
+        self.inner.save_events_multi(items).await?;
+
+        // Save merged events to FlowSystemEventStore, returning global event IDs
+        Ok(merge_event_data_per_item
+            .iter()
+            .map(|merge_event_data| {
+                self.flow_system_event_store
+                    .save_events(FlowSystemEventSourceType::FlowTrigger, merge_event_data)
+            })
+            .collect())
     }
 }
 
@@ -143,22 +182,23 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
         Box::pin(futures::stream::iter(active_bindings.into_iter().map(Ok)))
     }
 
-    async fn all_trigger_bindings_for_scope(
+    async fn all_trigger_bindings_for_scopes(
         &self,
-        flow_scope: &FlowScope,
+        flow_scopes: &[FlowScope],
     ) -> Result<Vec<FlowBinding>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
-        let mut seen_flow_types = HashSet::new();
+        let flow_scopes: HashSet<&FlowScope> = flow_scopes.iter().collect();
+        let mut seen_bindings = HashSet::new();
         let mut bindings = Vec::new();
 
         for event in g.events.iter().rev() {
             let binding = event.flow_binding();
-            if binding.scope != *flow_scope {
+            if !flow_scopes.contains(&binding.scope) {
                 continue;
             }
-            if seen_flow_types.insert(binding.flow_type.clone()) {
+            if seen_bindings.insert(binding) {
                 bindings.push(binding.clone());
             }
         }

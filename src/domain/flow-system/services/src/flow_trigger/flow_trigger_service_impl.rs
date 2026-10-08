@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::slice;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -100,24 +101,78 @@ impl FlowTriggerServiceImpl {
     ) -> Result<(), InternalError> {
         tracing::trace!(?flow_bindings, "Removing flow bindings");
 
-        for flow_binding in flow_bindings {
-            let maybe_flow_trigger =
-                FlowTrigger::try_load(flow_binding, self.flow_trigger_event_store.as_ref())
-                    .await
-                    .int_err()?;
+        let now = self.time_source.now();
 
-            if let Some(mut flow_trigger) = maybe_flow_trigger
-                && flow_trigger.is_alive()
-            {
-                flow_trigger
-                    .notify_scope_removed(self.time_source.now())
-                    .int_err()?;
+        let mut flow_triggers = self.load_alive_triggers(&flow_bindings).await?;
+        for flow_trigger in &mut flow_triggers {
+            flow_trigger.notify_scope_removed(now).int_err()?;
+        }
 
-                flow_trigger
-                    .save(self.flow_trigger_event_store.as_ref())
-                    .await
-                    .int_err()?;
+        FlowTrigger::save_multi(&mut flow_triggers, self.flow_trigger_event_store.as_ref())
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
+
+    /// Loads triggers of the given bindings in bulk, skipping missing and
+    /// stopped ones
+    async fn load_alive_triggers(
+        &self,
+        flow_bindings: &[FlowBinding],
+    ) -> Result<Vec<FlowTrigger>, InternalError> {
+        let mut flow_triggers = Vec::with_capacity(flow_bindings.len());
+
+        for load_result in
+            FlowTrigger::try_load_multi(flow_bindings, self.flow_trigger_event_store.as_ref()).await
+        {
+            match load_result {
+                Ok(flow_trigger) => {
+                    if flow_trigger.is_alive() {
+                        flow_triggers.push(flow_trigger);
+                    }
+                }
+                Err(LoadError::NotFound(_)) => {}
+                Err(e @ (LoadError::ProjectionError(_) | LoadError::Internal(_))) => {
+                    return Err(e.int_err());
+                }
             }
+        }
+
+        Ok(flow_triggers)
+    }
+
+    /// Applies a status change to all alive triggers of the given scopes, then
+    /// saves the changed ones in bulk and announces each of them
+    async fn change_triggers_for_scopes(
+        &self,
+        request_time: DateTime<Utc>,
+        scopes: &[FlowScope],
+        change: impl Fn(&mut FlowTrigger) -> Result<(), ProjectionError<FlowTriggerState>>,
+    ) -> Result<(), InternalError> {
+        let flow_bindings = self
+            .flow_trigger_event_store
+            .all_trigger_bindings_for_scopes(scopes)
+            .await?;
+
+        let mut changed_triggers = Vec::new();
+        for mut flow_trigger in self.load_alive_triggers(&flow_bindings).await? {
+            change(&mut flow_trigger).int_err()?;
+            if flow_trigger.has_updates() {
+                changed_triggers.push(flow_trigger);
+            }
+        }
+
+        FlowTrigger::save_multi(
+            &mut changed_triggers,
+            self.flow_trigger_event_store.as_ref(),
+        )
+        .await
+        .int_err()?;
+
+        for flow_trigger in &changed_triggers {
+            self.publish_trigger_updated(flow_trigger, request_time)
+                .await?;
         }
 
         Ok(())
@@ -258,32 +313,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         request_time: DateTime<Utc>,
         scopes: &[FlowScope],
     ) -> Result<(), InternalError> {
-        // TODO: maybe batch queries would be helpful here,
-        // but for now we just iterate over scopes
-        for flow_scope in scopes {
-            let flow_bindings = self
-                .flow_trigger_event_store
-                .all_trigger_bindings_for_scope(flow_scope)
-                .await
-                .int_err()?;
-
-            let flow_triggers = FlowTrigger::load_multi_simple(
-                &flow_bindings,
-                self.flow_trigger_event_store.as_ref(),
-            )
-            .await
-            .int_err()?;
-
-            for flow_trigger in flow_triggers {
-                if flow_trigger.is_alive() {
-                    self.pause_given_trigger(request_time, flow_trigger)
-                        .await
-                        .int_err()?;
-                }
-            }
-        }
-
-        Ok(())
+        self.change_triggers_for_scopes(request_time, scopes, |flow_trigger| {
+            flow_trigger.pause(request_time)
+        })
+        .await
     }
 
     async fn resume_flow_triggers_for_scopes(
@@ -291,32 +324,10 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         request_time: DateTime<Utc>,
         scopes: &[FlowScope],
     ) -> Result<(), InternalError> {
-        // TODO: maybe batch queries would be helpful here,
-        // but for now we just iterate over scopes
-        for flow_scope in scopes {
-            let flow_bindings = self
-                .flow_trigger_event_store
-                .all_trigger_bindings_for_scope(flow_scope)
-                .await
-                .int_err()?;
-
-            let flow_triggers = FlowTrigger::load_multi_simple(
-                &flow_bindings,
-                self.flow_trigger_event_store.as_ref(),
-            )
-            .await
-            .int_err()?;
-
-            for flow_trigger in flow_triggers {
-                if flow_trigger.is_alive() {
-                    self.resume_given_trigger(request_time, flow_trigger)
-                        .await
-                        .int_err()?;
-                }
-            }
-        }
-
-        Ok(())
+        self.change_triggers_for_scopes(request_time, scopes, |flow_trigger| {
+            flow_trigger.resume(request_time)
+        })
+        .await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(?scopes))]
@@ -366,7 +377,7 @@ impl FlowScopeRemovalHandler for FlowTriggerServiceImpl {
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let flow_bindings = self
             .flow_trigger_event_store
-            .all_trigger_bindings_for_scope(flow_scope)
+            .all_trigger_bindings_for_scopes(slice::from_ref(flow_scope))
             .await?;
 
         self.remove_given_bindings(flow_bindings).await.int_err()?;

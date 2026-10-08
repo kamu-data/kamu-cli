@@ -113,6 +113,10 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
         self.inner.get_events(task_id, opts)
     }
 
+    fn get_events_multi(&self, queries: &[TaskID]) -> MultiEventStream<'_, TaskID, TaskEvent> {
+        self.inner.get_events_multi(queries)
+    }
+
     async fn save_events(
         &self,
         task_id: &TaskID,
@@ -150,6 +154,45 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
         }
 
         Ok(last_event_id)
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<TaskID, TaskEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let events: Vec<TaskEvent> = items
+            .iter()
+            .flat_map(|item| item.events.iter().cloned())
+            .collect();
+
+        let has_queued_tasks = events.iter().any(|event| {
+            matches!(
+                event,
+                TaskEvent::TaskCreated(_) | TaskEvent::TaskRequeued(_)
+            )
+        });
+
+        let last_event_ids = self.inner.save_events_multi(items).await?;
+
+        // Indexed only once the save passed the concurrent modification check,
+        // as a rejected save must leave them intact
+        {
+            let state = self.inner.as_state();
+            let mut g = state.lock().unwrap();
+            for event in &events {
+                Self::update_index(&mut g, event);
+            }
+        }
+
+        if has_queued_tasks {
+            self.wakeup_hub.signal(TASKS_QUEUED_CHANNEL);
+        }
+
+        Ok(last_event_ids)
     }
 }
 

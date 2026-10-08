@@ -139,47 +139,42 @@ impl TaskAgentImpl {
                 break;
             }
 
-            let tasks = Task::load_multi_simple(&running_task_ids, task_event_store.as_ref())
+            let mut tasks = Task::load_multi_simple(&running_task_ids, task_event_store.as_ref())
                 .await
                 .int_err()?;
 
-            for mut task in tasks {
+            let now = self.time_source.now();
+            for task in &mut tasks {
                 if task.timing.cancellation_requested_at.is_some() {
-                    self.finish_interrupted_cancelled_task(&mut task, &task_event_store, &outbox)
-                        .await?;
+                    task.finish(now, TaskOutcome::Cancelled).int_err()?;
                 } else {
-                    task.requeue(self.time_source.now()).int_err()?;
-                    task.save(task_event_store.as_ref()).await.int_err()?;
+                    task.requeue(now).int_err()?;
+                }
+            }
+
+            Task::save_multi(&mut tasks, task_event_store.as_ref())
+                .await
+                .int_err()?;
+
+            for task in &tasks {
+                if task.timing.cancellation_requested_at.is_some() {
+                    outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_TASK_AGENT,
+                            TaskProgressMessage::finished(
+                                now,
+                                task.task_id,
+                                task.metadata.clone(),
+                                TaskOutcome::Cancelled,
+                            ),
+                        )
+                        .await?;
+
+                    tracing::info!(task_id = %task.task_id, "Interrupted cancelled task finished");
                 }
             }
         }
 
-        Ok(())
-    }
-
-    async fn finish_interrupted_cancelled_task(
-        &self,
-        task: &mut Task,
-        task_event_store: &Arc<dyn TaskEventStore>,
-        outbox: &Arc<dyn Outbox>,
-    ) -> Result<(), InternalError> {
-        let now = self.time_source.now();
-        task.finish(now, TaskOutcome::Cancelled).int_err()?;
-        task.save(task_event_store.as_ref()).await.int_err()?;
-
-        outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_TASK_AGENT,
-                TaskProgressMessage::finished(
-                    now,
-                    task.task_id,
-                    task.metadata.clone(),
-                    TaskOutcome::Cancelled,
-                ),
-            )
-            .await?;
-
-        tracing::info!(task_id = %task.task_id, "Interrupted cancelled task finished");
         Ok(())
     }
 

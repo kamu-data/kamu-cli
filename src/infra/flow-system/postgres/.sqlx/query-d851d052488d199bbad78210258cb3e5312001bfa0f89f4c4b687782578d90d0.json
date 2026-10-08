@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT q.idx AS \"idx!\", MAX(e.event_id) AS \"last_event_id?: i64\"\n                FROM UNNEST($1::text[], $2::jsonb[]) WITH ORDINALITY AS q(flow_type, scope_data, idx)\n                    LEFT JOIN flow_trigger_events e\n                        ON e.flow_type = q.flow_type AND e.scope_data = q.scope_data\n                GROUP BY q.idx\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "idx!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_event_id?: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "d851d052488d199bbad78210258cb3e5312001bfa0f89f4c4b687782578d90d0"
+}

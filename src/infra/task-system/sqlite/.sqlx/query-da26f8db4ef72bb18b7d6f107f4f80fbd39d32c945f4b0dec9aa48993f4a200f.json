@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE tasks\n                SET task_status = CASE\n                        WHEN tasks.task_status = 'running' THEN u.value ->> 'status_if_running'\n                        ELSE u.value ->> 'status_otherwise'\n                    END,\n                    last_event_id = u.value ->> 'last_event_id'\n                FROM json_each($1) AS u\n                WHERE tasks.task_id = u.value ->> 'task_id'\n                    AND tasks.last_event_id IS (u.value ->> 'prev_event_id')\n                RETURNING tasks.task_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "da26f8db4ef72bb18b7d6f107f4f80fbd39d32c945f4b0dec9aa48993f4a200f"
+}

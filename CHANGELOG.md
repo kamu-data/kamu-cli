@@ -17,6 +17,9 @@ Recommendation: for ease of reading, use the following format:
 ### Changed
 - SQLite bulk writes (ReBAC relations, dataset blocks and dependencies, flow and task events) are checked at
   compile time
+- Flow triggers, flow configurations, tasks and webhook subscriptions are loaded and saved in bulk where
+  several change at once (startup, pausing or resuming account flows, dataset deletion, flow listings),
+  instead of one database round-trip per item
 ### Fixed
 - Flaky GraphQL flow process card ordering test
 - SQLite: indexing more than ~5,400 new blocks of a dataset at once failed with "too many SQL variables"

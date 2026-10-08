@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE tasks\n                SET task_status = CASE\n                        WHEN tasks.task_status = 'running'::task_status_type\n                            THEN u.status_if_running\n                        ELSE u.status_otherwise\n                    END,\n                    last_event_id = u.last_event_id\n                FROM UNNEST($1::bigint[], $2::bigint[], $3::bigint[], $4::task_status_type[], $5::task_status_type[])\n                    AS u(task_id, prev_event_id, last_event_id, status_if_running, status_otherwise)\n                WHERE tasks.task_id = u.task_id\n                    AND tasks.last_event_id IS NOT DISTINCT FROM u.prev_event_id\n                RETURNING tasks.task_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array",
+        "Int8Array",
+        "Int8Array",
+        {
+          "Custom": {
+            "name": "task_status_type[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "task_status_type",
+                  "kind": {
+                    "Enum": [
+                      "queued",
+                      "running",
+                      "finished"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "Custom": {
+            "name": "task_status_type[]",
+            "kind": {
+              "Array": {
+                "Custom": {
+                  "name": "task_status_type",
+                  "kind": {
+                    "Enum": [
+                      "queued",
+                      "running",
+                      "finished"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3205755578ff462be3a8a9b07a9dd305f16e0523fd670f045768a6ce96910ec5"
+}

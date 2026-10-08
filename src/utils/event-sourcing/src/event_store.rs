@@ -102,7 +102,7 @@ pub type MultiEventStream<'a, Query, Event> = std::pin::Pin<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SaveEventsItem<Query, Event> {
     pub query: Query,
     pub maybe_prev_stored_event_id: Option<EventID>,
@@ -189,6 +189,49 @@ where
     }
 
     Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Maps event IDs assigned by one bulk insert of a multi-save back to its
+/// items.
+///
+/// The events must have been inserted in item order, so that sorted IDs follow
+/// that order too. Returns the last event ID of every item, preserving input
+/// order.
+pub fn last_event_ids_per_item(
+    mut inserted_event_ids: Vec<i64>,
+    item_event_counts: impl IntoIterator<Item = usize>,
+) -> Result<Vec<EventID>, InternalError> {
+    inserted_event_ids.sort_unstable();
+
+    let mut last_event_ids = Vec::new();
+    let mut num_events_seen = 0;
+
+    for item_event_count in item_event_counts {
+        num_events_seen += item_event_count;
+        let Some(last_event_id) = num_events_seen
+            .checked_sub(1)
+            .and_then(|i| inserted_event_ids.get(i))
+        else {
+            return Err(format!(
+                "Bulk insert returned {} event IDs, expected at least {num_events_seen}",
+                inserted_event_ids.len()
+            )
+            .int_err());
+        };
+        last_event_ids.push(EventID::new(*last_event_id));
+    }
+
+    if num_events_seen != inserted_event_ids.len() {
+        return Err(format!(
+            "Bulk insert returned {} event IDs, expected {num_events_seen}",
+            inserted_event_ids.len()
+        )
+        .int_err());
+    }
+
+    Ok(last_event_ids)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
