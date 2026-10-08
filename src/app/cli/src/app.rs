@@ -43,8 +43,10 @@ use crate::output::*;
 use crate::{
     ConfirmDeleteService,
     GcService,
+    WorkspaceFutureVersionError,
     WorkspaceLayout,
     WorkspaceService,
+    WorkspaceVersion,
     build_db_connection_settings,
     cli,
     cli_commands,
@@ -260,6 +262,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         if cli_commands::command_needs_workspace(&args) {
             if !is_in_workspace {
                 Err(CLIError::usage_error_from(NotInWorkspace))
+            } else if let Some(v @ WorkspaceVersion::Unknown(_)) = workspace_version {
+                Err(CLIError::usage_error_from(
+                    WorkspaceFutureVersionError::new(v, WorkspaceVersion::LATEST),
+                ))
             } else if is_workspace_upgrade_needed {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
             } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant

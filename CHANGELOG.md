@@ -24,6 +24,10 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when the account's
   storage is unlimited
 ### Fixed
+- Running an older kamu in a workspace whose database was migrated by a newer version no longer crashes with
+  "Migration failed: VersionMissing"; it reports the schema versions and asks to upgrade kamu
+- A workspace with a newer layout version than the running kamu now asks to upgrade kamu, instead of suggesting
+  `kamu system upgrade-workspace`
 - API server: an internal server error caused by a panic now reaches browser clients as a 500 response
   instead of a failed request without details; the Web UI server now handles panics the same way
 - GraphQL: `CollectionProjection.entries(maxDepth)` above 64 returns an error instead of crashing the

@@ -29,10 +29,15 @@ doctest = false
 database-common = { workspace = true }
 kamu-cli-e2e-common = { workspace = true }
 kamu-cli-e2e-repo-tests = { workspace = true, default-features = false }
+kamu-cli-puppet = { workspace = true, default-features = false, features = [
+    "extensions",
+] }
+kamu-core = { workspace = true }
 
 dill = { version = "0.17", default-features = false }
 indoc = "2"
 sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
     "sqlite",
 ] }
 tempfile = { version = "3" }
