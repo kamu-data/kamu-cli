@@ -56,7 +56,7 @@ pub struct IngestParams {
     path = "/ingest",
     params(IngestParams, DatasetAliasInPath),
     request_body = Vec<u8>,
-    responses((status = OK, body = ())),
+    responses((status = OK, description = "data ingested", body = ())),
     tag = "kamu",
     security(
         ("api_key" = []),

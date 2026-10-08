@@ -27,7 +27,7 @@ pub struct NodeInfoResponse {
 #[utoipa::path(
     get,
     path = "/info",
-    responses((status = OK, body = NodeInfoResponse)),
+    responses((status = OK, description = "node info", body = NodeInfoResponse)),
     tag = "odf-core",
     security(
         (),

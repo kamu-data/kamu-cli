@@ -20,8 +20,8 @@ use crate::axum_utils::ensure_authenticated_account;
     get,
     path = "/token/validate",
     responses(
-        (status = OK, body = ()),
-        (status = UNAUTHORIZED, body = ApiErrorResponse)
+        (status = OK, description = "token is valid", body = ()),
+        (status = UNAUTHORIZED, description = "token is missing or invalid", body = ApiErrorResponse)
     ),
     tag = "kamu",
     security(

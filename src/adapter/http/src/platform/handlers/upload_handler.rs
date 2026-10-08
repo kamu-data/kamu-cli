@@ -73,7 +73,7 @@ pub struct PlatformFileUploadQuery {
     post,
     path = "/file/upload/prepare",
     params(PlatformFileUploadQuery),
-    responses((status = OK, body = UploadContext)),
+    responses((status = OK, description = "upload prepared", body = UploadContext)),
     tag = "kamu",
     security(
         ("api_key" = []),
@@ -119,7 +119,7 @@ pub struct UploadFromPath {
     path = "/file/upload/{upload_token}",
     params(UploadFromPath),
     request_body = Vec<u8>,
-    responses((status = OK, body = UploadContext)),
+    responses((status = OK, description = "file uploaded", body = UploadContext)),
     tag = "kamu",
     security(
         ("api_key" = []),

@@ -131,7 +131,7 @@ use super::query_types::{QueryResponse, *};
     post,
     path = "/query",
     request_body = QueryRequest,
-    responses((status = OK, body = QueryResponse)),
+    responses((status = OK, description = "query result", body = QueryResponse)),
     tag = "odf-query",
     security(
         (),
@@ -156,7 +156,7 @@ pub async fn query_handler_post(
     get,
     path = "/query",
     params(QueryParams),
-    responses((status = OK, body = QueryResponse)),
+    responses((status = OK, description = "query result", body = QueryResponse)),
     tag = "odf-query",
     security(
         (),

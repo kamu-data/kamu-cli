@@ -39,8 +39,8 @@ impl From<Account> for AccountResponse {
     get,
     path = "/accounts/me",
     responses(
-        (status = OK, body = AccountResponse),
-        (status = UNAUTHORIZED, body = ApiErrorResponse),
+        (status = OK, description = "current account", body = AccountResponse),
+        (status = UNAUTHORIZED, description = "not authenticated", body = ApiErrorResponse),
     ),
     tag = "kamu",
     security(

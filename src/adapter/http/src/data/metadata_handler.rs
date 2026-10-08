@@ -137,7 +137,7 @@ pub struct Ref {
     get,
     path = "/metadata",
     params(DatasetMetadataParams, DatasetAliasInPath),
-    responses((status = OK, body = DatasetMetadataResponse)),
+    responses((status = OK, description = "dataset metadata", body = DatasetMetadataResponse)),
     tag = "odf-query",
     security(
         (),

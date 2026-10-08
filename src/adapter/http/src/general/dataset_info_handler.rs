@@ -74,9 +74,9 @@ impl DatasetInfoResponse {
         ("id" = String, Path, description = "Dataset ID")
     ),
     responses(
-        (status = OK, body = DatasetInfoResponse),
-        (status = UNAUTHORIZED, body = ApiErrorResponse),
-        (status = NOT_FOUND, body = ApiErrorResponse),
+        (status = OK, description = "dataset info", body = DatasetInfoResponse),
+        (status = UNAUTHORIZED, description = "not authenticated", body = ApiErrorResponse),
+        (status = NOT_FOUND, description = "dataset not found", body = ApiErrorResponse),
     ),
     tag = "kamu",
     security(

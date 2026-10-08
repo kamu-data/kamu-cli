@@ -78,7 +78,7 @@ impl DeviceAuthorizationResponse {
         content_type = "application/x-www-form-urlencoded"
     ),
     responses(
-        (status = OK, body = DeviceAuthorizationResponse),
+        (status = OK, description = "device authorization started", body = DeviceAuthorizationResponse),
     ),
     tag = "kamu",
     security(

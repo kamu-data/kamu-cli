@@ -57,7 +57,7 @@ pub struct PhysicalHashFromPath {
     get,
     path = "/refs/{reference}",
     params(RefFromPath, DatasetAliasInPath),
-    responses((status = OK, body = String)),
+    responses((status = OK, description = "block hash the reference points to", body = String)),
     tag = "odf-transfer",
     security(
         (),
@@ -210,7 +210,7 @@ async fn dataset_get_object_common(
     path = "/data/{physical_hash}",
     params(PhysicalHashFromPath, DatasetAliasInPath),
     request_body = Vec<u8>,
-    responses((status = OK, body = ())),
+    responses((status = OK, description = "data file stored", body = ())),
     tag = "odf-transfer",
     security(
         (),
@@ -245,7 +245,7 @@ pub async fn dataset_data_put_handler(
     path = "/checkpoints/{physical_hash}",
     params(PhysicalHashFromPath, DatasetAliasInPath),
     request_body = Vec<u8>,
-    responses((status = OK, body = ())),
+    responses((status = OK, description = "checkpoint file stored", body = ())),
     tag = "odf-transfer",
     security(
         (),
@@ -304,7 +304,7 @@ async fn dataset_put_object_common(
     get,
     path = "/push",
     params(DatasetAliasInPath),
-    responses((status = OK, body = ())),
+    responses((status = OK, description = "websocket upgrade for push protocol", body = ())),
     tag = "odf-transfer",
     security(
         (),
@@ -377,7 +377,7 @@ pub async fn dataset_push_ws_upgrade_handler(
     get,
     path = "/pull",
     params(DatasetAliasInPath),
-    responses((status = OK, body = ())),
+    responses((status = OK, description = "websocket upgrade for pull protocol", body = ())),
     tag = "odf-transfer",
     security(
         (),

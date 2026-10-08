@@ -1119,7 +1119,8 @@
                   "$ref": "#/components/schemas/AccountResponse"
                 }
               }
-            }
+            },
+            "description": "current account"
           },
           "401": {
             "content": {
@@ -1128,7 +1129,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "not authenticated"
           }
         },
         "security": [
@@ -1164,7 +1166,8 @@
                   "$ref": "#/components/schemas/DatasetInfoResponse"
                 }
               }
-            }
+            },
+            "description": "dataset info"
           },
           "401": {
             "content": {
@@ -1173,7 +1176,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "not authenticated"
           },
           "404": {
             "content": {
@@ -1182,7 +1186,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "dataset not found"
           }
         },
         "security": [
@@ -1207,7 +1212,8 @@
                   "$ref": "#/components/schemas/NodeInfoResponse"
                 }
               }
-            }
+            },
+            "description": "node info"
           }
         },
         "security": [
@@ -1233,7 +1239,8 @@
                   "type": "string"
                 }
               }
-            }
+            },
+            "description": "service document"
           }
         },
         "security": [
@@ -1259,7 +1266,8 @@
                   "type": "string"
                 }
               }
-            }
+            },
+            "description": "service metadata"
           }
         },
         "security": [
@@ -1296,7 +1304,8 @@
                   "type": "string"
                 }
               }
-            }
+            },
+            "description": "collection entries"
           }
         },
         "security": [
@@ -1349,7 +1358,8 @@
                   "$ref": "#/components/schemas/UploadContext"
                 }
               }
-            }
+            },
+            "description": "upload prepared"
           }
         },
         "security": [
@@ -1434,7 +1444,8 @@
                   "$ref": "#/components/schemas/UploadContext"
                 }
               }
-            }
+            },
+            "description": "file uploaded"
           }
         },
         "security": [
@@ -1469,7 +1480,8 @@
                   "$ref": "#/components/schemas/LoginResponseBody"
                 }
               }
-            }
+            },
+            "description": "logged in"
           },
           "400": {
             "content": {
@@ -1478,7 +1490,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "malformed request"
           },
           "401": {
             "content": {
@@ -1487,7 +1500,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "invalid credentials"
           }
         },
         "security": [
@@ -1520,7 +1534,8 @@
                   "$ref": "#/components/schemas/DeviceAccessTokenResponse"
                 }
               }
-            }
+            },
+            "description": "access token issued"
           },
           "400": {
             "content": {
@@ -1529,7 +1544,8 @@
                   "$ref": "#/components/schemas/DeviceAccessTokenError"
                 }
               }
-            }
+            },
+            "description": "authorization pending or failed"
           }
         },
         "security": [
@@ -1564,7 +1580,8 @@
                   "$ref": "#/components/schemas/DeviceAuthorizationResponse"
                 }
               }
-            }
+            },
+            "description": "device authorization started"
           }
         },
         "security": [
@@ -1589,7 +1606,8 @@
                   "default": null
                 }
               }
-            }
+            },
+            "description": "token is valid"
           },
           "401": {
             "content": {
@@ -1598,7 +1616,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "token is missing or invalid"
           }
         },
         "security": [
@@ -1694,7 +1713,8 @@
                   "$ref": "#/components/schemas/QueryResponse"
                 }
               }
-            }
+            },
+            "description": "query result"
           }
         },
         "security": [
@@ -1729,7 +1749,8 @@
                   "$ref": "#/components/schemas/QueryResponse"
                 }
               }
-            }
+            },
+            "description": "query result"
           }
         },
         "security": [
@@ -1789,7 +1810,8 @@
                   "$ref": "#/components/schemas/SignEip712Response"
                 }
               }
-            }
+            },
+            "description": "signature"
           },
           "404": {
             "content": {
@@ -1798,7 +1820,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "signing key not found"
           }
         },
         "security": [
@@ -1863,7 +1886,8 @@
                   "$ref": "#/components/schemas/VerifyResponse"
                 }
               }
-            }
+            },
+            "description": "verification result"
           },
           "400": {
             "content": {
@@ -1872,7 +1896,8 @@
                   "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
-            }
+            },
+            "description": "malformed request"
           }
         },
         "security": [
@@ -2052,7 +2077,8 @@
                   "default": null
                 }
               }
-            }
+            },
+            "description": "checkpoint file stored"
           }
         },
         "security": [
@@ -2176,7 +2202,8 @@
                   "default": null
                 }
               }
-            }
+            },
+            "description": "data file stored"
           }
         },
         "security": [
@@ -2253,7 +2280,8 @@
                   "default": null
                 }
               }
-            }
+            },
+            "description": "data ingested"
           }
         },
         "security": [
@@ -2316,7 +2344,8 @@
                   "$ref": "#/components/schemas/DatasetMetadataResponse"
                 }
               }
-            }
+            },
+            "description": "dataset metadata"
           }
         },
         "security": [
@@ -2362,7 +2391,8 @@
                   "default": null
                 }
               }
-            }
+            },
+            "description": "websocket upgrade for pull protocol"
           }
         },
         "security": [
@@ -2408,7 +2438,8 @@
                   "default": null
                 }
               }
-            }
+            },
+            "description": "websocket upgrade for push protocol"
           }
         },
         "security": [
@@ -2463,7 +2494,8 @@
                   "type": "string"
                 }
               }
-            }
+            },
+            "description": "block hash the reference points to"
           }
         },
         "security": [
@@ -2549,7 +2581,8 @@
                   "$ref": "#/components/schemas/DatasetTailResponse"
                 }
               }
-            }
+            },
+            "description": "last records of the dataset"
           }
         },
         "security": [

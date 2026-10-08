@@ -131,8 +131,8 @@ impl IntoApiError for DeviceAccessTokenError {
         content_type = "application/x-www-form-urlencoded"
     ),
     responses(
-        (status = OK, body = DeviceAccessTokenResponse),
-        (status = BAD_REQUEST, body = DeviceAccessTokenError)
+        (status = OK, description = "access token issued", body = DeviceAccessTokenResponse),
+        (status = BAD_REQUEST, description = "authorization pending or failed", body = DeviceAccessTokenError)
     ),
     tag = "kamu",
     security(

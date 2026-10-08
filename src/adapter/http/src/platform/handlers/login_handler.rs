@@ -37,9 +37,9 @@ pub struct LoginResponseBody {
     path = "/login",
     request_body = LoginRequestBody,
     responses(
-        (status = OK, body = LoginResponseBody),
-        (status = BAD_REQUEST, body = ApiErrorResponse),
-        (status = UNAUTHORIZED, body = ApiErrorResponse),
+        (status = OK, description = "logged in", body = LoginResponseBody),
+        (status = BAD_REQUEST, description = "malformed request", body = ApiErrorResponse),
+        (status = UNAUTHORIZED, description = "invalid credentials", body = ApiErrorResponse),
     ),
     tag = "kamu",
     security(())
