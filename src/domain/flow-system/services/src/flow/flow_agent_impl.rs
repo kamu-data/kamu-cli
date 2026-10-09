@@ -779,11 +779,8 @@ impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowAgentImpl {
     ) -> Result<(), InternalError> {
         tracing::debug!(received_message = ?message, "Received flow configuration message");
 
-        if !self.has_agent_started() {
-            // Flows recovered at startup read the configuration themselves
-            return Ok(());
-        }
-
+        // Unlike trigger updates, no startup step re-reads the configuration of
+        // a pending flow, so the message applies even before the agent starts
         let scheduling_service = target_catalog
             .get_one::<FlowSchedulingServiceImpl>()
             .unwrap();

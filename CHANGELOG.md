@@ -20,7 +20,8 @@ Recommendation: for ease of reading, use the following format:
 ### Changed
 - Flow configuration and trigger changes now reach a flow that is already waiting, instead of only the next
   one:
-  - ingest options apply until the flow's task is formed; options given for a single manual run are kept
+  - ingest, compaction and reset options apply until the flow's task is formed; options given for a single
+    manual run are kept
   - a new retry policy decides the remaining retries of a flow that has not finished
   - a changed schedule moves a waiting scheduled flow earlier or later
   - a changed batching rule re-evaluates a derived dataset's flow waiting for inputs, so it may run at once
