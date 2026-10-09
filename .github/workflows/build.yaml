@@ -27,6 +27,9 @@ on:
   # manual trigger
   workflow_dispatch: { }
 env:
+  # Decide crate freshness by file checksums, not mtimes, so that unchanged workspace crates
+  # restored from the cache are reused after `actions/checkout` resets all mtimes
+  CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
   RUST_LOG: "debug"
   RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
@@ -41,9 +44,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-          cache: true
-          cache-workspace-crates: true
-          cache-on-failure: true
+          cache: false
       - uses: cargo-bins/cargo-binstall@main
       - name: cargo fmt
         run: cargo fmt --check
@@ -81,6 +82,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt
+          cache: false
       # We use nix flake to install flatc, protoc and other tools needed for codegen
       - uses: cachix/install-nix-action@v31
       - uses: cachix/cachix-action@v16
@@ -213,6 +215,9 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           cache: true
+          # Prevents branch builds from evicting master cache
+          cache-save-if: ${{ github.ref == 'refs/heads/master' }}
+          # Requires CARGO_UNSTABLE_CHECKSUM_FRESHNESS
           cache-workspace-crates: true
           cache-on-failure: true
 
