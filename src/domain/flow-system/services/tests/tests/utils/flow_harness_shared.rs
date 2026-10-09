@@ -432,6 +432,17 @@ impl FlowHarness {
         flow_binding: &FlowBinding,
         activation_at: DateTime<Utc>,
     ) -> FlowID {
+        self.schedule_flow_for_activation_with_config_snapshot(flow_binding, activation_at, None)
+            .await
+    }
+
+    /// Same as `schedule_flow_for_activation`, with the given config snapshot
+    pub async fn schedule_flow_for_activation_with_config_snapshot(
+        &self,
+        flow_binding: &FlowBinding,
+        activation_at: DateTime<Utc>,
+        config_snapshot: Option<FlowConfigSnapshot>,
+    ) -> FlowID {
         let now = self.now();
         let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
 
@@ -449,7 +460,7 @@ impl FlowHarness {
                                 activation_time: now,
                             },
                         ),
-                        config_snapshot: None,
+                        config_snapshot,
                         retry_policy: None,
                     }
                     .into(),
@@ -476,6 +487,13 @@ impl FlowHarness {
             .unwrap();
 
         flow_id
+    }
+
+    pub async fn flow_state(&self, flow_id: FlowID) -> FlowState {
+        Flow::load(flow_id, self.flow_event_store.as_ref())
+            .await
+            .unwrap()
+            .into()
     }
 
     pub async fn task_exists(&self, task_id: TaskID) -> bool {

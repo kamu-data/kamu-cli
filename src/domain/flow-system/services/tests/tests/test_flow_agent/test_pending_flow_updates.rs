@@ -206,3 +206,231 @@ async fn test_schedule_trigger_modified_while_flow_waits() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_config_change_reaches_waiting_flow() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    let start_time = harness.aligned_now();
+    let flow_id = harness
+        .schedule_flow_for_activation(&foo_flow_binding, start_time + Duration::milliseconds(100))
+        .await;
+
+    let new_ingest_rule = FlowConfigRuleIngest {
+        fetch_uncacheable: true,
+        fetch_next_iteration: false,
+    };
+    let new_retry_policy = RetryPolicy {
+        max_attempts: 2,
+        min_delay_seconds: 1,
+        backoff_type: RetryBackoffType::Fixed,
+    };
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: formed at 100ms with the configuration set while the flow waited
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: None,
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: true,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(30)).await;
+
+                harness
+                    .set_dataset_flow_ingest(
+                        foo_flow_binding.clone(),
+                        new_ingest_rule.clone(),
+                        Some(new_retry_policy),
+                    )
+                    .await;
+
+                let flow_state = harness.flow_state(flow_id).await;
+                pretty_assertions::assert_eq!(
+                    Some(FlowConfigSnapshot::configured(
+                        new_ingest_rule.clone().into_flow_config()
+                    )),
+                    flow_state.config_snapshot
+                );
+                pretty_assertions::assert_eq!(Some(new_retry_policy), flow_state.retry_policy);
+
+                harness.advance_time(Duration::milliseconds(90)).await;
+            };
+
+            tokio::join!(task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_config_change_skips_flow_with_formed_task() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    let start_time = harness.aligned_now();
+    let flow_id = harness
+        .schedule_flow_for_activation(&foo_flow_binding, start_time + Duration::milliseconds(50))
+        .await;
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: formed at 50ms, before the configuration changes
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(70),
+                finish_in_with: None,
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(60)).await;
+                assert!(harness.task_exists(TaskID::new(0)).await);
+
+                harness
+                    .set_dataset_flow_ingest(
+                        foo_flow_binding.clone(),
+                        FlowConfigRuleIngest {
+                            fetch_uncacheable: true,
+                            fetch_next_iteration: false,
+                        },
+                        Some(RetryPolicy {
+                            max_attempts: 2,
+                            min_delay_seconds: 1,
+                            backoff_type: RetryBackoffType::Fixed,
+                        }),
+                    )
+                    .await;
+
+                let flow_state = harness.flow_state(flow_id).await;
+                pretty_assertions::assert_eq!(None, flow_state.config_snapshot);
+                pretty_assertions::assert_eq!(None, flow_state.retry_policy);
+
+                harness.advance_time(Duration::milliseconds(20)).await;
+            };
+
+            tokio::join!(task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_config_change_keeps_forced_snapshot() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    let forced_snapshot = FlowConfigSnapshot::forced(
+        FlowConfigRuleIngest {
+            fetch_uncacheable: true,
+            fetch_next_iteration: false,
+        }
+        .into_flow_config(),
+    );
+
+    let start_time = harness.aligned_now();
+    let flow_id = harness
+        .schedule_flow_for_activation_with_config_snapshot(
+            &foo_flow_binding,
+            start_time + Duration::milliseconds(100),
+            Some(forced_snapshot.clone()),
+        )
+        .await;
+
+    let new_retry_policy = RetryPolicy {
+        max_attempts: 2,
+        min_delay_seconds: 1,
+        backoff_type: RetryBackoffType::Fixed,
+    };
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: formed at 100ms with the forced configuration
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: None,
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: true,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(30)).await;
+
+                // The rule stays forced, while the retry policy still follows the configuration
+                harness
+                    .set_dataset_flow_ingest(
+                        foo_flow_binding.clone(),
+                        FlowConfigRuleIngest {
+                            fetch_uncacheable: false,
+                            fetch_next_iteration: false,
+                        },
+                        Some(new_retry_policy),
+                    )
+                    .await;
+
+                let flow_state = harness.flow_state(flow_id).await;
+                pretty_assertions::assert_eq!(
+                    Some(forced_snapshot.clone()),
+                    flow_state.config_snapshot
+                );
+                pretty_assertions::assert_eq!(Some(new_retry_policy), flow_state.retry_policy);
+
+                harness.advance_time(Duration::milliseconds(90)).await;
+            };
+
+            tokio::join!(task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

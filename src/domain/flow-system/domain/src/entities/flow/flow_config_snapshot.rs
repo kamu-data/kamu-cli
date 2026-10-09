@@ -101,3 +101,123 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use serde_json::json;
+
+    use crate::{
+        FlowActivationCause,
+        FlowActivationCauseAutoPolling,
+        FlowBinding,
+        FlowConfigSnapshot,
+        FlowConfigSnapshotModified,
+        FlowConfigurationRule,
+        FlowEventInitiated,
+        FlowID,
+        FlowScope,
+    };
+
+    fn ingest_rule() -> FlowConfigurationRule {
+        FlowConfigurationRule {
+            rule_type: "IngestRule".to_string(),
+            payload: json!({ "fetch_uncacheable": true, "fetch_next_iteration": false }),
+        }
+    }
+
+    fn initiated_event(config_snapshot: Option<FlowConfigSnapshot>) -> FlowEventInitiated {
+        let now = Utc::now();
+        FlowEventInitiated {
+            event_time: now,
+            flow_id: FlowID::new(1),
+            flow_binding: FlowBinding::new("test-flow", FlowScope::make_system_scope()),
+            activation_cause: FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+                activation_time: now,
+            }),
+            config_snapshot,
+            retry_policy: None,
+        }
+    }
+
+    fn modified_event(config_snapshot: FlowConfigSnapshot) -> FlowConfigSnapshotModified {
+        FlowConfigSnapshotModified {
+            event_time: Utc::now(),
+            flow_id: FlowID::new(1),
+            flow_binding: FlowBinding::new("test-flow", FlowScope::make_system_scope()),
+            config_snapshot,
+        }
+    }
+
+    /// Replaces the stored snapshot with the bare rule, as written before
+    /// snapshots had an origin
+    fn with_legacy_snapshot(mut stored: serde_json::Value) -> serde_json::Value {
+        stored["config_snapshot"] = serde_json::to_value(ingest_rule()).unwrap();
+        stored
+    }
+
+    #[test]
+    fn test_legacy_initial_snapshot_follows_configuration() {
+        let stored = with_legacy_snapshot(
+            serde_json::to_value(initiated_event(Some(FlowConfigSnapshot::forced(
+                ingest_rule(),
+            ))))
+            .unwrap(),
+        );
+
+        let event: FlowEventInitiated = serde_json::from_value(stored).unwrap();
+
+        assert_eq!(
+            Some(FlowConfigSnapshot::configured(ingest_rule())),
+            event.config_snapshot
+        );
+    }
+
+    #[test]
+    fn test_legacy_modified_snapshot_is_forced() {
+        let stored = with_legacy_snapshot(
+            serde_json::to_value(modified_event(
+                FlowConfigSnapshot::configured(ingest_rule()),
+            ))
+            .unwrap(),
+        );
+
+        let event: FlowConfigSnapshotModified = serde_json::from_value(stored).unwrap();
+
+        assert_eq!(
+            FlowConfigSnapshot::forced(ingest_rule()),
+            event.config_snapshot
+        );
+    }
+
+    #[test]
+    fn test_missing_initial_snapshot_stays_missing() {
+        let stored = serde_json::to_value(initiated_event(None)).unwrap();
+
+        let event: FlowEventInitiated = serde_json::from_value(stored).unwrap();
+
+        assert_eq!(None, event.config_snapshot);
+    }
+
+    #[test]
+    fn test_snapshot_keeps_its_origin_when_stored() {
+        for snapshot in [
+            FlowConfigSnapshot::configured(ingest_rule()),
+            FlowConfigSnapshot::forced(ingest_rule()),
+        ] {
+            let initiated: FlowEventInitiated = serde_json::from_value(
+                serde_json::to_value(initiated_event(Some(snapshot.clone()))).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(Some(snapshot.clone()), initiated.config_snapshot);
+
+            let modified: FlowConfigSnapshotModified = serde_json::from_value(
+                serde_json::to_value(modified_event(snapshot.clone())).unwrap(),
+            )
+            .unwrap();
+            assert_eq!(snapshot, modified.config_snapshot);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
