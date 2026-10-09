@@ -11,10 +11,10 @@ use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Preparing the build information
-    let build = vergen_gitcl::BuildBuilder::all_build()?;
-    let cargo = vergen_gitcl::CargoBuilder::all_cargo()?;
-    let gitcl = vergen_gitcl::GitclBuilder::all_git()?;
-    let rustc = vergen_gitcl::RustcBuilder::all_rustc()?;
+    let build = vergen_gitcl::Build::all_build();
+    let cargo = vergen_gitcl::Cargo::all_cargo();
+    let gitcl = vergen_gitcl::Gitcl::all_git();
+    let rustc = vergen_gitcl::Rustc::all_rustc();
 
     vergen_gitcl::Emitter::default()
         .add_instructions(&build)?

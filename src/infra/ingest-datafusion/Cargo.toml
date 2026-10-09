@@ -57,7 +57,7 @@ tokio = { version = "1", default-features = false, features = [
 ] }
 tracing = "0.1"
 walkdir = "2"
-zip = { version = "8", default-features = false, features = [
+zip = { version = "9", default-features = false, features = [
     "bzip2",
     "deflate",
     "zstd",

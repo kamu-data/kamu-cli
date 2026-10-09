@@ -145,20 +145,20 @@ tracing = "0.1"
 url = { version = "2", features = [
     "serde",
 ] }
-zip = { version = "8", default-features = false, features = [
+zip = { version = "9", default-features = false, features = [
     "bzip2",
     "deflate",
     "zstd",
 ] }
 
 # Optional dependencies
+# TODO: Pinned until datafusion & object_store unblock upgrade to reqwest v13
 alloy = { optional = true, version = "~1.7.3", default-features = false, features = [
     "provider-http",
     "provider-ws",
-    "reqwest-rustls-tls",
+    "reqwest",
     "std",
 ] }
-# TODO: Remove these pins
 alloy-provider = { optional = true, version = "~1.7.3", default-features = false }
 alloy-rpc-client = { optional = true, version = "~1.7.3", default-features = false }
 alloy-transport-http = { optional = true, version = "~1.7.3", default-features = false }
@@ -171,7 +171,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "55", features = [
+# TODO: Pinned until datafusion & object_store unblock upgrade to reqwest v13
+datafusion-ethers = { optional = true, version = "~55.0", features = [
     "eip712",
 ] }
 datafusion-functions-json = { optional = true, version = "0.55" }

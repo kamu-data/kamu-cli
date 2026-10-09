@@ -85,8 +85,8 @@ http = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 indoc = "2"
 itertools = { version = "0.15", default-features = false }
-jsonschema = { version = "0.46", default-features = false }
-num-bigint = { version = "0.4", default-features = false }
+jsonschema = { version = "0.58", default-features = false }
+num-bigint = { version = "0.5", default-features = false }
 nutype = { version = "0.8", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }

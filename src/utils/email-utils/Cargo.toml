@@ -29,4 +29,4 @@ serde = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }
-validator = "0.20"
+validator = "0.21"

@@ -36,6 +36,7 @@ default = [
 ]
 
 ingest-evm = [
+    "dep:alloy",
     "kamu/ingest-evm",
 ]
 ingest-ftp = [
@@ -159,10 +160,29 @@ server-console = { workspace = true }
 time-source = { workspace = true }
 wakeup-listener = { workspace = true }
 
-# Top-level TLS configuration
-# TODO: Include alloy, aws-smithy
-# TODO: Unify deps around either ring or aws-lc-rs
-# TODO: Unify deps around either using webpki or native certs
+# Top-level TLS configuration. Configure: aws-lc-rs, webpki root certs
+# TODO: alloy is pinned until datafusion & object_store upgrade to reqwest v13
+alloy = { optional = true, version = "~1.7.3", default-features = false, features = [
+    "reqwest-rustls-tls",
+] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "rustls-tls-webpki-roots",
+] }
+rumqttc = { optional = true, version = "0.25", default-features = false, features = [
+    "use-rustls",
+] }
+rustls = { version = "0.23", default-features = false, features = [
+    "aws-lc-rs",
+] }
+sqlx = { version = "0.9", default-features = false, features = [
+    "tls-rustls-aws-lc-rs",
+] }
+tokio-tungstenite = { version = "0.30", features = [
+    "rustls-tls-webpki-roots",
+] }
+# END: Top-level TLS configuration
+
+
 arrow-flight = { version = "59", features = [
     "flight-sql-experimental",
 ] }
@@ -214,18 +234,9 @@ prettytable-rs = "0.10" # ASCII table formatting
 prometheus = { version = "0.14", default-features = false }
 read_input = "0.8" # Basic user input
 regex = "1"
-reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls-webpki-roots",
-] }
-rumqttc = { optional = true, version = "0.25", default-features = false, features = [
-    "use-rustls",
-] }
 rust-embed = { optional = true, version = "8", features = [
     "compression",
     "interpolate-folder-path",
-] }
-rustls = { version = "0.23", default-features = false, features = [
-    "aws-lc-rs",
 ] }
 secrecy = "0.10"
 serde = { version = "1", features = [
@@ -255,9 +266,6 @@ setty = { version = "1", features = [
 ] }
 shlex = "2" # Parsing partial input for custom completions
 similar = "3" # Text diffing (apply manifest diffs)
-sqlx = { version = "0.9", default-features = false, features = [
-    "tls-rustls-aws-lc-rs",
-] }
 strum = { version = "0.28", features = [
     "derive",
 ] }
@@ -271,9 +279,6 @@ tokio = { version = "1", default-features = false, features = [
 ] }
 tokio-stream = { version = "0.1", default-features = false, features = [
     "net",
-] }
-tokio-tungstenite = { version = "0.30", features = [
-    "rustls-tls-webpki-roots",
 ] }
 tokio-util = { version = "0.7", default-features = false, features = [
     "io",
@@ -334,4 +339,4 @@ test-log = { version = "0.2", features = [
 
 
 [build-dependencies]
-vergen-gitcl = { version = "9.1.0", features = ["build", "cargo", "rustc"] }
+vergen-gitcl = { version = "10.0.3", features = ["build", "cargo", "rustc"] }
