@@ -195,7 +195,7 @@ impl FlowControllerCompactHarness {
                 activation_time: Utc::now(),
                 initiator_account_id: TEST_ACCOUNT_ID.clone(),
             }),
-            maybe_config_snapshot,
+            maybe_config_snapshot.map(FlowConfigSnapshot::configured),
             None,
         );
         flow.save(self.flow_event_store.as_ref()).await.unwrap();

@@ -24,6 +24,8 @@ pub enum FlowEvent {
     StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Config snapshot modified
     ConfigSnapshotModified(FlowConfigSnapshotModified),
+    /// Retry policy modified
+    RetryPolicyModified(FlowEventRetryPolicyModified),
     /// Secondary activation cause added
     ActivationCauseAdded(FlowEventActivationCauseAdded),
     /// Scheduled for activation at a particular time
@@ -46,6 +48,7 @@ impl FlowEvent {
             FlowEvent::Initiated(_) => "FlowEventInitiated",
             FlowEvent::StartConditionUpdated(_) => "FlowEventStartConditionUpdated",
             FlowEvent::ConfigSnapshotModified(_) => "FlowEventConfigSnapshotModified",
+            FlowEvent::RetryPolicyModified(_) => "FlowEventRetryPolicyModified",
             FlowEvent::ActivationCauseAdded(_) => "FlowEventActivationCauseAdded",
             FlowEvent::ScheduledForActivation(_) => "FlowEventScheduledForActivation",
             FlowEvent::TaskScheduled(_) => "FlowEventTaskScheduled",
@@ -65,7 +68,8 @@ pub struct FlowEventInitiated {
     pub flow_id: FlowID,
     pub flow_binding: FlowBinding,
     pub activation_cause: FlowActivationCause,
-    pub config_snapshot: Option<FlowConfigurationRule>,
+    #[serde(deserialize_with = "deserialize_initial_config_snapshot")]
+    pub config_snapshot: Option<FlowConfigSnapshot>,
     pub retry_policy: Option<RetryPolicy>,
 }
 
@@ -97,7 +101,18 @@ pub struct FlowConfigSnapshotModified {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub flow_binding: FlowBinding,
-    pub config_snapshot: FlowConfigurationRule,
+    #[serde(deserialize_with = "deserialize_modified_config_snapshot")]
+    pub config_snapshot: FlowConfigSnapshot,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlowEventRetryPolicyModified {
+    pub event_time: DateTime<Utc>,
+    pub flow_id: FlowID,
+    pub flow_binding: FlowBinding,
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,6 +186,7 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.flow_id,
             FlowEvent::StartConditionUpdated(e) => e.flow_id,
             FlowEvent::ConfigSnapshotModified(e) => e.flow_id,
+            FlowEvent::RetryPolicyModified(e) => e.flow_id,
             FlowEvent::ActivationCauseAdded(e) => e.flow_id,
             FlowEvent::ScheduledForActivation(e) => e.flow_id,
             FlowEvent::TaskScheduled(e) => e.flow_id,
@@ -186,6 +202,7 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => &e.flow_binding,
             FlowEvent::StartConditionUpdated(e) => &e.flow_binding,
             FlowEvent::ConfigSnapshotModified(e) => &e.flow_binding,
+            FlowEvent::RetryPolicyModified(e) => &e.flow_binding,
             FlowEvent::ActivationCauseAdded(e) => &e.flow_binding,
             FlowEvent::ScheduledForActivation(e) => &e.flow_binding,
             FlowEvent::TaskScheduled(e) => &e.flow_binding,
@@ -200,6 +217,7 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.event_time,
             FlowEvent::StartConditionUpdated(e) => e.event_time,
             FlowEvent::ConfigSnapshotModified(e) => e.event_time,
+            FlowEvent::RetryPolicyModified(e) => e.event_time,
             FlowEvent::ActivationCauseAdded(e) => e.event_time,
             FlowEvent::ScheduledForActivation(e) => e.event_time,
             FlowEvent::TaskScheduled(e) => e.event_time,
@@ -215,6 +233,7 @@ impl FlowEvent {
             FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
             FlowEvent::StartConditionUpdated(_)
             | FlowEvent::ConfigSnapshotModified(_)
+            | FlowEvent::RetryPolicyModified(_)
             | FlowEvent::ActivationCauseAdded(_)
             | FlowEvent::ScheduledForActivation(_)
             | FlowEvent::TaskScheduled(_) => None,
@@ -240,6 +259,7 @@ impl_enum_variant!(FlowEvent::StartConditionUpdated(
 impl_enum_variant!(FlowEvent::ConfigSnapshotModified(
     FlowConfigSnapshotModified
 ));
+impl_enum_variant!(FlowEvent::RetryPolicyModified(FlowEventRetryPolicyModified));
 impl_enum_variant!(FlowEvent::ActivationCauseAdded(
     FlowEventActivationCauseAdded
 ));

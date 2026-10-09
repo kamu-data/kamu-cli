@@ -58,7 +58,7 @@ impl FlowControllerIngest {
                 &flow_state.flow_binding,
                 vec![activation_cause.clone()],
                 None,
-                flow_state.config_snapshot.clone(),
+                flow_state.config_rule().cloned(),
             )
             .await
             .int_err()?;
@@ -83,7 +83,7 @@ impl fs::FlowController for FlowControllerIngest {
         let dataset_id = FlowScopeDataset::new(&flow.flow_binding.scope).dataset_id();
 
         let mut fetch_uncacheable = false;
-        if let Some(config_snapshot) = flow.config_snapshot.as_ref()
+        if let Some(config_snapshot) = flow.config_rule()
             && config_snapshot.rule_type == FlowConfigRuleIngest::TYPE_ID
         {
             let ingest_rule = FlowConfigRuleIngest::from_flow_config(config_snapshot)?;
@@ -142,8 +142,8 @@ impl fs::FlowController for FlowControllerIngest {
                                 flow_id: success_flow_state.flow_id,
                                 flow_type: success_flow_state.flow_binding.flow_type.clone(),
                                 maybe_flow_config_snapshot: success_flow_state
-                                    .config_snapshot
-                                    .clone(),
+                                    .config_rule()
+                                    .cloned(),
                             },
                             new_head,
                             old_head_maybe: old_head,
@@ -153,7 +153,7 @@ impl fs::FlowController for FlowControllerIngest {
                 );
 
                 if has_more
-                    && let Some(config_snapshot) = success_flow_state.config_snapshot.as_ref()
+                    && let Some(config_snapshot) = success_flow_state.config_rule()
                     && FlowConfigRuleIngest::from_flow_config(config_snapshot)?.fetch_next_iteration
                 {
                     self.run_next_iteration_ingest(success_flow_state, finish_time)

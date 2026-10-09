@@ -31,6 +31,8 @@ pub enum FlowEvent {
     StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Config snapshot modified
     ConfigSnapshotModified(FlowConfigSnapshotModified),
+    /// Retry policy modified
+    RetryPolicyModified(FlowEventRetryPolicyModified),
     /// Flow scheduled for activation
     ScheduledForActivation(FlowEventScheduledForActivation),
     /// Secondary activation cause added
@@ -65,6 +67,9 @@ impl FlowEvent {
             }
             fs::FlowEvent::ConfigSnapshotModified(e) => {
                 Self::ConfigSnapshotModified(FlowConfigSnapshotModified::build(event_id, e))
+            }
+            fs::FlowEvent::RetryPolicyModified(e) => {
+                Self::RetryPolicyModified(FlowEventRetryPolicyModified::build(event_id, &e))
             }
             fs::FlowEvent::ActivationCauseAdded(e) => Self::ActivationCauseAdded(
                 FlowEventActivationCauseAdded::build(event_id, e, ctx).await?,
@@ -186,7 +191,26 @@ impl FlowConfigSnapshotModified {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            config_snapshot: event.config_snapshot.into(),
+            config_snapshot: event.config_snapshot.rule.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct FlowEventRetryPolicyModified {
+    event_id: EventID,
+    event_time: DateTime<Utc>,
+    retry_policy: Option<FlowRetryPolicy>,
+}
+
+impl FlowEventRetryPolicyModified {
+    pub(crate) fn build(event_id: evs::EventID, event: &fs::FlowEventRetryPolicyModified) -> Self {
+        Self {
+            event_id: event_id.into(),
+            event_time: event.event_time,
+            retry_policy: event.retry_policy.map(Into::into),
         }
     }
 }

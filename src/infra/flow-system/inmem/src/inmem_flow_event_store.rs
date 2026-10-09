@@ -146,6 +146,7 @@ impl InMemoryFlowEventStore {
             FlowEvent::Initiated(_)
             | FlowEvent::StartConditionUpdated(_)
             | FlowEvent::ConfigSnapshotModified(_)
+            | FlowEvent::RetryPolicyModified(_)
             | FlowEvent::ActivationCauseAdded(_)
             | FlowEvent::TaskScheduled(_)
             | FlowEvent::TaskRunning(_)

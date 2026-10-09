@@ -53,7 +53,7 @@ impl fs::FlowController for FlowControllerCompact {
         let mut max_slice_size: Option<u64> = None;
         let mut max_slice_records: Option<u64> = None;
 
-        if let Some(config_snapshot) = flow.config_snapshot.as_ref()
+        if let Some(config_snapshot) = flow.config_rule()
             && config_snapshot.rule_type == FlowConfigRuleCompact::TYPE_ID
         {
             let compaction_rule = FlowConfigRuleCompact::from_flow_config(config_snapshot)?;
@@ -109,8 +109,8 @@ impl fs::FlowController for FlowControllerCompact {
                                 flow_id: success_flow_state.flow_id,
                                 flow_type: success_flow_state.flow_binding.flow_type.clone(),
                                 maybe_flow_config_snapshot: success_flow_state
-                                    .config_snapshot
-                                    .clone(),
+                                    .config_rule()
+                                    .cloned(),
                             },
                             new_head,
                             old_head_maybe: Some(old_head),

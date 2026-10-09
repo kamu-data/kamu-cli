@@ -109,6 +109,7 @@ impl FlowProcessStateProjector {
             | FlowEvent::Aborted(_)
             | FlowEvent::ActivationCauseAdded(_)
             | FlowEvent::ConfigSnapshotModified(_)
+            | FlowEvent::RetryPolicyModified(_)
             | FlowEvent::StartConditionUpdated(_)
             | FlowEvent::TaskScheduled(_)
             | FlowEvent::TaskFinished(_) => {

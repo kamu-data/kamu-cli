@@ -49,7 +49,7 @@ impl fs::FlowController for FlowControllerReset {
     ) -> Result<ts::LogicalPlan, InternalError> {
         let dataset_id = FlowScopeDataset::new(&flow.flow_binding.scope).dataset_id();
 
-        if let Some(config_snapshot) = flow.config_snapshot.as_ref()
+        if let Some(config_snapshot) = flow.config_rule()
             && config_snapshot.rule_type == FlowConfigRuleReset::TYPE_ID
         {
             let reset_rule = FlowConfigRuleReset::from_flow_config(config_snapshot)?;
@@ -99,7 +99,7 @@ impl fs::FlowController for FlowControllerReset {
                     source: DatasetUpdateSource::UpstreamFlow {
                         flow_type: success_flow_state.flow_binding.flow_type.clone(),
                         flow_id: success_flow_state.flow_id,
-                        maybe_flow_config_snapshot: success_flow_state.config_snapshot.clone(),
+                        maybe_flow_config_snapshot: success_flow_state.config_rule().cloned(),
                     },
                     new_head: reset_result.new_head,
                     old_head_maybe: reset_result.old_head,

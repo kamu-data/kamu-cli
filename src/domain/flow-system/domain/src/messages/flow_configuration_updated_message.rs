@@ -11,19 +11,16 @@ use chrono::{DateTime, Utc};
 use messaging_outbox::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{FlowBinding, FlowConfigurationRule};
+use crate::{FlowBinding, FlowConfigurationRule, RetryPolicy};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 3;
+const FLOW_CONFIGURATION_UPDATE_OUTBOX_VERSION: u32 = 4;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents a message indicating that a flow's configuration has been
 /// updated.
-///
-/// Not produced yet: reserved for applying configuration changes to pending
-/// flows.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FlowConfigurationUpdatedMessage {
     /// The time at which the event was recorded
@@ -34,6 +31,9 @@ pub struct FlowConfigurationUpdatedMessage {
 
     /// The updated configuration rule for the flow
     pub rule: FlowConfigurationRule,
+
+    /// The updated retry policy for the flow, if configured
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 impl Message for FlowConfigurationUpdatedMessage {

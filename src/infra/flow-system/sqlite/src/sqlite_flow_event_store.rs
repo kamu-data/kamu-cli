@@ -157,6 +157,7 @@ impl SqliteFlowEventStore {
                 FlowEvent::Initiated(_)
                 | FlowEvent::StartConditionUpdated(_)
                 | FlowEvent::ConfigSnapshotModified(_)
+                | FlowEvent::RetryPolicyModified(_)
                 | FlowEvent::ActivationCauseAdded(_)
                 | FlowEvent::TaskRunning(_)
                 | FlowEvent::Completed(_) => {

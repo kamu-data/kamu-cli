@@ -102,6 +102,42 @@ impl FlowSchedulingServiceImpl {
         .await
     }
 
+    /// Brings a configuration change into the pending flow of the binding,
+    /// unless its task is already formed
+    pub(crate) async fn apply_configuration_to_pending_flow(
+        &self,
+        update_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+        rule: FlowConfigurationRule,
+        retry_policy: Option<RetryPolicy>,
+    ) -> Result<(), InternalError> {
+        let Some(flow_id) = self.find_pending_flow(flow_binding).await? else {
+            return Ok(());
+        };
+
+        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+            .await
+            .int_err()?;
+
+        if !flow.task_ids.is_empty() {
+            tracing::debug!(
+                flow_id = %flow.flow_id,
+                "Pending flow keeps its configuration, as its task is already formed"
+            );
+            return Ok(());
+        }
+
+        flow.follow_configured_snapshot(update_time, rule)
+            .int_err()?;
+        flow.modify_retry_policy(
+            update_time,
+            self.effective_retry_policy(flow_binding, retry_policy),
+        )
+        .int_err()?;
+
+        flow.save(self.flow_event_store.as_ref()).await.int_err()
+    }
+
     pub(crate) async fn trigger_flow_common(
         &self,
         trigger_time: DateTime<Utc>,
@@ -202,7 +238,7 @@ impl FlowSchedulingServiceImpl {
                                 }
 
                                 if let Some(config_snapshot) = maybe_forced_flow_config_rule {
-                                    flow.modify_config_snapshot(activation_time, config_snapshot)
+                                    flow.force_config_snapshot(activation_time, config_snapshot)
                                         .int_err()?;
                                 }
 
@@ -441,6 +477,20 @@ impl FlowSchedulingServiceImpl {
             .await
     }
 
+    /// Retry policy of the configuration, or the default one for the flow type
+    fn effective_retry_policy(
+        &self,
+        flow_binding: &FlowBinding,
+        configured_retry_policy: Option<RetryPolicy>,
+    ) -> Option<RetryPolicy> {
+        configured_retry_policy.or_else(|| {
+            self.agent_config
+                .default_retry_policy_by_flow_type
+                .get(&flow_binding.flow_type)
+                .copied()
+        })
+    }
+
     async fn make_new_flow(
         &self,
         trigger_time: DateTime<Utc>,
@@ -466,37 +516,33 @@ impl FlowSchedulingServiceImpl {
             .await
             .int_err()?;
 
+        let retry_policy = self.effective_retry_policy(
+            &flow_binding,
+            maybe_flow_configuration
+                .as_ref()
+                .and_then(|config| config.retry_policy),
+        );
+        let flow_id = flow_event_store.new_flow_id().await?;
+
         // Decide on configuration rule snapshot:
         //  - if forced, use it
         //  - if not, use the latest configuration rule, if any
         //  - if no configuration, use default rule
-        let maybe_flow_config_rule_snapshot =
-            maybe_forced_flow_config_rule.map(Some).unwrap_or_else(|| {
-                maybe_flow_configuration
-                    .as_ref()
-                    .map(|config| Some(config.rule.clone()))
-                    .unwrap_or_default()
-            });
+        let maybe_config_snapshot = match maybe_forced_flow_config_rule {
+            Some(forced_flow_config_rule) => {
+                Some(FlowConfigSnapshot::forced(forced_flow_config_rule))
+            }
+            None => {
+                maybe_flow_configuration.map(|config| FlowConfigSnapshot::configured(config.rule))
+            }
+        };
 
-        // Decide on retry policy:
-        // - if configuration defines it, use it
-        // - if not, use default retry policy for this flow type, if it's defined
-        let retry_policy = maybe_flow_configuration
-            .and_then(|config| config.retry_policy)
-            .or_else(|| {
-                self.agent_config
-                    .default_retry_policy_by_flow_type
-                    .get(&flow_binding.flow_type)
-                    .copied()
-            });
-
-        // Create the flow
         let mut flow = Flow::new(
             trigger_time,
-            flow_event_store.new_flow_id().await?,
+            flow_id,
             flow_binding,
             first_cause,
-            maybe_flow_config_rule_snapshot,
+            maybe_config_snapshot,
             retry_policy,
         );
 

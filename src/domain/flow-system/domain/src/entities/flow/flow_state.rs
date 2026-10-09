@@ -33,7 +33,7 @@ pub struct FlowState {
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
     /// Flow config snapshot on the moment when flow was initiated
-    pub config_snapshot: Option<FlowConfigurationRule>,
+    pub config_snapshot: Option<FlowConfigSnapshot>,
     /// Retry policy used
     pub retry_policy: Option<RetryPolicy>,
 }
@@ -57,6 +57,11 @@ pub struct FlowTimingRecords {
 }
 
 impl FlowState {
+    /// Configuration rule the flow runs with, if any
+    pub fn config_rule(&self) -> Option<&FlowConfigurationRule> {
+        self.config_snapshot.as_ref().map(|snapshot| &snapshot.rule)
+    }
+
     /// Extract primary activation cause
     pub fn primary_activation_cause(&self) -> &FlowActivationCause {
         // At least 1 cause is initially defined for sure
@@ -145,6 +150,7 @@ impl Projection for FlowState {
                 }),
                 E::StartConditionUpdated(_)
                 | E::ConfigSnapshotModified(_)
+                | E::RetryPolicyModified(_)
                 | E::ActivationCauseAdded(_)
                 | E::ScheduledForActivation(_)
                 | E::TaskScheduled(_)
@@ -193,6 +199,16 @@ impl Projection for FlowState {
                         config_snapshot: Some(config_snapshot),
                         ..s
                     }),
+
+                    E::RetryPolicyModified(FlowEventRetryPolicyModified {
+                        retry_policy, ..
+                    }) => {
+                        if s.outcome.is_some() {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowState { retry_policy, ..s })
+                        }
+                    }
 
                     E::ActivationCauseAdded(FlowEventActivationCauseAdded {
                         ref activation_cause,

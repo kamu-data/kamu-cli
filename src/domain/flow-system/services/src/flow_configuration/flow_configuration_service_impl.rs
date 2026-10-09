@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use kamu_flow_system::*;
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,6 +19,7 @@ use time_source::SystemTimeSource;
 pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +31,12 @@ impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
+        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             event_store,
             time_source,
+            outbox,
         }
     }
 }
@@ -70,25 +74,47 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref()).await?;
 
+        // Pending flows only need to hear about an actual change
+        let is_changed = maybe_flow_configuration
+            .as_ref()
+            .is_none_or(|flow_configuration| {
+                !flow_configuration.is_active()
+                    || flow_configuration.rule != rule
+                    || flow_configuration.retry_policy != retry_policy
+            });
+
+        let now = self.time_source.now();
         let mut flow_configuration = match maybe_flow_configuration {
             // Modification
             Some(mut flow_configuration) => {
                 flow_configuration
-                    .modify_configuration(self.time_source.now(), rule, retry_policy)
+                    .modify_configuration(now, rule, retry_policy)
                     .int_err()?;
 
                 flow_configuration
             }
             // New configuration
-            None => {
-                FlowConfiguration::new(self.time_source.now(), flow_binding, rule, retry_policy)
-            }
+            None => FlowConfiguration::new(now, flow_binding, rule, retry_policy),
         };
 
         flow_configuration
             .save(self.event_store.as_ref())
             .await
             .int_err()?;
+
+        if is_changed {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+                    FlowConfigurationUpdatedMessage {
+                        event_time: now,
+                        flow_binding: flow_configuration.flow_binding.clone(),
+                        rule: flow_configuration.rule.clone(),
+                        retry_policy: flow_configuration.retry_policy,
+                    },
+                )
+                .await?;
+        }
 
         Ok(flow_configuration.into())
     }

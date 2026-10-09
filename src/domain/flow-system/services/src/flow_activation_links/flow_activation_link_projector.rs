@@ -123,6 +123,7 @@ impl FlowActivationLinkProjector {
 
             FlowEvent::StartConditionUpdated(_)
             | FlowEvent::ConfigSnapshotModified(_)
+            | FlowEvent::RetryPolicyModified(_)
             | FlowEvent::ScheduledForActivation(_)
             | FlowEvent::TaskScheduled(_)
             | FlowEvent::TaskRunning(_)

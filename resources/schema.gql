@@ -2634,6 +2634,12 @@ type FlowEventInitiated implements FlowEvent {
 	activationCause: FlowActivationCause!
 }
 
+type FlowEventRetryPolicyModified implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	retryPolicy: FlowRetryPolicy
+}
+
 type FlowEventScheduledForActivation implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
