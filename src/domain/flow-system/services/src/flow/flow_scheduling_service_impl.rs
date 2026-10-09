@@ -219,6 +219,20 @@ impl FlowSchedulingServiceImpl {
                                 None
                             }
                         }
+                        FlowTriggerContext::Scheduled(schedule)
+                            if flow.task_ids.is_empty() && flow.is_activated_by_schedule_only() =>
+                        {
+                            // Only the schedule wants this flow, so it follows the schedule,
+                            // whether that moves it earlier or later
+                            Some(self.plan_scheduled_activation(
+                                trigger_time,
+                                &mut flow,
+                                &schedule,
+                                activation_time,
+                                maybe_last_attempt_time,
+                                throttling_boundary_time,
+                            )?)
+                        }
                         FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
                             // Evaluate throttling condition: is new time earlier than planned?
                             // In case of reactive condition and manual trigger,
@@ -280,37 +294,14 @@ impl FlowSchedulingServiceImpl {
                         }
 
                         FlowTriggerContext::Scheduled(schedule) => {
-                            // Next activation time depends on:
-                            //  - last attempt time, if ever launched
-                            //  - schedule
-
-                            let naive_next_activation_time = schedule
-                                .next_activation_time(activation_time, maybe_last_attempt_time);
-
-                            // Apply throttling boundary
-                            let next_activation_time =
-                                std::cmp::max(throttling_boundary_time, naive_next_activation_time);
-
-                            // Set throttling activity as start condition
-                            if throttling_boundary_time > naive_next_activation_time {
-                                self.indicate_throttling_activity(
-                                    trigger_time,
-                                    &mut flow,
-                                    throttling_boundary_time,
-                                    naive_next_activation_time,
-                                )?;
-                            } else if naive_next_activation_time > activation_time {
-                                // Set waiting according to the schedule
-                                flow.set_relevant_start_condition(
-                                    trigger_time,
-                                    FlowStartCondition::Schedule(FlowStartConditionSchedule {
-                                        wake_up_at: naive_next_activation_time,
-                                    }),
-                                )
-                                .int_err()?;
-                            }
-
-                            Some(next_activation_time)
+                            Some(self.plan_scheduled_activation(
+                                trigger_time,
+                                &mut flow,
+                                &schedule,
+                                activation_time,
+                                maybe_last_attempt_time,
+                                throttling_boundary_time,
+                            )?)
                         }
 
                         FlowTriggerContext::Unconditional => {
@@ -349,6 +340,48 @@ impl FlowSchedulingServiceImpl {
         }
 
         Ok(flow.into())
+    }
+
+    /// Decides when a scheduled flow activates, and records what it waits for
+    fn plan_scheduled_activation(
+        &self,
+        trigger_time: DateTime<Utc>,
+        flow: &mut Flow,
+        schedule: &Schedule,
+        activation_time: DateTime<Utc>,
+        maybe_last_attempt_time: Option<DateTime<Utc>>,
+        throttling_boundary_time: DateTime<Utc>,
+    ) -> Result<DateTime<Utc>, InternalError> {
+        // Next activation time depends on:
+        //  - last attempt time, if ever launched
+        //  - schedule
+        let naive_next_activation_time =
+            schedule.next_activation_time(activation_time, maybe_last_attempt_time);
+
+        // Apply throttling boundary
+        let next_activation_time =
+            std::cmp::max(throttling_boundary_time, naive_next_activation_time);
+
+        // Set throttling activity as start condition
+        if throttling_boundary_time > naive_next_activation_time {
+            self.indicate_throttling_activity(
+                trigger_time,
+                flow,
+                throttling_boundary_time,
+                naive_next_activation_time,
+            )?;
+        } else if naive_next_activation_time > activation_time {
+            // Set waiting according to the schedule
+            flow.set_relevant_start_condition(
+                trigger_time,
+                FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                    wake_up_at: naive_next_activation_time,
+                }),
+            )
+            .int_err()?;
+        }
+
+        Ok(next_activation_time)
     }
 
     fn evaluate_flow_reactive_rule(

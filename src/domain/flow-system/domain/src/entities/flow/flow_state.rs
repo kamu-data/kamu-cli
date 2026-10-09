@@ -57,6 +57,13 @@ pub struct FlowTimingRecords {
 }
 
 impl FlowState {
+    /// Nothing but the schedule asked for this flow
+    pub fn is_activated_by_schedule_only(&self) -> bool {
+        self.activation_causes
+            .iter()
+            .all(FlowActivationCause::is_auto_polling)
+    }
+
     /// Configuration rule the flow runs with, if any
     pub fn config_rule(&self) -> Option<&FlowConfigurationRule> {
         self.config_snapshot.as_ref().map(|snapshot| &snapshot.rule)
