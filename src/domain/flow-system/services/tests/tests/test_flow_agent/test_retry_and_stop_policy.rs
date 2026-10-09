@@ -1369,3 +1369,103 @@ async fn test_retry_planned_before_restart_happens_after_restart() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_stricter_stop_policy_stops_trigger_at_once() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    let trigger_rule = FlowTriggerRule::Schedule(Duration::milliseconds(60).into());
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            foo_flow_binding.clone(),
+            trigger_rule.clone(),
+            FlowTriggerStopPolicy::AfterConsecutiveFailures {
+                failures_count: ConsecutiveFailuresCount::try_new(3).unwrap(),
+            },
+        )
+        .await;
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Task 0: start running at 10ms, fail at 20ms
+            let foo_task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(10),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task0_handle = foo_task0_driver.run();
+
+            // Task 1: start running at 90ms, fail at 100ms
+            let foo_task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(90),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let foo_task1_handle = foo_task1_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(120)).await;
+                pretty_assertions::assert_eq!(
+                    Some(FlowTriggerStatus::Active),
+                    harness.get_flow_trigger_status(&foo_flow_binding).await
+                );
+
+                // 2 failures are already enough under the new policy
+                harness
+                    .set_flow_trigger(
+                        harness.now(),
+                        foo_flow_binding.clone(),
+                        trigger_rule.clone(),
+                        FlowTriggerStopPolicy::AfterConsecutiveFailures {
+                            failures_count: ConsecutiveFailuresCount::try_new(2).unwrap(),
+                        },
+                    )
+                    .await;
+
+                harness.advance_time(Duration::milliseconds(10)).await;
+                pretty_assertions::assert_eq!(
+                    Some(FlowTriggerStatus::StoppedAutomatically),
+                    harness.get_flow_trigger_status(&foo_flow_binding).await
+                );
+
+                // The flow waiting for 160ms is aborted, and never forms a task
+                harness.advance_time(Duration::milliseconds(70)).await;
+                assert!(!harness.task_exists(TaskID::new(2)).await);
+            };
+
+            tokio::join!(foo_task0_handle, foo_task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
