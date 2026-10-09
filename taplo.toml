@@ -1,4 +1,5 @@
-include = ["Cargo.toml", "src/**/Cargo.toml"]
+# `.claude/state` holds the post-edit hook's test fixture
+include = ["Cargo.toml", "src/**/Cargo.toml", ".claude/state/**/Cargo.toml"]
 exclude = []
 
 [formatting]
