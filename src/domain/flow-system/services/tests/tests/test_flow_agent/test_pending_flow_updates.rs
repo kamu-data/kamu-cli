@@ -13,7 +13,7 @@ use kamu_adapter_task_dataset::*;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 
-use crate::tests::{FlowHarness, FlowSystemTestListener, TaskDriverArgs};
+use crate::tests::{FlowHarness, FlowSystemTestListener, ManualFlowActivationArgs, TaskDriverArgs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -283,7 +283,7 @@ async fn test_config_change_reaches_waiting_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_config_change_skips_flow_with_formed_task() {
+async fn test_config_change_keeps_rule_of_flow_with_formed_task() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -298,6 +298,12 @@ async fn test_config_change_skips_flow_with_formed_task() {
     let flow_id = harness
         .schedule_flow_for_activation(&foo_flow_binding, start_time + Duration::milliseconds(50))
         .await;
+
+    let new_retry_policy = RetryPolicy {
+        max_attempts: 2,
+        min_delay_seconds: 1,
+        backoff_type: RetryBackoffType::Fixed,
+    };
 
     harness
         .simulate_flow_scenario(|| async {
@@ -320,6 +326,7 @@ async fn test_config_change_skips_flow_with_formed_task() {
                 harness.advance_time(Duration::milliseconds(60)).await;
                 assert!(harness.task_exists(TaskID::new(0)).await);
 
+                // The rule stays, while the retry policy still decides on attempts to come
                 harness
                     .set_dataset_flow_ingest(
                         foo_flow_binding.clone(),
@@ -327,17 +334,13 @@ async fn test_config_change_skips_flow_with_formed_task() {
                             fetch_uncacheable: true,
                             fetch_next_iteration: false,
                         },
-                        Some(RetryPolicy {
-                            max_attempts: 2,
-                            min_delay_seconds: 1,
-                            backoff_type: RetryBackoffType::Fixed,
-                        }),
+                        Some(new_retry_policy),
                     )
                     .await;
 
                 let flow_state = harness.flow_state(flow_id).await;
                 pretty_assertions::assert_eq!(None, flow_state.config_snapshot);
-                pretty_assertions::assert_eq!(None, flow_state.retry_policy);
+                pretty_assertions::assert_eq!(Some(new_retry_policy), flow_state.retry_policy);
 
                 harness.advance_time(Duration::milliseconds(20)).await;
             };
@@ -431,6 +434,151 @@ async fn test_config_change_keeps_forced_snapshot() {
         })
         .await
         .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_retry_policy_change_reaches_retrying_flow() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let foo_flow_binding = ingest_dataset_binding(&foo_id);
+
+    let ingest_rule = FlowConfigRuleIngest {
+        fetch_uncacheable: false,
+        fetch_next_iteration: false,
+    };
+    harness
+        .set_dataset_flow_ingest(
+            foo_flow_binding.clone(),
+            ingest_rule.clone(),
+            Some(RetryPolicy {
+                max_attempts: 2,
+                min_delay_seconds: 1,
+                backoff_type: RetryBackoffType::Fixed,
+            }),
+        )
+        .await;
+
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+
+    harness
+        .simulate_flow_scenario(|| async {
+            // Manual trigger for "foo" at 20ms
+            let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowActivationArgs {
+                flow_binding: foo_flow_binding.clone(),
+                run_since_start: Duration::milliseconds(20),
+                initiator_id: None,
+                maybe_forced_flow_config_rule: None,
+            });
+            let trigger0_handle = trigger0_driver.run();
+
+            // Task 0: "foo" start running at 30ms, fail at 40ms
+            let task0_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(0),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(30),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task0_handle = task0_driver.run();
+
+            // Task 1: "foo" start running at 1040ms, fail at 1050ms
+            let task1_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(1),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(1040),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task1_handle = task1_driver.run();
+
+            let main_handle = async {
+                harness.advance_time(Duration::milliseconds(500)).await;
+
+                // While the flow waits for its retry, the policy allows one attempt less:
+                // the planned retry still runs, and its failure is final
+                harness
+                    .set_dataset_flow_ingest(
+                        foo_flow_binding.clone(),
+                        ingest_rule.clone(),
+                        Some(RetryPolicy {
+                            max_attempts: 1,
+                            min_delay_seconds: 1,
+                            backoff_type: RetryBackoffType::Fixed,
+                        }),
+                    )
+                    .await;
+
+                harness.advance_time(Duration::milliseconds(1600)).await;
+                assert!(!harness.task_exists(TaskID::new(2)).await);
+            };
+
+            tokio::join!(trigger0_handle, task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual
+
+            #2: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
+
+            #3: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #4: +40ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms)
+
+            #5: +1040ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=1040ms) Executor(task=1, since=1040ms)
+
+            #6: +1040ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0,1)
+
+            #7: +1050ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Failed
+
+            "#
+        ),
+        format!("{}", test_flow_listener.as_ref())
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

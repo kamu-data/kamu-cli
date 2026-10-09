@@ -102,8 +102,9 @@ impl FlowSchedulingServiceImpl {
         .await
     }
 
-    /// Brings a configuration change into the pending flow of the binding,
-    /// unless its task is already formed
+    /// Brings a configuration change into the pending flow of the binding:
+    ///  - the rule, unless a task is already formed for it;
+    ///  - the retry policy, which decides on the attempts still to come
     pub(crate) async fn apply_configuration_to_pending_flow(
         &self,
         update_time: DateTime<Utc>,
@@ -119,16 +120,16 @@ impl FlowSchedulingServiceImpl {
             .await
             .int_err()?;
 
-        if !flow.task_ids.is_empty() {
+        if flow.task_ids.is_empty() {
+            flow.follow_configured_snapshot(update_time, rule)
+                .int_err()?;
+        } else {
             tracing::debug!(
                 flow_id = %flow.flow_id,
-                "Pending flow keeps its configuration, as its task is already formed"
+                "Pending flow keeps its configuration rule, as its task is already formed"
             );
-            return Ok(());
         }
 
-        flow.follow_configured_snapshot(update_time, rule)
-            .int_err()?;
         flow.modify_retry_policy(
             update_time,
             self.effective_retry_policy(flow_binding, retry_policy),
