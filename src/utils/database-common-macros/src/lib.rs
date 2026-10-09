@@ -789,7 +789,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
             async fn #test_function_name (pg_pool: sqlx::PgPool) {
                 for table in #tables_for_cleanup {
-                    sqlx::query(format!("DELETE FROM {table}").as_str())
+                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
                     .execute(&pg_pool)
                     .await
                     .unwrap();
@@ -812,7 +812,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/sqlite"))]
             async fn #test_function_name (sqlite_pool: sqlx::SqlitePool) {
                 for table in #tables_for_cleanup {
-                    sqlx::query(format!("DELETE FROM {table}").as_str())
+                    sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {table}")))
                     .execute(&sqlite_pool)
                     .await
                     .unwrap();

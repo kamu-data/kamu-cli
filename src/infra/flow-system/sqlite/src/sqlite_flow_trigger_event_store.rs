@@ -19,7 +19,7 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use serde_json::json;
-use sqlx::Sqlite;
+use sqlx::{AssertSqlSafe, Sqlite};
 
 use crate::helpers::{flow_bindings_to_json, global_counter_event_ids_per_item};
 
@@ -141,7 +141,7 @@ impl EventStore<FlowTriggerState> for SqliteFlowTriggerEventStore {
 
             let mut query_stream = sqlx::query!(
                 r#"
-                SELECT q.value ->> 'idx' AS "idx!: i64", e.event_id, e.event_payload AS "event_payload: sqlx::types::JsonValue"
+                SELECT q.value ->> 'idx' AS "idx!: i64", e.event_id AS "event_id!", e.event_payload AS "event_payload: sqlx::types::JsonValue"
                 FROM flow_trigger_events e
                     JOIN json_each($1) q
                         ON e.flow_type = q.value ->> 'flow_type' AND e.scope_data = q.value ->> 'scope_data'
@@ -533,7 +533,7 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
             sqlite_generate_placeholders_list(scopes.len(), NonZeroUsize::new(1).unwrap())
         );
 
-        let mut query = sqlx::query_scalar(&query_str);
+        let mut query = sqlx::query_scalar(AssertSqlSafe(query_str));
         for scope in scopes {
             let scope_json = serde_json::to_value(scope).int_err()?;
             let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;

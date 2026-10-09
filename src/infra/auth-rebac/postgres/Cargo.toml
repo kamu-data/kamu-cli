@@ -30,7 +30,7 @@ kamu-auth-rebac = { workspace = true, features = [
 
 async-trait = "0.1"
 dill = { version = "0.17", default-features = false }
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "chrono",
     "macros",
     "postgres",

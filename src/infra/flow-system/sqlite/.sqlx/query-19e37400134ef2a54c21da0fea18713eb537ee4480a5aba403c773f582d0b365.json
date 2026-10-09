@@ -6,12 +6,24 @@
       {
         "name": "flow_id",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flows",
+            "name": "flow_id"
+          }
+        }
       },
       {
         "name": "activation_time!: DateTime<Utc>",
         "ordinal": 1,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flows",
+            "name": "scheduled_for_activation_at"
+          }
+        }
       }
     ],
     "parameters": {

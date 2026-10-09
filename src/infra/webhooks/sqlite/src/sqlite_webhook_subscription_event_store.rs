@@ -14,6 +14,7 @@ use dill::*;
 use futures::TryStreamExt;
 use internal_error::InternalError;
 use kamu_webhooks::*;
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -365,7 +366,7 @@ impl EventStore<WebhookSubscriptionState> for SqliteWebhookSubscriptionEventStor
                 )
             );
 
-            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            let mut query = sqlx::query_as::<_, EventRow>(AssertSqlSafe(query_str));
             for subscription_id in subscription_ids {
                 query = query.bind(subscription_id);
             }

@@ -16,6 +16,7 @@ use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
+use sqlx::AssertSqlSafe;
 
 use super::helpers::dataset_blocks_json;
 
@@ -206,7 +207,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             sqlite_generate_placeholders_list(dataset_ids.len(), NonZeroUsize::new(3).unwrap()),
         );
 
-        let mut query = sqlx::query_as::<_, KeyBlockRow>(&query_str);
+        let mut query = sqlx::query_as::<_, KeyBlockRow>(AssertSqlSafe(query_str));
         query = query.bind(block_ref.as_str()).bind(event_type.to_string());
         for dataset_id in dataset_ids {
             query = query.bind(dataset_id);

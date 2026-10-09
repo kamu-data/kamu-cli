@@ -27,22 +27,46 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "event_type"
+          }
         }
       },
       {
         "ordinal": 1,
         "name": "sequence_number",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "sequence_number"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "block_hash_bin",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "block_hash_bin"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "block_payload",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "block_payload"
+          }
+        }
       }
     ],
     "parameters": {

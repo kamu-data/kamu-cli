@@ -33,7 +33,7 @@ kamu-cli-e2e-common = { workspace = true }
 kamu-cli-e2e-repo-tests = { workspace = true, default-features = false }
 
 indoc = "2"
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "macros",
     "postgres",
 ] }

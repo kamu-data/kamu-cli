@@ -51,7 +51,7 @@ serde = { version = "1", features = [
 serde_json = "1"
 serde_urlencoded = { version = "0.7" }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "postgres",
     "sqlite",
 ] }

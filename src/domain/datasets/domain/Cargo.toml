@@ -82,7 +82,7 @@ uuid = { version = "1", default-features = false, features = [
 # Optional
 mockall = { optional = true, version = "0.15", default-features = false }
 oso = { optional = true, version = "0.27", default-features = false }
-sqlx = { optional = true, version = "0.8", default-features = false, features = [
+sqlx = { optional = true, version = "0.9", default-features = false, features = [
     "macros",
 ] }
 

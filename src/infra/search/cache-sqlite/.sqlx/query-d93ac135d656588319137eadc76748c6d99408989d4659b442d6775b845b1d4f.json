@@ -6,32 +6,68 @@
       {
         "name": "id",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "embedding_models",
+            "name": "id"
+          }
+        }
       },
       {
         "name": "provider",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "embedding_models",
+            "name": "provider"
+          }
+        }
       },
       {
         "name": "name",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "embedding_models",
+            "name": "name"
+          }
+        }
       },
       {
         "name": "revision",
         "ordinal": 3,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "embedding_models",
+            "name": "revision"
+          }
+        }
       },
       {
         "name": "dims",
         "ordinal": 4,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "embedding_models",
+            "name": "dims"
+          }
+        }
       },
       {
         "name": "created_at: DateTime<Utc>",
         "ordinal": 5,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "embedding_models",
+            "name": "created_at"
+          }
+        }
       }
     ],
     "parameters": {

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
-use sqlx::SqlitePool;
+use sqlx::{AssertSqlSafe, SqlitePool};
 use wakeup_listener::{
     HubWakeupListener,
     WakeHint,
@@ -59,9 +59,9 @@ pub(crate) struct SqliteWakeupHarness {
 impl SqliteWakeupHarness {
     pub(crate) async fn new(sqlite_pool: SqlitePool) -> Self {
         for table in ["records", "other_records"] {
-            sqlx::query(&format!(
+            sqlx::query(AssertSqlSafe(format!(
                 "CREATE TABLE {table} (record_id INTEGER PRIMARY KEY AUTOINCREMENT)"
-            ))
+            )))
             .execute(&sqlite_pool)
             .await
             .unwrap();
@@ -140,7 +140,7 @@ impl SqliteWakeupHarness {
     }
 
     async fn insert_into(&self, table: &str) {
-        sqlx::query(&format!("INSERT INTO {table} DEFAULT VALUES"))
+        sqlx::query(AssertSqlSafe(format!("INSERT INTO {table} DEFAULT VALUES")))
             .execute(&self.sqlite_pool)
             .await
             .unwrap();

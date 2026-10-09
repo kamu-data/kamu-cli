@@ -6,7 +6,13 @@
       {
         "name": "relationship",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_relations",
+            "name": "relationship"
+          }
+        }
       }
     ],
     "parameters": {

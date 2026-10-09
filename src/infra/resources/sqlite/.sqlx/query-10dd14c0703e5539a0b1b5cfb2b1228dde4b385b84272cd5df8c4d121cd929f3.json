@@ -6,37 +6,49 @@
       {
         "name": "resource_schema",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_schema"
+          }
+        }
       },
       {
         "name": "total_count!: i64",
         "ordinal": 1,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       },
       {
         "name": "reconciling_count!: i64",
         "ordinal": 2,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       },
       {
         "name": "ready_count!: i64",
         "ordinal": 3,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       },
       {
         "name": "degraded_count!: i64",
         "ordinal": 4,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       },
       {
         "name": "failed_count!: i64",
         "ordinal": 5,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       },
       {
         "name": "pending_count!: i64",
         "ordinal": 6,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -44,12 +56,12 @@
     },
     "nullable": [
       false,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
     ]
   },
   "hash": "10dd14c0703e5539a0b1b5cfb2b1228dde4b385b84272cd5df8c4d121cd929f3"

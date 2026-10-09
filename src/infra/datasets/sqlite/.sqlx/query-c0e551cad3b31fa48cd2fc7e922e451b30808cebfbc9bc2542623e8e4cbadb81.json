@@ -6,7 +6,13 @@
       {
         "name": "dataset_id",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_id"
+          }
+        }
       }
     ],
     "parameters": {

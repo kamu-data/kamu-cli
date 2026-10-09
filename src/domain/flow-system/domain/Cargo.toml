@@ -74,6 +74,6 @@ serde_with = { version = "3", default-features = false, features = [
 mockall = { optional = true, version = "0.15", default-features = false }
 
 # Optional
-sqlx = { optional = true, version = "0.8", default-features = false, features = [
+sqlx = { optional = true, version = "0.9", default-features = false, features = [
     "macros",
 ] }

@@ -6,52 +6,112 @@
       {
         "name": "delivery_id!: uuid::Uuid",
         "ordinal": 0,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "delivery_id"
+          }
+        }
       },
       {
         "name": "subscription_id!: uuid::Uuid",
         "ordinal": 1,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "subscription_id"
+          }
+        }
       },
       {
         "name": "event_type",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "event_type"
+          }
+        }
       },
       {
         "name": "request_payload!: serde_json::Value",
         "ordinal": 3,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "request_payload"
+          }
+        }
       },
       {
         "name": "request_headers!: serde_json::Value",
         "ordinal": 4,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "request_headers"
+          }
+        }
       },
       {
         "name": "requested_at!: DateTime<Utc>",
         "ordinal": 5,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "requested_at"
+          }
+        }
       },
       {
         "name": "response_code: i16",
         "ordinal": 6,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "response_code"
+          }
+        }
       },
       {
         "name": "response_body",
         "ordinal": 7,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "response_body"
+          }
+        }
       },
       {
         "name": "response_headers: serde_json::Value",
         "ordinal": 8,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "response_headers"
+          }
+        }
       },
       {
         "name": "response_at: DateTime<Utc>",
         "ordinal": 9,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_deliveries",
+            "name": "response_at"
+          }
+        }
       }
     ],
     "parameters": {

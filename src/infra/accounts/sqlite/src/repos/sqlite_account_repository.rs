@@ -17,6 +17,7 @@ use database_common::{
 };
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use sqlx::AssertSqlSafe;
 use sqlx::error::DatabaseError;
 use url::Url;
 
@@ -545,7 +546,7 @@ impl AccountRepository for SqliteAccountRepository {
 
             // ToDo replace it by macro once sqlx will support it
             // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-            let mut query = sqlx::query_as::<_, AccountRowModel>(&query_str)
+            let mut query = sqlx::query_as::<_, AccountRowModel>(AssertSqlSafe(query_str))
                 .bind(name_pattern)
                 .bind(limit)
                 .bind(offset);

@@ -20,7 +20,7 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
 use serde_json::json;
-use sqlx::Sqlite;
+use sqlx::{AssertSqlSafe, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -141,7 +141,7 @@ impl SqliteTaskEventStore {
                    value ->> 'event_payload'
             FROM json_each($1)
             ORDER BY key
-            RETURNING event_id
+            RETURNING event_id AS "event_id!"
             "#,
             events_json,
         )
@@ -279,7 +279,7 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
                 )
             );
 
-            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            let mut query = sqlx::query_as::<_, EventRow>(AssertSqlSafe(query_str));
             for task_id in task_ids {
                 query = query.bind(task_id);
             }
@@ -413,7 +413,7 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
                    value ->> 'event_payload'
             FROM json_each($1)
             ORDER BY key
-            RETURNING event_id
+            RETURNING event_id AS "event_id!"
             "#,
             events_json,
         )

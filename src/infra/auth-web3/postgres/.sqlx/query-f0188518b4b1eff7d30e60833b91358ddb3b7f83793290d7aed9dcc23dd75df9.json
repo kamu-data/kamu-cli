@@ -6,17 +6,35 @@
       {
         "ordinal": 0,
         "name": "wallet_address",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "web3_auth_eip4361_nonces",
+            "name": "wallet_address"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "nonce",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "web3_auth_eip4361_nonces",
+            "name": "nonce"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "expires_at",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "web3_auth_eip4361_nonces",
+            "name": "expires_at"
+          }
+        }
       }
     ],
     "parameters": {

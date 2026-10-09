@@ -6,7 +6,13 @@
       {
         "ordinal": 0,
         "name": "event_id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "resource_events",
+            "name": "event_id"
+          }
+        }
       }
     ],
     "parameters": {

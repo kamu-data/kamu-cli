@@ -59,7 +59,7 @@ tokio = { version = "1", default-features = false, features = [
 tracing = "0.1"
 
 # Optional
-sqlx = { optional = true, version = "0.8", default-features = false, features = [
+sqlx = { optional = true, version = "0.9", default-features = false, features = [
     "macros",
 ] }
 

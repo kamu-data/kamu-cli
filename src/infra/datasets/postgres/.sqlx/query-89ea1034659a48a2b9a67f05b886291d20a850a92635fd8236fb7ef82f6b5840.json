@@ -6,7 +6,13 @@
       {
         "ordinal": 0,
         "name": "dataset_id",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_key_blocks",
+            "name": "dataset_id"
+          }
+        }
       },
       {
         "ordinal": 1,
@@ -32,22 +38,46 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "dataset_key_blocks",
+            "name": "event_type"
+          }
         }
       },
       {
         "ordinal": 2,
         "name": "sequence_number",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "dataset_key_blocks",
+            "name": "sequence_number"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "block_hash_bin",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "dataset_key_blocks",
+            "name": "block_hash_bin"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "block_payload",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "dataset_key_blocks",
+            "name": "block_payload"
+          }
+        }
       }
     ],
     "parameters": {

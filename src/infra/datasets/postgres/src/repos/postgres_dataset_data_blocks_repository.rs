@@ -260,7 +260,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
-        let mut builder: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+        let mut builder: QueryBuilder<sqlx::Postgres> = QueryBuilder::new(
             "INSERT INTO dataset_data_blocks (
                 dataset_id,
                 block_ref_name,

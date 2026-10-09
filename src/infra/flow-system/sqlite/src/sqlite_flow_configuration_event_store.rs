@@ -134,7 +134,7 @@ impl EventStore<FlowConfigurationState> for SqliteFlowConfigurationEventStore {
 
             let mut query_stream = sqlx::query!(
                 r#"
-                SELECT q.value ->> 'idx' AS "idx!: i64", e.event_id, e.event_payload AS "event_payload: sqlx::types::JsonValue"
+                SELECT q.value ->> 'idx' AS "idx!: i64", e.event_id AS "event_id!", e.event_payload AS "event_payload: sqlx::types::JsonValue"
                 FROM flow_configuration_events e
                     JOIN json_each($1) q
                         ON e.flow_type = q.value ->> 'flow_type' AND e.scope_data = q.value ->> 'scope_data'

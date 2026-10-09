@@ -43,6 +43,7 @@ use kamu_resources::{
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -285,7 +286,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, ResourceHandleRow>(&query_str)
+        let mut query = sqlx::query_as::<_, ResourceHandleRow>(AssertSqlSafe(query_str))
             .bind(account_id_str)
             .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
         for id in ids {
@@ -330,7 +331,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, (uuid::Uuid, String)>(&query_str)
+        let mut query = sqlx::query_as::<_, (uuid::Uuid, String)>(AssertSqlSafe(query_str))
             .bind(account_id_str)
             .bind(schema.as_str());
 
@@ -620,7 +621,8 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(schema.as_str());
+        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(AssertSqlSafe(query_str))
+            .bind(schema.as_str());
         for id in ids {
             query = query.bind(*id.as_ref());
         }
@@ -749,7 +751,8 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(account_id_str);
+        let mut query =
+            sqlx::query_as::<_, ResourceSnapshotRow>(AssertSqlSafe(query_str)).bind(account_id_str);
         for id in ids {
             query = query.bind(*id.as_ref());
         }
@@ -920,7 +923,7 @@ fn sort_into_requested_order<Row, Key: std::hash::Hash + Eq>(
 /// Appends the bare predicate matching `query`'s one active mode, with no
 /// leading connective so it can be combined either way.
 fn push_query_predicate(
-    query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
     query: &ResourceQuery,
 ) {
     match query {
@@ -959,11 +962,11 @@ fn push_query_predicate(
 /// use `default_account_id`. `AnyType` spans one account, so it keeps the
 /// single outer term.
 fn push_scope_predicate(
-    query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
     scope: &ResourceScope,
     default_account_id: &odf::AccountID,
 ) {
-    let push_account = |query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+    let push_account = |query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
                         account_id: &odf::AccountID| {
         query_builder.push("r.account_id = ");
         query_builder.push_bind(account_id.to_string());
@@ -1024,7 +1027,7 @@ fn push_scope_predicate(
 
 /// Appends one label-projection predicate per `(key, value)` pair.
 fn push_label_filter_predicates(
-    query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
     label_pairs: &[ResourceLabelPair],
 ) {
     for (key, value) in label_pairs {

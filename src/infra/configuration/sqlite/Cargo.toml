@@ -35,7 +35,7 @@ odf = { workspace = true, features = [
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "chrono",
     "macros",
     "runtime-tokio",

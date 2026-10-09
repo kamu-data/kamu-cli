@@ -20,7 +20,7 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use serde_json::json;
-use sqlx::Sqlite;
+use sqlx::{AssertSqlSafe, Sqlite};
 
 use crate::helpers::*;
 
@@ -392,7 +392,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 )
             );
 
-            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            let mut query = sqlx::query_as::<_, EventRow>(AssertSqlSafe(query_str));
             for flow_id in flow_ids {
                 query = query.bind(flow_id);
             }
@@ -721,7 +721,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .unwrap_or_default(),
             );
 
-            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(i32::from(maybe_by_flow_types.is_some()))
                 .bind(i32::from(maybe_by_flow_statuses.is_some()))
                 .bind(i32::from(maybe_initiators.is_some()))
@@ -825,7 +825,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
             .bind(i32::from(maybe_by_flow_types.is_some()))
             .bind(i32::from(maybe_by_flow_statuses.is_some()))
             .bind(i32::from(maybe_initiators.is_some()));
@@ -881,7 +881,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query_scalar::<_, String>(&query_str);
+            let mut query = sqlx::query_scalar::<_, String>(AssertSqlSafe(query_str));
             for value in scope_values {
                 query = query.bind(value);
             }
@@ -957,7 +957,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .unwrap_or_default()
             );
 
-            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(i32::from(maybe_by_flow_types.is_some()))
                 .bind(i32::from(maybe_by_flow_statuses.is_some()))
                 .bind(i32::from(maybe_initiators.is_some()))
@@ -1055,7 +1055,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
             .bind(i32::from(maybe_by_flow_types.is_some()))
             .bind(i32::from(maybe_by_flow_statuses.is_some()))
             .bind(i32::from(maybe_initiators.is_some()));
@@ -1124,7 +1124,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             )
         );
 
-        let mut query = sqlx::query_scalar::<_, serde_json::Value>(&query_str);
+        let mut query = sqlx::query_scalar::<_, serde_json::Value>(AssertSqlSafe(query_str));
 
         for scope_json in scope_json_parts {
             query = query.bind(scope_json);

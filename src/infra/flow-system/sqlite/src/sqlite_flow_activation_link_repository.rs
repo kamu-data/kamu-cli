@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use kamu_flow_system::*;
-use sqlx::Sqlite;
+use sqlx::{AssertSqlSafe, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,7 +95,7 @@ impl FlowActivationLinkRepository for SqliteFlowActivationLinkRepository {
             )
         );
 
-        let mut query = sqlx::query_as::<_, FlowActivationLinkRow>(&query_str);
+        let mut query = sqlx::query_as::<_, FlowActivationLinkRow>(AssertSqlSafe(query_str));
         for upstream_flow_id in upstream_flow_ids {
             let upstream_flow_id: i64 = (*upstream_flow_id).try_into().unwrap();
             query = query.bind(upstream_flow_id);

@@ -6,77 +6,157 @@
       {
         "name": "id: uuid::Uuid",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_id"
+          }
+        }
       },
       {
         "name": "account_id: odf::AccountID",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "account_id"
+          }
+        }
       },
       {
         "name": "account_resource_id!: uuid::Uuid",
         "ordinal": 2,
-        "type_info": "Null"
+        "type_info": "Text",
+        "origin": "Expression"
       },
       {
         "name": "account_name!: String",
         "ordinal": 3,
-        "type_info": "Null"
+        "type_info": "Text",
+        "origin": "Expression"
       },
       {
         "name": "resource_schema",
         "ordinal": 4,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_schema"
+          }
+        }
       },
       {
         "name": "resource_name",
         "ordinal": 5,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_name"
+          }
+        }
       },
       {
         "name": "labels: serde_json::Value",
         "ordinal": 6,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "labels"
+          }
+        }
       },
       {
         "name": "annotations: serde_json::Value",
         "ordinal": 7,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "annotations"
+          }
+        }
       },
       {
         "name": "spec: serde_json::Value",
         "ordinal": 8,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "spec"
+          }
+        }
       },
       {
         "name": "status: serde_json::Value",
         "ordinal": 9,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "status"
+          }
+        }
       },
       {
         "name": "generation",
         "ordinal": 10,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "generation"
+          }
+        }
       },
       {
         "name": "created_at: DateTime<Utc>",
         "ordinal": 11,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "created_at"
+          }
+        }
       },
       {
         "name": "updated_at: DateTime<Utc>",
         "ordinal": 12,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "updated_at"
+          }
+        }
       },
       {
         "name": "deleted_at: DateTime<Utc>",
         "ordinal": 13,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "deleted_at"
+          }
+        }
       },
       {
         "name": "last_event_id",
         "ordinal": 14,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "last_event_id"
+          }
+        }
       }
     ],
     "parameters": {
@@ -85,8 +165,8 @@
     "nullable": [
       false,
       false,
-      null,
-      null,
+      false,
+      true,
       false,
       false,
       false,

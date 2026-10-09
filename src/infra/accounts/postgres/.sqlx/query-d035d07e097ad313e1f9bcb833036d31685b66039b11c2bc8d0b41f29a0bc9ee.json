@@ -6,32 +6,68 @@
       {
         "ordinal": 0,
         "name": "token_hash",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "token_hash"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "id: _",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "resource_id: _",
-        "type_info": "Uuid"
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "resource_id"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "account_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "account_name"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "email",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "email"
+          }
+        }
       },
       {
         "ordinal": 5,
         "name": "display_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "display_name"
+          }
+        }
       },
       {
         "ordinal": 6,
@@ -46,27 +82,57 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "account_type"
+          }
         }
       },
       {
         "ordinal": 7,
         "name": "avatar_url",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "avatar_url"
+          }
+        }
       },
       {
         "ordinal": 8,
         "name": "registered_at",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "registered_at"
+          }
+        }
       },
       {
         "ordinal": 9,
         "name": "provider",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "provider"
+          }
+        }
       },
       {
         "ordinal": 10,
         "name": "provider_identity_key",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "provider_identity_key"
+          }
+        }
       }
     ],
     "parameters": {

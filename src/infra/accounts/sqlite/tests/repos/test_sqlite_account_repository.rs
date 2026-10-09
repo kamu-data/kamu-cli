@@ -201,7 +201,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_accounts_repo_tests::test_delete_account,
+    fixture = ::kamu_accounts_repo_tests::test_delete_account,
     harness = SqliteAccountRepositoryHarness
 );
 

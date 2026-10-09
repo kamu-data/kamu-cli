@@ -6,17 +6,30 @@
       {
         "ordinal": 0,
         "name": "producer_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "outbox_messages",
+            "name": "producer_name"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "message_id!",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "outbox_messages",
+            "name": "message_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "tx_id!: i64",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": "Expression"
       }
     ],
     "parameters": {

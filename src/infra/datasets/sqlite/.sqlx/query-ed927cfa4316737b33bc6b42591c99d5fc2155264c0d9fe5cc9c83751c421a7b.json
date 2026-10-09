@@ -6,22 +6,46 @@
       {
         "name": "event_type",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "event_type"
+          }
+        }
       },
       {
         "name": "sequence_number",
         "ordinal": 1,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "sequence_number"
+          }
+        }
       },
       {
         "name": "block_hash_bin",
         "ordinal": 2,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "block_hash_bin"
+          }
+        }
       },
       {
         "name": "block_payload",
         "ordinal": 3,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "dataset_data_blocks",
+            "name": "block_payload"
+          }
+        }
       }
     ],
     "parameters": {

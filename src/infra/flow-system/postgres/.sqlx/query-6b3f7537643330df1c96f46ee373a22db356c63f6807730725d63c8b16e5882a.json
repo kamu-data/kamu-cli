@@ -6,17 +6,35 @@
       {
         "ordinal": 0,
         "name": "upstream_flow_id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_activation_links",
+            "name": "upstream_flow_id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "downstream_flow_id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_activation_links",
+            "name": "downstream_flow_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "activated_at: DateTime<Utc>",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "flow_activation_links",
+            "name": "activated_at"
+          }
+        }
       }
     ],
     "parameters": {

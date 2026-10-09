@@ -6,7 +6,13 @@
       {
         "name": "val",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flow_event_global_counter",
+            "name": "val"
+          }
+        }
       }
     ],
     "parameters": {

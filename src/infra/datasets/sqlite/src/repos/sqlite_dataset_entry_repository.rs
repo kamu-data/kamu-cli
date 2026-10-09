@@ -16,6 +16,7 @@ use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placehold
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -175,7 +176,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let mut query = sqlx::query_as::<_, DatasetEntryRowModel>(&query_str);
+        let mut query = sqlx::query_as::<_, DatasetEntryRowModel>(AssertSqlSafe(query_str));
         for dataset_id in dataset_ids {
             query = query.bind(dataset_id.to_string());
         }

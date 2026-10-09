@@ -12,7 +12,7 @@ use std::convert::AsRef;
 use database_common::{PaginationOpts, TransactionRefT};
 use dill::{component, interface};
 use kamu_flow_system::*;
-use sqlx::Postgres;
+use sqlx::{AssertSqlSafe, Postgres};
 
 use crate::PostgresFlowProcessStateRowModel;
 use crate::helpers::{form_scope_query_condition_values, generate_scope_query_condition_clauses};
@@ -141,7 +141,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             "#
         );
 
-        let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql)
+        let mut count_query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(count_sql))
             .bind(maybe_flow_types)
             .bind(maybe_effective_states)
             .bind(maybe_last_attempt_between)
@@ -210,14 +210,15 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             "#
         );
 
-        let mut list_query = sqlx::query_as::<_, PostgresFlowProcessStateRowModel>(&list_sql)
-            .bind(maybe_flow_types)
-            .bind(maybe_effective_states)
-            .bind(maybe_last_attempt_between)
-            .bind(filter.last_failure_since)
-            .bind(filter.next_planned_before)
-            .bind(filter.next_planned_after)
-            .bind(filter.min_consecutive_failures.map(i64::from));
+        let mut list_query =
+            sqlx::query_as::<_, PostgresFlowProcessStateRowModel>(AssertSqlSafe(list_sql))
+                .bind(maybe_flow_types)
+                .bind(maybe_effective_states)
+                .bind(maybe_last_attempt_between)
+                .bind(filter.last_failure_since)
+                .bind(filter.next_planned_before)
+                .bind(filter.next_planned_after)
+                .bind(filter.min_consecutive_failures.map(i64::from));
 
         // Bind pagination parameters if present
         if let Some(pagination) = pagination {
@@ -295,7 +296,7 @@ impl FlowProcessStateQuery for PostgresFlowProcessStateQuery {
             "#
         );
 
-        let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(&sql)
+        let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(AssertSqlSafe(sql))
             .bind(maybe_flow_types as Option<&[&str]>)
             .bind(maybe_effective_states as Option<&[FlowProcessEffectiveState]>)
             .bind(maybe_last_attempt_between)

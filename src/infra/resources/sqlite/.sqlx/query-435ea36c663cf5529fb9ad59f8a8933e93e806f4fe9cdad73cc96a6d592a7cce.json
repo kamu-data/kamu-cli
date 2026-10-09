@@ -6,12 +6,24 @@
       {
         "name": "label_key",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resource_labels_projection",
+            "name": "label_key"
+          }
+        }
       },
       {
         "name": "label_value",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "resource_labels_projection",
+            "name": "label_value"
+          }
+        }
       }
     ],
     "parameters": {

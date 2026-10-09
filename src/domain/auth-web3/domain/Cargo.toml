@@ -46,7 +46,7 @@ siwe = { version = "0.6", default-features = false }
 thiserror = { version = "2", default-features = false }
 
 # Optional
-sqlx = { optional = true, version = "0.8", default-features = false, features = [
+sqlx = { optional = true, version = "0.9", default-features = false, features = [
     "macros",
 ] }
 

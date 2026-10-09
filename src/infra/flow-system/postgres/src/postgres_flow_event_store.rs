@@ -12,7 +12,7 @@ use database_common::{PaginationOpts, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::{FromRow, Postgres, QueryBuilder};
+use sqlx::{AssertSqlSafe, FromRow, Postgres, QueryBuilder};
 
 use crate::helpers::*;
 
@@ -617,7 +617,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(by_flow_types as Option<Vec<String>>)
                 .bind(by_flow_statuses as Option<Vec<FlowStatus>>)
                 .bind(maybe_initiators as Option<Vec<String>>)
@@ -665,7 +665,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             "#,
         );
 
-        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
             .bind(filters.by_flow_types.clone())
             .bind(filters.by_flow_statuses.clone())
             .bind(maybe_initiators as Option<Vec<String>>);
@@ -701,7 +701,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query_scalar::<_, String>(&query_str);
+            let mut query = sqlx::query_scalar::<_, String>(AssertSqlSafe(query_str));
             for values in scope_values {
                 query = query.bind(values);
             }
@@ -750,7 +750,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query_stream = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query_stream = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(maybe_by_flow_types as Option<Vec<String>>)
                 .bind(maybe_by_flow_statuses as Option<Vec<FlowStatus>>)
                 .bind(maybe_initiators as Option<Vec<String>>)

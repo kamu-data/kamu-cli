@@ -25,7 +25,7 @@ doctest = false
 wakeup-listener = { workspace = true }
 
 dill = { version = "0.17", default-features = false }
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "runtime-tokio",
     "sqlite",
 ] }
@@ -39,7 +39,7 @@ tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "macros",
     "migrate",
     "runtime-tokio",

@@ -19,6 +19,12 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "webhook_subscriptions",
+            "name": "status"
+          }
         }
       }
     ],

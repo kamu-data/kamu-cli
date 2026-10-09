@@ -6,7 +6,8 @@
       {
         "name": "last_event_id?: i64",
         "ordinal": 0,
-        "type_info": "Null"
+        "type_info": "Integer",
+        "origin": "Expression"
       }
     ],
     "parameters": {

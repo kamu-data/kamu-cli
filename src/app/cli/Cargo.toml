@@ -255,7 +255,7 @@ setty = { version = "1", features = [
 ] }
 shlex = "2" # Parsing partial input for custom completions
 similar = "3" # Text diffing (apply manifest diffs)
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "tls-rustls-aws-lc-rs",
 ] }
 strum = { version = "0.28", features = [
@@ -304,7 +304,7 @@ utoipa-axum = { version = "0.3", default-features = true, features = [
 ] }
 uuid = { version = "1", default-features = false }
 webbrowser = "1" # For opening URLs in default system browser
-whoami = "1.6"
+whoami = "2.1"
 winnow = { version = "1", default-features = false, features = [
     "std",
 ] }

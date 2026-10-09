@@ -6,27 +6,57 @@
       {
         "ordinal": 0,
         "name": "id: _",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "owner_id: _",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "owner_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_name"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_name"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "created_at: _",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "created_at"
+          }
+        }
       },
       {
         "ordinal": 5,
@@ -40,6 +70,12 @@
                 "derivative"
               ]
             }
+          }
+        },
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "kind"
           }
         }
       }

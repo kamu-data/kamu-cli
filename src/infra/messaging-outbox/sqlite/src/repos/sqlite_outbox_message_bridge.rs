@@ -123,7 +123,7 @@ impl OutboxMessageBridge for SqliteOutboxMessageBridge {
                 FROM json_each($1)
             )
             SELECT
-                m.message_id,
+                m.message_id AS "message_id!",
                 0 AS "tx_id!: i64",
                 m.producer_name,
                 m.content_json as "content_json: _",

@@ -82,7 +82,7 @@ impl SqliteAccountQuotaEventStore {
         .await
         .int_err()?;
 
-        Ok(res.flatten())
+        Ok(res)
     }
 }
 

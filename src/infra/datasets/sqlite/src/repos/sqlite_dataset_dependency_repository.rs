@@ -13,6 +13,7 @@ use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -174,7 +175,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query(AssertSqlSafe(query_str));
 
         let stack_downstream_dataset_id = downstream_dataset_id.as_did_str().to_stack_string();
         query = query.bind(stack_downstream_dataset_id.as_str());

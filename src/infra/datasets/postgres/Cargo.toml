@@ -40,7 +40,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
 ] }
 dill = { version = "0.17", default-features = false }
 futures = "0.3"
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "chrono",
     "macros",
     "postgres",

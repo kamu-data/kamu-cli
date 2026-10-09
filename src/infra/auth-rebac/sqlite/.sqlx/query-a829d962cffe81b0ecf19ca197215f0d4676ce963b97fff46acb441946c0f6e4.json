@@ -6,12 +6,24 @@
       {
         "name": "property_name",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "property_name"
+          }
+        }
       },
       {
         "name": "property_value",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "property_value"
+          }
+        }
       }
     ],
     "parameters": {

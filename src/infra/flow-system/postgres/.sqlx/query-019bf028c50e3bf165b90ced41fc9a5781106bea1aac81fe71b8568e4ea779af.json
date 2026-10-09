@@ -6,12 +6,24 @@
       {
         "ordinal": 0,
         "name": "flow_type",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "flow_trigger_events",
+            "name": "flow_type"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "scope_data",
-        "type_info": "Jsonb"
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "flow_trigger_events",
+            "name": "scope_data"
+          }
+        }
       }
     ],
     "parameters": {

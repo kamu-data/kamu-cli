@@ -6,12 +6,24 @@
       {
         "name": "flow_type",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_trigger_events",
+            "name": "flow_type"
+          }
+        }
       },
       {
         "name": "scope_data: String",
         "ordinal": 1,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_trigger_events",
+            "name": "scope_data"
+          }
+        }
       }
     ],
     "parameters": {

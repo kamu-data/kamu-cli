@@ -6,12 +6,24 @@
       {
         "name": "block_ref_name",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_references",
+            "name": "block_ref_name"
+          }
+        }
       },
       {
         "name": "block_hash_bin",
         "ordinal": 1,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "dataset_references",
+            "name": "block_hash_bin"
+          }
+        }
       }
     ],
     "parameters": {

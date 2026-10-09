@@ -27,7 +27,7 @@ wakeup-listener = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.17", default-features = false }
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "postgres",
     "runtime-tokio",
 ] }
@@ -41,7 +41,7 @@ tracing = { version = "0.1", default-features = false }
 
 
 [dev-dependencies]
-sqlx = { version = "0.8", default-features = false, features = [
+sqlx = { version = "0.9", default-features = false, features = [
     "macros",
     "migrate",
     "postgres",

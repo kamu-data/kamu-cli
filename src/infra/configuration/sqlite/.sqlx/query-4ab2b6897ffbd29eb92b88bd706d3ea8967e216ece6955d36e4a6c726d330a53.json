@@ -6,37 +6,79 @@
       {
         "name": "entry_id: Uuid",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "config_secret_set_entries",
+            "name": "entry_id"
+          }
+        }
       },
       {
         "name": "account_id: odf::AccountID",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "config_secret_set_entries",
+            "name": "account_id"
+          }
+        }
       },
       {
         "name": "key",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "config_secret_set_entries",
+            "name": "secret_key"
+          }
+        }
       },
       {
         "name": "value: _",
         "ordinal": 3,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "config_secret_set_entries",
+            "name": "value"
+          }
+        }
       },
       {
         "name": "secret_nonce: _",
         "ordinal": 4,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "config_secret_set_entries",
+            "name": "secret_nonce"
+          }
+        }
       },
       {
         "name": "created_at: DateTime<Utc>",
         "ordinal": 5,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "config_secret_set_entries",
+            "name": "created_at"
+          }
+        }
       },
       {
         "name": "updated_at: DateTime<Utc>",
         "ordinal": 6,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "config_secret_set_entries",
+            "name": "updated_at"
+          }
+        }
       }
     ],
     "parameters": {

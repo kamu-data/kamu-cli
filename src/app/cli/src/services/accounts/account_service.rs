@@ -19,14 +19,18 @@ pub struct AccountService {}
 impl AccountService {
     pub fn default_account_name(tenancy_config: TenancyConfig) -> String {
         match tenancy_config {
-            TenancyConfig::MultiTenant => whoami::username(),
+            TenancyConfig::MultiTenant => {
+                whoami::username().unwrap_or_else(|_| String::from("unknown"))
+            }
             TenancyConfig::SingleTenant => String::from(DEFAULT_ACCOUNT_NAME_STR),
         }
     }
 
     pub fn default_user_name(tenancy_config: TenancyConfig) -> String {
         match tenancy_config {
-            TenancyConfig::MultiTenant => whoami::realname(),
+            TenancyConfig::MultiTenant => whoami::realname()
+                .or_else(|_| whoami::username())
+                .unwrap_or_else(|_| String::from("Unknown")),
             TenancyConfig::SingleTenant => String::from(DEFAULT_ACCOUNT_NAME_STR),
         }
     }

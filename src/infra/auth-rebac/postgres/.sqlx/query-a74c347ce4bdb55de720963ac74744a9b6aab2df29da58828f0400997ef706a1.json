@@ -16,17 +16,35 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_relations",
+            "name": "object_entity_type"
+          }
         }
       },
       {
         "ordinal": 1,
         "name": "entity_id",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_relations",
+            "name": "object_entity_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "relationship",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_relations",
+            "name": "relationship"
+          }
+        }
       }
     ],
     "parameters": {

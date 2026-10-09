@@ -66,7 +66,7 @@ uuid = { version = "1", default-features = false, features = [
 ] }
 
 # Optional
-sqlx = { optional = true, version = "0.8", default-features = false, features = [
+sqlx = { optional = true, version = "0.9", default-features = false, features = [
     "macros",
 ] }
 
