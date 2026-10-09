@@ -130,7 +130,7 @@ When modifying DB-backed repositories, adding DB infra crates, or changing migra
 make sqlx-local-setup
 ```
 
-This starts local DB containers, applies migrations, and writes crate-local `.env` files with `DATABASE_URL` and SQLx offline disabled.
+This starts local DB containers, applies migrations, and writes crate-local `.env` files with a `DATABASE_URL`, which switches those crates to live checking.
 
 After SQL changes, prepare only the crates whose queries changed:
 

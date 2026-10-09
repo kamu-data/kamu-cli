@@ -14,7 +14,7 @@ Repository rules (from `AGENTS.md`, which wins on any conflict):
 - Run commands on the whole workspace. Never add `-p <crate>` / `--package` to `cargo build`, `check`, `clippy`, `test` or `nextest run` unless the caller explicitly asked for it — it skips artifact reuse and recompiles heavy dependencies.
 - Narrow tests with nextest filtersets, which select tests without changing what gets built: `-E 'test(name)'`, `-E 'package(kamu-adapter-graphql)'`, `-E 'binary(name)'`, or combinations like `-E 'package(x) and test(y)'`.
 - Lint with `make clippy`, not a hand-written clippy invocation.
-- Never set `SQLX_OFFLINE` on the command line; `.env` files configure it.
+- Never set `SQLX_OFFLINE` on the command line; `.env` files configure query checking.
 - Never pipe test or build output into `head`/`tail` — read the full output and summarize it yourself.
 
 When running tests:

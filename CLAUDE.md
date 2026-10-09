@@ -7,10 +7,10 @@ is specific to Claude Code.
 ## Environment
 
 The usual local setup here runs against live databases: `make sqlx-local-setup` writes per-crate
-`.env` files (gitignored) with a `DATABASE_URL` and `SQLX_OFFLINE=false`, and the DB containers run
-under Podman. If those `.env` files exist, SQLx queries are checked against the real schema — never
-override `SQLX_OFFLINE` on the command line ([why](AGENTS.md#hard-rules)). If they do not, builds
-use the committed `.sqlx` cache and database-backed tests need the setup first
+`.env` files (gitignored) with a `DATABASE_URL`, and the DB containers run under Podman. If those
+`.env` files exist, SQLx queries are checked against the real schema — never override
+`SQLX_OFFLINE` on the command line ([why](AGENTS.md#hard-rules)). If they do not, builds use the
+committed `.sqlx` cache and database-backed tests need the setup first
 ([`DEVELOPER.md`](DEVELOPER.md#build-with-databases)).
 
 ## Hooks

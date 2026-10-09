@@ -130,13 +130,11 @@ lint-fix: lint-fix-сlippy fmt
 
 define Setup_EnvFile
 echo "DATABASE_URL=$(1)://root:root@localhost:$(2)/kamu" > $(3)/.env;
-echo "SQLX_OFFLINE=false" >> $(3)/.env;
 echo "KAMU_POSTGRES_IMAGE=$(POSTGRES_IMAGE)" >> $(3)/.env;
 endef
 
 define Setup_EnvFile_Sqlite
 echo "DATABASE_URL=sqlite://$(1)/kamu.sqlite.db" > $(2)/.env;
-echo "SQLX_OFFLINE=false" >> $(2)/.env;
 endef
 
 .PHONY: sqlx-local-setup

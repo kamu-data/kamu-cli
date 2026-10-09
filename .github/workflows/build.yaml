@@ -291,7 +291,6 @@ jobs:
       - name: Postgres database tests
         if: matrix.database
         env:
-          SQLX_OFFLINE: false
           DATABASE_URL: postgres://root:root@127.0.0.1:5432/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set-part }}'
 

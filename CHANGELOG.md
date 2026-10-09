@@ -24,6 +24,7 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when the account's
   storage is unlimited
 - Upgraded to `datafusion v55` and `arrow v59`
+- Upgraded to `sqlx v0.9`
 ### Fixed
 - Running an older kamu in a workspace whose database was migrated by a newer version no longer crashes with
   "Migration failed: VersionMissing"; it reports the schema versions and asks to upgrade kamu

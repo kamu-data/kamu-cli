@@ -30,10 +30,9 @@ load the skill, never route around it through another tool. Hook setup and limit
     writing. Line numbers go stale as soon as an earlier edit lands — re-read the file to
     recompute them.
 - **Never set `SQLX_OFFLINE` on the command line.** SQLx query-checking mode comes from `.env`
-  files: the root [`.env`](.env) sets `SQLX_OFFLINE=true` so CI (which has no database) compiles
-  from the committed `.sqlx` cache, and `make sqlx-local-setup` writes per-crate `.env` files with
-  a live `DATABASE_URL` that take precedence locally. Forcing it from the shell silently checks
-  queries against the stale cache and hides schema drift. See
+  files: a crate with a `DATABASE_URL` (written by `make sqlx-local-setup`) is checked against the
+  live database, and one without compiles from the committed `.sqlx` cache, as CI does. Forcing it
+  from the shell silently checks queries against the stale cache and hides schema drift. See
   [`DEVELOPER.md`](DEVELOPER.md#build-with-databases).
 - **Generated files are never edited by hand.** See [Documentation classes](#documentation-classes)
   for each file and the command that regenerates it.

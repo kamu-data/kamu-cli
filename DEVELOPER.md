@@ -115,7 +115,7 @@ KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test <some_test>
 
 ### Build with Databases
 
-By default, we define `SQLX_OFFLINE=true` environment variable to ensure the compilation succeeds without access to a live database.
+By default, no `DATABASE_URL` is set, so SQLx checks queries against the committed `.sqlx` cache and the compilation succeeds without access to a live database.
 The default mode is fine in most of the cases, assuming the developer's assignment is not related to databases/repositories directly.
 
 When databases have to be touched, the setup of local database containers must be configured using the following script:
@@ -126,8 +126,7 @@ make sqlx-local-setup
 This mode:
  * creates Docker containers with empty databases
  * applies all database migrations from scratch
- * generates `.env` files in specific crates to point to databases running in Docker containers by setting `DATABASE_URL` variables
-   as well as to disable `SQLX_OFFLINE` variable in those crates
+ * generates `.env` files in specific crates to point to databases running in containers by setting `DATABASE_URL` variables
 
 This setup ensures any SQL queries are automatically checked against live database schema at compile-time.
 This is highly useful when queries have to be written or modified.
@@ -147,7 +146,7 @@ Otherwise, GitHub CI flows will likely fail to build the project due to database
 
 The second step, `make sqlx-local-clean` would reverse `make sqlx-local-setup` by:
  * stopping and removing Docker containers with the databases
- * removing `.env` files in database-specific crates, which re-enables `SQLX_OFFLINE=true` for the entire repository.
+ * removing `.env` files in database-specific crates, which returns them to checking queries against the `.sqlx` cache.
 
 
 ### Database migrations

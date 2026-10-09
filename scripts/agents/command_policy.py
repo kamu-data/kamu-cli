@@ -41,7 +41,8 @@ BUILD_SCOPE_REASON = (
 )
 SQLX_REASON = (
     "Never set SQLX_OFFLINE on the command line (AGENTS.md, 'Hard rules'): `.env` files configure "
-    "it, and forcing it checks queries against the stale `.sqlx` cache. Run the plain command."
+    "query checking, and forcing it checks queries against the stale `.sqlx` cache. Run the plain "
+    "command."
 )
 TRUNCATE_REASON = (
     "Build/test/lint output piped into head/tail loses the failures (AGENTS.md, 'Validation'). "
