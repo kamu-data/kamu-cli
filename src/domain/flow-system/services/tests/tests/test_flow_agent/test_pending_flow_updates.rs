@@ -694,3 +694,150 @@ async fn test_retry_policy_change_reaches_retrying_flow() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_batching_rule_lowered_while_flow_waits() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let bar_id = harness
+        .create_derived_dataset(
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+    let bar_flow_binding = transform_dataset_binding(&bar_id);
+
+    let initial_rule = ReactiveRule::new(
+        BatchingRule::try_buffering(100, Duration::milliseconds(300)).unwrap(),
+        BreakingChangeRule::NoAction,
+    );
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            bar_flow_binding.clone(),
+            FlowTriggerRule::Reactive(initial_rule),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    // "bar" waits for 100 records until 300ms, and has 5 so far
+    harness
+        .save_batching_flow(&bar_flow_binding, &foo_id, 5, initial_rule)
+        .await;
+
+    harness
+        .simulate_flow_scenario(|| async {
+            harness.advance_time(Duration::milliseconds(20)).await;
+
+            // 3 records are enough now: the flow runs without waiting for more inputs
+            harness
+                .set_flow_trigger(
+                    harness.now(),
+                    bar_flow_binding.clone(),
+                    FlowTriggerRule::Reactive(ReactiveRule::new(
+                        BatchingRule::try_buffering(3, Duration::milliseconds(300)).unwrap(),
+                        BreakingChangeRule::NoAction,
+                    )),
+                    FlowTriggerStopPolicy::default(),
+                )
+                .await;
+
+            harness.advance_time(Duration::milliseconds(10)).await;
+            assert!(harness.task_exists(TaskID::new(0)).await);
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_batching_interval_extended_while_flow_waits() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness
+        .create_root_dataset(odf::DatasetAlias {
+            dataset_name: odf::DatasetName::new_unchecked("foo"),
+            account_name: None,
+        })
+        .await;
+    let bar_id = harness
+        .create_derived_dataset(
+            odf::DatasetAlias {
+                dataset_name: odf::DatasetName::new_unchecked("bar"),
+                account_name: None,
+            },
+            vec![foo_id.clone()],
+        )
+        .await;
+    let bar_flow_binding = transform_dataset_binding(&bar_id);
+
+    let initial_rule = ReactiveRule::new(
+        BatchingRule::try_buffering(100, Duration::milliseconds(100)).unwrap(),
+        BreakingChangeRule::NoAction,
+    );
+    harness
+        .set_flow_trigger(
+            harness.now(),
+            bar_flow_binding.clone(),
+            FlowTriggerRule::Reactive(initial_rule),
+            FlowTriggerStopPolicy::default(),
+        )
+        .await;
+
+    // "bar" waits for 100 records until 100ms, and has 5 so far
+    let start_time = harness.now();
+    let flow_id = harness
+        .save_batching_flow(&bar_flow_binding, &foo_id, 5, initial_rule)
+        .await;
+
+    let extended_rule = ReactiveRule::new(
+        BatchingRule::try_buffering(100, Duration::milliseconds(200)).unwrap(),
+        BreakingChangeRule::NoAction,
+    );
+
+    harness
+        .simulate_flow_scenario(|| async {
+            harness.advance_time(Duration::milliseconds(20)).await;
+
+            // The flow may batch longer: its deadline moves from 100ms to 200ms
+            harness
+                .set_flow_trigger(
+                    harness.now(),
+                    bar_flow_binding.clone(),
+                    FlowTriggerRule::Reactive(extended_rule),
+                    FlowTriggerStopPolicy::default(),
+                )
+                .await;
+
+            let Some(FlowStartCondition::Reactive(reactive_condition)) =
+                harness.flow_state(flow_id).await.start_condition
+            else {
+                panic!("Flow must still batch its inputs");
+            };
+            pretty_assertions::assert_eq!(extended_rule, reactive_condition.active_rule);
+            pretty_assertions::assert_eq!(
+                start_time + Duration::milliseconds(200),
+                reactive_condition.batching_deadline
+            );
+
+            harness.advance_time(Duration::milliseconds(130)).await;
+            assert!(!harness.task_exists(TaskID::new(0)).await);
+
+            harness.advance_time(Duration::milliseconds(60)).await;
+            assert!(harness.task_exists(TaskID::new(0)).await);
+        })
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

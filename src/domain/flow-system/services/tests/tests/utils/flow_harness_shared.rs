@@ -444,6 +444,80 @@ impl FlowHarness {
         config_snapshot: Option<FlowConfigSnapshot>,
     ) -> FlowID {
         let now = self.now();
+        self.save_waiting_flow(
+            flow_binding,
+            FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
+                activation_time: now,
+            }),
+            config_snapshot,
+            FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                wake_up_at: activation_at,
+            }),
+            activation_at,
+        )
+        .await
+    }
+
+    /// Stores a waiting flow, which batches the given number of new records of
+    /// an input under the given rule, bypassing triggers and sensors
+    pub async fn save_batching_flow(
+        &self,
+        flow_binding: &FlowBinding,
+        input_dataset_id: &odf::DatasetID,
+        records_added: u64,
+        reactive_rule: ReactiveRule,
+    ) -> FlowID {
+        let now = self.now();
+        let batching_deadline = now + reactive_rule.for_new_data.max_batching_interval();
+        self.save_waiting_flow(
+            flow_binding,
+            Self::input_new_data_cause(now, input_dataset_id, records_added),
+            None,
+            FlowStartCondition::Reactive(FlowStartConditionReactive {
+                active_rule: reactive_rule,
+                batching_deadline,
+                last_activation_cause_index: 0,
+            }),
+            batching_deadline,
+        )
+        .await
+    }
+
+    /// New records of an input dataset, detected outside of flows
+    fn input_new_data_cause(
+        activation_time: DateTime<Utc>,
+        input_dataset_id: &odf::DatasetID,
+        records_added: u64,
+    ) -> FlowActivationCause {
+        FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
+            activation_time,
+            resource_type: DATASET_RESOURCE_TYPE.to_string(),
+            changes: ResourceChanges::NewData(ResourceDataChanges {
+                blocks_added: 1,
+                records_added,
+                new_watermark: None,
+            }),
+            details: serde_json::to_value(DatasetResourceUpdateDetails {
+                dataset_id: input_dataset_id.clone(),
+                source: DatasetUpdateSource::ExternallyDetectedChange,
+                old_head_maybe: None,
+                new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+            })
+            .unwrap(),
+        })
+    }
+
+    /// Stores the events of a flow waiting for its start condition, and
+    /// planned for activation at the given moment
+    async fn save_waiting_flow(
+        &self,
+        flow_binding: &FlowBinding,
+        activation_cause: FlowActivationCause,
+        config_snapshot: Option<FlowConfigSnapshot>,
+        start_condition: FlowStartCondition,
+        activation_at: DateTime<Utc>,
+    ) -> FlowID {
+        let now = self.now();
         let flow_id = self.flow_event_store.new_flow_id().await.unwrap();
 
         self.flow_event_store
@@ -455,11 +529,7 @@ impl FlowHarness {
                         event_time: now,
                         flow_id,
                         flow_binding: flow_binding.clone(),
-                        activation_cause: FlowActivationCause::AutoPolling(
-                            FlowActivationCauseAutoPolling {
-                                activation_time: now,
-                            },
-                        ),
+                        activation_cause,
                         config_snapshot,
                         retry_policy: None,
                     }
@@ -468,9 +538,7 @@ impl FlowHarness {
                         event_time: now,
                         flow_id,
                         flow_binding: flow_binding.clone(),
-                        start_condition: FlowStartCondition::Schedule(FlowStartConditionSchedule {
-                            wake_up_at: activation_at,
-                        }),
+                        start_condition,
                         last_activation_cause_index: 0,
                     }
                     .into(),

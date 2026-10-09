@@ -64,6 +64,13 @@ impl FlowState {
             .all(FlowActivationCause::is_auto_polling)
     }
 
+    /// Someone asked to run this flow by hand
+    pub fn has_manual_activation_cause(&self) -> bool {
+        self.activation_causes
+            .iter()
+            .any(FlowActivationCause::is_manual)
+    }
+
     /// Configuration rule the flow runs with, if any
     pub fn config_rule(&self) -> Option<&FlowConfigurationRule> {
         self.config_snapshot.as_ref().map(|snapshot| &snapshot.rule)

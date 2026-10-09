@@ -50,6 +50,11 @@ impl FlowSchedulingServiceImpl {
                     )
                     .await
                     .int_err()?;
+
+                // A flow already batching inputs follows the rule at once,
+                // not only when the next input arrives
+                self.reevaluate_pending_reactive_flow(activation_time, flow_binding, reactive_rule)
+                    .await?;
             }
 
             // Scheduled action
@@ -152,30 +157,15 @@ impl FlowSchedulingServiceImpl {
             "At least one activation cause is required"
         );
 
-        // Flows may not be attempted more frequent than mandatory throttling period.
-        // If flow has never run before, let it go without restriction.
         let activation_time = activation_causes
             .first()
             .as_ref()
             .unwrap()
             .activation_time();
 
-        // Query previous runs stats to determine last attempt time
-        let maybe_flow_process_state = self
-            .flow_process_state_query
-            .try_get_process_state(flow_binding)
-            .await?;
-        let maybe_last_attempt_time: Option<DateTime<Utc>> = maybe_flow_process_state
-            .as_ref()
-            .and_then(FlowProcessState::last_attempt_at);
-
-        let mut throttling_boundary_time = maybe_last_attempt_time.map_or(activation_time, |t| {
-            t + self.agent_config.mandatory_throttling_period
-        });
-        // It's also possible we are waiting for some start condition much longer..
-        if throttling_boundary_time < activation_time {
-            throttling_boundary_time = activation_time;
-        }
+        let maybe_last_attempt_time = self.last_attempt_time(flow_binding).await?;
+        let throttling_boundary_time =
+            self.throttling_boundary_time(activation_time, maybe_last_attempt_time);
 
         let trigger_context = match &maybe_trigger_rule {
             None => FlowTriggerContext::Unconditional,
@@ -208,12 +198,18 @@ impl FlowSchedulingServiceImpl {
                             // Is this rule still waited?
                             if matches!(flow.start_condition, Some(FlowStartCondition::Reactive(_)))
                             {
+                                // A new input may only bring the activation earlier
                                 self.evaluate_flow_reactive_rule(
                                     activation_time,
                                     &mut flow,
                                     &reactive_rule,
                                     throttling_boundary_time,
                                 )?
+                                .filter(|next_activation_time| {
+                                    flow.timing
+                                        .scheduled_for_activation_at
+                                        .is_none_or(|planned| planned > *next_activation_time)
+                                })
                             } else {
                                 // Skip, the flow waits for something else
                                 None
@@ -340,6 +336,79 @@ impl FlowSchedulingServiceImpl {
         }
 
         Ok(flow.into())
+    }
+
+    /// Re-evaluates the batching condition of a pending flow under the given
+    /// rule, if the flow still batches its inputs
+    async fn reevaluate_pending_reactive_flow(
+        &self,
+        evaluation_time: DateTime<Utc>,
+        flow_binding: &FlowBinding,
+        reactive_rule: &ReactiveRule,
+    ) -> Result<(), InternalError> {
+        let Some(flow_id) = self.find_pending_flow(flow_binding).await? else {
+            return Ok(());
+        };
+
+        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+            .await
+            .int_err()?;
+        let Some(FlowStartCondition::Reactive(_)) = flow.start_condition else {
+            return Ok(());
+        };
+
+        let maybe_last_attempt_time = self.last_attempt_time(flow_binding).await?;
+        let throttling_boundary_time =
+            self.throttling_boundary_time(evaluation_time, maybe_last_attempt_time);
+
+        // The rule decides the activation, earlier or later, unless someone asked
+        // to run the flow by hand: that one is only ever moved earlier
+        if let Some(next_activation_time) = self.evaluate_flow_reactive_rule(
+            evaluation_time,
+            &mut flow,
+            reactive_rule,
+            throttling_boundary_time,
+        )? && flow.timing.scheduled_for_activation_at != Some(next_activation_time)
+            && (!flow.has_manual_activation_cause()
+                || flow
+                    .timing
+                    .scheduled_for_activation_at
+                    .is_none_or(|planned| planned > next_activation_time))
+        {
+            flow.schedule_for_activation(evaluation_time, next_activation_time)
+                .int_err()?;
+        }
+
+        flow.save(self.flow_event_store.as_ref()).await.int_err()
+    }
+
+    async fn last_attempt_time(
+        &self,
+        flow_binding: &FlowBinding,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        // Query previous runs stats to determine last attempt time
+        let maybe_flow_process_state = self
+            .flow_process_state_query
+            .try_get_process_state(flow_binding)
+            .await?;
+        Ok(maybe_flow_process_state
+            .as_ref()
+            .and_then(FlowProcessState::last_attempt_at))
+    }
+
+    /// Flows may not be attempted more frequent than mandatory throttling
+    /// period. If flow has never run before, let it go without restriction
+    fn throttling_boundary_time(
+        &self,
+        activation_time: DateTime<Utc>,
+        maybe_last_attempt_time: Option<DateTime<Utc>>,
+    ) -> DateTime<Utc> {
+        // It's also possible we are waiting for some start condition much longer
+        maybe_last_attempt_time
+            .map_or(activation_time, |t| {
+                t + self.agent_config.mandatory_throttling_period
+            })
+            .max(activation_time)
     }
 
     /// Decides when a scheduled flow activates, and records what it waits for
@@ -469,15 +538,7 @@ impl FlowSchedulingServiceImpl {
             let corrected_finish_time =
                 std::cmp::max(batching_finish_time, throttling_boundary_time);
 
-            let should_activate = match flow.timing.scheduled_for_activation_at {
-                Some(scheduled_for_activation_at) => {
-                    scheduled_for_activation_at > corrected_finish_time
-                }
-                None => true,
-            };
-            if should_activate {
-                return Ok(Some(corrected_finish_time));
-            }
+            return Ok(Some(corrected_finish_time));
         }
 
         Ok(None)
@@ -511,12 +572,14 @@ impl FlowSchedulingServiceImpl {
             .await
     }
 
-    /// Retry policy of the configuration, or the default one for the flow type
     fn effective_retry_policy(
         &self,
         flow_binding: &FlowBinding,
         configured_retry_policy: Option<RetryPolicy>,
     ) -> Option<RetryPolicy> {
+        // Decide on retry policy:
+        // - if configuration defines it, use it
+        // - if not, use default retry policy for this flow type, if it's defined
         configured_retry_policy.or_else(|| {
             self.agent_config
                 .default_retry_policy_by_flow_type
@@ -571,6 +634,7 @@ impl FlowSchedulingServiceImpl {
             }
         };
 
+        // Create the flow
         let mut flow = Flow::new(
             trigger_time,
             flow_id,

@@ -23,6 +23,13 @@ pub enum FlowActivationCause {
 }
 
 impl FlowActivationCause {
+    pub fn is_manual(&self) -> bool {
+        match self {
+            Self::Manual(_) => true,
+            Self::AutoPolling(_) | Self::ResourceUpdate(_) | Self::IterationFinished(_) => false,
+        }
+    }
+
     pub fn is_auto_polling(&self) -> bool {
         match self {
             Self::AutoPolling(_) => true,
