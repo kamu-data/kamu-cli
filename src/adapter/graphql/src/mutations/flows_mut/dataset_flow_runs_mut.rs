@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_adapter_flow_dataset as afs;
 use kamu_flow_system as fs;
 
@@ -81,7 +80,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         let flow_state = flow_run_service
             .run_flow_manually(
-                Utc::now(),
+                utils::system_time_now(ctx),
                 &flow_binding,
                 logged_account.account_handle.did,
                 maybe_forced_configuration_rule,
@@ -127,7 +126,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         let flow_state = flow_run_service
             .run_flow_manually(
-                Utc::now(),
+                utils::system_time_now(ctx),
                 &flow_binding,
                 logged_account.account_handle.did,
                 None,
@@ -193,7 +192,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         let flow_state = flow_run_service
             .run_flow_manually(
-                Utc::now(),
+                utils::system_time_now(ctx),
                 &flow_binding,
                 logged_account.account_handle.did,
                 maybe_forced_configuration_rule,
@@ -278,7 +277,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         let flow_state = flow_run_service
             .run_flow_manually(
-                Utc::now(),
+                utils::system_time_now(ctx),
                 &flow_binding,
                 logged_account.account_handle.did,
                 maybe_forced_flow_config_rule,
@@ -321,7 +320,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
         let flow_state = flow_run_service
             .run_flow_manually(
-                Utc::now(),
+                utils::system_time_now(ctx),
                 &flow_binding,
                 logged_account.account_handle.did,
                 None,
@@ -359,7 +358,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         // Attempt cancelling the flow
 
         let flow_state = flow_run_service
-            .cancel_flow_run(Utc::now(), flow_id.into())
+            .cancel_flow_run(utils::system_time_now(ctx), flow_id.into())
             .await
             .map_err(|e| match e {
                 fs::CancelFlowRunError::NotFound(_) => unreachable!("Flow checked already"),

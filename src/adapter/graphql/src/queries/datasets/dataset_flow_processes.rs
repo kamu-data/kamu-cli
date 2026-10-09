@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_adapter_flow_dataset::{ingest_dataset_binding, transform_dataset_binding};
 use kamu_adapter_flow_webhook::FlowScopeSubscription;
 use kamu_flow_system::FlowProcessStateQuery;
@@ -18,6 +17,7 @@ use crate::queries::{
     DatasetRequestStateWithOwner,
     WebhookFlowSubProcessGroup,
 };
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +66,10 @@ impl<'a> DatasetFlowProcesses<'a> {
             // Or synthesize unconfigured state if no process state exists
             Ok(DatasetFlowProcess::new(
                 self.dataset_request_state.clone(),
-                kamu_flow_system::FlowProcessState::unconfigured(Utc::now(), flow_binding),
+                kamu_flow_system::FlowProcessState::unconfigured(
+                    utils::system_time_now(ctx),
+                    flow_binding,
+                ),
             ))
         }
     }
