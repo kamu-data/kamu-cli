@@ -59,9 +59,11 @@ struct State {
 #[interface(dyn MessageConsumer)]
 #[interface(dyn MessageConsumerT<TaskProgressMessage>)]
 #[interface(dyn MessageConsumerT<FlowTriggerUpdatedMessage>)]
+#[interface(dyn MessageConsumerT<FlowConfigurationUpdatedMessage>)]
 #[meta(MessageConsumerMeta {
     consumer_name: MESSAGE_CONSUMER_KAMU_FLOW_AGENT,
     feeding_producers: &[
+        MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
         MESSAGE_PRODUCER_KAMU_TASK_AGENT,
     ],
@@ -758,6 +760,38 @@ impl MessageConsumerT<FlowTriggerUpdatedMessage> for FlowAgentImpl {
         }
 
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl MessageConsumerT<FlowConfigurationUpdatedMessage> for FlowAgentImpl {
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        name = "FlowAgentImpl[FlowConfigurationUpdatedMessage]"
+    )]
+    async fn consume_message(
+        &self,
+        target_catalog: &Catalog,
+        message: &FlowConfigurationUpdatedMessage,
+    ) -> Result<(), InternalError> {
+        tracing::debug!(received_message = ?message, "Received flow configuration message");
+
+        // Unlike trigger updates, no startup step re-reads the configuration of
+        // a pending flow, so the message applies even before the agent starts
+        let scheduling_service = target_catalog
+            .get_one::<FlowSchedulingServiceImpl>()
+            .unwrap();
+        scheduling_service
+            .apply_configuration_to_pending_flow(
+                message.event_time,
+                &message.flow_binding,
+                message.rule.clone(),
+                message.retry_policy,
+            )
+            .await
     }
 }
 

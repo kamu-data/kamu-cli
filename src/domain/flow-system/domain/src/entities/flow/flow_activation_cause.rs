@@ -23,6 +23,20 @@ pub enum FlowActivationCause {
 }
 
 impl FlowActivationCause {
+    pub fn is_on_demand(&self) -> bool {
+        match self {
+            Self::Manual(_) | Self::IterationFinished(_) => true,
+            Self::AutoPolling(_) | Self::ResourceUpdate(_) => false,
+        }
+    }
+
+    pub fn is_auto_polling(&self) -> bool {
+        match self {
+            Self::AutoPolling(_) => true,
+            Self::Manual(_) | Self::ResourceUpdate(_) | Self::IterationFinished(_) => false,
+        }
+    }
+
     pub fn activation_time(&self) -> DateTime<Utc> {
         match self {
             Self::Manual(t) => t.activation_time,

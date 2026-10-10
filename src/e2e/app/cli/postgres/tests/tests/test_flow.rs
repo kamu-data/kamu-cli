@@ -167,3 +167,34 @@ kamu_cli_run_api_server_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_schedule_change_reaches_waiting_flow,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM)
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_config_change_reaches_waiting_flow,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM)
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_batching_rule_change_reaches_waiting_flow,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

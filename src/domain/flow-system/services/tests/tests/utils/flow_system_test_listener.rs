@@ -455,6 +455,7 @@ impl FlowSystemEventProjector for FlowSystemTestListener {
 
                     FlowEvent::ActivationCauseAdded(_)
                     | FlowEvent::ConfigSnapshotModified(_)
+                    | FlowEvent::RetryPolicyModified(_)
                     | FlowEvent::Completed(_)
                     | FlowEvent::Initiated(_)
                     | FlowEvent::TaskScheduled(_) => { /* Ignore */ }

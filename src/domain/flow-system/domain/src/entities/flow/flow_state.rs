@@ -57,6 +57,22 @@ pub struct FlowTimingRecords {
 }
 
 impl FlowState {
+    /// Nothing but the schedule asked for this flow
+    pub fn is_activated_by_schedule_only(&self) -> bool {
+        self.activation_causes
+            .iter()
+            .all(FlowActivationCause::is_auto_polling)
+    }
+
+    /// Someone asked to run this flow by hand, or it continues an ingest that
+    /// has more to fetch: such a flow runs as soon as throttling allows, and
+    /// may carry a configuration rule of its own
+    pub fn is_requested_on_demand(&self) -> bool {
+        self.activation_causes
+            .iter()
+            .any(FlowActivationCause::is_on_demand)
+    }
+
     /// Extract primary activation cause
     pub fn primary_activation_cause(&self) -> &FlowActivationCause {
         // At least 1 cause is initially defined for sure
@@ -145,6 +161,7 @@ impl Projection for FlowState {
                 }),
                 E::StartConditionUpdated(_)
                 | E::ConfigSnapshotModified(_)
+                | E::RetryPolicyModified(_)
                 | E::ActivationCauseAdded(_)
                 | E::ScheduledForActivation(_)
                 | E::TaskScheduled(_)
@@ -193,6 +210,16 @@ impl Projection for FlowState {
                         config_snapshot: Some(config_snapshot),
                         ..s
                     }),
+
+                    E::RetryPolicyModified(FlowEventRetryPolicyModified {
+                        retry_policy, ..
+                    }) => {
+                        if s.outcome.is_some() || !s.task_ids.is_empty() {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowState { retry_policy, ..s })
+                        }
+                    }
 
                     E::ActivationCauseAdded(FlowEventActivationCauseAdded {
                         ref activation_cause,

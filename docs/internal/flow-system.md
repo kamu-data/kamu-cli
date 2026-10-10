@@ -188,8 +188,8 @@ Two background agents run in the API server: `FlowAgentImpl` (activations and ta
 | `activation_causes` | Causes gathered before the first task was scheduled; the first is the *primary* cause |
 | `late_activation_causes` | Causes that arrived after a task was scheduled; they may seed the next flow (see [§5](#5-life-of-a-flow)) |
 | `start_condition` | What it waits for now; cleared once its task runs |
-| `config_snapshot` | Taken at creation from the stored configuration, or from a forced configuration (a manual run, or the ingest controller carrying the snapshot into the next iteration); later changes to the stored configuration do not affect this flow. Replaced only by `ConfigSnapshotModified`, when a forced configuration merges into this pending flow and moves its activation earlier |
-| `retry_policy` | Fixed at creation |
+| `config_snapshot` | Taken at creation from the stored configuration, or from a forced configuration (a manual run, or the ingest controller carrying the snapshot into the next iteration). Follows configuration changes until the flow has a task, unless the flow is requested on demand (it has a `Manual` or `IterationFinished` cause, the only causes that can come with a forced configuration). A forced configuration merging into this pending flow replaces it only when it moves the activation earlier. The controller reads it when it builds the task |
+| `retry_policy` | Taken at creation from the configuration, or the flow type's default (`flowSystem.defaultRetryPolicies`). Follows configuration changes until the flow has a task; a flow already retrying keeps the policy it started with |
 | `task_ids` | One per attempt |
 | `outcome` | `FlowOutcome::{Success(TaskResult), Failed(TaskError), Aborted}` |
 | `timing` | `first_activated_at`, `scheduled_for_activation_at`, `awaiting_executor_since`, `running_since`, `last_attempt_finished_at`, `completed_at` |
@@ -219,7 +219,8 @@ stateDiagram-v2
 | `ActivationCauseAdded` | Appends to `activation_causes`, or to `late_activation_causes` once a task exists |
 | `StartConditionUpdated` | Sets the start condition; `Executor` also sets `awaiting_executor_since`. Rejected once a task awaits an executor |
 | `ScheduledForActivation` | Sets the planned activation time. Rejected once a task awaits an executor |
-| `ConfigSnapshotModified` | Replaces the snapshot (a forced configuration merged into a pending flow) |
+| `ConfigSnapshotModified` | Replaces the snapshot: a forced configuration merged into a pending flow, or a configuration change before the flow has a task |
+| `RetryPolicyModified` | Replaces the retry policy after a configuration change. Rejected once the flow has a task |
 | `TaskScheduled` | Appends a task ID; sets `first_activated_at` the first time |
 | `TaskRunning` | Sets `running_since`, clears the start condition |
 | `TaskFinished` | Success → outcome `Success`; cancelled → `Aborted`; failure with `next_attempt_at` → back to waiting with that activation time (`Retrying`); failure without → outcome `Failed` |
@@ -265,7 +266,7 @@ sequenceDiagram
 
     SRC->>SCH: trigger_flow_common (caller's transaction)
     alt binding has a pending flow
-        SCH->>SCH: merge cause, maybe move activation earlier
+        SCH->>SCH: merge cause, maybe move activation
     else no pending flow
         SCH->>SCH: Flow::new(config snapshot, retry policy)<br/>+ start condition + ScheduledForActivation(t)
     end
@@ -342,9 +343,9 @@ from these (schedule ticks, retry delays, batching deadlines, throttling boundar
 
 | Context | New flow | Pending flow |
 | --- | --- | --- |
-| Schedule | `max(boundary, schedule.next_activation_time(now, last_attempt))`; condition `Schedule` or `Throttling` | moved earlier only if the boundary is before the planned time |
+| Schedule | `max(boundary, schedule.next_activation_time(now, last_attempt))`; condition `Schedule` or `Throttling` | with only `AutoPolling` causes and no task: planned as a new flow, so a changed schedule moves it earlier or later. Otherwise moved earlier only if the boundary is before the planned time |
 | None (manual, late causes) | `max(boundary, activation_time)` | moved earlier if the boundary is before the planned time, and only then a forced configuration replaces the snapshot |
-| Reactive | batching evaluation, below | re-evaluated only if it still waits on a `Reactive` condition |
+| Reactive | batching evaluation, below | re-evaluated only if it still waits on a `Reactive` condition. A new input moves it earlier only; a changed rule moves it earlier or later, unless the flow is requested on demand |
 
 `Schedule::TimeDelta { every }` gives `max(now, last_attempt + every)`, or `now` when the binding
 never ran — so a new trigger on a fresh binding runs at once.
@@ -431,8 +432,9 @@ whole activation, including the task.
 | --- | --- |
 | `TaskProgressMessage::Running` | `flow.on_task_running` |
 | `TaskProgressMessage::Finished` | `flow.on_task_finished`; if the outcome is final and successful with a non-empty result, `propagate_success`; then completion metrics |
-| `FlowTriggerUpdatedMessage`, active | `activate_flow_trigger`: schedule → enqueue an auto-polling flow; reactive → `ensure_flow_sensor` |
+| `FlowTriggerUpdatedMessage`, active | `activate_flow_trigger`: schedule → enqueue an auto-polling flow, or re-plan the pending one ([§6](#deciding-the-activation-time)); reactive → `ensure_flow_sensor`, then a pending flow still batching is re-evaluated under the new rule |
 | `FlowTriggerUpdatedMessage`, inactive | `FlowAbortHelper::deactivate_flow_trigger`: abort the pending flow (cancelling its tasks) and unregister the sensor |
+| `FlowConfigurationUpdatedMessage` | `apply_configuration_to_pending_flow`: `Flow::apply_configuration`: the pending flow takes the new rule and retry policy as described in [§4](#state). Posted by `FlowConfigurationServiceImpl::set_configuration` |
 
 ### Run, cancel, query
 
@@ -559,7 +561,7 @@ stop policy, `consecutive_failures`, `last_success_at`, `last_failure_at`, `last
 
 | Event | Process state | Side effects (same transaction) |
 | --- | --- | --- |
-| Trigger `Created` / `Modified` | intent and stop policy; un-pausing from `StoppedAuto` resets failures | lifecycle messages |
+| Trigger `Created` / `Modified` | intent and stop policy; un-pausing from `StoppedAuto` resets failures; a stop policy the current failures already reach auto-stops at once (`StopPolicy`) | lifecycle messages; an auto-stop is applied as on `Completed` |
 | Flow `ScheduledForActivation` | `next_planned_at` (enabled only) | — |
 | Flow `TaskRunning` | `running_since` | — |
 | Flow `Completed` | while enabled: success resets failures (and self-heals an auto-stop); failure counts up unless already auto-stopped | see below |
@@ -825,6 +827,8 @@ may do: `canView` (logged in with read access) and `canRun` (maintain access).
 - **Downstream links lag.** They come from an asynchronous projection, so right after a flow
   completes its `downstreamFlows` may still be empty. Batch loading is per flow: avoid the field in
   list fragments.
+- **Time comes from the catalog.** Resolvers read the current time through `utils::system_time_now`,
+  the `SystemTimeSource`, so a frozen clock (tests, e2e) applies to trigger, run and cancel requests.
 - **A new flow type needs schema work**: an enum value or a process-type filter, a description
   variant, and, if it has a configuration, input and output types.
 
@@ -878,7 +882,7 @@ Wakeup channels and their SQLite polling equivalents are in
 4. **Configuration rule**, if the flow needs options: `flow_config_struct!` with a stable
    `TYPE_ID`. `from_flow_config` does not check the type, so check `rule_type` before decoding.
 5. **Controller**: a dill component implementing `FlowController` with `FlowControllerMeta`.
-   `build_task_logical_plan` reads the scope and the frozen config snapshot; `propagate_success`
+   `build_task_logical_plan` reads the scope and the config snapshot; `propagate_success`
    dispatches to sensors if others depend on this flow. Override `ensure_flow_sensor` if the type
    supports reactive triggers.
 6. **Sensor**, for reactive triggers: implement `FlowSensor`; keep it idempotent, since it is
@@ -905,7 +909,7 @@ Wakeup channels and their SQLite polling equivalents are in
 | Throttling input | Throttling reads `last_attempt_at` from the asynchronous projection; if the projector lags or is stuck, throttling uses stale data |
 | Continuation depends on the projector | A stuck flow-system event agent stops periodic flows, late-cause flows and auto-stop, while flows already scheduled still run |
 | Activation links lag | Links appear only after the projector applies the downstream flow's events; a stuck projector leaves `downstreamFlows` incomplete |
-| Configuration changes | Pending flows keep their snapshot and retry policy; only a forced configuration merged into the pending flow replaces the snapshot ([§4](#state)). Applying changes to pending flows is planned in [#1415](https://github.com/kamu-data/kamu-cli/issues/1415); `FlowConfigurationUpdatedMessage` is registered for it, but nothing produces or consumes it yet |
+| Configuration changes | A pending flow takes a new rule and retry policy only until its first task is formed, so a retrying flow keeps both; a flow requested on demand keeps its rule even before that ([§4](#state)) |
 | Late causes | Dropped when a flow ends unsuccessfully with its trigger stopped, or is aborted ([§5](#5-life-of-a-flow)) |
 | Unconfigured bindings | Without a trigger, failures are not counted and nothing auto-stops |
 | Manual cancel | Cancelling a flow pauses the binding's schedule trigger as a user pause |

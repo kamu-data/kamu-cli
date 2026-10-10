@@ -122,6 +122,74 @@ pub static DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: LazyLock<String> = LazyLock:
 pub static DATASET_DERIVATIVE_LEADERBOARD_NAME: LazyLock<odf::DatasetName> =
     LazyLock::new(|| odf::DatasetName::new_unchecked("leaderboard"));
 
+/// Root dataset `root-dataset`, polling CSV chunks of city populations from
+/// the files matching `<chunks_glob>`
+pub const DATASET_ROOT_CITY_POPULATION_SNAPSHOT_STR: &str = indoc::indoc!(
+    r#"
+    kind: DatasetSnapshot
+    version: 1
+    content:
+      name: root-dataset
+      kind: Root
+      metadata:
+        - kind: SetPollingSource
+          fetch:
+            kind: FilesGlob
+            path: <chunks_glob>
+          read:
+            kind: Csv
+            header: true
+            schema:
+              fields:
+                - name: event_time
+                  type: Timestamp
+                - name: city
+                  type: String
+                - name: population
+                  type: Int64
+          merge:
+            kind: Ledger
+            primaryKey:
+              - event_time
+              - city
+    "#
+);
+
+pub static DATASET_ROOT_CITY_POPULATION_SNAPSHOT: LazyLock<String> = LazyLock::new(|| {
+    DATASET_ROOT_CITY_POPULATION_SNAPSHOT_STR
+        .escape_default()
+        .to_string()
+});
+
+/// Derived dataset `derived-dataset`, copying `root-dataset` with the
+/// `DataFusion` engine
+pub const DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT_STR: &str = indoc::indoc!(
+    r#"
+    kind: DatasetSnapshot
+    version: 1
+    content:
+      name: derived-dataset
+      kind: Derivative
+      metadata:
+        - kind: SetTransform
+          inputs:
+            - datasetRef: root-dataset
+              alias: root
+          transform:
+            kind: Sql
+            engine: datafusion
+            queries:
+              - query: |
+                  SELECT event_time, city, population FROM root
+    "#
+);
+
+pub static DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT: LazyLock<String> = LazyLock::new(|| {
+    DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT_STR
+        .escape_default()
+        .to_string()
+});
+
 pub static E2E_USER_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(E2E_USER_ACCOUNT_NAME_STR));
 
@@ -1635,6 +1703,57 @@ impl FlowApi<'_> {
         dataset_id: &odf::DatasetID,
         for_breaking_change: &str,
     ) {
+        self.set_trigger(
+            dataset_id,
+            "EXECUTE_TRANSFORM",
+            &format!(
+                "reactive: {{ forNewData: {{ immediate: {{ dummy: false }} }}, forBreakingChange: \
+                 {for_breaking_change} }}"
+            ),
+        )
+        .await;
+    }
+
+    /// Reactive trigger, which batches inputs until the given number of
+    /// records or for the given number of hours
+    pub async fn set_buffering_transform_trigger(
+        &self,
+        dataset_id: &odf::DatasetID,
+        min_records_to_await: u64,
+        max_batching_interval_hours: u32,
+    ) {
+        self.set_trigger(
+            dataset_id,
+            "EXECUTE_TRANSFORM",
+            &format!(
+                "reactive: {{ forNewData: {{ buffering: {{ minRecordsToAwait: \
+                 {min_records_to_await}, maxBatchingInterval: {{ every: \
+                 {max_batching_interval_hours}, unit: HOURS }} }} }}, forBreakingChange: \
+                 NO_ACTION }}"
+            ),
+        )
+        .await;
+    }
+
+    pub async fn set_cron_ingest_trigger(
+        &self,
+        dataset_id: &odf::DatasetID,
+        cron_expression: &str,
+    ) {
+        self.set_trigger(
+            dataset_id,
+            "INGEST",
+            &format!(r#"schedule: {{ cron5ComponentExpression: "{cron_expression}" }}"#),
+        )
+        .await;
+    }
+
+    async fn set_trigger(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_flow_type: &str,
+        trigger_rule_input: &str,
+    ) {
         let mutation = indoc::indoc!(
             r#"
             mutation {
@@ -1643,13 +1762,8 @@ impl FlowApi<'_> {
                   flows {
                     triggers {
                       setTrigger(
-                        datasetFlowType: EXECUTE_TRANSFORM,
-                        triggerRuleInput: {
-                          reactive: {
-                            forNewData: { immediate: { dummy: false } },
-                            forBreakingChange: <for_breaking_change>
-                          }
-                        },
+                        datasetFlowType: <dataset_flow_type>,
+                        triggerRuleInput: { <trigger_rule_input> },
                         triggerStopPolicyInput: {
                           afterConsecutiveFailures: { maxFailures: 1 }
                         }
@@ -1664,7 +1778,8 @@ impl FlowApi<'_> {
             "#
         )
         .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-        .replace("<for_breaking_change>", for_breaking_change);
+        .replace("<dataset_flow_type>", dataset_flow_type)
+        .replace("<trigger_rule_input>", trigger_rule_input);
 
         let response = self.client.graphql_api_call(&mutation, None).await.data();
 
@@ -1674,6 +1789,75 @@ impl FlowApi<'_> {
                 .as_str()
                 .unwrap()
         );
+    }
+
+    /// Ingest configuration with a fixed retry policy, retrying every minute
+    pub async fn set_ingest_config(
+        &self,
+        dataset_id: &odf::DatasetID,
+        fetch_uncacheable: bool,
+        retry_max_attempts: u32,
+    ) {
+        let mutation = indoc::indoc!(
+            r#"
+            mutation {
+              datasets {
+                byId(datasetId: "<dataset_id>") {
+                  flows {
+                    configs {
+                      setIngestConfig(
+                        ingestConfigInput: {
+                          fetchUncacheable: <fetch_uncacheable>,
+                          fetchNextIteration: false
+                        },
+                        retryPolicyInput: {
+                          maxAttempts: <retry_max_attempts>,
+                          minDelay: { every: 1, unit: MINUTES },
+                          backoffType: FIXED
+                        }
+                      ) {
+                        message
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )
+        .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+        .replace("<fetch_uncacheable>", &fetch_uncacheable.to_string())
+        .replace("<retry_max_attempts>", &retry_max_attempts.to_string());
+
+        let response = self.client.graphql_api_call(&mutation, None).await.data();
+
+        pretty_assertions::assert_eq!(
+            "Success",
+            response["datasets"]["byId"]["flows"]["configs"]["setIngestConfig"]["message"]
+                .as_str()
+                .unwrap()
+        );
+    }
+
+    /// Waits until the dataset has a waiting flow that satisfies the
+    /// condition: flows follow trigger and configuration changes
+    /// asynchronously
+    pub async fn wait_for_waiting_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        condition: impl Fn(&FlowSummary) -> bool,
+    ) -> FlowSummary {
+        let retry_strategy = FixedInterval::from_millis(500).take(60); // 30s
+
+        Retry::start(retry_strategy, || async {
+            self.list_flows(dataset_id)
+                .await
+                .into_iter()
+                .find(|flow| flow.status == "WAITING" && condition(flow))
+                .ok_or(())
+        })
+        .await
+        .unwrap()
     }
 
     // Method to wait for a flow to finish
@@ -1686,50 +1870,14 @@ impl FlowApi<'_> {
         let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
 
         Retry::start(retry_strategy, || async {
-            let response = self
-                .client
-                .graphql_api_call(
-                    indoc::indoc!(
-                        r#"
-                        query {
-                          datasets {
-                            byId(datasetId: "<dataset_id>") {
-                              flows {
-                                runs {
-                                  listFlows {
-                                    edges {
-                                      node {
-                                        status
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                        "#
-                    )
-                    .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
-                    .as_str(),
-                    None,
-                )
-                .await
-                .data();
-
-            let edges = response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["edges"]
-                .as_array()
-                .unwrap();
-            if edges.len() < expected_flow_count {
-                return Err(());
+            let flows = self.list_flows(dataset_id).await;
+            if flows.len() >= expected_flow_count
+                && flows.iter().all(|flow| flow.status == "FINISHED")
+            {
+                Ok(())
+            } else {
+                Err(())
             }
-            let all_finished = edges.iter().all(|edge| {
-                let status = edge["node"]["status"].as_str().unwrap();
-
-                status == "FINISHED"
-            });
-
-            if all_finished { Ok(()) } else { Err(()) }
         })
         .await
         .unwrap();
@@ -1757,6 +1905,20 @@ impl FlowApi<'_> {
                                     taskIds
                                     outcome {
                                       __typename
+                                    }
+                                    startCondition {
+                                      __typename
+                                      ... on FlowStartConditionSchedule {
+                                        wakeUpAt
+                                      }
+                                    }
+                                    configSnapshot {
+                                      ... on FlowConfigRuleIngest {
+                                        fetchUncacheable
+                                      }
+                                    }
+                                    retryPolicy {
+                                      maxAttempts
                                     }
                                   }
                                 }
@@ -1797,6 +1959,14 @@ impl FlowApi<'_> {
                         .iter()
                         .map(|task_id| task_id.as_str().unwrap().to_owned())
                         .collect(),
+                    start_condition: node["startCondition"]["__typename"]
+                        .as_str()
+                        .map(ToOwned::to_owned),
+                    wake_up_at: node["startCondition"]["wakeUpAt"]
+                        .as_str()
+                        .map(|wake_up_at| DateTime::parse_from_rfc3339(wake_up_at).unwrap().into()),
+                    fetch_uncacheable: node["configSnapshot"]["fetchUncacheable"].as_bool(),
+                    retry_max_attempts: node["retryPolicy"]["maxAttempts"].as_u64(),
                 }
             })
             .collect()
@@ -1898,6 +2068,13 @@ pub struct FlowSummary {
     /// GraphQL type name of the outcome, if the flow finished
     pub outcome: Option<String>,
     pub task_ids: Vec<String>,
+    /// GraphQL type name of the start condition, if the flow waits for one
+    pub start_condition: Option<String>,
+    /// Planned wake up of a flow waiting for its schedule
+    pub wake_up_at: Option<DateTime<Utc>>,
+    /// Snapshot of an ingest configuration
+    pub fetch_uncacheable: Option<bool>,
+    pub retry_max_attempts: Option<u64>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

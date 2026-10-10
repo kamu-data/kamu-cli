@@ -13,6 +13,8 @@ use std::collections::HashSet;
 use chrono::{TimeZone, Utc};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
+    DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT,
+    DATASET_ROOT_CITY_POPULATION_SNAPSHOT,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
@@ -1838,63 +1840,6 @@ pub async fn test_ingest_flow_lists_reactive_transform_downstream(
 ) {
     let temp_dir = tempfile::tempdir().unwrap();
 
-    let root_dataset_snapshot = indoc::formatdoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: root-dataset
-          kind: Root
-          metadata:
-            - kind: SetPollingSource
-              fetch:
-                kind: FilesGlob
-                path: {}
-              read:
-                kind: Csv
-                header: true
-                schema:
-                  fields:
-                    - name: event_time
-                      type: Timestamp
-                    - name: city
-                      type: String
-                    - name: population
-                      type: Int64
-              merge:
-                kind: Ledger
-                primaryKey:
-                  - event_time
-                  - city
-        "#,
-        temp_dir.path().join("chunk-*.csv").display()
-    )
-    .escape_default()
-    .to_string();
-
-    let derived_dataset_snapshot = indoc::indoc!(
-        r#"
-        kind: DatasetSnapshot
-        version: 1
-        content:
-          name: derived-dataset
-          kind: Derivative
-          metadata:
-            - kind: SetTransform
-              inputs:
-                - datasetRef: root-dataset
-                  alias: root
-              transform:
-                kind: Sql
-                engine: datafusion
-                queries:
-                  - query: |
-                      SELECT event_time, city, population FROM root
-        "#
-    )
-    .escape_default()
-    .to_string();
-
     kamu_api_server_client.auth().login_as_kamu().await;
 
     let CreateDatasetResponse {
@@ -1902,14 +1847,17 @@ pub async fn test_ingest_flow_lists_reactive_transform_downstream(
         ..
     } = kamu_api_server_client
         .dataset()
-        .create_dataset(&root_dataset_snapshot)
+        .create_dataset(&DATASET_ROOT_CITY_POPULATION_SNAPSHOT.replace(
+            "<chunks_glob>",
+            &temp_dir.path().join("chunk-*.csv").display().to_string(),
+        ))
         .await;
     let CreateDatasetResponse {
         dataset_id: derived_dataset_id,
         ..
     } = kamu_api_server_client
         .dataset()
-        .create_dataset(&derived_dataset_snapshot)
+        .create_dataset(&DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT)
         .await;
 
     kamu_api_server_client
@@ -2376,6 +2324,191 @@ fn get_dataset_list_flows_query(dataset_id: &odf::DatasetID) -> String {
     .replace("$perPageTable", "15")
     .replace("$perPageTiles", "150")
     .replace("$filters", "{}")
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_schedule_change_reaches_waiting_flow(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&DATASET_ROOT_CITY_POPULATION_SNAPSHOT.replace(
+            "<chunks_glob>",
+            &temp_dir.path().join("chunk-*.csv").display().to_string(),
+        ))
+        .await;
+
+    // The system time is frozen at 2050-01-02: the flow waits for March
+    kamu_api_server_client
+        .flow()
+        .set_cron_ingest_trigger(&dataset_id, "0 0 1 3 *")
+        .await;
+    let waiting_flow = kamu_api_server_client
+        .flow()
+        .wait_for_waiting_flow(&dataset_id, |flow| flow.wake_up_at.is_some())
+        .await;
+    pretty_assertions::assert_eq!(
+        Some(Utc.with_ymd_and_hms(2050, 3, 1, 0, 0, 0).unwrap()),
+        waiting_flow.wake_up_at
+    );
+
+    // A later schedule postpones the same flow
+    kamu_api_server_client
+        .flow()
+        .set_cron_ingest_trigger(&dataset_id, "0 0 1 6 *")
+        .await;
+    let postponed_flow = kamu_api_server_client
+        .flow()
+        .wait_for_waiting_flow(&dataset_id, |flow| {
+            flow.wake_up_at == Some(Utc.with_ymd_and_hms(2050, 6, 1, 0, 0, 0).unwrap())
+        })
+        .await;
+    pretty_assertions::assert_eq!(waiting_flow.flow_id, postponed_flow.flow_id);
+
+    // An earlier schedule brings it forward
+    kamu_api_server_client
+        .flow()
+        .set_cron_ingest_trigger(&dataset_id, "0 0 1 2 *")
+        .await;
+    let advanced_flow = kamu_api_server_client
+        .flow()
+        .wait_for_waiting_flow(&dataset_id, |flow| {
+            flow.wake_up_at == Some(Utc.with_ymd_and_hms(2050, 2, 1, 0, 0, 0).unwrap())
+        })
+        .await;
+    pretty_assertions::assert_eq!(waiting_flow.flow_id, advanced_flow.flow_id);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_config_change_reaches_waiting_flow(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&DATASET_ROOT_CITY_POPULATION_SNAPSHOT.replace(
+            "<chunks_glob>",
+            &temp_dir.path().join("chunk-*.csv").display().to_string(),
+        ))
+        .await;
+
+    // The system time is frozen at 2050-01-02: the flow waits for March
+    kamu_api_server_client
+        .flow()
+        .set_cron_ingest_trigger(&dataset_id, "0 0 1 3 *")
+        .await;
+    let waiting_flow = kamu_api_server_client
+        .flow()
+        .wait_for_waiting_flow(&dataset_id, |flow| flow.wake_up_at.is_some())
+        .await;
+
+    kamu_api_server_client
+        .flow()
+        .set_ingest_config(&dataset_id, true, 3)
+        .await;
+
+    let configured_flow = kamu_api_server_client
+        .flow()
+        .wait_for_waiting_flow(&dataset_id, |flow| flow.fetch_uncacheable == Some(true))
+        .await;
+    pretty_assertions::assert_eq!(waiting_flow.flow_id, configured_flow.flow_id);
+    pretty_assertions::assert_eq!(Some(3), configured_flow.retry_max_attempts);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_batching_rule_change_reaches_waiting_flow(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&DATASET_ROOT_CITY_POPULATION_SNAPSHOT.replace(
+            "<chunks_glob>",
+            &temp_dir.path().join("chunk-*.csv").display().to_string(),
+        ))
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derived_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT)
+        .await;
+
+    // The transform batches inputs until 1000 records, or for a day
+    kamu_api_server_client
+        .flow()
+        .set_buffering_transform_trigger(&derived_dataset_id, 1000, 24)
+        .await;
+
+    std::fs::write(
+        temp_dir.path().join("chunk-1.csv"),
+        indoc::indoc!(
+            r#"
+            event_time,city,population
+            2020-01-01,A,1000
+            "#
+        ),
+    )
+    .unwrap();
+
+    let FlowTriggerResponse::Success(_) = kamu_api_server_client
+        .flow()
+        .trigger_ingest(&root_dataset_id)
+        .await
+    else {
+        panic!("ingest flow must be triggered");
+    };
+    kamu_api_server_client
+        .flow()
+        .wait(&root_dataset_id, 1)
+        .await;
+
+    // 1 record so far: the transform keeps batching
+    kamu_api_server_client
+        .flow()
+        .wait_for_waiting_flow(&derived_dataset_id, |flow| {
+            flow.start_condition.as_deref() == Some("FlowStartConditionReactive")
+        })
+        .await;
+
+    // 1 record is enough now: the transform runs without waiting for more inputs
+    kamu_api_server_client
+        .flow()
+        .set_buffering_transform_trigger(&derived_dataset_id, 1, 24)
+        .await;
+    kamu_api_server_client
+        .flow()
+        .wait(&derived_dataset_id, 1)
+        .await;
+
+    let transform_flows = kamu_api_server_client
+        .flow()
+        .list_flows(&derived_dataset_id)
+        .await;
+    pretty_assertions::assert_eq!(
+        vec![Some("FlowSuccessResult".to_owned())],
+        transform_flows
+            .into_iter()
+            .map(|flow| flow.outcome)
+            .collect::<Vec<_>>()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -80,6 +80,35 @@ impl Flow {
         self.apply(event)
     }
 
+    /// Follows a configuration change until the first task is formed. A flow
+    /// requested on demand keeps its rule, as the request may have forced it
+    pub fn apply_configuration(
+        &mut self,
+        now: DateTime<Utc>,
+        rule: FlowConfigurationRule,
+        retry_policy: Option<RetryPolicy>,
+    ) -> Result<(), ProjectionError<FlowState>> {
+        if !self.task_ids.is_empty() {
+            return Ok(());
+        }
+
+        if !self.is_requested_on_demand() && self.config_snapshot.as_ref() != Some(&rule) {
+            self.modify_config_snapshot(now, rule)?;
+        }
+
+        if self.retry_policy != retry_policy {
+            let event = FlowEventRetryPolicyModified {
+                event_time: now,
+                flow_id: self.flow_id,
+                flow_binding: self.flow_binding.clone(),
+                retry_policy,
+            };
+            self.apply(event)?;
+        }
+
+        Ok(())
+    }
+
     /// Add extra activation cause, if it's unique
     pub fn add_activation_cause_if_unique(
         &mut self,

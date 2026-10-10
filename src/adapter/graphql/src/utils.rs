@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
+use chrono::{DateTime, Utc};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::TenancyConfig;
 use kamu_datasets::{DatasetAction, SecretsEncryptionConfig};
 use kamu_task_system as ts;
+use time_source::SystemTimeSource;
 
 use crate::data_loader::{AccountEntityDataLoader, DatasetHandleDataLoader};
 use crate::prelude::AccessTokenID;
@@ -53,6 +55,13 @@ macro_rules! from_catalog_n {
 }
 
 pub(crate) use from_catalog_n;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Current time of the system time source, which tests and e2e runs may freeze
+pub(crate) fn system_time_now(ctx: &Context<'_>) -> DateTime<Utc> {
+    from_catalog_n!(ctx, dyn SystemTimeSource).now()
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

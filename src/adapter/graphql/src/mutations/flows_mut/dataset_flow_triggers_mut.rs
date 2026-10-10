@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService, FlowTriggerStopPolicy};
 
@@ -18,9 +17,9 @@ use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
 };
-use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
+use crate::{LoggedInGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -83,7 +82,12 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         let res = flow_trigger_service
-            .set_trigger(Utc::now(), flow_binding, trigger_rule, triggest_stop_policy)
+            .set_trigger(
+                utils::system_time_now(ctx),
+                flow_binding,
+                trigger_rule,
+                triggest_stop_policy,
+            )
             .await
             .int_err()?;
 
@@ -107,7 +111,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         flow_trigger_service
-            .pause_flow_trigger(Utc::now(), &flow_binding)
+            .pause_flow_trigger(utils::system_time_now(ctx), &flow_binding)
             .await?;
 
         Ok(true)
@@ -120,7 +124,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
         let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
         flow_trigger_service
-            .pause_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
+            .pause_flow_triggers_for_scopes(utils::system_time_now(ctx), &[flow_scope])
             .await?;
 
         Ok(true)
@@ -141,7 +145,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         flow_trigger_service
-            .resume_flow_trigger(Utc::now(), &flow_binding)
+            .resume_flow_trigger(utils::system_time_now(ctx), &flow_binding)
             .await?;
 
         Ok(true)
@@ -154,7 +158,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
         let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
         flow_trigger_service
-            .resume_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
+            .resume_flow_triggers_for_scopes(utils::system_time_now(ctx), &[flow_scope])
             .await?;
 
         Ok(true)

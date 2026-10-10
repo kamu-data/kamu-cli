@@ -150,6 +150,7 @@ addition to that match (a GraphQL resolver needs both `kamu-graphql-api` and `ka
 | Adding a new bounded context (domain + services + repositories + wiring) | `kamu-adding-a-bounded-context` | |
 | DataFusion, Arrow, Object Store, Parquet and related query-engine upgrades | `kamu-datafusion-upgrade-workflows` | |
 | Jupyter demo, rustfs, multi-platform demo image releases | `kamu-jupyter-demo-release-workflows` | |
+| GitHub through `gh`: editing PRs and issues, known `gh` failures and their workarounds | `kamu-github-operations` | |
 | Writing any Rust: imports, numeric conversions, strum mappings, module layout, visibility (baseline) | `kamu-rust-style` | `**/*.rs` |
 
 ### Documents

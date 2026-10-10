@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_accounts::Account;
 use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_datasets::{DatasetEntryService, DatasetEntryServiceExt};
 use kamu_flow_system::FlowTriggerService;
 
 use crate::prelude::*;
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,7 +51,7 @@ impl<'a> AccountFlowTriggersMut<'a> {
             .collect::<Vec<_>>();
 
         flow_trigger_service
-            .resume_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
+            .resume_flow_triggers_for_scopes(utils::system_time_now(ctx), &lookup_scopes)
             .await
             .int_err()?;
 
@@ -69,7 +69,7 @@ impl<'a> AccountFlowTriggersMut<'a> {
             .collect::<Vec<_>>();
 
         flow_trigger_service
-            .pause_flow_triggers_for_scopes(Utc::now(), &lookup_scopes)
+            .pause_flow_triggers_for_scopes(utils::system_time_now(ctx), &lookup_scopes)
             .await
             .int_err()?;
 

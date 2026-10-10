@@ -86,13 +86,17 @@ def format_manifest(path: Path) -> str | None:
     missing = [tool for tool in ("cargo-sort", "taplo") if not shutil.which(tool)]
     if missing:
         return f"{', '.join(missing)} not installed"
-    for command in (["cargo", "sort", "-g", "-n", str(path.parent)], ["taplo", "fmt", str(path)]):
+    # taplo reads the file from stdin: given a path, it silently skips files outside taplo.toml's `include`
+    for command, stdin in ((["cargo", "sort", "-g", "-n", str(path.parent)], None), (["taplo", "fmt", "-"], path)):
         try:
-            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(command, cwd=ROOT, input=stdin and stdin.read_text(),
+                                    capture_output=True, text=True, timeout=60)
         except (OSError, subprocess.TimeoutExpired) as e:
             return str(e)
         if result.returncode != 0:
             return result.stderr.strip()[:600]
+        if stdin:
+            stdin.write_text(result.stdout)
     return None
 
 

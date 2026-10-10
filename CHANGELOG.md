@@ -14,7 +14,19 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- GraphQL: flow history has a `FlowEventRetryPolicyModified` event, recorded when a new retry policy reaches a
+  waiting flow
 ### Changed
+- Flow configuration and trigger changes now reach a flow that is already waiting, instead of only the next
+  one:
+  - ingest, compaction and reset options and the retry policy apply until the flow's first task is formed, so a
+    flow already retrying keeps the retry policy it started with
+  - a flow run by hand keeps its options
+  - a changed schedule moves a waiting scheduled flow earlier or later
+  - a changed batching rule re-evaluates a derived dataset's flow waiting for inputs, so it may run at once
+    or wait longer
+  - a stop policy that the current consecutive failures already reach stops the trigger at once
 - SQLite bulk writes (ReBAC relations, dataset blocks and dependencies, flow and task events) are checked at
   compile time
 - Flow triggers, flow configurations, tasks and webhook subscriptions are loaded and saved in bulk where
