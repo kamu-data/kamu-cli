@@ -56,7 +56,8 @@ pub enum FlowConfigSnapshotOrigin {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Stored form of a snapshot: events written before snapshots had an origin
-/// hold the bare rule
+/// hold the bare rule, whether it came from the configuration or was forced.
+/// Such a snapshot reads as forced, so it stays as frozen as it was written
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum StoredFlowConfigSnapshot {
@@ -64,20 +65,15 @@ enum StoredFlowConfigSnapshot {
     Legacy(FlowConfigurationRule),
 }
 
-impl StoredFlowConfigSnapshot {
-    fn into_snapshot(self, legacy_origin: FlowConfigSnapshotOrigin) -> FlowConfigSnapshot {
-        match self {
-            Self::Current(snapshot) => snapshot,
-            Self::Legacy(rule) => FlowConfigSnapshot {
-                rule,
-                origin: legacy_origin,
-            },
+impl From<StoredFlowConfigSnapshot> for FlowConfigSnapshot {
+    fn from(stored: StoredFlowConfigSnapshot) -> Self {
+        match stored {
+            StoredFlowConfigSnapshot::Current(snapshot) => snapshot,
+            StoredFlowConfigSnapshot::Legacy(rule) => Self::forced(rule),
         }
     }
 }
 
-/// Initial snapshots were only forced by the caller when given explicitly,
-/// so a bare rule is treated as taken from the configuration
 pub(crate) fn deserialize_initial_config_snapshot<'de, D>(
     deserializer: D,
 ) -> Result<Option<FlowConfigSnapshot>, D::Error>
@@ -85,19 +81,16 @@ where
     D: Deserializer<'de>,
 {
     let maybe_stored = Option::<StoredFlowConfigSnapshot>::deserialize(deserializer)?;
-    Ok(maybe_stored.map(|stored| stored.into_snapshot(FlowConfigSnapshotOrigin::Configuration)))
+    Ok(maybe_stored.map(Into::into))
 }
 
-/// Snapshots were only modified when forced by the caller, so a bare rule is
-/// treated as forced
 pub(crate) fn deserialize_modified_config_snapshot<'de, D>(
     deserializer: D,
 ) -> Result<FlowConfigSnapshot, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let stored = StoredFlowConfigSnapshot::deserialize(deserializer)?;
-    Ok(stored.into_snapshot(FlowConfigSnapshotOrigin::Forced))
+    StoredFlowConfigSnapshot::deserialize(deserializer).map(Into::into)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,9 +150,9 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_initial_snapshot_follows_configuration() {
+    fn test_legacy_initial_snapshot_is_forced() {
         let stored = with_legacy_snapshot(
-            serde_json::to_value(initiated_event(Some(FlowConfigSnapshot::forced(
+            serde_json::to_value(initiated_event(Some(FlowConfigSnapshot::configured(
                 ingest_rule(),
             ))))
             .unwrap(),
@@ -168,7 +161,7 @@ mod tests {
         let event: FlowEventInitiated = serde_json::from_value(stored).unwrap();
 
         assert_eq!(
-            Some(FlowConfigSnapshot::configured(ingest_rule())),
+            Some(FlowConfigSnapshot::forced(ingest_rule())),
             event.config_snapshot
         );
     }

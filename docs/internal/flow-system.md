@@ -227,9 +227,9 @@ stateDiagram-v2
 | `Completed` | Emitted right after a final non-aborted `TaskFinished`; carries the outcome and the late causes |
 | `Aborted` | Outcome `Aborted`; idempotent; rejected after success |
 
-A stored snapshot without an origin is a bare rule. It reads back as `Configuration` in `Initiated`
-and as `Forced` in `ConfigSnapshotModified`, where a bare rule always came from a forced
-configuration (`deserialize_*_config_snapshot` in `entities/flow/flow_config_snapshot.rs`).
+A stored snapshot without an origin is a bare rule, which may have come from either source. It
+reads back as `Forced` in both `Initiated` and `ConfigSnapshotModified`, so such a flow keeps the
+snapshot it was created with (`StoredFlowConfigSnapshot` in `entities/flow/flow_config_snapshot.rs`).
 
 `Flow::on_task_finished` computes `next_attempt_at` from the retry policy only for
 **recoverable** failures, with the attempt number equal to the number of tasks so far — so
