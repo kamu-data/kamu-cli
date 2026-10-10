@@ -20,7 +20,7 @@ use kamu_adapter_flow_dataset::{
 };
 use kamu_adapter_task_dataset::*;
 use kamu_core::{CompactionResult, PullResult, ResetResult};
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
+use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{self as ts, TaskError};
 use odf::dataset::MetadataChainIncrementInterval;

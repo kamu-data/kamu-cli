@@ -12,9 +12,8 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{RenameDatasetError, RenameDatasetUseCase};
+use kamu_datasets::{MockDatasetActionAuthorizer, RenameDatasetError, RenameDatasetUseCase};
 use kamu_datasets_services::RenameDatasetUseCaseImpl;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{

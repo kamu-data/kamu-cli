@@ -13,6 +13,7 @@ use crate::{TaskDefinition, TaskOutcome};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TaskRunner: Send + Sync {
     async fn run_task(&self, task_definition: TaskDefinition)

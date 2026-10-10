@@ -17,6 +17,7 @@ use crate::*;
 pub enum OutboxProvider {
     #[default]
     Dummy,
+    #[cfg(feature = "testing")]
     Mock(MockOutbox),
     Immediate {
         force_immediate: bool,
@@ -30,6 +31,7 @@ impl OutboxProvider {
             OutboxProvider::Dummy => {
                 target_catalog_builder.add::<DummyOutboxImpl>();
             }
+            #[cfg(feature = "testing")]
             OutboxProvider::Mock(mock_outbox) => {
                 target_catalog_builder
                     .add_value(mock_outbox)

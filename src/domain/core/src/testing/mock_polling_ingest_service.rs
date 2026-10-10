@@ -7,35 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use kamu_core::{
-    DataWriterMetadataState,
-    PollingIngestError,
-    PollingIngestListener,
-    PollingIngestOptions,
-    PollingIngestResponse,
-    PollingIngestResult,
-    PollingIngestService,
-};
-use kamu_datasets::ResolvedDataset;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub PollingIngestService {}
-
-    #[async_trait::async_trait]
-    impl PollingIngestService for PollingIngestService {
-        async fn ingest(
-            &self,
-            target: ResolvedDataset,
-            metadata_state: Box<DataWriterMetadataState>,
-            options: PollingIngestOptions,
-            listener: Option<Arc<dyn PollingIngestListener>>,
-        ) -> Result<PollingIngestResponse, PollingIngestError>;
-    }
-}
+use crate::{MockPollingIngestService, PollingIngestResponse, PollingIngestResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

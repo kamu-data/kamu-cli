@@ -24,8 +24,12 @@ use kamu::{
 };
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::{DatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{
+    DatasetActionAuthorizer,
+    DatasetRegistry,
+    MockDatasetActionAuthorizer,
+    ResolvedDataset,
+};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;

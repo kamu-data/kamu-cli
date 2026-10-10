@@ -56,6 +56,9 @@ kamu-webhooks = { workspace = true, features = [
     "testing",
 ] }
 kamu-webhooks-inmem = { workspace = true }
+messaging-outbox = { workspace = true, features = [
+    "testing",
+] }
 
 mockall = { version = "0.15", default-features = false }
 oop = { version = "0.0.2", default-features = false }

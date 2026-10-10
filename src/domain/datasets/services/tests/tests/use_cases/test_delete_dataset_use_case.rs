@@ -21,9 +21,9 @@ use kamu_datasets::{
     DeleteDatasetPlanTarget,
     DeleteDatasetPlanningError,
     DeleteDatasetUseCase,
+    MockDatasetActionAuthorizer,
 };
 use kamu_datasets_services::DeleteDatasetUseCaseImpl;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
 use super::dataset_base_use_case_harness::{

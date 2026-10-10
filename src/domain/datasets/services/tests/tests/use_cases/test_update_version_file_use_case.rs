@@ -37,13 +37,13 @@ use kamu_core::{DidGenerator, FileUploadLimitConfig, MockDidGenerator};
 use kamu_datasets::{
     ContentArgs,
     DatasetRegistry,
+    MockDatasetActionAuthorizer,
     ResolvedDataset,
     UpdateVersionFileUseCaseError,
     UpdateVersionedFileUseCase,
     WriteCheckedDataset,
 };
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,

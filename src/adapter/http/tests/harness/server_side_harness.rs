@@ -23,9 +23,9 @@ use kamu_datasets::{
     DatasetActionAuthorizer,
     DatasetReferenceService,
     DatasetRegistry,
+    MockDatasetActionAuthorizer,
 };
 use kamu_datasets_services::DatasetEntryWriter;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 

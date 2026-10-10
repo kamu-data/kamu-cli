@@ -20,7 +20,6 @@ use kamu_adapter_flow_dataset::{
     ingest_dataset_binding,
 };
 use kamu_datasets::*;
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use messaging_outbox::*;
 use odf::dataset::MetadataChainIncrementInterval;

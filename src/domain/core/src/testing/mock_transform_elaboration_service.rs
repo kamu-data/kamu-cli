@@ -7,30 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use chrono::Utc;
-use engine::TransformRequestExt;
-use kamu_core::*;
-use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
+use kamu_datasets::ResolvedDatasetsMap;
 use random_strings::get_random_name;
 
+use crate::engine::TransformRequestExt;
+use crate::*;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub TransformElaborationService {}
-
-    #[async_trait::async_trait]
-    impl TransformElaborationService for TransformElaborationService {
-        async fn elaborate_transform(
-            &self,
-            target: ResolvedDataset,
-            plan: TransformPreliminaryPlan,
-            transform_options: TransformOptions,
-            maybe_listener: Option<Arc<dyn TransformListener>>,
-        ) -> Result<TransformElaboration, TransformElaborateError>;
-    }
-}
 
 impl MockTransformElaborationService {
     pub fn make_expect_elaborate_transform(mut self, target_alias: odf::DatasetAlias) -> Self {

@@ -11,12 +11,11 @@ use std::assert_matches;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions, *};
+use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetAction};
+use kamu_datasets::{CreateDatasetResult, DatasetAction, MockDatasetActionAuthorizer};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
@@ -95,7 +94,7 @@ async fn test_pull_transform_success() {
                 .make_expect_elaborate_transform(alias_bar.clone()),
         )
         .with_transform_execution_mock(
-            MockTransformExecutionService::new().make_expect_transform(alias_bar.clone()),
+            MockTransformExecutor::new().make_expect_transform(alias_bar.clone()),
         );
 
     let harness = PullUseCaseHarness::new(mocks);
@@ -332,7 +331,7 @@ async fn test_pull_multi_recursive() {
                 .make_expect_elaborate_transform(alias_foo_bar.clone()),
         )
         .with_transform_execution_mock(
-            MockTransformExecutionService::new().make_expect_transform(alias_foo_bar.clone()),
+            MockTransformExecutor::new().make_expect_transform(alias_foo_bar.clone()),
         );
     let harness = PullUseCaseHarness::new(mocks);
 
@@ -487,7 +486,7 @@ async fn test_pull_all_owned() {
                 .make_expect_elaborate_transform(alias_foo_baz.clone()),
         )
         .with_transform_execution_mock(
-            MockTransformExecutionService::new()
+            MockTransformExecutor::new()
                 .make_expect_transform(alias_foo_bar.clone())
                 .make_expect_transform(alias_foo_baz.clone()),
         );
@@ -689,7 +688,7 @@ impl PullUseCaseHarness {
             .add_value(mocks.mock_transform_elaboration_service)
             .bind::<dyn TransformElaborationService, MockTransformElaborationService>()
             .add_value(mocks.mock_transform_execution_service)
-            .bind::<dyn TransformExecutor, MockTransformExecutionService>()
+            .bind::<dyn TransformExecutor, MockTransformExecutor>()
             .add_value(mocks.mock_sync_service)
             .bind::<dyn SyncService, MockSyncService>()
             .add::<SyncRequestBuilder>()
@@ -766,7 +765,7 @@ struct PullUseCaseHarnessMocks {
     mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
     mock_polling_ingest_service: MockPollingIngestService,
     mock_transform_elaboration_service: MockTransformElaborationService,
-    mock_transform_execution_service: MockTransformExecutionService,
+    mock_transform_execution_service: MockTransformExecutor,
     mock_sync_service: MockSyncService,
 }
 
@@ -803,7 +802,7 @@ impl PullUseCaseHarnessMocks {
 
     fn with_transform_execution_mock(
         self,
-        mock_transform_execution_service: MockTransformExecutionService,
+        mock_transform_execution_service: MockTransformExecutor,
     ) -> Self {
         Self {
             mock_transform_execution_service,
@@ -825,7 +824,7 @@ impl Default for PullUseCaseHarnessMocks {
             mock_dataset_action_authorizer: MockDatasetActionAuthorizer::new(),
             mock_polling_ingest_service: MockPollingIngestService::new(),
             mock_transform_elaboration_service: MockTransformElaborationService::new(),
-            mock_transform_execution_service: MockTransformExecutionService::new(),
+            mock_transform_execution_service: MockTransformExecutor::new(),
             mock_sync_service: MockSyncService::new(),
         }
     }

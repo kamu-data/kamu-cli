@@ -43,8 +43,6 @@ use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault};
 
-use crate::mock_engine_provisioner;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TransformTestHarness {
@@ -823,9 +821,8 @@ async fn test_get_verification_plan_one_to_one() {
 
 #[test_log::test(tokio::test)]
 async fn test_transform_with_compaction_retry() {
-    let harness = TransformTestHarness::new_custom(
-        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
-    );
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let foo_target = harness.new_root_with_push_source(&foo_alias).await;
 
@@ -1122,9 +1119,8 @@ async fn test_transform_status() {
 
 #[test_log::test(tokio::test)]
 async fn test_transform_status_input_reset_to_metadata() {
-    let harness = TransformTestHarness::new_custom(
-        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
-    );
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
 
     let data_str = indoc!(
         "
@@ -1150,9 +1146,8 @@ async fn test_transform_status_input_reset_to_metadata() {
 
 #[test_log::test(tokio::test)]
 async fn test_transform_status_input_reset_and_same_offset() {
-    let harness = TransformTestHarness::new_custom(
-        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
-    );
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
 
     let data_str = indoc!(
         "
@@ -1191,9 +1186,8 @@ async fn test_transform_status_input_reset_and_same_offset() {
 
 #[test_log::test(tokio::test)]
 async fn test_transform_status_input_reset_and_smaller_offset() {
-    let harness = TransformTestHarness::new_custom(
-        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
-    );
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
 
     let data_str = indoc!(
         "
@@ -1231,9 +1225,8 @@ async fn test_transform_status_input_reset_and_smaller_offset() {
 
 #[test_log::test(tokio::test)]
 async fn test_transform_status_input_hard_compacted() {
-    let harness = TransformTestHarness::new_custom(
-        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
-    );
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
 
     let data_str_1 = indoc!(
         "
@@ -1270,9 +1263,8 @@ async fn test_transform_status_input_hard_compacted() {
 
 #[test_log::test(tokio::test)]
 async fn test_transform_status_input_metadata_only_advance() {
-    let harness = TransformTestHarness::new_custom(
-        mock_engine_provisioner::MockEngineProvisioner::new().always_provision_engine(),
-    );
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
 
     let data_str = indoc!(
         "

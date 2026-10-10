@@ -30,6 +30,7 @@ testing = [
     "dep:kamu-resources-inmem",
     "dep:kamu-wakeup-listener-inmem",
     "dep:wakeup-listener",
+    "messaging-outbox/testing",
 ]
 
 
@@ -82,7 +83,9 @@ kamu-resources-inmem = { workspace = true }
 kamu-resources-services = { workspace = true, features = [
     "testing",
 ] }
-messaging-outbox = { workspace = true }
+messaging-outbox = { workspace = true, features = [
+    "testing",
+] }
 odf = { workspace = true }
 time-source = { workspace = true }
 

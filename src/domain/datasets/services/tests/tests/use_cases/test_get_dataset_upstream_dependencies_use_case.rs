@@ -33,7 +33,7 @@ use kamu_auth_rebac_services::{
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetActionAuthorizer};
+use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_datasets_services::*;
 use messaging_outbox::{
     ConsumerFilter,

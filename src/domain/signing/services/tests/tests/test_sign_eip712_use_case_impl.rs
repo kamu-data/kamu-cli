@@ -36,8 +36,11 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{
+    AlwaysHappyDatasetActionAuthorizer,
+    DatasetActionAuthorizer,
+    MockDatasetActionAuthorizer,
+};
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{SignEip712UseCase, SignEip712UseCaseOptions};
 use kamu_signing::utils::b256;

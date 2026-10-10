@@ -11,7 +11,7 @@ use chrono::{Duration, Utc};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
 use kamu_core::{PullResult, TransformStatus};
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
+use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;

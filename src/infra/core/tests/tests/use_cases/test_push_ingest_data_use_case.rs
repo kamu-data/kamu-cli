@@ -23,9 +23,8 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_core::*;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,

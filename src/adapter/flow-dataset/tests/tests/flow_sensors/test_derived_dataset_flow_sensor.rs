@@ -16,9 +16,9 @@ use kamu_datasets::{
     DatasetDependenciesMessage,
     DatasetIncrementQueryService,
     MESSAGE_PRODUCER_KAMU_DATASET_DEPENDENCY_GRAPH_SERVICE,
+    MockDatasetIncrementQueryService,
 };
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use messaging_outbox::*;
 use odf::dataset::MetadataChainIncrementInterval;

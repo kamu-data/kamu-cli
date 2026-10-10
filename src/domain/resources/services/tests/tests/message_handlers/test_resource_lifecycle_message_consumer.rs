@@ -12,8 +12,8 @@ use dill::CatalogBuilder;
 use internal_error::InternalError;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    MockReconcileResourceUseCase,
     ReconcileResourceUseCase,
-    ReconcileResourceUseCaseError,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
@@ -23,27 +23,9 @@ use kamu_resources::{
     ResourceSnapshot,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
-use mockall::mock;
 use odf::metadata::resources::TypeUri;
 
 use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher, make_id};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Mock
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Not using automock, because it's a generic trait
-mock! {
-    pub TestResourceReconcileUseCase {}
-
-    #[async_trait::async_trait]
-    impl ReconcileResourceUseCase<TestResource> for TestResourceReconcileUseCase {
-        async fn execute(
-            &self,
-            id: &ResourceID,
-        ) -> Result<(), ReconcileResourceUseCaseError<TestResource>>;
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -128,8 +110,8 @@ struct ResourceLifecycleConsumerHarness {
 }
 
 impl ResourceLifecycleConsumerHarness {
-    fn expect_execute_once(id: ResourceID) -> MockTestResourceReconcileUseCase {
-        let mut mock = MockTestResourceReconcileUseCase::new();
+    fn expect_execute_once(id: ResourceID) -> MockReconcileResourceUseCase<TestResource> {
+        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
         mock.expect_execute()
             .once()
             .withf(move |id_| *id_ == id)
@@ -137,13 +119,13 @@ impl ResourceLifecycleConsumerHarness {
         mock
     }
 
-    fn expect_no_execute() -> MockTestResourceReconcileUseCase {
-        let mut mock = MockTestResourceReconcileUseCase::new();
+    fn expect_no_execute() -> MockReconcileResourceUseCase<TestResource> {
+        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
         mock.expect_execute().never();
         mock
     }
 
-    fn new(mock_reconcile_uc: MockTestResourceReconcileUseCase) -> Self {
+    fn new(mock_reconcile_uc: MockReconcileResourceUseCase<TestResource>) -> Self {
         let mut b = CatalogBuilder::new();
 
         OutboxProvider::Immediate {
@@ -152,7 +134,7 @@ impl ResourceLifecycleConsumerHarness {
         .embed_into_catalog(&mut b);
 
         b.add_value(mock_reconcile_uc)
-            .bind::<dyn ReconcileResourceUseCase<TestResource>, MockTestResourceReconcileUseCase>();
+            .bind::<dyn ReconcileResourceUseCase<TestResource>, MockReconcileResourceUseCase<TestResource>>();
 
         b.add::<TestResourceResourceLifecycleDispatcher>();
         b.add::<kamu_resources_services::ResourceLifecycleMessageConsumer>();

@@ -7,12 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![cfg_attr(
+    feature = "testing",
+    expect(
+        clippy::ref_option_ref,
+        reason = "mockall::automock generates `&Option<&T>` signatures"
+    )
+)]
+
 use internal_error::InternalError;
 use odf::dataset::MetadataChainIncrementInterval;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetIncrementQueryService: Sync + Send {
     /// Computes incremental stats between two given blocks of the dataset

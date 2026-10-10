@@ -13,7 +13,7 @@ use async_graphql::value;
 use chrono::Utc;
 use indoc::indoc;
 use kamu_core::TenancyConfig;
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
+use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{TaskError, TaskOutcome, TaskResult};
 use messaging_outbox::OutboxProvider;

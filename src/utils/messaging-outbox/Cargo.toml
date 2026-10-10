@@ -26,6 +26,9 @@ default = [
 sqlx = [
     "dep:sqlx",
 ]
+testing = [
+    "dep:mockall",
+]
 
 [dependencies]
 async-utils = { workspace = true }
@@ -44,7 +47,6 @@ chrono = { version = "0.4" }
 dill = { version = "0.17", default-features = false }
 futures = "0.3"
 itertools = "0.15"
-mockall = "0.15"
 prometheus = { version = "0.14", default-features = false }
 serde = { version = "1", features = [
     "derive",
@@ -59,6 +61,7 @@ tokio = { version = "1", default-features = false, features = [
 tracing = "0.1"
 
 # Optional
+mockall = { optional = true, version = "0.15", default-features = false }
 sqlx = { optional = true, version = "0.9", default-features = false, features = [
     "macros",
 ] }
