@@ -53,7 +53,7 @@ impl kamu_search::SearchEntitySchemaProvider for AccountSearchSchemaProvider {
         search_repo: Arc<dyn SearchRepository>,
         schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
-        assert!(schema.schema_name == account_search_schema::SCHEMA_NAME);
+        assert_eq!(schema.schema_name, account_search_schema::SCHEMA_NAME);
         self.index_accounts(search_repo).await
     }
 }

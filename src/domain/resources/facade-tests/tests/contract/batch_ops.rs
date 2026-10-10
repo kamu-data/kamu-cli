@@ -535,7 +535,7 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
         .unwrap();
 
     assert_batch_indexes(&response, &[0], &[1, 2]);
-    assert!(!response.successes[0].item.manifest.is_empty());
+    assert_ne!(response.successes[0].item.manifest, "");
 
     let problem_by_index: std::collections::HashMap<
         usize,

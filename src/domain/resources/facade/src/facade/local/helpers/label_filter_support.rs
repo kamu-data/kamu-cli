@@ -260,7 +260,7 @@ mod tests {
         )
         .unwrap();
 
-        assert!(applicable.is_empty());
+        assert_eq!(applicable, []);
         assert_eq!(resolved, ResolvedResourceLabelFilter::True);
     }
 
@@ -271,7 +271,7 @@ mod tests {
         let (applicable, resolved) =
             resolve_label_filter_for_schemas(&resolver(), None, &[]).unwrap();
 
-        assert!(applicable.is_empty());
+        assert_eq!(applicable, []);
         assert_eq!(resolved, ResolvedResourceLabelFilter::True);
     }
 

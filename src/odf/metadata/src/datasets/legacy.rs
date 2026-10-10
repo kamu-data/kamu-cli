@@ -64,7 +64,7 @@ impl DatasetHandle {
 
 impl fmt::Display for DatasetHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.alias)
+        write!(f, "{}", self.alias)
     }
 }
 
@@ -110,7 +110,7 @@ impl DatasetHandleRemote {
 
 impl fmt::Display for DatasetHandleRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.alias)
+        write!(f, "{}", self.alias)
     }
 }
 

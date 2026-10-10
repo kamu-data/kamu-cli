@@ -92,7 +92,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
         .try_collect()
         .await
         .unwrap();
-    assert!(snapshots.is_empty());
+    assert_eq!(snapshots, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2027,7 +2027,7 @@ pub async fn test_list_resource_snapshots_by_scope(catalog: &Catalog) {
         .try_collect()
         .await
         .unwrap();
-    assert!(kind_c.is_empty());
+    assert_eq!(kind_c, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2095,7 +2095,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
         .try_collect()
         .await
         .unwrap();
-    assert!(wrong_type.is_empty());
+    assert_eq!(wrong_type, []);
 
     // Each type carries its own query, so one call can span several.
     let multi_type: Vec<_> = repo
@@ -2266,7 +2266,7 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
         .try_collect()
         .await
         .unwrap();
-    assert!(empty_scope.is_empty());
+    assert_eq!(empty_scope, []);
 
     // Pagination must apply after filtering, not before.
     let first_page: Vec<_> = repo
@@ -2611,7 +2611,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_returns_nothing_initiall
         .await
         .unwrap();
 
-    assert!(ids.is_empty());
+    assert_eq!(ids, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

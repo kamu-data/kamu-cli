@@ -106,8 +106,7 @@ pub mod auth {
         pub email: String,
         /// URL of the account's avatar image.
         pub avatar_url: Option<String>,
-        /// Password for local authentication. Absent for SSO or DID-based
-        /// accounts.
+        /// Password for local authentication. Absent for SSO or DID-based accounts.
         pub password: Option<config::Secret>,
     }
 
@@ -153,8 +152,7 @@ pub mod auth {
         pub email: String,
         /// URL of the account's avatar image.
         pub avatar_url: Option<String>,
-        /// Password for local authentication. Absent for SSO or DID-based
-        /// accounts.
+        /// Password for local authentication. Absent for SSO or DID-based accounts.
         pub password: Option<config::Secret>,
     }
 
@@ -192,9 +190,9 @@ pub mod auth {
         Organization,
     }
 
-    /// A named group of accounts. Members are assigned via the `Member`
-    /// relation. Groups can be granted roles on resources, allowing permissions
-    /// to be managed at the group level rather than per-account.
+    /// A named group of accounts. Members are assigned via the `Member` relation. Groups can be
+    /// granted roles on resources, allowing permissions to be managed at the group level rather
+    /// than per-account.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Group
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -219,22 +217,21 @@ pub mod auth {
     static GROUP_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(GROUP_SCHEMA_STR));
 
-    /// Group specification. Groups have no intrinsic properties — membership
-    /// and permissions are expressed entirely through relations.
+    /// Group specification. Groups have no intrinsic properties — membership and permissions are
+    /// expressed entirely through relations.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpec
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct GroupSpec {}
 
-    /// Group specification. Groups have no intrinsic properties — membership
-    /// and permissions are expressed entirely through relations.
+    /// Group specification. Groups have no intrinsic properties — membership and permissions are
+    /// expressed entirely through relations.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpecInput
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct GroupSpecInput {}
 
-    /// A directed relationship between two resources, optionally carrying a
-    /// typed value.
+    /// A directed relationship between two resources, optionally carrying a typed value.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relation
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -243,15 +240,13 @@ pub mod auth {
         pub subject: resources::ResourceHandle,
         /// Name of the relation e.g. `role`, `member`, `owner`.
         pub relation: String,
-        /// Optional value associated with the relation e.g. `maintainer` for a
-        /// `role` relation.
+        /// Optional value associated with the relation e.g. `maintainer` for a `role` relation.
         pub value: Option<serde_json::Value>,
         /// The resource that is the target of the relation.
         pub object: resources::ResourceHandle,
     }
 
-    /// A directed relationship between two resources, optionally carrying a
-    /// typed value.
+    /// A directed relationship between two resources, optionally carrying a typed value.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationInput
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -260,8 +255,7 @@ pub mod auth {
         pub subject: resources::ResourceRef,
         /// Name of the relation e.g. `role`, `member`, `owner`.
         pub relation: String,
-        /// Optional value associated with the relation e.g. `maintainer` for a
-        /// `role` relation.
+        /// Optional value associated with the relation e.g. `maintainer` for a `role` relation.
         pub value: Option<serde_json::Value>,
         /// The resource that is the target of the relation.
         pub object: resources::ResourceRef,
@@ -326,8 +320,8 @@ pub mod config {
     pub struct Secret {
         /// A secret value in raw or encoded form.
         pub value: String,
-        /// Represents the encoding of the value. Typically will be `jwe` after
-        /// a raw secret gets encrypted.
+        /// Represents the encoding of the value. Typically will be `jwe` after a raw secret gets
+        /// encrypted.
         pub content_encoding: Option<String>,
     }
 
@@ -357,8 +351,8 @@ pub mod config {
     static SECRET_SET_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(SECRET_SET_SCHEMA_STR));
 
-    /// Defines a set of secrets stored and managed by the ODF node and
-    /// accessible via embedded sercets provider.
+    /// Defines a set of secrets stored and managed by the ODF node and accessible via embedded
+    /// sercets provider.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSetSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -367,8 +361,8 @@ pub mod config {
         pub secrets: config::Secrets,
     }
 
-    /// Defines a set of secrets stored and managed by the ODF node and
-    /// accessible via embedded sercets provider.
+    /// Defines a set of secrets stored and managed by the ODF node and accessible via embedded
+    /// sercets provider.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSetSpecInput
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -377,9 +371,8 @@ pub mod config {
         pub secrets: config::Secrets,
     }
 
-    /// Container for key-value secrets. Every key must be a string. Values may
-    /// be strings with raw unencrypted data or objects that signify the
-    /// encoding.
+    /// Container for key-value secrets. Every key must be a string. Values may be strings with raw
+    /// unencrypted data or objects that signify the encoding.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/Secrets
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -414,8 +407,7 @@ pub mod config {
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueRef
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ValueRef {
-        /// Reference to an account that owns the `VariableSet` or the
-        /// `SecretSet`.
+        /// Reference to an account that owns the `VariableSet` or the `SecretSet`.
         pub account: Option<auth::AccountRef>,
         /// ID of a resource.
         pub id: Option<ResourceID>,
@@ -437,8 +429,8 @@ pub mod config {
     }
     impl IntoResourceRef for ValueRef {}
 
-    /// Container for key-value variables. Every key must be a string. Values
-    /// shoud reference fields in `SecretSet`s and `VariableSet`s.
+    /// Container for key-value variables. Every key must be a string. Values shoud reference fields
+    /// in `SecretSet`s and `VariableSet`s.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueRefs
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -481,8 +473,8 @@ pub mod config {
     static VARIABLE_SET_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(VARIABLE_SET_SCHEMA_STR));
 
-    /// Defines a set of variables stored and managed by the ODF node and
-    /// accessible via embedded variables provider.
+    /// Defines a set of variables stored and managed by the ODF node and accessible via embedded
+    /// variables provider.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSetSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -491,8 +483,8 @@ pub mod config {
         pub variables: config::Variables,
     }
 
-    /// Defines a set of variables stored and managed by the ODF node and
-    /// accessible via embedded variables provider.
+    /// Defines a set of variables stored and managed by the ODF node and accessible via embedded
+    /// variables provider.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSetSpecInput
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -501,8 +493,8 @@ pub mod config {
         pub variables: config::Variables,
     }
 
-    /// Container for key-value variables. Every key must be a string. Values
-    /// may be raw strings or objects that incorporate the encoding.
+    /// Container for key-value variables. Every key must be a string. Values may be raw strings or
+    /// objects that incorporate the encoding.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/Variables
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -525,8 +517,7 @@ pub mod data {
     pub struct DataField {
         /// Name of the field
         pub name: String,
-        /// Logical type of the field that defines its semantic behavior and
-        /// value ranges
+        /// Logical type of the field that defines its semantic behavior and value ranges
         pub r#type: data::DataType,
         /// ODF extensions
         pub extra: Option<data::ExtraAttributes>,
@@ -543,9 +534,9 @@ pub mod data {
         pub extra: Option<data::ExtraAttributes>,
     }
 
-    /// Defines a logical type of the field. Logical type determines the
-    /// semantics and boudaries of a type and how it can be operated on, without
-    /// a concern about encoding and physical layout of the data in chunks.
+    /// Defines a logical type of the field. Logical type determines the semantics and boudaries of
+    /// a type and how it can be operated on, without a concern about encoding and physical layout
+    /// of the data in chunks.
     ///
     /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/DataType
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -607,8 +598,8 @@ pub mod data {
     /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/DataType#/$defs/Binary
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct DataTypeBinary {
-        /// Number of bytes per value for fixed-size binary. If omitted, the
-        /// binary is variable-length.
+        /// Number of bytes per value for fixed-size binary. If omitted, the binary is
+        /// variable-length.
         pub fixed_length: Option<u64>,
     }
 
@@ -631,12 +622,12 @@ pub mod data {
     pub struct DataTypeDecimal {
         /// Total number of decimal digits that can be stored.
         pub precision: u32,
-        /// Number of digits after the decimal point. In certain situations,
-        /// scale could be negative number. For negative scale, it is the number
-        /// of padding 0 to the right of the digits.
+        /// Number of digits after the decimal point. In certain situations, scale could be
+        /// negative number. For negative scale, it is the number of padding 0 to the right of the
+        /// digits.
         ///
-        /// For example the number 12300 could be treated as a decimal has
-        /// precision 3 and scale -2.
+        /// For example the number 12300 could be treated as a decimal has precision 3 and scale
+        /// -2.
         pub scale: i32,
     }
 
@@ -716,13 +707,13 @@ pub mod data {
     pub struct DataTypeList {
         /// Data type of list items.
         pub item_type: Box<data::DataType>,
-        /// Number of list items per value for fixed-size lists. If omitted, the
-        /// list is variable-length.
+        /// Number of list items per value for fixed-size lists. If omitted, the list is
+        /// variable-length.
         pub fixed_length: Option<u64>,
     }
 
-    /// A map of key-value pairs, represented as a list of entries (structs with
-    /// key and value fields).
+    /// A map of key-value pairs, represented as a list of entries (structs with key and value
+    /// fields).
     ///
     /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/DataType#/$defs/Map
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -765,8 +756,7 @@ pub mod data {
         pub fields: Vec<data::DataField>,
     }
 
-    /// A time of day value, without a date, with a specified unit of
-    /// granularity.
+    /// A time of day value, without a date, with a specified unit of granularity.
     ///
     /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/DataType#/$defs/Time
     #[derive(Clone, Debug, Eq, Default)]
@@ -793,8 +783,7 @@ pub mod data {
         }
     }
 
-    /// A point in time, represented as an offset from the Unix epoch in a
-    /// specific timezone.
+    /// A point in time, represented as an offset from the Unix epoch in a specific timezone.
     ///
     /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/DataType#/$defs/Timestamp
     #[derive(Clone, Debug, Eq, Default)]
@@ -806,10 +795,9 @@ pub mod data {
         /// The timezone is an optional string indicating the name of a timezone
         /// one of
         ///
-        /// * As used in the Olson timezone database (the "tz database" or
-        ///   "tzdata"), such as "America/New_York".
-        /// * An absolute timezone offset of the form "+XX:XX" or "-XX:XX", such
-        ///   as "+07:30".
+        /// * As used in the Olson timezone database (the "tz database" or "tzdata"), such as
+        ///   "America/New_York".
+        /// * An absolute timezone offset of the form "+XX:XX" or "-XX:XX", such as "+07:30".
         ///
         /// Defaults to: "UTC"
         pub timezone: Option<String>,
@@ -869,10 +857,9 @@ pub mod data {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct DataTypeUInt8 {}
 
-    /// Container for custom key-value extension attributes. Every key must be
-    /// in the form of `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to
-    /// fully disambiguate the value in the face of multiple extensions. Values
-    /// may be any valid JSON including nested objects.
+    /// Container for custom key-value extension attributes. Every key must be in the form of
+    /// `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully disambiguate the value in
+    /// the face of multiple extensions. Values may be any valid JSON including nested objects.
     ///
     /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/ExtraAttributes
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -908,25 +895,23 @@ pub mod datasets {
     pub struct AddData {
         /// Hash of the checkpoint file used to restore ingestion state, if any.
         pub prev_checkpoint: Option<Multihash>,
-        /// Last offset of the previous data slice, if any. Must be equal to the
-        /// last non-empty `newData.offsetInterval.end`.
+        /// Last offset of the previous data slice, if any. Must be equal to the last non-empty
+        /// `newData.offsetInterval.end`.
         pub prev_offset: Option<u64>,
         /// Describes output data written during this transaction, if any.
         pub new_data: Option<datasets::DataSlice>,
-        /// Describes checkpoint written during this transaction, if any. If an
-        /// engine operation resulted in no updates to the checkpoint, but
-        /// checkpoint is still relevant for subsequent runs - a hash of the
-        /// previous checkpoint should be specified.
+        /// Describes checkpoint written during this transaction, if any. If an engine operation
+        /// resulted in no updates to the checkpoint, but checkpoint is still relevant for
+        /// subsequent runs - a hash of the previous checkpoint should be specified.
         pub new_checkpoint: Option<datasets::Checkpoint>,
-        /// Last watermark of the output data stream, if any. Initial blocks may
-        /// not have watermarks, but once watermark is set - all subsequent
-        /// blocks should either carry the same watermark or specify a new
-        /// (greater) one. Thus, watermarks are monotonically non-decreasing.
+        /// Last watermark of the output data stream, if any. Initial blocks may not have
+        /// watermarks, but once watermark is set - all subsequent blocks should either carry the
+        /// same watermark or specify a new (greater) one. Thus, watermarks are monotonically
+        /// non-decreasing.
         pub new_watermark: Option<DateTime<Utc>>,
-        /// The state of the source the data was added from to allow fast
-        /// resuming. If the state did not change but is still relevant for
-        /// subsequent runs it should be carried, i.e. only the last state per
-        /// source is considered when resuming.
+        /// The state of the source the data was added from to allow fast resuming. If the state
+        /// did not change but is still relevant for subsequent runs it should be carried, i.e.
+        /// only the last state per source is considered when resuming.
         pub new_source_state: Option<sources::SourceState>,
         /// ODF extensions.
         pub extra: Option<data::ExtraAttributes>,
@@ -954,8 +939,7 @@ pub mod datasets {
     impl_enum_with_variants!(Attachments);
     impl_enum_variant!(Attachments::Embedded(datasets::AttachmentsEmbedded));
 
-    /// For attachments that are specified inline and are embedded in the
-    /// metadata.
+    /// For attachments that are specified inline and are embedded in the metadata.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Attachments#/$defs/Embedded
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -975,8 +959,7 @@ pub mod datasets {
         pub size: u64,
     }
 
-    /// Describes a slice of data added to a dataset or produced via
-    /// transformation
+    /// Describes a slice of data added to a dataset or produced via transformation
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DataSlice
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1058,10 +1041,9 @@ pub mod datasets {
     }
     impl IntoResourceRef for DatasetRef {}
 
-    /// Access role granted to a subject on a dataset. Note: in future this
-    /// fixed enum schema will likely be replaced by a reference to a
-    /// `DatasetRole` resources that defines granular permissions on different
-    /// actions available on a dataset.
+    /// Access role granted to a subject on a dataset. Note: in future this fixed enum schema will
+    /// likely be replaced by a reference to a `DatasetRole` resources that defines granular
+    /// permissions on different actions available on a dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetRole
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1082,12 +1064,11 @@ pub mod datasets {
         pub did: DatasetID,
         /// Type of the dataset.
         pub kind: datasets::DatasetKind,
-        /// An array of metadata events that will be used to populate the chain.
-        /// Here you can define polling and push sources, set licenses, add
-        /// attachments etc.
+        /// An array of metadata events that will be used to populate the chain. Here you can
+        /// define polling and push sources, set licenses, add attachments etc.
         pub metadata: Vec<datasets::MetadataEvent>,
-        /// Reference to a storage volume where dataset data will be stored. If
-        /// omitted, the node's default storage is used.
+        /// Reference to a storage volume where dataset data will be stored. If omitted, the node's
+        /// default storage is used.
         pub volume: resources::ResourceHandle,
     }
 
@@ -1100,12 +1081,11 @@ pub mod datasets {
         pub did: Option<DatasetID>,
         /// Type of the dataset.
         pub kind: datasets::DatasetKind,
-        /// An array of metadata events that will be used to populate the chain.
-        /// Here you can define polling and push sources, set licenses, add
-        /// attachments etc.
+        /// An array of metadata events that will be used to populate the chain. Here you can
+        /// define polling and push sources, set licenses, add attachments etc.
         pub metadata: Vec<datasets::MetadataEvent>,
-        /// Reference to a storage volume where dataset data will be stored. If
-        /// omitted, the node's default storage is used.
+        /// Reference to a storage volume where dataset data will be stored. If omitted, the node's
+        /// default storage is used.
         pub volume: Option<storage::PersistentVolumeRef>,
     }
 
@@ -1208,26 +1188,24 @@ pub mod datasets {
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ExecuteTransform
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ExecuteTransform {
-        /// Defines inputs used in this transaction. Slices corresponding to
-        /// every input dataset must be present.
+        /// Defines inputs used in this transaction. Slices corresponding to every input dataset
+        /// must be present.
         pub query_inputs: Vec<datasets::ExecuteTransformInput>,
-        /// Hash of the checkpoint file used to restore transformation state, if
-        /// any.
+        /// Hash of the checkpoint file used to restore transformation state, if any.
         pub prev_checkpoint: Option<Multihash>,
-        /// Last offset of the previous data slice, if any. Must be equal to the
-        /// last non-empty `newData.offsetInterval.end`.
+        /// Last offset of the previous data slice, if any. Must be equal to the last non-empty
+        /// `newData.offsetInterval.end`.
         pub prev_offset: Option<u64>,
         /// Describes output data written during this transaction, if any.
         pub new_data: Option<datasets::DataSlice>,
-        /// Describes checkpoint written during this transaction, if any. If an
-        /// engine operation resulted in no updates to the checkpoint, but
-        /// checkpoint is still relevant for subsequent runs - a hash of the
-        /// previous checkpoint should be specified.
+        /// Describes checkpoint written during this transaction, if any. If an engine operation
+        /// resulted in no updates to the checkpoint, but checkpoint is still relevant for
+        /// subsequent runs - a hash of the previous checkpoint should be specified.
         pub new_checkpoint: Option<datasets::Checkpoint>,
-        /// Last watermark of the output data stream, if any. Initial blocks may
-        /// not have watermarks, but once watermark is set - all subsequent
-        /// blocks should either carry the same watermark or specify a new
-        /// (greater) one. Thus, watermarks are monotonically non-decreasing.
+        /// Last watermark of the output data stream, if any. Initial blocks may not have
+        /// watermarks, but once watermark is set - all subsequent blocks should either carry the
+        /// same watermark or specify a new (greater) one. Thus, watermarks are monotonically
+        /// non-decreasing.
         pub new_watermark: Option<DateTime<Utc>>,
     }
 
@@ -1238,32 +1216,28 @@ pub mod datasets {
     pub struct ExecuteTransformInput {
         /// Input dataset identifier.
         pub dataset_id: DatasetID,
-        /// Last block of the input dataset that was previously incorporated
-        /// into the derivative transformation, if any. Must be equal to the
-        /// last non-empty `newBlockHash`. Together with `newBlockHash` defines
-        /// a half-open `(prevBlockHash, newBlockHash]` interval of blocks that
-        /// will be considered in this transaction.
+        /// Last block of the input dataset that was previously incorporated into the derivative
+        /// transformation, if any. Must be equal to the last non-empty `newBlockHash`. Together
+        /// with `newBlockHash` defines a half-open `(prevBlockHash, newBlockHash]` interval of
+        /// blocks that will be considered in this transaction.
         pub prev_block_hash: Option<Multihash>,
-        /// Hash of the last block that will be incorporated into the derivative
-        /// transformation. When present, defines a half-open `(prevBlockHash,
-        /// newBlockHash]` interval of blocks that will be considered in this
-        /// transaction.
+        /// Hash of the last block that will be incorporated into the derivative transformation.
+        /// When present, defines a half-open `(prevBlockHash, newBlockHash]` interval of blocks
+        /// that will be considered in this transaction.
         pub new_block_hash: Option<Multihash>,
-        /// Last data record offset in the input dataset that was previously
-        /// incorporated into the derivative transformation, if any. Must be
-        /// equal to the last non-empty `newOffset`. Together with `newOffset`
-        /// defines a half-open `(prevOffset, newOffset]` interval of data
-        /// records that will be considered in this transaction.
+        /// Last data record offset in the input dataset that was previously incorporated into the
+        /// derivative transformation, if any. Must be equal to the last non-empty `newOffset`.
+        /// Together with `newOffset` defines a half-open `(prevOffset, newOffset]` interval of
+        /// data records that will be considered in this transaction.
         pub prev_offset: Option<u64>,
-        /// Offset of the last data record that will be incorporated into the
-        /// derivative transformation, if any. When present, defines a half-open
-        /// `(prevOffset, newOffset]` interval of data records that will be
-        /// considered in this transaction.
+        /// Offset of the last data record that will be incorporated into the derivative
+        /// transformation, if any. When present, defines a half-open `(prevOffset, newOffset]`
+        /// interval of data records that will be considered in this transaction.
         pub new_offset: Option<u64>,
     }
 
-    /// An individual block in the metadata chain that captures the history of
-    /// modifications of a dataset.
+    /// An individual block in the metadata chain that captures the history of modifications of a
+    /// dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataBlock
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1365,8 +1339,7 @@ pub mod datasets {
         pub end: u64,
     }
 
-    /// Represents a projection of a dataaset history into a state for fast
-    /// lookups.
+    /// Represents a projection of a dataaset history into a state for fast lookups.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Projection
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1392,8 +1365,7 @@ pub mod datasets {
     static PROJECTION_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(PROJECTION_SCHEMA_STR));
 
-    /// Represents a projection of a dataaset history into a state for fast
-    /// lookups.
+    /// Represents a projection of a dataaset history into a state for fast lookups.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ProjectionSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1404,8 +1376,7 @@ pub mod datasets {
         pub project: datasets::Transform,
     }
 
-    /// Represents a projection of a dataaset history into a state for fast
-    /// lookups.
+    /// Represents a projection of a dataaset history into a state for fast lookups.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ProjectionSpecInput
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1416,8 +1387,7 @@ pub mod datasets {
         pub project: datasets::Transform,
     }
 
-    /// Establishes the identity of the dataset. Always the first metadata event
-    /// in the chain.
+    /// Establishes the identity of the dataset. Always the first metadata event in the chain.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Seed
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1437,17 +1407,15 @@ pub mod datasets {
         pub attachments: datasets::Attachments,
     }
 
-    /// Specifies the complete schema of Data Slices added to the Dataset
-    /// following this event.
+    /// Specifies the complete schema of Data Slices added to the Dataset following this event.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetDataSchema
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct SetDataSchema {
-        /// DEPRECATED: Apache Arrow schema encoded in its native flatbuffers
-        /// representation.
+        /// DEPRECATED: Apache Arrow schema encoded in its native flatbuffers representation.
         pub raw_arrow_schema: Option<Vec<u8>>,
-        /// Defines the logical schema of the data files that follow this event.
-        /// Will become a required field after migration.
+        /// Defines the logical schema of the data files that follow this event. Will become a
+        /// required field after migration.
         pub schema: Option<data::DataSchema>,
     }
 
@@ -1508,16 +1476,14 @@ pub mod datasets {
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SqlQueryStep
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct SqlQueryStep {
-        /// Name of the temporary view that will be created from result of the
-        /// query. Step without this alias will be treated as an output of the
-        /// transformation.
+        /// Name of the temporary view that will be created from result of the query. Step without
+        /// this alias will be treated as an output of the transformation.
         pub alias: Option<String>,
         /// SQL query the result of which will be exposed under the alias.
         pub query: String,
     }
 
-    /// Temporary Flink-specific extension for creating temporal tables from
-    /// streams.
+    /// Temporary Flink-specific extension for creating temporal tables from streams.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/TemporalTable
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1544,13 +1510,11 @@ pub mod datasets {
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/TransformInput
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TransformInput {
-        /// A local or remote dataset reference. When block is accepted this
-        /// MUST be in the form of a DatasetId to guarantee reproducibility, as
-        /// aliases can change over time.
+        /// A local or remote dataset reference. When block is accepted this MUST be in the form of
+        /// a DatasetId to guarantee reproducibility, as aliases can change over time.
         pub dataset_ref: crate::datasets::legacy::DatasetRef,
-        /// An alias under which this input will be available in queries. Will
-        /// be populated from `datasetRef` if not provided before resolving it
-        /// to DatasetId.
+        /// An alias under which this input will be available in queries. Will be populated from
+        /// `datasetRef` if not provided before resolving it to DatasetId.
         pub alias: Option<String>,
     }
 
@@ -1563,18 +1527,15 @@ pub mod datasets {
         pub engine: String,
         /// Version of the engine to use.
         pub version: Option<String>,
-        /// SQL query the result of which will be used as an output. This is a
-        /// convenience property meant only for defining queries by hand. When
-        /// stored in the metadata this property will never be set and instead
-        /// will be converted into a single-iter `queries` array.
+        /// SQL query the result of which will be used as an output. This is a convenience property
+        /// meant only for defining queries by hand. When stored in the metadata this property will
+        /// never be set and instead will be converted into a single-iter `queries` array.
         pub query: Option<String>,
-        /// Specifies multi-step SQL transformations. Each step acts as a
-        /// shorthand for `CREATE TEMPORARY VIEW <alias> AS (<query>)`. Last
-        /// query in the array should have no alias and will be treated as an
-        /// output.
+        /// Specifies multi-step SQL transformations. Each step acts as a shorthand for `CREATE
+        /// TEMPORARY VIEW <alias> AS (<query>)`. Last query in the array should have no alias and
+        /// will be treated as an output.
         pub queries: Option<Vec<datasets::SqlQueryStep>>,
-        /// Temporary Flink-specific extension for creating temporal tables from
-        /// streams.
+        /// Temporary Flink-specific extension for creating temporal tables from streams.
         pub temporal_tables: Option<Vec<datasets::TemporalTable>>,
     }
 
@@ -1597,14 +1558,13 @@ pub mod engines {
     #[allow(unused_imports)]
     use super::*;
 
-    /// Sent by the coordinator to an engine to perform query on raw input data,
-    /// usually as part of ingest preprocessing step
+    /// Sent by the coordinator to an engine to perform query on raw input data, usually as part of
+    /// ingest preprocessing step
     ///
     /// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryRequest
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct RawQueryRequest {
-        /// Paths to input data files to perform query over. Must all have
-        /// identical schema.
+        /// Paths to input data files to perform query over. Must all have identical schema.
         pub input_data_paths: Vec<PathBuf>,
         /// Transformation that will be applied to produce new data.
         pub transform: datasets::Transform,
@@ -1670,8 +1630,7 @@ pub mod engines {
         pub num_records: u64,
     }
 
-    /// Sent by the coordinator to an engine to perform the next step of data
-    /// transformation
+    /// Sent by the coordinator to an engine to perform the next step of data transformation
     ///
     /// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformRequest
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1686,24 +1645,23 @@ pub mod engines {
         pub vocab: datasets::DatasetVocabulary,
         /// Transformation that will be applied to produce new data.
         pub transform: datasets::Transform,
-        /// Defines inputs used in this transaction. Slices corresponding to
-        /// every input dataset must be present.
+        /// Defines inputs used in this transaction. Slices corresponding to every input dataset
+        /// must be present.
         pub query_inputs: Vec<engines::TransformRequestInput>,
         /// Starting offset to use for new data records.
         pub next_offset: u64,
-        /// TODO: This will be removed when coordinator will be speaking to
-        /// engines purely through Arrow.
+        /// TODO: This will be removed when coordinator will be speaking to engines purely through
+        /// Arrow.
         pub prev_checkpoint_path: Option<PathBuf>,
-        /// TODO: This will be removed when coordinator will be speaking to
-        /// engines purely through Arrow.
+        /// TODO: This will be removed when coordinator will be speaking to engines purely through
+        /// Arrow.
         pub new_checkpoint_path: PathBuf,
-        /// TODO: This will be removed when coordinator will be speaking to
-        /// engines purely through Arrow.
+        /// TODO: This will be removed when coordinator will be speaking to engines purely through
+        /// Arrow.
         pub new_data_path: PathBuf,
     }
 
-    /// Sent as part of the engine transform request operation to describe the
-    /// input
+    /// Sent as part of the engine transform request operation to describe the input
     ///
     /// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/TransformRequestInput
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1718,13 +1676,12 @@ pub mod engines {
         pub vocab: datasets::DatasetVocabulary,
         /// Subset of data that goes into this transaction.
         pub offset_interval: Option<datasets::OffsetInterval>,
-        /// TODO: This will be removed when coordinator will be slicing data for
-        /// the engine.
+        /// TODO: This will be removed when coordinator will be slicing data for the engine.
         pub data_paths: Vec<PathBuf>,
         /// TODO: replace with actual DDL or Parquet schema.
         pub schema_file: PathBuf,
-        /// Watermarks that should be injected into the stream to separate micro
-        /// batches for reproducibility.
+        /// Watermarks that should be injected into the stream to separate micro batches for
+        /// reproducibility.
         pub explicit_watermarks: Vec<datasets::Watermark>,
     }
 
@@ -1814,8 +1771,7 @@ pub mod flows {
     #[allow(unused_imports)]
     use super::*;
 
-    /// Defines a sequence of tasks to be executed upon certain trigger
-    /// conditions.
+    /// Defines a sequence of tasks to be executed upon certain trigger conditions.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/Flow
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1878,22 +1834,21 @@ pub mod flows {
         pub trigger: flows::FlowTrigger,
     }
 
-    /// Condition capturing what caused this FlowRun to be scheduled. Set by the
-    /// controller at creation time; never written by users. In case of a retry,
-    /// the causes of the original run are preserved.
+    /// Condition capturing what caused this FlowRun to be scheduled. Set by the controller at
+    /// creation time; never written by users. In case of a retry, the causes of the original run
+    /// are preserved.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunActivationCauses
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowRunActivationCauses {
         /// Triggers that caused this run to be scheduled.
         pub activation_causes: Vec<flows::FlowRunActivationCause>,
-        /// Additional triggers that fired while this run was already queued or
-        /// executing.
+        /// Additional triggers that fired while this run was already queued or executing.
         pub late_activation_causes: Option<Vec<flows::FlowRunActivationCause>>,
     }
 
-    /// Condition linking this FlowRun to the previous FlowRun it is retrying.
-    /// Set by the controller; never written by users.
+    /// Condition linking this FlowRun to the previous FlowRun it is retrying. Set by the
+    /// controller; never written by users.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunRetry
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1909,8 +1864,7 @@ pub mod flows {
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowRunSpec {
-        /// Defines the default target resources on which tasks will be
-        /// performed.
+        /// Defines the default target resources on which tasks will be performed.
         pub target: Option<resources::ResourceHandle>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<tasks::TaskSpec>,
@@ -1921,15 +1875,13 @@ pub mod flows {
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunSpecInput
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowRunSpecInput {
-        /// Defines the default target resources on which tasks will be
-        /// performed.
+        /// Defines the default target resources on which tasks will be performed.
         pub target: Option<resources::ResourceRef>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<tasks::TaskSpecInput>,
     }
 
-    /// Condition tracking the overall execution status of a FlowRun and its
-    /// spawned tasks.
+    /// Condition tracking the overall execution status of a FlowRun and its spawned tasks.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowRunStatus
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1967,8 +1919,7 @@ pub mod flows {
         Finished,
     }
 
-    /// Defines a sequence of tasks to be executed upon certain trigger
-    /// conditions.
+    /// Defines a sequence of tasks to be executed upon certain trigger conditions.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1983,8 +1934,7 @@ pub mod flows {
         pub retry_policy: Option<flows::RetryPolicy>,
     }
 
-    /// Defines a sequence of tasks to be executed upon certain trigger
-    /// conditions.
+    /// Defines a sequence of tasks to be executed upon certain trigger conditions.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowSpecInput
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1999,8 +1949,7 @@ pub mod flows {
         pub retry_policy: Option<flows::RetryPolicy>,
     }
 
-    /// Condition tracking the overall status of a Flow and a summary of recent
-    /// runs.
+    /// Condition tracking the overall status of a Flow and a summary of recent runs.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowStatus
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2010,8 +1959,7 @@ pub mod flows {
         /// Last N resources matched by the flow's target selector. Bounded by
         /// spec.recentBindingsRetention.
         pub recent_bindings: Option<Vec<flows::FlowStatusBindingEntry>>,
-        /// Total number of resources currently matched by the flow's target
-        /// selector.
+        /// Total number of resources currently matched by the flow's target selector.
         pub bindings_total: Option<u64>,
         /// Summaries of recent FlowRuns. Bounded by spec.recentRunsRetention.
         pub recent_runs: Option<Vec<flows::FlowStatusRunEntry>>,
@@ -2086,22 +2034,20 @@ pub mod flows {
         pub events: Option<Vec<String>>,
     }
 
-    /// Triggers the flow when an event bus event matching one of the filters is
-    /// observed.
+    /// Triggers the flow when an event bus event matching one of the filters is observed.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Event
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowTriggerEvent {
         /// Filters the event by type and fields.
         pub events: events::EventFilter,
-        /// The trigger will fire upon first observed event. If another event
-        /// arrives withing the `cooldown` interval the firing will be postponed
-        /// until `cooldown` interval ends. I.e. trigger is guaranteed to fire,
-        /// but may batch multiple events together into one flow run.
+        /// The trigger will fire upon first observed event. If another event arrives withing the
+        /// `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e.
+        /// trigger is guaranteed to fire, but may batch multiple events together into one flow
+        /// run.
         pub cooldown: Option<DurationString>,
-        /// If an event is observed a `cooldownMaxBatch` number of times during
-        /// the `cooldown` interval it will fire the trigger without waiting for
-        /// cooldown to finish.
+        /// If an event is observed a `cooldownMaxBatch` number of times during the `cooldown`
+        /// interval it will fire the trigger without waiting for cooldown to finish.
         pub cooldown_max_batch: Option<u64>,
     }
 
@@ -2135,22 +2081,20 @@ pub mod flows {
         pub events: Option<Vec<String>>,
     }
 
-    /// Triggers the flow when an event bus event matching one of the filters is
-    /// observed.
+    /// Triggers the flow when an event bus event matching one of the filters is observed.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Event
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowTriggerInputEvent {
         /// Filters the event by type and fields.
         pub events: events::EventFilter,
-        /// The trigger will fire upon first observed event. If another event
-        /// arrives withing the `cooldown` interval the firing will be postponed
-        /// until `cooldown` interval ends. I.e. trigger is guaranteed to fire,
-        /// but may batch multiple events together into one flow run.
+        /// The trigger will fire upon first observed event. If another event arrives withing the
+        /// `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e.
+        /// trigger is guaranteed to fire, but may batch multiple events together into one flow
+        /// run.
         pub cooldown: Option<DurationString>,
-        /// If an event is observed a `cooldownMaxBatch` number of times during
-        /// the `cooldown` interval it will fire the trigger without waiting for
-        /// cooldown to finish.
+        /// If an event is observed a `cooldownMaxBatch` number of times during the `cooldown`
+        /// interval it will fire the trigger without waiting for cooldown to finish.
         pub cooldown_max_batch: Option<u64>,
     }
 
@@ -2165,13 +2109,11 @@ pub mod flows {
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Schedule
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowTriggerInputSchedule {
-        /// Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * *
-        /// *`.
+        /// Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
         pub cron: String,
     }
 
-    /// Triggers the flow when a source receives new data, with optional
-    /// batching controls.
+    /// Triggers the flow when a source receives new data, with optional batching controls.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Source
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2180,8 +2122,7 @@ pub mod flows {
         pub source: resources::ResourceRef,
         /// Minimum number of new records to accumulate before triggering.
         pub min_records_to_await: Option<u64>,
-        /// Maximum time to wait for `minRecordsToAwait` before triggering
-        /// anyway e.g. `1h`.
+        /// Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
         pub max_await_interval: Option<DurationString>,
     }
 
@@ -2196,13 +2137,11 @@ pub mod flows {
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Schedule
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowTriggerSchedule {
-        /// Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * *
-        /// *`.
+        /// Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
         pub cron: String,
     }
 
-    /// Triggers the flow when a source receives new data, with optional
-    /// batching controls.
+    /// Triggers the flow when a source receives new data, with optional batching controls.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Source
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2211,8 +2150,7 @@ pub mod flows {
         pub source: resources::ResourceHandle,
         /// Minimum number of new records to accumulate before triggering.
         pub min_records_to_await: Option<u64>,
-        /// Maximum time to wait for `minRecordsToAwait` before triggering
-        /// anyway e.g. `1h`.
+        /// Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
         pub max_await_interval: Option<DurationString>,
     }
 
@@ -2246,8 +2184,7 @@ pub mod legacy {
     #[allow(unused_imports)]
     use super::*;
 
-    /// Describes how to ingest data into a root dataset from a certain logical
-    /// source.
+    /// Describes how to ingest data into a root dataset from a certain logical source.
     ///
     /// Schema: https://opendatafabric.org/schemas/legacy/v0/AddPushSource
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2258,14 +2195,12 @@ pub mod legacy {
         pub read: sources::ReadStep,
         /// Pre-processing query that shapes the data.
         pub preprocess: Option<datasets::Transform>,
-        /// Determines how newly-ingested data should be merged with existing
-        /// history.
+        /// Determines how newly-ingested data should be merged with existing history.
         pub merge: sources::MergeStrategy,
     }
 
-    /// Represents a projection of the dataset metadata at a single point in
-    /// time. This type is typically used for defining new datasets and
-    /// changing the existing ones.
+    /// Represents a projection of the dataset metadata at a single point in time.
+    /// This type is typically used for defining new datasets and changing the existing ones.
     ///
     /// Schema: https://opendatafabric.org/schemas/legacy/v0/DatasetSnapshot
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2274,9 +2209,8 @@ pub mod legacy {
         pub name: crate::datasets::legacy::DatasetAlias,
         /// Type of the dataset.
         pub kind: datasets::DatasetKind,
-        /// An array of metadata events that will be used to populate the chain.
-        /// Here you can define polling and push sources, set licenses, add
-        /// attachments etc.
+        /// An array of metadata events that will be used to populate the chain. Here you can
+        /// define polling and push sources, set licenses, add attachments etc.
         pub metadata: Vec<datasets::MetadataEvent>,
     }
 
@@ -2321,11 +2255,10 @@ pub mod legacy {
     pub struct FetchStepContainer {
         /// Image name and and an optional tag.
         pub image: String,
-        /// Specifies the entrypoint. Not executed within a shell. The default
-        /// OCI image's ENTRYPOINT is used if this is not provided.
+        /// Specifies the entrypoint. Not executed within a shell. The default OCI image's
+        /// ENTRYPOINT is used if this is not provided.
         pub command: Option<Vec<String>>,
-        /// Arguments to the entrypoint. The OCI image's CMD is used if this is
-        /// not provided.
+        /// Arguments to the entrypoint. The OCI image's CMD is used if this is not provided.
         pub args: Option<Vec<String>>,
         /// Environment variables to propagate into or set in the container.
         pub env: Option<Vec<sources::EnvVar>>,
@@ -2336,23 +2269,20 @@ pub mod legacy {
     /// Schema: https://opendatafabric.org/schemas/legacy/v0/FetchStep#/$defs/EthereumLogs
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct FetchStepEthereumLogs {
-        /// Identifier of the chain to scan logs from. This parameter may be
-        /// used for RPC endpoint lookup as well as asserting that provided
-        /// `nodeUrl` corresponds to the expected chain.
+        /// Identifier of the chain to scan logs from. This parameter may be used for RPC endpoint
+        /// lookup as well as asserting that provided `nodeUrl` corresponds to the expected chain.
         pub chain_id: Option<u64>,
         /// Url of the node.
         pub node_url: Option<String>,
-        /// An SQL WHERE clause that can be used to pre-filter the logs before
-        /// fetching them from the ETH node.
+        /// An SQL WHERE clause that can be used to pre-filter the logs before fetching them from
+        /// the ETH node.
         ///
         /// Examples:
-        /// - "block_number > 123 and address =
-        ///   X'5fbdb2315678afecb367f032d93f642f64180aa3' and topic1 =
-        ///   X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'
-        ///   "
+        /// - "block_number > 123 and address = X'5fbdb2315678afecb367f032d93f642f64180aa3' and
+        ///   topic1 = X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'"
         pub filter: Option<String>,
-        /// Solidity log event signature to use for decoding. Using this field
-        /// adds `event` to the output containing decoded log as JSON.
+        /// Solidity log event signature to use for decoding. Using this field adds `event` to the
+        /// output containing decoded log as JSON.
         pub signature: Option<String>,
     }
 
@@ -2405,25 +2335,22 @@ pub mod legacy {
         pub headers: Option<Vec<sources::RequestHeader>>,
     }
 
-    /// An object that wraps the metadata resources providing versioning and
-    /// type identification. All root-level resources are wrapped with a
-    /// manifest when serialized to disk.
+    /// An object that wraps the metadata resources providing versioning and type identification.
+    /// All root-level resources are wrapped with a manifest when serialized to disk.
     ///
     /// Schema: https://opendatafabric.org/schemas/legacy/v0/Manifest
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Manifest<ContentT> {
         /// Type of the resource.
         pub kind: String,
-        /// Major version number of the resource contained in this manifest. It
-        /// provides the mechanism for introducing compatibility breaking
-        /// changes.
+        /// Major version number of the resource contained in this manifest. It provides the
+        /// mechanism for introducing compatibility breaking changes.
         pub version: i32,
         /// Resource data.
         pub content: ContentT,
     }
 
-    /// Contains information on how externally-hosted data can be ingested into
-    /// the root dataset.
+    /// Contains information on how externally-hosted data can be ingested into the root dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/legacy/v0/SetPollingSource
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2436,8 +2363,7 @@ pub mod legacy {
         pub read: sources::ReadStep,
         /// Pre-processing query that shapes the data.
         pub preprocess: Option<datasets::Transform>,
-        /// Determines how newly-ingested data should be merged with existing
-        /// history.
+        /// Determines how newly-ingested data should be merged with existing history.
         pub merge: sources::MergeStrategy,
     }
 }
@@ -2457,9 +2383,8 @@ pub mod resources {
         pub entries: std::collections::BTreeMap<String, serde_json::Value>,
     }
 
-    /// Top-level container for canonical representation of a resource that
-    /// specifies the type and version of the resource, carries identity,
-    /// ownership, and status information.
+    /// Top-level container for canonical representation of a resource that specifies the type and
+    /// version of the resource, carries identity, ownership, and status information.
     ///
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/Resource
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2474,9 +2399,9 @@ pub mod resources {
         pub status: resources::ResourceStatus,
     }
 
-    /// Annotations is an unstructured key value map stored with a resource that
-    /// may be set by external tools to store and retrieve arbitrary metadata.
-    /// Unlike labels, annotations are not indexed and cannot be queried by.
+    /// Annotations is an unstructured key value map stored with a resource that may be set by
+    /// external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not
+    /// indexed and cannot be queried by.
     ///
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceAnnotations
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -2515,33 +2440,30 @@ pub mod resources {
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeaders
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ResourceHeaders {
-        /// Unique identifier of a resource within entire ODF node.
-        /// Automatically assigned upon resource creation.
+        /// Unique identifier of a resource within entire ODF node. Automatically assigned upon
+        /// resource creation.
         pub id: ResourceID,
-        /// Symbolic name of a resource that identifies it within a scope of an
-        /// onwing account.
+        /// Symbolic name of a resource that identifies it within a scope of an onwing account.
         pub name: ResourceName,
         /// Link to the account that owns the resource.
         pub account: auth::AccountHandle,
-        /// Map of string keys and values that can be used to organize,
-        /// categorize, and query resources.
+        /// Map of string keys and values that can be used to organize, categorize, and query
+        /// resources.
         pub labels: resources::ResourceLabels,
-        /// Annotations is a key value map stored with a resource that may be
-        /// set by external tools to store and retrieve arbitrary metadata.
-        /// Unlike labels, annotations are not indexed and cannot be queried by.
+        /// Annotations is a key value map stored with a resource that may be set by external tools
+        /// to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed
+        /// and cannot be queried by.
         pub annotations: resources::ResourceAnnotations,
-        /// References to resources that created this resource. Used for lineage
-        /// tracking and cascading cleanup.
+        /// References to resources that created this resource. Used for lineage tracking and
+        /// cascading cleanup.
         pub owner_references: Option<Vec<resources::ResourceHandle>>,
-        /// A sequential number that changes every time the resource header and
-        /// spec are updated. Does not increment on status changes, thus
-        /// signifying changes to the desired state. Populated by the system.
-        /// Starts with `1`.
+        /// A sequential number that changes every time the resource header and spec are updated.
+        /// Does not increment on status changes, thus signifying changes to the desired state.
+        /// Populated by the system. Starts with `1`.
         pub generation: u64,
         /// Time when the resource was first applied and assigned an identity.
         pub created_at: DateTime<Utc>,
-        /// Time when the resource was last updated, including header, spec, and
-        /// status updates.
+        /// Time when the resource was last updated, including header, spec, and status updates.
         pub updated_at: DateTime<Utc>,
         /// Time when the resource was deleted.
         pub deleted_at: Option<DateTime<Utc>>,
@@ -2552,28 +2474,27 @@ pub mod resources {
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeadersInput
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ResourceHeadersInput {
-        /// Unique identifier of a resource within entire ODF node.
-        /// Automatically assigned upon resource creation.
+        /// Unique identifier of a resource within entire ODF node. Automatically assigned upon
+        /// resource creation.
         pub id: Option<ResourceID>,
-        /// Symbolic name of a resource that identifies it within a scope of an
-        /// onwing account.
+        /// Symbolic name of a resource that identifies it within a scope of an onwing account.
         pub name: ResourceName,
         /// Reference to the account that owns the resource.
         pub account: Option<auth::AccountRef>,
-        /// Map of string keys and values that can be used to organize,
-        /// categorize, and query resources.
+        /// Map of string keys and values that can be used to organize, categorize, and query
+        /// resources.
         pub labels: Option<resources::ResourceLabels>,
-        /// Annotations is a key value map stored with a resource that may be
-        /// set by external tools to store and retrieve arbitrary metadata.
-        /// Unlike labels, annotations are not indexed and cannot be queried by.
+        /// Annotations is a key value map stored with a resource that may be set by external tools
+        /// to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed
+        /// and cannot be queried by.
         pub annotations: Option<resources::ResourceAnnotations>,
-        /// References to resources that created this resource. Used for lineage
-        /// tracking and cascading cleanup.
+        /// References to resources that created this resource. Used for lineage tracking and
+        /// cascading cleanup.
         pub owner_references: Option<Vec<resources::ResourceRef>>,
     }
 
-    /// Top-level container for user-authored representation of a resource that
-    /// specifies the type and version of the resource and its desired state.
+    /// Top-level container for user-authored representation of a resource that specifies the type
+    /// and version of the resource and its desired state.
     ///
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceInput
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2586,8 +2507,7 @@ pub mod resources {
         pub spec: SpecT,
     }
 
-    /// Map of string keys and values that can be used to organize, categorize,
-    /// and query resources.
+    /// Map of string keys and values that can be used to organize, categorize, and query resources.
     ///
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceLabels
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -2636,23 +2556,20 @@ pub mod resources {
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceStatus
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ResourceStatus {
-        /// Represents the reconciliation phase of a resource as seen by the
-        /// main resource controller.
-        pub phase: resources::ResourcePhase,
-        /// Resource generation that was last seen by the main resource
+        /// Represents the reconciliation phase of a resource as seen by the main resource
         /// controller.
+        pub phase: resources::ResourcePhase,
+        /// Resource generation that was last seen by the main resource controller.
         pub observed_generation: Option<u64>,
-        /// Time when the controller seen the resource state as defined in
-        /// `observedGeneration`.
+        /// Time when the controller seen the resource state as defined in `observedGeneration`.
         pub observed_at: Option<DateTime<Utc>>,
-        /// Resource generation that was last successfully reconciled by the
-        /// main resource controller.
+        /// Resource generation that was last successfully reconciled by the main resource
+        /// controller.
         pub reconciled_generation: Option<u64>,
-        /// Time when the controller last reconciled the desired resource state
-        /// as defined in `reconciledGeneration`.
+        /// Time when the controller last reconciled the desired resource state as defined in
+        /// `reconciledGeneration`.
         pub reconciled_at: Option<DateTime<Utc>>,
-        /// Detailed conditions describing the state of the resource that are
-        /// added by controllers.
+        /// Detailed conditions describing the state of the resource that are added by controllers.
         pub conditions: resources::ResourceConditions,
     }
 }
@@ -2664,8 +2581,7 @@ pub mod sinks {
     #[allow(unused_imports)]
     use super::*;
 
-    /// Defines a webhook endpoint that can receive event notifications and
-    /// data.
+    /// Defines a webhook endpoint that can receive event notifications and data.
     ///
     /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpoint
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2691,29 +2607,25 @@ pub mod sinks {
     static WEBHOOK_ENDPOINT_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(WEBHOOK_ENDPOINT_SCHEMA_STR));
 
-    /// Defines a webhook endpoint that can receive event notifications and
-    /// data.
+    /// Defines a webhook endpoint that can receive event notifications and data.
     ///
     /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpointSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct WebhookEndpointSpec {
         /// URL of the webhook endpoint.
         pub url: String,
-        /// Shared secret used for HMAC signature of the request payload for
-        /// authentication.
+        /// Shared secret used for HMAC signature of the request payload for authentication.
         pub secret: Option<config::Secret>,
     }
 
-    /// Defines a webhook endpoint that can receive event notifications and
-    /// data.
+    /// Defines a webhook endpoint that can receive event notifications and data.
     ///
     /// Schema: https://opendatafabric.org/schemas/sinks/v1alpha1/WebhookEndpointSpecInput
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct WebhookEndpointSpecInput {
         /// URL of the webhook endpoint.
         pub url: String,
-        /// Shared secret used for HMAC signature of the request payload for
-        /// authentication.
+        /// Shared secret used for HMAC signature of the request payload for authentication.
         pub secret: Option<config::Secret>,
     }
 }
@@ -2837,11 +2749,10 @@ pub mod sources {
     pub struct IngressContainer {
         /// Image name and and an optional tag.
         pub image: String,
-        /// Specifies the entrypoint. Not executed within a shell. The default
-        /// OCI image's ENTRYPOINT is used if this is not provided.
+        /// Specifies the entrypoint. Not executed within a shell. The default OCI image's
+        /// ENTRYPOINT is used if this is not provided.
         pub command: Option<Vec<String>>,
-        /// Arguments to the entrypoint. The OCI image's CMD is used if this is
-        /// not provided.
+        /// Arguments to the entrypoint. The OCI image's CMD is used if this is not provided.
         pub args: Option<Vec<String>>,
         /// Environment variables to propagate into or set in the container.
         pub env: Option<Vec<sources::EnvVar>>,
@@ -2852,23 +2763,20 @@ pub mod sources {
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/Ingress#/$defs/EvmLogs
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct IngressEvmLogs {
-        /// Identifier of the chain to scan logs from. This parameter may be
-        /// used for RPC endpoint lookup as well as asserting that provided
-        /// `nodeUrl` corresponds to the expected chain.
+        /// Identifier of the chain to scan logs from. This parameter may be used for RPC endpoint
+        /// lookup as well as asserting that provided `nodeUrl` corresponds to the expected chain.
         pub chain_id: Option<u64>,
         /// Url of the node.
         pub node_url: Option<String>,
-        /// An SQL WHERE clause that can be used to pre-filter the logs before
-        /// fetching them from the ETH node.
+        /// An SQL WHERE clause that can be used to pre-filter the logs before fetching them from
+        /// the ETH node.
         ///
         /// Examples:
-        /// - "block_number > 123 and address =
-        ///   X'5fbdb2315678afecb367f032d93f642f64180aa3' and topic1 =
-        ///   X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'
-        ///   "
+        /// - "block_number > 123 and address = X'5fbdb2315678afecb367f032d93f642f64180aa3' and
+        ///   topic1 = X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'"
         pub filter: Option<String>,
-        /// Solidity log event signature to use for decoding. Using this field
-        /// adds `event` to the output containing decoded log as JSON.
+        /// Solidity log event signature to use for decoding. Using this field adds `event` to the
+        /// output containing decoded log as JSON.
         pub signature: Option<String>,
     }
 
@@ -2930,8 +2838,8 @@ pub mod sources {
         pub headers: Option<Vec<sources::RequestHeader>>,
     }
 
-    /// Merge strategy determines how newly ingested data should be combined
-    /// with the data that already exists in the dataset.
+    /// Merge strategy determines how newly ingested data should be combined with the data that
+    /// already exists in the dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -2956,8 +2864,8 @@ pub mod sources {
 
     /// Append merge strategy.
     ///
-    /// Under this strategy new data will be appended to the dataset in its
-    /// entirety, without any deduplication.
+    /// Under this strategy new data will be appended to the dataset in its entirety, without any
+    /// deduplication.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Append
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -2965,86 +2873,76 @@ pub mod sources {
 
     /// Changelog stream merge strategy.
     ///
-    /// This is the native stream format for ODF that accurately describes the
-    /// evolution of all event records including appends, retractions, and
-    /// corrections as per RFC-015. No pre-processing except for format
-    /// validation is done.
+    /// This is the native stream format for ODF that accurately describes the evolution of all
+    /// event records including appends, retractions, and corrections as per RFC-015. No
+    /// pre-processing except for format validation is done.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/ChangelogStream
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct MergeStrategyChangelogStream {
-        /// Names of the columns that uniquely identify the record throughout
-        /// its lifetime
+        /// Names of the columns that uniquely identify the record throughout its lifetime
         pub primary_key: Vec<String>,
     }
 
     /// Ledger merge strategy.
     ///
-    /// This strategy should be used for data sources containing ledgers of
-    /// events. Currently this strategy will only perform deduplication of
-    /// events using user-specified primary key columns. This means that the
-    /// source data can contain partially overlapping set of records and only
+    /// This strategy should be used for data sources containing ledgers of events. Currently this
+    /// strategy will only perform deduplication of events using user-specified primary key columns.
+    /// This means that the source data can contain partially overlapping set of records and only
     /// those records that were not previously seen will be appended.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Ledger
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct MergeStrategyLedger {
-        /// Names of the columns that uniquely identify the record throughout
-        /// its lifetime
+        /// Names of the columns that uniquely identify the record throughout its lifetime
         pub primary_key: Vec<String>,
     }
 
     /// Snapshot merge strategy.
     ///
-    /// This strategy can be used for data state snapshots that are taken
-    /// periodically and contain only the latest state of the observed entity or
-    /// system. Over time such snapshots can have new rows added, and old rows
-    /// either removed or modified.
+    /// This strategy can be used for data state snapshots that are taken periodically and contain
+    /// only the latest state of the observed entity or system. Over time such snapshots can have
+    /// new rows added, and old rows either removed or modified.
     ///
-    /// This strategy transforms snapshot data into an append-only event stream
-    /// where data already added is immutable. It does so by performing Change
-    /// Data Capture - essentially diffing the current state of data against the
-    /// reconstructed previous state and recording differences as retractions or
-    /// corrections. The Operation Type "op" column will contain:
+    /// This strategy transforms snapshot data into an append-only event stream where data already
+    /// added is immutable. It does so by performing Change Data Capture - essentially diffing the
+    /// current state of data against the reconstructed previous state and recording differences as
+    /// retractions or corrections. The Operation Type "op" column will contain:
     ///   - append (`+A`) when a row appears for the first time
     ///   - retraction (`-D`) when row disappears
-    ///   - correction (`-C`, `+C`) when row data has changed, with `-C` event
-    ///     carrying the old value of the row and `+C` carrying the new value.
+    ///   - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old
+    ///     value of the row and `+C` carrying the new value.
     ///
-    /// To correctly associate rows between old and new snapshots this strategy
-    /// relies on user-specified primary key columns.
+    /// To correctly associate rows between old and new snapshots this strategy relies on
+    /// user-specified primary key columns.
     ///
-    /// To identify whether a row has changed this strategy will compare all
-    /// other columns one by one. If the data contains a column that is
-    /// guaranteed to change whenever any of the data columns changes (for
-    /// example a last modification timestamp, an incremental version, or a data
-    /// hash), then it can be specified in `compareColumns` property to speed up
-    /// the detection of modified rows.
+    /// To identify whether a row has changed this strategy will compare all other columns one by
+    /// one. If the data contains a column that is guaranteed to change whenever any of the data
+    /// columns changes (for example a last modification timestamp, an incremental version, or a
+    /// data hash), then it can be specified in `compareColumns` property to speed up the detection
+    /// of modified rows.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Snapshot
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct MergeStrategySnapshot {
-        /// Names of the columns that uniquely identify the record throughout
-        /// its lifetime.
+        /// Names of the columns that uniquely identify the record throughout its lifetime.
         pub primary_key: Vec<String>,
-        /// Names of the columns to compared to determine if a row has changed
-        /// between two snapshots.
+        /// Names of the columns to compared to determine if a row has changed between two
+        /// snapshots.
         pub compare_columns: Option<Vec<String>>,
     }
 
     /// Upsert stream merge strategy.
     ///
-    /// This strategy should be used for data sources containing ledgers of
-    /// insert-or-update and delete events. Unlike ChangelogStream the
-    /// insert-or-update events only carry the new values, so this strategy will
-    /// use primary key to re-classify the events into an append or a correction
-    /// from/to pair, looking up the previous values.
+    /// This strategy should be used for data sources containing ledgers of insert-or-update and
+    /// delete events. Unlike ChangelogStream the insert-or-update events only carry the new values,
+    /// so this strategy will use primary key to re-classify the events into an append or a
+    /// correction from/to pair, looking up the previous values.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/UpsertStream
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct MergeStrategyUpsertStream {
-        /// Names of the columns that uniquely identify the record throughout
-        /// its lifetime
+        /// Names of the columns that uniquely identify the record throughout its lifetime
         pub primary_key: Vec<String>,
     }
 
@@ -3108,8 +3006,7 @@ pub mod sources {
     pub struct PrepStepDecompress {
         /// Name of a compression algorithm used on data.
         pub format: sources::CompressionFormat,
-        /// Path to a data file within a multi-file archive. Can contain glob
-        /// patterns.
+        /// Path to a data file within a multi-file archive. Can contain glob patterns.
         pub sub_path: Option<String>,
     }
 
@@ -3150,8 +3047,8 @@ pub mod sources {
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Csv
     #[derive(Clone, Debug, Eq, Default)]
     pub struct ReadStepCsv {
-        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce
-        /// values into more appropriate data types.
+        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more
+        /// appropriate data types.
         ///
         /// Examples:
         /// - ["date TIMESTAMP","city STRING","population INT"]
@@ -3164,14 +3061,12 @@ pub mod sources {
         ///
         /// Defaults to: "utf8"
         pub encoding: Option<String>,
-        /// Sets a single character used for escaping quoted values where the
-        /// separator can be part of the value. Set an empty string to turn off
-        /// quotations.
+        /// Sets a single character used for escaping quoted values where the separator can be part
+        /// of the value. Set an empty string to turn off quotations.
         ///
         /// Defaults to: "\""
         pub quote: Option<String>,
-        /// Sets a single character used for escaping quotes inside an already
-        /// quoted value.
+        /// Sets a single character used for escaping quotes inside an already quoted value.
         ///
         /// Defaults to: "\\"
         pub escape: Option<String>,
@@ -3179,8 +3074,8 @@ pub mod sources {
         ///
         /// Defaults to: false
         pub header: Option<bool>,
-        /// Infers the input schema automatically from data. It requires one
-        /// extra pass over the data.
+        /// Infers the input schema automatically from data. It requires one extra pass over the
+        /// data.
         ///
         /// Defaults to: false
         pub infer_schema: Option<bool>,
@@ -3188,15 +3083,13 @@ pub mod sources {
         ///
         /// Defaults to: ""
         pub null_value: Option<String>,
-        /// Sets the string that indicates a date format. The `rfc3339` is the
-        /// only required format, the other format strings are
-        /// implementation-specific.
+        /// Sets the string that indicates a date format. The `rfc3339` is the only required
+        /// format, the other format strings are implementation-specific.
         ///
         /// Defaults to: "rfc3339"
         pub date_format: Option<String>,
-        /// Sets the string that indicates a timestamp format. The `rfc3339` is
-        /// the only required format, the other format strings are
-        /// implementation-specific.
+        /// Sets the string that indicates a timestamp format. The `rfc3339` is the only required
+        /// format, the other format strings are implementation-specific.
         ///
         /// Defaults to: "rfc3339"
         pub timestamp_format: Option<String>,
@@ -3345,27 +3238,25 @@ pub mod sources {
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/EsriShapefile
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ReadStepEsriShapefile {
-        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce
-        /// values into more appropriate data types.
+        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more
+        /// appropriate data types.
         pub ddl_schema: Option<Vec<String>>,
-        /// If the ZIP archive contains multiple shapefiles use this field to
-        /// specify a sub-path to the desired `.shp` file. Can contain glob
-        /// patterns to act as a filter.
+        /// If the ZIP archive contains multiple shapefiles use this field to specify a sub-path to
+        /// the desired `.shp` file. Can contain glob patterns to act as a filter.
         pub sub_path: Option<String>,
         /// Schema used to coerce values into more appropriate data types.
         pub schema: Option<data::DataSchema>,
     }
 
-    /// Reader for GeoJSON files. It expects one `FeatureCollection` object in
-    /// the root and will create a record per each `Feature` inside it
-    /// extracting the properties into individual columns and leaving the
-    /// feature geometry in its own column.
+    /// Reader for GeoJSON files. It expects one `FeatureCollection` object in the root and will
+    /// create a record per each `Feature` inside it extracting the properties into individual
+    /// columns and leaving the feature geometry in its own column.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/GeoJson
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ReadStepGeoJson {
-        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce
-        /// values into more appropriate data types.
+        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more
+        /// appropriate data types.
         pub ddl_schema: Option<Vec<String>>,
         /// Schema used to coerce values into more appropriate data types.
         pub schema: Option<data::DataSchema>,
@@ -3376,16 +3267,14 @@ pub mod sources {
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Json
     #[derive(Clone, Debug, Eq, Default)]
     pub struct ReadStepJson {
-        /// Path in the form of `a.b.c` to a sub-element of the root JSON object
-        /// that is an array or objects. If not specified it is assumed that the
-        /// root element is an array.
+        /// Path in the form of `a.b.c` to a sub-element of the root JSON object that is an array
+        /// or objects. If not specified it is assumed that the root element is an array.
         pub sub_path: Option<String>,
-        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce
-        /// values into more appropriate data types.
+        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more
+        /// appropriate data types.
         pub ddl_schema: Option<Vec<String>>,
-        /// Sets the string that indicates a date format. The `rfc3339` is the
-        /// only required format, the other format strings are
-        /// implementation-specific.
+        /// Sets the string that indicates a date format. The `rfc3339` is the only required
+        /// format, the other format strings are implementation-specific.
         ///
         /// Defaults to: "rfc3339"
         pub date_format: Option<String>,
@@ -3393,9 +3282,8 @@ pub mod sources {
         ///
         /// Defaults to: "utf8"
         pub encoding: Option<String>,
-        /// Sets the string that indicates a timestamp format. The `rfc3339` is
-        /// the only required format, the other format strings are
-        /// implementation-specific.
+        /// Sets the string that indicates a timestamp format. The `rfc3339` is the only required
+        /// format, the other format strings are implementation-specific.
         ///
         /// Defaults to: "rfc3339"
         pub timestamp_format: Option<String>,
@@ -3460,32 +3348,30 @@ pub mod sources {
         }
     }
 
-    /// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson`
-    /// format but instead of `FeatureCollection` object in the root it expects
-    /// every individual feature object to appear on its own line.
+    /// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson` format but instead of
+    /// `FeatureCollection` object in the root it expects every individual feature object to appear
+    /// on its own line.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdGeoJson
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ReadStepNdGeoJson {
-        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce
-        /// values into more appropriate data types.
+        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more
+        /// appropriate data types.
         pub ddl_schema: Option<Vec<String>>,
         /// Schema used to coerce values into more appropriate data types.
         pub schema: Option<data::DataSchema>,
     }
 
-    /// Reader for files containing multiple newline-delimited JSON objects with
-    /// the same schema.
+    /// Reader for files containing multiple newline-delimited JSON objects with the same schema.
     ///
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdJson
     #[derive(Clone, Debug, Eq, Default)]
     pub struct ReadStepNdJson {
-        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce
-        /// values into more appropriate data types.
+        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more
+        /// appropriate data types.
         pub ddl_schema: Option<Vec<String>>,
-        /// Sets the string that indicates a date format. The `rfc3339` is the
-        /// only required format, the other format strings are
-        /// implementation-specific.
+        /// Sets the string that indicates a date format. The `rfc3339` is the only required
+        /// format, the other format strings are implementation-specific.
         ///
         /// Defaults to: "rfc3339"
         pub date_format: Option<String>,
@@ -3493,9 +3379,8 @@ pub mod sources {
         ///
         /// Defaults to: "utf8"
         pub encoding: Option<String>,
-        /// Sets the string that indicates a timestamp format. The `rfc3339` is
-        /// the only required format, the other format strings are
-        /// implementation-specific.
+        /// Sets the string that indicates a timestamp format. The `rfc3339` is the only required
+        /// format, the other format strings are implementation-specific.
         ///
         /// Defaults to: "rfc3339"
         pub timestamp_format: Option<String>,
@@ -3564,8 +3449,8 @@ pub mod sources {
     /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/Parquet
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ReadStepParquet {
-        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce
-        /// values into more appropriate data types.
+        /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values into more
+        /// appropriate data types.
         pub ddl_schema: Option<Vec<String>>,
         /// Schema used to coerce values into more appropriate data types.
         pub schema: Option<data::DataSchema>,
@@ -3648,8 +3533,7 @@ pub mod sources {
         pub read: sources::ReadStep,
         /// Pre-processing query that shapes the data.
         pub preprocess: Option<datasets::Transform>,
-        /// Determines how newly-ingested data should be merged with existing
-        /// history.
+        /// Determines how newly-ingested data should be merged with existing history.
         pub merge: Option<sources::MergeStrategy>,
         /// Defines the mapping of system fields to dataset column names.
         pub vocab: Option<datasets::DatasetVocabulary>,
@@ -3670,8 +3554,7 @@ pub mod sources {
         pub read: sources::ReadStep,
         /// Pre-processing query that shapes the data.
         pub preprocess: Option<datasets::Transform>,
-        /// Determines how newly-ingested data should be merged with existing
-        /// history.
+        /// Determines how newly-ingested data should be merged with existing history.
         pub merge: Option<sources::MergeStrategy>,
         /// Defines the mapping of system fields to dataset column names.
         pub vocab: Option<datasets::DatasetVocabulary>,
@@ -3684,8 +3567,8 @@ pub mod sources {
     pub struct SourceState {
         /// Identifies the source that the state corresponds to.
         pub source_name: String,
-        /// Identifies the type of the state. Standard types include:
-        /// `odf/etag`, `odf/last-modified`.
+        /// Identifies the type of the state. Standard types include: `odf/etag`,
+        /// `odf/last-modified`.
         pub kind: String,
         /// Opaque value representing the state.
         pub value: String,
@@ -3721,8 +3604,7 @@ pub mod storage {
         pub secret_key: Option<config::ValueRef>,
     }
 
-    /// Defines a storage volume where data can be stored and its access
-    /// credentials.
+    /// Defines a storage volume where data can be stored and its access credentials.
     ///
     /// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolume
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -3762,8 +3644,7 @@ pub mod storage {
     }
     impl IntoResourceRef for PersistentVolumeRef {}
 
-    /// Defines a storage volume where data can be stored and its access
-    /// credentials.
+    /// Defines a storage volume where data can be stored and its access credentials.
     ///
     /// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpec
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -3774,8 +3655,7 @@ pub mod storage {
     impl_enum_with_variants!(PersistentVolumeSpec);
     impl_enum_variant!(PersistentVolumeSpec::S3(storage::PersistentVolumeSpecS3));
 
-    /// Defines a storage volume where data can be stored and its access
-    /// credentials.
+    /// Defines a storage volume where data can be stored and its access credentials.
     ///
     /// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecInput
     #[derive(Clone, PartialEq, Eq, Debug)]
@@ -3950,11 +3830,9 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Compaction
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecCompaction {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to compact. Defaults to the flow-level
-        /// target when omitted.
+        /// Reference to the dataset to compact. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetHandle>,
         /// Target maximum size of each compacted data slice e.g. `100MiB`.
         pub max_slice_size: Option<ByteSize>,
@@ -3967,11 +3845,10 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/GarbageCollection
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecGarbageCollection {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to collect garbage from. Defaults to the
-        /// flow-level target when omitted.
+        /// Reference to the dataset to collect garbage from. Defaults to the flow-level target
+        /// when omitted.
         pub target: Option<datasets::DatasetHandle>,
     }
 
@@ -3980,11 +3857,10 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Ingest
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TaskSpecIngest {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to ingest into. Defaults to the flow-level
-        /// target when omitted.
+        /// Reference to the dataset to ingest into. Defaults to the flow-level target when
+        /// omitted.
         pub target: Option<datasets::DatasetHandle>,
         /// Reference to the source resource that defines how to fetch data.
         pub source: resources::ResourceHandle,
@@ -4020,11 +3896,9 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Compaction
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecInputCompaction {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to compact. Defaults to the flow-level
-        /// target when omitted.
+        /// Reference to the dataset to compact. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetRef>,
         /// Target maximum size of each compacted data slice e.g. `100MiB`.
         pub max_slice_size: Option<ByteSize>,
@@ -4037,11 +3911,10 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecInputGarbageCollection {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to collect garbage from. Defaults to the
-        /// flow-level target when omitted.
+        /// Reference to the dataset to collect garbage from. Defaults to the flow-level target
+        /// when omitted.
         pub target: Option<datasets::DatasetRef>,
     }
 
@@ -4050,11 +3923,10 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Ingest
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TaskSpecInputIngest {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to ingest into. Defaults to the flow-level
-        /// target when omitted.
+        /// Reference to the dataset to ingest into. Defaults to the flow-level target when
+        /// omitted.
         pub target: Option<datasets::DatasetRef>,
         /// Reference to the source resource that defines how to fetch data.
         pub source: resources::ResourceRef,
@@ -4067,11 +3939,9 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Transform
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecInputTransform {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the derivative dataset that defines how to transform
-        /// data.
+        /// Reference to the derivative dataset that defines how to transform data.
         pub target: Option<datasets::DatasetRef>,
     }
 
@@ -4080,14 +3950,11 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Verify
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecInputVerify {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to verify. Defaults to the flow-level
-        /// target when omitted.
+        /// Reference to the dataset to verify. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetRef>,
-        /// If true, re-executes transformations on derivative datasets to
-        /// verify reproducibility.
+        /// If true, re-executes transformations on derivative datasets to verify reproducibility.
         pub replay_transform: Option<bool>,
     }
 
@@ -4096,8 +3963,7 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/WebhookCall
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TaskSpecInputWebhookCall {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the `WebhookEndpoint`.
         pub endpoint: resources::ResourceRef,
@@ -4112,11 +3978,9 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Transform
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecTransform {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the derivative dataset that defines how to transform
-        /// data.
+        /// Reference to the derivative dataset that defines how to transform data.
         pub target: Option<datasets::DatasetHandle>,
     }
 
@@ -4125,14 +3989,11 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Verify
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct TaskSpecVerify {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
-        /// Reference to the dataset to verify. Defaults to the flow-level
-        /// target when omitted.
+        /// Reference to the dataset to verify. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetHandle>,
-        /// If true, re-executes transformations on derivative datasets to
-        /// verify reproducibility.
+        /// If true, re-executes transformations on derivative datasets to verify reproducibility.
         pub replay_transform: Option<bool>,
     }
 
@@ -4141,8 +4002,7 @@ pub mod tasks {
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/WebhookCall
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TaskSpecWebhookCall {
-        /// An alias for the task used to refer to it in flows and access the
-        /// results
+        /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the `WebhookEndpoint`.
         pub endpoint: resources::ResourceHandle,

@@ -22,14 +22,12 @@ use super::{fixtures, summary_count};
 /// The enum owns the workspace [`KamuCliPuppet`]. There are two ways to target
 /// a remote context, and both are valid CLI usage:
 ///
-/// 1. **Active-context switch** (this type's default): `context use <name>` is
-///    run once at construction so plain commands target the remote. Used by the
-///    general lifecycle scenarios.
-/// 2. **Per-command `--context <name>`**: every resource command (`apply`,
-///    `get`, `list`, `delete`, `summary`, `context api-resources`) flattens
-///    `ResourceContextArgs` and accepts `--context`. Append it explicitly via
-///    [`ResourceCtx::context_override_arg`]. The dedicated context-override
-///    scenario focuses on this path.
+/// 1. **Active-context switch** (this type's default): `context use <name>` is run once at
+///    construction so plain commands target the remote. Used by the general lifecycle scenarios.
+/// 2. **Per-command `--context <name>`**: every resource command (`apply`, `get`, `list`, `delete`,
+///    `summary`, `context api-resources`) flattens `ResourceContextArgs` and accepts `--context`.
+///    Append it explicitly via [`ResourceCtx::context_override_arg`]. The dedicated
+///    context-override scenario focuses on this path.
 ///
 /// The only command that does *not* accept `--context` is the bare `context`
 /// switcher itself, so the flag must never be appended to it.

@@ -183,10 +183,10 @@ async fn test_find_owned_snapshots_all_found() {
         .await;
 
     assert_eq!(outcome.found.len(), 3);
-    assert!(outcome.not_found.is_empty());
-    assert!(outcome.access_denied.is_empty());
-    assert!(outcome.schema_mismatch.is_empty());
-    assert!(outcome.schema_mismatch.is_empty());
+    assert_eq!(outcome.not_found, []);
+    assert_eq!(outcome.access_denied, []);
+    assert_eq!(outcome.schema_mismatch, []);
+    assert_eq!(outcome.schema_mismatch, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -203,9 +203,9 @@ async fn test_find_owned_snapshots_not_found() {
         .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[uid_1, uid_2])
         .await;
 
-    assert!(outcome.found.is_empty());
+    assert_eq!(outcome.found, []);
     assert_eq!(outcome.not_found.len(), 2);
-    assert!(outcome.access_denied.is_empty());
+    assert_eq!(outcome.access_denied, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -226,7 +226,7 @@ async fn test_find_owned_snapshots_access_denied() {
         .find_owned_snapshots(&account_handle_b.did, TestResource::schema(), &[id])
         .await;
 
-    assert!(outcome.found.is_empty());
+    assert_eq!(outcome.found, []);
     assert_eq!(outcome.access_denied, vec![id]);
 }
 
@@ -246,7 +246,7 @@ async fn test_find_owned_snapshots_schema_mismatch_by_type() {
         .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[id])
         .await;
 
-    assert!(outcome.found.is_empty());
+    assert_eq!(outcome.found, []);
     assert_eq!(outcome.schema_mismatch.len(), 1);
     assert_eq!(outcome.schema_mismatch[0].0, id);
     assert_eq!(outcome.schema_mismatch[0].1, *OTHER_SCHEMA);
@@ -268,7 +268,7 @@ async fn test_find_owned_snapshots_schema_mismatch_by_version() {
         .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[id])
         .await;
 
-    assert!(outcome.found.is_empty());
+    assert_eq!(outcome.found, []);
     assert_eq!(outcome.schema_mismatch.len(), 1);
     assert_eq!(outcome.schema_mismatch[0].0, id);
     assert_eq!(outcome.schema_mismatch[0].1, *LEGACY_SCHEMA);

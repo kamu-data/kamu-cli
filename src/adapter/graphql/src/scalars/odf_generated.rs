@@ -58,25 +58,22 @@ impl From<odf::metadata::auth::AccountHandle> for AccountHandle {
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
     pub prev_checkpoint: Option<Multihash<'static>>,
-    /// Last offset of the previous data slice, if any. Must be equal to the
-    /// last non-empty `newData.offsetInterval.end`.
+    /// Last offset of the previous data slice, if any. Must be equal to the last non-empty
+    /// `newData.offsetInterval.end`.
     pub prev_offset: Option<UInt64>,
     /// Describes output data written during this transaction, if any.
     pub new_data: Option<DataSlice>,
-    /// Describes checkpoint written during this transaction, if any. If an
-    /// engine operation resulted in no updates to the checkpoint, but
-    /// checkpoint is still relevant for subsequent runs - a hash of the
-    /// previous checkpoint should be specified.
+    /// Describes checkpoint written during this transaction, if any. If an engine operation
+    /// resulted in no updates to the checkpoint, but checkpoint is still relevant for subsequent
+    /// runs - a hash of the previous checkpoint should be specified.
     pub new_checkpoint: Option<Checkpoint>,
-    /// Last watermark of the output data stream, if any. Initial blocks may not
-    /// have watermarks, but once watermark is set - all subsequent blocks
-    /// should either carry the same watermark or specify a new (greater) one.
-    /// Thus, watermarks are monotonically non-decreasing.
+    /// Last watermark of the output data stream, if any. Initial blocks may not have watermarks,
+    /// but once watermark is set - all subsequent blocks should either carry the same watermark or
+    /// specify a new (greater) one. Thus, watermarks are monotonically non-decreasing.
     pub new_watermark: Option<DateTime<Utc>>,
-    /// The state of the source the data was added from to allow fast resuming.
-    /// If the state did not change but is still relevant for subsequent runs it
-    /// should be carried, i.e. only the last state per source is considered
-    /// when resuming.
+    /// The state of the source the data was added from to allow fast resuming. If the state did
+    /// not change but is still relevant for subsequent runs it should be carried, i.e. only the
+    /// last state per source is considered when resuming.
     pub new_source_state: Option<SourceState>,
     /// ODF extensions.
     pub extra: Option<ExtraAttributes>,
@@ -98,8 +95,7 @@ impl From<odf::metadata::datasets::AddData> for AddData {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Describes how to ingest data into a root dataset from a certain logical
-/// source.
+/// Describes how to ingest data into a root dataset from a certain logical source.
 ///
 /// Schema: https://opendatafabric.org/schemas/legacy/v0/AddPushSource
 #[derive(SimpleObject, Debug, Clone)]
@@ -110,8 +106,7 @@ pub struct AddPushSource {
     pub read: ReadStep,
     /// Pre-processing query that shapes the data.
     pub preprocess: Option<Transform>,
-    /// Determines how newly-ingested data should be merged with existing
-    /// history.
+    /// Determines how newly-ingested data should be merged with existing history.
     pub merge: MergeStrategy,
 }
 
@@ -403,26 +398,23 @@ impl From<odf::metadata::sources::EventTimeSourceFromSystemTime> for EventTimeSo
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/ExecuteTransform
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ExecuteTransform {
-    /// Defines inputs used in this transaction. Slices corresponding to every
-    /// input dataset must be present.
+    /// Defines inputs used in this transaction. Slices corresponding to every input dataset must
+    /// be present.
     pub query_inputs: Vec<ExecuteTransformInput>,
-    /// Hash of the checkpoint file used to restore transformation state, if
-    /// any.
+    /// Hash of the checkpoint file used to restore transformation state, if any.
     pub prev_checkpoint: Option<Multihash<'static>>,
-    /// Last offset of the previous data slice, if any. Must be equal to the
-    /// last non-empty `newData.offsetInterval.end`.
+    /// Last offset of the previous data slice, if any. Must be equal to the last non-empty
+    /// `newData.offsetInterval.end`.
     pub prev_offset: Option<UInt64>,
     /// Describes output data written during this transaction, if any.
     pub new_data: Option<DataSlice>,
-    /// Describes checkpoint written during this transaction, if any. If an
-    /// engine operation resulted in no updates to the checkpoint, but
-    /// checkpoint is still relevant for subsequent runs - a hash of the
-    /// previous checkpoint should be specified.
+    /// Describes checkpoint written during this transaction, if any. If an engine operation
+    /// resulted in no updates to the checkpoint, but checkpoint is still relevant for subsequent
+    /// runs - a hash of the previous checkpoint should be specified.
     pub new_checkpoint: Option<Checkpoint>,
-    /// Last watermark of the output data stream, if any. Initial blocks may not
-    /// have watermarks, but once watermark is set - all subsequent blocks
-    /// should either carry the same watermark or specify a new (greater) one.
-    /// Thus, watermarks are monotonically non-decreasing.
+    /// Last watermark of the output data stream, if any. Initial blocks may not have watermarks,
+    /// but once watermark is set - all subsequent blocks should either carry the same watermark or
+    /// specify a new (greater) one. Thus, watermarks are monotonically non-decreasing.
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
@@ -448,27 +440,23 @@ impl From<odf::metadata::datasets::ExecuteTransform> for ExecuteTransform {
 pub struct ExecuteTransformInput {
     /// Input dataset identifier.
     pub dataset_id: DatasetID<'static>,
-    /// Last block of the input dataset that was previously incorporated into
-    /// the derivative transformation, if any. Must be equal to the last
-    /// non-empty `newBlockHash`. Together with `newBlockHash` defines a
-    /// half-open `(prevBlockHash, newBlockHash]` interval of blocks that will
-    /// be considered in this transaction.
+    /// Last block of the input dataset that was previously incorporated into the derivative
+    /// transformation, if any. Must be equal to the last non-empty `newBlockHash`. Together with
+    /// `newBlockHash` defines a half-open `(prevBlockHash, newBlockHash]` interval of blocks that
+    /// will be considered in this transaction.
     pub prev_block_hash: Option<Multihash<'static>>,
-    /// Hash of the last block that will be incorporated into the derivative
-    /// transformation. When present, defines a half-open `(prevBlockHash,
-    /// newBlockHash]` interval of blocks that will be considered in this
-    /// transaction.
-    pub new_block_hash: Option<Multihash<'static>>,
-    /// Last data record offset in the input dataset that was previously
-    /// incorporated into the derivative transformation, if any. Must be equal
-    /// to the last non-empty `newOffset`. Together with `newOffset` defines a
-    /// half-open `(prevOffset, newOffset]` interval of data records that will
+    /// Hash of the last block that will be incorporated into the derivative transformation. When
+    /// present, defines a half-open `(prevBlockHash, newBlockHash]` interval of blocks that will
     /// be considered in this transaction.
+    pub new_block_hash: Option<Multihash<'static>>,
+    /// Last data record offset in the input dataset that was previously incorporated into the
+    /// derivative transformation, if any. Must be equal to the last non-empty `newOffset`.
+    /// Together with `newOffset` defines a half-open `(prevOffset, newOffset]` interval of data
+    /// records that will be considered in this transaction.
     pub prev_offset: Option<UInt64>,
-    /// Offset of the last data record that will be incorporated into the
-    /// derivative transformation, if any. When present, defines a half-open
-    /// `(prevOffset, newOffset]` interval of data records that will be
-    /// considered in this transaction.
+    /// Offset of the last data record that will be incorporated into the derivative
+    /// transformation, if any. When present, defines a half-open `(prevOffset, newOffset]`
+    /// interval of data records that will be considered in this transaction.
     pub new_offset: Option<UInt64>,
 }
 
@@ -486,10 +474,9 @@ impl From<odf::metadata::datasets::ExecuteTransformInput> for ExecuteTransformIn
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Container for custom key-value extension attributes. Every key must be in
-/// the form of `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully
-/// disambiguate the value in the face of multiple extensions. Values may be any
-/// valid JSON including nested objects.
+/// Container for custom key-value extension attributes. Every key must be in the form of
+/// `<domain>/<path>` (e.g. `kamu.dev/archetype`) in order to fully disambiguate the value in the
+/// face of multiple extensions. Values may be any valid JSON including nested objects.
 ///
 /// Schema: https://opendatafabric.org/schemas/data/v1alpha1/ExtraAttributes
 
@@ -550,11 +537,10 @@ impl From<odf::metadata::legacy::FetchStep> for FetchStep {
 pub struct FetchStepContainer {
     /// Image name and and an optional tag.
     pub image: String,
-    /// Specifies the entrypoint. Not executed within a shell. The default OCI
-    /// image's ENTRYPOINT is used if this is not provided.
+    /// Specifies the entrypoint. Not executed within a shell. The default OCI image's ENTRYPOINT
+    /// is used if this is not provided.
     pub command: Option<Vec<String>>,
-    /// Arguments to the entrypoint. The OCI image's CMD is used if this is not
-    /// provided.
+    /// Arguments to the entrypoint. The OCI image's CMD is used if this is not provided.
     pub args: Option<Vec<String>>,
     /// Environment variables to propagate into or set in the container.
     pub env: Option<Vec<EnvVar>>,
@@ -578,22 +564,20 @@ impl From<odf::metadata::legacy::FetchStepContainer> for FetchStepContainer {
 /// Schema: https://opendatafabric.org/schemas/legacy/v0/FetchStep#/$defs/EthereumLogs
 #[derive(SimpleObject, Debug, Clone)]
 pub struct FetchStepEthereumLogs {
-    /// Identifier of the chain to scan logs from. This parameter may be used
-    /// for RPC endpoint lookup as well as asserting that provided `nodeUrl`
-    /// corresponds to the expected chain.
+    /// Identifier of the chain to scan logs from. This parameter may be used for RPC endpoint
+    /// lookup as well as asserting that provided `nodeUrl` corresponds to the expected chain.
     pub chain_id: Option<UInt64>,
     /// Url of the node.
     pub node_url: Option<String>,
-    /// An SQL WHERE clause that can be used to pre-filter the logs before
-    /// fetching them from the ETH node.
+    /// An SQL WHERE clause that can be used to pre-filter the logs before fetching them from the
+    /// ETH node.
     ///
     /// Examples:
-    /// - "block_number > 123 and address =
-    ///   X'5fbdb2315678afecb367f032d93f642f64180aa3' and topic1 =
-    ///   X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'"
+    /// - "block_number > 123 and address = X'5fbdb2315678afecb367f032d93f642f64180aa3' and topic1
+    ///   = X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'"
     pub filter: Option<String>,
-    /// Solidity log event signature to use for decoding. Using this field adds
-    /// `event` to the output containing decoded log as JSON.
+    /// Solidity log event signature to use for decoding. Using this field adds `event` to the
+    /// output containing decoded log as JSON.
     pub signature: Option<String>,
 }
 
@@ -699,8 +683,8 @@ impl From<odf::metadata::legacy::FetchStepUrl> for FetchStepUrl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Merge strategy determines how newly ingested data should be combined with
-/// the data that already exists in the dataset.
+/// Merge strategy determines how newly ingested data should be combined with the data that already
+/// exists in the dataset.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy
 #[derive(Union, Debug, Clone)]
@@ -730,8 +714,8 @@ impl From<odf::metadata::sources::MergeStrategy> for MergeStrategy {
 
 /// Append merge strategy.
 ///
-/// Under this strategy new data will be appended to the dataset in its
-/// entirety, without any deduplication.
+/// Under this strategy new data will be appended to the dataset in its entirety, without any
+/// deduplication.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Append
 #[derive(SimpleObject, Debug, Clone)]
@@ -749,16 +733,14 @@ impl From<odf::metadata::sources::MergeStrategyAppend> for MergeStrategyAppend {
 
 /// Changelog stream merge strategy.
 ///
-/// This is the native stream format for ODF that accurately describes the
-/// evolution of all event records including appends, retractions, and
-/// corrections as per RFC-015. No pre-processing except for format validation
-/// is done.
+/// This is the native stream format for ODF that accurately describes the evolution of all event
+/// records including appends, retractions, and corrections as per RFC-015. No pre-processing except
+/// for format validation is done.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/ChangelogStream
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategyChangelogStream {
-    /// Names of the columns that uniquely identify the record throughout its
-    /// lifetime
+    /// Names of the columns that uniquely identify the record throughout its lifetime
     pub primary_key: Vec<String>,
 }
 
@@ -774,17 +756,15 @@ impl From<odf::metadata::sources::MergeStrategyChangelogStream> for MergeStrateg
 
 /// Ledger merge strategy.
 ///
-/// This strategy should be used for data sources containing ledgers of events.
-/// Currently this strategy will only perform deduplication of events using
-/// user-specified primary key columns. This means that the source data can
-/// contain partially overlapping set of records and only those records that
-/// were not previously seen will be appended.
+/// This strategy should be used for data sources containing ledgers of events. Currently this
+/// strategy will only perform deduplication of events using user-specified primary key columns.
+/// This means that the source data can contain partially overlapping set of records and only those
+/// records that were not previously seen will be appended.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Ledger
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategyLedger {
-    /// Names of the columns that uniquely identify the record throughout its
-    /// lifetime
+    /// Names of the columns that uniquely identify the record throughout its lifetime
     pub primary_key: Vec<String>,
 }
 
@@ -800,39 +780,34 @@ impl From<odf::metadata::sources::MergeStrategyLedger> for MergeStrategyLedger {
 
 /// Snapshot merge strategy.
 ///
-/// This strategy can be used for data state snapshots that are taken
-/// periodically and contain only the latest state of the observed entity or
-/// system. Over time such snapshots can have new rows added, and old rows
-/// either removed or modified.
+/// This strategy can be used for data state snapshots that are taken periodically and contain only
+/// the latest state of the observed entity or system. Over time such snapshots can have new rows
+/// added, and old rows either removed or modified.
 ///
-/// This strategy transforms snapshot data into an append-only event stream
-/// where data already added is immutable. It does so by performing Change Data
-/// Capture - essentially diffing the current state of data against the
-/// reconstructed previous state and recording differences as retractions or
-/// corrections. The Operation Type "op" column will contain:
+/// This strategy transforms snapshot data into an append-only event stream where data already added
+/// is immutable. It does so by performing Change Data Capture - essentially diffing the current
+/// state of data against the reconstructed previous state and recording differences as retractions
+/// or corrections. The Operation Type "op" column will contain:
 ///   - append (`+A`) when a row appears for the first time
 ///   - retraction (`-D`) when row disappears
-///   - correction (`-C`, `+C`) when row data has changed, with `-C` event
-///     carrying the old value of the row and `+C` carrying the new value.
+///   - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old value of
+///     the row and `+C` carrying the new value.
 ///
-/// To correctly associate rows between old and new snapshots this strategy
-/// relies on user-specified primary key columns.
+/// To correctly associate rows between old and new snapshots this strategy relies on user-specified
+/// primary key columns.
 ///
-/// To identify whether a row has changed this strategy will compare all other
-/// columns one by one. If the data contains a column that is guaranteed to
-/// change whenever any of the data columns changes (for example a last
-/// modification timestamp, an incremental version, or a data hash), then it can
-/// be specified in `compareColumns` property to speed up the detection of
-/// modified rows.
+/// To identify whether a row has changed this strategy will compare all other columns one by one.
+/// If the data contains a column that is guaranteed to change whenever any of the data columns
+/// changes (for example a last modification timestamp, an incremental version, or a data hash),
+/// then it can be specified in `compareColumns` property to speed up the detection of modified
+/// rows.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/Snapshot
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategySnapshot {
-    /// Names of the columns that uniquely identify the record throughout its
-    /// lifetime.
+    /// Names of the columns that uniquely identify the record throughout its lifetime.
     pub primary_key: Vec<String>,
-    /// Names of the columns to compared to determine if a row has changed
-    /// between two snapshots.
+    /// Names of the columns to compared to determine if a row has changed between two snapshots.
     pub compare_columns: Option<Vec<String>>,
 }
 
@@ -851,17 +826,15 @@ impl From<odf::metadata::sources::MergeStrategySnapshot> for MergeStrategySnapsh
 
 /// Upsert stream merge strategy.
 ///
-/// This strategy should be used for data sources containing ledgers of
-/// insert-or-update and delete events. Unlike ChangelogStream the
-/// insert-or-update events only carry the new values, so this strategy will use
-/// primary key to re-classify the events into an append or a correction from/to
+/// This strategy should be used for data sources containing ledgers of insert-or-update and delete
+/// events. Unlike ChangelogStream the insert-or-update events only carry the new values, so this
+/// strategy will use primary key to re-classify the events into an append or a correction from/to
 /// pair, looking up the previous values.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/MergeStrategy#/$defs/UpsertStream
 #[derive(SimpleObject, Debug, Clone)]
 pub struct MergeStrategyUpsertStream {
-    /// Names of the columns that uniquely identify the record throughout its
-    /// lifetime
+    /// Names of the columns that uniquely identify the record throughout its lifetime
     pub primary_key: Vec<String>,
 }
 
@@ -875,8 +848,8 @@ impl From<odf::metadata::sources::MergeStrategyUpsertStream> for MergeStrategyUp
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An individual block in the metadata chain that captures the history of
-/// modifications of a dataset.
+/// An individual block in the metadata chain that captures the history of modifications of a
+/// dataset.
 ///
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataBlock
 #[derive(SimpleObject, Debug, Clone)]
@@ -1046,8 +1019,7 @@ impl From<odf::metadata::sources::PrepStep> for PrepStep {
 pub struct PrepStepDecompress {
     /// Name of a compression algorithm used on data.
     pub format: CompressionFormat,
-    /// Path to a data file within a multi-file archive. Can contain glob
-    /// patterns.
+    /// Path to a data file within a multi-file archive. Can contain glob patterns.
     pub sub_path: Option<String>,
 }
 
@@ -1283,10 +1255,9 @@ impl ReadStepEsriShapefile {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Reader for GeoJSON files. It expects one `FeatureCollection` object in the
-/// root and will create a record per each `Feature` inside it extracting the
-/// properties into individual columns and leaving the feature geometry in its
-/// own column.
+/// Reader for GeoJSON files. It expects one `FeatureCollection` object in the root and will create
+/// a record per each `Feature` inside it extracting the properties into individual columns and
+/// leaving the feature geometry in its own column.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/GeoJson
 #[derive(SimpleObject, Debug, Clone)]
@@ -1407,9 +1378,9 @@ impl ReadStepJson {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson`
-/// format but instead of `FeatureCollection` object in the root it expects
-/// every individual feature object to appear on its own line.
+/// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson` format but instead of
+/// `FeatureCollection` object in the root it expects every individual feature object to appear on
+/// its own line.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdGeoJson
 #[derive(SimpleObject, Debug, Clone)]
@@ -1454,8 +1425,7 @@ impl ReadStepNdGeoJson {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Reader for files containing multiple newline-delimited JSON objects with the
-/// same schema.
+/// Reader for files containing multiple newline-delimited JSON objects with the same schema.
 ///
 /// Schema: https://opendatafabric.org/schemas/sources/v1alpha1/ReadStep#/$defs/NdJson
 #[derive(SimpleObject, Debug, Clone)]
@@ -1592,9 +1562,8 @@ impl From<odf::metadata::sources::RequestHeader> for RequestHeader {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Top-level container for canonical representation of a resource that
-/// specifies the type and version of the resource, carries identity, ownership,
-/// and status information.
+/// Top-level container for canonical representation of a resource that specifies the type and
+/// version of the resource, carries identity, ownership, and status information.
 ///
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/Resource
 #[derive(SimpleObject, Debug, Clone)]
@@ -1622,9 +1591,9 @@ impl From<odf::metadata::resources::Resource<serde_json::Value>> for Resource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Annotations is an unstructured key value map stored with a resource that may
-/// be set by external tools to store and retrieve arbitrary metadata. Unlike
-/// labels, annotations are not indexed and cannot be queried by.
+/// Annotations is an unstructured key value map stored with a resource that may be set by external
+/// tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and
+/// cannot be queried by.
 ///
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceAnnotations
 
@@ -1718,32 +1687,30 @@ impl From<odf::metadata::resources::ResourceHandle> for ResourceHandle {
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeaders
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHeaders {
-    /// Unique identifier of a resource within entire ODF node. Automatically
-    /// assigned upon resource creation.
+    /// Unique identifier of a resource within entire ODF node. Automatically assigned upon
+    /// resource creation.
     pub id: ResourceID<'static>,
-    /// Symbolic name of a resource that identifies it within a scope of an
-    /// onwing account.
+    /// Symbolic name of a resource that identifies it within a scope of an onwing account.
     pub name: ResourceName<'static>,
     /// Link to the account that owns the resource.
     pub account: AccountHandle,
-    /// Map of string keys and values that can be used to organize, categorize,
-    /// and query resources.
+    /// Map of string keys and values that can be used to organize, categorize, and query
+    /// resources.
     pub labels: ResourceLabels,
-    /// Annotations is a key value map stored with a resource that may be set by
-    /// external tools to store and retrieve arbitrary metadata. Unlike labels,
-    /// annotations are not indexed and cannot be queried by.
+    /// Annotations is a key value map stored with a resource that may be set by external tools to
+    /// store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and
+    /// cannot be queried by.
     pub annotations: ResourceAnnotations,
-    /// References to resources that created this resource. Used for lineage
-    /// tracking and cascading cleanup.
+    /// References to resources that created this resource. Used for lineage tracking and cascading
+    /// cleanup.
     pub owner_references: Option<Vec<ResourceHandle>>,
-    /// A sequential number that changes every time the resource header and spec
-    /// are updated. Does not increment on status changes, thus signifying
-    /// changes to the desired state. Populated by the system. Starts with `1`.
+    /// A sequential number that changes every time the resource header and spec are updated. Does
+    /// not increment on status changes, thus signifying changes to the desired state. Populated by
+    /// the system. Starts with `1`.
     pub generation: UInt64,
     /// Time when the resource was first applied and assigned an identity.
     pub created_at: DateTime<Utc>,
-    /// Time when the resource was last updated, including header, spec, and
-    /// status updates.
+    /// Time when the resource was last updated, including header, spec, and status updates.
     pub updated_at: DateTime<Utc>,
     /// Time when the resource was deleted.
     pub deleted_at: Option<DateTime<Utc>>,
@@ -1770,8 +1737,7 @@ impl From<odf::metadata::resources::ResourceHeaders> for ResourceHeaders {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Map of string keys and values that can be used to organize, categorize, and
-/// query resources.
+/// Map of string keys and values that can be used to organize, categorize, and query resources.
 ///
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceLabels
 
@@ -1820,22 +1786,18 @@ pub enum ResourcePhase {
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceStatus
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceStatus {
-    /// Represents the reconciliation phase of a resource as seen by the main
-    /// resource controller.
+    /// Represents the reconciliation phase of a resource as seen by the main resource controller.
     pub phase: ResourcePhase,
     /// Resource generation that was last seen by the main resource controller.
     pub observed_generation: Option<UInt64>,
-    /// Time when the controller seen the resource state as defined in
-    /// `observedGeneration`.
+    /// Time when the controller seen the resource state as defined in `observedGeneration`.
     pub observed_at: Option<DateTime<Utc>>,
-    /// Resource generation that was last successfully reconciled by the main
-    /// resource controller.
+    /// Resource generation that was last successfully reconciled by the main resource controller.
     pub reconciled_generation: Option<UInt64>,
-    /// Time when the controller last reconciled the desired resource state as
-    /// defined in `reconciledGeneration`.
+    /// Time when the controller last reconciled the desired resource state as defined in
+    /// `reconciledGeneration`.
     pub reconciled_at: Option<DateTime<Utc>>,
-    /// Detailed conditions describing the state of the resource that are added
-    /// by controllers.
+    /// Detailed conditions describing the state of the resource that are added by controllers.
     pub conditions: ResourceConditions,
 }
 
@@ -1854,8 +1816,7 @@ impl From<odf::metadata::resources::ResourceStatus> for ResourceStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Establishes the identity of the dataset. Always the first metadata event in
-/// the chain.
+/// Establishes the identity of the dataset. Always the first metadata event in the chain.
 ///
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Seed
 #[derive(SimpleObject, Debug, Clone)]
@@ -1896,8 +1857,7 @@ impl From<odf::metadata::datasets::SetAttachments> for SetAttachments {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Specifies the complete schema of Data Slices added to the Dataset following
-/// this event.
+/// Specifies the complete schema of Data Slices added to the Dataset following this event.
 ///
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SetDataSchema
 #[derive(Debug, Clone)]
@@ -1976,8 +1936,7 @@ impl From<odf::metadata::datasets::SetLicense> for SetLicense {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Contains information on how externally-hosted data can be ingested into the
-/// root dataset.
+/// Contains information on how externally-hosted data can be ingested into the root dataset.
 ///
 /// Schema: https://opendatafabric.org/schemas/legacy/v0/SetPollingSource
 #[derive(SimpleObject, Debug, Clone)]
@@ -1990,8 +1949,7 @@ pub struct SetPollingSource {
     pub read: ReadStep,
     /// Pre-processing query that shapes the data.
     pub preprocess: Option<Transform>,
-    /// Determines how newly-ingested data should be merged with existing
-    /// history.
+    /// Determines how newly-ingested data should be merged with existing history.
     pub merge: MergeStrategy,
 }
 
@@ -2112,8 +2070,7 @@ pub enum SourceOrdering {
 pub struct SourceState {
     /// Identifies the source that the state corresponds to.
     pub source_name: String,
-    /// Identifies the type of the state. Standard types include: `odf/etag`,
-    /// `odf/last-modified`.
+    /// Identifies the type of the state. Standard types include: `odf/etag`, `odf/last-modified`.
     pub kind: String,
     /// Opaque value representing the state.
     pub value: String,
@@ -2136,9 +2093,8 @@ impl From<odf::metadata::sources::SourceState> for SourceState {
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/SqlQueryStep
 #[derive(SimpleObject, Debug, Clone)]
 pub struct SqlQueryStep {
-    /// Name of the temporary view that will be created from result of the
-    /// query. Step without this alias will be treated as an output of the
-    /// transformation.
+    /// Name of the temporary view that will be created from result of the query. Step without this
+    /// alias will be treated as an output of the transformation.
     pub alias: Option<String>,
     /// SQL query the result of which will be exposed under the alias.
     pub query: String,
@@ -2155,8 +2111,7 @@ impl From<odf::metadata::datasets::SqlQueryStep> for SqlQueryStep {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Temporary Flink-specific extension for creating temporal tables from
-/// streams.
+/// Temporary Flink-specific extension for creating temporal tables from streams.
 ///
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/TemporalTable
 #[derive(SimpleObject, Debug, Clone)]

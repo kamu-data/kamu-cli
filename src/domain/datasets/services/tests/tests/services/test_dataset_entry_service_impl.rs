@@ -221,7 +221,7 @@ async fn test_try_to_resolve_all_datasets_for_non_existing_user(tenancy_config: 
 
     let list_dataset: Vec<_> = resolve_dataset_result.try_collect().await.unwrap();
 
-    assert!(list_dataset.is_empty());
+    assert_eq!(list_dataset, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

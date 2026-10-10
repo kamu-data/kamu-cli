@@ -179,6 +179,22 @@ impl<'de> Deserialize<'de> for ResourceSchemaId {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("Invalid resource schema '{schema}'")]
+pub struct ParseResourceSchemaError {
+    pub schema: String,
+}
+
+impl ParseResourceSchemaError {
+    pub fn new(schema: &str) -> Self {
+        Self {
+            schema: schema.to_owned(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,22 +255,6 @@ mod tests {
                 ResourceSchemaId::parse(invalid_schema).is_err(),
                 "schema should be rejected: {invalid_schema}"
             );
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-#[error("Invalid resource schema '{schema}'")]
-pub struct ParseResourceSchemaError {
-    pub schema: String,
-}
-
-impl ParseResourceSchemaError {
-    pub fn new(schema: &str) -> Self {
-        Self {
-            schema: schema.to_owned(),
         }
     }
 }

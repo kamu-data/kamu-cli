@@ -54,11 +54,7 @@ impl SignEip712UseCaseImpl {
         target_account_name: &str,
     ) -> bool {
         // 1. We always have access only for our own account
-        if subject_account_name == target_account_name {
-            return true;
-        }
-
-        false
+        subject_account_name == target_account_name
     }
 
     async fn get_secret_key_for_dataset(

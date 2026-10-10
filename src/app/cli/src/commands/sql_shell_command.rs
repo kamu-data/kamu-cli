@@ -231,7 +231,7 @@ impl Command for SqlShellCommand {
                     .join(", ");
                 return Err(CLIError::usage_error(format!(
                     "Invalid output format for export '{}'. Supported formats: {}",
-                    &self.output_config.format, supported_str
+                    self.output_config.format, supported_str
                 )));
             }
         } else if self.records_per_file.is_some() {

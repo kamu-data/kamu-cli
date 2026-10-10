@@ -47,7 +47,7 @@ impl SessionAuth for SessionAuthAnonymous {
         // TODO: SEC: Anonymous tokens should be validated on subsequent requests,
         // otherwise malicious clients can just generate them. This will require
         // storing tokens in a cache (e.g. alongside rate limiting data).
-        let session_token = SessionToken(format!("anon_{}", &base32_token));
+        let session_token = SessionToken(format!("anon_{base32_token}"));
         Ok(session_token)
     }
 }

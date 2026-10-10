@@ -36,13 +36,11 @@ pub fn kamu_cli_execute_command_e2e_test(input: TokenStream) -> TokenStream {
 /// takes a `ResourceCtx`. From one invocation per storage it emits two
 /// separately-runnable tests:
 ///
-/// - `<fixture>_local` — runs the scenario against the implicit `local` context
-///   (via the `execute_command` harness; the scenario gets
-///   `ResourceCtx::Local`).
-/// - `<fixture>_remote` — boots an API server and runs the scenario against a
-///   remote context (via `run_api_server`; the scenario gets a `ResourceCtx`
-///   built by `ResourceCtx::remote_from_server`). Remote is always
-///   multi-tenant.
+/// - `<fixture>_local` — runs the scenario against the implicit `local` context (via the
+///   `execute_command` harness; the scenario gets `ResourceCtx::Local`).
+/// - `<fixture>_remote` — boots an API server and runs the scenario against a remote context (via
+///   `run_api_server`; the scenario gets a `ResourceCtx` built by
+///   `ResourceCtx::remote_from_server`). Remote is always multi-tenant.
 ///
 /// This removes the hand-written `_local`/`_remote` wrapper fns and collapses
 /// the two per-DB macro invocations into one. Author scenarios as a single

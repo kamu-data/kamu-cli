@@ -31,7 +31,7 @@ impl PushRequestPlannerImpl {
         &self,
         local_handle: odf::DatasetHandle,
         push_target: Option<&odf::DatasetPushTarget>,
-    ) -> Result<PushItem, PushResponse> {
+    ) -> Result<PushItem, Box<PushResponse>> {
         tracing::debug!(%local_handle, "Resolved push plan local target");
 
         match self
@@ -44,11 +44,11 @@ impl PushRequestPlannerImpl {
                 remote_target,
                 push_target: push_target.cloned(),
             }),
-            Err(e) => Err(PushResponse {
+            Err(e) => Err(Box::new(PushResponse {
                 local_handle: Some(local_handle),
                 target: push_target.cloned(),
                 result: Err(e.into()),
-            }),
+            })),
         }
     }
 }
@@ -67,7 +67,7 @@ impl PushRequestPlanner for PushRequestPlannerImpl {
         for hdl in dataset_handles {
             match self.collect_push_plan_item(hdl.clone(), push_target).await {
                 Ok(item) => plan.push(item),
-                Err(err) => errors.push(err),
+                Err(err) => errors.push(*err),
             }
         }
 

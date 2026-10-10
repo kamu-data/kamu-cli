@@ -135,7 +135,7 @@ async fn test_existing_token_skips_repository_in_user_scope() {
         .await
         .unwrap();
 
-    assert!(harness.repo_reg.added_repos().is_empty());
+    assert_eq!(harness.repo_reg.added_repos(), []);
 }
 
 #[test_log::test(tokio::test)]
@@ -147,7 +147,7 @@ async fn test_existing_token_skips_repository_when_add_repo_is_off() {
         .await
         .unwrap();
 
-    assert!(harness.repo_reg.added_repos().is_empty());
+    assert_eq!(harness.repo_reg.added_repos(), []);
 }
 
 /// The interactive/existing-token derivation names the repository after the

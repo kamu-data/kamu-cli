@@ -36,11 +36,11 @@ impl ResourceManifest {
     /// `created_at`/`updated_at`/`deleted_at`, and the whole `status`. Two
     /// consequences worth knowing:
     ///
-    /// - This is the single canonicalization shared by `render_manifests` and
-    ///   the apply diff, so `kamu apply` and `kamu get -o yaml` provably agree.
-    /// - Because timestamps and `generation` are absent, re-applying an
-    ///   unchanged manifest yields a byte-identical document. There is no need
-    ///   to normalize timestamp precision to suppress spurious differences.
+    /// - This is the single canonicalization shared by `render_manifests` and the apply diff, so
+    ///   `kamu apply` and `kamu get -o yaml` provably agree.
+    /// - Because timestamps and `generation` are absent, re-applying an unchanged manifest yields a
+    ///   byte-identical document. There is no need to normalize timestamp precision to suppress
+    ///   spurious differences.
     ///
     /// The `spec` is copied **as stored** (ciphertext for `SecretSet`); this
     /// never reveals sensitive fields.
@@ -324,7 +324,7 @@ mod tests {
 
         let err = serde_json::from_str::<ResourceManifestHeaders>(json).unwrap_err();
         // The error surfaces from `TypeRef`'s own `FromStr`/`Deserialize`.
-        assert!(!err.to_string().is_empty());
+        assert_ne!(err.to_string(), "");
     }
 }
 

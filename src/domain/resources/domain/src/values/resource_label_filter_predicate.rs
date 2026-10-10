@@ -91,7 +91,7 @@ mod tests {
             ResourceLabelFilterPredicate::flatten_conjunction(&ResolvedResourceLabelFilter::True)
                 .unwrap();
 
-        assert!(pairs.is_empty());
+        assert_eq!(pairs, []);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

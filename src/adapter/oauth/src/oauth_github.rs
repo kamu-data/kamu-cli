@@ -155,10 +155,10 @@ impl AuthenticationProvider for OAuthGithub {
                 .map_err(ProviderLoginError::invalid_credentials)?;
 
         // 2 types of login:
-        //  - we have GitHub code, which we use to resolve the access token, and then
-        //    use the token to get user info (UI flow)
-        //  - we have GitHub access token already, which we use to get the user info
-        //    quicker (silent login flow)
+        //  - we have GitHub code, which we use to resolve the access token, and then use the token
+        //    to get user info (UI flow)
+        //  - we have GitHub access token already, which we use to get the user info quicker (silent
+        //    login flow)
         let github_account_info = if let Some(code) = github_login_credentials.code {
             self.github_login_via_code(code).await?
         } else if let Some(access_token) = github_login_credentials.access_token {

@@ -465,12 +465,9 @@ async fn create_plan(
 ///
 /// # Parameters
 ///
-/// * `ctx`: A reference to the `SessionContext` for registering the object
-///   store.
-/// * `location`: A string reference representing the location of the object
-///   store.
-/// * `options`: A reference to a hash map containing configuration options for
-///   the object store.
+/// * `ctx`: A reference to the `SessionContext` for registering the object store.
+/// * `location`: A string reference representing the location of the object store.
+/// * `options`: A reference to a hash map containing configuration options for the object store.
 ///
 /// # Returns
 ///

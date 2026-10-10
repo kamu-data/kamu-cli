@@ -646,13 +646,13 @@ impl sources::MergeStrategy {
 
 impl Display for engines::RawQueryResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.message)
+        write!(f, "{}", self.message)
     }
 }
 
 impl Display for engines::RawQueryResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.message)?;
+        write!(f, "{}", self.message)?;
         if let Some(bt) = &self.backtrace {
             write!(f, "\n\n--- Engine Backtrace ---\n{bt}")?;
         }
@@ -666,13 +666,13 @@ impl Display for engines::RawQueryResponseInternalError {
 
 impl Display for engines::TransformResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.message)
+        write!(f, "{}", self.message)
     }
 }
 
 impl Display for engines::TransformResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.message)?;
+        write!(f, "{}", self.message)?;
         if let Some(bt) = &self.backtrace {
             write!(f, "\n\n--- Engine Backtrace ---\n{bt}")?;
         }

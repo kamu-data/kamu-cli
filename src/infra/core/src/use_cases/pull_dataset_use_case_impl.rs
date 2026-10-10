@@ -472,8 +472,7 @@ impl PullDatasetUseCaseImpl {
     ) -> Result<HashMap<String, kamu_datasets::DatasetEnvVar>, InternalError> {
         let feature_enabled = catalog
             .get_one::<SecretsEncryptionConfig>()
-            .ok()
-            .is_some_and(|config| config.is_enabled());
+            .is_ok_and(|config| config.is_enabled());
 
         if !feature_enabled {
             return Ok(HashMap::new());

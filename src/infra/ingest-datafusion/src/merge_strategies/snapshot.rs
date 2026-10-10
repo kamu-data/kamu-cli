@@ -31,9 +31,9 @@ impl MergeStrategySnapshot {
         vocab: odf::metadata::DatasetVocabulary,
         cfg: odf::metadata::MergeStrategySnapshot,
     ) -> Self {
-        assert!(!cfg.primary_key.is_empty());
+        assert_ne!(cfg.primary_key.len(), 0);
         if let Some(c) = &cfg.compare_columns {
-            assert!(!c.is_empty());
+            assert_ne!(c.len(), 0);
         }
         Self {
             vocab,

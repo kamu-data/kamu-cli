@@ -410,8 +410,8 @@ impl DataWriterDataFusion {
 
     // TODO: Replace this method with ODF schema comparator
     // Rules:
-    // - New columns are allowed to be non-null if original types are nullable -
-    //   they will be coerced on read
+    // - New columns are allowed to be non-null if original types are nullable - they will be
+    //   coerced on read
     // - Treat "large" variants equivalent to regular variants
     // - Treat view types equivalent to regular types
     pub fn validate_schema_compatible(

@@ -896,11 +896,11 @@ pub fn register_config_in_catalog(
 
     match &config.secrets_encryption.encryption_key {
         None => {
-            if config.secrets_encryption.enabled {
-                panic!("Secrets encryption key is required");
-            } else {
-                warn!("Secrets encryption configuration is missing. Feature will be disabled");
-            }
+            assert!(
+                !config.secrets_encryption.enabled,
+                "Secrets encryption key is required"
+            );
+            warn!("Secrets encryption configuration is missing. Feature will be disabled");
             catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
@@ -975,11 +975,11 @@ pub fn register_config_in_catalog(
 
     match &config.webhooks.secret_encryption_key {
         None => {
-            if config.webhooks.secret_encryption_enabled {
-                panic!("Webhook secrets encryption key is required")
-            } else {
-                warn!("Webhook encryption configuration is missing. Secrets will not be encrypted");
-            }
+            assert!(
+                !config.webhooks.secret_encryption_enabled,
+                "Webhook secrets encryption key is required"
+            );
+            warn!("Webhook encryption configuration is missing. Secrets will not be encrypted");
         }
         Some(encryption_key) => {
             if config.webhooks.secret_encryption_enabled {
@@ -1034,11 +1034,10 @@ pub fn register_config_in_catalog(
     }
 
     // Note: this is specific to CLI:
-    // - we are not registering SearchIndexer startup job here to avoid heavyweight
-    //   load in CLI commands
-    // - lazy init wrapper encapsulates the indexing launch on first search API use
-    //   (could be quite a long startup time, indexing itself + container start, if
-    //   containers are used)
+    // - we are not registering SearchIndexer startup job here to avoid heavyweight load in CLI
+    //   commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use (could be quite
+    //   a long startup time, indexing itself + container start, if containers are used)
     // - lazy init wrapper is unnecessary in server mode
 
     match &config.search.repo {

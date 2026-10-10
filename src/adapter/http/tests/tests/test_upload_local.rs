@@ -156,7 +156,7 @@ async fn test_attempt_upload_file_authorized() {
             .unwrap();
         pretty_assertions::assert_eq!(http::method::Method::POST.as_str(), upload_context.method);
         assert!(upload_context.use_multipart);
-        assert!(upload_context.fields.is_empty());
+        assert_eq!(upload_context.fields, []);
 
         let upload_main_url = upload_context.upload_url;
 
@@ -215,7 +215,7 @@ async fn test_attempt_upload_file_by_different_user() {
             .unwrap();
         pretty_assertions::assert_eq!(http::method::Method::POST.as_str(), upload_context.method);
         assert!(upload_context.use_multipart);
-        assert!(upload_context.fields.is_empty());
+        assert_eq!(upload_context.fields, []);
 
         let upload_main_url = upload_context.upload_url;
 

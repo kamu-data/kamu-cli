@@ -124,8 +124,7 @@ impl InMemoryFlowProcessState {
     fn apply_ordering(&self, states: &mut [&FlowProcessState], order: FlowProcessOrder) {
         // Apply ordering with multi-level sort criteria:
         // 1. Primary field (user-defined)
-        // 2. Last attempt time (newest first as tie-breaker, unless it's the primary
-        //    field)
+        // 2. Last attempt time (newest first as tie-breaker, unless it's the primary field)
         // 3. Flow type (for additional stability, unless it's the primary field)
         // 4. Sort key (final tie-breaker for stable pagination)
         states.sort_by(|a, b| {

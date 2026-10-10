@@ -239,13 +239,13 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 // Unsupported type rejection behaviour, which is uniform across the API except
 // for `apply_manifest`:
 //
-// - get / get_handles by name: UnsupportedSelector (type resolved against the
-//   descriptor list before any lookup)
+// - get / get_handles by name: UnsupportedSelector (type resolved against the descriptor list
+//   before any lookup)
 // - search / search_handles: UnsupportedSelector (validated before DB query)
-// - delete by id: UnsupportedSelector (type validated when the CRUD dispatcher
-//   is resolved, after the id is known)
-// - apply_manifest: UnsupportedDescriptor — the odd one out, since the type
-//   arrives inside the manifest rather than as a selector
+// - delete by id: UnsupportedSelector (type validated when the CRUD dispatcher is resolved, after
+//   the id is known)
+// - apply_manifest: UnsupportedDescriptor — the odd one out, since the type arrives inside the
+//   manifest rather than as a selector
 //
 // The name paths resolve the type up front rather than via a DB name lookup:
 // otherwise an unknown type would match nothing and report the miss as

@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn yields_no_tokens_for_blank_input() {
-        assert!(scan("   ").is_empty());
+        assert_eq!(scan("   "), []);
     }
 
     #[test]

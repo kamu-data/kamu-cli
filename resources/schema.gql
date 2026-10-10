@@ -2212,9 +2212,8 @@ type FetchStepEthereumLogs {
 	fetching them from the ETH node.
 	
 	Examples:
-	- "block_number > 123 and address =
-	X'5fbdb2315678afecb367f032d93f642f64180aa3' and topic1 =
-	X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'"
+	- "block_number > 123 and address = X'5fbdb2315678afecb367f032d93f642f64180aa3' and topic1
+	= X'000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'"
 	"""
 	filter: String
 	"""
@@ -3157,8 +3156,8 @@ reconstructed previous state and recording differences as retractions or
 corrections. The Operation Type "op" column will contain:
 - append (`+A`) when a row appears for the first time
 - retraction (`-D`) when row disappears
-- correction (`-C`, `+C`) when row data has changed, with `-C` event
-carrying the old value of the row and `+C` carrying the new value.
+- correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old value of
+the row and `+C` carrying the new value.
 
 To correctly associate rows between old and new snapshots this strategy
 relies on user-specified primary key columns.

@@ -925,7 +925,7 @@ async fn test_rename_own_account() {
         ))
         .await;
     assert!(res.is_err(), "{res:?}");
-    assert!(res.errors.len() == 1);
+    assert_eq!(res.errors.len(), 1);
     assert_eq!(
         res.errors[0].message,
         "Rejected credentials: invalid login or password".to_string()

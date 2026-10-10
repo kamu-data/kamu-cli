@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 // Re-export
-pub use enum_variants::*;
 
 // Combine this module's types with generated DTOs
 pub use crate::dtos::datasets::*;

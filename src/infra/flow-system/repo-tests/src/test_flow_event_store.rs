@@ -2595,7 +2595,7 @@ pub async fn test_flow_through_retry_attempts(catalog: &Catalog) {
         .try_get_all_scope_pending_flows(&FlowScopeDataset::make_scope(&dataset_id))
         .await
         .unwrap();
-    assert!(pending_flows.is_empty());
+    assert_eq!(pending_flows, []);
 
     // Nor due for activation
     assert_eq!(

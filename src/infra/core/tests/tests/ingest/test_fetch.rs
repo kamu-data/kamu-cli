@@ -1399,8 +1399,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
         }
     };
 
-    // 4) Try to ingest the next 40 rows from the exhausted source, but have no new
-    //    data
+    // 4) Try to ingest the next 40 rows from the exhausted source, but have no new data
     {
         let fetch_step_4 = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
             image: docker_images::BUSYBOX.to_owned(),

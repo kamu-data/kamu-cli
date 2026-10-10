@@ -505,11 +505,11 @@ pub async fn test_search_handles_for_account(h: &impl FacadeContractHarness) {
 
     for i in &handles {
         assert_eq!(i.r#type.as_str(), VARIABLE_SET_SCHEMA_STR);
-        assert!(
-            !kamu_resources::resource_type_name(&i.r#type)
+        assert_ne!(
+            kamu_resources::resource_type_name(&i.r#type)
                 .unwrap()
-                .as_str()
-                .is_empty()
+                .as_str(),
+            ""
         );
     }
 }
@@ -670,8 +670,8 @@ pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarn
         .unwrap()
         .items;
 
-    assert!(summaries.is_empty());
-    assert!(handles.is_empty());
+    assert_eq!(summaries, []);
+    assert_eq!(handles, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

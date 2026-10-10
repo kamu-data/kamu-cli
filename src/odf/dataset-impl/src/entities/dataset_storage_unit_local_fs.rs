@@ -131,10 +131,9 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
         }?;
 
         // If so, there are 2 possibilities:
-        // - Dataset was partially created before (no head yet) and was not GC'd - so we
-        //   assume ownership
-        // - Dataset existed before (has valid head) - we should error out with ref
-        //   collision
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we assume
+        //   ownership
+        // - Dataset existed before (has valid head) - we should error out with ref collision
         if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()

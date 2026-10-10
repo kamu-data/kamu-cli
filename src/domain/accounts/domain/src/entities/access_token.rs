@@ -63,7 +63,7 @@ impl KamuAccessToken {
                 .try_into()
                 .unwrap(),
             checksum: token_checksum,
-            composed_token: format!("{ACCESS_TOKEN_PREFIX}_{}", &base32_token),
+            composed_token: format!("{ACCESS_TOKEN_PREFIX}_{base32_token}"),
             base32_token,
         }
     }

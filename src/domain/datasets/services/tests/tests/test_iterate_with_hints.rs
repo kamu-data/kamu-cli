@@ -730,7 +730,7 @@ async fn test_page_boundary_stress_with_many_data_blocks() {
             assert_eq!(*seq_num, 153 - u64::try_from(i).unwrap()); // Should be 153, 152, 151, ..., 4
         } else if *event_type == odf::metadata::MetadataEventTypeFlags::SET_INFO {
             // SET_INFO blocks should be at sequence 3 and 1
-            assert!(*seq_num == 1);
+            assert_eq!(*seq_num, 1);
         } else {
             panic!("Unexpected event type encountered");
         }

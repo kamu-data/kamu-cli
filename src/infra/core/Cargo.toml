@@ -47,6 +47,7 @@ query-extensions-nested-functions = [
 ]
 testing = [
     # Deps: kamu
+    "dep:kamu-auth-rebac-services",
     "dep:kamu-datasets-services",
     # Deps: 3-rd party
     "dep:bon",
@@ -68,14 +69,10 @@ file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
-kamu-accounts-inmem = { workspace = true }
-kamu-accounts-services = { workspace = true }
 kamu-auth-rebac = { workspace = true }
-kamu-auth-rebac-services = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datafusion-udf = { workspace = true }
 kamu-datasets = { workspace = true }
-kamu-datasets-inmem = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, default-features = false, features = [
@@ -176,6 +173,7 @@ datafusion-ethers = { optional = true, version = "~55.0", features = [
     "eip712",
 ] }
 datafusion-functions-json = { optional = true, version = "0.55" }
+kamu-auth-rebac-services = { optional = true, workspace = true }
 kamu-datasets-services = { optional = true, workspace = true, features = [
     "testing",
 ] }
@@ -196,6 +194,7 @@ kamu-accounts = { workspace = true, default-features = false, features = [
 kamu-accounts-inmem = { workspace = true, default-features = false }
 kamu-accounts-services = { workspace = true, default-features = false }
 kamu-auth-rebac-inmem = { workspace = true, default-features = false }
+kamu-auth-rebac-services = { workspace = true }
 kamu-core = { workspace = true, default-features = false, features = [
     "testing",
 ] }

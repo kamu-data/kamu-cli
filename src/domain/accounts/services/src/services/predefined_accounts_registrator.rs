@@ -189,8 +189,8 @@ impl PredefinedAccountsRegistrator {
                 Err(e) => return Err(e.int_err()),
             }
         } else {
-            // 3) We were previously unable to find the ID based on the fields, which means
-            //    an account does not exist. Register it
+            // 3) We were previously unable to find the ID based on the fields, which means an
+            //    account does not exist. Register it
             self.register_unknown_account(account_config).await?
         };
 

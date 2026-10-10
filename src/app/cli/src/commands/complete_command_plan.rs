@@ -504,6 +504,6 @@ mod tests {
 
     #[test]
     fn an_out_of_range_cursor_yields_nothing() {
-        assert!(plan("kamu get", 99).completions.is_empty());
+        assert_eq!(plan("kamu get", 99).completions, []);
     }
 }

@@ -315,8 +315,7 @@ pub mod datetime_rfc3339_opt {
 ///
 /// We use the fact that JSON is a valid subset of YAML and:
 /// - serialize data to JSON
-/// - deserialize it into `serde_yaml::Value` which doesn't handle arbitrary
-///   precision
+/// - deserialize it into `serde_yaml::Value` which doesn't handle arbitrary precision
 /// - serialize it again into desired format
 ///
 /// This is obviously horrible. Solving this correctly likely requires arbitrary

@@ -329,7 +329,7 @@ async fn test_plan_delete_selected_unauthorized() {
     assert!(plan.plan.authorized_targets.is_empty());
     assert_eq!(plan.issues.unauthorized_selected_handles.len(), 1);
     assert!(plan.issues.inaccessible_downstream_handles.is_empty());
-    assert!(plan.issues.directly_dangling_references.is_empty());
+    assert_eq!(plan.issues.directly_dangling_references, []);
 
     assert_matches!(
         plan.into_executable_plan(false),
@@ -371,7 +371,7 @@ async fn test_plan_delete_recursive_orders_authorized_targets() {
     pretty_assertions::assert_eq!(vec!["bar", "foo"], planned_aliases);
     assert!(plan.issues.unauthorized_selected_handles.is_empty());
     assert!(plan.issues.inaccessible_downstream_handles.is_empty());
-    assert!(plan.issues.directly_dangling_references.is_empty());
+    assert_eq!(plan.issues.directly_dangling_references, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -408,7 +408,7 @@ async fn test_plan_delete_recursive_foreign_downstream_blocks_without_force() {
     assert_eq!(plan.plan.authorized_targets.len(), 1);
     assert_eq!(plan.issues.inaccessible_downstream_handles.len(), 1);
     assert!(plan.issues.unauthorized_selected_handles.is_empty());
-    assert!(plan.issues.directly_dangling_references.is_empty());
+    assert_eq!(plan.issues.directly_dangling_references, []);
 
     assert_matches!(
         plan.into_executable_plan(false),

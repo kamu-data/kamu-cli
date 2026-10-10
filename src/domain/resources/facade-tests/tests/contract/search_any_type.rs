@@ -203,7 +203,7 @@ pub async fn search_narrowed_by_selectors(h: &impl FacadeContractHarness) {
 
     // A pattern that matches nothing yields an empty listing, not an error.
     let no_match = search(vec![ResourceSelector::any_type_name_pattern("nomatch-%")]).await;
-    assert!(summary_keys(no_match).is_empty());
+    assert_eq!(summary_keys(no_match), []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -364,8 +364,8 @@ pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarn
         .unwrap()
         .items;
 
-    assert!(summaries.is_empty());
-    assert!(handles.is_empty());
+    assert_eq!(summaries, []);
+    assert_eq!(handles, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -127,7 +127,7 @@ where
         hint: MetadataVisitorDecision,
     ) -> Result<Option<(Multihash, MetadataBlock)>, GetBlockError> {
         // Guard against stopped hint
-        assert!(hint != MetadataVisitorDecision::Stop);
+        assert_ne!(hint, MetadataVisitorDecision::Stop);
 
         // Have we reached the tail? (if specified the boundary, otherwise Seed=0)
         if tail_sequence_number.unwrap_or_default() >= head_block.sequence_number {

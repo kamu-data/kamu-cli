@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+
 use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,10 +32,10 @@ impl CollectionPath {
     }
 }
 
-impl TryFrom<&str> for CollectionPath {
-    type Error = InternalError;
+impl FromStr for CollectionPath {
+    type Err = InternalError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         Ok(Self::new(value.to_string()))
     }
 }

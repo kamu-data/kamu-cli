@@ -17,10 +17,9 @@ use crate::resources::{ResourceCtx, fixtures};
 //   - a YAML file path,
 //   - a JSON file path,
 //   - stdin (`--stdin`),
-//   - an extensionless file with an explicit `--format` (and the negative: the
-//     same file *without* `--format` is rejected as an unsupported extension),
-//   - a directory (top-level files only by default; `--recursive` also walks
-//     nested files).
+//   - an extensionless file with an explicit `--format` (and the negative: the same file *without*
+//     `--format` is rejected as an unsupported extension),
+//   - a directory (top-level files only by default; `--recursive` also walks nested files).
 //
 // VariableSet only — no encryption config needed, so the harness wiring stays
 // minimal. Each sub-case uses a distinct resource name so the present/absent

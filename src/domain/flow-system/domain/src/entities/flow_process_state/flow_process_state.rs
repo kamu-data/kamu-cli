@@ -1224,8 +1224,7 @@ mod tests {
             FlowProcessEffectiveState::PausedManual
         );
 
-        // 3. Manual failure while paused -> stays PausedManual, no consecutive failure
-        //    increment
+        // 3. Manual failure while paused -> stays PausedManual, no consecutive failure increment
         state
             .on_flow_outcome(
                 EventID::new(4),

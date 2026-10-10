@@ -363,7 +363,7 @@ impl FlowControllerWebhookDeliverHarness {
         old_head_maybe: Option<&odf::Multihash>,
         new_heads: Vec<&odf::Multihash>,
     ) -> FlowState {
-        assert!(!new_heads.is_empty());
+        assert_ne!(new_heads.len(), 0);
 
         let mut flow = Flow::new(
             Utc::now(),

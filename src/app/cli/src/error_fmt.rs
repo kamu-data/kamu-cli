@@ -144,9 +144,9 @@ impl PrettyCLIError<'_> {
         use itertools::Itertools;
         for (first, second) in (0..errors.len()).tuple_windows() {
             if errors[first] == errors[second] {
-                errors[first].truncate(0);
+                errors[first].clear();
             } else {
-                let suffix = format!(": {}", &errors[second]);
+                let suffix = format!(": {}", errors[second]);
                 if errors[first].ends_with(&suffix) {
                     let new_len = errors[first].len() - suffix.len();
                     errors[first].truncate(new_len);

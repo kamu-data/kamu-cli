@@ -63,7 +63,7 @@ impl std::fmt::Display for DatasetResource {
         write!(
             f,
             "Dataset(owner_account_id='{}', allows_public_read={}, num_authorizations={})",
-            &self.owner_account_id,
+            self.owner_account_id,
             self.allows_public_read,
             self.authorized_users.len(),
         )

@@ -169,7 +169,7 @@ mod tests {
 
         assert_eq!(
             err_result.to_string(),
-            format!("Cron expression {} is invalid", &invalid_cron_expression),
+            format!("Cron expression {invalid_cron_expression} is invalid"),
         );
     }
 

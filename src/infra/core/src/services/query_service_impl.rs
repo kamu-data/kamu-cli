@@ -176,8 +176,8 @@ impl QueryServiceImpl {
                 // the number of datasets that can be scanned.
                 // Options:
                 // - Fail unrestricted query (e.g. `show tables`) after it touches >N datasets
-                // - Require specifying `limit` or `like` filters if number of datasets in the
-                //   node is too large
+                // - Require specifying `limit` or `like` filters if number of datasets in the node
+                //   is too large
                 //
                 // TODO: Private Datasets: PERF: find a way to narrow down the number of records
                 // to filter, e.g.:

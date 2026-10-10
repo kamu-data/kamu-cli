@@ -152,10 +152,7 @@ impl SecretsEncryptionConfig {
     }
 
     pub fn is_enabled(&self) -> bool {
-        if self.enabled && self.encryption_key.is_some() {
-            return true;
-        }
-        false
+        self.enabled && self.encryption_key.is_some()
     }
 
     /// Build a [`SecretCryptor`] from the configured encryption key.

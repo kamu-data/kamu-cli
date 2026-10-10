@@ -265,7 +265,7 @@ pub async fn test_list_processes_filter_by_last_attempt_between(catalog: &Catalo
 
     // Should find processes with last attempts between 07:00 and 12:00 on
     // 2025-09-08
-    assert!(!time_window_attempts.processes.is_empty());
+    assert_ne!(time_window_attempts.processes, []);
     assert_eq!(time_window_attempts.processes.len(), 15);
     assert_eq!(time_window_attempts.total_count, 15);
     assert_flow_type_distribution(&time_window_attempts.processes, 4, 3, 8);
@@ -309,7 +309,7 @@ pub async fn test_list_processes_filter_by_last_failure_since(catalog: &Catalog)
         .unwrap();
 
     // Should find processes that failed after 07:00 on 2025-09-08
-    assert!(!recent_failures.processes.is_empty());
+    assert_ne!(recent_failures.processes, []);
     assert_eq!(recent_failures.processes.len(), 9);
     assert_eq!(recent_failures.total_count, 9);
     assert_flow_type_distribution(&recent_failures.processes, 2, 2, 5);
@@ -348,7 +348,7 @@ pub async fn test_list_processes_filter_by_planned_before(catalog: &Catalog) {
         .unwrap();
 
     // Should find processes scheduled before 10:00
-    assert!(!upcoming_soon.processes.is_empty());
+    assert_ne!(upcoming_soon.processes, []);
 
     // All implementations should consistently return 3 processes
     // (excluding the process at exactly 2025-09-08T10:00:00Z)
@@ -392,7 +392,7 @@ pub async fn test_list_processes_filter_by_planned_after(catalog: &Catalog) {
     // From CSV: 12:00:00Z (zeta/metrics.daily), 12:00:00Z (acme/logs webhook),
     // 14:00:00Z (gamma/audit) The filter is "after" so 11:30:00Z should be
     // excluded, leaving 3 results
-    assert!(!future_scheduled.processes.is_empty());
+    assert_ne!(future_scheduled.processes, []);
     assert_eq!(future_scheduled.processes.len(), 3);
     assert_eq!(future_scheduled.total_count, 3);
     assert_flow_type_distribution(&future_scheduled.processes, 1, 1, 1);
@@ -441,7 +441,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .unwrap();
 
     // Should find processes with 3 or more consecutive failures
-    assert!(!chronic_failures.processes.is_empty());
+    assert_ne!(chronic_failures.processes, []);
     assert_eq!(chronic_failures.processes.len(), 4);
     assert_eq!(chronic_failures.total_count, 4);
     assert_flow_type_distribution(&chronic_failures.processes, 1, 0, 3);
@@ -482,7 +482,7 @@ pub async fn test_list_processes_filter_by_consecutive_failures(catalog: &Catalo
         .unwrap();
 
     // Should find no processes (11+ failures exceeds maximum in dataset)
-    assert!(no_results.processes.is_empty());
+    assert_eq!(no_results.processes, []);
     assert_eq!(no_results.processes.len(), 0);
     assert_eq!(no_results.total_count, 0);
 }
@@ -680,7 +680,7 @@ pub async fn test_list_processes_filter_by_scope(catalog: &Catalog) {
         .unwrap();
 
     // Should find no system flows in our test data
-    assert!(system_listing.processes.is_empty());
+    assert_eq!(system_listing.processes, []);
     assert_eq!(system_listing.processes.len(), 0);
     assert_eq!(system_listing.total_count, 0);
 }
@@ -706,7 +706,7 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
         .unwrap();
 
     // Should find only failing webhook processes
-    assert!(!failing_webhooks.processes.is_empty());
+    assert_ne!(failing_webhooks.processes, []);
     assert_flow_type_distribution(
         &failing_webhooks.processes,
         0,
@@ -738,7 +738,7 @@ pub async fn test_list_processes_combined_filters(catalog: &Catalog) {
         .unwrap();
 
     // Should find only acme ingest/transform processes that are active or failing
-    assert!(!complex_filter.processes.is_empty());
+    assert_ne!(complex_filter.processes, []);
     for process in &complex_filter.processes {
         // Check flow type
         let flow_type = &process.flow_binding().flow_type;

@@ -101,7 +101,7 @@ impl EmbeddingsProviderImpl {
             )));
         }
         let mut out = Vec::with_capacity(expected_dims);
-        for chunk in bytes.chunks_exact(4) {
+        for chunk in bytes.as_chunks::<4>().0 {
             out.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
         }
         Ok(out)

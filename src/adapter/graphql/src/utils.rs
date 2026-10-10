@@ -273,13 +273,13 @@ pub(crate) fn logged_account(ctx: &Context<'_>) -> bool {
 /// This wrapper is unfortunately necessary because of poor error handling
 /// strategy of async-graphql that:
 ///
-/// - prevents ? operator from quietly wrapping any Display value in query
-///   handler into an error thus putting us in danger of leaking sensitive info
+/// - prevents ? operator from quietly wrapping any Display value in query handler into an error
+///   thus putting us in danger of leaking sensitive info
 ///
 /// - ensures that only `InternalError` can be returned via ? operator
 ///
-/// - ensures that original error is preserved as `source` so it can be
-///   inspected and logged by the tracing middleware
+/// - ensures that original error is preserved as `source` so it can be inspected and logged by the
+///   tracing middleware
 
 #[derive(Debug)]
 pub enum GqlError {

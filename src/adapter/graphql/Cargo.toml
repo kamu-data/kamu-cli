@@ -43,12 +43,9 @@ kamu-adapter-task-dataset = { workspace = true }
 kamu-adapter-task-webhook = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-auth-web3 = { workspace = true }
-kamu-configuration = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
-kamu-datasets-services = { workspace = true }
 kamu-flow-system = { workspace = true }
-kamu-flow-system-services = { workspace = true }
 kamu-resources = { workspace = true }
 kamu-resources-facade = { workspace = true }
 kamu-search = { workspace = true }
@@ -125,6 +122,7 @@ kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
+kamu-configuration = { workspace = true }
 kamu-configuration-inmem = { workspace = true }
 kamu-configuration-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }

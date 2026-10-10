@@ -413,7 +413,6 @@ impl ElasticsearchQueryBuilder {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use kamu_search::*;
     use pretty_assertions::assert_eq;
 
     use super::*;

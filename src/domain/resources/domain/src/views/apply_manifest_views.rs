@@ -90,11 +90,10 @@ impl ApplyManifestPlan {
 /// The two facades legitimately differ here, and collapsing them into one
 /// representation is what makes invalid states expressible:
 ///
-/// - The **local** facade holds the raw pre-apply resource and cannot
-///   canonicalize until `headers.account` is final, which happens *after* the
-///   dispatcher returns.
-/// - The **remote** facade receives already-canonicalized documents and has no
-///   resource pair to rebuild them from.
+/// - The **local** facade holds the raw pre-apply resource and cannot canonicalize until
+///   `headers.account` is final, which happens *after* the dispatcher returns.
+/// - The **remote** facade receives already-canonicalized documents and has no resource pair to
+///   rebuild them from.
 ///
 /// Modeling this as an enum means there is no moment where a value looks like
 /// finished documents but is not — and no need to spell "not computed yet" as

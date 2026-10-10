@@ -240,8 +240,7 @@ impl FlowProcessStateProjector {
 
         // There might be late flow activations.
         // Consider scheduling new flow to handle those, if:
-        // - the last flow attempt succeeded (event if it was originally manually
-        //   launched)
+        // - the last flow attempt succeeded (event if it was originally manually launched)
         // - the trigger is still active after processing the latest events
         if completed_event.outcome.is_success()
             || (completed_event.outcome.is_recoverable_failure()

@@ -33,7 +33,7 @@ impl Command for RepositoryAddCommand {
             .add_repository(&self.name, self.url.clone())
             .map_err(CLIError::failure)?;
 
-        eprintln!("{}: {}", console::style("Added").green(), &self.name);
+        eprintln!("{}: {}", console::style("Added").green(), self.name);
         Ok(())
     }
 }

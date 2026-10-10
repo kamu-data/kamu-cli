@@ -688,8 +688,8 @@ impl FlowHarness {
     /// creation and final event catchup automatically.
     ///
     /// # Arguments
-    /// * `simulation_script` - An async closure/future that contains the test
-    ///   scenario logic (task drivers, manual triggers, time advancement, etc.)
+    /// * `simulation_script` - An async closure/future that contains the test scenario logic (task
+    ///   drivers, manual triggers, time advancement, etc.)
     ///
     /// # Example
     /// ```rust

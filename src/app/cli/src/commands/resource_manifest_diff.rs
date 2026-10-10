@@ -14,12 +14,12 @@
 //! of field-level changes, so deciding *what* changed and *how to show it* is
 //! this module's job. It works in two stages:
 //!
-//! 1. **Structured detect** — walk both JSON documents together and collect the
-//!    paths whose values differ. This is what keeps the output small: an
-//!    unchanged region is never rendered at all, no matter how large it is.
-//! 2. **Text render** — serialize just the changed regions to YAML and diff
-//!    those line-wise. YAML because that is what users author, and because its
-//!    line-per-scalar shape diffs far more legibly than JSON's braces.
+//! 1. **Structured detect** — walk both JSON documents together and collect the paths whose values
+//!    differ. This is what keeps the output small: an unchanged region is never rendered at all, no
+//!    matter how large it is.
+//! 2. **Text render** — serialize just the changed regions to YAML and diff those line-wise. YAML
+//!    because that is what users author, and because its line-per-scalar shape diffs far more
+//!    legibly than JSON's braces.
 //!
 //! Kept free of `OutputConfig`, progress bars, and `self` so it can be tested
 //! directly on strings.

@@ -821,7 +821,7 @@ mod tests {
             describe_items(&syntax),
             vec![format!("exact-any-type:{uuid}")]
         );
-        assert!(describe_shadowed(&syntax).is_empty());
+        assert_eq!(describe_shadowed(&syntax), Vec::<String>::new());
     }
 
     #[tokio::test]

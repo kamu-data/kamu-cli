@@ -82,7 +82,10 @@ impl DatasetBlockIndexer {
             .int_err()?;
 
         assert!(dataset_handles_map.unresolved_datasets.is_empty());
-        assert!(dataset_handles_map.resolved_handles.len() == unindexed_dataset_branches.len());
+        assert_eq!(
+            dataset_handles_map.resolved_handles.len(),
+            unindexed_dataset_branches.len()
+        );
 
         // Combine handles with block refs
 

@@ -89,7 +89,7 @@ pub async fn test_entries_empty_initially(catalog: &Catalog) {
     let resource_id = make_secret_set_resource(catalog).await;
 
     let entries = repo.get_entries(&resource_id, 0).await.unwrap();
-    assert!(entries.is_empty());
+    assert_eq!(entries, []);
 
     let entry = repo.find_entry(&resource_id, 0, "key").await.unwrap();
     assert!(entry.is_none());
@@ -211,7 +211,7 @@ pub async fn test_entries_isolated_by_generation(catalog: &Catalog) {
 
     // Generation 3 has no entries
     let gen3 = repo.get_entries(&resource_id, 3).await.unwrap();
-    assert!(gen3.is_empty());
+    assert_eq!(gen3, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -290,8 +290,8 @@ pub async fn test_cleanup_entries_before_generation(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert!(repo.get_entries(&resource_id, 1).await.unwrap().is_empty());
-    assert!(repo.get_entries(&resource_id, 2).await.unwrap().is_empty());
+    assert_eq!(repo.get_entries(&resource_id, 1).await.unwrap(), []);
+    assert_eq!(repo.get_entries(&resource_id, 2).await.unwrap(), []);
 
     let surviving = repo.get_entries(&resource_id, 3).await.unwrap();
     assert_eq!(1, surviving.len());
@@ -319,7 +319,7 @@ pub async fn test_cleanup_does_not_affect_other_resources(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert!(repo.get_entries(&resource_a, 1).await.unwrap().is_empty());
+    assert_eq!(repo.get_entries(&resource_a, 1).await.unwrap(), []);
 
     let b_entries = repo.get_entries(&resource_b, 1).await.unwrap();
     assert_eq!(1, b_entries.len());
@@ -389,7 +389,7 @@ pub async fn test_get_latest_entries(catalog: &Catalog) {
     // Empty resource returns empty vec
     let empty_resource = make_secret_set_resource(catalog).await;
     let empty_latest = repo.get_latest_entries(&empty_resource).await.unwrap();
-    assert!(empty_latest.is_empty());
+    assert_eq!(empty_latest, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -423,10 +423,10 @@ pub async fn test_delete_all_entries(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert!(repo.get_entries(&resource_a, 1).await.unwrap().is_empty());
-    assert!(repo.get_entries(&resource_a, 2).await.unwrap().is_empty());
-    assert!(repo.get_entries(&resource_a, 3).await.unwrap().is_empty());
-    assert!(repo.get_entries(&resource_b, 1).await.unwrap().is_empty());
+    assert_eq!(repo.get_entries(&resource_a, 1).await.unwrap(), []);
+    assert_eq!(repo.get_entries(&resource_a, 2).await.unwrap(), []);
+    assert_eq!(repo.get_entries(&resource_a, 3).await.unwrap(), []);
+    assert_eq!(repo.get_entries(&resource_b, 1).await.unwrap(), []);
 
     let c_entries = repo.get_entries(&resource_c, 1).await.unwrap();
     assert_eq!(1, c_entries.len());

@@ -137,7 +137,6 @@ mod tests {
     use std::assert_matches;
 
     use kamu_resources::ResourceID;
-    use kamu_resources_facade::*;
 
     use super::*;
     use crate::cynic_api::fragments::{

@@ -445,7 +445,7 @@ pub async fn test_remove_dependency(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert!(dependencies.is_empty());
+    assert_eq!(dependencies, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -561,7 +561,7 @@ pub async fn test_remove_all_dataset_dependencies(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert!(dependencies.is_empty());
+    assert_eq!(dependencies, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -591,7 +591,7 @@ pub async fn test_remove_orphan_dependencies(catalog: &Catalog) {
         .await
         .unwrap();
 
-    assert!(dependencies.is_empty());
+    assert_eq!(dependencies, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -147,7 +147,7 @@ impl PullRequestPlannerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
-    async fn build_ingest_item(&self, pi: PullItem) -> Result<PullIngestItem, PullResponse> {
+    async fn build_ingest_item(&self, pi: PullItem) -> Result<PullIngestItem, Box<PullResponse>> {
         assert!(pi.maybe_remote_ref.is_none());
 
         let hdl = match pi.local_target {
@@ -167,17 +167,20 @@ impl PullRequestPlannerImpl {
                 metadata_state: Box::new(metadata_state),
                 maybe_original_request: pi.maybe_original_request,
             }),
-            Err(e) => Err(PullResponse {
+            Err(e) => Err(Box::new(PullResponse {
                 maybe_original_request: pi.maybe_original_request,
                 maybe_local_ref: Some(hdl.as_local_ref()),
                 maybe_remote_ref: None,
                 result: Err(PullError::ScanMetadata(e)),
-            }),
+            })),
         }
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
-    async fn build_transform_item(&self, pi: PullItem) -> Result<PullTransformItem, PullResponse> {
+    async fn build_transform_item(
+        &self,
+        pi: PullItem,
+    ) -> Result<PullTransformItem, Box<PullResponse>> {
         assert!(pi.maybe_remote_ref.is_none());
 
         let hdl = match pi.local_target {
@@ -200,12 +203,12 @@ impl PullRequestPlannerImpl {
                 maybe_original_request: pi.maybe_original_request,
                 plan,
             }),
-            Err(e) => Err(PullResponse {
+            Err(e) => Err(Box::new(PullResponse {
                 maybe_original_request: pi.maybe_original_request,
                 maybe_local_ref: Some(hdl.as_local_ref()),
                 maybe_remote_ref: None,
                 result: Err(PullError::TransformError(TransformError::Plan(e))),
-            }),
+            })),
         }
     }
 
@@ -214,7 +217,7 @@ impl PullRequestPlannerImpl {
         &self,
         pi: PullItem,
         sync_options: SyncOptions,
-    ) -> Result<PullSyncItem, PullResponse> {
+    ) -> Result<PullSyncItem, Box<PullResponse>> {
         assert!(pi.maybe_remote_ref.is_some());
 
         let remote_ref = pi.maybe_remote_ref.unwrap();
@@ -235,12 +238,12 @@ impl PullRequestPlannerImpl {
                 maybe_original_request: pi.maybe_original_request,
                 sync_request: Box::new(sync_request),
             }),
-            Err(e) => Err(PullResponse {
+            Err(e) => Err(Box::new(PullResponse {
                 maybe_original_request: pi.maybe_original_request,
                 maybe_local_ref: Some(pi.local_target.as_local_ref()),
                 maybe_remote_ref: Some(remote_ref),
                 result: Err(PullError::SyncError(e)),
-            }),
+            })),
         }
     }
 }
@@ -332,7 +335,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
                             jobs.push(PullPlanIterationJob::Ingest(pii));
                         }
                         Err(ingest_error) => {
-                            errors.push(ingest_error);
+                            errors.push(*ingest_error);
                         }
                     }
 
@@ -344,7 +347,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
                             jobs.push(PullPlanIterationJob::Sync(psi));
                         }
                         Err(sync_error) => {
-                            errors.push(sync_error);
+                            errors.push(*sync_error);
                         }
                     }
                 }
@@ -356,7 +359,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
                             jobs.push(PullPlanIterationJob::Transform(pti));
                         }
                         Err(transform_error) => {
-                            errors.push(transform_error);
+                            errors.push(*transform_error);
                         }
                     }
                 }

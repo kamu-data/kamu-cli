@@ -125,11 +125,11 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
         "ident-name-test",
         &id,
     );
-    assert!(
-        !kamu_resources::resource_type_name(&handle.r#type)
+    assert_ne!(
+        kamu_resources::resource_type_name(&handle.r#type)
             .unwrap()
-            .as_str()
-            .is_empty()
+            .as_str(),
+        ""
     );
 }
 

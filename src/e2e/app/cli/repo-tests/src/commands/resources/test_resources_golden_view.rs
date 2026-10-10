@@ -25,8 +25,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // its brittleness at every call site.
 //
 // Volatile fields are stripped from the actual document before comparison:
-//   - headers.id / account / generation / createdAt / updatedAt — per-run /
-//     per-context
+//   - headers.id / account / generation / createdAt / updatedAt — per-run / per-context
 //   - status.reconciledAt — reconciler timestamp
 //   - status.conditions.*.lastTransitionTime — reconciler timestamps
 // Everything else is asserted verbatim against an expected document built from

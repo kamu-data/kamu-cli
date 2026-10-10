@@ -85,6 +85,11 @@ lint-sqlx:
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
 
 
+.PHONY: check
+check:
+	cargo check --workspace --all-targets
+
+
 .PHONY: clippy
 clippy:
 	cargo clippy --workspace --all-targets -- -D warnings

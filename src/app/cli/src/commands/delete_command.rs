@@ -358,10 +358,8 @@ impl<'a> DeleteRequestResolver<'a> {
     // - `kamu delete` / `kamu delete datasets ...` => datasets mode
     // - `kamu delete %` => resource all-types mode
     // - `kamu delete storages warehouse` => resource same-type mode
-    // - `kamu delete foo.bar` => datasets mode when `foo.bar` is not a known
-    //   resource type
-    // - `kamu delete vs/foo` => resource slash mode when `vs` is a known resource
-    //   prefix
+    // - `kamu delete foo.bar` => datasets mode when `foo.bar` is not a known resource type
+    // - `kamu delete vs/foo` => resource slash mode when `vs` is a known resource prefix
     async fn resolve(&self) -> Result<ResolvedDeleteRequest, CLIError> {
         match self.params.target {
             None => {

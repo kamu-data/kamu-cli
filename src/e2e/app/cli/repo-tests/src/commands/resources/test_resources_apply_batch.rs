@@ -15,10 +15,10 @@ use crate::resources::{ResourceCtx, fixtures};
 // `apply` accepts multiple manifest paths in one invocation. This covers:
 //   - ordered multi-manifest success across types (VariableSet + SecretSet),
 //   - later-wins when the same resource appears twice (last write applies),
-//   - stop-on-error (default): a rejected manifest aborts the batch, so items
-//     listed *after* it are never applied,
-//   - --continue-on-error: the batch processes every manifest, applying the
-//     valid ones and still reporting overall failure for the rejected one.
+//   - stop-on-error (default): a rejected manifest aborts the batch, so items listed *after* it are
+//     never applied,
+//   - --continue-on-error: the batch processes every manifest, applying the valid ones and still
+//     reporting overall failure for the rejected one.
 //
 // Includes a SecretSet, so the harness MUST wire
 // `fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG`. Manifests are written to disk via

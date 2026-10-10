@@ -34,10 +34,8 @@ impl ResourceSelectionSyntaxParser {
     /// Parses raw CLI `args` into a [`ParsedSyntax`] variant.
     ///
     /// Accepted forms:
-    /// - Same-type: first arg has no `/`, remaining args have no `/`, at least
-    ///   two args total.
-    /// - Ref form: every arg contains exactly one `/` with non-empty parts on
-    ///   both sides.
+    /// - Same-type: first arg has no `/`, remaining args have no `/`, at least two args total.
+    /// - Ref form: every arg contains exactly one `/` with non-empty parts on both sides.
     /// - Mixed forms are rejected.
     pub(super) fn parse(args: &[String]) -> Result<ParsedSyntax<'_>, CLIError> {
         if args.is_empty() {

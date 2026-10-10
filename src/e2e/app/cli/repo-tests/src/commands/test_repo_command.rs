@@ -94,7 +94,7 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
             "foo",
         )))
         .await;
-    assert!(aliases.is_empty());
+    assert_eq!(aliases, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +180,7 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
             "foo",
         )))
         .await;
-    assert!(aliases.is_empty());
+    assert_eq!(aliases, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

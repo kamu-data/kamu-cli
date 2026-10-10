@@ -23,8 +23,8 @@ pub struct MetadataChainComparator {}
 // TODO: This comparator explores the chains eagerly and may not be optimal for
 // really long chains. We should explore alternatives such as:
 // - making comparator streaming
-// - adding `MetadataChain::nth_block(head, sequence_number)` function that can
-//   skip through long chains faster
+// - adding `MetadataChain::nth_block(head, sequence_number)` function that can skip through long
+//   chains faster
 impl MetadataChainComparator {
     pub async fn compare_chains(
         lhs_chain: &dyn odf::MetadataChain,

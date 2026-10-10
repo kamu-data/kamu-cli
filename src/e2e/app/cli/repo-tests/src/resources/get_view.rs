@@ -13,12 +13,11 @@
 //!
 //! Resource e2e tests almost always want to answer one of two questions:
 //!
-//! 1. **Identity** — "which resources did this selector return?" i.e. the set
-//!    of `(schema, name)` pairs. This is the whole point of the
-//!    selector-grammar tests: did `ss/db-creds` resolve to the `SecretSet`
-//!    named `db-creds`, and *only* that?
-//! 2. **A specific field** — "does the resolved `VariableSet` carry
-//!    `MESSAGE=hello`?" i.e. the one spec field the case is actually about.
+//! 1. **Identity** — "which resources did this selector return?" i.e. the set of `(schema, name)`
+//!    pairs. This is the whole point of the selector-grammar tests: did `ss/db-creds` resolve to
+//!    the `SecretSet` named `db-creds`, and *only* that?
+//! 2. **A specific field** — "does the resolved `VariableSet` carry `MESSAGE=hello`?" i.e. the one
+//!    spec field the case is actually about.
 //!
 //! Neither question is served by comparing the *whole* `get -o json` document.
 //! A full-document comparison forces every test to (re-)assert volatile fields

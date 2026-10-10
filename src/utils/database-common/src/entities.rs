@@ -221,10 +221,9 @@ impl EntityPageStreamer {
     }
 
     /// # Arguments
-    /// * `get_args_callback` - a function to generating arguments for
-    ///   `next_entities_callback`. Note, it is only called once.
-    /// * `next_entities_callback` - a function that will be called for each
-    ///   page.
+    /// * `get_args_callback` - a function to generating arguments for `next_entities_callback`.
+    ///   Note, it is only called once.
+    /// * `next_entities_callback` - a function that will be called for each page.
     ///
     /// # Examples
     /// You can find examples of use in [`EntityPageStreamer`].
