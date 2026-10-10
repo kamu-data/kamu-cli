@@ -140,6 +140,15 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             AccountService::current_account_indication(args.account.clone(), tenancy_config)
                 .map_err(CLIError::usage_error_from)?;
 
+        // Checked before the account lookup: a single-tenant workspace has only the
+        // default account, so naming any other one is a usage error, not a missing account
+        if is_in_workspace
+            && tenancy_config == TenancyConfig::SingleTenant
+            && current_account.account_name != *DEFAULT_ACCOUNT_NAME
+        {
+            return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));
+        }
+
         prepare_run_dir(&workspace_layout.run_info_dir);
 
         let app_database_config =
@@ -219,7 +228,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                     current_account_indication
                         .to_current_account_subject(workspace_status, account_service)
                         .await
-                        .int_err()
+                        .map_err(CLIError::from)
                 },
             )
             .await?;
@@ -268,9 +277,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 ))
             } else if is_workspace_upgrade_needed {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-            } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant
-            {
-                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
             } else {
                 Ok(())
             }
