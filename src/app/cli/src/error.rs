@@ -34,6 +34,8 @@ use kamu_resources_facade::{
 use odf::utils::data::format::WriterError;
 use thiserror::Error;
 
+use crate::accounts::ToCurrentAccountSubjectError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
@@ -264,6 +266,17 @@ impl From<odf::IterBlocksError> for CLIError {
 impl From<InternalError> for CLIError {
     fn from(e: InternalError) -> Self {
         Self::critical(e)
+    }
+}
+
+impl From<ToCurrentAccountSubjectError> for CLIError {
+    fn from(v: ToCurrentAccountSubjectError) -> Self {
+        match v {
+            e @ ToCurrentAccountSubjectError::NotRegisteredAccount { .. } => {
+                Self::usage_error_from(e)
+            }
+            e @ ToCurrentAccountSubjectError::Internal(_) => Self::critical(e),
+        }
     }
 }
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_cli_e2e_common::DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR;
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
@@ -44,6 +45,21 @@ pub async fn test_account_argument_is_not_registered_account_mt(kamu: KamuCliPup
         Some([format!("Account '{valid_but_unknown_account_name}' not registered").as_str()]),
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_account_argument_accepts_only_default_account_st(kamu: KamuCliPuppet) {
+    kamu.assert_failure_command_execution(
+        ["--account", "unknown-account", "list"],
+        None,
+        Some(["Directory is not a multi-tenant kamu workspace"]),
+    )
+    .await;
+
+    kamu.execute(["--account", DEFAULT_ACCOUNT_NAME_STR, "list"])
+        .await
+        .success();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,6 +11,7 @@ mod test_access_token_registry_svc;
 mod test_complete_command;
 mod test_completions_command;
 mod test_config;
+mod test_current_account_indication;
 mod test_di_graph;
 mod test_generate_cli_markdown;
 mod test_login_flow_service;

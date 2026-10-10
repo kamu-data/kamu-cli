@@ -48,6 +48,7 @@ Recommendation: for ease of reading, use the following format:
   request; the argument description now explains that depth is counted from the root
 - Flaky GraphQL flow process card ordering test
 - SQLite: indexing more than ~5,400 new blocks of a dataset at once failed with "too many SQL variables"
+- `--account` with an unknown account is a usage error now, not an internal error
 - SQLite: workspaces created before v0.267.0 failed to start with "One or more predefined accounts failed to
   register/update"; a migration repairs the stored account and legacy env-var resource IDs
 - Pulling or pushing into an existing dataset that has a different ID now fails with "Source and destination
