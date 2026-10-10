@@ -24,6 +24,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TransformElaborationService: Send + Sync {
     async fn elaborate_transform(

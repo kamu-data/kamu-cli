@@ -82,6 +82,9 @@ kamu-search-elasticsearch = { workspace = true, default-features = false, featur
     "testing",
 ] }
 kamu-search-services = { workspace = true }
+messaging-outbox = { workspace = true, features = [
+    "testing",
+] }
 
 bon = { version = "3", default-features = false }
 mockall = { version = "0.15", default-features = false }

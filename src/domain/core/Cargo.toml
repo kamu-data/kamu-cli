@@ -27,6 +27,7 @@ default = [
 
 testing = [
     "dep:mockall",
+    "dep:random-strings",
 ]
 utoipa = [
     "dep:utoipa",
@@ -42,6 +43,7 @@ kamu-datasets = { workspace = true }
 odf = { workspace = true, features = [
     "datafusion",
 ] }
+random-strings = { optional = true, workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.23", default-features = false }

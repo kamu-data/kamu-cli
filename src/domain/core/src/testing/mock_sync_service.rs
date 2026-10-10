@@ -7,30 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use kamu_core::*;
-use kamu_datasets::ResolvedDataset;
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub SyncService {}
-
-    #[async_trait::async_trait]
-    impl SyncService for SyncService {
-        async fn sync(
-            &self,
-            request: SyncRequest,
-            options: SyncOptions,
-            listener: Option<Arc<dyn SyncListener>>,
-        ) -> Result<SyncResult, SyncError>;
-
-        /// Adds dataset to IPFS and returns the root CID.
-        /// Unlike `sync` it does not do IPNS resolution and publishing.
-        async fn ipfs_add(&self, src: ResolvedDataset) -> Result<String, IpfsAddError>;
-    }
-}
 
 impl MockSyncService {
     pub fn make_expect_sync_pull_from_remote_to_existing_local(

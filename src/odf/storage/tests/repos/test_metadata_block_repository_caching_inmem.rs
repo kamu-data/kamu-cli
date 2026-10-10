@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use odf_metadata::*;
 use odf_storage_lfs::ObjectRepositoryLocalFSSha3;
 use opendatafabric_storage::*;
 
@@ -66,35 +65,4 @@ async fn test_insert_block_cached_if_no_error() {
     let repo = MetadataBlockRepositoryCachingInMem::new(wrapped_mock_repo);
 
     test_metadata_block_repository_shared::test_insert_block(&repo).await;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MockMetadataBlockRepository
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    MetadataBlockRepository {}
-
-    #[async_trait::async_trait]
-    impl MetadataBlockRepository for MetadataBlockRepository {
-        async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;
-
-        async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
-
-        async fn get_block_bytes(&self, hash: &Multihash) -> Result<MetadataBlockBytes, GetBlockDataError>;
-
-        async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
-
-        async fn insert_block<'a>(
-            &'a self,
-            block: &MetadataBlock,
-            options: InsertOpts<'a>,
-        ) -> Result<InsertBlockResult, InsertBlockError>;
-
-        async fn insert_block_data<'a>(
-            &'a self,
-            block_data: &'a [u8],
-            options: InsertOpts<'a>,
-        ) -> Result<InsertBlockResult, InsertBlockError>;
-    }
 }

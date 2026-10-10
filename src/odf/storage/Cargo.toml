@@ -22,6 +22,7 @@ doctest = false
 
 [features]
 testing = [
+    "dep:mockall",
     "dep:pretty_assertions",
 ]
 
@@ -44,12 +45,16 @@ thiserror = { version = "2", default-features = false, features = [
 ] }
 url = { version = "2", default-features = false }
 
+mockall = { optional = true, version = "0.15", default-features = false }
 pretty_assertions = { optional = true, version = "1" }
 
 
 [dev-dependencies]
 odf-storage-lfs = { workspace = true }
+# Enables our own `testing` feature for integration tests; not renamed, so cargo-deny can resolve it
+opendatafabric-storage = { path = ".", features = [
+    "testing",
+] }
 
-mockall = "0.15"
 tempfile = "3"
 tokio = { version = "1", default-features = false }

@@ -7,25 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
 use odf::dataset::MetadataChainIncrementInterval;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub DatasetIncrementQueryService {}
-
-    #[async_trait::async_trait]
-    impl DatasetIncrementQueryService for DatasetIncrementQueryService {
-        #[allow(clippy::ref_option_ref, reason = "signature mirrors the mocked trait")]
-        async fn get_increment_between<'a>(
-            &'a self,
-            dataset_id: &'a odf::DatasetID,
-            old_head: Option<&'a odf::Multihash>,
-            new_head: &'a odf::Multihash,
-        ) -> Result<MetadataChainIncrementInterval, GetIncrementError>;
-    }
-}
+use crate::{GetIncrementError, MockDatasetIncrementQueryService};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

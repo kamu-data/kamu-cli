@@ -25,6 +25,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait]
 pub trait MetadataBlockRepository: Send + Sync {
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;

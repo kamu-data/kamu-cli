@@ -21,7 +21,7 @@ use kamu_adapter_flow_dataset::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_datasets_services::testing::{FakeDatasetEntryService, MockDatasetIncrementQueryService};
+use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;

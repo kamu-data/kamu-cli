@@ -24,32 +24,33 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowQueryService: Sync + Send {
     /// Returns state of all flows, regardless of the scope,
     /// ordered by creation time from newest to oldest
-    async fn list_all_flows(
-        &self,
+    async fn list_all_flows<'a>(
+        &'a self,
         order: FlowOrder,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, InternalError>;
+    ) -> Result<FlowStateListing<'a>, InternalError>;
 
     /// Returns states of flows matching scope and other filters
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
-    async fn list_scoped_flows(
-        &self,
+    async fn list_scoped_flows<'a>(
+        &'a self,
         scope_query: FlowScopeQuery,
         filters: FlowFilters,
         order: FlowOrder,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, InternalError>;
+    ) -> Result<FlowStateListing<'a>, InternalError>;
 
     /// Returns initiators of flows associated with matching scopes
-    async fn list_scoped_flow_initiators(
-        &self,
+    async fn list_scoped_flow_initiators<'a>(
+        &'a self,
         scope_query: FlowScopeQuery,
-    ) -> Result<FlowInitiatorListing, InternalError>;
+    ) -> Result<FlowInitiatorListing<'a>, InternalError>;
 
     /// Returns subset of input scopes that have at least one flow
     async fn filter_flow_scopes_having_flows(

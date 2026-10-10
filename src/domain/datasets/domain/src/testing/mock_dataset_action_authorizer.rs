@@ -7,59 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 
-use internal_error::InternalError;
-use kamu_datasets::{
+use mockall::Predicate;
+use mockall::predicate::{always, eq, function};
+
+use crate::{
     ClassifyByAllowanceDatasetActionUnauthorizedError,
     ClassifyByAllowanceIdsResponse,
     ClassifyByAllowanceResponse,
     DatasetAction,
-    DatasetActionAuthorizer,
     DatasetActionUnauthorizedError,
-    GetAllowedActionsError,
+    MockDatasetActionAuthorizer,
 };
-use mockall::Predicate;
-use mockall::predicate::{always, eq, function};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub DatasetActionAuthorizer {}
-
-    #[async_trait::async_trait]
-    impl DatasetActionAuthorizer for DatasetActionAuthorizer {
-        async fn check_action_allowed(
-            &self,
-            dataset_id: &odf::DatasetID,
-            action: DatasetAction,
-        ) -> Result<(), DatasetActionUnauthorizedError>;
-
-        async fn get_allowed_actions(
-            &self,
-            dataset_id: &odf::DatasetID,
-        ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError>;
-
-        async fn filter_datasets_allowing(
-            &self,
-            dataset_handles: Vec<odf::DatasetHandle>,
-            action: DatasetAction,
-        ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
-
-        async fn classify_dataset_handles_by_allowance(
-            &self,
-            dataset_handles: Vec<odf::DatasetHandle>,
-            action: DatasetAction,
-        ) -> Result<ClassifyByAllowanceResponse, InternalError>;
-
-        async fn classify_dataset_ids_by_allowance<'a>(
-            &'a self,
-            dataset_ids: &[Cow<'a, odf::DatasetID>],
-            action: DatasetAction,
-        ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
-    }
-}
 
 impl MockDatasetActionAuthorizer {
     pub fn denying() -> Self {

@@ -15,7 +15,7 @@ mod messages;
 mod repos;
 mod search;
 mod services;
-#[cfg(any(feature = "testing", test))]
+#[cfg(feature = "testing")]
 pub mod testing;
 mod use_cases;
 

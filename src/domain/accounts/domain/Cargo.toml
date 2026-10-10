@@ -29,6 +29,7 @@ sqlx = [
 ]
 testing = [
     "dep:mockall",
+    "messaging-outbox/testing",
     "odf/testing",
 ]
 

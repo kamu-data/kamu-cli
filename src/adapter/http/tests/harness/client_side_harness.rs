@@ -127,8 +127,8 @@ impl ClientSideHarness {
         if options.authenticated_remotely {
             b.add::<odf::dataset::DummyOdfServerAccessTokenResolver>();
         } else {
-            b.add_value(odf::dataset::testing::MockOdfServerAccessTokenResolver::empty());
-            b.bind::<dyn odf::dataset::OdfServerAccessTokenResolver, odf::dataset::testing::MockOdfServerAccessTokenResolver>();
+            b.add_value(odf::dataset::MockOdfServerAccessTokenResolver::empty());
+            b.bind::<dyn odf::dataset::OdfServerAccessTokenResolver, odf::dataset::MockOdfServerAccessTokenResolver>();
         }
 
         b.add::<SystemTimeSourceDefault>();

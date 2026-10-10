@@ -41,7 +41,7 @@ use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
-use crate::{TransformTestHelper, mock_engine_provisioner};
+use crate::TransformTestHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1424,10 +1424,8 @@ impl CompactTestHarness {
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutorImpl>()
-            .add_value(
-                mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
-            )
-            .bind::<dyn EngineProvisioner, mock_engine_provisioner::MockEngineProvisioner>()
+            .add_value(MockEngineProvisioner::new().stub_provision_engine())
+            .bind::<dyn EngineProvisioner, MockEngineProvisioner>()
             .add::<VerificationServiceImpl>()
             .build();
 

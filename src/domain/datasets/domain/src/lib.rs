@@ -16,6 +16,8 @@ mod repos;
 mod search;
 mod services;
 mod snapshots;
+#[cfg(feature = "testing")]
+mod testing;
 mod use_cases;
 
 pub use entities::*;

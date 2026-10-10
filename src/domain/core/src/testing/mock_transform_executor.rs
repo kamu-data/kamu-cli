@@ -7,38 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use kamu_core::*;
-use kamu_datasets::ResolvedDataset;
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-mockall::mock! {
-    pub TransformExecutionService {}
-
-    #[async_trait::async_trait]
-    impl TransformExecutor for TransformExecutionService {
-        async fn execute_transform(
-            &self,
-            target: ResolvedDataset,
-            plan: TransformPlan,
-            maybe_listener: Option<Arc<dyn TransformListener>>,
-        ) -> (
-            ResolvedDataset,
-            Result<TransformResult, TransformExecuteError>,
-        );
-
-        async fn execute_verify_transform(
-            &self,
-            target: ResolvedDataset,
-            verification_operation: VerifyTransformOperation,
-            maybe_listener: Option<Arc<dyn VerificationListener>>,
-        ) -> Result<(), VerifyTransformExecuteError>;
-    }
-}
-
-impl MockTransformExecutionService {
+impl MockTransformExecutor {
     pub fn make_expect_transform(mut self, target_alias: odf::DatasetAlias) -> Self {
         self.expect_execute_transform()
             .withf(move |target, _, _| target.get_alias() == &target_alias)

@@ -39,7 +39,10 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu-auth-rebac-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true, default-features = false, features = [
+kamu-datasets = { workspace = true, features = [
+    "testing",
+] }
+messaging-outbox = { workspace = true, features = [
     "testing",
 ] }
 

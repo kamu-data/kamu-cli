@@ -19,6 +19,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ReconcileResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
     async fn execute(&self, id: &ResourceID) -> Result<(), ReconcileResourceUseCaseError<R>>;

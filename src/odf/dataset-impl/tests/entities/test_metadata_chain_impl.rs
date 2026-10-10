@@ -1871,6 +1871,7 @@ pub enum MockError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Not using automock: it would fix the associated `Error` type for every user of the mock
 mockall::mock! {
     MetadataChainVisitor {}
 

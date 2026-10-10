@@ -503,29 +503,3 @@ impl TaskAgentHarness {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub TaskRunner {}
-
-    #[async_trait::async_trait]
-    impl TaskRunner for TaskRunner {
-        async fn run_task(&self, task_definition: TaskDefinition) -> Result<TaskOutcome, InternalError>;
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub TaskDefinitionPlanner {}
-
-    #[async_trait::async_trait]
-    impl TaskDefinitionPlanner for TaskDefinitionPlanner {
-        async fn prepare_task_definition(
-            &self,
-            task_id: TaskID,
-            logical_plan: &LogicalPlan,
-        ) -> Result<TaskDefinition, InternalError>;
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

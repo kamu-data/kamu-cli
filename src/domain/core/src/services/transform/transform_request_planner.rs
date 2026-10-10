@@ -17,6 +17,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TransformRequestPlanner: Send + Sync {
     async fn build_transform_preliminary_plan(

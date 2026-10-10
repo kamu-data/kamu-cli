@@ -80,6 +80,9 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
+messaging-outbox = { workspace = true, features = [
+    "testing",
+] }
 odf = { workspace = true, features = [
     "testing",
 ] }

@@ -17,12 +17,13 @@ use kamu::TransformRequestPlannerImpl;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_flow_webhook::webhook_deliver_binding;
 use kamu_core::TenancyConfig;
-use kamu_datasets::{DatasetIncrementQueryService, DeleteDatasetUseCase};
-use kamu_datasets_services::DeleteDatasetUseCaseImpl;
-use kamu_datasets_services::testing::{
-    FakeDependencyGraphIndexer,
+use kamu_datasets::{
+    DatasetIncrementQueryService,
+    DeleteDatasetUseCase,
     MockDatasetIncrementQueryService,
 };
+use kamu_datasets_services::DeleteDatasetUseCaseImpl;
+use kamu_datasets_services::testing::FakeDependencyGraphIndexer;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};

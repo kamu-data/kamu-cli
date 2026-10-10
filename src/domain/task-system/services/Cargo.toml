@@ -57,8 +57,14 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
+kamu-task-system = { workspace = true, features = [
+    "testing",
+] }
 kamu-task-system-inmem = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
+messaging-outbox = { workspace = true, features = [
+    "testing",
+] }
 odf = { workspace = true, default-features = true, features = [
     "testing",
 ] }

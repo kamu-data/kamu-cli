@@ -19,7 +19,7 @@ use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
-use kamu_datasets_services::testing::{MockDatasetActionAuthorizer, TestDatasetOutboxListener};
+use kamu_datasets_services::testing::TestDatasetOutboxListener;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;

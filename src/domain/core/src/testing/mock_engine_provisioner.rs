@@ -10,23 +10,12 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu_core::engine::*;
-use kamu_core::*;
 use kamu_datasets::ResolvedDatasetsMap;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+use crate::engine::*;
+use crate::*;
 
-mockall::mock! {
-    pub EngineProvisioner {}
-    #[async_trait::async_trait]
-    impl EngineProvisioner for EngineProvisioner {
-        async fn provision_engine<'a>(
-            &'a self,
-            engine_id: &str,
-            maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-        ) -> Result<Arc<dyn Engine>, EngineProvisioningError>;
-    }
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockEngineProvisioner {
     pub fn stub_provision_engine(mut self) -> Self {
@@ -44,7 +33,7 @@ impl MockEngineProvisioner {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EngineStub {}
+struct EngineStub {}
 
 #[async_trait::async_trait]
 impl Engine for EngineStub {

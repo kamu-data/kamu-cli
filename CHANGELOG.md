@@ -35,6 +35,8 @@ Recommendation: for ease of reading, use the following format:
 - Storage quotas no longer limit datasets owned by admin accounts, even when a quota is set for them
 - GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when the account's
   storage is unlimited
+- Test mocks of service traits are generated with `mockall::automock` on the trait itself, behind each crate's
+  `testing` feature, instead of hand-written `mock!` copies; `messaging-outbox` gained a `testing` feature
 - Upgraded to `datafusion v55` and `arrow v59`
 - Upgraded to `sqlx v0.9`
 ### Fixed

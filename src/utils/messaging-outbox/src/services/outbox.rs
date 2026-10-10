@@ -13,6 +13,7 @@ use crate::Message;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait Outbox: Send + Sync {
     async fn post_message_as_json(
