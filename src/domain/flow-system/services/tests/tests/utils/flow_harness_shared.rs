@@ -16,7 +16,7 @@ use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use dill::*;
 use internal_error::InternalError;
-use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME_STR, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
@@ -432,26 +432,41 @@ impl FlowHarness {
         flow_binding: &FlowBinding,
         activation_at: DateTime<Utc>,
     ) -> FlowID {
-        self.schedule_flow_for_activation_with_config_snapshot(flow_binding, activation_at, None)
-            .await
-    }
-
-    /// Same as `schedule_flow_for_activation`, with the given config snapshot
-    pub async fn schedule_flow_for_activation_with_config_snapshot(
-        &self,
-        flow_binding: &FlowBinding,
-        activation_at: DateTime<Utc>,
-        config_snapshot: Option<FlowConfigSnapshot>,
-    ) -> FlowID {
         let now = self.now();
         self.save_waiting_flow(
             flow_binding,
             FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
                 activation_time: now,
             }),
-            config_snapshot,
+            None,
             FlowStartCondition::Schedule(FlowStartConditionSchedule {
                 wake_up_at: activation_at,
+            }),
+            activation_at,
+        )
+        .await
+    }
+
+    /// Stores a flow requested by hand with the given configuration rule, which
+    /// throttling holds until the given moment
+    pub async fn schedule_manual_flow_for_activation(
+        &self,
+        flow_binding: &FlowBinding,
+        activation_at: DateTime<Utc>,
+        forced_rule: FlowConfigurationRule,
+    ) -> FlowID {
+        let now = self.now();
+        self.save_waiting_flow(
+            flow_binding,
+            FlowActivationCause::Manual(FlowActivationCauseManual {
+                activation_time: now,
+                initiator_account_id: TEST_ACCOUNT_ID.clone(),
+            }),
+            Some(forced_rule),
+            FlowStartCondition::Throttling(FlowStartConditionThrottling {
+                interval: activation_at - now,
+                wake_up_at: activation_at,
+                shifted_from: now,
             }),
             activation_at,
         )
@@ -513,7 +528,7 @@ impl FlowHarness {
         &self,
         flow_binding: &FlowBinding,
         activation_cause: FlowActivationCause,
-        config_snapshot: Option<FlowConfigSnapshot>,
+        config_snapshot: Option<FlowConfigurationRule>,
         start_condition: FlowStartCondition,
         activation_at: DateTime<Utc>,
     ) -> FlowID {

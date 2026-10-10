@@ -68,8 +68,7 @@ pub struct FlowEventInitiated {
     pub flow_id: FlowID,
     pub flow_binding: FlowBinding,
     pub activation_cause: FlowActivationCause,
-    #[serde(deserialize_with = "deserialize_initial_config_snapshot")]
-    pub config_snapshot: Option<FlowConfigSnapshot>,
+    pub config_snapshot: Option<FlowConfigurationRule>,
     pub retry_policy: Option<RetryPolicy>,
 }
 
@@ -101,8 +100,7 @@ pub struct FlowConfigSnapshotModified {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub flow_binding: FlowBinding,
-    #[serde(deserialize_with = "deserialize_modified_config_snapshot")]
-    pub config_snapshot: FlowConfigSnapshot,
+    pub config_snapshot: FlowConfigurationRule,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

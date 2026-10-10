@@ -2950,7 +2950,7 @@ impl<'a> DatasetFlowGenerator<'a> {
             flow_id,
             FlowBinding::new(flow_type, FlowScopeDataset::make_scope(self.dataset_id)),
             initial_activation_cause,
-            config_snapshot.map(FlowConfigSnapshot::configured),
+            config_snapshot,
             retry_policy,
         );
 
@@ -3054,7 +3054,7 @@ impl SystemFlowGenerator {
             flow_id,
             FlowBinding::new(flow_type, FlowScope::make_system_scope()),
             initial_activation_cause,
-            config_snapshot.map(FlowConfigSnapshot::configured),
+            config_snapshot,
             None,
         );
 

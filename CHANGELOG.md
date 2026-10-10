@@ -16,13 +16,13 @@ Recommendation: for ease of reading, use the following format:
 ## [Unreleased]
 ### Added
 - GraphQL: flow history has a `FlowEventRetryPolicyModified` event, recorded when a new retry policy reaches a
-  flow that has not finished
+  waiting flow
 ### Changed
 - Flow configuration and trigger changes now reach a flow that is already waiting, instead of only the next
   one:
-  - ingest, compaction and reset options apply until the flow's task is formed; options given for a single
-    manual run are kept
-  - a new retry policy decides the remaining retries of a flow that has not finished
+  - ingest, compaction and reset options and the retry policy apply until the flow's first task is formed, so a
+    flow already retrying keeps the retry policy it started with
+  - a flow run by hand keeps its options
   - a changed schedule moves a waiting scheduled flow earlier or later
   - a changed batching rule re-evaluates a derived dataset's flow waiting for inputs, so it may run at once
     or wait longer

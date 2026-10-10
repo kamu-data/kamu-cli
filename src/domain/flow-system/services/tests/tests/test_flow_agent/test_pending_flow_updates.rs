@@ -498,9 +498,7 @@ async fn test_config_change_reaches_waiting_flow() {
 
                 let flow_state = harness.flow_state(flow_id).await;
                 pretty_assertions::assert_eq!(
-                    Some(FlowConfigSnapshot::configured(
-                        new_ingest_rule.clone().into_flow_config()
-                    )),
+                    Some(new_ingest_rule.clone().into_flow_config()),
                     flow_state.config_snapshot
                 );
                 pretty_assertions::assert_eq!(Some(new_retry_policy), flow_state.retry_policy);
@@ -517,7 +515,7 @@ async fn test_config_change_reaches_waiting_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_config_change_keeps_rule_of_flow_with_formed_task() {
+async fn test_config_change_keeps_flow_with_formed_task() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -560,7 +558,7 @@ async fn test_config_change_keeps_rule_of_flow_with_formed_task() {
                 harness.advance_time(Duration::milliseconds(60)).await;
                 assert!(harness.task_exists(TaskID::new(0)).await);
 
-                // The rule stays, while the retry policy still decides on attempts to come
+                // Neither the rule nor the retry policy reach a flow with a task
                 harness
                     .set_dataset_flow_ingest(
                         foo_flow_binding.clone(),
@@ -574,7 +572,7 @@ async fn test_config_change_keeps_rule_of_flow_with_formed_task() {
 
                 let flow_state = harness.flow_state(flow_id).await;
                 pretty_assertions::assert_eq!(None, flow_state.config_snapshot);
-                pretty_assertions::assert_eq!(Some(new_retry_policy), flow_state.retry_policy);
+                pretty_assertions::assert_eq!(None, flow_state.retry_policy);
 
                 harness.advance_time(Duration::milliseconds(20)).await;
             };
@@ -588,7 +586,7 @@ async fn test_config_change_keeps_rule_of_flow_with_formed_task() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_config_change_keeps_forced_snapshot() {
+async fn test_config_change_keeps_rule_of_manually_requested_flow() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -599,20 +597,18 @@ async fn test_config_change_keeps_forced_snapshot() {
         .await;
     let foo_flow_binding = ingest_dataset_binding(&foo_id);
 
-    let forced_snapshot = FlowConfigSnapshot::forced(
-        FlowConfigRuleIngest {
-            fetch_uncacheable: true,
-            fetch_next_iteration: false,
-        }
-        .into_flow_config(),
-    );
+    let forced_rule = FlowConfigRuleIngest {
+        fetch_uncacheable: true,
+        fetch_next_iteration: false,
+    }
+    .into_flow_config();
 
     let start_time = harness.aligned_now();
     let flow_id = harness
-        .schedule_flow_for_activation_with_config_snapshot(
+        .schedule_manual_flow_for_activation(
             &foo_flow_binding,
             start_time + Duration::milliseconds(100),
-            Some(forced_snapshot.clone()),
+            forced_rule.clone(),
         )
         .await;
 
@@ -642,7 +638,8 @@ async fn test_config_change_keeps_forced_snapshot() {
             let main_handle = async {
                 harness.advance_time(Duration::milliseconds(30)).await;
 
-                // The rule stays forced, while the retry policy still follows the configuration
+                // The rule given by hand stays, while the retry policy follows the
+                // configuration
                 harness
                     .set_dataset_flow_ingest(
                         foo_flow_binding.clone(),
@@ -656,7 +653,7 @@ async fn test_config_change_keeps_forced_snapshot() {
 
                 let flow_state = harness.flow_state(flow_id).await;
                 pretty_assertions::assert_eq!(
-                    Some(forced_snapshot.clone()),
+                    Some(forced_rule.clone()),
                     flow_state.config_snapshot
                 );
                 pretty_assertions::assert_eq!(Some(new_retry_policy), flow_state.retry_policy);
@@ -673,7 +670,7 @@ async fn test_config_change_keeps_forced_snapshot() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_retry_policy_change_reaches_retrying_flow() {
+async fn test_retry_policy_change_keeps_policy_of_retrying_flow() {
     let harness = FlowHarness::new();
 
     let foo_id = harness
@@ -750,11 +747,29 @@ async fn test_retry_policy_change_reaches_retrying_flow() {
             });
             let task1_handle = task1_driver.run();
 
+            // Task 2: "foo" start running at 2050ms, fail at 2060ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(2050),
+                finish_in_with: Some((
+                    Duration::milliseconds(10),
+                    TaskOutcome::Failed(TaskError::empty_recoverable()),
+                )),
+                expected_logical_plan: LogicalPlanDatasetUpdate {
+                    dataset_id: foo_id.clone(),
+                    fetch_uncacheable: false,
+                }
+                .into_logical_plan(),
+            });
+            let task2_handle = task2_driver.run();
+
             let main_handle = async {
                 harness.advance_time(Duration::milliseconds(500)).await;
 
                 // While the flow waits for its retry, the policy allows one attempt less:
-                // the planned retry still runs, and its failure is final
+                // the flow has started, so it makes both retries of its own policy
                 harness
                     .set_dataset_flow_ingest(
                         foo_flow_binding.clone(),
@@ -767,11 +782,23 @@ async fn test_retry_policy_change_reaches_retrying_flow() {
                     )
                     .await;
 
+                let flow_state = harness.flow_state(FlowID::new(0)).await;
+                pretty_assertions::assert_eq!(
+                    Some(2),
+                    flow_state.retry_policy.map(|policy| policy.max_attempts)
+                );
+
                 harness.advance_time(Duration::milliseconds(1600)).await;
-                assert!(!harness.task_exists(TaskID::new(2)).await);
+                assert!(harness.task_exists(TaskID::new(2)).await);
             };
 
-            tokio::join!(trigger0_handle, task0_handle, task1_handle, main_handle);
+            tokio::join!(
+                trigger0_handle,
+                task0_handle,
+                task1_handle,
+                task2_handle,
+                main_handle
+            );
         })
         .await
         .unwrap();
@@ -806,6 +833,18 @@ async fn test_retry_policy_change_reaches_retrying_flow() {
                 Flow ID = 0 Running(task=0,1)
 
             #7: +1050ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=2050ms)
+
+            #8: +2050ms:
+              "foo" Ingest:
+                Flow ID = 0 Retrying(scheduled_at=2050ms) Executor(task=2, since=2050ms)
+
+            #9: +2050ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0,1,2)
+
+            #10: +2060ms:
               "foo" Ingest:
                 Flow ID = 0 Finished Failed
 

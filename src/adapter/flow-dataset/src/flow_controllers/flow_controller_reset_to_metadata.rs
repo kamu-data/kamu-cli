@@ -96,8 +96,8 @@ impl fs::FlowController for FlowControllerResetToMetadata {
                                 flow_type: success_flow_state.flow_binding.flow_type.clone(),
                                 flow_id: success_flow_state.flow_id,
                                 maybe_flow_config_snapshot: success_flow_state
-                                    .config_rule()
-                                    .cloned(),
+                                    .config_snapshot
+                                    .clone(),
                             },
                             new_head,
                             old_head_maybe: Some(old_head),

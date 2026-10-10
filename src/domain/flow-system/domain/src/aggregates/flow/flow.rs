@@ -26,7 +26,7 @@ impl Flow {
         flow_id: FlowID,
         flow_binding: FlowBinding,
         activation_cause: FlowActivationCause,
-        config_snapshot: Option<FlowConfigSnapshot>,
+        config_snapshot: Option<FlowConfigurationRule>,
         retry_policy: Option<RetryPolicy>,
     ) -> Self {
         Self(
@@ -65,65 +65,48 @@ impl Flow {
         }
     }
 
-    /// Replace config snapshot with one forced by the caller
-    pub fn force_config_snapshot(
+    /// Define config snapshot
+    pub fn modify_config_snapshot(
         &mut self,
         now: DateTime<Utc>,
-        rule: FlowConfigurationRule,
+        config_snapshot: FlowConfigurationRule,
     ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowConfigSnapshotModified {
-            event_time: now,
-            flow_id: self.flow_id,
-            flow_binding: self.flow_binding.clone(),
-            config_snapshot: FlowConfigSnapshot::forced(rule),
-        };
-        self.apply(event)
-    }
-
-    /// Follow a configuration change, unless the snapshot was forced or the
-    /// rule is unchanged. Returns whether the snapshot was replaced
-    pub fn follow_configured_snapshot(
-        &mut self,
-        now: DateTime<Utc>,
-        rule: FlowConfigurationRule,
-    ) -> Result<bool, ProjectionError<FlowState>> {
-        let config_snapshot = FlowConfigSnapshot::configured(rule);
-        if self
-            .config_snapshot
-            .as_ref()
-            .is_some_and(|current| current.is_forced() || *current == config_snapshot)
-        {
-            return Ok(false);
-        }
-
         let event = FlowConfigSnapshotModified {
             event_time: now,
             flow_id: self.flow_id,
             flow_binding: self.flow_binding.clone(),
             config_snapshot,
         };
-        self.apply(event)?;
-        Ok(true)
+        self.apply(event)
     }
 
-    /// Replace retry policy, if it differs. Returns whether it was replaced
-    pub fn modify_retry_policy(
+    /// Follows a configuration change until the first task is formed. A flow
+    /// requested on demand keeps its rule, as the request may have forced it
+    pub fn apply_configuration(
         &mut self,
         now: DateTime<Utc>,
+        rule: FlowConfigurationRule,
         retry_policy: Option<RetryPolicy>,
-    ) -> Result<bool, ProjectionError<FlowState>> {
-        if self.retry_policy == retry_policy {
-            return Ok(false);
+    ) -> Result<(), ProjectionError<FlowState>> {
+        if !self.task_ids.is_empty() {
+            return Ok(());
         }
 
-        let event = FlowEventRetryPolicyModified {
-            event_time: now,
-            flow_id: self.flow_id,
-            flow_binding: self.flow_binding.clone(),
-            retry_policy,
-        };
-        self.apply(event)?;
-        Ok(true)
+        if !self.is_requested_on_demand() && self.config_snapshot.as_ref() != Some(&rule) {
+            self.modify_config_snapshot(now, rule)?;
+        }
+
+        if self.retry_policy != retry_policy {
+            let event = FlowEventRetryPolicyModified {
+                event_time: now,
+                flow_id: self.flow_id,
+                flow_binding: self.flow_binding.clone(),
+                retry_policy,
+            };
+            self.apply(event)?;
+        }
+
+        Ok(())
     }
 
     /// Add extra activation cause, if it's unique

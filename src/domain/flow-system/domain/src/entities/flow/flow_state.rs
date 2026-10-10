@@ -33,7 +33,7 @@ pub struct FlowState {
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
     /// Flow config snapshot on the moment when flow was initiated
-    pub config_snapshot: Option<FlowConfigSnapshot>,
+    pub config_snapshot: Option<FlowConfigurationRule>,
     /// Retry policy used
     pub retry_policy: Option<RetryPolicy>,
 }
@@ -64,16 +64,13 @@ impl FlowState {
             .all(FlowActivationCause::is_auto_polling)
     }
 
-    /// Someone asked to run this flow by hand
-    pub fn has_manual_activation_cause(&self) -> bool {
+    /// Someone asked to run this flow by hand, or it continues an ingest that
+    /// has more to fetch: such a flow runs as soon as throttling allows, and
+    /// may carry a configuration rule of its own
+    pub fn is_requested_on_demand(&self) -> bool {
         self.activation_causes
             .iter()
-            .any(FlowActivationCause::is_manual)
-    }
-
-    /// Configuration rule the flow runs with, if any
-    pub fn config_rule(&self) -> Option<&FlowConfigurationRule> {
-        self.config_snapshot.as_ref().map(|snapshot| &snapshot.rule)
+            .any(FlowActivationCause::is_on_demand)
     }
 
     /// Extract primary activation cause
@@ -217,7 +214,7 @@ impl Projection for FlowState {
                     E::RetryPolicyModified(FlowEventRetryPolicyModified {
                         retry_policy, ..
                     }) => {
-                        if s.outcome.is_some() {
+                        if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState { retry_policy, ..s })

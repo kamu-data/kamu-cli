@@ -74,15 +74,6 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref()).await?;
 
-        // Pending flows only need to hear about an actual change
-        let is_changed = maybe_flow_configuration
-            .as_ref()
-            .is_none_or(|flow_configuration| {
-                !flow_configuration.is_active()
-                    || flow_configuration.rule != rule
-                    || flow_configuration.retry_policy != retry_policy
-            });
-
         let now = self.time_source.now();
         let mut flow_configuration = match maybe_flow_configuration {
             // Modification
@@ -102,19 +93,17 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
             .await
             .int_err()?;
 
-        if is_changed {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
-                    FlowConfigurationUpdatedMessage {
-                        event_time: now,
-                        flow_binding: flow_configuration.flow_binding.clone(),
-                        rule: flow_configuration.rule.clone(),
-                        retry_policy: flow_configuration.retry_policy,
-                    },
-                )
-                .await?;
-        }
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+                FlowConfigurationUpdatedMessage {
+                    event_time: now,
+                    flow_binding: flow_configuration.flow_binding.clone(),
+                    rule: flow_configuration.rule.clone(),
+                    retry_policy: flow_configuration.retry_policy,
+                },
+            )
+            .await?;
 
         Ok(flow_configuration.into())
     }

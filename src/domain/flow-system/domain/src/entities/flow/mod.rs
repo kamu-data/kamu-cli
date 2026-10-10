@@ -9,7 +9,6 @@
 
 mod flow_activation_cause;
 mod flow_activation_link;
-mod flow_config_snapshot;
 mod flow_event;
 mod flow_id;
 mod flow_outcome;
@@ -19,7 +18,6 @@ mod flow_status;
 
 pub use flow_activation_cause::*;
 pub use flow_activation_link::*;
-pub use flow_config_snapshot::*;
 pub use flow_event::*;
 pub use flow_id::*;
 pub use flow_outcome::*;
