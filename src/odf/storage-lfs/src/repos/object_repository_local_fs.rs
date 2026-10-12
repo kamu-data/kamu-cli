@@ -13,11 +13,13 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 use async_utils::AsyncReadObj;
 use bytes::Bytes;
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf_metadata::*;
-use odf_storage::{get_staging_name, *};
+use odf_storage::*;
 use tokio::io::AsyncWriteExt;
 use url::Url;
+
+use super::StagingFile;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,15 +66,6 @@ where
         Ok(self.get_path(hash))
     }
 
-    // TODO: Cleanup procedure for orphaned staging files?
-    fn get_staging_path(&self) -> Result<PathBuf, std::io::Error> {
-        if !self.root.exists() {
-            std::fs::create_dir_all(&self.root)?;
-        }
-
-        Ok(self.root.join(get_staging_name()))
-    }
-
     async fn write_stream_with_digest<'a>(
         &'a self,
         path: &'a Path,
@@ -99,6 +92,16 @@ where
         file.flush().await?;
 
         Ok(Multihash::new(Multicodec::try_from(C).unwrap(), &digest.finalize()).unwrap())
+    }
+
+    // Matches on the error of the operation itself rather than checking
+    // existence first, so a file removed concurrently still reads as not found
+    fn into_get_error(hash: &Multihash, err: std::io::Error) -> GetError {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            GetError::NotFound(ObjectNotFoundError { hash: hash.clone() })
+        } else {
+            err.int_err().into()
+        }
     }
 }
 
@@ -132,12 +135,9 @@ where
 
         tracing::debug!(?path, "Reading object size");
 
-        if !path.exists() {
-            return Err(GetError::NotFound(ObjectNotFoundError {
-                hash: hash.clone(),
-            }));
-        }
-        let metadata = tokio::fs::metadata(path).await.int_err()?;
+        let metadata = tokio::fs::metadata(path)
+            .await
+            .map_err(|err| Self::into_get_error(hash, err))?;
         Ok(metadata.len())
     }
 
@@ -147,12 +147,9 @@ where
 
         tracing::debug!(?path, "Reading object");
 
-        if !path.exists() {
-            return Err(GetError::NotFound(ObjectNotFoundError {
-                hash: hash.clone(),
-            }));
-        }
-        let data = tokio::fs::read(path).await.int_err()?;
+        let data = tokio::fs::read(path)
+            .await
+            .map_err(|err| Self::into_get_error(hash, err))?;
 
         Ok(Bytes::from(data))
     }
@@ -163,13 +160,9 @@ where
 
         tracing::debug!(?path, "Reading object stream");
 
-        if !path.exists() {
-            return Err(GetError::NotFound(ObjectNotFoundError {
-                hash: hash.clone(),
-            }));
-        }
-
-        let file = tokio::fs::File::open(path).await.int_err()?;
+        let file = tokio::fs::File::open(path)
+            .await
+            .map_err(|err| Self::into_get_error(hash, err))?;
 
         Ok(Box::new(file))
     }
@@ -223,13 +216,11 @@ where
             return Ok(InsertResult { hash });
         }
 
-        let staging_path = self.get_staging_path().int_err()?;
-
-        // Write to staging file
-        tokio::fs::write(&staging_path, data).await.int_err()?;
-
-        // Atomic move
-        std::fs::rename(&staging_path, path).int_err()?;
+        let staging_file = StagingFile::new_in(&self.root).int_err()?;
+        tokio::fs::write(staging_file.path(), data)
+            .await
+            .int_err()?;
+        staging_file.commit(&path).int_err()?;
 
         Ok(InsertResult { hash })
     }
@@ -240,10 +231,10 @@ where
         src: Box<AsyncReadObj>,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        let staging_path = self.get_staging_path().int_err()?;
+        let staging_file = StagingFile::new_in(&self.root).int_err()?;
 
         let actual_hash = self
-            .write_stream_with_digest(&staging_path, src)
+            .write_stream_with_digest(staging_file.path(), src)
             .await
             .int_err()?;
 
@@ -256,8 +247,6 @@ where
         if let Some(expected_hash) = options.expected_hash
             && *expected_hash != hash
         {
-            tokio::fs::remove_file(&staging_path).await.int_err()?;
-
             return Err(InsertError::HashMismatch(HashMismatchError {
                 expected: expected_hash.clone(),
                 actual: hash,
@@ -269,13 +258,10 @@ where
         tracing::debug!(?path, "Inserting object stream");
 
         if path.exists() {
-            tokio::fs::remove_file(&staging_path).await.int_err()?;
-
             return Ok(InsertResult { hash });
         }
 
-        // Atomic move
-        std::fs::rename(&staging_path, path).int_err()?;
+        staging_file.commit(&path).int_err()?;
 
         Ok(InsertResult { hash })
     }
@@ -322,10 +308,11 @@ where
 
         tracing::debug!(?path, "Deleting object");
 
-        if path.exists() {
-            tokio::fs::remove_file(&path).await.int_err()?;
+        match tokio::fs::remove_file(&path).await {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err.int_err().into()),
         }
-        Ok(())
     }
 }
 

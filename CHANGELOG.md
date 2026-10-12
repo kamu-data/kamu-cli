@@ -13,6 +13,11 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- The local disk cache of S3 metadata blocks writes entries atomically, so a failed or interrupted download
+  no longer leaves a truncated block that breaks the node until the cache is cleared
+
 ## [0.270.0] - 2026-10-12
 ### Added
 - GraphQL: `FlowEventRetryPolicyModified` flow history event, recorded when a waiting flow gets a new retry policy

@@ -21,6 +21,7 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents a content-addressable storage
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait]
 pub trait ObjectRepository: Send + Sync {
     /// Returns the protocol implemented by this repository
