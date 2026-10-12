@@ -38,6 +38,7 @@ use crate::queries::{
 
 pub struct Resources;
 
+/// Queries over declarative resources and their types
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Resources {
@@ -282,6 +283,7 @@ impl Resources {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of computing the resources summary of an account
 #[derive(Union, Debug, Clone)]
 pub enum ResourcesSummaryOutcome {
     Success(ResourcesSummary),
@@ -290,6 +292,7 @@ pub enum ResourcesSummaryOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of listing resources by selectors
 #[derive(Union)]
 pub enum ResourceListOutcome {
     Success(ResourceConnection),
@@ -300,6 +303,7 @@ pub enum ResourceListOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of listing resource handles by selectors
 #[derive(Union)]
 pub enum ResourceHandleListOutcome {
     Success(ResourceHandleConnection),

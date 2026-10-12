@@ -16,9 +16,12 @@ use crate::prelude::*;
 // NOTE: This type is kept for backward data compatibility.
 //        For new code, please use `CollectionPathV2`
 
-// Collection entry paths are similar to HTTP path components. They are rooted
-// (start with `/`), separated by forward slashes, with elements URL-encoded
-// (e.g. `/foo%20bar/baz`)
-simple_string_scalar!(CollectionPath, kamu_datasets::CollectionPath, from_str);
+simple_string_scalar!(
+    /// Path of a collection entry: rooted, slash-separated, with URL-encoded
+    /// elements (e.g. `/foo%20bar/baz`)
+    CollectionPath,
+    kamu_datasets::CollectionPath,
+    from_str
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -18,6 +18,7 @@ pub struct AccountFlowsMut<'a> {
     account: &'a Account,
 }
 
+/// Flow mutations scoped to an account
 #[Object]
 impl<'a> AccountFlowsMut<'a> {
     #[graphql(skip)]
@@ -25,6 +26,7 @@ impl<'a> AccountFlowsMut<'a> {
         Self { account }
     }
 
+    /// Flow trigger mutations for the account's datasets
     pub async fn triggers(&self) -> AccountFlowTriggersMut<'_> {
         AccountFlowTriggersMut::new(self.account)
     }

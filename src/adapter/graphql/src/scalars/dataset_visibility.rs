@@ -11,9 +11,12 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Who can see a dataset
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DatasetVisibility {
+    /// Only the owner and accounts granted access
     Private,
+    /// Everyone
     Public,
 }
 

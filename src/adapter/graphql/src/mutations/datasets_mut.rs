@@ -64,6 +64,7 @@ impl DatasetsMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Mutations that look up and create datasets
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl DatasetsMut {
@@ -413,20 +414,38 @@ impl DatasetsMut {
 // CreateDatasetResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of creating an empty dataset
 #[derive(Interface, Debug)]
 #[graphql(
-    field(name = "is_success", ty = "bool"),
-    field(name = "message", ty = "String")
+    field(
+        name = "is_success",
+        ty = "bool",
+        desc = "Whether the operation succeeded"
+    ),
+    field(
+        name = "message",
+        ty = "String",
+        desc = "Human-readable outcome message"
+    )
 )]
 pub enum CreateDatasetResult<'a> {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision<'a>),
 }
 
+/// Outcome of creating a dataset from a snapshot
 #[derive(Interface, Debug)]
 #[graphql(
-    field(name = "is_success", ty = "bool"),
-    field(name = "message", ty = "String")
+    field(
+        name = "is_success",
+        ty = "bool",
+        desc = "Whether the operation succeeded"
+    ),
+    field(
+        name = "message",
+        ty = "String",
+        desc = "Human-readable outcome message"
+    )
 )]
 pub enum CreateDatasetFromSnapshotResult<'a> {
     Success(CreateDatasetResultSuccess),
@@ -441,17 +460,21 @@ pub enum CreateDatasetFromSnapshotResult<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Dataset was created
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultSuccess {
+    /// Created dataset
     pub dataset: Dataset,
 }
 
 #[ComplexObject]
 impl CreateDatasetResultSuccess {
+    /// Always true
     pub async fn is_success(&self) -> bool {
         true
     }
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -459,18 +482,23 @@ impl CreateDatasetResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Dataset with the requested name already exists
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultNameCollision<'a> {
+    /// Owner account of the existing dataset, null in single-tenant mode
     pub account_name: Option<AccountName<'a>>,
+    /// Name that is already taken
     pub dataset_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
 impl CreateDatasetResultNameCollision<'_> {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         format!("Dataset with name '{}' already exists", self.dataset_name)
     }
@@ -478,14 +506,17 @@ impl CreateDatasetResultNameCollision<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Snapshot or the events in it are invalid
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultInvalidSnapshot {
+    /// Reason the snapshot was rejected
     pub message: String,
 }
 
 #[ComplexObject]
 impl CreateDatasetResultInvalidSnapshot {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
@@ -493,19 +524,23 @@ impl CreateDatasetResultInvalidSnapshot {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Derivative dataset references inputs that do not exist
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateDatasetResultMissingInputs {
     // TODO: Input can be referenced by ID or by name
     // do we need DatasetRef-style scalar for GQL?
+    /// References to the inputs that could not be resolved
     pub missing_inputs: Vec<String>,
 }
 
 #[ComplexObject]
 impl CreateDatasetResultMissingInputs {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         format!(
             "Dataset is referencing non-existing inputs: {}",

@@ -93,7 +93,8 @@ impl ResolveManifestAccountError {
     pub fn empty_selector() -> Self {
         Self::Resolution(ResourceAccountResolutionError {
             code: ResourceAccountResolutionProblemCode::EmptySelector,
-            message: "Account selector must specify at least one of `id`, `did`, or `name`"
+            message: "Account selector must specify `did` or `name`; `id` is only checked for \
+                      agreement"
                 .to_string(),
         })
     }

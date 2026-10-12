@@ -24,6 +24,7 @@ pub struct WebhookSubscriptionMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Mutations of a single webhook subscription
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl WebhookSubscriptionMut {
@@ -34,6 +35,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    /// Replaces the target URL, event types and label of the subscription
     pub async fn update(
         &self,
         ctx: &Context<'_>,
@@ -97,6 +99,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    /// Pauses deliveries of an enabled subscription
     pub async fn pause(&self, ctx: &Context<'_>) -> Result<PauseWebhookSubscriptionResult> {
         let pause_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::PauseWebhookSubscriptionUseCase);
@@ -125,6 +128,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    /// Resumes deliveries of a paused subscription
     pub async fn resume(&self, ctx: &Context<'_>) -> Result<ResumeWebhookSubscriptionResult> {
         let resume_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::ResumeWebhookSubscriptionUseCase);
@@ -153,6 +157,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    /// Re-enables a subscription that was marked unreachable
     pub async fn reactivate(
         &self,
         ctx: &Context<'_>,
@@ -184,6 +189,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    /// Generates a new signing secret, replacing the current one
     pub async fn rotate_secret(
         &self,
         ctx: &Context<'_>,
@@ -223,6 +229,7 @@ impl WebhookSubscriptionMut {
         }
     }
 
+    /// Removes the subscription
     pub async fn remove(&self, ctx: &Context<'_>) -> Result<RemoveWebhookSubscriptionResult> {
         let remove_webhook_subscription_use_case =
             from_catalog_n!(ctx, dyn kamu_webhooks::RemoveWebhookSubscriptionUseCase);
@@ -246,8 +253,13 @@ impl WebhookSubscriptionMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of updating a webhook subscription
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum UpdateWebhookSubscriptionResult {
     Success(UpdateWebhookSubscriptionResultSuccess),
     UpdateUnexpected(UpdateWebhookSubscriptionResultUnexpected),
@@ -256,27 +268,33 @@ pub enum UpdateWebhookSubscriptionResult {
     NoEventTypesProvided(WebhookSubscriptionNoEventTypesProvided),
 }
 
+/// Webhook subscription was updated
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpdateWebhookSubscriptionResultSuccess {
+    /// Always true
     updated: bool,
 }
 
 #[ComplexObject]
 impl UpdateWebhookSubscriptionResultSuccess {
+    /// Human-readable success message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
+/// Operation is not allowed in the current subscription status
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct UpdateWebhookSubscriptionResultUnexpected {
+    /// Current status of the subscription
     status: WebhookSubscriptionStatus,
 }
 
 #[ComplexObject]
 impl UpdateWebhookSubscriptionResultUnexpected {
+    /// Human-readable error message
     async fn message(&self) -> String {
         "Updating webhook subscription is unexpected at this state".to_string()
     }
@@ -284,34 +302,45 @@ impl UpdateWebhookSubscriptionResultUnexpected {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of pausing a webhook subscription
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum PauseWebhookSubscriptionResult {
     Success(PauseWebhookSubscriptionResultSuccess),
     PauseUnexpected(PauseWebhookSubscriptionResultUnexpected),
 }
 
+/// Webhook subscription was paused
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct PauseWebhookSubscriptionResultSuccess {
+    /// Always true
     paused: bool,
 }
 
 #[ComplexObject]
 impl PauseWebhookSubscriptionResultSuccess {
+    /// Human-readable success message
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
+/// Operation is not allowed in the current subscription status
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct PauseWebhookSubscriptionResultUnexpected {
+    /// Current status of the subscription
     status: WebhookSubscriptionStatus,
 }
 
 #[ComplexObject]
 impl PauseWebhookSubscriptionResultUnexpected {
+    /// Human-readable error message
     async fn message(&self) -> String {
         "Pausing webhook subscription is unexpected at this state".to_string()
     }
@@ -319,34 +348,45 @@ impl PauseWebhookSubscriptionResultUnexpected {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of resuming a webhook subscription
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum ResumeWebhookSubscriptionResult {
     Success(ResumeWebhookSubscriptionResultSuccess),
     ResumeUnexpected(ResumeWebhookSubscriptionResultUnexpected),
 }
 
+/// Webhook subscription was resumed
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ResumeWebhookSubscriptionResultSuccess {
+    /// Always true
     resumed: bool,
 }
 
 #[ComplexObject]
 impl ResumeWebhookSubscriptionResultSuccess {
+    /// Human-readable success message
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
+/// Operation is not allowed in the current subscription status
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ResumeWebhookSubscriptionResultUnexpected {
+    /// Current status of the subscription
     status: WebhookSubscriptionStatus,
 }
 
 #[ComplexObject]
 impl ResumeWebhookSubscriptionResultUnexpected {
+    /// Human-readable error message
     async fn message(&self) -> String {
         "Resuming webhook subscription is unexpected at this state".to_string()
     }
@@ -354,34 +394,45 @@ impl ResumeWebhookSubscriptionResultUnexpected {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of reactivating a webhook subscription
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum ReactivateWebhookSubscriptionResult {
     Success(ReactivateWebhookSubscriptionResultSuccess),
     ReactivateUnexpected(ReactivateWebhookSubscriptionResultUnexpected),
 }
 
+/// Webhook subscription was reactivated
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ReactivateWebhookSubscriptionResultSuccess {
+    /// Always true
     reactivated: bool,
 }
 
 #[ComplexObject]
 impl ReactivateWebhookSubscriptionResultSuccess {
+    /// Human-readable success message
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
+/// Operation is not allowed in the current subscription status
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ReactivateWebhookSubscriptionResultUnexpected {
+    /// Current status of the subscription
     status: WebhookSubscriptionStatus,
 }
 
 #[ComplexObject]
 impl ReactivateWebhookSubscriptionResultUnexpected {
+    /// Human-readable error message
     async fn message(&self) -> String {
         "Reactivating webhook subscription is unexpected at this state".to_string()
     }
@@ -389,20 +440,28 @@ impl ReactivateWebhookSubscriptionResultUnexpected {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of rotating a webhook subscription secret
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum RotateWebhookSubscriptionSecretResult {
     Success(RotateWebhookSubscriptionSecretSuccess),
 }
 
+/// Subscription secret was rotated
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RotateWebhookSubscriptionSecretSuccess {
+    /// New secret for verifying delivery signatures, returned only once
     new_secret: String,
 }
 
 #[ComplexObject]
 impl RotateWebhookSubscriptionSecretSuccess {
+    /// Human-readable success message
     async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -410,20 +469,28 @@ impl RotateWebhookSubscriptionSecretSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of removing a webhook subscription
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum RemoveWebhookSubscriptionResult {
     Success(RemoveWebhookSubscriptionResultSuccess),
 }
 
+/// Webhook subscription was removed
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RemoveWebhookSubscriptionResultSuccess {
+    /// Always true
     removed: bool,
 }
 
 #[ComplexObject]
 impl RemoveWebhookSubscriptionResultSuccess {
+    /// Human-readable success message
     async fn message(&self) -> String {
         "Success".to_string()
     }

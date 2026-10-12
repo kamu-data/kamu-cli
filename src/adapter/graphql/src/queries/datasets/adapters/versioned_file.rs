@@ -86,6 +86,7 @@ impl<'a> VersionedFile<'a> {
     }
 }
 
+/// Versioned file archetype view of a dataset, where each version is a file
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl VersionedFile<'_> {

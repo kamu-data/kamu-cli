@@ -94,6 +94,7 @@ impl Dataset {
     }
 }
 
+/// Dataset with its metadata, data and related information
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Dataset {
@@ -304,6 +305,7 @@ impl Dataset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Visibility of a dataset
 #[derive(Union, Debug, PartialEq, Eq)]
 pub enum DatasetVisibilityOutput {
     Private(PrivateDatasetVisibility),
@@ -322,15 +324,19 @@ impl DatasetVisibilityOutput {
     }
 }
 
+/// Dataset is visible only to its owner and collaborators
 #[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PrivateDatasetVisibilityInput")]
 pub struct PrivateDatasetVisibility {
+    /// Placeholder field without meaning, always null
     _dummy: Option<String>,
 }
 
+/// Dataset is readable by all authenticated users
 #[derive(SimpleObject, InputObject, Debug, PartialEq, Eq)]
 #[graphql(input_name = "PublicDatasetVisibilityInput")]
 pub struct PublicDatasetVisibility {
+    /// Whether anonymous (unauthenticated) users can read the dataset too
     pub anonymous_available: bool,
 }
 

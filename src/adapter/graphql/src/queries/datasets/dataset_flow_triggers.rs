@@ -19,6 +19,7 @@ pub struct DatasetFlowTriggers<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Flow trigger queries of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowTriggers<'a> {

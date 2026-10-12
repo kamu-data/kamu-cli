@@ -38,6 +38,7 @@ impl VersionedFileEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Single version of a versioned file
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl VersionedFileEntry {
@@ -122,6 +123,7 @@ page_based_connection!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Information needed to download file content directly from storage
 #[derive(SimpleObject)]
 pub struct VersionedFileContentDownload {
     /// Direct download URL

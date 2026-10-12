@@ -18,6 +18,7 @@ pub struct DatasetData<'a> {
     readable_state: &'a DatasetRequestState,
 }
 
+/// Data stored in a dataset and its statistics
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetData<'a> {

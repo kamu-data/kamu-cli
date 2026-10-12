@@ -131,6 +131,7 @@ impl Datasets {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Queries for looking up and listing datasets
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Datasets {

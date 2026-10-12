@@ -25,6 +25,7 @@ pub struct Flow {
     description: FlowDescription,
 }
 
+/// One run of a flow, possibly over several task attempts
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Flow {

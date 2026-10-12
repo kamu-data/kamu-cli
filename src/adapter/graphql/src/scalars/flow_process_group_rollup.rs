@@ -11,14 +11,22 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Counts of flow processes in a group by effective state
 #[derive(SimpleObject, Copy, Clone, PartialEq, Eq)]
 pub struct FlowProcessGroupRollup {
+    /// Number of processes in the group
     pub total: u32,
+    /// Number of processes running without failures
     pub active: u32,
+    /// Number of processes with failures below the stop threshold
     pub failing: u32,
+    /// Number of processes paused by a user
     pub paused: u32,
+    /// Number of processes without a trigger
     pub unconfigured: u32,
+    /// Number of processes stopped automatically
     pub stopped: u32,
+    /// Longest streak of failed runs in a row among the processes
     pub worst_consecutive_failures: u32,
 }
 

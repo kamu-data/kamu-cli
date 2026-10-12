@@ -33,9 +33,12 @@ pub struct Account {
     full_account_info: OnceCell<Box<kamu_accounts::Account>>,
 }
 
+/// Kind of account
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum AccountType {
+    /// Account of an individual user
     User,
+    /// Account of an organization
     Organization,
 }
 
@@ -163,6 +166,7 @@ impl Account {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// User or organization account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Account {

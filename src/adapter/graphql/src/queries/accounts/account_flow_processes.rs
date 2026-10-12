@@ -40,6 +40,7 @@ pub struct AccountFlowProcesses<'a> {
     account: &'a AccountEntity,
 }
 
+/// Recurring flow processes of the datasets owned by an account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountFlowProcesses<'a> {
@@ -50,6 +51,7 @@ impl<'a> AccountFlowProcesses<'a> {
         Self { account }
     }
 
+    /// State counts of dataset ingest and transform processes
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_primary_rollup, skip_all)]
     pub async fn primary_rollup(
         &self,
@@ -67,6 +69,7 @@ impl<'a> AccountFlowProcesses<'a> {
         Ok(rollup.into())
     }
 
+    /// State counts of webhook delivery processes
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_webhook_rollup, skip_all)]
     pub async fn webhook_rollup(
         &self,
@@ -80,6 +83,7 @@ impl<'a> AccountFlowProcesses<'a> {
         Ok(rollup.into())
     }
 
+    /// State counts of dataset and webhook delivery processes together
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_full_rollup, skip_all)]
     pub async fn full_rollup(
         &self,
@@ -101,6 +105,7 @@ impl<'a> AccountFlowProcesses<'a> {
         Ok(rollup.into())
     }
 
+    /// Page of dataset ingest and transform processes
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_primary_cards, skip_all, fields(?page, ?per_page))]
     pub async fn primary_cards(
         &self,
@@ -142,6 +147,7 @@ impl<'a> AccountFlowProcesses<'a> {
         ))
     }
 
+    /// Page of webhook delivery processes
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_webhook_cards, skip_all, fields(?page, ?per_page))]
     pub async fn webhook_cards(
         &self,
@@ -188,6 +194,7 @@ impl<'a> AccountFlowProcesses<'a> {
         ))
     }
 
+    /// Page of dataset and webhook delivery processes together
     #[tracing::instrument(level = "info", name = AccountFlowProcesses_all_cards, skip_all, fields(?page, ?per_page))]
     pub async fn all_cards(
         &self,
@@ -389,6 +396,7 @@ impl<'a> AccountFlowProcesses<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Flow process of an account: a dataset process or a webhook delivery
 #[derive(Union)]
 pub enum AccountFlowProcessCard {
     Dataset(DatasetFlowProcess),
@@ -405,6 +413,8 @@ page_based_connection!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Conditions a flow process must match; processes without a trigger are
+/// excluded unless states are given explicitly
 #[derive(InputObject, Debug, Default)]
 pub struct FlowProcessFilters {
     /// State filter
@@ -426,20 +436,27 @@ pub struct FlowProcessFilters {
     pub min_consecutive_failures: Option<u32>,
 }
 
+/// Time range with inclusive bounds
 #[derive(InputObject, Debug)]
 pub struct FlowProcessFiltersTimeRange {
+    /// Start of the range, inclusive
     pub start: DateTime<Utc>,
+    /// End of the range, inclusive
     pub end: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Sort order of flow processes
 #[derive(InputObject, Debug, Clone)]
 pub struct FlowProcessOrdering {
+    /// Property to sort by
     pub field: FlowProcessOrderField,
+    /// Sort direction
     pub direction: OrderingDirection,
 }
 
+/// Property of a flow process to sort by
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
 #[graphql(remote = "fs::FlowProcessOrderField")]
 pub enum FlowProcessOrderField {

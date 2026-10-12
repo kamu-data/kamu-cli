@@ -16,6 +16,7 @@ use crate::queries::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of applying one manifest: success, rejection or a validation problem
 #[derive(Union, Debug, Clone)]
 pub enum ResourceApplyOutcome {
     Success(ResourceApplySuccess),
@@ -32,6 +33,7 @@ pub enum ResourceApplyOutcome {
 /// The manifest text could not be parsed (malformed JSON/YAML).
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplyParseManifestProblem {
+    /// Human-readable description of the parse error
     pub message: String,
 }
 
@@ -40,19 +42,31 @@ pub struct ResourceApplyParseManifestProblem {
 /// A header field value (e.g. name, label key) failed validation.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceInvalidHeaderProblem {
+    /// Which header rule was violated
     pub code: ResourceHeaderValidationProblemCode,
+    /// Human-readable description of the violation
     pub message: String,
 }
 
+/// Kind of resource header validation failure
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceHeaderValidationProblemCode {
+    /// Resource name is empty
     EmptyName,
+    /// Resource name exceeds the maximum length
     NameTooLong,
+    /// Resource name has an invalid format
     InvalidName,
+    /// Number of labels exceeds the maximum
     TooManyLabels,
+    /// The same label key appears more than once
     DuplicateLabelKey,
+    /// Number of annotations exceeds the maximum
     TooManyAnnotations,
+    /// The same annotation key appears more than once
     DuplicateAnnotationKey,
+    /// A label or annotation key could not be resolved to a registered
+    /// extension schema, or its value is invalid for it
     ResourceExtensionSchema,
 }
 
@@ -91,7 +105,9 @@ impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvali
 /// The `spec` field failed domain validation.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceInvalidSpecProblem {
+    /// Schema URI of the resource type whose spec was rejected
     pub schema: TypeUri<'static>,
+    /// Human-readable description of the validation failure
     pub message: String,
 }
 
@@ -160,7 +176,9 @@ impl TryFrom<kamu_resources::ApplyManifestApplicationDecision> for ResourceApply
 /// than a pre-computed change list: clients decide how to diff and display it.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplySuccess {
+    /// Whether the resource was created, updated or left unchanged
     pub operation: ResourceApplyOperation,
+    /// Resource as it is (or would be, on a dry run) after the apply
     pub resource: Resource,
 
     /// Canonical manifest before the apply. Null **iff** the resource is being
@@ -171,24 +189,32 @@ pub struct ResourceApplySuccess {
     /// on an accepted apply.
     pub after: serde_json::Value,
 
+    /// Non-fatal issues found in the manifest
     pub warnings: Vec<ResourceApplyWarning>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Effect of an accepted apply on the resource
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "kamu_resources::ApplyResourceOutcome")]
 pub enum ResourceApplyOperation {
+    /// A new resource was created
     Created,
+    /// An existing resource's spec or headers changed
     Updated,
+    /// The manifest matched the existing resource, nothing changed
     Untouched,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The resource type refused the requested change
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplyRejection {
+    /// Kind of rule the change violated
     pub category: ResourceApplyRejectionCategory,
+    /// Human-readable reason for the rejection
     pub message: String,
 }
 
@@ -203,10 +229,14 @@ impl From<kamu_resources::ApplyManifestRejection> for ResourceApplyRejection {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Non-fatal issue found while applying a manifest
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplyWarning {
+    /// Machine-readable warning code, e.g. `missing_description`
     pub code: String,
+    /// Dotted path to the manifest field concerned, null if not field-specific
     pub path: Option<String>,
+    /// Human-readable description of the warning
     pub message: String,
 }
 
@@ -222,12 +252,17 @@ impl From<kamu_resources::ResourceWarning> for ResourceApplyWarning {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reason a resource manifest was rejected
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "kamu_resources::ApplyResourceRejectionCategory")]
 pub enum ResourceApplyRejectionCategory {
+    /// The manifest changes a field that cannot be modified after creation
     ImmutableFieldChanged,
+    /// The spec violates a rule of the resource type
     BusinessValidationFailed,
+    /// The spec refers to an object that does not exist
     ReferencedObjectMissing,
+    /// The change conflicts with the resource's current lifecycle state
     LifecycleRuleConflict,
 }
 

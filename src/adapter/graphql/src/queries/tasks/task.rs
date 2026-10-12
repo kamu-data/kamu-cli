@@ -20,6 +20,7 @@ pub struct Task {
     state: ts::TaskState,
 }
 
+/// Unit of work executed on behalf of a flow
 #[Object]
 impl Task {
     #[graphql(skip)]

@@ -483,8 +483,8 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   optional. The account is looked up by `did` if given, else by `name`; any other selector field(s)
   present are then checked for agreement against the resolved account (a mismatch on `id`, `did`, or
   `name` → `SelectorMismatch`). An empty selector (`{}`) parses successfully (the struct derives
-  `Default`) but is rejected by the resolver itself with `EmptySelector`, since at least one of
-  `id`/`did`/`name` is required to resolve an account.
+  `Default`) but is rejected by the resolver itself with `EmptySelector`. So is a selector with only
+  `id`: lookup needs `did` or `name`.
 - **Remote calls.** For a remote context the CLI authenticates with an access token; the server then
   resolves the *authenticated principal* into the current account subject exactly as above — the
   client never asserts its own account id, the server derives it.

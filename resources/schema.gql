@@ -5,6 +5,9 @@
 # make codegen-graphql-schema
 # ```
 
+"""
+A page of `ViewAccessToken` items
+"""
 type AccessTokenConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -18,15 +21,30 @@ type AccessTokenConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [AccessTokenEdge!]!
 }
 
+"""
+An edge wrapping a single `ViewAccessToken` item
+"""
 type AccessTokenEdge {
+	"""
+	The item itself
+	"""
 	node: ViewAccessToken!
 }
 
+"""
+Unique identifier of an access token
+"""
 scalar AccessTokenID
 
+"""
+User or organization account
+"""
 type Account {
 	"""
 	Unique and stable identifier of this account.
@@ -96,15 +114,33 @@ type Account {
 	quotas: AccountQuotas!
 }
 
+"""
+Access tokens of an account
+"""
 type AccountAccessTokens {
+	"""
+	Lists access tokens of this account, including revoked ones
+	"""
 	listAccessTokens(page: Int, perPage: Int): AccessTokenConnection!
 }
 
+"""
+Mutations managing access tokens of an account
+"""
 type AccountAccessTokensMut {
+	"""
+	Creates a new access token with the given name for this account
+	"""
 	createAccessToken(tokenName: String!): CreateTokenResult!
+	"""
+	Revokes the access token with the given ID
+	"""
 	revokeAccessToken(tokenId: AccessTokenID!): RevokeResult!
 }
 
+"""
+A page of `Account` items
+"""
 type AccountConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -118,35 +154,89 @@ type AccountConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [AccountEdge!]!
 }
 
+"""
+Change of an account's role in a dataset
+"""
 input AccountDatasetRelationOperation {
+	"""
+	Account whose role changes
+	"""
 	accountId: AccountID!
+	"""
+	Change to apply
+	"""
 	operation: DatasetRoleOperation!
+	"""
+	Dataset the role applies to
+	"""
 	datasetId: DatasetID!
 }
 
+"""
+Account name to display
+"""
 scalar AccountDisplayName
 
+"""
+An edge wrapping a single `Account` item
+"""
 type AccountEdge {
+	"""
+	The item itself
+	"""
 	node: Account!
 }
 
+"""
+Account was not created: a unique field value is already taken
+"""
 type AccountFieldNonUnique implements CreateAccountResult {
+	"""
+	Name of the field whose value is already taken
+	"""
 	field: String!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Filters for flows of an account's datasets
+"""
 input AccountFlowFilters {
+	"""
+	Only flows in one of these statuses
+	"""
 	byStatus: [FlowStatus!]
+	"""
+	Only flows started by the given initiator
+	"""
 	byInitiator: InitiatorFilterInput
+	"""
+	Only flows of these datasets, empty means all owned datasets
+	"""
 	byDatasetIds: [DatasetID!]!
+	"""
+	Only flows of the given process kind
+	"""
 	byProcessType: FlowProcessTypeFilterInput
 }
 
+"""
+Flow process of an account: a dataset process or a webhook delivery
+"""
 union AccountFlowProcessCard = DatasetFlowProcess | WebhookFlowSubProcess
 
+"""
+A page of `AccountFlowProcessCard` items
+"""
 type AccountFlowProcessCardConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -160,27 +250,69 @@ type AccountFlowProcessCardConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [AccountFlowProcessCardEdge!]!
 }
 
+"""
+An edge wrapping a single `AccountFlowProcessCard` item
+"""
 type AccountFlowProcessCardEdge {
+	"""
+	The item itself
+	"""
 	node: AccountFlowProcessCard!
 }
 
+"""
+Recurring flow processes of the datasets owned by an account
+"""
 type AccountFlowProcesses {
+	"""
+	State counts of dataset ingest and transform processes
+	"""
 	primaryRollup(filters: FlowProcessFilters): FlowProcessGroupRollup!
+	"""
+	State counts of webhook delivery processes
+	"""
 	webhookRollup(filters: FlowProcessFilters): FlowProcessGroupRollup!
+	"""
+	State counts of dataset and webhook delivery processes together
+	"""
 	fullRollup(filters: FlowProcessFilters): FlowProcessGroupRollup!
+	"""
+	Page of dataset ingest and transform processes
+	"""
 	primaryCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): DatasetFlowProcessConnection!
+	"""
+	Page of webhook delivery processes
+	"""
 	webhookCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): WebhookFlowSubProcessConnection!
+	"""
+	Page of dataset and webhook delivery processes together
+	"""
 	allCards(filters: FlowProcessFilters, ordering: FlowProcessOrdering, page: Int, perPage: Int): AccountFlowProcessCardConnection!
 }
 
+"""
+Flow run queries across datasets owned by an account
+"""
 type AccountFlowRuns {
+	"""
+	Lists flows of the account's datasets, paginated and optionally filtered
+	"""
 	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters, order: FlowRunOrder): FlowConnection!
+	"""
+	Lists the account's datasets that have at least one flow
+	"""
 	listDatasetsWithFlow: DatasetConnection!
 }
 
+"""
+Flow trigger queries across datasets owned by an account
+"""
 type AccountFlowTriggers {
 	"""
 	Checks if all triggers of all datasets in account are disabled
@@ -188,11 +320,23 @@ type AccountFlowTriggers {
 	allPaused: Boolean!
 }
 
+"""
+Flow trigger mutations across all datasets owned by an account
+"""
 type AccountFlowTriggersMut {
+	"""
+	Resumes flow triggers of all datasets owned by the account
+	"""
 	resumeAccountDatasetFlows: Boolean!
+	"""
+	Pauses flow triggers of all datasets owned by the account
+	"""
 	pauseAccountDatasetFlows: Boolean!
 }
 
+"""
+Flow queries scoped to an account
+"""
 type AccountFlows {
 	"""
 	Returns interface for flow processes summary queries
@@ -208,7 +352,13 @@ type AccountFlows {
 	triggers: AccountFlowTriggers!
 }
 
+"""
+Flow mutations scoped to an account
+"""
 type AccountFlowsMut {
+	"""
+	Flow trigger mutations for the account's datasets
+	"""
 	triggers: AccountFlowTriggersMut!
 }
 
@@ -232,12 +382,24 @@ type AccountHandle {
 	name: AccountName!
 }
 
+"""
+Unique and stable identifier of an account (`did:...`)
+"""
 scalar AccountID
 
+"""
+Filters narrowing an account name lookup
+"""
 input AccountLookupFilter {
+	"""
+	Accounts to leave out of the results
+	"""
 	excludeAccountsByIds: [AccountID!]!
 }
 
+"""
+Mutations of a single account
+"""
 type AccountMut {
 	"""
 	Convert to read-only accessor to an account
@@ -285,16 +447,37 @@ type AccountMut {
 	quotas: AccountQuotasMut!
 }
 
+"""
+Unique symbolic name of an account
+"""
 scalar AccountName
 
+"""
+Account password
+"""
 scalar AccountPassword
 
+"""
+Method an account uses to log in
+"""
 enum AccountProvider {
+	"""
+	Login with account name and password
+	"""
 	PASSWORD
+	"""
+	Login via GitHub OAuth
+	"""
 	OAUTH_GITHUB
+	"""
+	Login by signing a message with an Ethereum wallet
+	"""
 	WEB3_WALLET
 }
 
+"""
+Quotas of an account
+"""
 type AccountQuotas {
 	"""
 	User-level quotas
@@ -302,6 +485,9 @@ type AccountQuotas {
 	user: AccountQuotasUsage!
 }
 
+"""
+Mutations of account quotas
+"""
 type AccountQuotasMut {
 	"""
 	Setting quotas at the account level.
@@ -309,6 +495,9 @@ type AccountQuotasMut {
 	setAccountQuotas(quotas: SetAccountQuotasInput!): SetAccountQuotasResult!
 }
 
+"""
+User-level quotas of an account
+"""
 type AccountQuotasUsage {
 	"""
 	User-level quotas
@@ -316,6 +505,9 @@ type AccountQuotasUsage {
 	storage: AccountQuotasUsageStorage!
 }
 
+"""
+Storage quotas of an account
+"""
 type AccountQuotasUsageStorage {
 	"""
 	Total bytes limit for this account, or `null` when the storage of this
@@ -331,25 +523,61 @@ Resolves by `did` if given, else by `name`; any other field present is then
 checked for agreement, so a mismatch is reported rather than ignored.
 """
 input AccountRefInput {
+	"""
+	Resource ID of the account, only checked for agreement
+	"""
 	id: ResourceID
+	"""
+	Account DID, used for lookup when given
+	"""
 	did: AccountID
+	"""
+	Account name, used for lookup when `did` is absent
+	"""
 	name: AccountName
 }
 
+"""
+Kind of account
+"""
 enum AccountType {
+	"""
+	Account of an individual user
+	"""
 	USER
+	"""
+	Account of an organization
+	"""
 	ORGANIZATION
 }
 
+"""
+Resource usage of an account
+"""
 type AccountUsage {
+	"""
+	Aggregated storage statistics of datasets owned by the account
+	"""
 	storage: TotalDatasetsStatistic!
 }
 
+"""
+Collaborator of a dataset with their role
+"""
 type AccountWithRole {
+	"""
+	Collaborator account
+	"""
 	account: Account!
+	"""
+	Role of the account in the dataset
+	"""
 	role: DatasetAccessRole!
 }
 
+"""
+A page of `AccountWithRole` items
+"""
 type AccountWithRoleConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -363,13 +591,25 @@ type AccountWithRoleConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [AccountWithRoleEdge!]!
 }
 
+"""
+An edge wrapping a single `AccountWithRole` item
+"""
 type AccountWithRoleEdge {
+	"""
+	The item itself
+	"""
 	node: AccountWithRole!
 }
 
+"""
+Account lookup queries
+"""
 type Accounts {
 	"""
 	Returns the account that is making the call (authorized subject)
@@ -406,6 +646,9 @@ type Accounts {
 	): [Account!]!
 }
 
+"""
+Mutations of accounts
+"""
 type AccountsMut {
 	"""
 	Returns the mutable account that is making the call (authorized subject)
@@ -517,24 +760,57 @@ type AddPushSource {
 	merge: MergeStrategy!
 }
 
+"""
+Administrative queries, available only to administrators
+"""
 type Admin {
+	"""
+	Checks that the caller has administrator access, returns "OK"
+	"""
 	selfTest: String!
 }
 
+"""
+Administrative mutations, available only to administrators
+"""
 type AdminMut {
+	"""
+	Search index administration
+	"""
 	search: AdminSearchMut!
 }
 
+"""
+Search index administration
+"""
 type AdminSearchMut {
+	"""
+	Drops and fully rebuilds the given search indices, all of them if none are given
+	"""
 	resetSearchIndices(entityNames: [SearchEntityName!]): String!
 }
 
+"""
+One manifest to apply as part of a batch
+"""
 input ApplyManifestInput {
+	"""
+	Manifest text describing the desired resource state
+	"""
 	manifest: String!
+	"""
+	Format the manifest text is in
+	"""
 	format: ResourceManifestFormat!
 }
 
+"""
+Account-dataset relations were applied
+"""
 type ApplyRolesMatrixResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
@@ -573,26 +849,59 @@ type AttachmentsEmbedded {
 	items: [AttachmentEmbedded!]!
 }
 
+"""
+Authentication and authorization queries
+"""
 type Auth {
+	"""
+	Login methods enabled on this node
+	"""
 	enabledProviders: [AccountProvider!]!
+	"""
+	Dataset roles granted to the given accounts
+	"""
 	relations(accountIds: [AccountID!]!, page: Int, perPage: Int): AuthRelationConnection!
 }
 
+"""
+Authentication mutations
+"""
 type AuthMut {
 	"""
 	Web3-related functionality group
 	"""
 	web3: AuthWeb3Mut!
+	"""
+	Logs in with the given provider credentials and issues an access token
+	"""
 	login(loginMethod: AccountProvider!, loginCredentialsJson: String!, deviceCode: DeviceCode): LoginResponse!
+	"""
+	Returns the account that the given access token belongs to
+	"""
 	accountDetails(accessToken: String!): Account!
 }
 
+"""
+Role an account has in a dataset
+"""
 type AuthRelation {
+	"""
+	Account the role is granted to
+	"""
 	account: Account!
+	"""
+	Role of the account in the dataset
+	"""
 	role: DatasetAccessRole!
+	"""
+	Dataset the role applies to
+	"""
 	dataset: Dataset!
 }
 
+"""
+A page of `AuthRelation` items
+"""
 type AuthRelationConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -606,14 +915,29 @@ type AuthRelationConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [AuthRelationEdge!]!
 }
 
+"""
+An edge wrapping a single `AuthRelation` item
+"""
 type AuthRelationEdge {
+	"""
+	The item itself
+	"""
 	node: AuthRelation!
 }
 
+"""
+Web3 wallet authentication mutations
+"""
 type AuthWeb3Mut {
+	"""
+	Issues a nonce for the wallet to sign in a Sign-In with Ethereum message
+	"""
 	eip4361AuthNonce(account: EvmWalletAddress!): Eip4361AuthNonceResponse!
 }
 
@@ -622,74 +946,212 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
+"""
+Resource handle found for one reference of a batch
+"""
 type BatchResourceHandleSuccess {
+	"""
+	Zero-based position of the reference in the request
+	"""
 	requestIndex: Int!
+	"""
+	Handle of the resource the reference resolved to
+	"""
 	handle: ResourceHandle!
 }
 
+"""
+Result of looking up resource handles by reference
+"""
 union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
+"""
+Resource handles found and references that could not be resolved
+"""
 type BatchResourceHandlesResult {
+	"""
+	Handles found, one per resolved reference
+	"""
 	handles: [BatchResourceHandleSuccess!]!
+	"""
+	References that could not be resolved
+	"""
 	problems: [BatchResourceProblem!]!
 }
 
+"""
+Manifest rendered for one reference of a batch
+"""
 type BatchResourceManifestSuccess {
+	"""
+	Zero-based position of the reference in the request
+	"""
 	requestIndex: Int!
+	"""
+	Manifest of the resource the reference resolved to
+	"""
 	manifest: ResourceRenderManifestResult!
 }
 
+"""
+Result of rendering manifests for resources looked up by reference
+"""
 union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
+"""
+Rendered manifests and references that could not be resolved
+"""
 type BatchResourceManifestsResult {
+	"""
+	Manifests rendered, one per resolved reference
+	"""
 	manifests: [BatchResourceManifestSuccess!]!
+	"""
+	References that could not be resolved
+	"""
 	problems: [BatchResourceProblem!]!
 }
 
+"""
+Reference of a batch that could not be resolved
+"""
 type BatchResourceProblem {
+	"""
+	Zero-based position of the reference in the request
+	"""
 	requestIndex: Int!
+	"""
+	Why the reference could not be resolved
+	"""
 	problem: ResourceLookupProblem!
 }
 
+"""
+Resource found for one reference of a batch
+"""
 type BatchResourceSuccess {
+	"""
+	Zero-based position of the reference in the request
+	"""
 	requestIndex: Int!
+	"""
+	Resource the reference resolved to
+	"""
 	resource: Resource!
 }
 
+"""
+Result of looking up resources by reference
+"""
 union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
+"""
+Resources found and references that could not be resolved
+"""
 type BatchResourcesResult {
+	"""
+	Resources found, one per resolved reference
+	"""
 	resources: [BatchResourceSuccess!]!
+	"""
+	References that could not be resolved
+	"""
 	problems: [BatchResourceProblem!]!
 }
 
+"""
+Named reference to a metadata block
+"""
 type BlockRef {
+	"""
+	Name of the reference, e.g. `head`
+	"""
 	name: String!
+	"""
+	Hash of the block the reference points to
+	"""
 	blockHash: Multihash!
 }
 
+"""
+Build details of the running server; fields are null when unknown
+"""
 type BuildInfo {
+	"""
+	Version of the application
+	"""
 	appVersion: String!
+	"""
+	Time the binary was built
+	"""
 	buildTimestamp: String
+	"""
+	Output of `git describe` for the built revision
+	"""
 	gitDescribe: String
+	"""
+	Git commit hash the binary was built from
+	"""
 	gitSha: String
+	"""
+	Date of the git commit the binary was built from
+	"""
 	gitCommitDate: String
+	"""
+	Git branch the binary was built from
+	"""
 	gitBranch: String
+	"""
+	Version of the Rust compiler
+	"""
 	rustcSemver: String
+	"""
+	Release channel of the Rust compiler
+	"""
 	rustcChannel: String
+	"""
+	Host target triple of the Rust compiler
+	"""
 	rustcHostTriple: String
+	"""
+	Commit hash of the Rust compiler
+	"""
 	rustcCommitSha: String
+	"""
+	Target triple the binary was built for
+	"""
 	cargoTargetTriple: String
+	"""
+	Cargo features enabled in the build
+	"""
 	cargoFeatures: String
+	"""
+	Compiler optimization level of the build
+	"""
 	cargoOptLevel: String
 }
 
+"""
+Outcome of cancelling a flow run
+"""
 interface CancelFlowRunResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Flow run was cancelled
+"""
 type CancelFlowRunSuccess implements CancelFlowRunResult {
+	"""
+	Flow after cancellation
+	"""
 	flow: Flow!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
@@ -709,11 +1171,23 @@ type Checkpoint {
 	size: Uint64!
 }
 
+"""
+Kamu CLI commands to sync a dataset with this node
+"""
 type CliProtocolDesc {
+	"""
+	Command that pulls the dataset from this node
+	"""
 	pullCommand: String!
+	"""
+	Command that pushes a local dataset to this node
+	"""
 	pushCommand: String!
 }
 
+"""
+Mutations that manage account access to datasets in bulk
+"""
 type CollaborationMut {
 	"""
 	Batch application of relations between accounts and datasets
@@ -721,6 +1195,9 @@ type CollaborationMut {
 	applyAccountDatasetRelations(operations: [AccountDatasetRelationOperation!]!): ApplyRolesMatrixResult!
 }
 
+"""
+Collection archetype view of a dataset: a set of entries linking to other datasets by path
+"""
 type Collection {
 	"""
 	Latest state projection of the state of a collection
@@ -733,6 +1210,9 @@ type Collection {
 	asOf(blockHash: Multihash!): CollectionProjection!
 }
 
+"""
+Entry of a collection that links a path to a dataset
+"""
 type CollectionEntry {
 	"""
 	System time when this entry was created
@@ -762,6 +1242,9 @@ type CollectionEntry {
 	asDataset: Dataset
 }
 
+"""
+A page of `CollectionEntry` items
+"""
 type CollectionEntryConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -775,13 +1258,25 @@ type CollectionEntryConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [CollectionEntryEdge!]!
 }
 
+"""
+An edge wrapping a single `CollectionEntry` item
+"""
 type CollectionEntryEdge {
+	"""
+	The item itself
+	"""
 	node: CollectionEntry!
 }
 
+"""
+Collection entry to add
+"""
 input CollectionEntryInput {
 	"""
 	Entry path
@@ -797,6 +1292,9 @@ input CollectionEntryInput {
 	extraData: ExtraData
 }
 
+"""
+Mutations of a collection dataset
+"""
 type CollectionMut {
 	"""
 	Links new entry to this collection
@@ -816,8 +1314,15 @@ type CollectionMut {
 	updateEntries(operations: [CollectionUpdateInput!]!, expectedHead: Multihash): CollectionUpdateResult!
 }
 
+"""
+Path of a collection entry: rooted, slash-separated, with URL-encoded
+elements (e.g. `/foo%20bar/baz`)
+"""
 scalar CollectionPath
 
+"""
+State of a collection at a specific point in its history
+"""
 type CollectionProjection {
 	"""
 	Returns an entry at the specified path
@@ -843,27 +1348,75 @@ type CollectionProjection {
 	entriesByRef(refs: [DatasetID!]!): [CollectionEntry!]!
 }
 
+"""
+Dataset head did not match the expected one, likely due to a concurrent update
+"""
 type CollectionUpdateErrorCasFailed implements CollectionUpdateResult {
+	"""
+	Head block hash the caller expected
+	"""
 	expectedHead: Multihash!
+	"""
+	Current head block hash of the dataset, null if it has none
+	"""
 	actualHead: Multihash
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Entry referenced by an operation does not exist
+"""
 type CollectionUpdateErrorNotFound implements CollectionUpdateResult {
+	"""
+	Path that was not found
+	"""
 	path: CollectionPath!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Update would exceed the storage quota of the account
+"""
 type CollectionUpdateErrorQuotaExceeded implements CollectionUpdateResult {
+	"""
+	Storage already used, in bytes; null if no quota is configured
+	"""
 	used: Int
+	"""
+	Size of the rejected data, in bytes; null if no quota is configured
+	"""
 	incoming: Int
+	"""
+	Storage limit, in bytes; null if no quota is configured
+	"""
 	limit: Int
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Single collection update operation; exactly one field must be set
+"""
 input CollectionUpdateInput {
 	"""
 	Inserts a new entry under the specified path. If an entry at the target
@@ -883,12 +1436,27 @@ input CollectionUpdateInput {
 	remove: CollectionUpdateInputRemove
 }
 
+"""
+Adds an entry to the collection
+"""
 input CollectionUpdateInputAdd {
+	"""
+	Entry to add
+	"""
 	entry: CollectionEntryInput!
 }
 
+"""
+Moves an entry to a new path
+"""
 input CollectionUpdateInputMove {
+	"""
+	Current path of the entry
+	"""
 	pathFrom: CollectionPath!
+	"""
+	New path of the entry
+	"""
 	pathTo: CollectionPath!
 	"""
 	Optionally update the extra data
@@ -896,24 +1464,63 @@ input CollectionUpdateInputMove {
 	extraData: ExtraData
 }
 
+"""
+Removes an entry from the collection
+"""
 input CollectionUpdateInputRemove {
+	"""
+	Path of the entry to remove
+	"""
 	path: CollectionPath!
 }
 
+"""
+Outcome of updating collection entries
+"""
 interface CollectionUpdateResult {
+	"""
+	Whether the operation succeeded
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Collection entries were updated
+"""
 type CollectionUpdateSuccess implements CollectionUpdateResult {
+	"""
+	Hash of the metadata chain head before the update
+	"""
 	oldHead: Multihash!
+	"""
+	Hash of the metadata chain head after the update
+	"""
 	newHead: Multihash!
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
+	"""
+	Always empty
+	"""
 	message: String!
 }
 
+"""
+Operations did not change the collection
+"""
 type CollectionUpdateUpToDate implements CollectionUpdateResult {
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
+	"""
+	Always empty
+	"""
 	message: String!
 }
 
@@ -931,41 +1538,110 @@ input ColumnInput {
 	type: DataTypeInput!
 }
 
+"""
+Outcome of committing an event to the metadata chain
+"""
 interface CommitResult {
+	"""
+	Whether the operation succeeded
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Event could not be appended to the metadata chain
+"""
 type CommitResultAppendError implements CommitResult & UpdateReadmeResult {
+	"""
+	Reason the append failed
+	"""
 	message: String!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
 }
 
+"""
+Event was committed to the metadata chain
+"""
 type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
+	"""
+	Hash of the chain head before the commit, null if the chain was empty
+	"""
 	oldHead: Multihash
+	"""
+	Hash of the new chain head
+	"""
 	newHead: Multihash!
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of comparing a remote metadata chain with the local one
+"""
 union CompareChainsResult = CompareChainsResultStatus | CompareChainsResultError
 
+"""
+Metadata chains could not be compared
+"""
 type CompareChainsResultError {
+	"""
+	Reason of the failure
+	"""
 	reason: CompareChainsResultReason!
 }
 
+"""
+Reason the metadata chains could not be compared
+"""
 type CompareChainsResultReason {
+	"""
+	Description of the problem
+	"""
 	message: String!
 }
 
+"""
+Metadata chains were compared successfully
+"""
 type CompareChainsResultStatus {
+	"""
+	State of the remote chain relative to the local one
+	"""
 	message: CompareChainsStatus!
 }
 
+"""
+State of a remote metadata chain relative to the local one
+"""
 enum CompareChainsStatus {
+	"""
+	Both chains have the same head
+	"""
 	EQUAL
+	"""
+	Remote is missing blocks the local chain has
+	"""
 	BEHIND
+	"""
+	Remote has blocks the local chain is missing
+	"""
 	AHEAD
+	"""
+	Chains have diverged or belong to different datasets
+	"""
 	DIVERGED
 }
 
@@ -979,82 +1655,223 @@ enum CompressionFormat {
 	ZIP
 }
 
+"""
+Access token was not created: the account already has a token with this name
+"""
 type CreateAccessTokenResultDuplicate implements CreateTokenResult {
+	"""
+	Name that is already taken
+	"""
 	tokenName: String!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Access token was created
+"""
 type CreateAccessTokenResultSuccess implements CreateTokenResult {
+	"""
+	The created token
+	"""
 	token: CreatedAccessToken!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating an account
+"""
 interface CreateAccountResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Account was created
+"""
 type CreateAccountSuccess implements CreateAccountResult {
+	"""
+	The created account
+	"""
 	account: Account!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating a dataset from a snapshot
+"""
 interface CreateDatasetFromSnapshotResult {
+	"""
+	Whether the operation succeeded
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating an empty dataset
+"""
 interface CreateDatasetResult {
+	"""
+	Whether the operation succeeded
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Snapshot or the events in it are invalid
+"""
 type CreateDatasetResultInvalidSnapshot implements CreateDatasetFromSnapshotResult {
+	"""
+	Reason the snapshot was rejected
+	"""
 	message: String!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
 }
 
+"""
+Derivative dataset references inputs that do not exist
+"""
 type CreateDatasetResultMissingInputs implements CreateDatasetFromSnapshotResult {
+	"""
+	References to the inputs that could not be resolved
+	"""
 	missingInputs: [String!]!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Dataset with the requested name already exists
+"""
 type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
+	"""
+	Owner account of the existing dataset, null in single-tenant mode
+	"""
 	accountName: AccountName
+	"""
+	Name that is already taken
+	"""
 	datasetName: DatasetName!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Dataset was created
+"""
 type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
+	"""
+	Created dataset
+	"""
 	dataset: Dataset!
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating an access token
+"""
 interface CreateTokenResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating wallet accounts
+"""
 interface CreateWalletAccountsResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Wallet accounts exist for all given addresses
+"""
 type CreateWalletAccountsSuccess implements CreateWalletAccountsResult {
+	"""
+	Accounts of the given wallets, including already existing ones
+	"""
 	accounts: [Account!]!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating a webhook subscription
+"""
 interface CreateWebhookSubscriptionResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Webhook subscription was created
+"""
 type CreateWebhookSubscriptionResultSuccess implements CreateWebhookSubscriptionResult {
+	"""
+	Unique identifier of the new subscription
+	"""
 	subscriptionId: String!
+	"""
+	Secret for verifying delivery signatures, returned only once
+	"""
 	secret: String!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Newly created access token, including its secret value
+"""
 type CreatedAccessToken {
 	"""
 	Unique identifier of the access token
@@ -1074,26 +1891,62 @@ type CreatedAccessToken {
 	account: Account!
 }
 
+"""
+Cron schedule of a trigger
+"""
 type Cron5ComponentExpression {
+	"""
+	Cron expression: min hour dayOfMonth month dayOfWeek
+	"""
 	cron5ComponentExpression: String!
 }
 
+"""
+Batch of records encoded in the requested format
+"""
 type DataBatch {
+	"""
+	Format the content is encoded in
+	"""
 	format: DataBatchFormat!
+	"""
+	Encoded records
+	"""
 	content: String!
+	"""
+	Number of records in the batch
+	"""
 	numRecords: Int!
 }
 
+"""
+Encoding of the records in a data batch
+"""
 enum DataBatchFormat {
 	"""
 	Deprecated: Use `JSON_AOS` instead and expect it to become default in
 	future versions
 	"""
 	JSON
+	"""
+	JSON array of objects, one object per record
+	"""
 	JSON_AOS
+	"""
+	JSON object with an array of values per column
+	"""
 	JSON_SOA
+	"""
+	JSON array of arrays, one array of values per record
+	"""
 	JSON_AOA
+	"""
+	Newline-delimited JSON, one object per line
+	"""
 	ND_JSON
+	"""
+	CSV with a header row
+	"""
 	CSV
 	"""
 	Deprecated: Use `ND_JSON` instead
@@ -1101,6 +1954,9 @@ enum DataBatchFormat {
 	JSON_LD
 }
 
+"""
+Queries that operate on data across datasets
+"""
 type DataQueries {
 	"""
 	Executes a specified query and returns its result
@@ -1112,37 +1968,101 @@ type DataQueries {
 	knownEngines: [EngineDesc!]!
 }
 
+"""
+Outcome of a data query
+"""
 union DataQueryResult = DataQueryResultSuccess | DataQueryResultError
 
+"""
+Query could not be executed
+"""
 type DataQueryResultError {
+	"""
+	Description of the problem
+	"""
 	errorMessage: String!
+	"""
+	Category of the problem
+	"""
 	errorKind: DataQueryResultErrorKind!
 }
 
+"""
+Category of a query error
+"""
 enum DataQueryResultErrorKind {
+	"""
+	Query is malformed or refers to a dataset or block that does not exist
+	"""
 	INVALID_SQL
 }
 
+"""
+Query executed successfully
+"""
 type DataQueryResultSuccess {
+	"""
+	Schema of the result
+	"""
 	schema: DataSchema!
+	"""
+	Records of the result
+	"""
 	data: DataBatch!
+	"""
+	Input datasets of the query and the blocks they were read at, allowing
+	the query to be reproduced
+	"""
 	datasets: [DatasetState!]!
+	"""
+	Maximum number of records the result was limited to
+	"""
 	limit: Int!
 }
 
+"""
+Schema of data rendered in the requested format
+"""
 type DataSchema {
+	"""
+	Format the content is rendered in
+	"""
 	format: DataSchemaFormat!
+	"""
+	Schema rendered in the format
+	"""
 	content: String!
 }
 
+"""
+Format a data schema is rendered in
+"""
 enum DataSchemaFormat {
+	"""
+	Arrow schema as JSON
+	"""
 	ARROW_JSON
+	"""
+	Open Data Fabric schema as JSON
+	"""
 	ODF_JSON
+	"""
+	Open Data Fabric schema as YAML
+	"""
 	ODF_YAML
+	"""
+	Parquet schema in its message type text notation
+	"""
 	PARQUET
+	"""
+	Parquet schema as JSON
+	"""
 	PARQUET_JSON
 }
 
+"""
+ODF data schema in its JSON form
+"""
 scalar DataSchemaInput
 
 """
@@ -1169,6 +2089,9 @@ type DataSlice {
 	size: Uint64!
 }
 
+"""
+Data type of a column
+"""
 input DataTypeInput {
 	"""
 	Defines type using DDL syntax
@@ -1176,6 +2099,9 @@ input DataTypeInput {
 	ddl: String!
 }
 
+"""
+Dataset with its metadata, data and related information
+"""
 type Dataset {
 	"""
 	Unique identifier of the dataset
@@ -1266,19 +2192,43 @@ A dataset the caller may read, or only its ID when the dataset is missing
 or not readable by the caller
 """
 interface DatasetAccessResult {
+	"""
+	Human-readable access status
+	"""
 	message: String!
 }
 
+"""
+Dataset was found and is readable by the caller
+"""
 type DatasetAccessResultAccessible implements DatasetAccessResult {
+	"""
+	Accessible dataset
+	"""
 	dataset: Dataset!
+	"""
+	Human-readable access status
+	"""
 	message: String!
 }
 
+"""
+Dataset does not exist or is not readable by the caller
+"""
 type DatasetAccessResultNotAccessible implements DatasetAccessResult {
+	"""
+	Identifier of the requested dataset
+	"""
 	id: DatasetID!
+	"""
+	Human-readable access status
+	"""
 	message: String!
 }
 
+"""
+Role granting an account access to a dataset
+"""
 enum DatasetAccessRole {
 	"""
 	Role opening the possibility for read-only access
@@ -1294,13 +2244,29 @@ enum DatasetAccessRole {
 	MAINTAINER
 }
 
+"""
+Dataset name, optionally prefixed with the owner account
+(`account/dataset`)
+"""
 scalar DatasetAlias
 
+"""
+Well-known kind of a dataset that defines how its data is interpreted
+"""
 enum DatasetArchetype {
+	"""
+	Set of entries linking paths to other datasets
+	"""
 	COLLECTION
+	"""
+	File whose every version is stored as a record
+	"""
 	VERSIONED_FILE
 }
 
+"""
+Access sharing of a dataset with other accounts
+"""
 type DatasetCollaboration {
 	"""
 	Accounts (and their roles) that have access to the dataset
@@ -1308,6 +2274,9 @@ type DatasetCollaboration {
 	accountRoles(page: Int, perPage: Int): AccountWithRoleConnection!
 }
 
+"""
+Mutations that manage account access to a dataset
+"""
 type DatasetCollaborationMut {
 	"""
 	Grant account access as the specified role for the dataset
@@ -1319,11 +2288,23 @@ type DatasetCollaborationMut {
 	unsetRoles(accountIds: [AccountID!]!): UnsetRoleResult!
 }
 
+"""
+Permissions for managing access of other accounts to a dataset
+"""
 type DatasetCollaborationPermissions {
+	"""
+	Whether the account can see who has access to the dataset
+	"""
 	canView: Boolean!
+	"""
+	Whether the account can grant and revoke access to the dataset
+	"""
 	canUpdate: Boolean!
 }
 
+"""
+A page of `Dataset` items
+"""
 type DatasetConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -1337,9 +2318,15 @@ type DatasetConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [DatasetEdge!]!
 }
 
+"""
+Data stored in a dataset and its statistics
+"""
 type DatasetData {
 	"""
 	Total number of records in this dataset
@@ -1381,37 +2368,103 @@ type DatasetData {
 	tail(skip: Int, limit: Int, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat): DataQueryResult!
 }
 
+"""
+An edge wrapping a single `Dataset` item
+"""
 type DatasetEdge {
+	"""
+	The item itself
+	"""
 	node: Dataset!
 }
 
+"""
+Ways to access a dataset over the supported protocols
+"""
 type DatasetEndpoints {
+	"""
+	Link to the dataset page in the web UI
+	"""
 	webLink: LinkProtocolDesc!
+	"""
+	Commands to pull and push the dataset with the kamu CLI
+	"""
 	cli: CliProtocolDesc!
+	"""
+	REST API endpoints for the dataset
+	"""
 	rest: RestProtocolDesc!
+	"""
+	Arrow Flight SQL endpoint
+	"""
 	flightsql: FlightSqlDesc!
+	"""
+	JDBC connection URL
+	"""
 	jdbc: JdbcDesc!
+	"""
+	PostgreSQL protocol endpoint, currently a placeholder
+	"""
 	postgresql: PostgreSqlDesl!
+	"""
+	Kafka protocol endpoint, currently a placeholder
+	"""
 	kafka: KafkaProtocolDesc!
+	"""
+	WebSocket endpoint, currently a placeholder
+	"""
 	websocket: WebSocketProtocolDesc!
+	"""
+	`OData` API endpoints
+	"""
 	odata: OdataProtocolDesc!
 }
 
+"""
+Environment variables of a dataset
+"""
 type DatasetEnvVars {
+	"""
+	Returns the value of a variable, decrypting it if it is secret
+	"""
 	exposedValue(datasetEnvVarKey: String!): String!
+	"""
+	Lists environment variables of the dataset
+	"""
 	listEnvVariables(page: Int, perPage: Int): ViewDatasetEnvVarConnection!
 }
 
+"""
+Mutations that manage environment variables of a dataset
+"""
 type DatasetEnvVarsMut {
+	"""
+	Creates or updates an environment variable, optionally as a secret
+	"""
 	upsertEnvVariable(key: String!, value: String!, isSecret: Boolean!): UpsertDatasetEnvVarResult!
+	"""
+	Deletes an environment variable by its key
+	"""
 	deleteEnvVariable(key: String!): DeleteDatasetEnvVarResult!
 }
 
+"""
+Permissions for environment variables of a dataset
+"""
 type DatasetEnvVarsPermissions {
+	"""
+	Whether the account can see the environment variables
+	"""
 	canView: Boolean!
+	"""
+	Whether the account can change the environment variables
+	"""
 	canUpdate: Boolean!
 }
 
+"""
+Flow configuration queries of a dataset
+"""
 type DatasetFlowConfigs {
 	"""
 	Returns defined configuration for a flow of specified type
@@ -1419,23 +2472,59 @@ type DatasetFlowConfigs {
 	byType(datasetFlowType: DatasetFlowType!): FlowConfiguration
 }
 
+"""
+Mutations that change flow configurations of a dataset
+"""
 type DatasetFlowConfigsMut {
+	"""
+	Sets the ingest flow configuration of a root dataset
+	"""
 	setIngestConfig(ingestConfigInput: FlowConfigIngestInput!, retryPolicyInput: FlowRetryPolicyInput): SetFlowConfigResult!
+	"""
+	Sets the compaction flow configuration of a root dataset
+	"""
 	setCompactionConfig(compactionConfigInput: FlowConfigCompactionInput!, retryPolicyInput: FlowRetryPolicyInput): SetFlowConfigResult!
 }
 
+"""
+Filters for flows of a dataset
+"""
 input DatasetFlowFilters {
+	"""
+	Only flows in one of these statuses
+	"""
 	byStatus: [FlowStatus!]
+	"""
+	Only flows started by the given initiator
+	"""
 	byInitiator: InitiatorFilterInput
+	"""
+	Only flows of the given process kind
+	"""
 	byProcessType: FlowProcessTypeFilterInput
 }
 
+"""
+Recurring flow process of a dataset
+"""
 type DatasetFlowProcess {
+	"""
+	Kind of flow this process runs
+	"""
 	flowType: DatasetFlowType!
+	"""
+	Dataset the process belongs to
+	"""
 	dataset: Dataset!
+	"""
+	Health and timing of the process
+	"""
 	summary: FlowProcessSummary!
 }
 
+"""
+A page of `DatasetFlowProcess` items
+"""
 type DatasetFlowProcessConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -1449,33 +2538,88 @@ type DatasetFlowProcessConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [DatasetFlowProcessEdge!]!
 }
 
+"""
+An edge wrapping a single `DatasetFlowProcess` item
+"""
 type DatasetFlowProcessEdge {
+	"""
+	The item itself
+	"""
 	node: DatasetFlowProcess!
 }
 
+"""
+Recurring flow processes of a dataset
+"""
 type DatasetFlowProcesses {
+	"""
+	Main update process: ingest for a root dataset, transform for a
+	derivative
+	"""
 	primary: DatasetFlowProcess!
+	"""
+	Webhook delivery processes of subscriptions to this dataset
+	"""
 	webhooks: WebhookFlowSubProcessGroup!
 }
 
+"""
+Flow run queries of a dataset
+"""
 type DatasetFlowRuns {
+	"""
+	Returns a flow of this dataset by its ID
+	"""
 	getFlow(flowId: FlowID!): GetFlowResult!
+	"""
+	Lists flows of this dataset, paginated and optionally filtered
+	"""
 	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters, order: FlowRunOrder): FlowConnection!
+	"""
+	Lists accounts that have started flows of this dataset
+	"""
 	listFlowInitiators: AccountConnection!
 }
 
+"""
+Mutations that trigger or cancel flow runs of a dataset
+"""
 type DatasetFlowRunsMut {
+	"""
+	Manually triggers an ingest flow of a root dataset
+	"""
 	triggerIngestFlow(ingestConfigInput: FlowConfigIngestInput): TriggerFlowResult!
+	"""
+	Manually triggers a transform flow of a derivative dataset
+	"""
 	triggerTransformFlow: TriggerFlowResult!
+	"""
+	Manually triggers a compaction flow of a root dataset
+	"""
 	triggerCompactionFlow(compactionConfigInput: FlowConfigCompactionInput): TriggerFlowResult!
+	"""
+	Manually triggers a flow that resets the dataset head to an earlier block
+	"""
 	triggerResetFlow(resetConfigInput: FlowConfigResetInput): TriggerFlowResult!
+	"""
+	Manually triggers a flow that removes data and keeps only metadata
+	"""
 	triggerResetToMetadataFlow: TriggerFlowResult!
+	"""
+	Cancels a scheduled or running flow of this dataset
+	"""
 	cancelFlowRun(flowId: FlowID!): CancelFlowRunResult!
 }
 
+"""
+Flow trigger queries of a dataset
+"""
 type DatasetFlowTriggers {
 	"""
 	Returns defined trigger for a flow of specified type
@@ -1483,22 +2627,61 @@ type DatasetFlowTriggers {
 	byType(datasetFlowType: DatasetFlowType!): FlowTrigger
 }
 
+"""
+Mutations that manage flow triggers of a dataset
+"""
 type DatasetFlowTriggersMut {
+	"""
+	Creates or replaces the trigger of a flow type
+	"""
 	setTrigger(datasetFlowType: DatasetFlowType!, triggerRuleInput: FlowTriggerRuleInput!, triggerStopPolicyInput: FlowTriggerStopPolicyInput!): SetFlowTriggerResult!
+	"""
+	Pauses the trigger of a flow type
+	"""
 	pauseFlow(datasetFlowType: DatasetFlowType!): Boolean!
+	"""
+	Pauses triggers of all flow types of the dataset
+	"""
 	pauseFlows: Boolean!
+	"""
+	Resumes the trigger of a flow type
+	"""
 	resumeFlow(datasetFlowType: DatasetFlowType!): Boolean!
+	"""
+	Resumes triggers of all flow types of the dataset
+	"""
 	resumeFlows: Boolean!
 }
 
+"""
+Kind of a flow that operates on a dataset
+"""
 enum DatasetFlowType {
+	"""
+	Ingests new data into a root dataset
+	"""
 	INGEST
+	"""
+	Runs the transformation of a derivative dataset
+	"""
 	EXECUTE_TRANSFORM
+	"""
+	Compacts data slices of a dataset
+	"""
 	HARD_COMPACTION
+	"""
+	Moves the dataset head to an earlier block, by default its seed
+	"""
 	RESET
+	"""
+	Drops the dataset's data while keeping its metadata
+	"""
 	RESET_TO_METADATA
 }
 
+"""
+Flow queries scoped to a dataset
+"""
 type DatasetFlows {
 	"""
 	Returns interface for flow configurations queries
@@ -1518,23 +2701,59 @@ type DatasetFlows {
 	processes: DatasetFlowProcesses!
 }
 
+"""
+Flow mutations scoped to a dataset
+"""
 type DatasetFlowsMut {
+	"""
+	Flow configuration mutations
+	"""
 	configs: DatasetFlowConfigsMut!
+	"""
+	Mutations that trigger or cancel flow runs
+	"""
 	runs: DatasetFlowRunsMut!
+	"""
+	Flow trigger mutations
+	"""
 	triggers: DatasetFlowTriggersMut!
 }
 
+"""
+Permissions for flows of a dataset
+"""
 type DatasetFlowsPermissions {
+	"""
+	Whether the account can see the flows and their history
+	"""
 	canView: Boolean!
+	"""
+	Whether the account can trigger and configure the flows
+	"""
 	canRun: Boolean!
 }
 
+"""
+Permissions for general management of a dataset
+"""
 type DatasetGeneralPermissions {
+	"""
+	Whether the account can rename the dataset
+	"""
 	canRename: Boolean!
+	"""
+	Whether the account can change the dataset visibility
+	"""
 	canSetVisibility: Boolean!
+	"""
+	Whether the account can delete the dataset
+	"""
 	canDelete: Boolean!
 }
 
+"""
+Unique and stable identifier of a dataset (`did:odf:...`)
+"""
 scalar DatasetID
 
 """
@@ -1547,6 +2766,9 @@ enum DatasetKind {
 	DERIVATIVE
 }
 
+"""
+Metadata of a dataset and its current state derived from the metadata chain
+"""
 type DatasetMetadata {
 	"""
 	Access to the temporal metadata chain of the dataset
@@ -1601,6 +2823,10 @@ type DatasetMetadata {
 	Current vocabulary associated with the dataset
 	"""
 	currentVocab: SetVocab
+	"""
+	Blocks holding the currently effective events of the requested types,
+	as of the given head or the latest block
+	"""
 	metadataProjection(eventTypes: [MetadataEventType!]!, head: Multihash): [MetadataBlockExtended!]!
 	"""
 	Experimental: Current archetype as per `kamu.dev/archetype` annotation,
@@ -1609,6 +2835,9 @@ type DatasetMetadata {
 	currentArchetype: DatasetArchetype
 }
 
+"""
+Mutations of the dataset metadata
+"""
 type DatasetMetadataMut {
 	"""
 	Access to the mutable metadata chain of the dataset
@@ -1620,10 +2849,19 @@ type DatasetMetadataMut {
 	updateReadme(content: String): UpdateReadmeResult!
 }
 
+"""
+Permissions for metadata of a dataset
+"""
 type DatasetMetadataPermissions {
+	"""
+	Whether the account can commit new metadata events
+	"""
 	canCommit: Boolean!
 }
 
+"""
+Mutations of a single dataset
+"""
 type DatasetMut {
 	"""
 	Convert to read-only accessor to a dataset
@@ -1675,43 +2913,112 @@ type DatasetMut {
 	asCollection: CollectionMut
 }
 
+"""
+Name of a dataset, unique within its owner account
+"""
 scalar DatasetName
 
+"""
+Actions the current account is allowed to perform on a dataset
+"""
 type DatasetPermissions {
+	"""
+	Permissions for managing access of other accounts
+	"""
 	collaboration: DatasetCollaborationPermissions!
+	"""
+	Permissions for dataset environment variables
+	"""
 	envVars: DatasetEnvVarsPermissions!
+	"""
+	Permissions for dataset flows
+	"""
 	flows: DatasetFlowsPermissions!
+	"""
+	Permissions for dataset webhooks
+	"""
 	webhooks: DatasetWebhooksPermissions!
+	"""
+	Permissions for general dataset management
+	"""
 	general: DatasetGeneralPermissions!
+	"""
+	Permissions for dataset metadata
+	"""
 	metadata: DatasetMetadataPermissions!
 }
 
+"""
+Sync state of a dataset relative to one of its push remotes
+"""
 type DatasetPushStatus {
+	"""
+	Remote dataset the local one is pushed to
+	"""
 	remote: DatasetRefRemote!
+	"""
+	Result of comparing the remote metadata chain with the local one
+	"""
 	result: CompareChainsResult!
 }
 
+"""
+Sync states of a dataset relative to all its push remotes
+"""
 type DatasetPushStatuses {
+	"""
+	Sync state per push remote
+	"""
 	statuses: [DatasetPushStatus!]!
 }
 
+"""
+Reference to a local dataset by ID or alias
+"""
 scalar DatasetRef
 
+"""
+Reference to a remote dataset by ID, alias or URL
+"""
 scalar DatasetRefRemote
 
+"""
+Change to an account's role in a dataset
+"""
 input DatasetRoleOperation @oneOf {
+	"""
+	Grant the role, replacing any existing one
+	"""
 	set: DatasetRoleSetOperation
+	"""
+	Revoke the existing role
+	"""
 	unset: DatasetRoleUnsetOperation
 }
 
+"""
+Grants a role to an account
+"""
 input DatasetRoleSetOperation {
+	"""
+	Role to grant
+	"""
 	role: DatasetAccessRole!
 }
 
+"""
+Revokes the role of an account
+"""
 input DatasetRoleUnsetOperation {
+	"""
+	Placeholder field without meaning, its value is ignored
+	"""
 	dummy: Boolean!
 }
 
+"""
+Input dataset of a query and the state it was queried at
+"""
 type DatasetState {
 	"""
 	Globally unique identity of the dataset
@@ -1728,18 +3035,42 @@ type DatasetState {
 	blockHash: Multihash
 }
 
+"""
+Who can see a dataset
+"""
 enum DatasetVisibility {
+	"""
+	Only the owner and accounts granted access
+	"""
 	PRIVATE
+	"""
+	Everyone
+	"""
 	PUBLIC
 }
 
+"""
+New visibility of a dataset
+"""
 input DatasetVisibilityInput @oneOf {
+	"""
+	Dataset is visible only to accounts with explicit access
+	"""
 	private: PrivateDatasetVisibilityInput
+	"""
+	Dataset is readable by all authenticated users, optionally anonymous too
+	"""
 	public: PublicDatasetVisibilityInput
 }
 
+"""
+Visibility of a dataset
+"""
 union DatasetVisibilityOutput = PrivateDatasetVisibility | PublicDatasetVisibility
 
+"""
+Webhook subscription queries of a dataset
+"""
 type DatasetWebhooks {
 	"""
 	Lists all webhook subscriptions for the dataset
@@ -1751,7 +3082,13 @@ type DatasetWebhooks {
 	subscription(id: WebhookSubscriptionID!): WebhookSubscription
 }
 
+"""
+Webhook subscription mutations of a dataset
+"""
 type DatasetWebhooksMut {
+	"""
+	Creates a webhook subscription for this dataset
+	"""
 	createSubscription(input: WebhookSubscriptionInput!): CreateWebhookSubscriptionResult!
 	"""
 	Returns a webhook subscription management API by ID
@@ -1759,11 +3096,23 @@ type DatasetWebhooksMut {
 	subscription(id: WebhookSubscriptionID!): WebhookSubscriptionMut
 }
 
+"""
+Permissions for webhooks of a dataset
+"""
 type DatasetWebhooksPermissions {
+	"""
+	Whether the account can see the webhook subscriptions
+	"""
 	canView: Boolean!
+	"""
+	Whether the account can change the webhook subscriptions
+	"""
 	canUpdate: Boolean!
 }
 
+"""
+Queries for looking up and listing datasets
+"""
 type Datasets {
 	"""
 	Returns a dataset by its ID, if found
@@ -1809,6 +3158,9 @@ type Datasets {
 	byAccountName(accountName: AccountName!, page: Int, perPage: Int): DatasetConnection!
 }
 
+"""
+Mutations that look up and create datasets
+"""
 type DatasetsMut {
 	"""
 	Returns a mutable dataset by its ID, if found
@@ -1905,45 +3257,114 @@ The input/output is a string in RFC3339 format.
 """
 scalar DateTime
 
+"""
+Outcome of deleting an account
+"""
 interface DeleteAccountResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Account was deleted
+"""
 type DeleteAccountSuccess implements DeleteAccountResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of deleting an environment variable
+"""
 interface DeleteDatasetEnvVarResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Environment variable with the given key does not exist
+"""
 type DeleteDatasetEnvVarResultNotFound implements DeleteDatasetEnvVarResult {
+	"""
+	Key that was not found
+	"""
 	envVarKey: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Environment variable was deleted
+"""
 type DeleteDatasetEnvVarResultSuccess implements DeleteDatasetEnvVarResult {
+	"""
+	Key of the deleted environment variable
+	"""
 	envVarKey: String!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of deleting a dataset
+"""
 interface DeleteResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Dataset was not deleted because downstream datasets still use it as input
+"""
 type DeleteResultDanglingReference implements DeleteResult {
+	"""
+	Alias of the dataset that was not deleted
+	"""
 	notDeletedDataset: DatasetAlias!
+	"""
+	Downstream datasets that reference this dataset as input
+	"""
 	danglingChildRefs: [DatasetRef!]!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Dataset was deleted
+"""
 type DeleteResultSuccess implements DeleteResult {
+	"""
+	Alias of the deleted dataset
+	"""
 	deletedDataset: DatasetAlias!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Code that identifies a device during the device authorization flow
+"""
 scalar DeviceCode
 
+"""
+Decentralized identifier (DID)
+"""
 scalar Did
 
 """
@@ -1974,19 +3395,43 @@ type DisablePushSource {
 	sourceName: String!
 }
 
+"""
+Single-use nonce of a Sign-In with Ethereum message
+"""
 scalar Eip4361AuthNonce
 
+"""
+Nonce issued for a Sign-In with Ethereum login
+"""
 type Eip4361AuthNonceResponse {
+	"""
+	Nonce to include in the signed message
+	"""
 	value: Eip4361AuthNonce!
 }
 
+"""
+Email address
+"""
 scalar Email
 
+"""
+Metadata block serialized in a manifest format
+"""
 type EncodedBlock {
+	"""
+	Format the block is serialized in
+	"""
 	encoding: MetadataManifestFormat!
+	"""
+	Serialized block
+	"""
 	content: String!
 }
 
+"""
+Data processing engine available on the node
+"""
 type EngineDesc {
 	"""
 	A short name of the engine, e.g. "Spark", "Flink".
@@ -2021,6 +3466,9 @@ type EnvVar {
 	value: String
 }
 
+"""
+Identifier of a stored event
+"""
 scalar EventID
 
 """
@@ -2064,6 +3512,9 @@ type EventTimeSourceFromSystemTime {
 	dummy: String
 }
 
+"""
+Hex-encoded EVM wallet address
+"""
 scalar EvmWalletAddress
 
 """
@@ -2144,6 +3595,9 @@ type ExecuteTransformInput {
 
 scalar ExtraAttributes
 
+"""
+JSON object of user-defined fields with string, number or boolean values
+"""
 scalar ExtraData
 
 """
@@ -2287,10 +3741,19 @@ type FetchStepUrl {
 	headers: [RequestHeader!]
 }
 
+"""
+Arrow Flight SQL endpoint
+"""
 type FlightSqlDesc {
+	"""
+	Arrow Flight SQL server URL
+	"""
 	url: String!
 }
 
+"""
+One run of a flow, possibly over several task attempts
+"""
 type Flow {
 	"""
 	Unique identifier of the flow
@@ -2355,57 +3818,135 @@ type Flow {
 	relatedTrigger: FlowTrigger
 }
 
+"""
+Flow was aborted before completion
+"""
 type FlowAbortedResult {
+	"""
+	Fixed status text
+	"""
 	message: String!
 }
 
+"""
+Reason a flow was started
+"""
 union FlowActivationCause = FlowActivationCauseManual | FlowActivationCauseAutoPolling | FlowActivationCauseDatasetUpdate | FlowActivationCauseIterationFinished
 
+"""
+Flow was started by a schedule or after a restart
+"""
 type FlowActivationCauseAutoPolling {
+	"""
+	Placeholder without meaning, always true
+	"""
 	dummy: Boolean!
 }
 
+"""
+Flow was started by an update of a dataset
+"""
 type FlowActivationCauseDatasetUpdate {
+	"""
+	Identifier of the updated dataset
+	"""
 	datasetId: DatasetID!
 	"""
 	Null when the dataset was deleted or is not readable by the caller
 	"""
 	dataset: Dataset
+	"""
+	What updated the dataset
+	"""
 	source: FlowActivationCauseDatasetUpdateSource!
 }
 
+"""
+What updated the dataset
+"""
 union FlowActivationCauseDatasetUpdateSource = FlowActivationCauseDatasetUpdateSourceUpstreamFlow | FlowActivationCauseDatasetUpdateSourceHttpIngest | FlowActivationCauseDatasetUpdateSourceSmartProtocolPush | FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange
 
+"""
+Dataset was changed outside of the flow system
+"""
 type FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange {
+	"""
+	Placeholder without meaning, always true
+	"""
 	dummy: Boolean!
 }
 
+"""
+Dataset was updated by data pushed over HTTP
+"""
 type FlowActivationCauseDatasetUpdateSourceHttpIngest {
+	"""
+	Name of the push source, null for the default source
+	"""
 	sourceName: String
 }
 
+"""
+Dataset was updated by a push over the smart transfer protocol
+"""
 type FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
+	"""
+	Account that pushed the data, null if unknown
+	"""
 	accountName: AccountName
+	"""
+	Whether the push was forced, possibly rewriting history
+	"""
 	isForce: Boolean!
 }
 
+"""
+Dataset was updated by another flow
+"""
 type FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+	"""
+	Identifier of the flow that updated the dataset
+	"""
 	flowId: FlowID!
 }
 
+"""
+Flow was started because the previous ingest left more data to fetch
+"""
 type FlowActivationCauseIterationFinished {
+	"""
+	Placeholder without meaning, always true
+	"""
 	dummy: Boolean!
 }
 
+"""
+Flow was started manually by a user
+"""
 type FlowActivationCauseManual {
+	"""
+	Account that started the flow
+	"""
 	initiator: Account!
 }
 
+"""
+Settings of a compaction flow
+"""
 input FlowConfigCompactionInput {
+	"""
+	Maximum size of a compacted data slice, in bytes
+	"""
 	maxSliceSize: Int!
+	"""
+	Maximum number of records in a compacted data slice
+	"""
 	maxSliceRecords: Int!
 }
 
+"""
+Settings of an ingest flow
+"""
 input FlowConfigIngestInput {
 	"""
 	Flag indicates to ignore cache during ingest step for API calls
@@ -2418,62 +3959,164 @@ input FlowConfigIngestInput {
 	fetchNextIteration: Boolean!
 }
 
+"""
+Block a reset moves the dataset head to
+"""
 input FlowConfigInputResetPropagationMode @oneOf {
+	"""
+	Reset to a given block
+	"""
 	custom: FlowConfigInputResetPropagationModeCustom
+	"""
+	Reset to the seed block
+	"""
 	toSeed: FlowConfigInputResetPropagationModeToSeed
 }
 
+"""
+Reset the dataset head to a given block
+"""
 input FlowConfigInputResetPropagationModeCustom {
+	"""
+	Hash of the block that becomes the new head
+	"""
 	newHeadHash: Multihash!
 }
 
+"""
+Reset the dataset head to its seed block
+"""
 input FlowConfigInputResetPropagationModeToSeed {
+	"""
+	Placeholder without meaning, the value is ignored
+	"""
 	dummy: String
 }
 
+"""
+Settings of a reset flow
+"""
 input FlowConfigResetInput {
+	"""
+	Block the dataset head is moved to
+	"""
 	mode: FlowConfigInputResetPropagationMode!
+	"""
+	Expected current head; the reset fails if the head differs, null to
+	skip the check
+	"""
 	oldHeadHash: Multihash
 }
 
+"""
+Block a reset moves the dataset head to
+"""
 union FlowConfigResetPropagationMode = FlowConfigResetPropagationModeCustom | FlowConfigResetPropagationModeToSeed
 
+"""
+Reset the dataset head to a given block
+"""
 type FlowConfigResetPropagationModeCustom {
+	"""
+	Hash of the block that becomes the new head
+	"""
 	newHeadHash: Multihash!
 }
 
+"""
+Reset the dataset head to its seed block
+"""
 type FlowConfigResetPropagationModeToSeed {
+	"""
+	Placeholder without meaning, always null
+	"""
 	dummy: String
 }
 
+"""
+Settings specific to the flow type
+"""
 union FlowConfigRule = FlowConfigRuleIngest | FlowConfigRuleCompaction | FlowConfigRuleReset
 
+"""
+Settings of a compaction flow
+"""
 type FlowConfigRuleCompaction {
+	"""
+	Maximum size of a compacted data slice, in bytes
+	"""
 	maxSliceSize: Int!
+	"""
+	Maximum number of records in a compacted data slice
+	"""
 	maxSliceRecords: Int!
 }
 
+"""
+Settings of an ingest flow
+"""
 type FlowConfigRuleIngest {
+	"""
+	Whether to ignore the cache for API calls during ingest
+	"""
 	fetchUncacheable: Boolean!
+	"""
+	Whether to run the next ingest right away when the source has more
+	data
+	"""
 	fetchNextIteration: Boolean!
 }
 
+"""
+Settings of a reset flow
+"""
 type FlowConfigRuleReset {
+	"""
+	Block the dataset head is moved to
+	"""
 	mode: FlowConfigResetPropagationMode!
+	"""
+	Expected current head; the reset fails if the head differs, null to
+	skip the check
+	"""
 	oldHeadHash: Multihash
 }
 
+"""
+Configuration used by the flow was changed
+"""
 type FlowConfigSnapshotModified implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
+	"""
+	New configuration of the flow
+	"""
 	configSnapshot: FlowConfigRule!
 }
 
+"""
+Settings that define how a flow runs
+"""
 type FlowConfiguration {
+	"""
+	Settings specific to the flow type
+	"""
 	rule: FlowConfigRule!
+	"""
+	Retry policy for failed runs, null to use the flow type's default
+	"""
 	retryPolicy: FlowRetryPolicy
 }
 
+"""
+A page of `Flow` items
+"""
 type FlowConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -2487,77 +4130,200 @@ type FlowConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [FlowEdge!]!
 }
 
+"""
+What a flow does, with its result once it succeeded
+"""
 union FlowDescription = FlowDescriptionUnknown | FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetHardCompaction | FlowDescriptionDatasetReset | FlowDescriptionDatasetResetToMetadata | FlowDescriptionSystemGC | FlowDescriptionWebhookDeliver
 
+"""
+Flow that runs the transformation of a derivative dataset
+"""
 type FlowDescriptionDatasetExecuteTransform {
+	"""
+	Result of the transformation, null until the flow succeeds
+	"""
 	transformResult: FlowDescriptionUpdateResult
+	"""
+	Transformation the flow runs
+	"""
 	transform: SetTransform!
 }
 
+"""
+Flow that compacts data slices of a dataset
+"""
 type FlowDescriptionDatasetHardCompaction {
+	"""
+	Result of the compaction, null until the flow succeeds
+	"""
 	compactionResult: FlowDescriptionDatasetReorganizationResult
 }
 
+"""
+Flow that ingests data from the dataset's polling source
+"""
 type FlowDescriptionDatasetPollingIngest {
+	"""
+	Result of the ingest, null until the flow succeeds
+	"""
 	ingestResult: FlowDescriptionUpdateResult
+	"""
+	Polling source the data is fetched from
+	"""
 	pollingSource: SetPollingSource!
 }
 
+"""
+Flow that ingests data pushed into the dataset
+"""
 type FlowDescriptionDatasetPushIngest {
+	"""
+	Name of the push source, null for the default source or when unknown
+	"""
 	sourceName: String
+	"""
+	Result of the ingest, null until the flow succeeds
+	"""
 	ingestResult: FlowDescriptionUpdateResult
+	"""
+	Human-readable description of what started the flow
+	"""
 	message: String!
 }
 
+"""
+Result of a flow that rewrites the dataset's history
+"""
 union FlowDescriptionDatasetReorganizationResult = FlowDescriptionReorganizationNothingToDo | FlowDescriptionReorganizationSuccess
 
+"""
+Flow that moves the dataset head to an earlier block
+"""
 type FlowDescriptionDatasetReset {
+	"""
+	Result of the reset, null until the flow succeeds
+	"""
 	resetResult: FlowDescriptionResetResult
 }
 
+"""
+Flow that drops the dataset's data while keeping its metadata
+"""
 type FlowDescriptionDatasetResetToMetadata {
+	"""
+	Result of the reset, null until the flow succeeds
+	"""
 	resetToMetadataResult: FlowDescriptionDatasetReorganizationResult
 }
 
+"""
+Dataset needed no changes
+"""
 type FlowDescriptionReorganizationNothingToDo {
+	"""
+	Placeholder without meaning, always null
+	"""
 	dummy: String
+	"""
+	Fixed status text
+	"""
 	message: String!
 }
 
+"""
+Dataset history was rewritten
+"""
 type FlowDescriptionReorganizationSuccess {
+	"""
+	Number of metadata blocks before the rewrite
+	"""
 	originalBlocksCount: Int!
+	"""
+	Number of metadata blocks after the rewrite
+	"""
 	resultingBlocksCount: Int!
+	"""
+	Hash of the new head block
+	"""
 	newHead: Multihash!
 }
 
+"""
+Dataset head was moved
+"""
 type FlowDescriptionResetResult {
+	"""
+	Hash of the new head block
+	"""
 	newHead: Multihash!
 }
 
+"""
+System garbage collection flow
+"""
 type FlowDescriptionSystemGC {
+	"""
+	Placeholder without meaning, always true
+	"""
 	dummy: Boolean!
 }
 
+"""
+Dataset flow whose details could not be determined
+"""
 type FlowDescriptionUnknown {
+	"""
+	Why the details are unavailable
+	"""
 	message: String!
 }
 
+"""
+Result of a flow that updates a dataset
+"""
 union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess | FlowDescriptionUpdateResultUnknown
 
+"""
+Dataset was updated with new data
+"""
 type FlowDescriptionUpdateResultSuccess {
+	"""
+	Number of metadata blocks added
+	"""
 	numBlocks: Int!
+	"""
+	Number of data records added
+	"""
 	numRecords: Int!
+	"""
+	New watermark of the dataset, null if it did not change
+	"""
 	updatedWatermark: DateTime
+	"""
+	Whether the source has more data to fetch
+	"""
 	hasMore: Boolean!
 }
 
+"""
+Dataset was updated, but the added data could not be determined
+"""
 type FlowDescriptionUpdateResultUnknown {
+	"""
+	Why the added data could not be determined
+	"""
 	message: String!
 }
 
+"""
+Dataset was already up to date, nothing was added
+"""
 type FlowDescriptionUpdateResultUpToDate {
 	"""
 	The value indicates whether the api cache was used
@@ -2565,9 +4331,21 @@ type FlowDescriptionUpdateResultUpToDate {
 	uncacheable: Boolean!
 }
 
+"""
+Flow that delivers an event to a webhook subscription
+"""
 type FlowDescriptionWebhookDeliver {
+	"""
+	URL the event is delivered to
+	"""
 	targetUrl: Url!
+	"""
+	Label of the webhook subscription
+	"""
 	label: String!
+	"""
+	Type of the delivered event
+	"""
 	eventType: String!
 }
 
@@ -2598,28 +4376,73 @@ type FlowDownstreamLink {
 	flow: Flow
 }
 
+"""
+An edge wrapping a single `Flow` item
+"""
 type FlowEdge {
+	"""
+	The item itself
+	"""
 	node: Flow!
 }
 
+"""
+Event in the history of a flow
+"""
 interface FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
 }
 
+"""
+Flow was aborted
+"""
 type FlowEventAborted implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
 }
 
+"""
+Another reason to run was added to a waiting flow
+"""
 type FlowEventActivationCauseAdded implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
+	"""
+	Added reason to run the flow
+	"""
 	activationCause: FlowActivationCause!
 }
 
+"""
+Flow completed with an outcome
+"""
 type FlowEventCompleted implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
 	"""
 	Flows activated by this flow's completion. Filled asynchronously, so
@@ -2628,96 +4451,274 @@ type FlowEventCompleted implements FlowEvent {
 	downstreamFlows: [FlowDownstreamLink!]!
 }
 
+"""
+Flow was created
+"""
 type FlowEventInitiated implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
+	"""
+	Reason the flow was started
+	"""
 	activationCause: FlowActivationCause!
 }
 
+"""
+Retry policy used by the flow was changed
+"""
 type FlowEventRetryPolicyModified implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
+	"""
+	New retry policy, null if failed runs are not retried
+	"""
 	retryPolicy: FlowRetryPolicy
 }
 
+"""
+Flow's planned activation time was set
+"""
 type FlowEventScheduledForActivation implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
+	"""
+	Time the flow is planned to activate
+	"""
 	scheduledForActivationAt: DateTime!
 }
 
+"""
+Flow's start condition was set
+"""
 type FlowEventStartConditionUpdated implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
+	"""
+	What the flow waits for before it runs
+	"""
 	startCondition: FlowStartCondition!
 }
 
+"""
+Task of the flow was scheduled, started or finished
+"""
 type FlowEventTaskChanged implements FlowEvent {
+	"""
+	Unique identifier of the event
+	"""
 	eventId: EventID!
+	"""
+	Time the event occurred
+	"""
 	eventTime: DateTime!
+	"""
+	Identifier of the task
+	"""
 	taskId: TaskID!
+	"""
+	New status of the task
+	"""
 	taskStatus: TaskStatus!
+	"""
+	Time of the next attempt after a retryable failure, null otherwise
+	"""
 	nextAttemptAt: DateTime
+	"""
+	Task of the flow
+	"""
 	task: Task!
 }
 
+"""
+Flow failed
+"""
 type FlowFailedError {
+	"""
+	Why the flow failed
+	"""
 	reason: TaskFailureReason!
 }
 
+"""
+Unique identifier of a flow
+"""
 scalar FlowID
 
+"""
+Flow type is not applicable to this kind of dataset
+"""
 type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
+	"""
+	Dataset kind the flow type requires
+	"""
 	expectedDatasetKind: DatasetKind!
+	"""
+	Kind of the target dataset
+	"""
 	actualDatasetKind: DatasetKind!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Provided flow configuration input is invalid
+"""
 type FlowInvalidConfigInputError implements SetFlowConfigResult {
+	"""
+	Explanation of what is invalid in the input
+	"""
 	reason: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Provided flow run configuration is invalid
+"""
 type FlowInvalidRunConfigurations implements TriggerFlowResult {
+	"""
+	Explanation of what is invalid in the configuration
+	"""
 	error: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Provided trigger rule is invalid
+"""
 type FlowInvalidTriggerInputError implements SetFlowTriggerResult {
+	"""
+	Explanation of what is invalid in the rule
+	"""
 	reason: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Provided trigger stop policy is invalid
+"""
 type FlowInvalidTriggerStopPolicyInputError implements SetFlowTriggerResult {
+	"""
+	Explanation of what is invalid in the stop policy
+	"""
 	reason: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Flow does not exist or does not belong to this dataset
+"""
 type FlowNotFound implements GetFlowResult & CancelFlowRunResult {
+	"""
+	Identifier of the flow that was requested
+	"""
 	flowId: FlowID!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Final result of a finished flow
+"""
 union FlowOutcome = FlowSuccessResult | FlowFailedError | FlowAbortedResult
 
+"""
+Dataset does not satisfy the preconditions of the flow
+"""
 type FlowPreconditionsNotMet implements SetFlowConfigResult & TriggerFlowResult & SetFlowTriggerResult {
+	"""
+	Description of the unmet precondition
+	"""
 	preconditions: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Why a flow process was stopped automatically
+"""
 enum FlowProcessAutoStopReason {
+	"""
+	Failures in a row reached the stop policy threshold
+	"""
 	STOP_POLICY
+	"""
+	A run failed in a way that retrying cannot fix
+	"""
 	UNRECOVERABLE_FAILURE
 }
 
+"""
+Overall state of a flow process
+"""
 enum FlowProcessEffectiveState {
+	"""
+	No trigger is set, the flow runs only manually
+	"""
 	UNCONFIGURED
+	"""
+	Trigger is enabled and the last run did not fail
+	"""
 	ACTIVE
+	"""
+	Trigger is enabled but recent runs failed
+	"""
 	FAILING
+	"""
+	Trigger was paused by a user
+	"""
 	PAUSED_MANUAL
+	"""
+	Trigger was stopped automatically after failures
+	"""
 	STOPPED_AUTO
 }
 
+"""
+Conditions a flow process must match; processes without a trigger are
+excluded unless states are given explicitly
+"""
 input FlowProcessFilters {
 	"""
 	State filter
@@ -2745,21 +4746,57 @@ input FlowProcessFilters {
 	minConsecutiveFailures: Int
 }
 
+"""
+Time range with inclusive bounds
+"""
 input FlowProcessFiltersTimeRange {
+	"""
+	Start of the range, inclusive
+	"""
 	start: DateTime!
+	"""
+	End of the range, inclusive
+	"""
 	end: DateTime!
 }
 
+"""
+Counts of flow processes in a group by effective state
+"""
 type FlowProcessGroupRollup {
+	"""
+	Number of processes in the group
+	"""
 	total: Int!
+	"""
+	Number of processes running without failures
+	"""
 	active: Int!
+	"""
+	Number of processes with failures below the stop threshold
+	"""
 	failing: Int!
+	"""
+	Number of processes paused by a user
+	"""
 	paused: Int!
+	"""
+	Number of processes without a trigger
+	"""
 	unconfigured: Int!
+	"""
+	Number of processes stopped automatically
+	"""
 	stopped: Int!
+	"""
+	Longest streak of failed runs in a row among the processes
+	"""
 	worstConsecutiveFailures: Int!
 }
 
+"""
+Property of a flow process to sort by
+"""
 enum FlowProcessOrderField {
 	"""
 	Default for “recent activity”.
@@ -2787,57 +4824,166 @@ enum FlowProcessOrderField {
 	FLOW_TYPE
 }
 
+"""
+Sort order of flow processes
+"""
 input FlowProcessOrdering {
+	"""
+	Property to sort by
+	"""
 	field: FlowProcessOrderField!
+	"""
+	Sort direction
+	"""
 	direction: OrderingDirection!
 }
 
+"""
+Health and timing of a recurring flow process
+"""
 type FlowProcessSummary {
+	"""
+	Current state of the process
+	"""
 	effectiveState: FlowProcessEffectiveState!
+	"""
+	Number of failed runs in a row, reset by a success
+	"""
 	consecutiveFailures: Int!
+	"""
+	When the trigger stops itself after failures
+	"""
 	stopPolicy: FlowTriggerStopPolicy!
+	"""
+	Completion time of the last successful run, null if none succeeded
+	"""
 	lastSuccessAt: DateTime
+	"""
+	Completion time of the last run, successful or failed
+	"""
 	lastAttemptAt: DateTime
+	"""
+	Completion time of the last failed run, null if none failed
+	"""
 	lastFailureAt: DateTime
+	"""
+	Planned time of the next run, null if none is planned
+	"""
 	nextPlannedAt: DateTime
+	"""
+	Start time of the run in progress, null if none is running
+	"""
 	runningSince: DateTime
+	"""
+	Time the user paused the process, null if not paused
+	"""
 	pausedAt: DateTime
+	"""
+	Why the process was stopped automatically, null if it was not
+	"""
 	autoStoppedReason: FlowProcessAutoStopReason
+	"""
+	Time the process was stopped automatically, null if it was not
+	"""
 	autoStoppedAt: DateTime
 }
 
+"""
+Selects flows by process kind
+"""
 input FlowProcessTypeFilterInput @oneOf {
+	"""
+	Flows of the dataset itself
+	"""
 	primary: FlowProcessTypePrimaryFilterInput
+	"""
+	Webhook delivery flows of the dataset's subscriptions
+	"""
 	webhooks: FlowProcessTypeWebhooksFilterInput
 }
 
+"""
+Filter for flows of the dataset itself
+"""
 input FlowProcessTypePrimaryFilterInput {
+	"""
+	Only flows of these types, null or empty means all types
+	"""
 	byFlowTypes: [DatasetFlowType!]
 }
 
+"""
+Filter for webhook delivery flows
+"""
 input FlowProcessTypeWebhooksFilterInput {
+	"""
+	Only deliveries of these subscriptions, null or empty means all
+	"""
 	subscriptionIds: [WebhookSubscriptionID!]
 }
 
+"""
+How the retry delay grows with each retry
+"""
 enum FlowRetryBackoffType {
+	"""
+	Every retry waits the base delay
+	"""
 	FIXED
+	"""
+	Retry N waits N times the base delay
+	"""
 	LINEAR
+	"""
+	The delay doubles with each retry
+	"""
 	EXPONENTIAL
+	"""
+	The delay doubles with each retry, plus a random part below the base
+	delay
+	"""
 	EXPONENTIAL_WITH_JITTER
 }
 
+"""
+How a flow retries after a recoverable failure
+"""
 type FlowRetryPolicy {
+	"""
+	Maximum number of retries after the first attempt
+	"""
 	maxAttempts: Int!
+	"""
+	Base delay before a retry
+	"""
 	minDelay: TimeDelta!
+	"""
+	How the delay grows with each retry
+	"""
 	backoffType: FlowRetryBackoffType!
 }
 
+"""
+How a flow retries after a recoverable failure
+"""
 input FlowRetryPolicyInput {
+	"""
+	Maximum number of retries after the first attempt
+	"""
 	maxAttempts: Int!
+	"""
+	Base delay before a retry
+	"""
 	minDelay: TimeDeltaInput!
+	"""
+	How the delay grows with each retry
+	"""
 	backoffType: FlowRetryBackoffType!
 }
 
+"""
+Sort order of flow runs
+"""
 enum FlowRunOrder {
 	"""
 	Queue-oriented ordering:
@@ -2851,41 +4997,110 @@ enum FlowRunOrder {
 	SCHEDULED_FOR_ACTIVATION
 }
 
+"""
+What a waiting flow waits for before it runs
+"""
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionReactive | FlowStartConditionExecutor
 
+"""
+Flow waits for its task to be picked up by an executor
+"""
 type FlowStartConditionExecutor {
+	"""
+	Identifier of the scheduled task
+	"""
 	taskId: TaskID!
 }
 
+"""
+Flow waits for enough new input data
+"""
 type FlowStartConditionReactive {
+	"""
+	Batching rule in effect for this flow
+	"""
 	activeBatchingRule: FlowTriggerBatchingRule!
+	"""
+	Time the flow runs even if too few records arrived
+	"""
 	batchingDeadline: DateTime!
+	"""
+	Number of new input records accumulated so far
+	"""
 	accumulatedRecordsCount: Int!
+	"""
+	Whether any input advanced its watermark
+	"""
 	watermarkModified: Boolean!
+	"""
+	How to react when an input's history is rewritten
+	"""
 	forBreakingChange: FlowTriggerBreakingChangeRule!
 }
 
+"""
+Flow waits for its scheduled time
+"""
 type FlowStartConditionSchedule {
+	"""
+	Time the flow is scheduled to run
+	"""
 	wakeUpAt: DateTime!
 }
 
+"""
+Flow was delayed because its previous run was too recent
+"""
 type FlowStartConditionThrottling {
+	"""
+	Minimum interval between runs, in seconds
+	"""
 	intervalSec: Int!
+	"""
+	Time the flow will run
+	"""
 	wakeUpAt: DateTime!
+	"""
+	Time the flow would have run without throttling
+	"""
 	shiftedFrom: DateTime!
 }
 
+"""
+Lifecycle status of a flow
+"""
 enum FlowStatus {
+	"""
+	Flow waits for its start condition or for its task to start
+	"""
 	WAITING
+	"""
+	Flow task is running
+	"""
 	RUNNING
+	"""
+	Previous attempt failed and the flow waits for the next one
+	"""
 	RETRYING
+	"""
+	Flow has completed with an outcome
+	"""
 	FINISHED
 }
 
+"""
+Flow completed successfully
+"""
 type FlowSuccessResult {
+	"""
+	Fixed status text
+	"""
 	message: String!
 }
 
+"""
+Key moments in the lifecycle of a flow
+"""
 type FlowTimingRecords {
 	"""
 	Initiation time
@@ -2919,59 +5134,160 @@ type FlowTimingRecords {
 	completedAt: DateTime
 }
 
+"""
+Rule that defines when a flow runs automatically
+"""
 type FlowTrigger {
+	"""
+	Whether the trigger is inactive: paused by a user or auto-stopped
+	"""
 	paused: Boolean!
+	"""
+	Schedule rule, null if the trigger is reactive
+	"""
 	schedule: FlowTriggerScheduleRule
+	"""
+	Reactive rule, null if the trigger runs on a schedule
+	"""
 	reactive: FlowTriggerReactiveRule
+	"""
+	When the trigger stops itself after failures
+	"""
 	stopPolicy: FlowTriggerStopPolicy!
 }
 
+"""
+How new input data is accumulated before a reactive flow runs
+"""
 union FlowTriggerBatchingRule = FlowTriggerBatchingRuleImmediate | FlowTriggerBatchingRuleBuffering
 
+"""
+Accumulate new input data until enough records arrive or the interval
+passes
+"""
 type FlowTriggerBatchingRuleBuffering {
+	"""
+	Number of new input records that runs the flow
+	"""
 	minRecordsToAwait: Int!
+	"""
+	Longest wait after the first new data before the flow runs anyway
+	"""
 	maxBatchingInterval: TimeDelta!
 }
 
+"""
+Accumulate new input data until enough records arrive or the interval
+passes
+"""
 input FlowTriggerBatchingRuleBufferingInput {
+	"""
+	Number of new input records that runs the flow
+	"""
 	minRecordsToAwait: Int!
+	"""
+	Longest wait after the first new data before the flow runs anyway
+	"""
 	maxBatchingInterval: TimeDeltaInput!
 }
 
+"""
+Run the flow as soon as new input data appears
+"""
 type FlowTriggerBatchingRuleImmediate {
+	"""
+	Placeholder without meaning, always true
+	"""
 	dummy: Boolean!
 }
 
+"""
+Run the flow as soon as new input data appears
+"""
 input FlowTriggerBatchingRuleImmediateInput {
+	"""
+	Placeholder without meaning, the value is ignored
+	"""
 	dummy: Boolean!
 }
 
+"""
+How new input data is accumulated before a reactive flow runs
+"""
 input FlowTriggerBatchingRuleInput @oneOf {
+	"""
+	Run as soon as new input data appears
+	"""
 	immediate: FlowTriggerBatchingRuleImmediateInput
+	"""
+	Accumulate new input data first
+	"""
 	buffering: FlowTriggerBatchingRuleBufferingInput
 }
 
+"""
+How to react to a breaking change (history rewrite) of a dataset
+"""
 enum FlowTriggerBreakingChangeRule {
+	"""
+	Ignore breaking changes
+	"""
 	NO_ACTION
+	"""
+	React to breaking changes, e.g. reset a derivative dataset to metadata
+	"""
 	RECOVER
 }
 
+"""
+Rule that runs a flow in reaction to changes of its inputs
+"""
 type FlowTriggerReactiveRule {
+	"""
+	How new input data is batched before the flow runs
+	"""
 	forNewData: FlowTriggerBatchingRule!
+	"""
+	How to react when an input's history is rewritten
+	"""
 	forBreakingChange: FlowTriggerBreakingChangeRule!
 }
 
+"""
+Rule that defines when a flow runs automatically
+"""
 input FlowTriggerRuleInput @oneOf {
+	"""
+	Run on a schedule
+	"""
 	schedule: FlowTriggerRuleScheduleInput
+	"""
+	Run in reaction to changes of inputs
+	"""
 	reactive: FlowTriggerRuleReactiveInput
 }
 
+"""
+Rule that runs a flow in reaction to changes of its inputs
+"""
 input FlowTriggerRuleReactiveInput {
+	"""
+	How new input data is batched before the flow runs
+	"""
 	forNewData: FlowTriggerBatchingRuleInput!
+	"""
+	How to react when an input's history is rewritten
+	"""
 	forBreakingChange: FlowTriggerBreakingChangeRule!
 }
 
+"""
+Schedule of a trigger: a fixed interval or a cron expression
+"""
 input FlowTriggerRuleScheduleInput @oneOf {
+	"""
+	Run at a fixed interval
+	"""
 	timeDelta: TimeDeltaInput
 	"""
 	Supported CRON syntax: min hour dayOfMonth month dayOfWeek
@@ -2979,66 +5295,178 @@ input FlowTriggerRuleScheduleInput @oneOf {
 	cron5ComponentExpression: String
 }
 
+"""
+Schedule of a trigger: a fixed interval or a cron expression
+"""
 union FlowTriggerScheduleRule = TimeDelta | Cron5ComponentExpression
 
+"""
+When a trigger stops itself after failed runs
+"""
 union FlowTriggerStopPolicy = FlowTriggerStopPolicyNever | FlowTriggerStopPolicyAfterConsecutiveFailures
 
+"""
+Trigger stops after a number of failed runs in a row
+"""
 type FlowTriggerStopPolicyAfterConsecutiveFailures {
+	"""
+	Number of failed runs in a row that stops the trigger
+	"""
 	maxFailures: Int!
 }
 
+"""
+Trigger stops after a number of failed runs in a row
+"""
 input FlowTriggerStopPolicyAfterConsecutiveFailuresInput {
+	"""
+	Number of failed runs in a row that stops the trigger, from 1 to 10
+	"""
 	maxFailures: Int!
 }
 
+"""
+When a trigger stops itself after failed runs
+"""
 input FlowTriggerStopPolicyInput @oneOf {
+	"""
+	Never stop the trigger because of failures
+	"""
 	never: FlowTriggerStopPolicyNeverInput
+	"""
+	Stop the trigger after a number of failed runs in a row
+	"""
 	afterConsecutiveFailures: FlowTriggerStopPolicyAfterConsecutiveFailuresInput
 }
 
+"""
+Trigger never stops because of failures
+"""
 type FlowTriggerStopPolicyNever {
+	"""
+	Placeholder without meaning, always true
+	"""
 	dummy: Boolean!
 }
 
+"""
+Trigger never stops because of failures
+"""
 input FlowTriggerStopPolicyNeverInput {
+	"""
+	Placeholder without meaning, the value is ignored
+	"""
 	dummy: Boolean!
 }
 
+"""
+Flow type is not supported for this operation
+"""
 type FlowTypeIsNotSupported implements SetFlowTriggerResult {
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Fragment of a field that matched a full-text search
+"""
 type FullTextSearchHighlight {
+	"""
+	Name of the matching field
+	"""
 	field: String!
+	"""
+	Most relevant fragment of the field with the matches highlighted
+	"""
 	bestFragment: String!
 }
 
+"""
+Object matching a full-text search
+"""
 type FullTextSearchHit {
+	"""
+	Identifier of the matching object
+	"""
 	id: String!
+	"""
+	Name of the search schema the object belongs to, e.g. datasets or
+	accounts
+	"""
 	schemaName: String!
+	"""
+	Relevance score, null when results are not ranked
+	"""
 	score: Float
+	"""
+	Indexed document of the object as JSON
+	"""
 	source: JSON!
+	"""
+	Fragments of the fields that matched the prompt, if any
+	"""
 	highlights: [FullTextSearchHighlight!]
 }
 
+"""
+Results of a full-text search
+"""
 type FullTextSearchResponse {
+	"""
+	Time the search engine spent on the request, in milliseconds
+	"""
 	tookMs: Int!
+	"""
+	Whether the search timed out and returned partial results
+	"""
 	timeout: Boolean!
+	"""
+	Total number of matching objects across all pages
+	"""
 	totalHits: Int!
+	"""
+	Matching objects on the requested page
+	"""
 	hits: [FullTextSearchHit!]!
 }
 
+"""
+Outcome of looking up a flow
+"""
 interface GetFlowResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Flow was found
+"""
 type GetFlowSuccess implements GetFlowResult {
+	"""
+	Flow that was requested
+	"""
 	flow: Flow!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Selects flows by who started them
+"""
 input InitiatorFilterInput @oneOf {
+	"""
+	Flows started by the system, the value is ignored
+	"""
 	system: Boolean
+	"""
+	Flows started by any of these accounts
+	"""
 	accounts: [AccountID!]
 }
 
@@ -3047,32 +5475,71 @@ A scalar that can represent any JSON value.
 """
 scalar JSON
 
+"""
+JDBC connection details
+"""
 type JdbcDesc {
-	url: String!
-}
-
-type KafkaProtocolDesc {
+	"""
+	JDBC connection URL for the Arrow Flight SQL driver
+	"""
 	url: String!
 }
 
 """
-Represents base64-encoded binary data using standard encoding
+Kafka protocol endpoint
+"""
+type KafkaProtocolDesc {
+	"""
+	Kafka connection URL
+	"""
+	url: String!
+}
+
+"""
+Key-value pair of strings
 """
 type KeyValue {
+	"""
+	Key of the pair
+	"""
 	key: String!
+	"""
+	Value of the pair
+	"""
 	value: String!
 }
 
+"""
+Link to a dataset page in the web UI
+"""
 type LinkProtocolDesc {
+	"""
+	URL of the dataset page
+	"""
 	url: String!
 }
 
+"""
+Result of a successful login
+"""
 type LoginResponse {
+	"""
+	Access token to authenticate subsequent requests
+	"""
 	accessToken: String!
+	"""
+	Account that logged in
+	"""
 	account: Account!
 }
 
+"""
+Filters narrowing a name lookup
+"""
 input LookupFilters {
+	"""
+	Filters applied to accounts
+	"""
 	byAccount: AccountLookupFilter
 }
 
@@ -3184,6 +5651,9 @@ type MergeStrategyUpsertStream {
 	primaryKey: [String!]!
 }
 
+"""
+A page of `MetadataBlockExtended` items
+"""
 type MetadataBlockConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -3197,23 +5667,59 @@ type MetadataBlockConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [MetadataBlockEdge!]!
 }
 
+"""
+An edge wrapping a single `MetadataBlockExtended` item
+"""
 type MetadataBlockEdge {
+	"""
+	The item itself
+	"""
 	node: MetadataBlockExtended!
 }
 
+"""
+Metadata block with its hash and author
+"""
 type MetadataBlockExtended {
+	"""
+	Hash of this block
+	"""
 	blockHash: Multihash!
+	"""
+	Hash of the preceding block, null for the first block
+	"""
 	prevBlockHash: Multihash
+	"""
+	System time when this block was created
+	"""
 	systemTime: DateTime!
+	"""
+	Author of the block, reported as the dataset owner
+	"""
 	author: Account!
+	"""
+	Metadata event recorded in this block
+	"""
 	event: MetadataEvent!
+	"""
+	Position of this block in the chain, starting from zero
+	"""
 	sequenceNumber: Int!
+	"""
+	Block serialized in the requested format
+	"""
 	encoded(encoding: MetadataManifestFormat!): EncodedBlock
 }
 
+"""
+Chain of metadata blocks of a dataset
+"""
 type MetadataChain {
 	"""
 	Returns all named metadata block references
@@ -3234,6 +5740,9 @@ type MetadataChain {
 	blocks(page: Int, perPage: Int): MetadataBlockConnection!
 }
 
+"""
+Mutations of the dataset metadata chain
+"""
 type MetadataChainMut {
 	"""
 	Commits new event to the metadata chain
@@ -3248,41 +5757,113 @@ Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/MetadataEvent
 """
 union MetadataEvent = AddData | ExecuteTransform | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
 
+"""
+Type of a metadata event
+"""
 enum MetadataEventType {
+	"""
+	Event that establishes the identity of a dataset
+	"""
 	SEED
+	"""
+	Event that defines a source polled for new data
+	"""
 	SET_POLLING_SOURCE
+	"""
+	Event that defines column names with special meaning
+	"""
 	SET_VOCAB
+	"""
+	Event that sets attached files
+	"""
 	SET_ATTACHMENTS
+	"""
+	Event that sets the description, keywords and similar info
+	"""
 	SET_INFO
+	"""
+	Event that sets the license
+	"""
 	SET_LICENSE
+	"""
+	Event that sets the schema of the data
+	"""
 	SET_DATA_SCHEMA
+	"""
+	Event that defines how a derivative dataset is computed
+	"""
 	SET_TRANSFORM
+	"""
+	Event that adds a source data can be pushed into
+	"""
 	ADD_PUSH_SOURCE
 }
 
+"""
+Serialization format of metadata manifests
+"""
 enum MetadataManifestFormat {
+	"""
+	YAML manifest
+	"""
 	YAML
 }
 
+"""
+Manifest could not be parsed
+"""
 type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapshotResult {
+	"""
+	Description of the problem
+	"""
 	message: String!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
 }
 
+"""
+Manifest version is not supported by this node
+"""
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Description of the problem with the supported version range
+	"""
 	message: String!
 }
 
+"""
+Outcome of changing an account password
+"""
 interface ModifyPasswordResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Password was changed
+"""
 type ModifyPasswordSuccess implements ModifyPasswordResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Password was not changed: the old password is wrong
+"""
 type ModifyPasswordWrongOldPassword implements ModifyPasswordResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
@@ -3315,8 +5896,14 @@ type MqttTopicSubscription {
 	qos: MqttQos
 }
 
+"""
+Self-describing hash in multibase encoding
+"""
 scalar Multihash
 
+"""
+Root of all mutations
+"""
 type Mutation {
 	"""
 	Authentication and authorization-related functionality group
@@ -3352,8 +5939,14 @@ type Mutation {
 	admin: AdminMut!
 }
 
+"""
+Object found by a name lookup
+"""
 union NameLookupResult = Account
 
+"""
+A page of `NameLookupResult` items
+"""
 type NameLookupResultConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -3367,20 +5960,47 @@ type NameLookupResultConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [NameLookupResultEdge!]!
 }
 
+"""
+An edge wrapping a single `NameLookupResult` item
+"""
 type NameLookupResultEdge {
+	"""
+	The item itself
+	"""
 	node: NameLookupResult!
 }
 
+"""
+Request did not change the dataset
+"""
 type NoChanges implements CommitResult & UpdateReadmeResult {
+	"""
+	Explanation of why nothing changed
+	"""
 	message: String!
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
 }
 
+"""
+`OData` API endpoints for a dataset
+"""
 type OdataProtocolDesc {
+	"""
+	URL of the `OData` service of the dataset owner
+	"""
 	serviceUrl: String!
+	"""
+	URL of the `OData` collection of the dataset
+	"""
 	collectionUrl: String!
 }
 
@@ -3400,11 +6020,23 @@ type OffsetInterval {
 	end: Uint64!
 }
 
+"""
+Sort direction
+"""
 enum OrderingDirection {
+	"""
+	Ascending, smallest first
+	"""
 	ASC
+	"""
+	Descending, largest first
+	"""
 	DESC
 }
 
+"""
+Position of a page within a page-based listing
+"""
 type PageBasedInfo {
 	"""
 	When paginating backwards, are there more items?
@@ -3425,21 +6057,51 @@ type PageBasedInfo {
 	totalPages: Int
 }
 
+"""
+Outcome of pausing a webhook subscription
+"""
 interface PauseWebhookSubscriptionResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Webhook subscription was paused
+"""
 type PauseWebhookSubscriptionResultSuccess implements PauseWebhookSubscriptionResult {
+	"""
+	Always true
+	"""
 	paused: Boolean!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Operation is not allowed in the current subscription status
+"""
 type PauseWebhookSubscriptionResultUnexpected implements PauseWebhookSubscriptionResult {
+	"""
+	Current status of the subscription
+	"""
 	status: WebhookSubscriptionStatus!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+PostgreSQL protocol endpoint
+"""
 type PostgreSqlDesl {
+	"""
+	PostgreSQL connection URL
+	"""
 	url: String!
 }
 
@@ -3478,22 +6140,49 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+"""
+Dataset is visible only to its owner and collaborators
+"""
 type PrivateDatasetVisibility {
+	"""
+	Placeholder field without meaning, always null
+	"""
 	dummy: String
 }
 
+"""
+Dataset is visible only to its owner and collaborators
+"""
 input PrivateDatasetVisibilityInput {
+	"""
+	Placeholder field without meaning, always null
+	"""
 	dummy: String
 }
 
+"""
+Dataset is readable by all authenticated users
+"""
 type PublicDatasetVisibility {
+	"""
+	Whether anonymous (unauthenticated) users can read the dataset too
+	"""
 	anonymousAvailable: Boolean!
 }
 
+"""
+Dataset is readable by all authenticated users
+"""
 input PublicDatasetVisibilityInput {
+	"""
+	Whether anonymous (unauthenticated) users can read the dataset too
+	"""
 	anonymousAvailable: Boolean!
 }
 
+"""
+Root of all read-only queries
+"""
 type Query {
 	"""
 	Returns the version of the GQL API
@@ -3546,24 +6235,63 @@ type Query {
 	admin: Admin!
 }
 
+"""
+Query language and dialect
+"""
 enum QueryDialect {
+	"""
+	Apache Spark SQL
+	"""
 	SQL_SPARK
+	"""
+	Apache Flink SQL
+	"""
 	SQL_FLINK
+	"""
+	Apache `DataFusion` SQL
+	"""
 	SQL_DATA_FUSION
+	"""
+	`RisingWave` SQL
+	"""
 	SQL_RISING_WAVE
 }
 
+"""
+Outcome of reactivating a webhook subscription
+"""
 interface ReactivateWebhookSubscriptionResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Webhook subscription was reactivated
+"""
 type ReactivateWebhookSubscriptionResultSuccess implements ReactivateWebhookSubscriptionResult {
+	"""
+	Always true
+	"""
 	reactivated: Boolean!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Operation is not allowed in the current subscription status
+"""
 type ReactivateWebhookSubscriptionResultUnexpected implements ReactivateWebhookSubscriptionResult {
+	"""
+	Current status of the subscription
+	"""
 	status: WebhookSubscriptionStatus!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
@@ -3817,45 +6545,117 @@ type ReadStepParquet implements ReadStep {
 	schema(format: DataSchemaFormat): DataSchema
 }
 
+"""
+Outcome of removing a webhook subscription
+"""
 interface RemoveWebhookSubscriptionResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Webhook subscription was removed
+"""
 type RemoveWebhookSubscriptionResultSuccess implements RemoveWebhookSubscriptionResult {
+	"""
+	Always true
+	"""
 	removed: Boolean!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Account was not renamed: the new name is already taken
+"""
 type RenameAccountNameNotUnique implements RenameAccountResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of renaming an account
+"""
 interface RenameAccountResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Account was renamed
+"""
 type RenameAccountSuccess implements RenameAccountResult {
+	"""
+	New name of the account
+	"""
 	newName: String!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of renaming a dataset
+"""
 interface RenameResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Another dataset with the requested name already exists
+"""
 type RenameResultNameCollision implements RenameResult {
+	"""
+	Alias of the existing dataset that holds the name
+	"""
 	collidingAlias: DatasetAlias!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+New name equals the current one, nothing was changed
+"""
 type RenameResultNoChanges implements RenameResult {
+	"""
+	Current name of the dataset
+	"""
 	preservedName: DatasetName!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Dataset was renamed
+"""
 type RenameResultSuccess implements RenameResult {
+	"""
+	Name of the dataset before the rename
+	"""
 	oldName: DatasetName!
+	"""
+	Name of the dataset after the rename
+	"""
 	newName: DatasetName!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
@@ -3908,52 +6708,130 @@ an authorization outcome — a caller denied access to another account's
 resources gets a top-level GraphQL error, never this type.
 """
 type ResourceAccountResolutionProblem {
+	"""
+	Reason the account could not be resolved
+	"""
 	code: ResourceAccountResolutionProblemCode!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
+"""
+Reason an account reference could not be resolved
+"""
 enum ResourceAccountResolutionProblemCode {
+	"""
+	The reference has neither a DID nor a name to look up by
+	"""
 	EMPTY_SELECTOR
+	"""
+	No account exists with the given DID
+	"""
 	ACCOUNT_NOT_FOUND_BY_ID
+	"""
+	No account exists with the given name
+	"""
 	ACCOUNT_NOT_FOUND_BY_NAME
+	"""
+	The resolved account does not match the other given fields
+	"""
 	SELECTOR_MISMATCH
 }
 
 scalar ResourceAnnotations
 
+"""
+Outcome of applying one manifest of a batch
+"""
 type ResourceApplyManifestItemResult {
+	"""
+	Zero-based position of the manifest in the request
+	"""
 	requestIndex: Int!
+	"""
+	Result of applying this manifest
+	"""
 	outcome: ResourceApplyOutcome!
 }
 
+"""
+All manifests of the batch were accepted
+"""
 type ResourceApplyManifestsResult {
+	"""
+	Outcome for each manifest of the batch
+	"""
 	items: [ResourceApplyManifestItemResult!]!
 }
 
+"""
+Effect of an accepted apply on the resource
+"""
 enum ResourceApplyOperation {
+	"""
+	A new resource was created
+	"""
 	CREATED
+	"""
+	An existing resource's spec or headers changed
+	"""
 	UPDATED
+	"""
+	The manifest matched the existing resource, nothing changed
+	"""
 	UNTOUCHED
 }
 
+"""
+Result of applying one manifest: success, rejection or a validation problem
+"""
 union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceAccountResolutionProblem | ResourceInvalidHeaderProblem | ResourceInvalidSpecProblem
 
 """
 The manifest text could not be parsed (malformed JSON/YAML).
 """
 type ResourceApplyParseManifestProblem {
+	"""
+	Human-readable description of the parse error
+	"""
 	message: String!
 }
 
+"""
+The resource type refused the requested change
+"""
 type ResourceApplyRejection {
+	"""
+	Kind of rule the change violated
+	"""
 	category: ResourceApplyRejectionCategory!
+	"""
+	Human-readable reason for the rejection
+	"""
 	message: String!
 }
 
+"""
+Reason a resource manifest was rejected
+"""
 enum ResourceApplyRejectionCategory {
+	"""
+	The manifest changes a field that cannot be modified after creation
+	"""
 	IMMUTABLE_FIELD_CHANGED
+	"""
+	The spec violates a rule of the resource type
+	"""
 	BUSINESS_VALIDATION_FAILED
+	"""
+	The spec refers to an object that does not exist
+	"""
 	REFERENCED_OBJECT_MISSING
+	"""
+	The change conflicts with the resource's current lifecycle state
+	"""
 	LIFECYCLE_RULE_CONFLICT
 }
 
@@ -3962,7 +6840,13 @@ An accepted apply, reported as the canonical manifest on each side rather
 than a pre-computed change list: clients decide how to diff and display it.
 """
 type ResourceApplySuccess {
+	"""
+	Whether the resource was created, updated or left unchanged
+	"""
 	operation: ResourceApplyOperation!
+	"""
+	Resource as it is (or would be, on a dry run) after the apply
+	"""
 	resource: Resource!
 	"""
 	Canonical manifest before the apply. Null **iff** the resource is being
@@ -3974,17 +6858,35 @@ type ResourceApplySuccess {
 	on an accepted apply.
 	"""
 	after: JSON!
+	"""
+	Non-fatal issues found in the manifest
+	"""
 	warnings: [ResourceApplyWarning!]!
 }
 
+"""
+Non-fatal issue found while applying a manifest
+"""
 type ResourceApplyWarning {
+	"""
+	Machine-readable warning code, e.g. `missing_description`
+	"""
 	code: String!
+	"""
+	Dotted path to the manifest field concerned, null if not field-specific
+	"""
 	path: String
+	"""
+	Human-readable description of the warning
+	"""
 	message: String!
 }
 
 scalar ResourceConditions
 
+"""
+A page of `ResourceSummary` items
+"""
 type ResourceConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -3998,22 +6900,52 @@ type ResourceConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [ResourceEdge!]!
 }
 
+"""
+Result of deleting resources by reference
+"""
 union ResourceDeleteOutcome = ResourceDeleteResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
+"""
+Resources deleted and references that could not be resolved
+"""
 type ResourceDeleteResult {
+	"""
+	Resources that were deleted
+	"""
 	resources: [ResourceDeleteSuccess!]!
+	"""
+	References that could not be resolved
+	"""
 	problems: [BatchResourceProblem!]!
 }
 
+"""
+Resource deleted for one reference of a batch
+"""
 type ResourceDeleteSuccess {
+	"""
+	Zero-based position of the reference in the request
+	"""
 	requestIndex: Int!
+	"""
+	Unique identifier of the deleted resource
+	"""
 	resourceId: ResourceID!
 }
 
+"""
+An edge wrapping a single `ResourceSummary` item
+"""
 type ResourceEdge {
+	"""
+	The item itself
+	"""
 	node: ResourceSummary!
 }
 
@@ -4021,6 +6953,9 @@ type ResourceEdge {
 A reference that named neither an id nor a name.
 """
 type ResourceEmptyRefProblem {
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
@@ -4052,6 +6987,9 @@ type ResourceHandle {
 	name: ResourceName!
 }
 
+"""
+A page of `ResourceHandle` items
+"""
 type ResourceHandleConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -4065,23 +7003,63 @@ type ResourceHandleConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [ResourceHandleEdge!]!
 }
 
+"""
+An edge wrapping a single `ResourceHandle` item
+"""
 type ResourceHandleEdge {
+	"""
+	The item itself
+	"""
 	node: ResourceHandle!
 }
 
+"""
+Result of listing resource handles by selectors
+"""
 union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
 
+"""
+Kind of resource header validation failure
+"""
 enum ResourceHeaderValidationProblemCode {
+	"""
+	Resource name is empty
+	"""
 	EMPTY_NAME
+	"""
+	Resource name exceeds the maximum length
+	"""
 	NAME_TOO_LONG
+	"""
+	Resource name has an invalid format
+	"""
 	INVALID_NAME
+	"""
+	Number of labels exceeds the maximum
+	"""
 	TOO_MANY_LABELS
+	"""
+	The same label key appears more than once
+	"""
 	DUPLICATE_LABEL_KEY
+	"""
+	Number of annotations exceeds the maximum
+	"""
 	TOO_MANY_ANNOTATIONS
+	"""
+	The same annotation key appears more than once
+	"""
 	DUPLICATE_ANNOTATION_KEY
+	"""
+	A label or annotation key could not be resolved to a registered
+	extension schema, or its value is invalid for it
+	"""
 	RESOURCE_EXTENSION_SCHEMA
 }
 
@@ -4140,10 +7118,22 @@ type ResourceHeaders {
 	deletedAt: DateTime
 }
 
+"""
+Unique and stable identifier of a resource
+"""
 scalar ResourceID
 
+"""
+No resource exists with the referenced ID
+"""
 type ResourceIDNotFoundProblem {
+	"""
+	ID that was not found
+	"""
 	id: ResourceID!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
@@ -4151,7 +7141,13 @@ type ResourceIDNotFoundProblem {
 A header field value (e.g. name, label key) failed validation.
 """
 type ResourceInvalidHeaderProblem {
+	"""
+	Which header rule was violated
+	"""
 	code: ResourceHeaderValidationProblemCode!
+	"""
+	Human-readable description of the violation
+	"""
 	message: String!
 }
 
@@ -4159,7 +7155,13 @@ type ResourceInvalidHeaderProblem {
 A selector's `labels` could not be resolved into a matchable filter.
 """
 type ResourceInvalidLabelFilterProblem {
+	"""
+	Reason the label filter was rejected
+	"""
 	code: ResourceLabelFilterProblemCode!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
@@ -4167,7 +7169,13 @@ type ResourceInvalidLabelFilterProblem {
 The `spec` field failed domain validation.
 """
 type ResourceInvalidSpecProblem {
+	"""
+	Schema URI of the resource type whose spec was rejected
+	"""
 	schema: TypeUri!
+	"""
+	Human-readable description of the validation failure
+	"""
 	message: String!
 }
 
@@ -4175,7 +7183,13 @@ type ResourceInvalidSpecProblem {
 One authored `key = value` label predicate.
 """
 input ResourceLabelFilterEntryInput {
+	"""
+	Label key to match
+	"""
 	key: String!
+	"""
+	Required label value, must be a string
+	"""
 	value: JSON!
 }
 
@@ -4184,53 +7198,144 @@ Selects resources by label predicates.
 A list preserves duplicate keys for validation.
 """
 input ResourceLabelFilterInput {
+	"""
+	Predicates that must all hold, each key at most once
+	"""
 	entries: [ResourceLabelFilterEntryInput!]!
 }
 
+"""
+Reason a label filter was rejected
+"""
 enum ResourceLabelFilterProblemCode {
+	"""
+	A label key could not be parsed
+	"""
 	INVALID_KEY
+	"""
+	A label key could not be resolved to a registered extension schema
+	applicable to the resource type, or its value is invalid for it
+	"""
 	RESOURCE_EXTENSION_SCHEMA
+	"""
+	A label value is not a string
+	"""
 	NON_STRING_VALUE
+	"""
+	Two different keys resolve to the same canonical label
+	"""
 	DUPLICATE_AFTER_CANONICALIZATION
+	"""
+	The filter uses an expression that is not supported
+	"""
 	UNSUPPORTED_EXPRESSION
 }
 
 scalar ResourceLabels
 
+"""
+Data type of a list column's values
+"""
 enum ResourceListColumnDataType {
+	"""
+	Text value, read from `stringValue`
+	"""
 	STRING
+	"""
+	Unsigned 64-bit integer, read from `uint64Value`
+	"""
 	U_INT_64
+	"""
+	Boolean value, read from `boolValue`
+	"""
 	BOOL
 }
 
+"""
+Type-specific column to show when listing resources
+"""
 type ResourceListColumnDescriptor {
+	"""
+	Column key, matching `ResourceListColumnValueView.key`
+	"""
 	key: String!
+	"""
+	Column title to display
+	"""
 	header: String!
+	"""
+	Data type of the column's values
+	"""
 	dataType: ResourceListColumnDataType!
+	"""
+	When the column is shown
+	"""
 	visibility: ResourceListColumnVisibility!
 }
 
+"""
+Value of one list column for a resource; exactly one value field is set
+"""
 type ResourceListColumnValueView {
+	"""
+	Key of the column this value belongs to
+	"""
 	key: String!
+	"""
+	Value of a `STRING` column, null otherwise
+	"""
 	stringValue: String
+	"""
+	Value of a `U_INT_64` column, null otherwise
+	"""
 	uint64Value: Uint64
+	"""
+	Value of a `BOOL` column, null otherwise
+	"""
 	boolValue: Boolean
 }
 
+"""
+When a list column is shown
+"""
 enum ResourceListColumnVisibility {
+	"""
+	Shown in every listing
+	"""
 	DEFAULT
+	"""
+	Shown only in the wide listing
+	"""
 	WIDE_ONLY
 }
 
+"""
+Result of listing resources by selectors
+"""
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
 
+"""
+Reason a resource reference could not be resolved
+"""
 union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem | ResourceUntypedNameProblem
 
+"""
+Text format of a resource manifest
+"""
 enum ResourceManifestFormat {
+	"""
+	JSON document
+	"""
 	JSON
+	"""
+	YAML document
+	"""
 	YAML
 }
 
+"""
+Name of a resource
+"""
 scalar ResourceName
 
 """
@@ -4239,15 +7344,39 @@ resources. The pair is a consistency assertion, so the mismatch fails the
 entry rather than letting the `id` silently win.
 """
 type ResourceNameMismatchProblem {
+	"""
+	ID given in the reference
+	"""
 	id: ResourceID!
+	"""
+	Name given in the reference
+	"""
 	expectedName: ResourceName!
+	"""
+	Actual name of the resource with that ID
+	"""
 	actualName: ResourceName!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
+"""
+No resource of the referenced type has the referenced name
+"""
 type ResourceNameNotFoundProblem {
+	"""
+	Resource type that was searched
+	"""
 	typeName: TypeName!
+	"""
+	Name that was not found
+	"""
 	name: ResourceName!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
@@ -4264,11 +7393,29 @@ enum ResourcePhase {
 	FAILED
 }
 
+"""
+Number of resources in each reconciliation phase
+"""
 type ResourcePhaseCounts {
+	"""
+	Resources waiting to be reconciled
+	"""
 	pending: Uint64!
+	"""
+	Resources being reconciled
+	"""
 	reconciling: Uint64!
+	"""
+	Resources whose latest generation is reconciled
+	"""
 	ready: Uint64!
+	"""
+	Resources whose last reconcile failed after an earlier success
+	"""
 	degraded: Uint64!
+	"""
+	Resources that failed and were never reconciled
+	"""
 	failed: Uint64!
 }
 
@@ -4289,6 +7436,9 @@ To match resources *without* knowing their type, use a selector
 type, while a ref names exactly one.
 """
 input ResourceRefInput {
+	"""
+	Account owning the resource, defaults to the calling account
+	"""
 	account: AccountRefInput
 	"""
 	Canonical selector (`variablesets`), alias (`vs`), ODF type name
@@ -4299,6 +7449,9 @@ input ResourceRefInput {
 	resource on its own.
 	"""
 	type: ResourceTypeSelectorInput
+	"""
+	Unique identifier of the resource
+	"""
 	id: ResourceID
 	"""
 	Exact name. Never a pattern; use a selector for pattern matching.
@@ -4306,15 +7459,39 @@ input ResourceRefInput {
 	name: ResourceName
 }
 
+"""
+Resource rendered as a manifest document
+"""
 type ResourceRenderManifestResult {
+	"""
+	Manifest text
+	"""
 	manifest: String!
+	"""
+	Format the manifest text is in
+	"""
 	format: ResourceManifestFormat!
 }
 
+"""
+The resource with the referenced ID is of a different type than requested
+"""
 type ResourceSchemaMismatchProblem {
+	"""
+	ID of the resource found
+	"""
 	id: ResourceID!
+	"""
+	Schema URI of the requested type
+	"""
 	expectedSchema: TypeUri!
+	"""
+	Schema URI of the resource's actual type
+	"""
 	actualSchema: TypeUri!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
@@ -4341,6 +7518,9 @@ input ResourceSelectorInput {
 	(`VariableSet`), or full schema URI. `null` spans every type.
 	"""
 	type: ResourceTypeSelectorInput
+	"""
+	Matches only the resource with this ID
+	"""
 	id: ResourceID
 	"""
 	Name pattern in SQL `LIKE` format, per the ODF schema. Only `%` acts as
@@ -4356,6 +7536,9 @@ input ResourceSelectorInput {
 	labels: ResourceLabelFilterInput
 }
 
+"""
+Short name that selects a resource type (e.g. in `kind` filters)
+"""
 scalar ResourceSelectorName
 
 """
@@ -4391,44 +7574,133 @@ type ResourceStatus {
 	conditions: ResourceConditions!
 }
 
+"""
+Condensed reconciliation status of a resource
+"""
 type ResourceStatusSummary {
+	"""
+	Current reconciliation phase
+	"""
 	phase: ResourcePhase
+	"""
+	Generation last seen by the controller, null if never observed
+	"""
 	observedGeneration: Uint64
+	"""
+	Time the controller observed `observedGeneration`
+	"""
 	observedAt: DateTime
+	"""
+	Generation last successfully reconciled, null if never reconciled
+	"""
 	reconciledGeneration: Uint64
+	"""
+	Time `reconciledGeneration` was reconciled
+	"""
 	reconciledAt: DateTime
 }
 
+"""
+Condensed view of a resource for listings
+"""
 type ResourceSummary {
+	"""
+	Unique and stable identifier of the resource
+	"""
 	id: ResourceID!
+	"""
+	Schema URI of the resource type
+	"""
 	schema: TypeUri!
+	"""
+	Name of the resource, unique within its type and account
+	"""
 	name: ResourceName!
+	"""
+	Description from the resource annotations, null if not set
+	"""
 	description: String
+	"""
+	Revision of the desired state, bumped on each spec or headers change
+	"""
 	generation: Uint64!
+	"""
+	Time the resource was created
+	"""
 	createdAt: DateTime!
+	"""
+	Time the resource was last updated
+	"""
 	updatedAt: DateTime!
+	"""
+	Reconciliation status, null if not yet recorded
+	"""
 	status: ResourceStatusSummary
+	"""
+	Values of the type-specific list columns
+	"""
 	listValues: [ResourceListColumnValueView!]!
 }
 
+"""
+Resource counts for one resource type
+"""
 type ResourceTypeCountSummary {
+	"""
+	Schema URI of the resource type
+	"""
 	schema: TypeUri!
+	"""
+	ODF type name of the resource type, e.g. `VariableSet`
+	"""
 	typeName: TypeName!
+	"""
+	Number of resources of this type
+	"""
 	totalCount: Uint64!
+	"""
+	Number of resources of this type in each phase
+	"""
 	phaseCounts: ResourcePhaseCounts!
 }
 
+"""
+Registered resource type with its selectors and list columns
+"""
 type ResourceTypeDescriptor {
+	"""
+	Main selector name of the type, e.g. `variablesets`
+	"""
 	canonicalSelector: ResourceSelectorName!
+	"""
+	Short alternative selector names, e.g. `vs`
+	"""
 	selectorAliases: [ResourceSelectorName!]!
+	"""
+	Schema URI identifying the type
+	"""
 	schema: TypeUri!
+	"""
+	Type-specific columns to show when listing resources
+	"""
 	listColumns: [ResourceListColumnDescriptor!]!
 }
 
+"""
+Identifies a resource type by selector, alias, ODF type name or schema URI
+"""
 input ResourceTypeSelectorInput {
+	"""
+	Canonical selector (`variablesets`), alias (`vs`), ODF type name
+	(`VariableSet`), or full schema URI
+	"""
 	selector: ResourceTypeSelectorRaw!
 }
 
+"""
+Resource type selector as authored: a selector name, an alias, a type
+name or a schema URI
+"""
 scalar ResourceTypeSelectorRaw
 
 """
@@ -4439,7 +7711,13 @@ lookups surface [`ResourceUnsupportedSelectorProblem`] instead, so this
 field never carries a short selector masquerading as a URI.
 """
 type ResourceUnsupportedDescriptorProblem {
+	"""
+	Schema URI that matched no registered type
+	"""
 	schema: TypeUri!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
@@ -4450,7 +7728,13 @@ string — never a schema URI (the public API selects resource types by
 selector).
 """
 type ResourceUnsupportedSelectorProblem {
+	"""
+	Selector as supplied by the caller
+	"""
 	selector: ResourceTypeSelectorRaw!
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
@@ -4459,9 +7743,15 @@ A reference addressing by `name` without a `type`. A name is unique only
 within one type, so the reference identifies nothing as posed.
 """
 type ResourceUntypedNameProblem {
+	"""
+	Human-readable description of the problem
+	"""
 	message: String!
 }
 
+"""
+Queries over declarative resources and their types
+"""
 type Resources {
 	"""
 	Returns resource types supported by the current server
@@ -4495,61 +7785,162 @@ type Resources {
 	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourceManifestsOutcome!
 }
 
+"""
+Mutations that create, update and delete declarative resources
+"""
 type ResourcesMut {
+	"""
+	Creates or updates a resource from a manifest, or only plans the
+	change when `dryRun` is set
+	"""
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
+	"""
+	Applies several manifests atomically: if any item fails, the whole
+	request is rolled back and returned as an error
+	"""
 	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
+	"""
+	Deletes the resources identified by the given references
+	"""
 	delete(resourceRefs: [ResourceRefInput!]!): ResourceDeleteOutcome!
 }
 
+"""
+Resource counts of an account, per type
+"""
 type ResourcesSummary {
+	"""
+	Counts for each resource type
+	"""
 	resourceCounts: [ResourceTypeCountSummary!]!
 }
 
+"""
+Result of computing the resources summary of an account
+"""
 union ResourcesSummaryOutcome = ResourcesSummary | ResourceAccountResolutionProblem
 
+"""
+REST API endpoints for a dataset
+"""
 type RestProtocolDesc {
+	"""
+	Example URL fetching the latest records of the dataset
+	"""
 	tailUrl: String!
+	"""
+	Example URL of the SQL query endpoint
+	"""
 	queryUrl: String!
+	"""
+	URL of the endpoint that ingests data into the dataset
+	"""
 	pushUrl: String!
 }
 
+"""
+Outcome of resuming a webhook subscription
+"""
 interface ResumeWebhookSubscriptionResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Webhook subscription was resumed
+"""
 type ResumeWebhookSubscriptionResultSuccess implements ResumeWebhookSubscriptionResult {
+	"""
+	Always true
+	"""
 	resumed: Boolean!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Operation is not allowed in the current subscription status
+"""
 type ResumeWebhookSubscriptionResultUnexpected implements ResumeWebhookSubscriptionResult {
+	"""
+	Current status of the subscription
+	"""
 	status: WebhookSubscriptionStatus!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Outcome of revoking an access token
+"""
 interface RevokeResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Access token was already revoked earlier
+"""
 type RevokeResultAlreadyRevoked implements RevokeResult {
+	"""
+	Identifier of the token
+	"""
 	tokenId: AccessTokenID!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Access token was revoked
+"""
 type RevokeResultSuccess implements RevokeResult {
+	"""
+	Identifier of the revoked token
+	"""
 	tokenId: AccessTokenID!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of rotating a webhook subscription secret
+"""
 interface RotateWebhookSubscriptionSecretResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Subscription secret was rotated
+"""
 type RotateWebhookSubscriptionSecretSuccess implements RotateWebhookSubscriptionSecretResult {
+	"""
+	New secret for verifying delivery signatures, returned only once
+	"""
 	newSecret: String!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Search over datasets and other objects managed by the node
+"""
 type Search {
 	"""
 	This endpoint uses heuristics to infer whether the query string is a DSL
@@ -4557,6 +7948,10 @@ type Search {
 	versatile interface to the user consisting of just one input field.
 	"""
 	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
+	"""
+	Full-text search over datasets and accounts, listing all of them
+	sorted by title when the prompt is empty
+	"""
 	queryFullText(prompt: String!, page: Int, perPage: Int): FullTextSearchResponse!
 	"""
 	Searches for datasets and other objects managed by the
@@ -4576,8 +7971,17 @@ type Search {
 	nameLookup(query: String!, filters: LookupFilters!, page: Int, perPage: Int): NameLookupResultConnection!
 }
 
+"""
+Kind of entity indexed for search
+"""
 enum SearchEntityName {
+	"""
+	Dataset search index
+	"""
 	DATASETS
+	"""
+	Account search index
+	"""
 	ACCOUNTS
 }
 
@@ -4599,8 +8003,14 @@ input SearchResourcesInput {
 	selectors: [ResourceSelectorInput!]
 }
 
+"""
+Object found by a search
+"""
 union SearchResult = Dataset
 
+"""
+A page of `SearchResult` items
+"""
 type SearchResultConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -4614,18 +8024,39 @@ type SearchResultConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [SearchResultEdge!]!
 }
 
+"""
+An edge wrapping a single `SearchResult` item
+"""
 type SearchResultEdge {
+	"""
+	The item itself
+	"""
 	node: SearchResult!
 }
 
+"""
+Object found by a search, with its relevance score
+"""
 type SearchResultEx {
+	"""
+	Found object
+	"""
 	item: SearchResult!
+	"""
+	Relevance score, higher is more relevant
+	"""
 	score: Float!
 }
 
+"""
+A page of `SearchResultEx` items
+"""
 type SearchResultExConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -4639,10 +8070,19 @@ type SearchResultExConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [SearchResultExEdge!]!
 }
 
+"""
+An edge wrapping a single `SearchResultEx` item
+"""
 type SearchResultExEdge {
+	"""
+	The item itself
+	"""
 	node: SearchResultEx!
 }
 
@@ -4662,26 +8102,65 @@ type Seed {
 	datasetKind: DatasetKind!
 }
 
+"""
+New quota values of an account
+"""
 input SetAccountQuotasInput {
+	"""
+	Storage quotas to set
+	"""
 	storage: SetAccountQuotasStorageInput
 }
 
+"""
+Outcome of setting account quotas
+"""
 interface SetAccountQuotasResult {
+	"""
+	Whether the quotas were set
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message, empty on success
+	"""
 	message: String!
 }
 
+"""
+Account quotas were not set: the input is invalid
+"""
 type SetAccountQuotasResultInvalidInput implements SetAccountQuotasResult {
+	"""
+	Description of what is wrong with the input
+	"""
 	message: String!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
 }
 
+"""
+Account quotas were set
+"""
 type SetAccountQuotasResultSuccess implements SetAccountQuotasResult {
+	"""
+	Human-readable outcome message, empty on success
+	"""
 	message: String!
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
 }
 
+"""
+Storage quota values of an account
+"""
 input SetAccountQuotasStorageInput {
+	"""
+	Maximum total size of stored data in bytes; required
+	"""
 	limitTotalBytes: Int
 }
 
@@ -4701,29 +8180,71 @@ type SetDataSchema {
 	schema(format: DataSchemaFormat): DataSchema!
 }
 
+"""
+Outcome of changing dataset visibility
+"""
 interface SetDatasetVisibilityResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Dataset visibility was changed
+"""
 type SetDatasetVisibilityResultSuccess implements SetDatasetVisibilityResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of setting a flow configuration
+"""
 interface SetFlowConfigResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Flow configuration was set
+"""
 type SetFlowConfigSuccess implements SetFlowConfigResult {
+	"""
+	Configuration that is now in effect
+	"""
 	config: FlowConfiguration!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Outcome of setting a flow trigger
+"""
 interface SetFlowTriggerResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Flow trigger was set
+"""
 type SetFlowTriggerSuccess implements SetFlowTriggerResult {
+	"""
+	Trigger that is now in effect
+	"""
 	trigger: FlowTrigger!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
@@ -4795,11 +8316,23 @@ type SetPollingSource {
 	merge: MergeStrategy!
 }
 
+"""
+Outcome of granting a dataset role to an account
+"""
 interface SetRoleResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Role was granted
+"""
 type SetRoleResultSuccess implements SetRoleResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
@@ -4843,20 +8376,47 @@ type SetVocab {
 	eventTimeColumn: String
 }
 
+"""
+Watermark cannot be set manually on a derivative dataset
+"""
 type SetWatermarkIsDerivative implements SetWatermarkResult {
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Outcome of advancing the dataset watermark
+"""
 interface SetWatermarkResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Watermark already had the requested value
+"""
 type SetWatermarkUpToDate implements SetWatermarkResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Watermark was advanced
+"""
 type SetWatermarkUpdated implements SetWatermarkResult {
+	"""
+	Hash of the new metadata chain head
+	"""
 	newHead: Multihash!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
@@ -4936,28 +8496,79 @@ type SqlQueryStep {
 	query: String!
 }
 
+"""
+File is larger than the upload size limit
+"""
 type StartUploadVersionErrorTooLarge implements StartUploadVersionResult {
+	"""
+	Size of the file, in bytes
+	"""
 	uploadSize: Int!
+	"""
+	Maximum allowed upload size, in bytes
+	"""
 	uploadLimit: Int!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Outcome of starting a direct file upload
+"""
 interface StartUploadVersionResult {
+	"""
+	Whether the operation succeeded
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Upload was started; describes how to send the content
+"""
 type StartUploadVersionSuccess implements StartUploadVersionResult {
+	"""
+	URL to send the file content to
+	"""
 	url: String!
+	"""
+	HTTP method to use for the upload
+	"""
 	method: String!
+	"""
+	Whether the content must be sent as a multipart form
+	"""
 	useMultipart: Boolean!
+	"""
+	HTTP headers to include in the upload request
+	"""
 	headers: [KeyValue!]!
+	"""
+	Token to pass to `finishUploadNewVersion` once the upload completes
+	"""
 	uploadToken: String!
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
+	"""
+	Always empty
+	"""
 	message: String!
 }
 
+"""
+Unit of work executed on behalf of a flow
+"""
 type Task {
 	"""
 	Unique and stable identifier of this task
@@ -4994,23 +8605,56 @@ type Task {
 	finishedAt: DateTime
 }
 
+"""
+Cause of a task failure
+"""
 union TaskFailureReason = TaskFailureReasonGeneral | TaskFailureReasonInputDatasetCompacted | TaskFailureReasonWebhookDeliveryProblem
 
+"""
+Task failed for a reason without a dedicated type
+"""
 type TaskFailureReasonGeneral {
+	"""
+	Human-readable description of the failure
+	"""
 	message: String!
+	"""
+	Whether the failure is transient and the task may be retried
+	"""
 	recoverable: Boolean!
 }
 
+"""
+Transform failed because an input dataset was compacted
+"""
 type TaskFailureReasonInputDatasetCompacted {
+	"""
+	Input dataset that was compacted
+	"""
 	inputDataset: Dataset!
+	"""
+	Human-readable description of the failure
+	"""
 	message: String!
 }
 
+"""
+Webhook could not be delivered to its target
+"""
 type TaskFailureReasonWebhookDeliveryProblem {
+	"""
+	URL the delivery was sent to
+	"""
 	targetUrl: Url!
+	"""
+	Description of the delivery problem
+	"""
 	message: String!
 }
 
+"""
+Unique identifier of a task
+"""
 scalar TaskID
 
 """
@@ -5018,15 +8662,33 @@ Describes a certain final outcome of the task
 """
 union TaskOutcome = TaskOutcomeSuccess | TaskOutcomeFailed | TaskOutcomeCancelled
 
+"""
+Task was cancelled before completing
+"""
 type TaskOutcomeCancelled {
+	"""
+	Human-readable cancellation message
+	"""
 	message: String!
 }
 
+"""
+Task failed
+"""
 type TaskOutcomeFailed {
+	"""
+	Why the task failed
+	"""
 	reason: TaskFailureReason!
 }
 
+"""
+Task completed successfully
+"""
 type TaskOutcomeSuccess {
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
@@ -5064,29 +8726,83 @@ type TemporalTable {
 	primaryKey: [String!]!
 }
 
+"""
+Time interval expressed as a number of units
+"""
 type TimeDelta {
+	"""
+	Number of units in the interval
+	"""
 	every: Int!
+	"""
+	Unit of the interval
+	"""
 	unit: TimeUnit!
 }
 
+"""
+Time interval expressed as a number of units
+"""
 input TimeDeltaInput {
+	"""
+	Number of units in the interval
+	"""
 	every: Int!
+	"""
+	Unit of the interval
+	"""
 	unit: TimeUnit!
 }
 
+"""
+Unit of a time interval
+"""
 enum TimeUnit {
+	"""
+	Minutes
+	"""
 	MINUTES
+	"""
+	Hours
+	"""
 	HOURS
+	"""
+	Days
+	"""
 	DAYS
+	"""
+	Weeks
+	"""
 	WEEKS
 }
 
+"""
+Storage usage summed over a set of datasets
+"""
 type TotalDatasetsStatistic {
+	"""
+	Number of data records
+	"""
 	totalRecords: Int!
+	"""
+	Size of data files in bytes
+	"""
 	totalDataSizeBytes: Int!
+	"""
+	Size of checkpoint files in bytes
+	"""
 	totalCheckpointsSizeBytes: Int!
+	"""
+	Number of linked objects
+	"""
 	totalNumLinkedObjects: Int!
+	"""
+	Size of linked objects in bytes
+	"""
 	totalLinkedObjectsSizeBytes: Int!
+	"""
+	Size of data, checkpoints and linked objects together in bytes
+	"""
 	totalSizeBytes: Int!
 }
 
@@ -5134,111 +8850,303 @@ type TransformSql {
 	temporalTables: [TemporalTable!]
 }
 
+"""
+Outcome of manually triggering a flow
+"""
 interface TriggerFlowResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Flow was triggered
+"""
 type TriggerFlowSuccess implements TriggerFlowResult {
+	"""
+	Flow that was scheduled to run
+	"""
 	flow: Flow!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Name of a resource type
+"""
 scalar TypeName
 
+"""
+URI of a resource type schema
+"""
 scalar TypeUri
 
+"""
+Absolute URL
+"""
 scalar URL
 
+"""
+Unsigned 64-bit integer, passed as a string to avoid precision loss
+"""
 scalar Uint64
 
+"""
+Outcome of revoking dataset roles from accounts
+"""
 interface UnsetRoleResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Roles were revoked
+"""
 type UnsetRoleResultSuccess implements UnsetRoleResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Email was not updated: it is already used by another account
+"""
 type UpdateEmailNonUnique implements UpdateEmailResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of updating an account email
+"""
 interface UpdateEmailResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Account email was updated
+"""
 type UpdateEmailSuccess implements UpdateEmailResult {
+	"""
+	New email of the account
+	"""
 	newEmail: String!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Outcome of updating the dataset readme
+"""
 interface UpdateReadmeResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Dataset head did not match the expected one, likely due to a concurrent update
+"""
 type UpdateVersionErrorCasFailed implements UpdateVersionResult {
+	"""
+	Head block hash the caller expected
+	"""
 	expectedHead: Multihash!
+	"""
+	Current head block hash of the dataset
+	"""
 	actualHead: Multihash!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Extra data does not match the dataset schema
+"""
 type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
+	"""
+	Reason the extra data was rejected
+	"""
 	message: String!
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
 }
 
+"""
+Update would exceed the storage quota of the account
+"""
 type UpdateVersionErrorQuotaExceeded implements UpdateVersionResult {
+	"""
+	Storage already used, in bytes; null if no quota is configured
+	"""
 	used: Int
+	"""
+	Size of the rejected content, in bytes; null if no quota is configured
+	"""
 	incoming: Int
+	"""
+	Storage limit, in bytes; null if no quota is configured
+	"""
 	limit: Int
+	"""
+	Always false
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating a new file version
+"""
 interface UpdateVersionResult {
+	"""
+	Whether the operation succeeded
+	"""
 	isSuccess: Boolean!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+New file version was created
+"""
 type UpdateVersionSuccess implements UpdateVersionResult {
+	"""
+	Number of the created version
+	"""
 	newVersion: Int!
+	"""
+	Hash of the metadata chain head before the update
+	"""
 	oldHead: Multihash!
+	"""
+	Hash of the metadata chain head after the update
+	"""
 	newHead: Multihash!
+	"""
+	Hash of the file content of the new version
+	"""
 	contentHash: Multihash!
+	"""
+	Always true
+	"""
 	isSuccess: Boolean!
+	"""
+	Always empty
+	"""
 	message: String!
 }
 
+"""
+Outcome of updating a webhook subscription
+"""
 interface UpdateWebhookSubscriptionResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Webhook subscription was updated
+"""
 type UpdateWebhookSubscriptionResultSuccess implements UpdateWebhookSubscriptionResult {
+	"""
+	Always true
+	"""
 	updated: Boolean!
+	"""
+	Human-readable success message
+	"""
 	message: String!
 }
 
+"""
+Operation is not allowed in the current subscription status
+"""
 type UpdateWebhookSubscriptionResultUnexpected implements UpdateWebhookSubscriptionResult {
+	"""
+	Current status of the subscription
+	"""
 	status: WebhookSubscriptionStatus!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Outcome of creating or updating an environment variable
+"""
 interface UpsertDatasetEnvVarResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Environment variable was created
+"""
 type UpsertDatasetEnvVarResultCreated implements UpsertDatasetEnvVarResult {
+	"""
+	Created environment variable
+	"""
 	envVar: ViewDatasetEnvVar!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Environment variable was updated
+"""
 type UpsertDatasetEnvVarResultUpdated implements UpsertDatasetEnvVarResult {
+	"""
+	Updated environment variable
+	"""
 	envVar: ViewDatasetEnvVar!
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
+"""
+Environment variable already had the requested value
+"""
 type UpsertDatasetEnvVarUpToDate implements UpsertDatasetEnvVarResult {
+	"""
+	Human-readable outcome message
+	"""
 	message: String!
 }
 
@@ -5247,6 +9155,9 @@ URL is a String implementing the [URL Standard](http://url.spec.whatwg.org/)
 """
 scalar Url
 
+"""
+Versioned file archetype view of a dataset, where each version is a file
+"""
 type VersionedFile {
 	"""
 	Returns list of versions in reverse chronological order
@@ -5267,6 +9178,9 @@ type VersionedFile {
 	asOf(version: Int, blockHash: Multihash): VersionedFileEntry
 }
 
+"""
+Information needed to download file content directly from storage
+"""
 type VersionedFileContentDownload {
 	"""
 	Direct download URL
@@ -5282,6 +9196,9 @@ type VersionedFileContentDownload {
 	expiresAt: DateTime
 }
 
+"""
+Single version of a versioned file
+"""
 type VersionedFileEntry {
 	"""
 	System time when this version was created
@@ -5322,6 +9239,9 @@ type VersionedFileEntry {
 	contentUrl: VersionedFileContentDownload!
 }
 
+"""
+A page of `VersionedFileEntry` items
+"""
 type VersionedFileEntryConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -5335,13 +9255,25 @@ type VersionedFileEntryConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [VersionedFileEntryEdge!]!
 }
 
+"""
+An edge wrapping a single `VersionedFileEntry` item
+"""
 type VersionedFileEntryEdge {
+	"""
+	The item itself
+	"""
 	node: VersionedFileEntry!
 }
 
+"""
+Mutations of a versioned file dataset
+"""
 type VersionedFileMut {
 	"""
 	Uploads a new version of content in-band. Can be used for very small
@@ -5413,6 +9345,9 @@ type VersionedFileMut {
 	): UpdateVersionResult!
 }
 
+"""
+Access token as seen when listing tokens, without its secret value
+"""
 type ViewAccessToken {
 	"""
 	Unique identifier of the access token
@@ -5436,6 +9371,9 @@ type ViewAccessToken {
 	account: Account!
 }
 
+"""
+Environment variable of a dataset
+"""
 type ViewDatasetEnvVar {
 	"""
 	Key of the dataset environment variable
@@ -5449,9 +9387,15 @@ type ViewDatasetEnvVar {
 	Date of the dataset environment variable creation
 	"""
 	createdAt: DateTime!
+	"""
+	Whether the value is stored encrypted and hidden from listings
+	"""
 	isSecret: Boolean!
 }
 
+"""
+A page of `ViewDatasetEnvVar` items
+"""
 type ViewDatasetEnvVarConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -5465,26 +9409,62 @@ type ViewDatasetEnvVarConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [ViewDatasetEnvVarEdge!]!
 }
 
+"""
+An edge wrapping a single `ViewDatasetEnvVar` item
+"""
 type ViewDatasetEnvVarEdge {
+	"""
+	The item itself
+	"""
 	node: ViewDatasetEnvVar!
 }
 
+"""
+WebSocket endpoint
+"""
 type WebSocketProtocolDesc {
+	"""
+	WebSocket connection URL
+	"""
 	url: String!
 }
 
+"""
+Type of event a webhook subscription delivers (e.g. `DATASET.REF.UPDATED`)
+"""
 scalar WebhookEventType
 
+"""
+Webhook delivery process of a single subscription
+"""
 type WebhookFlowSubProcess {
+	"""
+	Identifier of the webhook subscription
+	"""
 	id: WebhookSubscriptionID!
+	"""
+	Subscription label, or its target URL when the label is empty
+	"""
 	name: String!
+	"""
+	Dataset the subscription belongs to, null for non-dataset subscriptions
+	"""
 	parentDataset: Dataset
+	"""
+	Current state summary of the delivery process
+	"""
 	summary: FlowProcessSummary!
 }
 
+"""
+A page of `WebhookFlowSubProcess` items
+"""
 type WebhookFlowSubProcessConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -5498,18 +9478,39 @@ type WebhookFlowSubProcessConnection {
 	Page information
 	"""
 	pageInfo: PageBasedInfo!
+	"""
+	Items of this page, each wrapped in an edge
+	"""
 	edges: [WebhookFlowSubProcessEdge!]!
 }
 
+"""
+An edge wrapping a single `WebhookFlowSubProcess` item
+"""
 type WebhookFlowSubProcessEdge {
+	"""
+	The item itself
+	"""
 	node: WebhookFlowSubProcess!
 }
 
+"""
+Webhook delivery processes of a dataset
+"""
 type WebhookFlowSubProcessGroup {
+	"""
+	Aggregated state counts across the dataset's webhook processes
+	"""
 	rollup: FlowProcessGroupRollup!
+	"""
+	Webhook delivery processes of the dataset, ordered by name
+	"""
 	subprocesses: [WebhookFlowSubProcess!]!
 }
 
+"""
+Subscription that delivers dataset events to a target URL
+"""
 type WebhookSubscription {
 	"""
 	Unique identifier of the webhook subscription
@@ -5538,48 +9539,135 @@ type WebhookSubscription {
 	status: WebhookSubscriptionStatus!
 }
 
+"""
+Another subscription of the dataset already uses this label
+"""
 type WebhookSubscriptionDuplicateLabel implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	"""
+	Label that is already taken
+	"""
 	label: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Unique identifier of a webhook subscription
+"""
 scalar WebhookSubscriptionID
 
+"""
+Settings of a webhook subscription
+"""
 input WebhookSubscriptionInput {
+	"""
+	URL that receives webhook deliveries
+	"""
 	targetUrl: URL!
+	"""
+	Event types to deliver, at least one is required
+	"""
 	eventTypes: [WebhookEventType!]!
+	"""
+	Label to identify the subscription, unique within the dataset
+	"""
 	label: WebhookSubscriptionLabel!
 }
 
+"""
+Target URL is not acceptable for webhook delivery
+"""
 type WebhookSubscriptionInvalidTargetUrl implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	"""
+	Explanation of why the URL was rejected
+	"""
 	innerMessage: String!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Human-readable label of a webhook subscription
+"""
 scalar WebhookSubscriptionLabel
 
+"""
+Mutations of a single webhook subscription
+"""
 type WebhookSubscriptionMut {
+	"""
+	Replaces the target URL, event types and label of the subscription
+	"""
 	update(input: WebhookSubscriptionInput!): UpdateWebhookSubscriptionResult!
+	"""
+	Pauses deliveries of an enabled subscription
+	"""
 	pause: PauseWebhookSubscriptionResult!
+	"""
+	Resumes deliveries of a paused subscription
+	"""
 	resume: ResumeWebhookSubscriptionResult!
+	"""
+	Re-enables a subscription that was marked unreachable
+	"""
 	reactivate: ReactivateWebhookSubscriptionResult!
+	"""
+	Generates a new signing secret, replacing the current one
+	"""
 	rotateSecret: RotateWebhookSubscriptionSecretResult!
+	"""
+	Removes the subscription
+	"""
 	remove: RemoveWebhookSubscriptionResult!
 }
 
+"""
+No event types were provided for the subscription
+"""
 type WebhookSubscriptionNoEventTypesProvided implements CreateWebhookSubscriptionResult & UpdateWebhookSubscriptionResult {
+	"""
+	Number of event types provided, always zero
+	"""
 	numEventTypes: Int!
+	"""
+	Human-readable error message
+	"""
 	message: String!
 }
 
+"""
+Lifecycle status of a webhook subscription
+"""
 enum WebhookSubscriptionStatus {
+	"""
+	Created but not yet enabled
+	"""
 	UNVERIFIED
+	"""
+	Events are being delivered
+	"""
 	ENABLED
+	"""
+	Deliveries were paused by a user
+	"""
 	PAUSED
+	"""
+	Deliveries kept failing, reactivation is required to resume them
+	"""
 	UNREACHABLE
+	"""
+	Subscription was removed
+	"""
 	REMOVED
 }
 
+"""
+Global webhook information
+"""
 type Webhooks {
 	"""
 	List of supported event types

@@ -14,6 +14,7 @@ use crate::queries::TaskFailureReason;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Final result of a finished flow
 #[derive(Union)]
 pub(crate) enum FlowOutcome {
     Success(FlowSuccessResult),
@@ -21,18 +22,24 @@ pub(crate) enum FlowOutcome {
     Aborted(FlowAbortedResult),
 }
 
+/// Flow failed
 #[derive(SimpleObject)]
 pub(crate) struct FlowFailedError {
+    /// Why the flow failed
     reason: TaskFailureReason,
 }
 
+/// Flow completed successfully
 #[derive(SimpleObject)]
 pub(crate) struct FlowSuccessResult {
+    /// Fixed status text
     message: String,
 }
 
+/// Flow was aborted before completion
 #[derive(SimpleObject)]
 pub(crate) struct FlowAbortedResult {
+    /// Fixed status text
     message: String,
 }
 

@@ -17,6 +17,7 @@ pub struct DatasetWebhooks<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Webhook subscription queries of a dataset
 #[Object]
 impl<'a> DatasetWebhooks<'a> {
     #[graphql(skip)]

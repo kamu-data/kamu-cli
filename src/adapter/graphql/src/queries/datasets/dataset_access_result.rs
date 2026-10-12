@@ -15,7 +15,7 @@ use crate::queries::*;
 /// A dataset the caller may read, or only its ID when the dataset is missing
 /// or not readable by the caller
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(name = "message", ty = "String", desc = "Human-readable access status"))]
 pub enum DatasetAccessResult<'a> {
     Accessible(DatasetAccessResultAccessible),
     NotAccessible(DatasetAccessResultNotAccessible<'a>),
@@ -33,27 +33,33 @@ impl DatasetAccessResult<'_> {
     }
 }
 
+/// Dataset was found and is readable by the caller
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DatasetAccessResultAccessible {
+    /// Accessible dataset
     pub dataset: Dataset,
 }
 
 #[ComplexObject]
 impl DatasetAccessResultAccessible {
+    /// Human-readable access status
     async fn message(&self) -> String {
         "Found".to_string()
     }
 }
 
+/// Dataset does not exist or is not readable by the caller
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DatasetAccessResultNotAccessible<'a> {
+    /// Identifier of the requested dataset
     pub id: DatasetID<'a>,
 }
 
 #[ComplexObject]
 impl DatasetAccessResultNotAccessible<'_> {
+    /// Human-readable access status
     async fn message(&self) -> String {
         "Not Accessible".to_string()
     }

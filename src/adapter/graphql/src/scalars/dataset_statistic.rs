@@ -13,13 +13,20 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Storage usage summed over a set of datasets
 #[derive(SimpleObject, Debug)]
 pub struct TotalDatasetsStatistic {
+    /// Number of data records
     pub total_records: u64,
+    /// Size of data files in bytes
     pub total_data_size_bytes: u64,
+    /// Size of checkpoint files in bytes
     pub total_checkpoints_size_bytes: u64,
+    /// Number of linked objects
     pub total_num_linked_objects: u64,
+    /// Size of linked objects in bytes
     pub total_linked_objects_size_bytes: u64,
+    /// Size of data, checkpoints and linked objects together in bytes
     pub total_size_bytes: u64,
 }
 

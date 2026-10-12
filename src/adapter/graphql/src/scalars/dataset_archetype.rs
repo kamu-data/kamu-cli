@@ -11,10 +11,13 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Well-known kind of a dataset that defines how its data is interpreted
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "odf::schema::ext::DatasetArchetype")]
 pub enum DatasetArchetype {
+    /// Set of entries linking paths to other datasets
     Collection,
+    /// File whose every version is stored as a record
     VersionedFile,
 }
 

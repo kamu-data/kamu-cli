@@ -17,9 +17,12 @@ use crate::queries::{Account, DatasetRequestState};
 // MetadataRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Named reference to a metadata block
 #[derive(SimpleObject)]
 pub struct BlockRef {
+    /// Name of the reference, e.g. `head`
     name: String,
+    /// Hash of the block the reference points to
     block_hash: Multihash<'static>,
 }
 
@@ -31,6 +34,7 @@ pub struct MetadataChain<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Chain of metadata blocks of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> MetadataChain<'a> {

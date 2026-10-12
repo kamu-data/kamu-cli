@@ -19,6 +19,7 @@ use crate::queries::{Account, Dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reason a flow was started
 #[derive(Union)]
 pub(crate) enum FlowActivationCause {
     Manual(FlowActivationCauseManual),
@@ -97,13 +98,17 @@ impl FlowActivationCause {
     }
 }
 
+/// Flow was started manually by a user
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseManual {
+    /// Account that started the flow
     initiator: Account,
 }
 
+/// Flow was started by a schedule or after a restart
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseAutoPolling {
+    /// Placeholder without meaning, always true
     dummy: bool,
 }
 
@@ -113,8 +118,10 @@ impl From<fs::FlowActivationCauseAutoPolling> for FlowActivationCauseAutoPolling
     }
 }
 
+/// Flow was started because the previous ingest left more data to fetch
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseIterationFinished {
+    /// Placeholder without meaning, always true
     dummy: bool,
 }
 
@@ -124,14 +131,18 @@ impl From<fs::FlowActivationCauseIterationFinished> for FlowActivationCauseItera
     }
 }
 
+/// Flow was started by an update of a dataset
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseDatasetUpdate {
+    /// Identifier of the updated dataset
     dataset_id: DatasetID<'static>,
     /// Null when the dataset was deleted or is not readable by the caller
     dataset: Option<Dataset>,
+    /// What updated the dataset
     source: FlowActivationCauseDatasetUpdateSource,
 }
 
+/// What updated the dataset
 #[derive(Union, Debug, Clone, Eq, PartialEq)]
 pub(crate) enum FlowActivationCauseDatasetUpdateSource {
     UpstreamFlow(FlowActivationCauseDatasetUpdateSourceUpstreamFlow),
@@ -140,24 +151,33 @@ pub(crate) enum FlowActivationCauseDatasetUpdateSource {
     ExternallyDetectedChange(FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange),
 }
 
+/// Dataset was updated by another flow
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+    /// Identifier of the flow that updated the dataset
     flow_id: FlowID,
 }
 
+/// Dataset was updated by data pushed over HTTP
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceHttpIngest {
+    /// Name of the push source, null for the default source
     source_name: Option<String>,
 }
 
+/// Dataset was updated by a push over the smart transfer protocol
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
+    /// Account that pushed the data, null if unknown
     account_name: Option<AccountName<'static>>,
+    /// Whether the push was forced, possibly rewriting history
     is_force: bool,
 }
 
+/// Dataset was changed outside of the flow system
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange {
+    /// Placeholder without meaning, always true
     dummy: bool,
 }
 

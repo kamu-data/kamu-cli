@@ -23,9 +23,12 @@ use crate::queries::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// One manifest to apply as part of a batch
 #[derive(InputObject, Debug, Clone)]
 pub struct ApplyManifestInput {
+    /// Manifest text describing the desired resource state
     pub manifest: String,
+    /// Format the manifest text is in
     pub format: ResourceManifestFormat,
 }
 
@@ -42,9 +45,12 @@ impl From<ApplyManifestInput> for kamu_resources_facade::ApplyManifestRequest {
 
 pub struct ResourcesMut;
 
+/// Mutations that create, update and delete declarative resources
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl ResourcesMut {
+    /// Creates or updates a resource from a manifest, or only plans the
+    /// change when `dryRun` is set
     #[tracing::instrument(level = "info", name = ResourcesMut_apply_manifest, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn apply_manifest(
@@ -79,6 +85,8 @@ impl ResourcesMut {
         }
     }
 
+    /// Applies several manifests atomically: if any item fails, the whole
+    /// request is rolled back and returned as an error
     #[tracing::instrument(level = "info", name = ResourcesMut_apply_manifests, skip_all, fields(item_count = manifests.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn apply_manifests(
@@ -131,6 +139,7 @@ impl ResourcesMut {
         }
     }
 
+    /// Deletes the resources identified by the given references
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(
@@ -158,16 +167,21 @@ impl ResourcesMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// All manifests of the batch were accepted
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplyManifestsResult {
+    /// Outcome for each manifest of the batch
     pub items: Vec<ResourceApplyManifestItemResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of applying one manifest of a batch
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplyManifestItemResult {
+    /// Zero-based position of the manifest in the request
     pub request_index: usize,
+    /// Result of applying this manifest
     pub outcome: ResourceApplyOutcome,
 }
 
@@ -384,6 +398,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of deleting resources by reference
 #[derive(Union, Debug, Clone)]
 pub enum ResourceDeleteOutcome {
     Success(ResourceDeleteResult),
@@ -391,9 +406,12 @@ pub enum ResourceDeleteOutcome {
     AccountResolution(ResourceAccountResolutionProblem),
 }
 
+/// Resources deleted and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteResult {
+    /// Resources that were deleted
     pub resources: Vec<ResourceDeleteSuccess>,
+    /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -420,9 +438,12 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resource deleted for one reference of a batch
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteSuccess {
+    /// Zero-based position of the reference in the request
     pub request_index: usize,
+    /// Unique identifier of the deleted resource
     pub resource_id: ResourceID<'static>,
 }
 

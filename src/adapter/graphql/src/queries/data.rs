@@ -16,6 +16,7 @@ use crate::prelude::*;
 
 pub struct DataQueries;
 
+/// Queries that operate on data across datasets
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl DataQueries {

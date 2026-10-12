@@ -11,18 +11,25 @@ use crate::prelude::*;
 use crate::queries::{Account, Dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Collaborator of a dataset with their role
 #[derive(SimpleObject, Clone)]
 pub struct AccountWithRole {
+    /// Collaborator account
     pub account: Account,
+    /// Role of the account in the dataset
     pub role: DatasetAccessRole,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Role an account has in a dataset
 #[derive(SimpleObject)]
 pub struct AuthRelation {
+    /// Account the role is granted to
     pub account: Account,
+    /// Role of the account in the dataset
     pub role: DatasetAccessRole,
+    /// Dataset the role applies to
     pub dataset: Dataset,
 }
 

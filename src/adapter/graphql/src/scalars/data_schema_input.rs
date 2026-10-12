@@ -12,6 +12,7 @@
 #[nutype::nutype(derive(AsRef, Clone, Debug, Into, PartialEq, Eq))]
 pub struct DataSchemaInput(odf::schema::DataSchema);
 
+/// ODF data schema in its JSON form
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for DataSchemaInput {
     fn parse(gql_value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {

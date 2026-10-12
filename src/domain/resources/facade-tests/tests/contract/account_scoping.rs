@@ -557,8 +557,8 @@ contract_test!(
 /// `account` key entirely (which defaults to the caller's own account, see
 /// RF-120). `ResourceAccountRef` is a struct with all-optional fields, so
 /// `{}` parses fine (all `None`); it is instead rejected by account
-/// resolution (`ResourceAccountResolverImpl`), which requires at least one of
-/// `id`, `did`, or `name` to be present.
+/// resolution (`ResourceAccountResolverImpl`), which looks the account up by
+/// `did` or `name` and requires one of them.
 pub async fn test_empty_account_selector_is_rejected(h: &impl FacadeContractHarness) {
     let manifest = indoc::formatdoc!(
         r#"

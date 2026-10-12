@@ -15,25 +15,37 @@ use crate::prelude::*;
 // DataQueryResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Query executed successfully
 #[derive(SimpleObject)]
 pub struct DataQueryResultSuccess {
+    /// Schema of the result
     pub schema: DataSchema,
+    /// Records of the result
     pub data: DataBatch,
+    /// Input datasets of the query and the blocks they were read at, allowing
+    /// the query to be reproduced
     pub datasets: Vec<DatasetState>,
+    /// Maximum number of records the result was limited to
     pub limit: u64,
 }
 
+/// Query could not be executed
 #[derive(SimpleObject)]
 pub struct DataQueryResultError {
+    /// Description of the problem
     pub error_message: String,
+    /// Category of the problem
     pub error_kind: DataQueryResultErrorKind,
 }
 
+/// Category of a query error
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataQueryResultErrorKind {
+    /// Query is malformed or refers to a dataset or block that does not exist
     InvalidSql,
 }
 
+/// Outcome of a data query
 #[derive(Union)]
 pub enum DataQueryResult {
     Success(DataQueryResultSuccess),

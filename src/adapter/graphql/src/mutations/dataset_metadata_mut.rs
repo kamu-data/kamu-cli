@@ -22,6 +22,7 @@ pub struct DatasetMetadataMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Mutations of the dataset metadata
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetMetadataMut<'a> {
@@ -134,8 +135,13 @@ impl<'a> DatasetMetadataMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of updating the dataset readme
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum UpdateReadmeResult<'a> {
     Success(CommitResultSuccess<'a>),
     NoChanges(NoChanges),

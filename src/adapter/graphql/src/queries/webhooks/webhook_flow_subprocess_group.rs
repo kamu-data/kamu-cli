@@ -31,6 +31,7 @@ pub struct WebhookFlowSubProcessGroup<'a> {
     parent_dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
+/// Webhook delivery processes of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> WebhookFlowSubProcessGroup<'a> {
@@ -45,6 +46,7 @@ impl<'a> WebhookFlowSubProcessGroup<'a> {
         }
     }
 
+    /// Aggregated state counts across the dataset's webhook processes
     #[tracing::instrument(level = "info", name = WebhookFlowSubProcessGroup_rollup, skip_all)]
     pub async fn rollup(&self, ctx: &Context<'_>) -> Result<FlowProcessGroupRollup> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
@@ -58,6 +60,7 @@ impl<'a> WebhookFlowSubProcessGroup<'a> {
         Ok(rollup.into())
     }
 
+    /// Webhook delivery processes of the dataset, ordered by name
     #[tracing::instrument(level = "info", name = WebhookFlowSubProcessGroup_subprocesses, skip_all)]
     pub async fn subprocesses(&self, ctx: &Context<'_>) -> Result<Vec<WebhookFlowSubProcess>> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);

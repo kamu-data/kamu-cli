@@ -19,6 +19,7 @@ pub struct ViewDatasetEnvVar {
     env_var: DatasetEnvVar,
 }
 
+/// Environment variable of a dataset
 #[Object]
 impl ViewDatasetEnvVar {
     #[graphql(skip)]
@@ -41,6 +42,7 @@ impl ViewDatasetEnvVar {
         self.env_var.created_at
     }
 
+    /// Whether the value is stored encrypted and hidden from listings
     async fn is_secret(&self) -> bool {
         self.env_var.secret_nonce.is_some()
     }

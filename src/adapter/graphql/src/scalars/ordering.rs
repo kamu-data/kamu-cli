@@ -11,9 +11,12 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Sort direction
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
 pub enum OrderingDirection {
+    /// Ascending, smallest first
     Asc,
+    /// Descending, largest first
     Desc,
 }
 

@@ -21,6 +21,7 @@ pub struct AccountFlowTriggersMut<'a> {
     account: &'a Account,
 }
 
+/// Flow trigger mutations across all datasets owned by an account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountFlowTriggersMut<'a> {
@@ -40,6 +41,7 @@ impl<'a> AccountFlowTriggersMut<'a> {
         Ok(dataset_ids)
     }
 
+    /// Resumes flow triggers of all datasets owned by the account
     #[tracing::instrument(level = "info", name = AccountFlowTriggersMut_resume_account_dataset_flows, skip_all)]
     pub async fn resume_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);
@@ -58,6 +60,7 @@ impl<'a> AccountFlowTriggersMut<'a> {
         Ok(true)
     }
 
+    /// Pauses flow triggers of all datasets owned by the account
     #[tracing::instrument(level = "info", name = AccountFlowTriggersMut_pause_account_dataset_flows, skip_all)]
     pub async fn pause_account_dataset_flows(&self, ctx: &Context<'_>) -> Result<bool> {
         let flow_trigger_service = from_catalog_n!(ctx, dyn FlowTriggerService);

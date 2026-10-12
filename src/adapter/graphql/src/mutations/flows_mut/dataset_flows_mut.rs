@@ -18,6 +18,7 @@ pub struct DatasetFlowsMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Flow mutations scoped to a dataset
 #[Object]
 impl<'a> DatasetFlowsMut<'a> {
     #[graphql(skip)]
@@ -32,14 +33,17 @@ impl<'a> DatasetFlowsMut<'a> {
         })
     }
 
+    /// Flow configuration mutations
     pub async fn configs(&self) -> DatasetFlowConfigsMut<'_> {
         DatasetFlowConfigsMut::new(self.dataset_request_state)
     }
 
+    /// Mutations that trigger or cancel flow runs
     pub async fn runs(&self) -> DatasetFlowRunsMut<'_> {
         DatasetFlowRunsMut::new(self.dataset_request_state)
     }
 
+    /// Flow trigger mutations
     pub async fn triggers(&self) -> DatasetFlowTriggersMut<'_> {
         DatasetFlowTriggersMut::new(self.dataset_request_state)
     }

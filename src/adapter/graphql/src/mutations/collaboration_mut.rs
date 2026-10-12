@@ -16,6 +16,7 @@ use crate::prelude::*;
 #[derive(Debug)]
 pub struct CollaborationMut;
 
+/// Mutations that manage account access to datasets in bulk
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollaborationMut {
@@ -41,8 +42,10 @@ impl CollaborationMut {
 // ApplyRolesMatrixResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account-dataset relations were applied
 #[derive(SimpleObject)]
 pub struct ApplyRolesMatrixResult {
+    /// Human-readable outcome message
     pub message: String,
 }
 
