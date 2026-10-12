@@ -7,7 +7,6 @@ KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | 
 SQLX_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "sqlx") | .version')
 IMAGE_SQLX_TAG = $(SQLX_VERSION)-1
 RUSTC_VERSION = $(shell rustc --version | grep -oP 'rustc \K\d+\.\d+')
-RUSTC_PREVIOUS_STABLE_VERSION = $(shell echo "$(RUSTC_VERSION) - 0.01" | bc)
 
 ################################################################################
 
@@ -94,11 +93,17 @@ sqlx-cli sqlx-cli-push: SQLX_CLI_IMAGE_EXISTS = $(shell \
 			|| echo no \
 	)
 
-# We sometimes use versions that did not have stable releases -- in such cases, we need to take the previous one
+# Nightly toolchains are up to two minor versions ahead of the latest stable release,
+# so we take the newest version (current or up to 3 below) that has a published image
 sqlx-cli sqlx-cli-push: SQLX_RUSTC_VERSION = $(shell \
-		docker manifest inspect rust:$(RUSTC_VERSION)-alpine > /dev/null 2>&1 \
-			&& echo $(RUSTC_VERSION) \
-			|| echo $(RUSTC_PREVIOUS_STABLE_VERSION) \
+		major=$$(echo $(RUSTC_VERSION) | cut -d. -f1); \
+		minor=$$(echo $(RUSTC_VERSION) | cut -d. -f2); \
+		for m in $$minor $$((minor - 1)) $$((minor - 2)) $$((minor - 3)); do \
+			if docker manifest inspect rust:$$major.$$m-alpine > /dev/null 2>&1; then \
+				echo $$major.$$m; \
+				break; \
+			fi; \
+		done \
 	)
 
 
