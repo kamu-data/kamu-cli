@@ -15,9 +15,11 @@ use async_utils::AsyncReadObj;
 use bytes::Bytes;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf_metadata::*;
-use odf_storage::{get_staging_name, *};
+use odf_storage::*;
 use tokio::io::AsyncWriteExt;
 use url::Url;
+
+use super::StagingFile;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,15 +64,6 @@ where
             std::fs::create_dir_all(&self.root)?;
         }
         Ok(self.get_path(hash))
-    }
-
-    // TODO: Cleanup procedure for staging files orphaned by a crash?
-    fn new_staging_file(&self) -> Result<StagingFile, std::io::Error> {
-        if !self.root.exists() {
-            std::fs::create_dir_all(&self.root)?;
-        }
-
-        Ok(StagingFile::new(self.root.join(get_staging_name())))
     }
 
     async fn write_stream_with_digest<'a>(
@@ -223,7 +216,7 @@ where
             return Ok(InsertResult { hash });
         }
 
-        let staging_file = self.new_staging_file().int_err()?;
+        let staging_file = StagingFile::new_in(&self.root).int_err()?;
         tokio::fs::write(staging_file.path(), data)
             .await
             .int_err()?;
@@ -238,7 +231,7 @@ where
         src: Box<AsyncReadObj>,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        let staging_file = self.new_staging_file().int_err()?;
+        let staging_file = StagingFile::new_in(&self.root).int_err()?;
 
         let actual_hash = self
             .write_stream_with_digest(staging_file.path(), src)
@@ -319,50 +312,6 @@ where
             Ok(()) => Ok(()),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(err) => Err(err.int_err().into()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A not yet committed object file in the repository root.
-///
-/// Removed on drop unless [`StagingFile::commit()`] moved it into place, so
-/// a failed or cancelled write leaves nothing behind.
-struct StagingFile {
-    path: PathBuf,
-    committed: bool,
-}
-
-impl StagingFile {
-    fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            committed: false,
-        }
-    }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    /// Atomically moves the file to `target`, replacing any existing file
-    fn commit(mut self, target: &Path) -> std::io::Result<()> {
-        std::fs::rename(&self.path, target)?;
-        self.committed = true;
-        Ok(())
-    }
-}
-
-impl Drop for StagingFile {
-    fn drop(&mut self) {
-        if self.committed {
-            return;
-        }
-        if let Err(err) = std::fs::remove_file(&self.path)
-            && err.kind() != std::io::ErrorKind::NotFound
-        {
-            tracing::warn!(path = ?self.path, error = ?err, "Failed to remove staging file");
         }
     }
 }

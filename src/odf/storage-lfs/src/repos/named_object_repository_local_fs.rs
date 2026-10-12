@@ -12,7 +12,9 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use bytes::Bytes;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use odf_storage::{get_staging_name, *};
+use odf_storage::*;
+
+use super::StagingFile;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,15 +31,6 @@ impl NamedObjectRepositoryLocalFS {
     {
         let root = root.into();
         Self { root }
-    }
-
-    // TODO: Cleanup procedure for orphaned staging files?
-    fn get_staging_path(&self) -> Result<PathBuf, std::io::Error> {
-        if !self.root.exists() {
-            std::fs::create_dir_all(&self.root)?;
-        }
-
-        Ok(self.root.join(get_staging_name()))
     }
 }
 
@@ -63,11 +56,11 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
 
     #[tracing::instrument(level = "debug", name = NamedObjectRepositoryLocalFS_set, skip_all, fields(%name))]
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
-        let staging_path = self.get_staging_path().int_err()?;
-        tokio::fs::write(&staging_path, data).await.int_err()?;
-
-        // Atomic move/replace
-        std::fs::rename(&staging_path, self.root.join(name)).int_err()?;
+        let staging_file = StagingFile::new_in(&self.root).int_err()?;
+        tokio::fs::write(staging_file.path(), data)
+            .await
+            .int_err()?;
+        staging_file.commit(&self.root.join(name)).int_err()?;
         Ok(())
     }
 
