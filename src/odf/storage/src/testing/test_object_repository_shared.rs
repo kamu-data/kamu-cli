@@ -150,6 +150,8 @@ pub struct ExternalUrlTestOptions {
     pub cut_query_params: bool,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_external_urls(
     repo: &dyn ObjectRepository,
     hash: &Multihash,

@@ -23,6 +23,8 @@ async fn test_insert_block() {
     test_metadata_block_repository_shared::test_insert_block(&repo).await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_insert_block_cached_if_no_error() {
     let mut wrapped_mock_repo = MockMetadataBlockRepository::new();

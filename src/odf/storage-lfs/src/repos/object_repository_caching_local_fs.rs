@@ -7,47 +7,50 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::Path;
 
 use async_trait::async_trait;
 use async_utils::AsyncReadObj;
 use bytes::Bytes;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use odf_metadata::*;
 use odf_storage::*;
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 use url::Url;
+
+use crate::ObjectRepositoryLocalFSSha3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A read-through and (partially) a write-through caching layer for
 /// [`ObjectRepository`] using a local file system.
 ///
+/// Cache entries are written atomically: a failed or interrupted fill leaves
+/// no entry behind, so a later read goes to the wrapped repository again.
+///
 /// Currently, caches objects forever, so a cache directory cleanup has to be
 /// handled separately.
 pub struct ObjectRepositoryCachingLocalFs<WrappedRepo> {
     wrapped: WrappedRepo,
-    cache_dir: Arc<PathBuf>,
+    cache: ObjectRepositoryLocalFSSha3,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<WrappedRepo> ObjectRepositoryCachingLocalFs<WrappedRepo> {
-    pub fn new(wrapped: WrappedRepo, cache_dir: Arc<PathBuf>) -> Self {
-        Self { wrapped, cache_dir }
-    }
-
-    fn cache_path(&self, hash: &Multihash) -> PathBuf {
-        self.cache_dir.join(hash.as_multibase().to_stack_string())
-    }
-
-    fn ensure_cache_dir(&self) -> Result<(), std::io::Error> {
-        if !self.cache_dir.exists() {
-            std::fs::create_dir_all(self.cache_dir.as_ref())?;
+    pub fn new(wrapped: WrappedRepo, cache_dir: &Path) -> Self {
+        Self {
+            wrapped,
+            cache: ObjectRepositoryLocalFSSha3::new(cache_dir),
         }
-        Ok(())
+    }
+
+    // The hash comes from the wrapped repository, so the cache must not
+    // recompute it with its own digest algorithm
+    fn cache_insert_opts(hash: &Multihash) -> InsertOpts<'_> {
+        InsertOpts {
+            precomputed_hash: Some(hash),
+            ..Default::default()
+        }
     }
 }
 
@@ -65,8 +68,7 @@ where
 
     #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_contains, skip_all, fields(%hash))]
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
-        let cache_path = self.cache_path(hash);
-        if cache_path.is_file() {
+        if self.cache.contains(hash).await? {
             Ok(true)
         } else {
             self.wrapped.contains(hash).await
@@ -75,48 +77,39 @@ where
 
     #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_get_size, skip_all, fields(%hash))]
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
-        let cache_path = self.cache_path(hash);
-        match std::fs::metadata(&cache_path) {
-            Ok(meta) => Ok(meta.len()),
-            Err(err) if err.kind() == ErrorKind::NotFound => self.wrapped.get_size(hash).await,
-            Err(err) => Err(err.int_err().into()),
+        match self.cache.get_size(hash).await {
+            Err(GetError::NotFound(_)) => self.wrapped.get_size(hash).await,
+            res @ (Ok(_) | Err(GetError::Access(_) | GetError::Internal(_))) => res,
         }
     }
 
     #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_get_bytes, skip_all, fields(%hash))]
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
-        let cache_path = self.cache_path(hash);
-        match std::fs::read(&cache_path) {
-            Ok(data) => Ok(Bytes::from(data)),
-            Err(err) if err.kind() == ErrorKind::NotFound => {
+        match self.cache.get_bytes(hash).await {
+            Err(GetError::NotFound(_)) => {
                 let bytes = self.wrapped.get_bytes(hash).await?;
-                self.ensure_cache_dir().int_err()?;
-                std::fs::write(&cache_path, &bytes).int_err()?;
+                self.cache
+                    .insert_bytes(&bytes, Self::cache_insert_opts(hash))
+                    .await
+                    .map_err(ErrorIntoInternal::int_err)?;
                 Ok(bytes)
             }
-            Err(err) => Err(err.int_err().into()),
+            res @ (Ok(_) | Err(GetError::Access(_) | GetError::Internal(_))) => res,
         }
     }
 
     #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_get_stream, skip_all, fields(%hash))]
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
-        let cache_path = self.cache_path(hash);
-
-        match tokio::fs::File::open(&cache_path).await {
-            Ok(file) => Ok(Box::new(file)),
-            Err(err) if err.kind() == ErrorKind::NotFound => {
-                let mut stream = self.wrapped.get_stream(hash).await?;
-
-                self.ensure_cache_dir().int_err()?;
-
-                let mut file = tokio::fs::File::create(cache_path).await.int_err()?;
-                tokio::io::copy(&mut stream, &mut file).await.int_err()?;
-                file.flush().await.int_err()?;
-
-                file.seek(std::io::SeekFrom::Start(0)).await.int_err()?;
-                Ok(Box::new(file))
+        match self.cache.get_stream(hash).await {
+            Err(GetError::NotFound(_)) => {
+                let stream = self.wrapped.get_stream(hash).await?;
+                self.cache
+                    .insert_stream(stream, Self::cache_insert_opts(hash))
+                    .await
+                    .map_err(ErrorIntoInternal::int_err)?;
+                self.cache.get_stream(hash).await
             }
-            Err(err) => Err(err.int_err().into()),
+            res @ (Ok(_) | Err(GetError::Access(_) | GetError::Internal(_))) => res,
         }
     }
 
@@ -147,9 +140,10 @@ where
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
         let res = self.wrapped.insert_bytes(data, options).await?;
-        self.ensure_cache_dir().int_err()?;
-        let cache_path = self.cache_path(&res.hash);
-        std::fs::write(cache_path, data).int_err()?;
+        self.cache
+            .insert_bytes(data, Self::cache_insert_opts(&res.hash))
+            .await
+            .map_err(ErrorIntoInternal::int_err)?;
         Ok(res)
     }
 
@@ -175,12 +169,7 @@ where
 
     #[tracing::instrument(level = "debug", name = ObjectRepositoryCachingLocalFs_delete, skip_all, fields(%hash))]
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
-        let cache_path = self.cache_path(hash);
-        match std::fs::remove_file(&cache_path) {
-            Ok(()) => Ok(()),
-            Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
-            Err(err) => Err(err.int_err()),
-        }?;
+        self.cache.delete(hash).await?;
         self.wrapped.delete(hash).await
     }
 }

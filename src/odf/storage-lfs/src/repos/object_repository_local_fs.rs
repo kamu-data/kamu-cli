@@ -64,13 +64,13 @@ where
         Ok(self.get_path(hash))
     }
 
-    // TODO: Cleanup procedure for orphaned staging files?
-    fn get_staging_path(&self) -> Result<PathBuf, std::io::Error> {
+    // TODO: Cleanup procedure for staging files orphaned by a crash?
+    fn new_staging_file(&self) -> Result<StagingFile, std::io::Error> {
         if !self.root.exists() {
             std::fs::create_dir_all(&self.root)?;
         }
 
-        Ok(self.root.join(get_staging_name()))
+        Ok(StagingFile::new(self.root.join(get_staging_name())))
     }
 
     async fn write_stream_with_digest<'a>(
@@ -223,13 +223,11 @@ where
             return Ok(InsertResult { hash });
         }
 
-        let staging_path = self.get_staging_path().int_err()?;
-
-        // Write to staging file
-        tokio::fs::write(&staging_path, data).await.int_err()?;
-
-        // Atomic move
-        std::fs::rename(&staging_path, path).int_err()?;
+        let staging_file = self.new_staging_file().int_err()?;
+        tokio::fs::write(staging_file.path(), data)
+            .await
+            .int_err()?;
+        staging_file.commit(&path).int_err()?;
 
         Ok(InsertResult { hash })
     }
@@ -240,10 +238,10 @@ where
         src: Box<AsyncReadObj>,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        let staging_path = self.get_staging_path().int_err()?;
+        let staging_file = self.new_staging_file().int_err()?;
 
         let actual_hash = self
-            .write_stream_with_digest(&staging_path, src)
+            .write_stream_with_digest(staging_file.path(), src)
             .await
             .int_err()?;
 
@@ -256,8 +254,6 @@ where
         if let Some(expected_hash) = options.expected_hash
             && *expected_hash != hash
         {
-            tokio::fs::remove_file(&staging_path).await.int_err()?;
-
             return Err(InsertError::HashMismatch(HashMismatchError {
                 expected: expected_hash.clone(),
                 actual: hash,
@@ -269,13 +265,10 @@ where
         tracing::debug!(?path, "Inserting object stream");
 
         if path.exists() {
-            tokio::fs::remove_file(&staging_path).await.int_err()?;
-
             return Ok(InsertResult { hash });
         }
 
-        // Atomic move
-        std::fs::rename(&staging_path, path).int_err()?;
+        staging_file.commit(&path).int_err()?;
 
         Ok(InsertResult { hash })
     }
@@ -326,6 +319,50 @@ where
             tokio::fs::remove_file(&path).await.int_err()?;
         }
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A not yet committed object file in the repository root.
+///
+/// Removed on drop unless [`StagingFile::commit()`] moved it into place, so
+/// a failed or cancelled write leaves nothing behind.
+struct StagingFile {
+    path: PathBuf,
+    committed: bool,
+}
+
+impl StagingFile {
+    fn new(path: PathBuf) -> Self {
+        Self {
+            path,
+            committed: false,
+        }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Atomically moves the file to `target`, replacing any existing file
+    fn commit(mut self, target: &Path) -> std::io::Result<()> {
+        std::fs::rename(&self.path, target)?;
+        self.committed = true;
+        Ok(())
+    }
+}
+
+impl Drop for StagingFile {
+    fn drop(&mut self) {
+        if self.committed {
+            return;
+        }
+        if let Err(err) = std::fs::remove_file(&self.path)
+            && err.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(path = ?self.path, error = ?err, "Failed to remove staging file");
+        }
     }
 }
 

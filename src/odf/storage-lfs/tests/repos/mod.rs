@@ -8,4 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_named_object_repository_local_fs;
+mod test_object_repository_caching_local_fs;
 mod test_object_repository_local_fs;
+mod test_streams;
