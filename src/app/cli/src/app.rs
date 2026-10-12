@@ -846,23 +846,25 @@ pub fn register_config_in_catalog(
         let accounts_config = if tenancy_config == TenancyConfig::MultiTenant {
             let mut accounts_config = config.auth.users.clone();
 
-            let mt_account = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
-                AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
-            ))
-            .set_display_name(AccountService::default_user_name(
-                TenancyConfig::MultiTenant,
-            ))
-            .set_properties(vec![AccountPropertyName::IsAdmin]);
-
             // The implicit OS-user account is a fallback, not an override: a
             // config entry of the same name is authoritative, and appending a
             // second one collides on `idx_accounts_name`, aborting the shared
-            // registration transaction and with it startup.
-            if !accounts_config
-                .predefined
-                .iter()
-                .any(|account| account.account_name == mt_account.account_name)
+            // registration transaction and with it startup. An OS user name
+            // with no usable account name gets no implicit account; the run
+            // then selects a configured one with `--account`.
+            if let Ok(os_account_name) =
+                AccountService::default_account_name(TenancyConfig::MultiTenant)
+                && !accounts_config
+                    .predefined
+                    .iter()
+                    .any(|account| account.account_name == os_account_name)
             {
+                let mt_account = AccountConfig::test_config_from_name(os_account_name)
+                    .set_display_name(AccountService::default_user_name(
+                        TenancyConfig::MultiTenant,
+                    ))
+                    .set_properties(vec![AccountPropertyName::IsAdmin]);
+
                 accounts_config.predefined.push(mt_account);
             }
 

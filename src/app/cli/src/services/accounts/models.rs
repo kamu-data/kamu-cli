@@ -115,3 +115,31 @@ pub enum ToCurrentAccountSubjectError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum CurrentAccountIndicationError {
+    #[error(transparent)]
+    InvalidAccountName(#[from] odf::metadata::ParseError<odf::AccountName>),
+
+    #[error(transparent)]
+    OsUserAccountName(#[from] OsUserAccountNameError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const SELECT_CONFIGURED_ACCOUNT_HINT: &str =
+    "define an account under `auth.users.predefined` in the config and select it with `--account`";
+
+#[derive(Debug, Error)]
+pub enum OsUserAccountNameError {
+    #[error("Cannot determine the OS user name; {hint}", hint = SELECT_CONFIGURED_ACCOUNT_HINT)]
+    Unavailable,
+
+    #[error(
+        "OS user name '{os_user_name}' has no characters valid in an account name; {hint}",
+        hint = SELECT_CONFIGURED_ACCOUNT_HINT
+    )]
+    NoValidCharacters { os_user_name: String },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
