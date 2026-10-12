@@ -75,9 +75,13 @@ jobs:
           path: kamu-cli
       - name: Copy rust-toolchain file
         run: cp kamu-cli/rust-toolchain.toml ./rust-toolchain.toml
+      - name: Read pinned ODF spec version
+        id: odf
+        run: echo "ref=$(make -s -C kamu-cli print-odf-spec-ref)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
         with:
           repository: open-data-fabric/open-data-fabric
+          ref: ${{ steps.odf.outputs.ref }}
           path: open-data-fabric
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:

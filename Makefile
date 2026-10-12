@@ -1,4 +1,6 @@
 ODF_SPEC_DIR=../open-data-fabric
+# Version of the ODF spec used by codegen; CI checks out this ref via `make print-odf-spec-ref`
+ODF_SPEC_REF=v0.40.0
 ODF_METADATA_CRATE_DIR=./src/odf/metadata
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
@@ -627,22 +629,41 @@ define insert_text_into_beginning
 	mv tmp $(2)
 endef
 
+.PHONY: print-odf-spec-ref
+print-odf-spec-ref:
+	@echo $(ODF_SPEC_REF)
+
+
+# Warns (without failing) when the ODF checkout differs from the pinned ref, so local schema work is not blocked
+.PHONY: codegen-odf-check-version
+codegen-odf-check-version:
+	@expected=$$(git -C $(ODF_SPEC_DIR) rev-parse -q --verify "$(ODF_SPEC_REF)^{commit}") || \
+		{ echo "WARNING: $(ODF_SPEC_REF) not found in $(ODF_SPEC_DIR) (try: git fetch --tags)"; exit 0; }; \
+	actual=$$(git -C $(ODF_SPEC_DIR) rev-parse HEAD); \
+	if [ "$$expected" != "$$actual" ]; then \
+		echo "WARNING: $(ODF_SPEC_DIR) is at $$(git -C $(ODF_SPEC_DIR) describe --tags --always), expected $(ODF_SPEC_REF)"; \
+	fi; \
+	if [ -n "$$(git -C $(ODF_SPEC_DIR) status --porcelain)" ]; then \
+		echo "WARNING: $(ODF_SPEC_DIR) has uncommitted changes"; \
+	fi
+
+
 .PHONY: codegen-odf-dtos
-codegen-odf-dtos:
+codegen-odf-dtos: codegen-odf-check-version
 	$(call odf_codegen, rust-dtos, $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs
 
 
 .PHONY: codegen-odf-flatbuffers-schema
-codegen-odf-flatbuffers-schema:
+codegen-odf-flatbuffers-schema: codegen-odf-check-version
 	$(call odf_codegen, flatbuffers-schema, $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs)
 
 
 # Requires `flatbuffers` package
 # TODO: Consider using devbox to pin specific versions
 .PHONY: codegen-odf-serde-flatbuffers
-codegen-odf-serde-flatbuffers:
+codegen-odf-serde-flatbuffers: codegen-odf-check-version
 	flatc -o $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs
 	mv $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 	$(call insert_text_into_beginning, "// Generated with flatc=$(shell flatc --version)", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
@@ -656,7 +677,7 @@ codegen-odf-serde-flatbuffers:
 
 
 .PHONY: codegen-odf-serde-yaml
-codegen-odf-serde-yaml:
+codegen-odf-serde-yaml: codegen-odf-check-version
 	$(call odf_codegen, rust-serde, $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
@@ -685,7 +706,7 @@ codegen-engine-tonic:
 
 
 .PHONY: codegen-graphql
-codegen-graphql:
+codegen-graphql: codegen-odf-check-version
 	$(call odf_codegen, rust-graphql, src/adapter/graphql/src/scalars/odf_generated.rs)
 	$(call add_license_header, "src/adapter/graphql/src/scalars/odf_generated.rs")
 	rustfmt src/adapter/graphql/src/scalars/odf_generated.rs

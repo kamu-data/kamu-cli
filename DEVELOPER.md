@@ -352,7 +352,7 @@ Many core types in `kamu` are generated from schemas and IDLs in the [open-data-
 make codegen
 ```
 
-Make sure you have all related dependencies installed (see above) and that ODF repo is checked out in the same directory as `kamu-cli` repo.
+Make sure you have all related dependencies installed (see above) and that ODF repo is checked out in the same directory as `kamu-cli` repo and on the same revision as pinned by `ODF_SPEC_REF` in the `Makefile`.
 
 
 ## Code Structure
