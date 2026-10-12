@@ -107,7 +107,11 @@ where
                     .insert_stream(stream, Self::cache_insert_opts(hash))
                     .await
                     .map_err(ErrorIntoInternal::int_err)?;
-                self.cache.get_stream(hash).await
+                match self.cache.get_stream(hash).await {
+                    // Removed right after the fill, e.g. by a cache cleanup
+                    Err(GetError::NotFound(_)) => self.wrapped.get_stream(hash).await,
+                    res @ (Ok(_) | Err(GetError::Access(_) | GetError::Internal(_))) => res,
+                }
             }
             res @ (Ok(_) | Err(GetError::Access(_) | GetError::Internal(_))) => res,
         }

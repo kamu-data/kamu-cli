@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use async_trait::async_trait;
 use async_utils::AsyncReadObj;
 use bytes::Bytes;
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf_metadata::*;
 use odf_storage::{get_staging_name, *};
 use tokio::io::AsyncWriteExt;
@@ -100,6 +100,16 @@ where
 
         Ok(Multihash::new(Multicodec::try_from(C).unwrap(), &digest.finalize()).unwrap())
     }
+
+    // Matches on the error of the operation itself rather than checking
+    // existence first, so a file removed concurrently still reads as not found
+    fn into_get_error(hash: &Multihash, err: std::io::Error) -> GetError {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            GetError::NotFound(ObjectNotFoundError { hash: hash.clone() })
+        } else {
+            err.int_err().into()
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,12 +142,9 @@ where
 
         tracing::debug!(?path, "Reading object size");
 
-        if !path.exists() {
-            return Err(GetError::NotFound(ObjectNotFoundError {
-                hash: hash.clone(),
-            }));
-        }
-        let metadata = tokio::fs::metadata(path).await.int_err()?;
+        let metadata = tokio::fs::metadata(path)
+            .await
+            .map_err(|err| Self::into_get_error(hash, err))?;
         Ok(metadata.len())
     }
 
@@ -147,12 +154,9 @@ where
 
         tracing::debug!(?path, "Reading object");
 
-        if !path.exists() {
-            return Err(GetError::NotFound(ObjectNotFoundError {
-                hash: hash.clone(),
-            }));
-        }
-        let data = tokio::fs::read(path).await.int_err()?;
+        let data = tokio::fs::read(path)
+            .await
+            .map_err(|err| Self::into_get_error(hash, err))?;
 
         Ok(Bytes::from(data))
     }
@@ -163,13 +167,9 @@ where
 
         tracing::debug!(?path, "Reading object stream");
 
-        if !path.exists() {
-            return Err(GetError::NotFound(ObjectNotFoundError {
-                hash: hash.clone(),
-            }));
-        }
-
-        let file = tokio::fs::File::open(path).await.int_err()?;
+        let file = tokio::fs::File::open(path)
+            .await
+            .map_err(|err| Self::into_get_error(hash, err))?;
 
         Ok(Box::new(file))
     }
@@ -315,10 +315,11 @@ where
 
         tracing::debug!(?path, "Deleting object");
 
-        if path.exists() {
-            tokio::fs::remove_file(&path).await.int_err()?;
+        match tokio::fs::remove_file(&path).await {
+            Ok(()) => Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(err) => Err(err.int_err().into()),
         }
-        Ok(())
     }
 }
 
