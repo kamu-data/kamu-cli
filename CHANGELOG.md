@@ -13,55 +13,46 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.270.0] - 2026-10-12
 ### Added
-- GraphQL: flow history has a `FlowEventRetryPolicyModified` event, recorded when a new retry policy reaches a
-  waiting flow
+- GraphQL: `FlowEventRetryPolicyModified` flow history event, recorded when a waiting flow gets a new retry policy
 ### Changed
-- Flow configuration and trigger changes now reach a flow that is already waiting, instead of only the next
-  one:
-  - ingest, compaction and reset options and the retry policy apply until the flow's first task is formed, so a
-    flow already retrying keeps the retry policy it started with
-  - a flow run by hand keeps its options
+- Flow configuration and trigger changes now apply to an already waiting flow, not only the next one:
+  - ingest, compaction and reset options and the retry policy apply until the first task is formed, so a
+    retrying flow keeps its original retry policy; manual runs keep their options
   - a changed schedule moves a waiting scheduled flow earlier or later
-  - a changed batching rule re-evaluates a derived dataset's flow waiting for inputs, so it may run at once
-    or wait longer
-  - a stop policy that the current consecutive failures already reach stops the trigger at once
+  - a changed batching rule re-evaluates a derived flow waiting for inputs: it may run at once or wait longer
+  - a stop policy already reached by consecutive failures stops the trigger at once
+- Flow triggers, configurations, tasks and webhook subscriptions are loaded and saved in bulk (startup,
+  pausing or resuming account flows, dataset deletion, flow listings) instead of one round-trip per item
 - SQLite bulk writes (ReBAC relations, dataset blocks and dependencies, flow and task events) are checked at
   compile time
-- Flow triggers, flow configurations, tasks and webhook subscriptions are loaded and saved in bulk where
-  several change at once (startup, pausing or resuming account flows, dataset deletion, flow listings),
-  instead of one database round-trip per item
-- Storage quotas no longer limit datasets owned by admin accounts, even when a quota is set for them
-- GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when the account's
-  storage is unlimited
-- Test mocks of service traits are generated with `mockall::automock` on the trait itself, behind each crate's
-  `testing` feature, instead of hand-written `mock!` copies; `messaging-outbox` gained a `testing` feature
-- Upgraded to `datafusion v55` and `arrow v59`
-- Upgraded to `sqlx v0.9`
+- Storage quotas no longer apply to admin accounts, even when set
+- GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when storage is unlimited
+- Service trait mocks use `mockall::automock` behind each crate's `testing` feature instead of hand-written
+  `mock!` copies; `messaging-outbox` gained a `testing` feature
+- Upgraded to `datafusion v55`, `arrow v59` and `sqlx v0.9`
 ### Fixed
-- Multi-tenant workspaces now work for OS users whose names are not valid account names (`john_doe` on
-  Linux, `_www` on macOS, `John Doe` on Windows): the implicit account name replaces separators such as
-  `_` and spaces with `-` and drops other invalid characters. When no valid character remains, or the OS
-  user name cannot be determined, kamu reports an error and asks to select a configured account with
-  `--account`, instead of using an `unknown` account. A name given with `--account` is still used as
-  typed and rejected if invalid
-- Running an older kamu in a workspace whose database was migrated by a newer version no longer crashes with
-  "Migration failed: VersionMissing"; it reports the schema versions and asks to upgrade kamu
-- A workspace with a newer layout version than the running kamu now asks to upgrade kamu, instead of suggesting
+- Multi-tenant workspaces work for OS user names that are not valid account names (`john_doe` on Linux,
+  `_www` on macOS, `John Doe` on Windows): separators become `-` and other invalid characters are dropped.
+  If nothing valid remains or the OS user is unknown, kamu asks for `--account` instead of using an
+  `unknown` account. Names given with `--account` are used as typed and rejected if invalid
+- `--account` with an unknown account is a usage error, not an internal error
+- An older kamu on a database migrated by a newer version reports both schema versions and asks to upgrade,
+  instead of crashing with "Migration failed: VersionMissing"
+- A workspace with a newer layout version asks to upgrade kamu instead of suggesting
   `kamu system upgrade-workspace`
-- API server: an internal server error caused by a panic now reaches browser clients as a 500 response
-  instead of a failed request without details; the Web UI server now handles panics the same way
-- GraphQL: `CollectionProjection.entries(maxDepth)` above 64 returns an error instead of crashing the
-  request; the argument description now explains that depth is counted from the root
-- Flaky GraphQL flow process card ordering test
-- SQLite: indexing more than ~5,400 new blocks of a dataset at once failed with "too many SQL variables"
-- `--account` with an unknown account is a usage error now, not an internal error
 - SQLite: workspaces created before v0.267.0 failed to start with "One or more predefined accounts failed to
   register/update"; a migration repairs the stored account and legacy env-var resource IDs
-- Pulling or pushing into an existing dataset that has a different ID now fails with "Source and destination
-  are different datasets" and both IDs, instead of a misleading divergence or invalid interval error;
-  `--force` now refuses such a dataset before transferring anything
+- SQLite: indexing more than ~5,400 new blocks at once failed with "too many SQL variables"
+- Pull or push into an existing dataset with a different ID fails with "Source and destination are different
+  datasets" and both IDs, instead of a misleading divergence or invalid interval error; `--force` refuses
+  such a dataset before transferring anything
+- API server and Web UI: panics return a 500 response to browser clients instead of a failed request
+  without details
+- GraphQL: `CollectionProjection.entries(maxDepth)` above 64 returns an error instead of crashing the
+  request; the argument description explains that depth counts from the root
+- Flaky GraphQL flow process card ordering test
 
 ## [0.269.0] - 2026-10-06
 ### Added
