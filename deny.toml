@@ -154,4 +154,9 @@ ignore = [
     # Dependency of the unmaintained `im` crate
     # https://rustsec.org/advisories/RUSTSEC-2026-0251
     "RUSTSEC-2026-0251",
+    # Unmaintained: unsafe-libyaml
+    # Used by serde_yaml_ng, both directly and via `setty` (fmt-yaml); migrating to
+    # serde-saphyr requires a `setty` release first
+    # https://rustsec.org/advisories/RUSTSEC-2024-0449
+    "RUSTSEC-2024-0449",
 ]
