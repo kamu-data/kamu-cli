@@ -19,10 +19,19 @@ use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Event in the history of a flow
 #[derive(Interface)]
 #[graphql(
-    field(name = "event_id", ty = "&EventID"),
-    field(name = "event_time", ty = "&DateTime<Utc>")
+    field(
+        name = "event_id",
+        ty = "&EventID",
+        desc = "Unique identifier of the event"
+    ),
+    field(
+        name = "event_time",
+        ty = "&DateTime<Utc>",
+        desc = "Time the event occurred"
+    )
 )]
 pub enum FlowEvent {
     /// Flow initiated
@@ -110,10 +119,14 @@ impl FlowEvent {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Flow was created
 #[derive(SimpleObject)]
 pub struct FlowEventInitiated {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
+    /// Reason the flow was started
     activation_cause: FlowActivationCause,
 }
 
@@ -133,10 +146,14 @@ impl FlowEventInitiated {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Flow's start condition was set
 #[derive(SimpleObject)]
 pub struct FlowEventStartConditionUpdated {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
+    /// What the flow waits for before it runs
     start_condition: FlowStartCondition,
 }
 
@@ -156,10 +173,14 @@ impl FlowEventStartConditionUpdated {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Another reason to run was added to a waiting flow
 #[derive(SimpleObject)]
 pub struct FlowEventActivationCauseAdded {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
+    /// Added reason to run the flow
     activation_cause: FlowActivationCause,
 }
 
@@ -179,10 +200,14 @@ impl FlowEventActivationCauseAdded {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Configuration used by the flow was changed
 #[derive(SimpleObject)]
 pub struct FlowConfigSnapshotModified {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
+    /// New configuration of the flow
     config_snapshot: FlowConfigRule,
 }
 
@@ -198,10 +223,14 @@ impl FlowConfigSnapshotModified {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Retry policy used by the flow was changed
 #[derive(SimpleObject)]
 pub struct FlowEventRetryPolicyModified {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
+    /// New retry policy, null if failed runs are not retried
     retry_policy: Option<FlowRetryPolicy>,
 }
 
@@ -217,11 +246,15 @@ impl FlowEventRetryPolicyModified {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Flow's planned activation time was set
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct FlowEventScheduledForActivation {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
+    /// Time the flow is planned to activate
     scheduled_for_activation_at: DateTime<Utc>,
 }
 
@@ -243,13 +276,19 @@ impl FlowEventScheduledForActivation {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Task of the flow was scheduled, started or finished
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct FlowEventTaskChanged {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
+    /// Identifier of the task
     task_id: TaskID,
+    /// New status of the task
     task_status: TaskStatus,
+    /// Time of the next attempt after a retryable failure, null otherwise
     next_attempt_at: Option<DateTime<Utc>>,
 }
 
@@ -272,6 +311,7 @@ impl FlowEventTaskChanged {
         }
     }
 
+    /// Task of the flow
     async fn task(&self, ctx: &Context<'_>) -> Result<Task> {
         let task_state = utils::get_task(ctx, self.task_id.into()).await?;
         Ok(Task::new(task_state))
@@ -280,10 +320,13 @@ impl FlowEventTaskChanged {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Flow completed with an outcome
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct FlowEventCompleted {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
     #[graphql(skip)]
     flow_id: fs::FlowID,
@@ -309,9 +352,12 @@ impl FlowEventCompleted {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Flow was aborted
 #[derive(SimpleObject)]
 pub struct FlowEventAborted {
+    /// Unique identifier of the event
     event_id: EventID,
+    /// Time the event occurred
     event_time: DateTime<Utc>,
 }
 

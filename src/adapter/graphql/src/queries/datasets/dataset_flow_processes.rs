@@ -25,6 +25,7 @@ pub struct DatasetFlowProcesses<'a> {
     dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
+/// Recurring flow processes of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowProcesses<'a> {
@@ -35,6 +36,8 @@ impl<'a> DatasetFlowProcesses<'a> {
         }
     }
 
+    /// Main update process: ingest for a root dataset, transform for a
+    /// derivative
     #[tracing::instrument(level = "info", name = DatasetFlowProcesses_primary, skip_all)]
     pub async fn primary(&self, ctx: &Context<'_>) -> Result<DatasetFlowProcess> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
@@ -76,6 +79,7 @@ impl<'a> DatasetFlowProcesses<'a> {
 
     // TODO: other secondary processes in future
 
+    /// Webhook delivery processes of subscriptions to this dataset
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"

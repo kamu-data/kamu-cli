@@ -19,6 +19,7 @@ pub struct ViewAccessToken {
     token: ViewKamuAccessToken,
 }
 
+/// Access token as seen when listing tokens, without its secret value
 #[Object]
 impl ViewAccessToken {
     #[graphql(skip)]
@@ -63,6 +64,7 @@ pub struct CreatedAccessToken<'a> {
     token_name: String,
 }
 
+/// Newly created access token, including its secret value
 #[Object]
 impl<'a> CreatedAccessToken<'a> {
     #[graphql(skip)]
@@ -97,14 +99,17 @@ impl<'a> CreatedAccessToken<'a> {
     }
 }
 
+/// Access token was created
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateAccessTokenResultSuccess<'a> {
+    /// The created token
     pub token: CreatedAccessToken<'a>,
 }
 
 #[ComplexObject]
 impl CreateAccessTokenResultSuccess<'_> {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }

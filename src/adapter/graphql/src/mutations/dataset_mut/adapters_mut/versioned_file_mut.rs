@@ -29,6 +29,7 @@ pub struct VersionedFileMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Mutations of a versioned file dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> VersionedFileMut<'a> {
@@ -282,10 +283,19 @@ impl<'a> VersionedFileMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of creating a new file version
 #[derive(Interface)]
 #[graphql(
-    field(name = "is_success", ty = "bool"),
-    field(name = "message", ty = "String")
+    field(
+        name = "is_success",
+        ty = "bool",
+        desc = "Whether the operation succeeded"
+    ),
+    field(
+        name = "message",
+        ty = "String",
+        desc = "Human-readable outcome message"
+    )
 )]
 pub enum UpdateVersionResult {
     Success(UpdateVersionSuccess),
@@ -294,66 +304,87 @@ pub enum UpdateVersionResult {
     QuotaExceeded(UpdateVersionErrorQuotaExceeded),
 }
 
+/// New file version was created
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateVersionSuccess {
+    /// Number of the created version
     pub new_version: FileVersion,
+    /// Hash of the metadata chain head before the update
     pub old_head: Multihash<'static>,
+    /// Hash of the metadata chain head after the update
     pub new_head: Multihash<'static>,
+    /// Hash of the file content of the new version
     pub content_hash: Multihash<'static>,
 }
 #[ComplexObject]
 impl UpdateVersionSuccess {
+    /// Always true
     pub async fn is_success(&self) -> bool {
         true
     }
+    /// Always empty
     pub async fn message(&self) -> String {
         String::new()
     }
 }
 
+/// Dataset head did not match the expected one, likely due to a concurrent update
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateVersionErrorCasFailed {
+    /// Head block hash the caller expected
     pub expected_head: Multihash<'static>,
+    /// Current head block hash of the dataset
     pub actual_head: Multihash<'static>,
 }
 #[ComplexObject]
 impl UpdateVersionErrorCasFailed {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         "Expected head didn't match, dataset was likely updated concurrently".to_string()
     }
 }
 
+/// Extra data does not match the dataset schema
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateVersionErrorInvalidExtraData {
+    /// Reason the extra data was rejected
     pub message: String,
 }
 #[ComplexObject]
 impl UpdateVersionErrorInvalidExtraData {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
 }
 
+/// Update would exceed the storage quota of the account
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateVersionErrorQuotaExceeded {
+    /// Storage already used, in bytes; null if no quota is configured
     pub used: Option<u64>,
+    /// Size of the rejected content, in bytes; null if no quota is configured
     pub incoming: Option<u64>,
+    /// Storage limit, in bytes; null if no quota is configured
     pub limit: Option<u64>,
 }
 
 #[ComplexObject]
 impl UpdateVersionErrorQuotaExceeded {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
 
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         match (self.used, self.incoming, self.limit) {
             (Some(used), Some(incoming), Some(limit)) => {
@@ -366,16 +397,26 @@ impl UpdateVersionErrorQuotaExceeded {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of starting a direct file upload
 #[derive(Interface)]
 #[graphql(
-    field(name = "is_success", ty = "bool"),
-    field(name = "message", ty = "String")
+    field(
+        name = "is_success",
+        ty = "bool",
+        desc = "Whether the operation succeeded"
+    ),
+    field(
+        name = "message",
+        ty = "String",
+        desc = "Human-readable outcome message"
+    )
 )]
 pub enum StartUploadVersionResult {
     Success(StartUploadVersionSuccess),
     TooLarge(StartUploadVersionErrorTooLarge),
 }
 
+/// Upload was started; describes how to send the content
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct StartUploadVersionSuccess {
@@ -384,25 +425,32 @@ pub struct StartUploadVersionSuccess {
 }
 #[ComplexObject]
 impl StartUploadVersionSuccess {
+    /// Always true
     async fn is_success(&self) -> bool {
         true
     }
+    /// Always empty
     async fn message(&self) -> String {
         String::new()
     }
 }
 
+/// File is larger than the upload size limit
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct StartUploadVersionErrorTooLarge {
+    /// Size of the file, in bytes
     pub upload_size: usize,
+    /// Maximum allowed upload size, in bytes
     pub upload_limit: usize,
 }
 #[ComplexObject]
 impl StartUploadVersionErrorTooLarge {
+    /// Always false
     async fn is_success(&self) -> bool {
         false
     }
+    /// Human-readable error message
     async fn message(&self) -> String {
         format!(
             "Upload of {} exceeds the {} limit",
@@ -416,10 +464,15 @@ impl StartUploadVersionErrorTooLarge {
 
 #[derive(Debug, SimpleObject)]
 pub struct UploadContext {
+    /// URL to send the file content to
     pub url: String,
+    /// HTTP method to use for the upload
     pub method: String,
+    /// Whether the content must be sent as a multipart form
     pub use_multipart: bool,
+    /// HTTP headers to include in the upload request
     pub headers: Vec<KeyValue>,
+    /// Token to pass to `finishUploadNewVersion` once the upload completes
     pub upload_token: String,
 }
 

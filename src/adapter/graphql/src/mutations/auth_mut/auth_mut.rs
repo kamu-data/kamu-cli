@@ -15,6 +15,7 @@ use crate::queries::Account;
 
 pub(crate) struct AuthMut;
 
+/// Authentication mutations
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AuthMut {
@@ -23,6 +24,7 @@ impl AuthMut {
         AuthWeb3Mut
     }
 
+    /// Logs in with the given provider credentials and issues an access token
     #[tracing::instrument(level = "info", name = AuthMut_login, skip_all, fields(?login_method))]
     async fn login(
         &self,
@@ -45,6 +47,7 @@ impl AuthMut {
         }
     }
 
+    /// Returns the account that the given access token belongs to
     #[tracing::instrument(level = "info", name = AuthMut_account_details, skip_all)]
     async fn account_details(&self, ctx: &Context<'_>, access_token: String) -> Result<Account> {
         let authentication_service = from_catalog_n!(ctx, dyn kamu_accounts::AuthenticationService);
@@ -99,9 +102,12 @@ impl From<kamu_accounts::GetAccountInfoError> for GqlError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of a successful login
 #[derive(SimpleObject, Debug)]
 pub(crate) struct LoginResponse {
+    /// Access token to authenticate subsequent requests
     access_token: String,
+    /// Account that logged in
     account: Account,
 }
 

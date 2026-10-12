@@ -19,6 +19,7 @@ pub struct DatasetCollaborationMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Mutations that manage account access to a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetCollaborationMut<'a> {
@@ -91,14 +92,21 @@ impl<'a> DatasetCollaborationMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of granting a dataset role to an account
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum SetRoleResult {
     Success(SetRoleResultSuccess),
 }
 
+/// Role was granted
 #[derive(SimpleObject, Debug)]
 pub struct SetRoleResultSuccess {
+    /// Human-readable outcome message
     message: String,
 }
 
@@ -112,14 +120,21 @@ impl Default for SetRoleResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of revoking dataset roles from accounts
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum UnsetRoleResult {
     Success(UnsetRoleResultSuccess),
 }
 
+/// Roles were revoked
 #[derive(SimpleObject, Debug)]
 pub struct UnsetRoleResultSuccess {
+    /// Human-readable outcome message
     message: String,
 }
 

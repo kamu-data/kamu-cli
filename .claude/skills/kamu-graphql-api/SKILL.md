@@ -22,6 +22,34 @@ GraphQL schema is code-first in `kamu-adapter-graphql`.
 - Implement resolver bodies fully for production code.
 - For schema-only prototypes where the user explicitly states to defer implementation (e.g., "just add the schema without implementation" or "stub out the resolver"), resolver bodies may be left as `todo!()`.
 
+### 3. Schema Documentation
+
+Every type, field, operation and enum value that reaches the schema carries a description. The
+schema is the API reference for its consumers; an undocumented item is unfinished.
+
+- One line, usually 3–10 words: `/// Account name to display`. Match the punctuation of the
+  neighbouring docs.
+- Wrap CamelCase product names in backticks (`` `DataFusion` ``); Clippy's `doc_markdown`
+  rejects them bare.
+- State the contract for a consumer: what the item is or does, and when it is null if that is
+  not obvious. Read the code to get it right; do not restate the identifier.
+- Result and error types say which outcome they represent: `/// Dataset was created`.
+- General comment rules (no history, tickets or tallies) are in `kamu-prose-and-comments`.
+
+async-graphql takes descriptions from different places per item kind:
+
+| Item | Description goes on |
+|---|---|
+| `#[derive(SimpleObject / InputObject / Enum / Union / Interface / OneofObject)]` type | `///` on the struct or enum |
+| `#[Object]` type | `///` on the `impl` block — a doc on the struct never reaches the schema |
+| Struct field, enum value, union member, oneof variant | `///` on the field or variant |
+| Resolver field or operation | `///` on the `async fn` |
+| Interface field declared in `#[graphql(field(...))]` | `desc = "..."` inside that `field(...)` |
+| Scalar | `///` on the `#[Scalar]` impl; with `simple_scalar!` / `simple_string_scalar!`, `///` as the first macro argument |
+| Resolver argument | `#[graphql(desc = "...")]` on the parameter, when its meaning is not obvious |
+
+After regenerating the schema, check the diff for new items without a `"""` description.
+
 ## Enums
 
 - For GraphQL enums that mirror domain enums, prefer `#[graphql(remote = ...)]` when names align.

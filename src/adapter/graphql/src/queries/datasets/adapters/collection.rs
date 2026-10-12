@@ -58,6 +58,7 @@ impl Collection<'_> {
     }
 }
 
+/// Collection archetype view of a dataset: a set of entries linking to other datasets by path
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> Collection<'a> {
@@ -97,6 +98,7 @@ impl<'a> CollectionProjection<'a> {
     }
 }
 
+/// State of a collection at a specific point in its history
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollectionProjection<'_> {

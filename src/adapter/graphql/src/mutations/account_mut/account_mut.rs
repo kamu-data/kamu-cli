@@ -20,6 +20,7 @@ pub struct AccountMut {
     account: Account,
 }
 
+/// Mutations of a single account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AccountMut {
@@ -212,8 +213,13 @@ impl AccountMut {
 // RenameAccountResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of renaming an account
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum RenameAccountResult {
     Success(RenameAccountSuccess),
     NonUniqueName(RenameAccountNameNotUnique),
@@ -221,14 +227,17 @@ pub enum RenameAccountResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was renamed
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct RenameAccountSuccess {
+    /// New name of the account
     pub new_name: String,
 }
 
 #[ComplexObject]
 impl RenameAccountSuccess {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Account renamed".to_string()
     }
@@ -236,8 +245,10 @@ impl RenameAccountSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was not renamed: the new name is already taken
 #[derive(SimpleObject, Debug)]
 pub struct RenameAccountNameNotUnique {
+    /// Human-readable outcome message
     message: String,
 }
 
@@ -253,8 +264,13 @@ impl Default for RenameAccountNameNotUnique {
 // UpdateEmailResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of updating an account email
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum UpdateEmailResult {
     Success(UpdateEmailSuccess),
     NonUniqueEmail(UpdateEmailNonUnique),
@@ -262,14 +278,17 @@ pub enum UpdateEmailResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account email was updated
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateEmailSuccess {
+    /// New email of the account
     pub new_email: String,
 }
 
 #[ComplexObject]
 impl UpdateEmailSuccess {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -277,8 +296,10 @@ impl UpdateEmailSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Email was not updated: it is already used by another account
 #[derive(SimpleObject, Debug)]
 pub struct UpdateEmailNonUnique {
+    /// Human-readable outcome message
     message: String,
 }
 
@@ -294,8 +315,13 @@ impl Default for UpdateEmailNonUnique {
 // ModifyPasswordResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of changing an account password
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "&String"))]
+#[graphql(field(
+    name = "message",
+    ty = "&String",
+    desc = "Human-readable outcome message"
+))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
     WrongOldPassword(ModifyPasswordWrongOldPassword),
@@ -303,8 +329,10 @@ pub enum ModifyPasswordResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Password was changed
 #[derive(SimpleObject)]
 pub struct ModifyPasswordSuccess {
+    /// Human-readable outcome message
     pub message: String,
 }
 
@@ -316,8 +344,10 @@ impl Default for ModifyPasswordSuccess {
     }
 }
 
+/// Password was not changed: the old password is wrong
 #[derive(SimpleObject)]
 pub struct ModifyPasswordWrongOldPassword {
+    /// Human-readable outcome message
     pub message: String,
 }
 
@@ -333,16 +363,23 @@ impl Default for ModifyPasswordWrongOldPassword {
 // DeleteAccountResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of deleting an account
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum DeleteAccountResult {
     Success(DeleteAccountSuccess),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was deleted
 #[derive(SimpleObject)]
 pub struct DeleteAccountSuccess {
+    /// Human-readable outcome message
     message: String,
 }
 

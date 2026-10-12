@@ -13,6 +13,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Role granting an account access to a dataset
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 pub enum DatasetAccessRole {
     /// Role opening the possibility for read-only access

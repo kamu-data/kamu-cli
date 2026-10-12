@@ -29,7 +29,11 @@ pub(crate) async fn ensure_scheduling_permission(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub(crate) enum FlowInDatasetError {
     NotFound(FlowNotFound),
 }
@@ -224,28 +228,35 @@ pub(crate) async fn ensure_flow_preconditions(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Dataset does not satisfy the preconditions of the flow
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowPreconditionsNotMet {
+    /// Description of the unmet precondition
     pub preconditions: String,
 }
 
 #[ComplexObject]
 impl FlowPreconditionsNotMet {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         format!("Flow didn't met preconditions: '{}'", self.preconditions)
     }
 }
 
+/// Flow type is not applicable to this kind of dataset
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub(crate) struct FlowIncompatibleDatasetKind {
+    /// Dataset kind the flow type requires
     pub expected_dataset_kind: DatasetKind,
+    /// Kind of the target dataset
     pub actual_dataset_kind: DatasetKind,
 }
 
 #[ComplexObject]
 impl FlowIncompatibleDatasetKind {
+    /// Human-readable error message
     pub(crate) async fn message(&self) -> String {
         format!(
             "Expected a {} dataset, but a {} dataset was provided",

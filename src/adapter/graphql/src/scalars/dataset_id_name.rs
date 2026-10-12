@@ -13,11 +13,37 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-simple_string_scalar!(DatasetID, odf::DatasetID, from_did_str);
-simple_string_scalar!(DatasetName, odf::DatasetName);
-simple_string_scalar!(DatasetAlias, odf::DatasetAlias);
-simple_string_scalar!(DatasetRefAny, odf::DatasetRefAny);
-simple_string_scalar!(DatasetRef, odf::DatasetRef);
-simple_string_scalar!(DatasetRefRemote, odf::DatasetRefRemote);
+simple_string_scalar!(
+    /// Unique and stable identifier of a dataset (`did:odf:...`)
+    DatasetID,
+    odf::DatasetID,
+    from_did_str
+);
+simple_string_scalar!(
+    /// Name of a dataset, unique within its owner account
+    DatasetName,
+    odf::DatasetName
+);
+simple_string_scalar!(
+    /// Dataset name, optionally prefixed with the owner account
+    /// (`account/dataset`)
+    DatasetAlias,
+    odf::DatasetAlias
+);
+simple_string_scalar!(
+    /// Reference to a local or remote dataset by ID, alias or URL
+    DatasetRefAny,
+    odf::DatasetRefAny
+);
+simple_string_scalar!(
+    /// Reference to a local dataset by ID or alias
+    DatasetRef,
+    odf::DatasetRef
+);
+simple_string_scalar!(
+    /// Reference to a remote dataset by ID, alias or URL
+    DatasetRefRemote,
+    odf::DatasetRefRemote
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

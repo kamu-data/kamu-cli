@@ -19,6 +19,7 @@ pub struct DatasetCollaboration<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Access sharing of a dataset with other accounts
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetCollaboration<'a> {

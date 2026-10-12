@@ -98,7 +98,8 @@ pub use u256::*;
 pub use webhook_scalars::*;
 
 macro_rules! simple_scalar {
-    ($name: ident, $source_type: ty) => {
+    ($(#[$attr:meta])* $name: ident, $source_type: ty) => {
+        $(#[$attr])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         pub struct $name($source_type);
 
@@ -127,6 +128,7 @@ macro_rules! simple_scalar {
             }
         }
 
+        $(#[$attr])*
         #[Scalar]
         impl ScalarType for $name {
             fn parse(value: Value) -> InputValueResult<Self> {
@@ -152,14 +154,18 @@ pub(crate) use simple_scalar;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! simple_string_scalar {
-    ($name: ident, $source_type: ty) => {
-        crate::scalars::__simple_string_scalar_general!($name, $source_type);
-        crate::scalars::__simple_string_scalar_scalar_type!($name, $source_type, try_from);
-    };
-    ($name: ident, $source_type: ty, $source_parse_method: ident) => {
-        crate::scalars::__simple_string_scalar_general!($name, $source_type);
+    ($(#[$attr:meta])* $name: ident, $source_type: ty) => {
+        crate::scalars::__simple_string_scalar_general!($(#[$attr])* $name, $source_type);
         crate::scalars::__simple_string_scalar_scalar_type!(
-            $name,
+            $(#[$attr])* $name,
+            $source_type,
+            try_from
+        );
+    };
+    ($(#[$attr:meta])* $name: ident, $source_type: ty, $source_parse_method: ident) => {
+        crate::scalars::__simple_string_scalar_general!($(#[$attr])* $name, $source_type);
+        crate::scalars::__simple_string_scalar_scalar_type!(
+            $(#[$attr])* $name,
             $source_type,
             $source_parse_method
         );
@@ -167,7 +173,8 @@ macro_rules! simple_string_scalar {
 }
 
 macro_rules! __simple_string_scalar_general {
-    ($name: ident, $source_type: ty) => {
+    ($(#[$attr:meta])* $name: ident, $source_type: ty) => {
+        $(#[$attr])*
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub struct $name<'a>(std::borrow::Cow<'a, $source_type>);
 
@@ -217,7 +224,8 @@ macro_rules! __simple_string_scalar_general {
 }
 
 macro_rules! __simple_string_scalar_scalar_type {
-    ($name: ident, $source_type: ty, $source_parse_method: ident) => {
+    ($(#[$attr:meta])* $name: ident, $source_type: ty, $source_parse_method: ident) => {
+        $(#[$attr])*
         #[async_graphql::Scalar]
         impl async_graphql::ScalarType for $name<'_> {
             fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {

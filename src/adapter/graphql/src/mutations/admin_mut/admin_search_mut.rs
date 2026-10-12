@@ -16,9 +16,12 @@ use crate::prelude::*;
 
 pub struct AdminSearchMut;
 
+/// Kind of entity indexed for search
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 enum SearchEntityName {
+    /// Dataset search index
     Datasets,
+    /// Account search index
     Accounts,
 }
 
@@ -31,8 +34,10 @@ impl SearchEntityName {
     }
 }
 
+/// Search index administration
 #[Object]
 impl AdminSearchMut {
+    /// Drops and fully rebuilds the given search indices, all of them if none are given
     async fn reset_search_indices(
         &self,
         ctx: &Context<'_>,

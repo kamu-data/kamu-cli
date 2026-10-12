@@ -14,9 +14,12 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings that define how a flow runs
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfiguration {
+    /// Settings specific to the flow type
     pub rule: FlowConfigRule,
+    /// Retry policy for failed runs, null to use the flow type's default
     pub retry_policy: Option<FlowRetryPolicy>,
 }
 
@@ -31,6 +34,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings specific to the flow type
 #[derive(Union, Eq, PartialEq)]
 pub enum FlowConfigRule {
     Ingest(FlowConfigRuleIngest),
@@ -66,9 +70,13 @@ impl From<fs::FlowConfigurationRule> for FlowConfigRule {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings of an ingest flow
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigRuleIngest {
+    /// Whether to ignore the cache for API calls during ingest
     pub fetch_uncacheable: bool,
+    /// Whether to run the next ingest right away when the source has more
+    /// data
     pub fetch_next_iteration: bool,
 }
 
@@ -83,9 +91,12 @@ impl From<afs::FlowConfigRuleIngest> for FlowConfigRuleIngest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings of a compaction flow
 #[derive(SimpleObject, Eq, PartialEq)]
 pub struct FlowConfigRuleCompaction {
+    /// Maximum size of a compacted data slice, in bytes
     pub max_slice_size: u64,
+    /// Maximum number of records in a compacted data slice
     pub max_slice_records: u64,
 }
 
@@ -100,25 +111,34 @@ impl From<afs::FlowConfigRuleCompact> for FlowConfigRuleCompaction {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings of a reset flow
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigRuleReset {
+    /// Block the dataset head is moved to
     pub mode: FlowConfigResetPropagationMode,
+    /// Expected current head; the reset fails if the head differs, null to
+    /// skip the check
     pub old_head_hash: Option<Multihash<'static>>,
 }
 
+/// Block a reset moves the dataset head to
 #[derive(Union, PartialEq, Eq)]
 pub enum FlowConfigResetPropagationMode {
     Custom(FlowConfigResetPropagationModeCustom),
     ToSeed(FlowConfigResetPropagationModeToSeed),
 }
 
+/// Reset the dataset head to a given block
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowConfigResetPropagationModeCustom {
+    /// Hash of the block that becomes the new head
     pub new_head_hash: Multihash<'static>,
 }
 
+/// Reset the dataset head to its seed block
 #[derive(SimpleObject, PartialEq, Eq, Default)]
 pub struct FlowConfigResetPropagationModeToSeed {
+    /// Placeholder without meaning, always null
     _dummy: Option<String>,
 }
 
@@ -140,25 +160,36 @@ impl From<afs::FlowConfigRuleReset> for FlowConfigRuleReset {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings of a reset flow
 #[derive(InputObject)]
 pub struct FlowConfigResetInput {
+    /// Block the dataset head is moved to
     pub mode: FlowConfigInputResetPropagationMode,
+    /// Expected current head; the reset fails if the head differs, null to
+    /// skip the check
     pub old_head_hash: Option<Multihash<'static>>,
 }
 
+/// Block a reset moves the dataset head to
 #[derive(OneofObject)]
 pub enum FlowConfigInputResetPropagationMode {
+    /// Reset to a given block
     Custom(FlowConfigInputResetPropagationModeCustom),
+    /// Reset to the seed block
     ToSeed(FlowConfigInputResetPropagationModeToSeed),
 }
 
+/// Reset the dataset head to a given block
 #[derive(InputObject)]
 pub struct FlowConfigInputResetPropagationModeCustom {
+    /// Hash of the block that becomes the new head
     pub new_head_hash: Multihash<'static>,
 }
 
+/// Reset the dataset head to its seed block
 #[derive(InputObject)]
 pub struct FlowConfigInputResetPropagationModeToSeed {
+    /// Placeholder without meaning, the value is ignored
     _dummy: Option<String>,
 }
 
@@ -175,9 +206,12 @@ impl FlowConfigResetInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings of a compaction flow
 #[derive(InputObject, Copy, Clone)]
 pub struct FlowConfigCompactionInput {
+    /// Maximum size of a compacted data slice, in bytes
     pub max_slice_size: u64,
+    /// Maximum number of records in a compacted data slice
     pub max_slice_records: u64,
 }
 
@@ -192,6 +226,7 @@ impl TryFrom<FlowConfigCompactionInput> for afs::FlowConfigRuleCompact {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings of an ingest flow
 #[derive(InputObject, Copy, Clone)]
 pub struct FlowConfigIngestInput {
     /// Flag indicates to ignore cache during ingest step for API calls

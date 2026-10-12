@@ -36,8 +36,11 @@ type BatchGetResourceProblem =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Identifies a resource type by selector, alias, ODF type name or schema URI
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceTypeSelectorInput {
+    /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
+    /// (`VariableSet`), or full schema URI
     pub selector: ResourceTypeSelectorRaw<'static>,
 }
 
@@ -62,7 +65,9 @@ impl ResourceTypeSelectorInput {
 /// One authored `key = value` label predicate.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceLabelFilterEntryInput {
+    /// Label key to match
     pub key: String,
+    /// Required label value, must be a string
     pub value: serde_json::Value,
 }
 
@@ -70,6 +75,7 @@ pub struct ResourceLabelFilterEntryInput {
 /// A list preserves duplicate keys for validation.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceLabelFilterInput {
+    /// Predicates that must all hold, each key at most once
     pub entries: Vec<ResourceLabelFilterEntryInput>,
 }
 
@@ -98,8 +104,11 @@ impl ResourceLabelFilterInput {
 /// checked for agreement, so a mismatch is reported rather than ignored.
 #[derive(InputObject, Debug, Clone, Default)]
 pub struct AccountRefInput {
+    /// Resource ID of the account, only checked for agreement
     pub id: Option<ResourceID<'static>>,
+    /// Account DID, used for lookup when given
     pub did: Option<AccountID<'static>>,
+    /// Account name, used for lookup when `did` is absent
     pub name: Option<AccountName<'static>>,
 }
 
@@ -165,6 +174,7 @@ pub struct ResourceSelectorInput {
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI. `null` spans every type.
     pub r#type: Option<ResourceTypeSelectorInput>,
+    /// Matches only the resource with this ID
     pub id: Option<ResourceID<'static>>,
     /// Name pattern in SQL `LIKE` format, per the ODF schema. Only `%` acts as
     /// a wildcard — `_` is escaped to a literal underscore. A pattern with no
@@ -263,6 +273,7 @@ impl SearchResourcesInput {
 /// type, while a ref names exactly one.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceRefInput {
+    /// Account owning the resource, defaults to the calling account
     pub account: Option<AccountRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI — all resolve to the same type.
@@ -271,6 +282,7 @@ pub struct ResourceRefInput {
     /// one type. May be omitted only when `id` is given, which identifies a
     /// resource on its own.
     pub r#type: Option<ResourceTypeSelectorInput>,
+    /// Unique identifier of the resource
     pub id: Option<ResourceID<'static>>,
     /// Exact name. Never a pattern; use a selector for pattern matching.
     pub name: Option<ResourceName<'static>>,
@@ -299,11 +311,16 @@ impl TryFrom<ResourceRefInput> for kamu_resources::ResourceRef {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Registered resource type with its selectors and list columns
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ResourceTypeDescriptor {
+    /// Main selector name of the type, e.g. `variablesets`
     pub canonical_selector: ResourceSelectorName<'static>,
+    /// Short alternative selector names, e.g. `vs`
     pub selector_aliases: Vec<ResourceSelectorName<'static>>,
+    /// Schema URI identifying the type
     pub schema: TypeUri<'static>,
+    /// Type-specific columns to show when listing resources
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
@@ -327,7 +344,9 @@ impl From<kamu_resources::ResourceTypeDescriptor> for ResourceTypeDescriptor {
 /// field never carries a short selector masquerading as a URI.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceUnsupportedDescriptorProblem {
+    /// Schema URI that matched no registered type
     pub schema: TypeUri<'static>,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
@@ -337,7 +356,9 @@ pub struct ResourceUnsupportedDescriptorProblem {
 /// selector).
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceUnsupportedSelectorProblem {
+    /// Selector as supplied by the caller
     pub selector: ResourceTypeSelectorRaw<'static>,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
@@ -384,7 +405,9 @@ pub(crate) fn map_unsupported_selector_problem(
 /// resources gets a top-level GraphQL error, never this type.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceAccountResolutionProblem {
+    /// Reason the account could not be resolved
     pub code: ResourceAccountResolutionProblemCode,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
@@ -408,34 +431,51 @@ impl From<kamu_resources_facade::ResourceAccountResolutionError>
     }
 }
 
+/// Reason an account reference could not be resolved
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceAccountResolutionProblemCode {
+    /// The reference has neither a DID nor a name to look up by
     EmptySelector,
+    /// No account exists with the given DID
     AccountNotFoundById,
+    /// No account exists with the given name
     AccountNotFoundByName,
+    /// The resolved account does not match the other given fields
     SelectorMismatch,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// No resource exists with the referenced ID
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceIDNotFoundProblem {
+    /// ID that was not found
     pub id: ResourceID<'static>,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
+/// No resource of the referenced type has the referenced name
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceNameNotFoundProblem {
+    /// Resource type that was searched
     pub type_name: TypeName<'static>,
+    /// Name that was not found
     pub name: ResourceName<'static>,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
+/// The resource with the referenced ID is of a different type than requested
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceSchemaMismatchProblem {
+    /// ID of the resource found
     pub id: ResourceID<'static>,
+    /// Schema URI of the requested type
     pub expected_schema: TypeUri<'static>,
+    /// Schema URI of the resource's actual type
     pub actual_schema: TypeUri<'static>,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
@@ -444,9 +484,13 @@ pub struct ResourceSchemaMismatchProblem {
 /// entry rather than letting the `id` silently win.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceNameMismatchProblem {
+    /// ID given in the reference
     pub id: ResourceID<'static>,
+    /// Name given in the reference
     pub expected_name: ResourceName<'static>,
+    /// Actual name of the resource with that ID
     pub actual_name: ResourceName<'static>,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
@@ -455,6 +499,7 @@ pub struct ResourceNameMismatchProblem {
 /// A reference that named neither an id nor a name.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceEmptyRefProblem {
+    /// Human-readable description of the problem
     pub message: String,
 }
 
@@ -462,9 +507,11 @@ pub struct ResourceEmptyRefProblem {
 /// within one type, so the reference identifies nothing as posed.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceUntypedNameProblem {
+    /// Human-readable description of the problem
     pub message: String,
 }
 
+/// Reason a resource reference could not be resolved
 #[derive(Union, Debug, Clone)]
 pub enum ResourceLookupProblem {
     UidNotFound(ResourceIDNotFoundProblem),
@@ -521,16 +568,25 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
 /// A selector's `labels` could not be resolved into a matchable filter.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceInvalidLabelFilterProblem {
+    /// Reason the label filter was rejected
     pub code: ResourceLabelFilterProblemCode,
+    /// Human-readable description of the problem
     pub message: String,
 }
 
+/// Reason a label filter was rejected
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceLabelFilterProblemCode {
+    /// A label key could not be parsed
     InvalidKey,
+    /// A label key could not be resolved to a registered extension schema
+    /// applicable to the resource type, or its value is invalid for it
     ResourceExtensionSchema,
+    /// A label value is not a string
     NonStringValue,
+    /// Two different keys resolve to the same canonical label
     DuplicateAfterCanonicalization,
+    /// The filter uses an expression that is not supported
     UnsupportedExpression,
 }
 
@@ -559,18 +615,24 @@ impl From<kamu_resources_facade::ResourceInvalidLabelFilterError>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Text format of a resource manifest
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "kamu_resources_facade::ResourceManifestFormat")]
 pub enum ResourceManifestFormat {
+    /// JSON document
     Json,
+    /// YAML document
     Yaml,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resource rendered as a manifest document
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceRenderManifestResult {
+    /// Manifest text
     pub manifest: String,
+    /// Format the manifest text is in
     pub format: ResourceManifestFormat,
 }
 
@@ -580,6 +642,7 @@ pub use crate::scalars::Resource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of looking up resources by reference
 #[derive(Union, Debug, Clone)]
 pub enum BatchResourcesOutcome {
     Success(BatchResourcesResult),
@@ -587,9 +650,12 @@ pub enum BatchResourcesOutcome {
     AccountResolution(ResourceAccountResolutionProblem),
 }
 
+/// Resources found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourcesResult {
+    /// Resources found, one per resolved reference
     pub resources: Vec<BatchResourceSuccess>,
+    /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -611,14 +677,18 @@ impl From<BatchGetResourcesResponse> for BatchResourcesResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resource found for one reference of a batch
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceSuccess {
+    /// Zero-based position of the reference in the request
     pub request_index: usize,
+    /// Resource the reference resolved to
     pub resource: Resource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of rendering manifests for resources looked up by reference
 #[derive(Union, Debug, Clone)]
 pub enum BatchResourceManifestsOutcome {
     Success(BatchResourceManifestsResult),
@@ -626,9 +696,12 @@ pub enum BatchResourceManifestsOutcome {
     AccountResolution(ResourceAccountResolutionProblem),
 }
 
+/// Rendered manifests and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestsResult {
+    /// Manifests rendered, one per resolved reference
     pub manifests: Vec<BatchResourceManifestSuccess>,
+    /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -653,14 +726,18 @@ impl From<BatchRenderResourceManifestsResponse> for BatchResourceManifestsResult
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Manifest rendered for one reference of a batch
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestSuccess {
+    /// Zero-based position of the reference in the request
     pub request_index: usize,
+    /// Manifest of the resource the reference resolved to
     pub manifest: ResourceRenderManifestResult,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of looking up resource handles by reference
 #[derive(Union, Debug, Clone)]
 pub enum BatchResourceHandlesOutcome {
     Success(BatchResourceHandlesResult),
@@ -668,9 +745,12 @@ pub enum BatchResourceHandlesOutcome {
     AccountResolution(ResourceAccountResolutionProblem),
 }
 
+/// Resource handles found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceHandlesResult {
+    /// Handles found, one per resolved reference
     pub handles: Vec<BatchResourceHandleSuccess>,
+    /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -692,17 +772,23 @@ impl From<BatchGetResourceHandlesResponse> for BatchResourceHandlesResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resource handle found for one reference of a batch
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceHandleSuccess {
+    /// Zero-based position of the reference in the request
     pub request_index: usize,
+    /// Handle of the resource the reference resolved to
     pub handle: ResourceHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reference of a batch that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceProblem {
+    /// Zero-based position of the reference in the request
     pub request_index: usize,
+    /// Why the reference could not be resolved
     pub problem: ResourceLookupProblem,
 }
 
@@ -717,16 +803,26 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Condensed view of a resource for listings
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceSummary {
+    /// Unique and stable identifier of the resource
     pub id: ResourceID<'static>,
+    /// Schema URI of the resource type
     pub schema: TypeUri<'static>,
+    /// Name of the resource, unique within its type and account
     pub name: ResourceName<'static>,
+    /// Description from the resource annotations, null if not set
     pub description: Option<String>,
+    /// Revision of the desired state, bumped on each spec or headers change
     pub generation: UInt64,
+    /// Time the resource was created
     pub created_at: DateTime<Utc>,
+    /// Time the resource was last updated
     pub updated_at: DateTime<Utc>,
+    /// Reconciliation status, null if not yet recorded
     pub status: Option<ResourceStatusSummary>,
+    /// Values of the type-specific list columns
     pub list_values: Vec<ResourceListColumnValueView>,
 }
 
@@ -748,30 +844,42 @@ impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Data type of a list column's values
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "kamu_resources::ResourceListColumnDataType")]
 pub enum ResourceListColumnDataType {
+    /// Text value, read from `stringValue`
     String,
+    /// Unsigned 64-bit integer, read from `uint64Value`
     UInt64,
+    /// Boolean value, read from `boolValue`
     Bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// When a list column is shown
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "kamu_resources::ResourceListColumnVisibility")]
 pub enum ResourceListColumnVisibility {
+    /// Shown in every listing
     Default,
+    /// Shown only in the wide listing
     WideOnly,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Type-specific column to show when listing resources
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ResourceListColumnDescriptor {
+    /// Column key, matching `ResourceListColumnValueView.key`
     pub key: String,
+    /// Column title to display
     pub header: String,
+    /// Data type of the column's values
     pub data_type: ResourceListColumnDataType,
+    /// When the column is shown
     pub visibility: ResourceListColumnVisibility,
 }
 
@@ -788,11 +896,16 @@ impl From<kamu_resources::ResourceListColumnDescriptor> for ResourceListColumnDe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Value of one list column for a resource; exactly one value field is set
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ResourceListColumnValueView {
+    /// Key of the column this value belongs to
     pub key: String,
+    /// Value of a `STRING` column, null otherwise
     pub string_value: Option<String>,
+    /// Value of a `U_INT_64` column, null otherwise
     pub uint64_value: Option<UInt64>,
+    /// Value of a `BOOL` column, null otherwise
     pub bool_value: Option<bool>,
 }
 
@@ -815,12 +928,18 @@ impl From<kamu_resources::ResourceListColumnValueView> for ResourceListColumnVal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Condensed reconciliation status of a resource
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceStatusSummary {
+    /// Current reconciliation phase
     pub phase: Option<ResourcePhase>,
+    /// Generation last seen by the controller, null if never observed
     pub observed_generation: Option<UInt64>,
+    /// Time the controller observed `observedGeneration`
     pub observed_at: Option<DateTime<Utc>>,
+    /// Generation last successfully reconciled, null if never reconciled
     pub reconciled_generation: Option<UInt64>,
+    /// Time `reconciledGeneration` was reconciled
     pub reconciled_at: Option<DateTime<Utc>>,
 }
 
@@ -845,8 +964,10 @@ impl From<kamu_resources::ResourceStatusSummaryView> for ResourceStatusSummary {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resource counts of an account, per type
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourcesSummary {
+    /// Counts for each resource type
     pub resource_counts: Vec<ResourceTypeCountSummary>,
 }
 
@@ -860,11 +981,16 @@ impl From<kamu_resources::ResourcesSummary> for ResourcesSummary {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resource counts for one resource type
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceTypeCountSummary {
+    /// Schema URI of the resource type
     pub schema: TypeUri<'static>,
+    /// ODF type name of the resource type, e.g. `VariableSet`
     pub type_name: TypeName<'static>,
+    /// Number of resources of this type
     pub total_count: UInt64,
+    /// Number of resources of this type in each phase
     pub phase_counts: ResourcePhaseCounts,
 }
 
@@ -881,12 +1007,18 @@ impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Number of resources in each reconciliation phase
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourcePhaseCounts {
+    /// Resources waiting to be reconciled
     pub pending: UInt64,
+    /// Resources being reconciled
     pub reconciling: UInt64,
+    /// Resources whose latest generation is reconciled
     pub ready: UInt64,
+    /// Resources whose last reconcile failed after an earlier success
     pub degraded: UInt64,
+    /// Resources that failed and were never reconciled
     pub failed: UInt64,
 }
 

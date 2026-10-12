@@ -119,6 +119,7 @@ impl<'a> CollectionMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Mutations of a collection dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollectionMut<'_> {
@@ -200,6 +201,7 @@ impl CollectionMut<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Collection entry to add
 #[derive(InputObject, Debug)]
 pub struct CollectionEntryInput {
     /// Entry path
@@ -225,6 +227,7 @@ impl From<CollectionEntryInput> for kamu_datasets::CollectionEntryRecord {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Single collection update operation; exactly one field must be set
 #[derive(InputObject, Debug, Default)]
 pub struct CollectionUpdateInput {
     /// Inserts a new entry under the specified path. If an entry at the target
@@ -241,31 +244,47 @@ pub struct CollectionUpdateInput {
     pub remove: Option<CollectionUpdateInputRemove>,
 }
 
+/// Adds an entry to the collection
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputAdd {
+    /// Entry to add
     pub entry: CollectionEntryInput,
 }
 
+/// Moves an entry to a new path
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputMove {
+    /// Current path of the entry
     pub path_from: CollectionPath<'static>,
+    /// New path of the entry
     pub path_to: CollectionPath<'static>,
 
     /// Optionally update the extra data
     pub extra_data: Option<ExtraData>,
 }
 
+/// Removes an entry from the collection
 #[derive(InputObject, Debug)]
 pub struct CollectionUpdateInputRemove {
+    /// Path of the entry to remove
     pub path: CollectionPath<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of updating collection entries
 #[derive(Interface)]
 #[graphql(
-    field(name = "is_success", ty = "bool"),
-    field(name = "message", ty = "String")
+    field(
+        name = "is_success",
+        ty = "bool",
+        desc = "Whether the operation succeeded"
+    ),
+    field(
+        name = "message",
+        ty = "String",
+        desc = "Human-readable outcome message"
+    )
 )]
 pub enum CollectionUpdateResult {
     Success(CollectionUpdateSuccess),
@@ -275,79 +294,102 @@ pub enum CollectionUpdateResult {
     QuotaExceeded(CollectionUpdateErrorQuotaExceeded),
 }
 
+/// Collection entries were updated
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateSuccess {
+    /// Hash of the metadata chain head before the update
     pub old_head: Multihash<'static>,
+    /// Hash of the metadata chain head after the update
     pub new_head: Multihash<'static>,
 }
 #[ComplexObject]
 impl CollectionUpdateSuccess {
+    /// Always true
     async fn is_success(&self) -> bool {
         true
     }
+    /// Always empty
     async fn message(&self) -> String {
         String::new()
     }
 }
 
 pub struct CollectionUpdateUpToDate;
+/// Operations did not change the collection
 #[Object]
 impl CollectionUpdateUpToDate {
+    /// Always true
     async fn is_success(&self) -> bool {
         true
     }
+    /// Always empty
     async fn message(&self) -> String {
         String::new()
     }
 }
 
+/// Dataset head did not match the expected one, likely due to a concurrent update
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateErrorCasFailed {
+    /// Head block hash the caller expected
     expected_head: Multihash<'static>,
+    /// Current head block hash of the dataset, null if it has none
     actual_head: Option<Multihash<'static>>,
 }
 #[ComplexObject]
 impl CollectionUpdateErrorCasFailed {
+    /// Always false
     async fn is_success(&self) -> bool {
         false
     }
+    /// Human-readable error message
     async fn message(&self) -> String {
         "Expected head didn't match, dataset was likely updated concurrently".to_string()
     }
 }
 
+/// Entry referenced by an operation does not exist
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateErrorNotFound {
+    /// Path that was not found
     pub path: CollectionPath<'static>,
 }
 
 #[ComplexObject]
 impl CollectionUpdateErrorNotFound {
+    /// Always false
     async fn is_success(&self) -> bool {
         false
     }
+    /// Human-readable error message
     async fn message(&self) -> String {
         format!("Path {} does not exist", self.path)
     }
 }
 
+/// Update would exceed the storage quota of the account
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CollectionUpdateErrorQuotaExceeded {
+    /// Storage already used, in bytes; null if no quota is configured
     pub used: Option<u64>,
+    /// Size of the rejected data, in bytes; null if no quota is configured
     pub incoming: Option<u64>,
+    /// Storage limit, in bytes; null if no quota is configured
     pub limit: Option<u64>,
 }
 
 #[ComplexObject]
 impl CollectionUpdateErrorQuotaExceeded {
+    /// Always false
     async fn is_success(&self) -> bool {
         false
     }
 
+    /// Human-readable error message
     async fn message(&self) -> String {
         match (self.used, self.incoming, self.limit) {
             (Some(used), Some(incoming), Some(limit)) => {

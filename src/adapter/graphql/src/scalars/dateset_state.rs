@@ -11,6 +11,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Input dataset of a query and the state it was queried at
 #[derive(SimpleObject, Debug, PartialEq, Eq)]
 pub struct DatasetState {
     /// Globally unique identity of the dataset

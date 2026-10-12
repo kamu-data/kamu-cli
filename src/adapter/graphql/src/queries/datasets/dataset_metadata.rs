@@ -91,6 +91,7 @@ impl<'a> DatasetMetadata<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Metadata of a dataset and its current state derived from the metadata chain
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetMetadata<'a> {
@@ -321,6 +322,8 @@ impl<'a> DatasetMetadata<'a> {
             .map(Into::into))
     }
 
+    /// Blocks holding the currently effective events of the requested types,
+    /// as of the given head or the latest block
     #[tracing::instrument(level = "info", name = DatasetMetadata_metadata_projection, skip_all)]
     async fn metadata_projection(
         &self,

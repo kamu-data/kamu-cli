@@ -31,6 +31,7 @@ pub struct DatasetFlowRuns<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Flow run queries of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowRuns<'a> {
@@ -43,6 +44,7 @@ impl<'a> DatasetFlowRuns<'a> {
         }
     }
 
+    /// Returns a flow of this dataset by its ID
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_get_flow, skip_all, fields(%flow_id))]
     pub async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
         if let Some(error) =
@@ -69,6 +71,7 @@ impl<'a> DatasetFlowRuns<'a> {
         }))
     }
 
+    /// Lists flows of this dataset, paginated and optionally filtered
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_list_flows, skip_all, fields(?page, ?per_page))]
     pub async fn list_flows(
         &self,
@@ -131,6 +134,7 @@ impl<'a> DatasetFlowRuns<'a> {
         ))
     }
 
+    /// Lists accounts that have started flows of this dataset
     #[tracing::instrument(level = "info", name = DatasetFlowRuns_list_flow_initiators, skip_all)]
     pub async fn list_flow_initiators(&self, ctx: &Context<'_>) -> Result<AccountConnection> {
         let (flow_query_service, account_service) =
@@ -173,21 +177,29 @@ page_based_connection!(Account, AccountConnection, AccountEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of looking up a flow
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum GetFlowResult {
     Success(GetFlowSuccess),
     NotFound(FlowNotFound),
 }
 
+/// Flow was found
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct GetFlowSuccess {
+    /// Flow that was requested
     pub flow: Flow,
 }
 
 #[ComplexObject]
 impl GetFlowSuccess {
+    /// Human-readable success message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -195,32 +207,46 @@ impl GetFlowSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Filters for flows of a dataset
 #[derive(InputObject, Debug, Clone)]
 pub(crate) struct DatasetFlowFilters {
+    /// Only flows in one of these statuses
     by_status: Option<Vec<FlowStatus>>,
+    /// Only flows started by the given initiator
     by_initiator: Option<InitiatorFilterInput>,
+    /// Only flows of the given process kind
     by_process_type: Option<FlowProcessTypeFilterInput>,
 }
 
+/// Selects flows by who started them
 #[derive(OneofObject, Debug, Clone)]
 pub(crate) enum InitiatorFilterInput {
+    /// Flows started by the system, the value is ignored
     System(bool),
+    /// Flows started by any of these accounts
     Accounts(Vec<AccountID<'static>>),
 }
 
+/// Selects flows by process kind
 #[derive(OneofObject, Debug, Clone)]
 pub(crate) enum FlowProcessTypeFilterInput {
+    /// Flows of the dataset itself
     Primary(FlowProcessTypePrimaryFilterInput),
+    /// Webhook delivery flows of the dataset's subscriptions
     Webhooks(FlowProcessTypeWebhooksFilterInput),
 }
 
+/// Filter for flows of the dataset itself
 #[derive(InputObject, Debug, Clone)]
 pub(crate) struct FlowProcessTypePrimaryFilterInput {
+    /// Only flows of these types, null or empty means all types
     pub(crate) by_flow_types: Option<Vec<DatasetFlowType>>,
 }
 
+/// Filter for webhook delivery flows
 #[derive(InputObject, Debug, Clone)]
 pub(crate) struct FlowProcessTypeWebhooksFilterInput {
+    /// Only deliveries of these subscriptions, null or empty means all
     pub(crate) subscription_ids: Option<Vec<WebhookSubscriptionID>>,
 }
 

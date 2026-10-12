@@ -15,8 +15,10 @@ use crate::prelude::*;
 
 pub struct AdminMut;
 
+/// Administrative mutations, available only to administrators
 #[Object]
 impl AdminMut {
+    /// Search index administration
     #[graphql(guard = "AdminGuard::new()")]
     async fn search(&self) -> AdminSearchMut {
         AdminSearchMut

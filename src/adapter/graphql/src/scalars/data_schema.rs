@@ -17,12 +17,18 @@ use crate::prelude::*;
 // DataSchema
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Format a data schema is rendered in
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataSchemaFormat {
+    /// Arrow schema as JSON
     ArrowJson,
+    /// Open Data Fabric schema as JSON
     OdfJson,
+    /// Open Data Fabric schema as YAML
     OdfYaml,
+    /// Parquet schema in its message type text notation
     Parquet,
+    /// Parquet schema as JSON
     ParquetJson,
 }
 
@@ -97,12 +103,15 @@ impl DataSchema {
     }
 }
 
+/// Schema of data rendered in the requested format
 #[Object]
 impl DataSchema {
+    /// Format the content is rendered in
     pub async fn format(&self) -> DataSchemaFormat {
         self.format
     }
 
+    /// Schema rendered in the format
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -127,6 +136,7 @@ pub struct ColumnInput {
     pub data_type: DataTypeInput,
 }
 
+/// Data type of a column
 #[derive(InputObject)]
 pub struct DataTypeInput {
     /// Defines type using DDL syntax

@@ -29,6 +29,7 @@ impl CollectionEntry {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Entry of a collection that links a path to a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl CollectionEntry {

@@ -26,6 +26,7 @@ impl From<UInt64> for u64 {
     }
 }
 
+/// Unsigned 64-bit integer, passed as a string to avoid precision loss
 #[Scalar]
 impl ScalarType for UInt64 {
     fn parse(value: Value) -> InputValueResult<Self> {

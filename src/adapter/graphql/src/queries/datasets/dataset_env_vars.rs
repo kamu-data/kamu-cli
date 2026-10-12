@@ -21,6 +21,7 @@ pub struct DatasetEnvVars<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Environment variables of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetEnvVars<'a> {
@@ -39,6 +40,7 @@ impl<'a> DatasetEnvVars<'a> {
         })
     }
 
+    /// Returns the value of a variable, decrypting it if it is secret
     #[tracing::instrument(level = "info", name = DatasetEnvVars_exposed_value, skip_all)]
     async fn exposed_value(
         &self,
@@ -61,6 +63,7 @@ impl<'a> DatasetEnvVars<'a> {
             .await?)
     }
 
+    /// Lists environment variables of the dataset
     #[tracing::instrument(level = "info", name = DatasetEnvVars_list_env_variables, skip_all, fields(?page, ?per_page))]
     async fn list_env_variables(
         &self,

@@ -29,6 +29,7 @@ pub struct DatasetFlowRunsMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Mutations that trigger or cancel flow runs of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowRunsMut<'a> {
@@ -39,6 +40,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }
     }
 
+    /// Manually triggers an ingest flow of a root dataset
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_ingest_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn trigger_ingest_flow(
@@ -96,6 +98,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }))
     }
 
+    /// Manually triggers a transform flow of a derivative dataset
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_transform_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn trigger_transform_flow(&self, ctx: &Context<'_>) -> Result<TriggerFlowResult> {
@@ -142,6 +145,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }))
     }
 
+    /// Manually triggers a compaction flow of a root dataset
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_compaction_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn trigger_compaction_flow(
@@ -208,6 +212,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }))
     }
 
+    /// Manually triggers a flow that resets the dataset head to an earlier block
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_reset_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn trigger_reset_flow(
@@ -293,6 +298,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }))
     }
 
+    /// Manually triggers a flow that removes data and keeps only metadata
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_trigger_reset_to_metadata_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn trigger_reset_to_metadata_flow(
@@ -336,6 +342,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
         }))
     }
 
+    /// Cancels a scheduled or running flow of this dataset
     #[tracing::instrument(level = "info", name = DatasetFlowRunsMut_cancel_flow_run, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn cancel_flow_run(
@@ -376,8 +383,13 @@ impl<'a> DatasetFlowRunsMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of manually triggering a flow
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
@@ -385,14 +397,17 @@ pub enum TriggerFlowResult {
     InvalidRunConfigurations(FlowInvalidRunConfigurations),
 }
 
+/// Flow was triggered
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct TriggerFlowSuccess {
+    /// Flow that was scheduled to run
     pub flow: Flow,
 }
 
 #[ComplexObject]
 impl TriggerFlowSuccess {
+    /// Human-readable success message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -400,21 +415,29 @@ impl TriggerFlowSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of cancelling a flow run
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum CancelFlowRunResult {
     Success(CancelFlowRunSuccess),
     NotFound(FlowNotFound),
 }
 
+/// Flow run was cancelled
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CancelFlowRunSuccess {
+    /// Flow after cancellation
     pub flow: Flow,
 }
 
 #[ComplexObject]
 impl CancelFlowRunSuccess {
+    /// Human-readable success message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -422,14 +445,17 @@ impl CancelFlowRunSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Provided flow run configuration is invalid
 #[derive(Debug, SimpleObject)]
 #[graphql(complex)]
 pub struct FlowInvalidRunConfigurations {
+    /// Explanation of what is invalid in the configuration
     pub error: String,
 }
 
 #[ComplexObject]
 impl FlowInvalidRunConfigurations {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         format!("Invalid flow configuration provided: '{}'", self.error)
     }

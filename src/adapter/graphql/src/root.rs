@@ -18,6 +18,7 @@ use crate::queries::*;
 
 pub struct Query;
 
+/// Root of all read-only queries
 #[Object]
 impl Query {
     /// Returns the version of the GQL API
@@ -86,6 +87,7 @@ impl Query {
 
 pub struct Mutation;
 
+/// Root of all mutations
 #[Object]
 impl Mutation {
     /// Authentication and authorization-related functionality group

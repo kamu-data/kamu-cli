@@ -17,6 +17,7 @@ pub struct AccountUsage<'a> {
     account_id: &'a AccountID<'a>,
 }
 
+/// Resource usage of an account
 #[Object]
 impl<'a> AccountUsage<'a> {
     #[graphql(skip)]
@@ -24,6 +25,7 @@ impl<'a> AccountUsage<'a> {
         Self { account_id }
     }
 
+    /// Aggregated storage statistics of datasets owned by the account
     async fn storage(&self, ctx: &Context<'_>) -> Result<TotalDatasetsStatistic> {
         let dataset_statistic_service = from_catalog_n!(ctx, dyn DatasetStatisticsService);
 

@@ -40,6 +40,7 @@ impl Default for ExtraData {
     }
 }
 
+/// JSON object of user-defined fields with string, number or boolean values
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ExtraData {
     fn parse(gql_value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {

@@ -16,16 +16,22 @@ const MAX_SOA_BUFFER_SIZE: usize = 100_000_000;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Encoding of the records in a data batch
 #[derive(Enum, Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataBatchFormat {
     /// Deprecated: Use `JSON_AOS` instead and expect it to become default in
     /// future versions
     #[default]
     Json,
+    /// JSON array of objects, one object per record
     JsonAOS,
+    /// JSON object with an array of values per column
     JsonSOA,
+    /// JSON array of arrays, one array of values per record
     JsonAOA,
+    /// Newline-delimited JSON, one object per line
     NdJson,
+    /// CSV with a header row
     Csv,
     /// Deprecated: Use `ND_JSON` instead
     JsonLD,
@@ -33,10 +39,14 @@ pub enum DataBatchFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Batch of records encoded in the requested format
 #[derive(SimpleObject)]
 pub struct DataBatch {
+    /// Format the content is encoded in
     pub format: DataBatchFormat,
+    /// Encoded records
     pub content: String,
+    /// Number of records in the batch
     pub num_records: u64,
 }
 

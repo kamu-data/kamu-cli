@@ -15,6 +15,7 @@ use crate::utils;
 
 pub struct Accounts;
 
+/// Account lookup queries
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Accounts {

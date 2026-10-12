@@ -17,6 +17,7 @@ pub struct AccountQuotas<'a> {
     account: &'a Account,
 }
 
+/// Quotas of an account
 #[Object]
 impl<'a> AccountQuotas<'a> {
     #[graphql(skip)]
@@ -36,6 +37,7 @@ pub struct AccountQuotasUsage<'a> {
     account: &'a Account,
 }
 
+/// User-level quotas of an account
 #[Object]
 impl<'a> AccountQuotasUsage<'a> {
     #[graphql(skip)]
@@ -55,6 +57,7 @@ pub struct AccountQuotasUsageStorage<'a> {
     account: &'a Account,
 }
 
+/// Storage quotas of an account
 #[Object]
 impl<'a> AccountQuotasUsageStorage<'a> {
     #[graphql(skip)]

@@ -21,6 +21,7 @@ pub struct DatasetEndpoints<'a> {
     config: Arc<ServerUrlConfig>,
 }
 
+/// Ways to access a dataset over the supported protocols
 #[Object]
 impl<'a> DatasetEndpoints<'a> {
     #[graphql(skip)]
@@ -49,6 +50,7 @@ impl<'a> DatasetEndpoints<'a> {
         self.dataset_request_state.dataset_name().as_str()
     }
 
+    /// Link to the dataset page in the web UI
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -64,6 +66,7 @@ impl<'a> DatasetEndpoints<'a> {
         Ok(LinkProtocolDesc { url })
     }
 
+    /// Commands to pull and push the dataset with the kamu CLI
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -85,6 +88,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
+    /// REST API endpoints for the dataset
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -111,6 +115,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
+    /// Arrow Flight SQL endpoint
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -121,6 +126,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
+    /// JDBC connection URL
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -135,6 +141,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
+    /// PostgreSQL protocol endpoint, currently a placeholder
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -145,6 +152,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
+    /// Kafka protocol endpoint, currently a placeholder
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -155,6 +163,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
+    /// WebSocket endpoint, currently a placeholder
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"
@@ -165,6 +174,7 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
+    /// `OData` API endpoints
     #[expect(
         clippy::unused_async,
         reason = "async-graphql resolvers are async by framework contract"

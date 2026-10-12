@@ -23,6 +23,7 @@ use crate::utils::from_catalog_n;
 
 pub struct Search;
 
+/// Search over datasets and other objects managed by the node
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Search {
@@ -110,6 +111,8 @@ impl Search {
         ))
     }
 
+    /// Full-text search over datasets and accounts, listing all of them
+    /// sorted by title when the prompt is empty
     #[tracing::instrument(level = "info", name = Search_query_full_text, skip_all)]
     async fn query_full_text(
         &self,
@@ -412,31 +415,47 @@ impl Search {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Results of a full-text search
 #[derive(SimpleObject, Debug)]
 pub struct FullTextSearchResponse {
+    /// Time the search engine spent on the request, in milliseconds
     pub took_ms: u64,
+    /// Whether the search timed out and returned partial results
     pub timeout: bool,
+    /// Total number of matching objects across all pages
     pub total_hits: u64,
+    /// Matching objects on the requested page
     pub hits: Vec<FullTextSearchHit>,
 }
 
+/// Object matching a full-text search
 #[derive(SimpleObject, Debug)]
 pub struct FullTextSearchHit {
+    /// Identifier of the matching object
     pub id: String,
+    /// Name of the search schema the object belongs to, e.g. datasets or
+    /// accounts
     pub schema_name: String,
+    /// Relevance score, null when results are not ranked
     pub score: Option<f64>,
+    /// Indexed document of the object as JSON
     pub source: serde_json::Value,
+    /// Fragments of the fields that matched the prompt, if any
     pub highlights: Option<Vec<FullTextSearchHighlight>>,
 }
 
+/// Fragment of a field that matched a full-text search
 #[derive(SimpleObject, Debug)]
 pub struct FullTextSearchHighlight {
+    /// Name of the matching field
     pub field: String,
+    /// Most relevant fragment of the field with the matches highlighted
     pub best_fragment: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Object found by a search
 #[derive(Union, Debug)]
 pub enum SearchResult {
     Dataset(Dataset),
@@ -449,9 +468,12 @@ page_based_connection!(SearchResult, SearchResultConnection, SearchResultEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Object found by a search, with its relevance score
 #[derive(SimpleObject, Debug)]
 pub struct SearchResultEx {
+    /// Found object
     pub item: SearchResult,
+    /// Relevance score, higher is more relevant
     pub score: f64,
 }
 
@@ -459,6 +481,7 @@ page_based_connection!(SearchResultEx, SearchResultExConnection, SearchResultExE
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Object found by a name lookup
 #[derive(Union, Debug)]
 pub enum NameLookupResult {
     Account(Account),
@@ -467,13 +490,17 @@ pub enum NameLookupResult {
     // Issue,
 }
 
+/// Filters narrowing a name lookup
 #[derive(InputObject, Debug)]
 pub struct LookupFilters {
+    /// Filters applied to accounts
     by_account: Option<AccountLookupFilter>,
 }
 
+/// Filters narrowing an account name lookup
 #[derive(InputObject, Debug)]
 pub struct AccountLookupFilter {
+    /// Accounts to leave out of the results
     exclude_accounts_by_ids: Vec<AccountID<'static>>,
 }
 

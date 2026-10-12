@@ -13,9 +13,11 @@ use crate::prelude::*;
 
 pub(crate) struct AuthWeb3Mut;
 
+/// Web3 wallet authentication mutations
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AuthWeb3Mut {
+    /// Issues a nonce for the wallet to sign in a Sign-In with Ethereum message
     #[tracing::instrument(level = "info", name = AuthWeb3Mut_eip4361_auth_nonce, skip_all, fields(%account))]
     async fn eip4361_auth_nonce(
         &self,
@@ -34,8 +36,10 @@ impl AuthWeb3Mut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Nonce issued for a Sign-In with Ethereum login
 #[derive(SimpleObject, Debug)]
 pub(crate) struct Eip4361AuthNonceResponse<'a> {
+    /// Nonce to include in the signed message
     value: Eip4361AuthNonce<'a>,
 }
 

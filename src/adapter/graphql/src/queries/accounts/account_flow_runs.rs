@@ -39,6 +39,7 @@ pub struct AccountFlowRuns<'a> {
     account: &'a AccountEntity,
 }
 
+/// Flow run queries across datasets owned by an account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountFlowRuns<'a> {
@@ -49,6 +50,7 @@ impl<'a> AccountFlowRuns<'a> {
         Self { account }
     }
 
+    /// Lists flows of the account's datasets, paginated and optionally filtered
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_flows, skip_all, fields(?page, ?per_page, ?filters))]
     pub async fn list_flows(
         &self,
@@ -143,6 +145,7 @@ impl<'a> AccountFlowRuns<'a> {
         ))
     }
 
+    /// Lists the account's datasets that have at least one flow
     #[tracing::instrument(level = "info", name = AccountFlowRuns_list_datasets_with_flow, skip_all)]
     pub async fn list_datasets_with_flow(&self, ctx: &Context<'_>) -> Result<DatasetConnection> {
         let logged = utils::logged_account(ctx);
@@ -174,11 +177,16 @@ impl<'a> AccountFlowRuns<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Filters for flows of an account's datasets
 #[derive(InputObject, Debug)]
 pub struct AccountFlowFilters {
+    /// Only flows in one of these statuses
     by_status: Option<Vec<FlowStatus>>,
+    /// Only flows started by the given initiator
     by_initiator: Option<InitiatorFilterInput>,
+    /// Only flows of these datasets, empty means all owned datasets
     by_dataset_ids: Vec<DatasetID<'static>>,
+    /// Only flows of the given process kind
     by_process_type: Option<FlowProcessTypeFilterInput>,
 }
 

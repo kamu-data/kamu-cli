@@ -26,6 +26,7 @@ impl WebhookSubscription {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Subscription that delivers dataset events to a target URL
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl WebhookSubscription {
