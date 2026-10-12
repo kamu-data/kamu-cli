@@ -40,6 +40,12 @@ Recommendation: for ease of reading, use the following format:
 - Upgraded to `datafusion v55` and `arrow v59`
 - Upgraded to `sqlx v0.9`
 ### Fixed
+- Multi-tenant workspaces now work for OS users whose names are not valid account names (`john_doe` on
+  Linux, `_www` on macOS, `John Doe` on Windows): the implicit account name replaces separators such as
+  `_` and spaces with `-` and drops other invalid characters. When no valid character remains, or the OS
+  user name cannot be determined, kamu reports an error and asks to select a configured account with
+  `--account`, instead of using an `unknown` account. A name given with `--account` is still used as
+  typed and rejected if invalid
 - Running an older kamu in a workspace whose database was migrated by a newer version no longer crashes with
   "Migration failed: VersionMissing"; it reports the schema versions and asks to upgrade kamu
 - A workspace with a newer layout version than the running kamu now asks to upgrade kamu, instead of suggesting
