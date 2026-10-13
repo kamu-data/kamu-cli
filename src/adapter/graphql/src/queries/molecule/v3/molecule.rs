@@ -389,9 +389,12 @@ impl From<MoleculeSemanticSearchFilters> for kamu_molecule_domain::MoleculeSearc
     }
 }
 
+/// Kind of entity to search for
 #[derive(Enum, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MoleculeSearchEntityKindInput {
+    /// Data room files, in their current state
     File,
+    /// Announcements
     Announcement,
 }
 

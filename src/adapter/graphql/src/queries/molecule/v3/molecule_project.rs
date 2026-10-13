@@ -18,6 +18,7 @@ use kamu_molecule_domain::{
     MoleculeViewDataRoomActivitiesError,
     MoleculeViewProjectActivitiesUseCase,
 };
+use strum::IntoEnumIterator as _;
 
 use crate::molecule::molecule_subject;
 use crate::prelude::*;
@@ -224,25 +225,50 @@ impl From<MoleculeProjectActivityFilters> for kamu_molecule_domain::MoleculeActi
             by_access_level_rules: value
                 .by_access_level_rules
                 .map(|rules| rules.into_iter().map(Into::into).collect()),
-            by_kinds: value
-                .by_kinds
-                .map(|kinds| kinds.into_iter().map(Into::into).collect()),
+            by_kinds: value.by_kinds.map(|kinds| {
+                kinds
+                    .into_iter()
+                    .flat_map(MoleculeActivityKindInput::into_domain_kinds)
+                    .collect()
+            }),
         }
     }
 }
 
+/// Kind of activity to filter by
 #[derive(Enum, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MoleculeActivityKindInput {
+    /// Any file activity: same as `FILE_ADDED`, `FILE_UPDATED` and
+    /// `FILE_REMOVED` together
     File,
+    /// File was added to the data room
+    FileAdded,
+    /// New version of a file was uploaded, or a file was moved or its
+    /// metadata changed
+    FileUpdated,
+    /// File was removed from the data room
+    FileRemoved,
+    /// Announcement was published
     Announcement,
 }
 
-impl From<MoleculeActivityKindInput> for kamu_molecule_domain::MoleculeActivityKind {
-    fn from(value: MoleculeActivityKindInput) -> Self {
+impl MoleculeActivityKindInput {
+    fn into_domain_kinds(self) -> Vec<kamu_molecule_domain::MoleculeActivityKind> {
         use kamu_molecule_domain::MoleculeActivityKind as Domain;
-        match value {
-            MoleculeActivityKindInput::File => Domain::DataRoomActivity,
-            MoleculeActivityKindInput::Announcement => Domain::Announcement,
+        match self {
+            Self::File => MoleculeDataRoomFileActivityType::iter()
+                .map(Domain::DataRoomActivity)
+                .collect(),
+            Self::FileAdded => vec![Domain::DataRoomActivity(
+                MoleculeDataRoomFileActivityType::Added,
+            )],
+            Self::FileUpdated => vec![Domain::DataRoomActivity(
+                MoleculeDataRoomFileActivityType::Updated,
+            )],
+            Self::FileRemoved => vec![Domain::DataRoomActivity(
+                MoleculeDataRoomFileActivityType::Removed,
+            )],
+            Self::Announcement => vec![Domain::Announcement],
         }
     }
 }

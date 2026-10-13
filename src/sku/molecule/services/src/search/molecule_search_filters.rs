@@ -10,9 +10,13 @@
 use kamu_molecule_domain::{
     MoleculeAccessLevelRule,
     MoleculeActivitiesFilters,
+    MoleculeActivityKindSelection,
     MoleculeAnnouncementsFilters,
     MoleculeDataRoomEntriesFilters,
+    MoleculeDataRoomFileActivityType,
     MoleculeSearchFilters,
+    molecule_activity_search_schema as activity_schema,
+    molecule_announcement_search_schema as announcement_schema,
     molecule_search_schema_common as molecule_schema,
 };
 use kamu_search::*;
@@ -103,10 +107,38 @@ pub(crate) fn map_molecule_announcements_filters_to_search(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn map_molecule_activity_kinds_to_search_schemas(
+    kind_selection: &MoleculeActivityKindSelection,
+) -> Vec<&'static str> {
+    let mut schemas = vec![];
+    if kind_selection.includes_data_room_activities() {
+        schemas.push(activity_schema::SCHEMA_NAME);
+    }
+    if kind_selection.includes_announcements() {
+        schemas.push(announcement_schema::SCHEMA_NAME);
+    }
+    schemas
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn map_molecule_activities_filters_to_search(
     filters: MoleculeActivitiesFilters,
 ) -> Vec<SearchFilterExpr> {
     let mut search_filters = vec![];
+
+    // Excluding the unselected types rather than matching the selected ones keeps
+    // announcements, whose index has no `activity_type` field
+    let excluded_activity_types = MoleculeActivityKindSelection::from_filters(Some(&filters))
+        .excluded_data_room_activity_types();
+    if !excluded_activity_types.is_empty() {
+        search_filters.push(filter_not!(field_in_str(
+            activity_schema::fields::ACTIVITY_TYPE,
+            excluded_activity_types
+                .into_iter()
+                .map(MoleculeDataRoomFileActivityType::stored_value),
+        )));
+    }
 
     if let Some(by_access_levels) = filters.by_access_levels
         && !by_access_levels.is_empty()

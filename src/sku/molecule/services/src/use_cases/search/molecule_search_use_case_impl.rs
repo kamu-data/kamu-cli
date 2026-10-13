@@ -113,11 +113,11 @@ impl MoleculeSearchUseCaseImpl {
                     .build()?
                     .alias(RANK_COLUMN),
             ])?
-            .filter(
-                col(Column::from_name(RANK_COLUMN))
-                    .eq(lit(1))
-                    .and(col(Column::from_name("activity_type")).not_eq(lit("removed"))),
-            )?
+            .filter(col(Column::from_name(RANK_COLUMN)).eq(lit(1)).and(
+                col(Column::from_name("activity_type")).not_eq(lit(
+                    MoleculeDataRoomFileActivityType::Removed.stored_value(),
+                )),
+            ))?
             .without_columns(&[RANK_COLUMN])?;
 
         Ok(projection)
@@ -161,7 +161,9 @@ impl MoleculeSearchUseCaseImpl {
             return Ok(MoleculeSearchHitsListing::empty());
         };
 
-        // Filtering
+        // Filters apply to the current state of files, so project first
+        let df = Self::project_global_data_room_activities(df).int_err()?;
+
         let df = if let Some(filters) = filters {
             crate::utils::apply_molecule_filters_to_df(
                 df,
@@ -174,8 +176,6 @@ impl MoleculeSearchUseCaseImpl {
         } else {
             df
         };
-
-        let df = Self::project_global_data_room_activities(df).int_err()?;
 
         let pattern = lit(format!("%{prompt}%"));
         let df = df.filter(col("description").ilike(pattern)).int_err()?;

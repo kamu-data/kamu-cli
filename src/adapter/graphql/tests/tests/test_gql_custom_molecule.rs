@@ -7404,6 +7404,76 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         },
     ]);
 
+    let expected_global_file_added_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileAdded",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAdded",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+    ]);
+    let expected_global_file_updated_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+    ]);
+    let expected_global_file_removed_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileRemoved",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+    ]);
+
     let expected_global_announcement_activity_nodes = value!([
         {
             "__typename": "MoleculeActivityAnnouncement",
@@ -7502,6 +7572,132 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
                 "v3": {
                     "activity": {
                         "nodes": expected_global_announcement_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only FILE_ADDED
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byKinds": ["FILE_ADDED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "activity": {
+                        "nodes": expected_global_file_added_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only FILE_UPDATED
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byKinds": ["FILE_UPDATED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "activity": {
+                        "nodes": expected_global_file_updated_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only FILE_REMOVED
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byKinds": ["FILE_REMOVED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "activity": {
+                        "nodes": expected_global_file_removed_activity_nodes
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> FILE_REMOVED and ANNOUNCEMENT
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byKinds": ["FILE_REMOVED", "ANNOUNCEMENT"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json_data(),
+        json!({
+            "molecule": {
+                "v3": {
+                    "activity": {
+                        "nodes": json!([
+                            json!(expected_global_announcement_activity_nodes)[0],
+                            json!(expected_global_file_removed_activity_nodes)[0],
+                            json!(expected_global_announcement_activity_nodes)[1],
+                        ])
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> FILE overlapping FILE_ADDED is the same as FILE
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": {
+                    "byKinds": ["FILE", "FILE_ADDED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "activity": {
+                        "nodes": expected_global_file_activity_nodes
                     }
                 }
             }
@@ -7682,6 +7878,76 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
         },
     ]);
 
+    let expected_project_file_added_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileAdded",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAdded",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+    ]);
+    let expected_project_file_updated_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/foo_renamed.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileUpdated",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": project_1_file_1_dataset_id,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+    ]);
+    let expected_project_file_removed_activity_nodes = value!([
+        {
+            "__typename": "MoleculeActivityFileRemoved",
+            "entry": {
+                "path": "/bar.txt",
+                "ref": project_1_file_2_dataset_id,
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+            }
+        },
+    ]);
+
     let expected_project_announcement_activity_nodes = value!([
         {
             "__typename": "MoleculeActivityAnnouncement",
@@ -7831,8 +8097,149 @@ async fn test_molecule_activity(search_variant: GraphQLMoleculeHarnessSearchVari
                     "project": {
                         "activity": {
                             "nodes": expected_project_announcement_activity_nodes
+                                .clone()
                                 .into_json()
                                 .unwrap()
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only FILE_ADDED
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "filters": {
+                    "byKinds": ["FILE_ADDED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "activity": {
+                            "nodes": expected_project_file_added_activity_nodes
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only FILE_UPDATED
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "filters": {
+                    "byKinds": ["FILE_UPDATED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "activity": {
+                            "nodes": expected_project_file_updated_activity_nodes
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> only FILE_REMOVED
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "filters": {
+                    "byKinds": ["FILE_REMOVED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "activity": {
+                            "nodes": expected_project_file_removed_activity_nodes
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> FILE_REMOVED and ANNOUNCEMENT
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "filters": {
+                    "byKinds": ["FILE_REMOVED", "ANNOUNCEMENT"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        // NOTE: For correct number comparison, which sometimes appear as
+        //       `{"$serde_json::private::Number": "2"}`
+        .into_json_data(),
+        json!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "activity": {
+                            "nodes": json!([
+                                json!(expected_project_file_removed_activity_nodes)[0],
+                                json!(expected_project_announcement_activity_nodes)[0],
+                            ])
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filters: byKinds -> FILE overlapping FILE_ADDED is the same as FILE
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "filters": {
+                    "byKinds": ["FILE", "FILE_ADDED"],
+                },
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "activity": {
+                            "nodes": expected_project_file_activity_nodes
                         }
                     }
                 }
@@ -11457,6 +11864,74 @@ async fn test_molecule_search(search_variant: GraphQLMoleculeHarnessSearchVarian
                 // project_2_announcement_1_search_hit_node,
                 project_1_announcement_1_search_hit_node,
                 // project_1_file_1_dataset_search_hit_node,
+            ],
+            "totalCount": 1
+        })
+    );
+
+    // Filters match the current state of a file, not its earlier versions
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            indoc!(
+                r#"
+                mutation ($oclId: String!, $ref: DatasetID!, $changeBy: String!, $accessLevel: String!) {
+                  molecule {
+                    v3 {
+                      project(oclId: $oclId) {
+                        dataRoom {
+                          updateFileMetadata(
+                            ref: $ref
+                            accessLevel: $accessLevel
+                            changeBy: $changeBy
+                          ) {
+                            isSuccess
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                "#
+            ),
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID_1,
+                "ref": project_1_file_1_dataset_id,
+                "changeBy": USER_1,
+                "accessLevel": "holders",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .data,
+        value!({
+            "molecule": {
+                "v3": {
+                    "project": {
+                        "dataRoom": {
+                            "updateFileMetadata": {
+                                "isSuccess": true,
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    harness.synchronize_agents().await;
+
+    pretty_assertions::assert_eq!(
+        harness
+            .execute_search_query(
+                "",
+                Some(json!({
+                    "byAccessLevels": ["public"],
+                })),
+            )
+            .await,
+        json!({
+            "nodes": [
+                project_1_announcement_1_search_hit_node,
             ],
             "totalCount": 1
         })

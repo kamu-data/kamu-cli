@@ -5978,8 +5978,31 @@ type MoleculeActivityFileUpdated {
 	entry: MoleculeDataRoomEntry!
 }
 
+"""
+Kind of activity to filter by
+"""
 enum MoleculeActivityKindInput {
+	"""
+	Any file activity: same as `FILE_ADDED`, `FILE_UPDATED` and
+	`FILE_REMOVED` together
+	"""
 	FILE
+	"""
+	File was added to the data room
+	"""
+	FILE_ADDED
+	"""
+	New version of a file was uploaded, or a file was moved or its
+	metadata changed
+	"""
+	FILE_UPDATED
+	"""
+	File was removed from the data room
+	"""
+	FILE_REMOVED
+	"""
+	Announcement was published
+	"""
 	ANNOUNCEMENT
 }
 
@@ -6407,8 +6430,17 @@ type MoleculeQuotaExceeded implements MoleculeDataRoomFinishUploadFileResult & M
 	message: String!
 }
 
+"""
+Kind of entity to search for
+"""
 enum MoleculeSearchEntityKindInput {
+	"""
+	Data room files, in their current state
+	"""
 	FILE
+	"""
+	Announcements
+	"""
 	ANNOUNCEMENT
 }
 

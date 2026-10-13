@@ -15,12 +15,25 @@ use crate::{MoleculeDataRoomEntry, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Copy, Debug, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize, strum::EnumIter,
+)]
 #[serde(rename_all = "camelCase")]
 pub enum MoleculeDataRoomFileActivityType {
     Added,
     Updated,
     Removed,
+}
+
+impl MoleculeDataRoomFileActivityType {
+    /// Value of the `activity_type` column in the global activity dataset and
+    /// in the activity search index
+    pub fn stored_value(self) -> String {
+        let serde_json::Value::String(value) = serde_json::to_value(self).unwrap() else {
+            unreachable!("Unit variants serialize to strings");
+        };
+        value
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -216,5 +229,24 @@ pub type MoleculeDataRoomActivityChangelogInsertionRecord =
     odf::serde::DatasetDefaultVocabularyChangelogInsertionRecord<
         MoleculeDataRoomActivityPayloadRecord,
     >;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stored_values_are_stable() {
+        assert_eq!(
+            [
+                MoleculeDataRoomFileActivityType::Added.stored_value(),
+                MoleculeDataRoomFileActivityType::Updated.stored_value(),
+                MoleculeDataRoomFileActivityType::Removed.stored_value(),
+            ],
+            ["added", "updated", "removed"]
+        );
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

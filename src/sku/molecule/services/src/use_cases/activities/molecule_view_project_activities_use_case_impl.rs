@@ -20,7 +20,12 @@ use kamu_molecule_domain::{
 };
 use kamu_search::*;
 
-use crate::{MoleculeDatasetAccessorFactory, map_molecule_activities_filters_to_search, utils};
+use crate::{
+    MoleculeDatasetAccessorFactory,
+    map_molecule_activities_filters_to_search,
+    map_molecule_activity_kinds_to_search_schemas,
+    utils,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,15 +66,10 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             }
         }
 
-        let by_kinds = filters
-            .as_ref()
-            .and_then(|f| f.by_kinds.as_deref())
-            .unwrap_or(&[]);
+        let kind_selection = MoleculeActivityKindSelection::from_filters(filters.as_ref());
 
-        let fetch_data_room =
-            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::DataRoomActivity);
-        let fetch_announcements =
-            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::Announcement);
+        let fetch_data_room = kind_selection.includes_data_room_activities();
+        let fetch_announcements = kind_selection.includes_announcements();
 
         if !fetch_data_room && !fetch_announcements {
             return Ok(MoleculeProjectActivityListing::default());
@@ -77,7 +77,11 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
 
         let data_room_fut = fetch_or_empty(
             fetch_data_room,
-            self.data_room_activities_listing_from_source(molecule_project, filters.clone()),
+            self.data_room_activities_listing_from_source(
+                molecule_project,
+                filters.clone(),
+                &kind_selection,
+            ),
         );
 
         let announcements_fut = fetch_or_empty(
@@ -123,6 +127,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         &self,
         molecule_project: &MoleculeProject,
         filters: Option<MoleculeActivitiesFilters>,
+        kind_selection: &MoleculeActivityKindSelection,
     ) -> Result<MoleculeProjectActivityListing, MoleculeViewDataRoomActivitiesError> {
         // Get read access to the data room
         let data_room_reader = self
@@ -251,6 +256,10 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                 }
             };
 
+            if !kind_selection.includes_data_room_activity_type(activity_type) {
+                continue;
+            }
+
             nodes.push(MoleculeProjectActivity::DataRoomActivity(
                 MoleculeDataRoomActivity::from_data_room_operation(
                     offset,
@@ -322,27 +331,9 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
             },
         };
 
-        let entity_schemas = {
-            if let Some(by_kinds) = maybe_activities_filters
-                .as_ref()
-                .and_then(|f| f.by_kinds.as_deref())
-                && !by_kinds.is_empty()
-            {
-                let mut schemas = vec![];
-                if by_kinds.contains(&MoleculeActivityKind::DataRoomActivity) {
-                    schemas.push(activity_schema::SCHEMA_NAME);
-                }
-                if by_kinds.contains(&MoleculeActivityKind::Announcement) {
-                    schemas.push(announcement_schema::SCHEMA_NAME);
-                }
-                schemas
-            } else {
-                vec![
-                    activity_schema::SCHEMA_NAME,
-                    announcement_schema::SCHEMA_NAME,
-                ]
-            }
-        };
+        let entity_schemas = map_molecule_activity_kinds_to_search_schemas(
+            &MoleculeActivityKindSelection::from_filters(maybe_activities_filters.as_ref()),
+        );
 
         let filter = {
             let mut and_clauses = vec![];

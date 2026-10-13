@@ -24,6 +24,7 @@ use kamu_search::*;
 use crate::{
     MoleculeGlobalDataRoomActivitiesService,
     map_molecule_activities_filters_to_search,
+    map_molecule_activity_kinds_to_search_schemas,
     utils,
 };
 
@@ -61,15 +62,10 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             }
         }
 
-        let by_kinds = filters
-            .as_ref()
-            .and_then(|f| f.by_kinds.as_deref())
-            .unwrap_or(&[]);
+        let kind_selection = MoleculeActivityKindSelection::from_filters(filters.as_ref());
 
-        let fetch_data_room =
-            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::DataRoomActivity);
-        let fetch_announcements =
-            by_kinds.is_empty() || by_kinds.contains(&MoleculeActivityKind::Announcement);
+        let fetch_data_room = kind_selection.includes_data_room_activities();
+        let fetch_announcements = kind_selection.includes_announcements();
 
         if !fetch_data_room && !fetch_announcements {
             return Ok(MoleculeGlobalActivityListing::default());
@@ -77,7 +73,11 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
 
         let data_room_fut = fetch_or_empty(
             fetch_data_room,
-            self.global_data_room_activities_listing_from_source(molecule_subject, filters.clone()),
+            self.global_data_room_activities_listing_from_source(
+                molecule_subject,
+                filters.clone(),
+                &kind_selection,
+            ),
         );
 
         let announcements_fut = fetch_or_empty(
@@ -117,6 +117,7 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
         &self,
         molecule_subject: &LoggedAccount,
         filters: Option<MoleculeActivitiesFilters>,
+        kind_selection: &MoleculeActivityKindSelection,
     ) -> Result<MoleculeGlobalActivityListing, MoleculeViewGlobalActivitiesError> {
         // Get read access to global activities dataset
         let data_room_activities_reader = match self
@@ -159,6 +160,24 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             )?
         } else {
             df
+        };
+
+        let excluded_activity_types = kind_selection.excluded_data_room_activity_types();
+        let df = if excluded_activity_types.is_empty() {
+            df
+        } else {
+            use datafusion::logical_expr::{col, lit};
+
+            df.filter(
+                col("activity_type").in_list(
+                    excluded_activity_types
+                        .into_iter()
+                        .map(|activity_type| lit(activity_type.stored_value()))
+                        .collect(),
+                    true,
+                ),
+            )
+            .int_err()?
         };
 
         // Sorting will be done after merge
@@ -232,27 +251,9 @@ impl MoleculeViewGlobalActivitiesUseCaseImpl {
             },
         };
 
-        let entity_schemas = {
-            if let Some(by_kinds) = maybe_activities_filters
-                .as_ref()
-                .and_then(|f| f.by_kinds.as_deref())
-                && !by_kinds.is_empty()
-            {
-                let mut schemas = vec![];
-                if by_kinds.contains(&MoleculeActivityKind::DataRoomActivity) {
-                    schemas.push(activity_schema::SCHEMA_NAME);
-                }
-                if by_kinds.contains(&MoleculeActivityKind::Announcement) {
-                    schemas.push(announcement_schema::SCHEMA_NAME);
-                }
-                schemas
-            } else {
-                vec![
-                    activity_schema::SCHEMA_NAME,
-                    announcement_schema::SCHEMA_NAME,
-                ]
-            }
-        };
+        let entity_schemas = map_molecule_activity_kinds_to_search_schemas(
+            &MoleculeActivityKindSelection::from_filters(maybe_activities_filters.as_ref()),
+        );
 
         let maybe_filter = maybe_activities_filters.and_then(|filters| {
             let and_clauses = map_molecule_activities_filters_to_search(filters);
