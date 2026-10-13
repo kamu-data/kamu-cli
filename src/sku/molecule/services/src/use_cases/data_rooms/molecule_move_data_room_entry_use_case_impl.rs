@@ -105,7 +105,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
             })?;
 
         if let MoleculeUpdateDataRoomEntryResult::Success(success) = &result {
-            assert!(!success.inserted_records.is_empty());
+            assert_ne!(success.inserted_records, []);
             let last_inserted_record = &(success.inserted_records.last().unwrap().1);
 
             self.outbox

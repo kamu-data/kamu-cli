@@ -53,7 +53,15 @@ impl From<PushIngestError> for MoleculeAppendDataRoomActivityError {
             PushIngestError::Access(e) => Self::Access(e),
             PushIngestError::QuotaExceeded(e) => Self::QuotaExceeded(e),
             PushIngestError::Internal(e) => Self::Internal(e),
-            other => Self::Internal(other.int_err()),
+            PushIngestError::UnsupportedMediaType(_)
+            | PushIngestError::EngineError(_)
+            | PushIngestError::ReadError(_)
+            | PushIngestError::BadInputSchema(_)
+            | PushIngestError::IncompatibleSchema(_)
+            | PushIngestError::MergeError(_)
+            | PushIngestError::ExecutionError(_)
+            | PushIngestError::DataValidation(_)
+            | PushIngestError::CommitError(_) => Self::Internal(err.int_err()),
         }
     }
 }

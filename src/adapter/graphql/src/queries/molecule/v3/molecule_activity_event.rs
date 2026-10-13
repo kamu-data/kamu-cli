@@ -37,7 +37,7 @@ impl MoleculeActivityEvent {
         Self::Announcement(MoleculeActivityAnnouncement { announcement })
     }
 
-    #[expect(dead_code)]
+    #[expect(dead_code, reason = "API completeness")]
     pub fn data_room_entry(&self) -> Option<&MoleculeDataRoomEntry> {
         match self {
             Self::FileAdded(event) => Some(&event.entry),

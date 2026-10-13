@@ -431,7 +431,9 @@ impl MoleculeDataRoomMut {
             // Update happens in two records
             MoleculeDataRoomFileActivityType::Updated if inserted_records.len() == 2 => {}
             MoleculeDataRoomFileActivityType::Removed if inserted_records.len() == 1 => {}
-            _ => unreachable!(),
+            MoleculeDataRoomFileActivityType::Added
+            | MoleculeDataRoomFileActivityType::Updated
+            | MoleculeDataRoomFileActivityType::Removed => unreachable!(),
         }
 
         let molecule_subject = molecule_subject(ctx)?;

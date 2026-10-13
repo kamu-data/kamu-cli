@@ -140,7 +140,8 @@ impl MoleculeDatasetWriter {
             .await
             .map_err(|e| match e {
                 PushIngestDataError::Execution(e) => e,
-                e => PushIngestError::Internal(e.int_err()),
+                PushIngestDataError::Internal(e) => PushIngestError::Internal(e),
+                e @ PushIngestDataError::Planning(_) => PushIngestError::Internal(e.int_err()),
             })?;
 
         Ok(res)
@@ -160,7 +161,7 @@ pub struct MoleculeDatasetReader {
 }
 
 impl MoleculeDatasetReader {
-    #[expect(dead_code)]
+    #[expect(dead_code, reason = "API completeness")]
     pub(crate) fn read_checked_dataset(&self) -> &ReadCheckedDataset<'_> {
         &self.dataset
     }

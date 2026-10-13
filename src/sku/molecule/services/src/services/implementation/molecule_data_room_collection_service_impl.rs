@@ -342,7 +342,7 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
 
         match result {
             MoleculeUpdateDataRoomEntryResult::Success(mut success) => {
-                assert!(!success.inserted_records.is_empty());
+                assert_ne!(success.inserted_records, []);
 
                 let (op, last_inserted_record) = success.inserted_records.pop().unwrap();
                 assert_eq!(op, odf::metadata::OperationType::Append);

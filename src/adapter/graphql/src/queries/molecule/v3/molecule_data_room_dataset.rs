@@ -54,7 +54,10 @@ impl MoleculeDataRoom {
         &self.dataset
     }
 
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn latest(&self) -> Result<MoleculeDataRoomProjection<'_>> {
         Ok(MoleculeDataRoomProjection {
             project: &self.project,
@@ -62,7 +65,10 @@ impl MoleculeDataRoom {
         })
     }
 
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn as_of(
         &self,
         block_hash: Multihash<'static>,
@@ -296,7 +302,10 @@ impl MoleculeDataRoomEntry {
     }
     // <--
 
-    #[expect(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn as_versioned_file(&self) -> Result<MoleculeVersionedFile<'_>> {
         Ok(MoleculeVersionedFile::new(
             Cow::Borrowed(&self.entity),

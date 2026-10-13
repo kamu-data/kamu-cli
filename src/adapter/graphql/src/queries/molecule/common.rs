@@ -23,7 +23,7 @@ pub fn molecule_subject(ctx: &Context<'_>) -> Result<LoggedAccount> {
         {
             subj
         }
-        _ => {
+        CurrentAccountSubject::Logged(_) | CurrentAccountSubject::Anonymous(_) => {
             return Err(GqlError::Access(odf::AccessError::Unauthorized(
                 format!(
                     "Only accounts {} can provision projects",
