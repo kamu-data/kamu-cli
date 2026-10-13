@@ -108,6 +108,8 @@ members = [
     "src/odf/storage-inmem",
     "src/odf/storage-lfs",
     "src/odf/storage-s3",
+    "src/sku/molecule/domain",
+    "src/sku/molecule/services",
     "src/utils/async-utils",
     "src/utils/common-macros",
     "src/utils/container-runtime",
@@ -303,6 +305,10 @@ kamu-adapter-odata = { version = "0.270.0", path = "src/adapter/odata", default-
 kamu-adapter-resources-facade-graphql = { version = "0.270.0", path = "src/adapter/resources-facade-graphql", default-features = false }
 kamu-adapter-task-dataset = { version = "0.270.0", path = "src/adapter/task-dataset", default-features = false }
 kamu-adapter-task-webhook = { version = "0.270.0", path = "src/adapter/task-webhook", default-features = false }
+
+# SKU modules
+kamu-molecule-domain = { version = "0.270.0", path = "src/sku/molecule/domain", default-features = false }
+kamu-molecule-services = { version = "0.270.0", path = "src/sku/molecule/services", default-features = false }
 
 # E2E
 kamu-cli-e2e-common = { version = "0.270.0", path = "src/e2e/app/cli/common", default-features = false }

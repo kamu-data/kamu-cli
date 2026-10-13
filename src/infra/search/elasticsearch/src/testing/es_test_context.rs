@@ -19,7 +19,15 @@ use crate::{ElasticsearchClientConfig, ElasticsearchRepository, ElasticsearchRep
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static ELASTICSEARCH_CLIENT: OnceCell<Arc<ElasticsearchClient>> = OnceCell::const_new();
+// NOTE: We cache only the parsed config (which involves URL parsing, env
+// lookups and CA cert path resolution + file read), NOT the
+// `ElasticsearchClient` itself. `reqwest::Client` wraps a `hyper` connection
+// pool whose dispatcher task is spawned on whichever Tokio runtime called
+// `Client::build()`. Reusing it across different `#[tokio::test]` runtimes
+// causes `DispatchGone` ("runtime dropped the dispatch task") errors once the
+// originating runtime shuts down.
+static ELASTICSEARCH_CLIENT_CONFIG: OnceCell<Arc<ElasticsearchClientConfig>> =
+    OnceCell::const_new();
 
 const ENV_ELASTICSEARCH_URL: &str = "ELASTICSEARCH_URL";
 const ENV_ELASTICSEARCH_PASSWORD: &str = "ELASTICSEARCH_PASSWORD";
@@ -47,6 +55,46 @@ pub struct ElasticsearchTestContext {
 
 impl ElasticsearchTestContext {
     pub async fn new(_test_name: &str) -> Self {
+        // Reuse configuration across tests to avoid repeated env lookups,
+        // URL parsing, and CA cert path resolution.
+        let client_config = ELASTICSEARCH_CLIENT_CONFIG
+            .get_or_init(|| async { Arc::new(Self::load_client_config()) })
+            .await
+            .clone();
+
+        // Build a fresh client per test. `reqwest::Client` binds its
+        // connection-pool dispatcher to the current Tokio runtime, so sharing
+        // one across `#[tokio::test]` runtimes causes `DispatchGone` failures.
+        let client = Arc::new(ElasticsearchClient::init(&client_config).unwrap());
+
+        // Prepare repository config: this one is test-specific and not shared
+        let index_prefix = get_random_name(Some(INDEX_PREFIX_TEMPLATE), 10).to_ascii_lowercase();
+        let repo_config = ElasticsearchRepositoryConfig {
+            index_prefix: index_prefix.clone(),
+            embedding_dimensions: 1536,
+        };
+
+        // Manually build repository with predefined client and config
+        let mut catalog_builder = dill::CatalogBuilder::new();
+        catalog_builder.add_value(ElasticsearchRepository::with_predefined_client(
+            client_config,
+            Arc::new(repo_config),
+            client.clone(),
+        ));
+        catalog_builder.bind::<dyn SearchRepository, ElasticsearchRepository>();
+
+        let catalog = catalog_builder.build();
+        let search_repo = catalog.get_one::<ElasticsearchRepository>().unwrap();
+
+        Self {
+            catalog,
+            client,
+            search_repo,
+            index_prefix,
+        }
+    }
+
+    fn load_client_config() -> ElasticsearchClientConfig {
         // Read configuration from environment variables
         let es_url = std::env::var(ENV_ELASTICSEARCH_URL)
             .unwrap_or_else(|_| DEFAULT_ELASTICSEARCH_URL.to_string());
@@ -84,50 +132,12 @@ impl ElasticsearchTestContext {
                 }
             });
 
-        // Client config
-        let client_config = ElasticsearchClientConfig {
+        ElasticsearchClientConfig {
             url: es_url,
-            password: es_password.clone(),
+            password: es_password,
             ca_cert_pem_path: es_ca_cert_pem_path,
             timeout_secs: ELASTICSEARCH_TIMEOUT_SECS,
             enable_compression: false,
-        };
-
-        // Reuse client across tests to speed up execution
-        // (helps with `cargo test`, but not with `argo nextest run`)
-        let client = ELASTICSEARCH_CLIENT
-            .get_or_init(|| async {
-                // Initialize client
-                let client = ElasticsearchClient::init(&client_config).unwrap();
-                Arc::new(client)
-            })
-            .await
-            .clone();
-
-        // Prepare repository config: this one is test-specific and not shared
-        let index_prefix = get_random_name(Some(INDEX_PREFIX_TEMPLATE), 10).to_ascii_lowercase();
-        let repo_config = ElasticsearchRepositoryConfig {
-            index_prefix: index_prefix.clone(),
-            embedding_dimensions: 1536,
-        };
-
-        // Manually build repository with predefined client and config
-        let mut catalog_builder = dill::CatalogBuilder::new();
-        catalog_builder.add_value(ElasticsearchRepository::with_predefined_client(
-            Arc::new(client_config),
-            Arc::new(repo_config),
-            client.clone(),
-        ));
-        catalog_builder.bind::<dyn SearchRepository, ElasticsearchRepository>();
-
-        let catalog = catalog_builder.build();
-        let search_repo = catalog.get_one::<ElasticsearchRepository>().unwrap();
-
-        Self {
-            catalog,
-            client,
-            search_repo,
-            index_prefix,
         }
     }
 

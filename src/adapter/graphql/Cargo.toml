@@ -46,6 +46,7 @@ kamu-auth-web3 = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
+kamu-molecule-domain = { workspace = true }
 kamu-resources = { workspace = true }
 kamu-resources-facade = { workspace = true }
 kamu-search = { workspace = true }
@@ -131,8 +132,15 @@ kamu-datasets-services = { workspace = true, features = [
 ] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
+kamu-messaging-outbox-inmem = { workspace = true }
+kamu-molecule-services = { workspace = true }
 kamu-resources-inmem = { workspace = true }
 kamu-resources-services = { workspace = true }
+kamu-search-cache-inmem = { workspace = true }
+kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
+    "testing",
+] }
+kamu-search-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }

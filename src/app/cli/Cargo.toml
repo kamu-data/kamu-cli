@@ -113,6 +113,7 @@ kamu-flow-system-sqlite = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-messaging-outbox-postgres = { workspace = true }
 kamu-messaging-outbox-sqlite = { workspace = true }
+kamu-molecule-services = { workspace = true }
 kamu-resources = { workspace = true }
 kamu-resources-facade = { workspace = true }
 kamu-resources-inmem = { workspace = true }
