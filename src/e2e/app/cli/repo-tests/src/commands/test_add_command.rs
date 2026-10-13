@@ -293,7 +293,7 @@ pub async fn test_add_with_duplicate_dependencies(kamu: KamuCliPuppet) {
         .map(|dataset| dataset.name)
         .collect::<Vec<_>>();
 
-    assert!(dataset_names.is_empty());
+    assert_eq!(dataset_names, Vec::<odf::DatasetName>::new());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

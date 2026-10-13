@@ -13,7 +13,7 @@ use std::sync::Arc;
 use async_graphql::value;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
 use kamu_core::{PullResult, TenancyConfig};
-use kamu_datasets_services::testing::MockDatasetIncrementQueryService;
+use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_webhooks::*;

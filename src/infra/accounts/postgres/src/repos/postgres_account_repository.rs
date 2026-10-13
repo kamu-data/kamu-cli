@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::{PaginationOpts, TransactionRefT};
+use database_common::{PaginationOpts, TransactionRefT, sql_like_escape_literal};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
@@ -60,10 +60,11 @@ impl AccountRepository for PostgresAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
-                VALUES ($1, $2, $3, $4, ($5::text)::account_type, $6, $7, $8, $9)
+            INSERT INTO accounts (id, resource_id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES ($1, $2, $3, $4, $5, ($6::text)::account_type, $7, $8, $9, $10)
             "#,
             account_id_stack.as_str(),
+            *account.resource_id.as_ref(),
             account.account_name.as_str(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
@@ -75,15 +76,14 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    CreateAccountError::Duplicate(self.convert_unique_constraint_violation(e.as_ref()))
-                } else {
-                    CreateAccountError::Internal(e.int_err())
-                }
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                CreateAccountError::Duplicate(self.convert_unique_constraint_violation(db_err))
+            } else {
+                CreateAccountError::Internal(e.int_err())
             }
-            _ => CreateAccountError::Internal(e.int_err())
         })?;
 
         Ok(())
@@ -123,17 +123,14 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    UpdateAccountError::Duplicate(
-                        self.convert_unique_constraint_violation(e.as_ref()),
-                    )
-                } else {
-                    UpdateAccountError::Internal(e.int_err())
-                }
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                UpdateAccountError::Duplicate(self.convert_unique_constraint_violation(db_err))
+            } else {
+                UpdateAccountError::Internal(e.int_err())
             }
-            _ => UpdateAccountError::Internal(e.int_err()),
         })?;
 
         if update_result.rows_affected() == 0 {
@@ -169,17 +166,14 @@ impl AccountRepository for PostgresAccountRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) => {
-                if e.is_unique_violation() {
-                    UpdateAccountError::Duplicate(
-                        self.convert_unique_constraint_violation(e.as_ref()),
-                    )
-                } else {
-                    UpdateAccountError::Internal(e.int_err())
-                }
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                UpdateAccountError::Duplicate(self.convert_unique_constraint_violation(db_err))
+            } else {
+                UpdateAccountError::Internal(e.int_err())
             }
-            _ => UpdateAccountError::Internal(e.int_err()),
         })?;
 
         if update_result.rows_affected() == 0 {
@@ -208,6 +202,7 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id: _",
                 account_name,
                 email,
                 display_name,
@@ -253,6 +248,7 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id: _",
                 account_name,
                 email,
                 display_name,
@@ -287,6 +283,7 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id: _",
                 account_name,
                 email,
                 display_name,
@@ -436,11 +433,13 @@ impl AccountRepository for PostgresAccountRepository {
                 .iter()
                 .map(ToString::to_string)
                 .collect::<Vec<_>>();
+            let name_pattern = sql_like_escape_literal(name_pattern);
 
             let mut query_stream = sqlx::query_as!(
                 AccountRowModel,
                 r#"
                 SELECT id           AS "id: _",
+                       resource_id  AS "resource_id: _",
                        account_name,
                        email,
                        display_name,
@@ -450,8 +449,8 @@ impl AccountRepository for PostgresAccountRepository {
                        provider,
                        provider_identity_key
                 FROM accounts
-                WHERE (account_name ILIKE '%'||$1||'%'
-                    OR display_name ILIKE '%'||$1||'%')
+                WHERE (account_name ILIKE '%'||$1||'%' ESCAPE '\'
+                    OR display_name ILIKE '%'||$1||'%' ESCAPE '\')
                   AND id != ALL($4)
                 ORDER BY account_name
                 LIMIT $2 OFFSET $3
@@ -523,6 +522,7 @@ impl AccountRepository for PostgresAccountRepository {
             AccountRowModel,
             r#"
             SELECT id           AS "id: _",
+                   resource_id  AS "resource_id: _",
                    account_name,
                    email,
                    display_name,
@@ -580,6 +580,7 @@ impl ExpensiveAccountRepository for PostgresAccountRepository {
                 AccountRowModel,
                 r#"
                 SELECT id           AS "id: _",
+                       resource_id  AS "resource_id: _",
                        account_name,
                        email,
                        display_name,

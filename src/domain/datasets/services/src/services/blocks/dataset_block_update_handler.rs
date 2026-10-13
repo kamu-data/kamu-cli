@@ -37,7 +37,7 @@ use messaging_outbox::*;
     feeding_producers: &[
         MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Immediate,
+    consumption_mode: MessageConsumptionMode::Immediate,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct DatasetBlockUpdateHandler {

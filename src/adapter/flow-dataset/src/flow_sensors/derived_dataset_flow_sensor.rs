@@ -214,6 +214,68 @@ impl fs::FlowSensor for DerivedDatasetFlowSensor {
                 )
                 .await?;
             }
+
+            // An input's history was rewritten since the last transform run
+            TransformStatus::InputBreakingChange { breaking_inputs } => {
+                let dataset_id = FlowScopeDataset::new(&self.flow_scope).dataset_id();
+                let for_breaking_change = self.reactive_rule().for_breaking_change;
+                for breaking_input in &breaking_inputs {
+                    tracing::warn!(
+                        %dataset_id,
+                        input_dataset_id = %breaking_input.dataset_id,
+                        consumed_input_head = ?breaking_input.prev_block_hash,
+                        current_input_head = ?breaking_input.new_block_hash,
+                        ?for_breaking_change,
+                        "Derived dataset input no longer contains the block consumed by the last \
+                         transform",
+                    );
+                }
+
+                match for_breaking_change {
+                    fs::BreakingChangeRule::Recover => {
+                        tracing::info!(
+                            %dataset_id,
+                            num_breaking_inputs = breaking_inputs.len(),
+                            "Recovering from breaking input changes, triggering reset to metadata",
+                        );
+
+                        // One reset covers all broken inputs
+                        let breaking_input = breaking_inputs.into_iter().next().unwrap();
+                        let activation_cause = fs::FlowActivationCause::ResourceUpdate(
+                            fs::FlowActivationCauseResourceUpdate {
+                                activation_time,
+                                changes: fs::ResourceChanges::Breaking,
+                                resource_type: DATASET_RESOURCE_TYPE.to_string(),
+                                details: serde_json::to_value(DatasetResourceUpdateDetails {
+                                    dataset_id: breaking_input.dataset_id,
+                                    // Only chain heads are compared here, so the operation that
+                                    // rewrote the input (upstream flow, push, CLI) is unknown
+                                    source: DatasetUpdateSource::ExternallyDetectedChange,
+                                    new_head: breaking_input.new_block_hash.unwrap(),
+                                    old_head_maybe: breaking_input.prev_block_hash,
+                                })
+                                .int_err()?,
+                            },
+                        );
+
+                        let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
+                        self.run_reset_to_metadata_only(
+                            activation_time,
+                            &activation_cause,
+                            flow_run_service.as_ref(),
+                        )
+                        .await?;
+                    }
+                    fs::BreakingChangeRule::NoAction => {
+                        tracing::warn!(
+                            %dataset_id,
+                            num_breaking_inputs = breaking_inputs.len(),
+                            "Recovery from breaking input changes is disabled, transforms will \
+                             fail until the dataset is reset",
+                        );
+                    }
+                }
+            }
         }
 
         Ok(())

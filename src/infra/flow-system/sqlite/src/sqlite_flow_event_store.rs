@@ -10,11 +10,17 @@
 use std::num::NonZeroUsize;
 
 use chrono::{DateTime, Utc};
-use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    sqlite_datetime_text,
+    sqlite_generate_placeholders_list,
+};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::{QueryBuilder, Sqlite};
+use serde_json::json;
+use sqlx::{AssertSqlSafe, Sqlite};
 
 use crate::helpers::*;
 
@@ -148,14 +154,19 @@ impl SqliteFlowEventStore {
                     maybe_scheduled_for_activation_at = None;
                     reset_scheduled_for_activation_at = true;
                 }
-                _ => {
+                FlowEvent::Initiated(_)
+                | FlowEvent::StartConditionUpdated(_)
+                | FlowEvent::ConfigSnapshotModified(_)
+                | FlowEvent::RetryPolicyModified(_)
+                | FlowEvent::ActivationCauseAdded(_)
+                | FlowEvent::TaskRunning(_)
+                | FlowEvent::Completed(_) => {
                     reset_scheduled_for_activation_at = false;
                 }
             }
 
             if maybe_scheduled_for_activation_at.is_none() && !reset_scheduled_for_activation_at {
                 #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-                #[allow(dead_code)]
                 pub struct ActivationRow {
                     pub activation_time: Option<DateTime<Utc>>,
                 }
@@ -213,26 +224,38 @@ impl SqliteFlowEventStore {
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
         events: &[FlowEvent],
     ) -> Result<EventID, SaveEventsError> {
-        let mut query_builder = QueryBuilder::<sqlx::Sqlite>::new(
-            r#"
-            INSERT INTO flow_events (flow_id, event_time, event_type, event_payload)
-            "#,
-        );
-
-        query_builder.push_values(events, |mut b, event| {
-            let event_flow_id: i64 = (event.flow_id()).try_into().unwrap();
-            b.push_bind(event_flow_id);
-            b.push_bind(event.event_time());
-            b.push_bind(event.typename());
-            b.push_bind(serde_json::to_value(event).unwrap());
-        });
+        let events_json = serde_json::to_string(
+            &events
+                .iter()
+                .map(|event| {
+                    let event_flow_id: i64 = event.flow_id().try_into().unwrap();
+                    Ok(json!({
+                        "flow_id": event_flow_id,
+                        "event_time": sqlite_datetime_text(&event.event_time()),
+                        "event_type": event.typename(),
+                        "event_payload": serde_json::to_value(event).int_err()?.to_string(),
+                    }))
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        )
+        .int_err()?;
 
         let connection_mut = tr.connection_mut().await?;
-        query_builder
-            .build()
-            .fetch_all(connection_mut)
-            .await
-            .int_err()?;
+        sqlx::query!(
+            r#"
+            INSERT INTO flow_events (flow_id, event_time, event_type, event_payload)
+            SELECT value ->> 'flow_id',
+                   value ->> 'event_time',
+                   value ->> 'event_type',
+                   value ->> 'event_payload'
+            FROM json_each($1)
+            ORDER BY key
+            "#,
+            events_json,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
 
         let connection_mut = tr.connection_mut().await?;
         let actual_last_event_id =
@@ -260,7 +283,6 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 .await?;
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-            #[allow(dead_code)]
             pub struct EventModel {
                 pub event_id: i64,
                 pub event_payload: sqlx::types::JsonValue
@@ -305,7 +327,6 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 .await?;
 
             #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-            #[allow(dead_code)]
             pub struct EventModel {
                 pub event_id: i64,
                 pub event_payload: sqlx::types::JsonValue
@@ -372,7 +393,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
                 )
             );
 
-            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            let mut query = sqlx::query_as::<_, EventRow>(AssertSqlSafe(query_str));
             for flow_id in flow_ids {
                 query = query.bind(flow_id);
             }
@@ -435,7 +456,7 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
         Ok(last_event_id)
     }
 
-    async fn len(&self) -> Result<usize, InternalError> {
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -457,13 +478,11 @@ impl EventStore<FlowState> for SqliteFlowEventStore {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct NewFlow {
     pub flow_id: i64,
 }
 
 #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-#[allow(dead_code)]
 pub struct RunStatsRow {
     pub last_event_time: DateTime<Utc>,
 }
@@ -561,7 +580,6 @@ impl FlowEventStore for SqliteFlowEventStore {
         let mut tr = self.transaction.lock().await;
 
         #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-        #[allow(dead_code)]
         pub struct ActivationRow {
             pub activation_time: Option<DateTime<Utc>>,
         }
@@ -592,30 +610,46 @@ impl FlowEventStore for SqliteFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn get_flows_scheduled_for_activation_at(
+    async fn get_flows_due_for_activation(
         &self,
-        scheduled_for_activation_at: DateTime<Utc>,
-    ) -> Result<Vec<FlowID>, InternalError> {
+        up_to: DateTime<Utc>,
+        after: Option<DueFlowActivation>,
+        limit: usize,
+    ) -> Result<Vec<DueFlowActivation>, InternalError> {
+        let after_activation_time = after.map(|after| after.activation_time);
+        let after_flow_id: Option<i64> = after.map(|after| after.flow_id.try_into().unwrap());
+        let limit = i64::try_from(limit).unwrap();
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-        let flow_ids = sqlx::query!(
+        let due_flows = sqlx::query!(
             r#"
-            SELECT f.flow_id as flow_id
+            SELECT
+                f.flow_id as flow_id,
+                f.scheduled_for_activation_at as "activation_time!: DateTime<Utc>"
                 FROM flows f
                 WHERE
-                    f.scheduled_for_activation_at = $1 AND
-                    (f.flow_status = 'waiting' OR f.flow_status = 'retrying')
-                ORDER BY f.flow_id
+                    f.scheduled_for_activation_at <= $1 AND
+                    (f.flow_status = 'waiting' OR f.flow_status = 'retrying') AND
+                    ($2 IS NULL OR (f.scheduled_for_activation_at, f.flow_id) > ($2, $3))
+                ORDER BY f.scheduled_for_activation_at, f.flow_id
+                LIMIT $4
             "#,
-            scheduled_for_activation_at,
+            up_to,
+            after_activation_time,
+            after_flow_id,
+            limit,
         )
-        .map(|row| FlowID::try_from(row.flow_id).unwrap())
+        .map(|row| DueFlowActivation {
+            flow_id: FlowID::try_from(row.flow_id).unwrap(),
+            activation_time: row.activation_time,
+        })
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        Ok(flow_ids)
+        Ok(due_flows)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(flow_scope_query))]
@@ -688,7 +722,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .unwrap_or_default(),
             );
 
-            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(i32::from(maybe_by_flow_types.is_some()))
                 .bind(i32::from(maybe_by_flow_statuses.is_some()))
                 .bind(i32::from(maybe_initiators.is_some()))
@@ -792,7 +826,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
             .bind(i32::from(maybe_by_flow_types.is_some()))
             .bind(i32::from(maybe_by_flow_statuses.is_some()))
             .bind(i32::from(maybe_initiators.is_some()));
@@ -848,7 +882,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query_scalar::<_, String>(&query_str);
+            let mut query = sqlx::query_scalar::<_, String>(AssertSqlSafe(query_str));
             for value in scope_values {
                 query = query.bind(value);
             }
@@ -924,7 +958,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     .unwrap_or_default()
             );
 
-            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(i32::from(maybe_by_flow_types.is_some()))
                 .bind(i32::from(maybe_by_flow_statuses.is_some()))
                 .bind(i32::from(maybe_initiators.is_some()))
@@ -1022,7 +1056,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                 .unwrap_or_default()
         );
 
-        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
             .bind(i32::from(maybe_by_flow_types.is_some()))
             .bind(i32::from(maybe_by_flow_statuses.is_some()))
             .bind(i32::from(maybe_initiators.is_some()));
@@ -1091,7 +1125,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             )
         );
 
-        let mut query = sqlx::query_scalar::<_, serde_json::Value>(&query_str);
+        let mut query = sqlx::query_scalar::<_, serde_json::Value>(AssertSqlSafe(query_str));
 
         for scope_json in scope_json_parts {
             query = query.bind(scope_json);

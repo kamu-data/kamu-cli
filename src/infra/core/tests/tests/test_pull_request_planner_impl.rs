@@ -1005,16 +1005,15 @@ enum PullJob {
 
 impl PullJob {
     fn cmp_ref(lhs: &odf::DatasetRefAny, rhs: &odf::DatasetRefAny) -> bool {
-        #[allow(clippy::type_complexity)]
-        fn tuplify(
-            v: &odf::DatasetRefAny,
-        ) -> (
-            Option<&odf::DatasetID>,
-            Option<&url::Url>,
-            Option<&str>,
-            Option<&str>,
-            Option<&odf::DatasetName>,
-        ) {
+        type RefParts<'a> = (
+            Option<&'a odf::DatasetID>,
+            Option<&'a url::Url>,
+            Option<&'a str>,
+            Option<&'a str>,
+            Option<&'a odf::DatasetName>,
+        );
+
+        fn tuplify(v: &odf::DatasetRefAny) -> RefParts<'_> {
             match v {
                 odf::DatasetRefAny::ID(_, id) => (Some(id), None, None, None, None),
                 odf::DatasetRefAny::Url(url) => (None, Some(url), None, None, None),

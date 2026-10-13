@@ -207,7 +207,7 @@ impl std::fmt::Display for RouteOrUri<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async, reason = "axum handlers must be async")]
 pub async fn unknown_fallback_handler(
     request: axum::http::Request<axum::body::Body>,
 ) -> impl axum::response::IntoResponse {
@@ -223,7 +223,6 @@ pub async fn unknown_fallback_handler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::needless_pass_by_value)]
 pub fn panic_handler(_err: Box<dyn Any + Send + 'static>) -> Response<Body> {
     let body = Body::from(r#"{"error":"Internal Server Error"}"#);
     Response::builder()

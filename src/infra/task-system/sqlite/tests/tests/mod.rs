@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_sqlite_task_event_store;
+mod test_sqlite_task_queue_wakeup_source;

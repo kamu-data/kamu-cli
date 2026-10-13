@@ -7,9 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod test_flow_activation_link_repository;
 pub mod test_flow_configuration_event_store;
 pub mod test_flow_event_store;
 pub mod test_flow_trigger_event_store;
 
+mod flow_activation_links_backfill;
 mod flow_process_state;
+
+pub use flow_activation_links_backfill::*;
 pub use flow_process_state::*;

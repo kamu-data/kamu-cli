@@ -39,8 +39,8 @@ impl From<Account> for AccountResponse {
     get,
     path = "/accounts/me",
     responses(
-        (status = OK, body = AccountResponse),
-        (status = UNAUTHORIZED, body = ApiErrorResponse),
+        (status = OK, description = "current account", body = AccountResponse),
+        (status = UNAUTHORIZED, description = "not authenticated", body = ApiErrorResponse),
     ),
     tag = "kamu",
     security(
@@ -63,7 +63,7 @@ async fn get_account(catalog: &Catalog) -> Result<Json<AccountResponse>, ApiErro
         CurrentAccountSubject::Logged(account) => {
             let account_service = catalog.get_one::<dyn AccountService>().unwrap();
             match account_service
-                .try_get_account_by_id(&account.account_id)
+                .try_get_account_by_id(&account.account_handle.did)
                 .await?
             {
                 Some(full_account_info) => Ok(Json(full_account_info.into())),

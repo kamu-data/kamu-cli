@@ -319,6 +319,7 @@ pub async fn test_duplicate_github_account_name(catalog: &dill::Catalog) {
     assert_matches!(
         account_repo.save_account(&Account {
             id: odf::AccountID::new_generated_ed25519().1,
+            resource_id: Account::generate_resource_id(),
             ..make_test_account(
                 "wasya",
                 "wasya2@example.com", // different email
@@ -435,6 +436,10 @@ pub async fn test_duplicate_github_account_email(catalog: &dill::Catalog) {
 
     let duplicate_email_account = Account {
         id: odf::AccountID::new_generated_ed25519().1,
+        // Distinct resource id: otherwise the struct-update below would copy it
+        // from `account` and trip the resource_id unique constraint first,
+        // masking the email duplicate this test is about.
+        resource_id: Account::generate_resource_id(),
         account_name: odf::AccountName::new_unchecked("petya"),
         provider_identity_key: "petya".to_string(),
         ..account
@@ -454,6 +459,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &dill::Catalog) {
     fn account(account_name: &str, display_name: &str, email: &str) -> Account {
         Account {
             id: account_id(&account_name),
+            resource_id: Account::generate_resource_id(),
             account_name: odf::AccountName::new_unchecked(account_name),
             email: Email::parse(email).unwrap(),
             display_name: display_name.to_string(),
@@ -473,14 +479,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &dill::Catalog) {
         use futures::TryStreamExt;
 
         let accounts = repo
-            .search_accounts_by_name_pattern(
-                query,
-                filters,
-                PaginationOpts {
-                    limit: 20,
-                    offset: 0,
-                },
-            )
+            .search_accounts_by_name_pattern(query, filters, PaginationOpts::from_max_results(20))
             .try_collect::<Vec<_>>()
             .await
             .unwrap();
@@ -561,6 +560,83 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &dill::Catalog) {
             }
         )
         .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_accounts_by_name_pattern_special_chars(catalog: &dill::Catalog) {
+    // AccountName follows hostname grammar ([a-zA-Z0-9] + hyphens/dots), so '_',
+    // '%', and '\' can never appear in a stored account_name.  The only place
+    // these characters can actually occur is in display_name, which is free-form.
+    //
+    // This test therefore verifies that LIKE special characters in the search
+    // pattern are treated as literals when matched against display_name.  Without
+    // proper escaping:
+    //   '_' would match any single character → every account would match
+    //   '%' would match any substring        → every account would match
+    //
+    // Searching for '_' or '%' against account_name is intentionally NOT tested
+    // here: the grammar makes such stored values impossible, so the result is
+    // always empty regardless of escaping.
+    fn account(account_name: &str, display_name: &str, email: &str) -> Account {
+        Account {
+            id: account_id(&account_name),
+            resource_id: Account::generate_resource_id(),
+            account_name: odf::AccountName::new_unchecked(account_name),
+            email: Email::parse(email).unwrap(),
+            display_name: display_name.to_string(),
+            account_type: AccountType::User,
+            avatar_url: None,
+            registered_at: Utc::now(),
+            provider: AccountProvider::Password.to_string(),
+            provider_identity_key: account_name.to_string(),
+        }
+    }
+
+    async fn search(repo: &Arc<dyn AccountRepository>, query: &str) -> Vec<odf::AccountName> {
+        use futures::TryStreamExt;
+
+        let accounts = repo
+            .search_accounts_by_name_pattern(
+                query,
+                SearchAccountsByNamePatternFilters::default(),
+                PaginationOpts::from_max_results(20),
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap();
+
+        accounts.into_iter().map(|a| a.account_name).collect()
+    }
+
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    use odf::metadata::testing::{account_id, account_name as name};
+
+    // display_name is free-form and carries the special characters under test
+    let accounts = [
+        account("alice", "alice", "alice@example.com"),
+        account("bob", "bob_underscore", "bob@example.com"),
+        account("carol", "carol%percent", "carol@example.com"),
+    ];
+    for a in accounts {
+        account_repo.save_account(&a).await.unwrap();
+    }
+
+    // '_' must not be treated as a single-char wildcard → only bob's display_name
+    // contains a literal underscore
+    assert_eq!(
+        [name(&"bob")],
+        *search(&account_repo, "_").await,
+        "underscore must match literally in display_name, not as a wildcard"
+    );
+
+    // '%' must not be treated as a multi-char wildcard → only carol's display_name
+    // contains a literal percent sign
+    assert_eq!(
+        [name(&"carol")],
+        *search(&account_repo, "%").await,
+        "percent must match literally in display_name, not as a wildcard"
     );
 }
 

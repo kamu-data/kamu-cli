@@ -14,6 +14,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
@@ -442,7 +443,7 @@ pub struct ClassifyByAllowanceIdsResponse {
     )>,
 }
 
-#[cfg(any(feature = "testing", test))]
+#[cfg(feature = "testing")]
 impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
     fn from(v: ClassifyByAllowanceResponse) -> Self {
         Self {

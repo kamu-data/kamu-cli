@@ -467,9 +467,9 @@ fn hash_input(text: &str) -> [u8; 32] {
 fn create_mock_embedding(dims: usize) -> Vec<u8> {
     // Create a mock embedding as packed f32 values in little-endian
     let mut bytes = Vec::with_capacity(dims * 4);
-    #[allow(clippy::cast_precision_loss)]
+    let dims_f32 = f32::from(u16::try_from(dims).unwrap());
     for i in 0..dims {
-        let value = (i as f32) / (dims as f32);
+        let value = f32::from(u16::try_from(i).unwrap()) / dims_f32;
         bytes.extend_from_slice(&value.to_le_bytes());
     }
     bytes

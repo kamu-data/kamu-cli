@@ -548,7 +548,7 @@ where
             self.try_data_block_repo_lookup(|repo, dataset_id| async move {
                 repo.get_data_block_size(&dataset_id, hash)
                     .await
-                    .map(|size_opt| size_opt.map(|size| size as u64))
+                    .map(|size_opt| size_opt.map(|size| u64::try_from(size).unwrap()))
             }),
             self.metadata_chain.get_block_size(hash),
         )
@@ -702,7 +702,7 @@ where
         hint: odf::dataset::MetadataVisitorDecision,
     ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, odf::storage::GetBlockError> {
         // Guard against stopped hint
-        assert!(hint != odf::dataset::MetadataVisitorDecision::Stop);
+        assert_ne!(hint, odf::dataset::MetadataVisitorDecision::Stop);
 
         // Have we reached the tail? (if specified the boundary, otherwise Seed=0)
         let tail_sequence_number = tail_sequence_number.unwrap_or_default();

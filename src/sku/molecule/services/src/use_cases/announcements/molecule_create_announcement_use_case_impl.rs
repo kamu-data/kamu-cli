@@ -107,7 +107,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
 
         let global_announcements_writer = self
             .announcements_service
-            .global_writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
+            .global_writer(&molecule_subject.account_handle.name, true) // TODO: try to create once as start-up job?
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateAnnouncementError>)?;
 
@@ -158,7 +158,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
                         MoleculeAnnouncementMessage::published(
                             source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
-                            molecule_subject.account_id.clone(),
+                            molecule_subject.account_handle.did.clone(),
                             molecule_project.ocl_id.clone(),
                             project_announcement_record.payload,
                         ),

@@ -24,8 +24,12 @@ jobs:
             installer-vars: KAMU_LIBC=musl
             expected-target: x86_64-unknown-linux-musl
             expected-install-path: /home/runner/.local/bin/kamu
-          - name: MacOS / arm64
-            runs-on: macos-14
+          - name: MacOS 15 / arm64
+            runs-on: macos-15
+            expected-target: aarch64-apple-darwin
+            expected-install-path: /Users/runner/.local/bin/kamu
+          - name: MacOS 26 / arm64
+            runs-on: macos-26
             expected-target: aarch64-apple-darwin
             expected-install-path: /Users/runner/.local/bin/kamu
     name: Install via script (${{ matrix.name }})

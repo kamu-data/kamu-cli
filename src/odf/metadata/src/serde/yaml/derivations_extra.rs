@@ -13,40 +13,60 @@ use crate::serde::yaml as proxies;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<dtos::resource::ResourceSelector> for proxies::resource::ResourceSelector {
-    fn from(_v: dtos::resource::ResourceSelector) -> Self {
-        todo!()
+impl From<dtos::resources::ResourceSelector> for proxies::resources::ResourceSelector {
+    fn from(v: dtos::resources::ResourceSelector) -> Self {
+        let dtos::resources::ResourceSelector {
+            account,
+            id,
+            did,
+            r#type,
+            name,
+            labels,
+        } = v;
+        Self {
+            account: account.map(Into::into),
+            id,
+            did,
+            r#type,
+            name,
+            labels: labels.map(Into::into),
+        }
     }
 }
 
-impl TryFrom<proxies::resource::ResourceSelector> for dtos::resource::ResourceSelector {
+impl TryFrom<proxies::resources::ResourceSelector> for dtos::resources::ResourceSelector {
     type Error = ValidationError;
-    fn try_from(v: proxies::resource::ResourceSelector) -> Result<Self, Self::Error> {
-        let proxies::resource::ResourceSelector {
+    fn try_from(v: proxies::resources::ResourceSelector) -> Result<Self, Self::Error> {
+        let proxies::resources::ResourceSelector {
             account,
-            r#type: _,
-            id: _,
-            did: _,
-            name: _,
-            labels: _,
+            id,
+            did,
+            r#type,
+            name,
+            labels,
         } = v;
         Ok(Self {
             account: account.map(TryInto::try_into).transpose()?,
+            id,
+            did,
+            r#type,
+            name,
+            labels: labels.map(TryInto::try_into).transpose()?,
         })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<dtos::dataset::DatasetSelector> for proxies::dataset::DatasetSelector {
-    fn from(_v: dtos::dataset::DatasetSelector) -> Self {
+impl From<dtos::datasets::DatasetSelector> for proxies::datasets::DatasetSelector {
+    fn from(_v: dtos::datasets::DatasetSelector) -> Self {
         todo!()
     }
 }
 
-impl TryFrom<proxies::dataset::DatasetSelector> for dtos::dataset::DatasetSelector {
+impl TryFrom<proxies::datasets::DatasetSelector> for dtos::datasets::DatasetSelector {
     type Error = ValidationError;
-    fn try_from(_v: proxies::dataset::DatasetSelector) -> Result<Self, Self::Error> {
+    fn try_from(_v: proxies::datasets::DatasetSelector) -> Result<Self, Self::Error> {
         todo!()
     }
 }

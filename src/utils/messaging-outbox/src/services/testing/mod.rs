@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod dummy_outbox_impl;
-mod mock_outbox_impl;
 mod test_outbox_provider;
 
 pub use dummy_outbox_impl::*;
-pub use mock_outbox_impl::*;
 pub use test_outbox_provider::*;

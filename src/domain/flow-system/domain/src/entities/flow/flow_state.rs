@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::*;
 use kamu_task_system::{self as ts};
 
 use crate::*;
@@ -41,10 +40,11 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
-    /// Flow scheduled for the first time
-    pub first_scheduled_at: Option<DateTime<Utc>>,
-    /// Flow scheduled and will be activated at time
-    /// (different than first in case of retries)
+    /// First task scheduled; unlike the planned activation time, never moved
+    /// by manual runs, batching or retries
+    pub first_activated_at: Option<DateTime<Utc>>,
+    /// Planned activation time of the next attempt; moved by manual runs,
+    /// batching and retries
     pub scheduled_for_activation_at: Option<DateTime<Utc>>,
     /// Task scheduled and waiting for execution since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
@@ -57,6 +57,22 @@ pub struct FlowTimingRecords {
 }
 
 impl FlowState {
+    /// Nothing but the schedule asked for this flow
+    pub fn is_activated_by_schedule_only(&self) -> bool {
+        self.activation_causes
+            .iter()
+            .all(FlowActivationCause::is_auto_polling)
+    }
+
+    /// Someone asked to run this flow by hand, or it continues an ingest that
+    /// has more to fetch: such a flow runs as soon as throttling allows, and
+    /// may carry a configuration rule of its own
+    pub fn is_requested_on_demand(&self) -> bool {
+        self.activation_causes
+            .iter()
+            .any(FlowActivationCause::is_on_demand)
+    }
+
     /// Extract primary activation cause
     pub fn primary_activation_cause(&self) -> &FlowActivationCause {
         // At least 1 cause is initially defined for sure
@@ -80,10 +96,6 @@ impl FlowState {
         self.outcome
             .as_ref()
             .and_then(|outcome| outcome.try_task_result_as_ref())
-    }
-
-    pub fn can_schedule(&self) -> bool {
-        matches!(self.status(), FlowStatus::Waiting | FlowStatus::Retrying)
     }
 
     pub fn get_reactive_data_increment(
@@ -135,7 +147,7 @@ impl Projection for FlowState {
                     late_activation_causes: vec![],
                     start_condition: None,
                     timing: FlowTimingRecords {
-                        first_scheduled_at: None,
+                        first_activated_at: None,
                         scheduled_for_activation_at: None,
                         awaiting_executor_since: None,
                         running_since: None,
@@ -147,7 +159,16 @@ impl Projection for FlowState {
                     outcome: None,
                     retry_policy,
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::StartConditionUpdated(_)
+                | E::ConfigSnapshotModified(_)
+                | E::RetryPolicyModified(_)
+                | E::ActivationCauseAdded(_)
+                | E::ScheduledForActivation(_)
+                | E::TaskScheduled(_)
+                | E::TaskRunning(_)
+                | E::TaskFinished(_)
+                | E::Completed(_)
+                | E::Aborted(_) => Err(ProjectionError::new(None, event)),
             },
 
             (Some(s), event) => {
@@ -190,6 +211,16 @@ impl Projection for FlowState {
                         ..s
                     }),
 
+                    E::RetryPolicyModified(FlowEventRetryPolicyModified {
+                        retry_policy, ..
+                    }) => {
+                        if s.outcome.is_some() || !s.task_ids.is_empty() {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowState { retry_policy, ..s })
+                        }
+                    }
+
                     E::ActivationCauseAdded(FlowEventActivationCauseAdded {
                         ref activation_cause,
                         ..
@@ -222,13 +253,7 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
-                                    // First time: pick the time of scheduling
-                                    // After that, keep the previous value
-                                    first_scheduled_at: s
-                                        .timing
-                                        .first_scheduled_at
-                                        .or(Some(scheduled_for_activation_at)),
-
+                                    first_activated_at: s.timing.first_activated_at,
                                     scheduled_for_activation_at: Some(scheduled_for_activation_at),
                                     awaiting_executor_since: None,
                                     running_since: None,
@@ -240,13 +265,27 @@ impl Projection for FlowState {
                         }
                     }
 
-                    E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
+                    E::TaskScheduled(FlowEventTaskScheduled {
+                        event_time,
+                        task_id,
+                        ..
+                    }) => {
                         if s.outcome.is_some() || s.timing.scheduled_for_activation_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-                            Ok(FlowState { task_ids, ..s })
+                            Ok(FlowState {
+                                task_ids,
+                                timing: FlowTimingRecords {
+                                    first_activated_at: s
+                                        .timing
+                                        .first_activated_at
+                                        .or(Some(event_time)),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
                         }
                     }
 
@@ -309,7 +348,7 @@ impl Projection for FlowState {
                                     if let Some(next_attempt_at) = next_attempt_at {
                                         Ok(FlowState {
                                             timing: FlowTimingRecords {
-                                                first_scheduled_at: s.timing.first_scheduled_at,
+                                                first_activated_at: s.timing.first_activated_at,
                                                 // Next task will have to be scheduled
                                                 awaiting_executor_since: None,
                                                 // No longer running

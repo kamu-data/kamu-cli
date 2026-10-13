@@ -13,8 +13,6 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use async_utils::AsyncReadObj;
-use aws_sdk_s3::operation::get_object::GetObjectError;
-use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use bytes::Bytes;
 use internal_error::*;
@@ -94,11 +92,15 @@ where
 
         match self.s3_context.head_object(key).await {
             Ok(_) => Ok(true),
-            Err(err) => match err.into_service_error() {
+            Err(err) => {
+                let err = err.into_service_error();
                 // TODO: Detect credentials error
-                HeadObjectError::NotFound(_) => Ok(false),
-                err => return Err(err.int_err().into()),
-            },
+                if err.is_not_found() {
+                    Ok(false)
+                } else {
+                    return Err(err.int_err().into());
+                }
+            }
         }
     }
 
@@ -115,13 +117,17 @@ where
                     .ok_or_else(|| "S3 did not return content length".int_err())?,
             )
             .map_err(|err| err.int_err().into()),
-            Err(err) => match err.into_service_error() {
+            Err(err) => {
+                let err = err.into_service_error();
                 // TODO: Detect credentials error
-                HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {
-                    hash: hash.clone(),
-                })),
-                err => Err(err.int_err().into()),
-            },
+                if err.is_not_found() {
+                    Err(GetError::NotFound(ObjectNotFoundError {
+                        hash: hash.clone(),
+                    }))
+                } else {
+                    Err(err.int_err().into())
+                }
+            }
         }
     }
 
@@ -133,13 +139,17 @@ where
 
         let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
-            Err(err) => match err.into_service_error() {
+            Err(err) => {
+                let err = err.into_service_error();
                 // TODO: Detect credentials error
-                GetObjectError::NoSuchKey(_) => Err(GetError::NotFound(ObjectNotFoundError {
-                    hash: hash.clone(),
-                })),
-                err => return Err(err.int_err().into()),
-            },
+                if err.is_no_such_key() {
+                    Err(GetError::NotFound(ObjectNotFoundError {
+                        hash: hash.clone(),
+                    }))
+                } else {
+                    return Err(err.int_err().into());
+                }
+            }
         }?;
 
         // Allocate the exact sized buffer for the body
@@ -165,13 +175,17 @@ where
 
         let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
-            Err(err) => match err.into_service_error() {
+            Err(err) => {
+                let err = err.into_service_error();
                 // TODO: Detect credentials error
-                GetObjectError::NoSuchKey(_) => Err(GetError::NotFound(ObjectNotFoundError {
-                    hash: hash.clone(),
-                })),
-                err => return Err(err.int_err().into()),
-            },
+                if err.is_no_such_key() {
+                    Err(GetError::NotFound(ObjectNotFoundError {
+                        hash: hash.clone(),
+                    }))
+                } else {
+                    return Err(err.int_err().into());
+                }
+            }
         }?;
 
         let stream = resp.body.into_async_read();

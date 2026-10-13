@@ -93,7 +93,7 @@ impl Ord for DidPkh {
             .cmp(&other.caip10_account_id.chain_id.namespace)
         {
             Ordering::Equal => {}
-            res => return res,
+            res @ (Ordering::Less | Ordering::Greater) => return res,
         }
 
         match self
@@ -103,7 +103,7 @@ impl Ord for DidPkh {
             .cmp(&other.caip10_account_id.chain_id.reference)
         {
             Ordering::Equal => {}
-            res => return res,
+            res @ (Ordering::Less | Ordering::Greater) => return res,
         }
 
         self.caip10_account_id

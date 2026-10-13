@@ -93,6 +93,22 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_save_multiple_subscriptions_at_once,
+    harness = InMemoryWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_save_multiple_subscriptions_concurrent_modification,
+    harness = InMemoryWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryWebhookSubscriptionEventStoreHarness {
     catalog: Catalog,
 }

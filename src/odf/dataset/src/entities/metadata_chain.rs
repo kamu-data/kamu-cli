@@ -12,6 +12,7 @@ use std::fmt::Display;
 
 use ::serde::{Deserialize, Serialize};
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use internal_error::*;
 use odf_metadata::*;
 use odf_storage::*;
@@ -183,36 +184,27 @@ pub trait MetadataChainExt: MetadataChain {
         while let Some((_, block)) = block_stream.try_next().await.map_err(|err| match err {
             IterBlocksError::BlockNotFound(e) => GetIncrementError::BlockNotFound(e),
             IterBlocksError::InvalidInterval(e) => GetIncrementError::InvalidInterval(e),
-            _ => GetIncrementError::Internal(err.int_err()),
+            IterBlocksError::RefNotFound(_)
+            | IterBlocksError::BlockVersion(_)
+            | IterBlocksError::BlockMalformed(_)
+            | IterBlocksError::Access(_)
+            | IterBlocksError::Internal(_) => GetIncrementError::Internal(err.int_err()),
         })? {
             // Each block counts
             num_blocks += 1;
 
             // Count added records in data blocks
-            num_records += match &block.event {
-                MetadataEvent::AddData(add_data) => add_data
-                    .new_data
-                    .as_ref()
-                    .map(DataSlice::num_records)
-                    .unwrap_or_default(),
-                MetadataEvent::ExecuteTransform(execute_transform) => execute_transform
-                    .new_data
-                    .as_ref()
-                    .map(DataSlice::num_records)
-                    .unwrap_or_default(),
-                _ => 0,
-            };
+            let data_event = block.event.as_data_stream_event();
+            num_records += data_event
+                .as_ref()
+                .and_then(|e| e.new_data)
+                .map(DataSlice::num_records)
+                .unwrap_or_default();
 
             // If we haven't decided on the updated watermark yet, analyze watermarks
             if updated_watermark.is_none() {
                 // Extract watermark of this block, if present
-                let block_watermark = match &block.event {
-                    MetadataEvent::AddData(add_data) => add_data.new_watermark,
-                    MetadataEvent::ExecuteTransform(execute_transform) => {
-                        execute_transform.new_watermark
-                    }
-                    _ => None,
-                };
+                let block_watermark = data_event.and_then(|e| e.new_watermark.copied());
                 if let Some(block_watermark) = block_watermark {
                     // Did we have a watermark already since the start of scanning?
                     if let Some(latest_watermark_ref) = latest_watermark.as_ref() {
@@ -241,7 +233,7 @@ pub trait MetadataChainExt: MetadataChain {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
                 // Yes, so try locating the previous watermark containing node
-                let previous_nearest_watermark: Option<chrono::DateTime<chrono::Utc>> = self
+                let previous_nearest_watermark: Option<DateTime<Utc>> = self
                     .accept_one_by_hash(old_head, crate::SearchSingleDataBlockVisitor::next())
                     .await
                     .int_err()?
@@ -1108,7 +1100,7 @@ impl Display for OffsetsNotSequentialError {
 pub struct MetadataChainIncrementInterval {
     pub num_blocks: u64,
     pub num_records: u64,
-    pub updated_watermark: Option<chrono::DateTime<chrono::Utc>>,
+    pub updated_watermark: Option<DateTime<Utc>>,
 }
 
 impl std::ops::AddAssign for MetadataChainIncrementInterval {

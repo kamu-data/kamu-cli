@@ -26,8 +26,10 @@ use kamu_accounts::{
 };
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_http::DatasetAuthorizationLayer;
+use observability::axum::panic_handler;
 use rust_embed::RustEmbed;
 use serde::Serialize;
+use tower_http::catch_panic::CatchPanicLayer;
 use url::Url;
 use utoipa_axum::router::OpenApiRouter;
 
@@ -197,6 +199,9 @@ impl WebUIServer {
             .fallback(app_handler)
             .merge(kamu_adapter_http::data::root_router())
             .layer(kamu_adapter_http::AuthenticationLayer::new())
+            // Must stay inside the CORS layer: otherwise the 500 response lacks CORS headers and
+            // browsers report it as a network failure
+            .layer(CatchPanicLayer::custom(panic_handler))
             .layer(
                 tower_http::cors::CorsLayer::new()
                     .allow_origin(tower_http::cors::Any)

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use event_sourcing::*;
 
 use crate::*;
 
@@ -102,7 +101,10 @@ impl Projection for TaskState {
                         cancellation_requested_at: None,
                     },
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::TaskRunning(_)
+                | E::TaskRequeued(_)
+                | E::TaskCancelled(_)
+                | E::TaskFinished(_) => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
                 assert_eq!(s.task_id, event.task_id());
@@ -120,7 +122,9 @@ impl Projection for TaskState {
                             })
                         }
 
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        TaskStatus::Queued | TaskStatus::Running | TaskStatus::Finished => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     // Maybe be requeued when running, unless cancellation was requested
@@ -139,9 +143,20 @@ impl Projection for TaskState {
 
                     // May cancel in all states except finished or already cancelled
                     E::TaskCancelled(TaskEventCancelled { event_time, .. }) => match s.status() {
-                        TaskStatus::Queued | TaskStatus::Running
-                            if s.timing.cancellation_requested_at.is_none() =>
-                        {
+                        // Never taken by an executor, so nothing else would ever finish it
+                        TaskStatus::Queued if s.timing.cancellation_requested_at.is_none() => {
+                            Ok(Self {
+                                outcome: Some(TaskOutcome::Cancelled),
+                                timing: TaskTimingRecords {
+                                    cancellation_requested_at: Some(event_time),
+                                    finished_at: Some(event_time),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
+                        }
+                        // The executor finishes it, as a run cannot be interrupted
+                        TaskStatus::Running if s.timing.cancellation_requested_at.is_none() => {
                             Ok(Self {
                                 timing: TaskTimingRecords {
                                     cancellation_requested_at: Some(event_time),
@@ -150,7 +165,9 @@ impl Projection for TaskState {
                                 ..s
                             })
                         }
-                        _ => Err(ProjectionError::new(Some(s), event)),
+                        TaskStatus::Queued | TaskStatus::Running | TaskStatus::Finished => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
                     },
 
                     // May finish only if running

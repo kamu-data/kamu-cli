@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO task_events (task_id, event_time, event_type, event_payload)\n            SELECT value ->> 'task_id',\n                   value ->> 'event_time',\n                   value ->> 'event_type',\n                   value ->> 'event_payload'\n            FROM json_each($1)\n            ORDER BY key\n            RETURNING event_id AS \"event_id!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "event_id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "task_events",
+            "name": "event_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "6a5cca567b1b4a8da0a42ba2c9dfe6208190d4b3764eea9736f01205267f8574"
+}

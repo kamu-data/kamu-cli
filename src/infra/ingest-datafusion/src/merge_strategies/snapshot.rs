@@ -7,10 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::common::DFSchema;
+use datafusion::common::{DFSchema, TableReference};
 use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
-use datafusion::sql::TableReference;
 use internal_error::*;
 use odf::utils::data::DataFrameExt;
 
@@ -32,9 +31,9 @@ impl MergeStrategySnapshot {
         vocab: odf::metadata::DatasetVocabulary,
         cfg: odf::metadata::MergeStrategySnapshot,
     ) -> Self {
-        assert!(!cfg.primary_key.is_empty());
+        assert_ne!(cfg.primary_key.len(), 0);
         if let Some(c) = &cfg.compare_columns {
-            assert!(!c.is_empty());
+            assert_ne!(c.len(), 0);
         }
         Self {
             vocab,

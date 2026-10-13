@@ -37,7 +37,7 @@ use crate::search::indexers::{
     feeding_producers: &[
         MESSAGE_PRODUCER_MOLECULE_PROJECT_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct MoleculeProjectSearchUpdater {

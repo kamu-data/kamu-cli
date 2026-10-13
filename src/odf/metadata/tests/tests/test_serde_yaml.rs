@@ -17,13 +17,13 @@ use opendatafabric_metadata::auth::*;
 use opendatafabric_metadata::config::*;
 use opendatafabric_metadata::data::ext::*;
 use opendatafabric_metadata::data::*;
-use opendatafabric_metadata::dataset::*;
+use opendatafabric_metadata::datasets::*;
 use opendatafabric_metadata::errors::ValidationError;
 use opendatafabric_metadata::legacy::*;
-use opendatafabric_metadata::resource::*;
+use opendatafabric_metadata::resources::*;
 use opendatafabric_metadata::serde::yaml::IntoDto;
 use opendatafabric_metadata::serde::{yaml as serde, *};
-use opendatafabric_metadata::source::*;
+use opendatafabric_metadata::sources::*;
 use opendatafabric_metadata::*;
 use serde_json::json;
 
@@ -38,7 +38,7 @@ fn serde_enum_tagging() {
 
     // Check produces PascalCase tags on serialize
     assert_eq!(
-        serde_yaml::to_string(&serde::source::ReadStep::from(value.clone())).unwrap(),
+        serde_yaml::to_string(&serde::sources::ReadStep::from(value.clone())).unwrap(),
         indoc::indoc!(
             "
             kind: NdJson
@@ -48,7 +48,7 @@ fn serde_enum_tagging() {
     );
 
     // Check deserialize with exact tag match
-    let de_value: serde::source::ReadStep = serde_yaml::from_str(indoc::indoc!(
+    let de_value: serde::sources::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: NdJson
         encoding: utf-8
@@ -58,7 +58,7 @@ fn serde_enum_tagging() {
     assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check deserialize with old camelCase tag
-    let de_value: serde::source::ReadStep = serde_yaml::from_str(indoc::indoc!(
+    let de_value: serde::sources::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: ndJson
         encoding: utf-8
@@ -68,7 +68,7 @@ fn serde_enum_tagging() {
     assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check deserialize with lowercase tag
-    let de_value: serde::source::ReadStep = serde_yaml::from_str(indoc::indoc!(
+    let de_value: serde::sources::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: ndjson
         encoding: utf-8
@@ -78,7 +78,7 @@ fn serde_enum_tagging() {
     assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check rejects other case permutations
-    serde_yaml::from_str::<serde::source::ReadStep>(indoc::indoc!(
+    serde_yaml::from_str::<serde::sources::ReadStep>(indoc::indoc!(
         "
         kind: nDjson
         encoding: utf-8
@@ -96,7 +96,7 @@ fn serde_string_enum_names() {
 
     // Check produces PascalCase values on serialize as in spec schemas
     assert_eq!(
-        serde_yaml::to_string(&serde::source::SourceOrdering::from(value)).unwrap(),
+        serde_yaml::to_string(&serde::sources::SourceOrdering::from(value)).unwrap(),
         indoc::indoc!(
             "
             ByEventTime
@@ -105,7 +105,7 @@ fn serde_string_enum_names() {
     );
 
     // Can deserialize from camelCase
-    let de_value: serde::source::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
+    let de_value: serde::sources::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
         "
         byEventTime
         "
@@ -114,7 +114,7 @@ fn serde_string_enum_names() {
     assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Can deserialize from lowercase
-    let de_value: serde::source::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
+    let de_value: serde::sources::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
         "
         byeventtime
         "
@@ -123,7 +123,7 @@ fn serde_string_enum_names() {
     assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check rejects other case permutations
-    serde_yaml::from_str::<serde::source::SourceOrdering>(indoc::indoc!(
+    serde_yaml::from_str::<serde::sources::SourceOrdering>(indoc::indoc!(
         "
         bYeventtime
         "
@@ -363,7 +363,10 @@ fn serde_set_data_schema() {
 
 #[cfg(feature = "arrow")]
 #[test]
-#[expect(deprecated)]
+#[expect(
+    deprecated,
+    reason = "exercises the deprecated legacy format on purpose"
+)]
 fn serde_set_data_schema_legacy() {
     use arrow::datatypes::*;
 
@@ -665,11 +668,17 @@ fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
         metadata: vec![MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {
-                    dataset_ref: DatasetRef::try_from("b/com.naturalearthdata.10m.admin0").unwrap(),
+                    dataset_ref: datasets::legacy::DatasetRef::try_from(
+                        "b/com.naturalearthdata.10m.admin0",
+                    )
+                    .unwrap(),
                     alias: None,
                 },
                 TransformInput {
-                    dataset_ref: DatasetRef::try_from("c/com.naturalearthdata.50m.admin0").unwrap(),
+                    dataset_ref: datasets::legacy::DatasetRef::try_from(
+                        "c/com.naturalearthdata.50m.admin0",
+                    )
+                    .unwrap(),
                     alias: None,
                 },
             ],
@@ -883,7 +892,7 @@ fn serde_transform() {
         "
     );
 
-    let actual = serde_yaml::from_str::<serde::dataset::Transform>(data)
+    let actual = serde_yaml::from_str::<serde::datasets::Transform>(data)
         .unwrap()
         .into_dto()
         .unwrap();
@@ -905,7 +914,7 @@ fn serde_transform() {
     assert_eq!(expected, actual);
 
     assert_eq!(
-        serde_yaml::to_string(&serde::dataset::Transform::from(actual)).unwrap(),
+        serde_yaml::to_string(&serde::datasets::Transform::from(actual)).unwrap(),
         data
     );
 }
@@ -1015,7 +1024,7 @@ fn test_serde_resource_input_generics() {
     );
 
     // Read only header ignoring the rest
-    let val = serde_yaml::from_str::<serde::resource::ResourceInput<Ignore>>(data)
+    let val = serde_yaml::from_str::<serde::resources::ResourceInput<Ignore>>(data)
         .unwrap()
         .into_dto()
         .unwrap();
@@ -1030,6 +1039,7 @@ fn test_serde_resource_input_generics() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: Ignore,
         }
@@ -1037,7 +1047,7 @@ fn test_serde_resource_input_generics() {
 
     // Read & write typed spec
     let val = serde_yaml::from_str::<
-        serde::resource::ResourceInput<serde::config::SecretSetSpecInput>,
+        serde::resources::ResourceInput<serde::config::SecretSetSpecInput>,
     >(data)
     .unwrap()
     .into_dto()
@@ -1053,6 +1063,7 @@ fn test_serde_resource_input_generics() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: SecretSetSpecInput {
                 secrets: Secrets {
@@ -1069,7 +1080,7 @@ fn test_serde_resource_input_generics() {
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::ResourceInput::<
+        serde_yaml::to_string(&serde::resources::ResourceInput::<
             serde::config::SecretSetSpecInput,
         >::from(val))
         .unwrap(),
@@ -1077,7 +1088,7 @@ fn test_serde_resource_input_generics() {
     );
 
     // Read & write generic spec
-    let val = serde_yaml::from_str::<serde::resource::ResourceInput<serde_json::Value>>(data)
+    let val = serde_yaml::from_str::<serde::resources::ResourceInput<serde_json::Value>>(data)
         .unwrap()
         .into_dto()
         .unwrap();
@@ -1092,6 +1103,7 @@ fn test_serde_resource_input_generics() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: json!({
                 "secrets": {
@@ -1104,7 +1116,7 @@ fn test_serde_resource_input_generics() {
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::ResourceInput::<serde_json::Value>::from(
+        serde_yaml::to_string(&serde::resources::ResourceInput::<serde_json::Value>::from(
             val
         ))
         .unwrap(),
@@ -1146,7 +1158,7 @@ fn test_serde_resource_input_short_forms() {
         "#
     );
 
-    let val = serde_yaml::from_str::<serde::resource::ResourceInput<MySpec>>(data)
+    let val = serde_yaml::from_str::<serde::resources::ResourceInput<MySpec>>(data)
         .unwrap()
         .into_dto()
         .unwrap();
@@ -1163,6 +1175,7 @@ fn test_serde_resource_input_short_forms() {
                 account: Some("sergiimk".parse().unwrap()),
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: MySpec {
                 secrets: Secrets {
@@ -1185,7 +1198,7 @@ fn test_serde_resource_input_short_forms() {
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::ResourceInput::<MySpec>::from(val)).unwrap(),
+        serde_yaml::to_string(&serde::resources::ResourceInput::<MySpec>::from(val)).unwrap(),
         indoc!(
             r#"
             $schema: https://kamu.dev/schemas/core/v1/MyResource
@@ -1225,20 +1238,15 @@ fn test_serde_resource_input_refs() {
                 type: Dataset
                 account: bob
                 name: bobs-dataset
-          attributes:
-            - object: Dataset:bob/bobs-dataset # Short form of `{ type: Dataset, account: bob, name: bobs-dataset }`
-              name: allowPublicRead
-              value: true
         "#
     );
 
-    let val =
-        serde_yaml::from_str::<serde::resource::ResourceInput<serde::auth::RelationsSpecInput>>(
-            data,
-        )
-        .unwrap()
-        .into_dto()
-        .unwrap();
+    let val = serde_yaml::from_str::<
+        serde::resources::ResourceInput<serde::auth::RelationsSpecInput>,
+    >(data)
+    .unwrap()
+    .into_dto()
+    .unwrap();
 
     pretty_assertions::assert_eq!(
         val,
@@ -1250,6 +1258,7 @@ fn test_serde_resource_input_refs() {
                 account: None,
                 labels: None,
                 annotations: None,
+                owner_references: None,
             },
             spec: RelationsSpecInput {
                 relations: Some(vec![RelationInput {
@@ -1274,27 +1283,12 @@ fn test_serde_resource_input_refs() {
                         name: Some("bobs-dataset".parse().unwrap()),
                     },
                 }]),
-                attributes: Some(vec![AttributeInput {
-                    object: ResourceRef {
-                        account: Some(AccountRef {
-                            id: None,
-                            did: None,
-                            name: Some("bob".parse().unwrap()),
-                        }),
-                        r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
-                        id: None,
-                        did: None,
-                        name: Some("bobs-dataset".parse().unwrap()),
-                    },
-                    name: "allowPublicRead".to_string(),
-                    value: json!(true),
-                },],),
             },
         }
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::ResourceInput::<
+        serde_yaml::to_string(&serde::resources::ResourceInput::<
             serde::auth::RelationsSpecInput,
         >::from(val))
         .unwrap(),
@@ -1315,14 +1309,6 @@ fn test_serde_resource_input_refs() {
                     name: bob
                   type: Dataset
                   name: bobs-dataset
-              attributes:
-              - object:
-                  account:
-                    name: bob
-                  type: Dataset
-                  name: bobs-dataset
-                name: allowPublicRead
-                value: true
             "#
         )
     );
@@ -1337,7 +1323,7 @@ fn test_serde_resource_canonical() {
         r#"
         $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
         headers:
-          id: aa-12345
+          id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
           name: my-secret
           account:
             id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
@@ -1364,6 +1350,8 @@ fn test_serde_resource_canonical() {
         status:
           phase: Ready
           observedGeneration: 1
+          observedAt: 2026-01-01T00:00:00Z
+          reconciledGeneration: 1
           reconciledAt: 2026-01-01T00:00:00Z
           conditions:
             https://opendatafabric.org/core/v1/Bool:
@@ -1379,17 +1367,18 @@ fn test_serde_resource_canonical() {
         "#
     );
 
-    let val = serde_yaml::from_str::<serde::resource::Resource<serde::config::SecretSetSpec>>(data)
-        .unwrap()
-        .into_dto()
-        .unwrap();
+    let val =
+        serde_yaml::from_str::<serde::resources::Resource<serde::config::SecretSetSpec>>(data)
+            .unwrap()
+            .into_dto()
+            .unwrap();
 
     pretty_assertions::assert_eq!(
         val,
         Resource {
             schema: SecretSet::schema().clone(),
             headers: ResourceHeaders {
-                id: "aa-12345".parse().unwrap(),
+                id: "7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
                 account: AccountHandle {
                     id: "c27331ce-ce88-4ff9-8c5a-4ce8107cc03f".parse().unwrap(),
@@ -1408,6 +1397,7 @@ fn test_serde_resource_canonical() {
                         ("nested".parse().unwrap(), json!({"a": "x", "b": "y"}))
                     ])
                 },
+                owner_references: None,
                 generation: 1,
                 created_at: "2026-01-01T00:00:00Z".parse().unwrap(),
                 updated_at: "2026-01-01T00:00:00Z".parse().unwrap(),
@@ -1427,6 +1417,8 @@ fn test_serde_resource_canonical() {
             status: ResourceStatus {
                 phase: ResourcePhase::Ready,
                 observed_generation: Some(1),
+                observed_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+                reconciled_generation: Some(1),
                 reconciled_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
                 conditions: ResourceConditions {
                     entries: BTreeMap::from_iter([
@@ -1454,7 +1446,7 @@ fn test_serde_resource_canonical() {
 
     pretty_assertions::assert_eq!(
         serde_yaml::to_string(
-            &serde::resource::Resource::<serde::config::SecretSetSpec>::from(val.clone())
+            &serde::resources::Resource::<serde::config::SecretSetSpec>::from(val.clone())
         )
         .unwrap(),
         data
@@ -1464,7 +1456,7 @@ fn test_serde_resource_canonical() {
     let ival: ResourceInput<SecretSetSpecInput> = val.into();
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::ResourceInput::<
+        serde_yaml::to_string(&serde::resources::ResourceInput::<
             serde::config::SecretSetSpecInput,
         >::from(ival))
         .unwrap(),
@@ -1472,7 +1464,7 @@ fn test_serde_resource_canonical() {
             r#"
             $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
             headers:
-              id: aa-12345
+              id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
               name: my-secret
               account:
                 id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
@@ -1495,6 +1487,170 @@ fn test_serde_resource_canonical() {
             "#
         )
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_account_ref() {
+    let resource_id = ResourceID::new(uuid::Uuid::new_v4());
+    let did = AccountID::new_generated_ed25519().1;
+
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({ "did": did.to_string() }))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: Some(did.clone()),
+            name: None,
+        }
+    );
+
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({ "name": "alice" }))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }
+    );
+
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(
+            json!({ "id": resource_id.to_string(), "did": did.to_string(), "name": "alice" })
+        )
+        .unwrap()
+        .into_dto()
+        .unwrap(),
+        AccountRef {
+            id: Some(resource_id),
+            did: Some(did.clone()),
+            name: Some("alice".parse().unwrap()),
+        }
+    );
+
+    // All fields are optional: an empty object is valid and resolves to an
+    // unspecified reference (resolution failure, if any, happens downstream).
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({}))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: None,
+            name: None,
+        }
+    );
+
+    let both = AccountRef {
+        id: Some(resource_id),
+        did: Some(did),
+        name: Some("alice".parse().unwrap()),
+    };
+    let round_tripped: AccountRef =
+        serde_json::to_value(serde::auth::AccountRef::from(both.clone()))
+            .and_then(serde_json::from_value::<serde::auth::AccountRef>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+    assert_eq!(round_tripped, both);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `struct-or-string` routes a bare string through `FromStr`, so the short form
+// is only reachable in YAML if that impl is real — a stub would panic rather
+// than fail to compile.
+#[test]
+fn test_serde_resource_selector_short_form() {
+    let selector: ResourceSelector = serde_yaml::from_str::<
+        serde::StructOrString<serde::resources::ResourceSelector>,
+    >("SecretSet:alice/app-%")
+    .unwrap()
+    .0
+    .into_dto()
+    .unwrap();
+
+    assert_eq!(
+        selector.r#type.as_ref().map(TypeRef::as_str),
+        Some("SecretSet")
+    );
+    assert_eq!(selector.name.as_deref(), Some("app-%"));
+    assert_matches!(
+        selector.account,
+        Some(AccountRef { name: Some(ref n), .. }) if n.as_str() == "alice"
+    );
+
+    // A malformed short form must be a deserialization error, never a panic.
+    assert_matches!(
+        serde_yaml::from_str::<serde::StructOrString<serde::resources::ResourceSelector>>(
+            "not a selector"
+        ),
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Proxy conversions are hand-written (`rust.dtoType`) rather than generated, so
+// every field is asserted individually: a dropped one is silently discarded
+// instead of failing to compile.
+#[test]
+fn test_serde_resource_selector() {
+    let selector = ResourceSelector {
+        account: Some(AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }),
+        id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        did: None,
+        r#type: Some(TypeName::new_unchecked("SecretSet").into()),
+        name: Some("app-%".to_string()),
+        labels: Some(LabelFilter {
+            entries: [("environment".to_string(), json!("production"))]
+                .into_iter()
+                .collect(),
+        }),
+    };
+
+    let round_tripped: ResourceSelector =
+        serde_json::to_value(serde::resources::ResourceSelector::from(selector.clone()))
+            .and_then(serde_json::from_value::<serde::resources::ResourceSelector>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+
+    assert_eq!(round_tripped, selector);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `type` became optional when ODF adopted the type-less selector. A selector
+// that names no type must round-trip as `None` rather than failing the
+// now-absent required-field check.
+#[test]
+fn test_serde_resource_selector_without_type() {
+    let selector = ResourceSelector {
+        name: Some("app-%".to_string()),
+        ..Default::default()
+    };
+
+    let round_tripped: ResourceSelector =
+        serde_json::to_value(serde::resources::ResourceSelector::from(selector.clone()))
+            .and_then(serde_json::from_value::<serde::resources::ResourceSelector>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+
+    assert_eq!(round_tripped, selector);
+    assert!(round_tripped.r#type.is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

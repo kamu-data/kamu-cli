@@ -63,7 +63,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         // Gain write access to `projects` dataset
         let projects_writer = self
             .projects_service
-            .writer(&molecule_subject.account_name, true)
+            .writer(&molecule_subject.account_handle.name, true)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeCreateProjectError>)?;
 
@@ -102,7 +102,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         // Create a project account
         let molecule_account = self
             .account_service
-            .try_get_account_by_id(&molecule_subject.account_id)
+            .try_get_account_by_id(&molecule_subject.account_handle.did)
             .await?
             .unwrap();
 
@@ -176,7 +176,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         // Give maintainer permissions to molecule
         self.rebac_service
             .set_account_dataset_relation(
-                &molecule_subject.account_id,
+                &molecule_subject.account_handle.did,
                 kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
                 &data_room_create_res.dataset_handle.id,
             )
@@ -185,7 +185,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
 
         self.rebac_service
             .set_account_dataset_relation(
-                &molecule_subject.account_id,
+                &molecule_subject.account_handle.did,
                 kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
                 &announcements_create_res.dataset_handle.id,
             )
@@ -232,7 +232,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                         MoleculeProjectMessage::created(
                             source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
-                            molecule_subject.account_id.clone(),
+                            molecule_subject.account_handle.did.clone(),
                             project_account.id,
                             ocl_id,
                             symbol,

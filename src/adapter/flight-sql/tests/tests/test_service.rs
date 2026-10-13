@@ -15,8 +15,12 @@ use arrow_flight::sql::client::FlightSqlServiceClient;
 use datafusion::prelude::*;
 use futures::TryStreamExt;
 use indoc::indoc;
-use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::{Account, AuthenticationService, GetAccountInfoError};
+use kamu_accounts::{
+    Account,
+    AuthenticationService,
+    GetAccountInfoError,
+    MockAuthenticationService,
+};
 use kamu_adapter_flight_sql::*;
 use kamu_core::{MockQueryService, QueryService};
 use odf::utils::data::DataFrameExt;

@@ -16,22 +16,46 @@
               ]
             }
           }
+        },
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "entity_type"
+          }
         }
       },
       {
         "ordinal": 1,
         "name": "entity_id",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "entity_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "property_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "property_name"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "property_value",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "property_value"
+          }
+        }
       }
     ],
     "parameters": {

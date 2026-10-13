@@ -53,7 +53,7 @@ impl CachedBlocksRange {
     pub(crate) fn try_get_block_size(&self, hash: &odf::Multihash) -> Option<u64> {
         self.blocks_lookup
             .get(hash)
-            .map(|&idx| self.blocks[idx].2.len() as u64)
+            .map(|&idx| u64::try_from(self.blocks[idx].2.len()).unwrap())
     }
 
     pub(crate) fn try_get_original_block_payload(

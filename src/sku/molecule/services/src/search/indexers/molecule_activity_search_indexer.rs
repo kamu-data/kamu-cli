@@ -99,8 +99,8 @@ pub(crate) async fn index_activities(
     repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         "Indexing global activities for Molecule organization account",
     );
 
@@ -141,12 +141,14 @@ pub(crate) async fn index_activities(
             };
 
             // Serialize activity into search document
-            let document =
-                index_data_room_activity(&organization_account.account_id, &data_room_activity);
+            let document = index_data_room_activity(
+                &organization_account.account_handle.did,
+                &data_room_activity,
+            );
 
             // Generate unique ID using molecule_account_id and the activity's offset
             let id = activity_schema::unique_id_for_data_room_activity(
-                &organization_account.account_id,
+                &organization_account.account_handle.did,
                 data_room_activity.offset,
             );
 
@@ -171,8 +173,8 @@ pub(crate) async fn index_activities(
     }
 
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         indexed_documents_count = total_documents_count,
         "Indexed global activities for Molecule organization account",
     );

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE\n            FROM auth_rebac_relations\n            WHERE (subject_entity_type,\n                   subject_entity_id,\n                   object_entity_type,\n                   object_entity_id) IN (SELECT value ->> 'subject_entity_type',\n                                                value ->> 'subject_entity_id',\n                                                value ->> 'object_entity_type',\n                                                value ->> 'object_entity_id'\n                                         FROM json_each($1))\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "39192b8af66fb6a527ddbc2b54ebfcf0e5e43de7c4cb4049a32c48a3cf0333f6"
+}

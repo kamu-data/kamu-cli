@@ -9,7 +9,7 @@
 
 use kamu::SchemaServiceImpl;
 use kamu_core::SchemaService;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::MockDatasetActionAuthorizer;
 use tempfile::TempDir;
 use test_utils::LocalS3Server;
 

@@ -39,7 +39,7 @@ use crate::context::*;
 #[utoipa::path(
     get,
     path = "/",
-    responses((status = OK, body = String)),
+    responses((status = OK, description = "service document", body = String)),
     tag = "kamu-odata",
     security(
         (),
@@ -60,7 +60,7 @@ pub async fn odata_service_handler_st(
     params(
         ("account_name" = String, Path, description = "Account name")
     ),
-    responses((status = OK, body = String)),
+    responses((status = OK, description = "service document", body = String)),
     tag = "kamu-odata",
     security(
         (),
@@ -81,7 +81,7 @@ pub async fn odata_service_handler_mt(
 #[utoipa::path(
     get,
     path = "/$metadata",
-    responses((status = OK, body = String)),
+    responses((status = OK, description = "service metadata", body = String)),
     tag = "kamu-odata",
     security(
         (),
@@ -102,7 +102,7 @@ pub async fn odata_metadata_handler_st(
     params(
         ("account_name" = String, Path, description = "Account name")
     ),
-    responses((status = OK, body = String)),
+    responses((status = OK, description = "service metadata", body = String)),
     tag = "kamu-odata",
     security(
         (),
@@ -126,7 +126,7 @@ pub async fn odata_metadata_handler_mt(
     params(
         ("dataset_name" = String, Path, description = "Dataset name")
     ),
-    responses((status = OK, body = String)),
+    responses((status = OK, description = "collection entries", body = String)),
     tag = "kamu-odata",
     security(
         (),
@@ -151,7 +151,7 @@ pub async fn odata_collection_handler_st(
         ("account_name" = String, Path, description = "Account name"),
         ("dataset_name" = String, Path, description = "Dataset name"),
     ),
-    responses((status = OK, body = String)),
+    responses((status = OK, description = "collection entries", body = String)),
     tag = "kamu-odata",
     security(
         (),

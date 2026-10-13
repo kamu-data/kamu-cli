@@ -33,7 +33,10 @@ pub struct WebhookSenderImpl {
 #[component(pub)]
 #[interface(dyn WebhookSender)]
 impl WebhookSenderImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(webhook_config: Arc<WebhooksConfig>) -> Self {
         let timeout_setting = webhook_config.delivery_timeout.to_std().unwrap();
 

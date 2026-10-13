@@ -24,6 +24,7 @@ pub fn register_dependencies(
     catalog_builder.add::<FlowControllerResetToMetadata>();
 
     catalog_builder.add::<FlowDatasetsEventBridge>();
+    catalog_builder.add::<DatasetResourceUpstreamFlowExtractor>();
     if opts.with_default_transform_evaluator {
         catalog_builder.add::<TransformFlowEvaluatorImpl>();
     }

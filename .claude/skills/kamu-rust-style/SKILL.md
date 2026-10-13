@@ -1,0 +1,193 @@
+---
+name: kamu-rust-style
+description: Rust coding style for Kamu CLI — imports and paths, exhaustive matches without catch-all arms, numeric conversions, enum/string mappings with strum, formatting macros, module and file organization, visibility, re-exports, macros vs functions. Use before writing or editing any Rust code; the edit hook requires it for every .rs file.
+---
+
+# Kamu Rust Style
+
+Follow the style of the surrounding code first; the rules below settle what surrounding code
+leaves open. Layout belongs to the formatters — `rustfmt` for Rust, `cargo sort` and `taplo` for
+`Cargo.toml` — which the post-edit hook and `make fmt` both run. `make clippy` owns what lints can
+see. This skill owns the rest.
+
+## Rules
+
+### Imports and paths
+
+Import items with `use`; never spell out crate paths inline:
+
+```rust
+// No
+b.add::<wakeup_listener::WakeupListenerMetrics>();
+let name = kamu_flow_system::FLOW_AGENT_NAME;
+
+// Yes
+use kamu_flow_system::FLOW_AGENT_NAME;
+use wakeup_listener::WakeupListenerMetrics;
+b.add::<WakeupListenerMetrics>();
+```
+
+Qualify a name only to resolve a clash. Two exceptions:
+
+- **App wiring** (`src/app/cli/src/app.rs`, `database.rs`) integrates every crate, so it qualifies
+  components explicitly to show where each comes from.
+- **Open Data Fabric types are always written with the `odf::` prefix, never imported:**
+  `odf::DatasetID`, `odf::metadata::MetadataEvent`, `odf::dataset::MetadataChain`. The prefix marks
+  a protocol-level type at every use and keeps it apart from same-named Kamu types. Reach ODF
+  through the `odf` facade crate, not the `odf-*` sub-crates (code inside `src/odf/` aside).
+  Import from `odf` only what cannot be used qualified — extension traits needed for method
+  syntax (`use odf::utils::data::DataFrameExt;`) — and test helpers such as
+  `odf::metadata::testing::MetadataFactory`.
+
+```rust
+// No
+use odf::{DatasetAlias, DatasetID};
+fn resolve(id: &DatasetID) -> DatasetAlias { ... }
+
+// Yes
+fn resolve(id: &odf::DatasetID) -> odf::DatasetAlias { ... }
+```
+
+### Numeric conversions never use `as`
+
+`as` silently truncates, wraps or loses precision, and reads the same as a lossless conversion.
+Clippy pedantic enforces it between fixed-width types (`cast_possible_truncation`,
+`cast_sign_loss`, `cast_possible_wrap`, `cast_precision_loss`, `cast_lossless`); casts to and from
+`usize` are on review.
+
+| Conversion | Write |
+|---|---|
+| Lossless | `f64::from(x_u32)`, `i64::from(x_i32)`, `u64::from(x_u32)`, `usize::from(x_u8)` |
+| Narrowing | `usize::try_from(x).unwrap()` when overflow is a bug, or handle the error |
+| `usize` ↔ fixed width | `u64::try_from(v.len()).unwrap()` — no `From` exists because the width is platform-defined, and the pedantic lints do not flag `usize as u64`, so review must |
+| Time span to float | `chrono::TimeDelta::as_seconds_f64()`, `std::time::Duration::as_secs_f64()` — not `as f64` on integer milliseconds |
+| `char` ↔ bytes | `char::from(byte)`, `str::starts_with(c)`, `c.len_utf8()` — never `c as u8` |
+
+`as` stays the right tool where nothing is converted:
+
+- enum discriminants: `OperationType::Append as i32`, `{ Multicodec::Sha3_256 as u32 }` in const
+  generics;
+- sqlx type overrides inside `query!` arguments: `entity.entity_type as EntityType`;
+- unsizing coercions: `Arc::new(ds) as Arc<dyn Dataset>`.
+
+### Enum ↔ string mappings come from `strum`
+
+Derive `IntoStaticStr`, `Display`, `EnumString`, `EnumDiscriminants`, `EnumIter` instead of
+hand-written `match` arms (e.g. `FlowOutcome` → `FlowOutcomeKind` via `EnumDiscriminants`). A
+hand-written mapping drifts from the variants as they change.
+
+- Keep a manual mapping only when the strings are irregular.
+- Strings that are persisted or exported (DB values, metric labels, event type names) are data:
+  pin them with a test **before** converting a manual mapping to `strum`, so the conversion
+  cannot silently change them (see `kamu-renaming-a-concept`).
+
+### Matches on our enums are exhaustive — no catch-all `_` arm
+
+List every variant. A `_` (or a binding like `other =>`) arm turns adding a variant into a silent
+behaviour change: the new case falls into whatever the catch-all does, and nobody is asked. An
+exhaustive match turns it into a compile error at every site that must decide, which is exactly
+where review should happen.
+
+```rust
+// No — a new FlowStatus variant silently counts as "not finished"
+match status {
+    FlowStatus::Finished => true,
+    _ => false,
+}
+
+// Yes — a new variant fails to compile here until someone decides
+match status {
+    FlowStatus::Finished => true,
+    FlowStatus::Waiting | FlowStatus::Running | FlowStatus::Retrying => false,
+}
+```
+
+- Group variants that share an outcome with `|` rather than reaching for `_`.
+- The same applies to predicates: `matches!(status, A | B)` over an enum we own is a hidden
+  catch-all when the answer must be decided per variant — write the exhaustive `match`.
+- Error conversions are the most common case (see `kamu-domain-design`, "Error Handling").
+- Clippy enforces this (`wildcard_enum_match_arm`, `match_wildcard_for_single_variants`), on
+  foreign enums too.
+
+Code that intentionally handles one shape is not a catch-all — say so with the construct, not a
+`_` arm:
+
+| Situation | Write |
+|---|---|
+| Extract one variant or bail | `let Event::AddData(e) = &block.event else { return None; };` |
+| One guarded shape, otherwise a default | `if let Some(db_err) = e.as_database_error() && db_err.is_unique_violation() { … } else { … }` |
+| A yes/no test on a foreign enum | `matches!(…)`, `==`, or the type's own predicate (`err.is_no_such_key()`, `e.kind() == ErrorKind::NotFound`) |
+| A field shared by a few variants | an accessor that owns the match (`as_data_stream_event()`), or a narrower private enum so impossible cases cannot be expressed |
+
+`_` stays legitimate on integers, strings and other open domains. On a foreign enum where most
+variants are irrelevant (Arrow `DataType`, sqlparser AST, DataFusion errors), keep the `_` and
+mark it with `#[expect(clippy::wildcard_enum_match_arm, reason = "…")]` on the statement or
+function — listing dozens of foreign variants would break on every upgrade.
+
+### Lint suppressions are the last resort
+
+Fix the cause first: rename a keep-alive field to `_field`, prefix an unused parameter with `_`,
+take a reference, merge identical arms, use a checked conversion, delete dead code. Suppress only
+when the code is right and the lint cannot see why, and always with a reason
+(`clippy::allow_attributes_without_reason` enforces it):
+
+| Use | When |
+|---|---|
+| `#[expect(lint, reason = "...")]` | Default — it fails once the suppression is no longer needed |
+| `#[allow(lint, reason = "...")]` | Only when the lint fires in some builds but not others (`cfg`/feature-dependent code, macro templates expanded more than once, generated code) |
+
+`make clippy` builds with `--all-targets`, so a lint that fires only outside tests (a field read
+only by a `#[cfg(test)]` module) looks stale there. Before deleting a suppression that `#[expect]`
+reports as unfulfilled, check `cargo clippy --workspace` without `--all-targets`; if it fires
+there, it is cfg-dependent and takes `#[allow]`.
+
+Reasons that hold up: a framework contract (async-graphql resolvers and axum handlers are async,
+dill injects by value, mockall needs a named lifetime), wire or external names, a deliberate test
+of legacy behaviour, a value kept for `Debug` output or debugging. "Shorter" or "consistent with
+siblings" is not a reason. Ask the user before adding a new suppression (AGENTS.md, "Validation").
+
+### Formatting
+
+Inline captured identifiers: `format!("value={value}")`, not `format!("value={}", value)`.
+
+### Macros
+
+Keep macros declarative and thin. Algorithmic logic goes into ordinary functions or services the
+macro calls — macro bodies are hard to read, debug and test.
+
+### Module and file organization
+
+- Split conceptually distinct logic into its own module early, rather than growing a file until it
+  has to be broken up.
+- Order model files top-down: the highest-level result/union type first, then the structs and
+  enums it references, each type's `impl` blocks immediately after the type.
+- When a function repeats a logical section, extract a named helper for it if it represents a
+  coherent concept.
+
+### Visibility and re-exports
+
+- Default to the tightest visibility: private, then `pub(crate)`. Use `pub` only at a real crate
+  boundary.
+- Do not publicly re-export internal helper modules unless external consumers or macro expansion
+  truly require it.
+
+## Rejected approaches
+
+Do not re-propose these without new evidence.
+
+| Approach | Why it was rejected |
+|---|---|
+| `x as f64` / `x as usize` "because it is shorter" | Truncation and wrapping are silent; `From`/`try_from` make the intent and the failure mode explicit. |
+| Enabling `clippy::as_conversions` | A survey found ~190 hits, all lossless (discriminants, sqlx overrides, coercions) apart from `usize as u64`, which was fixed by hand: the pedantic `cast_*` lints catch every other lossy cast, so the lint would add dozens of `#[expect]`s for little gain. |
+| Inline crate paths to avoid touching the `use` block | Hides the file's dependencies; the `use` block is where a reader looks for them. |
+| Importing ODF types with `use odf::…` to shorten signatures | Loses the protocol-type marker and invites clashes with Kamu types of the same name. |
+| Hand-written `match` for enum ↔ string | Drifts from the variants; `strum` derives stay in sync. |
+| Catch-all `_` arm on an enum we own, "to keep the match short" | A new variant silently takes the fallback path instead of failing to compile where a decision is needed. |
+| Silencing a lint instead of fixing it, or without a `reason` | Hides the problem; most suppressions removed in the cleanup turned out to be fixable or stale. |
+
+## What lives elsewhere
+
+- Comments, doc comments, dividing lines: `kamu-prose-and-comments`.
+- Test structure and assertions: `kamu-test-harness`.
+- DI components and scopes: `kamu-dill-di`.
+- Error types and domain modelling: `kamu-domain-design`.

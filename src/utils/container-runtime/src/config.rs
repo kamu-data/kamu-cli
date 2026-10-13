@@ -36,6 +36,7 @@ impl Default for ContainerRuntimeConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Not derived with strum: `setty::Config` copies the enum without its derives
 #[derive(setty::Config, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContainerRuntimeType {
     Docker,

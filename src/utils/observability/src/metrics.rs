@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use prometheus::Encoder as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,6 +20,18 @@ pub trait MetricsProvider: Send + Sync {
     /// IMPORTANT: Metrics that you register must be static or live in the
     /// [`dill::Singleton`] scope.
     fn register(&self, reg: &prometheus::Registry) -> prometheus::Result<()>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Seconds between two moments, for duration metrics; 0 if `to` precedes `from`
+pub fn seconds_between(from: DateTime<Utc>, to: DateTime<Utc>) -> f64 {
+    (to - from).as_seconds_f64().max(0.0)
+}
+
+/// Unix time in seconds, for timestamp gauges
+pub fn unix_timestamp_seconds(at: DateTime<Utc>) -> f64 {
+    seconds_between(DateTime::UNIX_EPOCH, at)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +62,7 @@ pub async fn metrics_handler(axum::Extension(catalog): axum::Extension<dill::Cat
     metrics_handler_raw(axum::Extension(reg.as_ref().clone())).await
 }
 
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async, reason = "axum handlers must be async")]
 pub async fn metrics_handler_raw(
     axum::Extension(reg): axum::Extension<prometheus::Registry>,
 ) -> String {

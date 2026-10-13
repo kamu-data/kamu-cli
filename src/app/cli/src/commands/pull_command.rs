@@ -124,6 +124,9 @@ impl PullCommand {
             ingest_options: PollingIngestOptions {
                 fetch_uncacheable: self.fetch_uncacheable,
                 exhaust_sources: true,
+                // Left empty deliberately: env vars are per-dataset, and one
+                // `PullOptions` may cover many. `PullDatasetUseCaseImpl`
+                // resolves them per dataset at the ingest fan-out.
                 dataset_env_vars: HashMap::new(),
                 schema_inference: SchemaInferenceOpts::default(),
             },
@@ -219,13 +222,11 @@ impl PullCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for PullCommand {
-    #[allow(clippy::match_same_arms)]
     async fn run(&self) -> Result<(), CLIError> {
         match (self.refs.len(), self.recursive, self.all, &self.as_name) {
             (0, _, false, _) => Err(CLIError::usage_error("Specify a dataset or pass --all")),
             (0, false, true, None) => Ok(()),
-            (1, false, false, Some(_)) if self.refs.len() == 1 => Ok(()),
-            (1, false, false, None) if self.refs.len() == 1 => Ok(()),
+            (1, false, false, _) if self.refs.len() == 1 => Ok(()),
             (refs, _, false, None) if refs > 0 => Ok(()),
             _ => Err(CLIError::usage_error(
                 "Invalid combination of arguments".to_owned(),
@@ -455,7 +456,12 @@ impl PrettyIngestProgress {
     fn style_for_stage(&self, stage: PollingIngestStage) -> ProgressStyle {
         match stage {
             PollingIngestStage::Fetch => ProgressStyle::Bar,
-            _ => ProgressStyle::Spinner,
+            PollingIngestStage::CheckCache
+            | PollingIngestStage::Prepare
+            | PollingIngestStage::Read
+            | PollingIngestStage::Preprocess
+            | PollingIngestStage::Merge
+            | PollingIngestStage::Commit => ProgressStyle::Spinner,
         }
     }
 

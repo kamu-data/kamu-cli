@@ -6,22 +6,46 @@
       {
         "ordinal": 0,
         "name": "model_id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "model_id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "input_hash",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "input_hash"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "input_text",
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "input_text"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "embedding",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "embedding"
+          }
+        }
       }
     ],
     "parameters": {

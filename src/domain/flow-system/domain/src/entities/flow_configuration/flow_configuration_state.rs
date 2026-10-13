@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::*;
-
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,7 +51,7 @@ impl Projection for FlowConfigurationState {
                     status: FlowConfigurationStatus::Active,
                     retry_policy,
                 }),
-                _ => Err(ProjectionError::new(None, event)),
+                E::Modified(_) | E::ScopeRemoved(_) => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
                 assert_eq!(&s.flow_binding, event.flow_binding());
@@ -68,6 +66,7 @@ impl Projection for FlowConfigurationState {
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowConfigurationState {
                             rule: rule.clone(),
+                            status: FlowConfigurationStatus::Active,
                             retry_policy: *retry_policy,
                             ..s
                         })

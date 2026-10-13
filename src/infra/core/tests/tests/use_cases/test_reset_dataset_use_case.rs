@@ -12,8 +12,7 @@ use std::sync::Arc;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::ResolvedDataset;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_matches;
 

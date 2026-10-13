@@ -17,7 +17,28 @@ use crate::{ScanMetadataError, SourceNotFoundError};
 pub struct WriterSourceEventVisitor<'a> {
     maybe_source_name: Option<&'a str>,
     next_block_flags: Flag,
-    maybe_source_event: Option<odf::MetadataEvent>,
+    maybe_source_event: Option<SourceEvent>,
+}
+
+enum SourceEvent {
+    Polling(odf::metadata::SetPollingSource),
+    Push(odf::metadata::AddPushSource),
+}
+
+impl SourceEvent {
+    fn merge_strategy(&self) -> &odf::metadata::MergeStrategy {
+        match self {
+            Self::Polling(e) => &e.merge,
+            Self::Push(e) => &e.merge,
+        }
+    }
+
+    fn into_metadata_event(self) -> odf::MetadataEvent {
+        match self {
+            Self::Polling(e) => e.into(),
+            Self::Push(e) => e.into(),
+        }
+    }
 }
 
 impl<'a> WriterSourceEventVisitor<'a> {
@@ -41,11 +62,7 @@ impl<'a> WriterSourceEventVisitor<'a> {
     ) -> Result<(Option<odf::MetadataEvent>, odf::metadata::MergeStrategy), ScanMetadataError> {
         let merge_strategy = match (&self.maybe_source_event, self.maybe_source_name) {
             // Source found
-            (Some(e), _) => match e {
-                odf::MetadataEvent::SetPollingSource(e) => Ok(e.merge.clone()),
-                odf::MetadataEvent::AddPushSource(e) => Ok(e.merge.clone()),
-                _ => unreachable!(),
-            },
+            (Some(e), _) => Ok(e.merge_strategy().clone()),
             // No source defined - assuming append strategy
             (None, None) => Ok(odf::metadata::MergeStrategy::Append(
                 odf::metadata::MergeStrategyAppend {},
@@ -57,7 +74,11 @@ impl<'a> WriterSourceEventVisitor<'a> {
             )),
         }?;
 
-        Ok((self.maybe_source_event, merge_strategy))
+        Ok((
+            self.maybe_source_event
+                .map(SourceEvent::into_metadata_event),
+            merge_strategy,
+        ))
     }
 
     fn handle_set_polling_source(
@@ -72,7 +93,7 @@ impl<'a> WriterSourceEventVisitor<'a> {
             .into());
         }
 
-        self.maybe_source_event = Some(e.clone().into());
+        self.maybe_source_event = Some(SourceEvent::Polling(e.clone()));
 
         Ok(())
     }
@@ -86,10 +107,10 @@ impl<'a> WriterSourceEventVisitor<'a> {
                 if self.maybe_source_name.is_none()
                     || self.maybe_source_name == Some(e.source_name.as_str())
                 {
-                    self.maybe_source_event = Some(e.clone().into());
+                    self.maybe_source_event = Some(SourceEvent::Push(e.clone()));
                 }
             }
-            Some(odf::MetadataEvent::AddPushSource(s)) if s.source_name == e.source_name => {
+            Some(SourceEvent::Push(s)) if s.source_name == e.source_name => {
                 // Encountered previous definition of the same source - the
                 // one found first takes precedence
             }

@@ -14,8 +14,7 @@ use tokio::process::{Child, Command};
 
 pub struct IpfsDaemon {
     temp_dir: tempfile::TempDir,
-    #[allow(dead_code)]
-    process: Child,
+    _process: Child,
 }
 
 impl IpfsDaemon {
@@ -54,7 +53,10 @@ impl IpfsDaemon {
             .spawn()
             .unwrap();
 
-        let this = Self { temp_dir, process };
+        let this = Self {
+            temp_dir,
+            _process: process,
+        };
 
         // Yuck: re-using wait-for-socket functionality
         let container_runtime = container_runtime::ContainerRuntime::default();

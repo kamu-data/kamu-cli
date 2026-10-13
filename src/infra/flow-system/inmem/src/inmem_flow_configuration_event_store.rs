@@ -62,8 +62,8 @@ impl InMemoryFlowConfigurationEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore {
-    async fn len(&self) -> Result<usize, InternalError> {
-        self.inner.len().await
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
+        self.inner.total_events_stored().await
     }
 
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowConfigurationEvent> {
@@ -76,6 +76,13 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
         opts: GetEventsOpts,
     ) -> EventStream<'_, FlowConfigurationEvent> {
         self.inner.get_events(query, opts)
+    }
+
+    fn get_events_multi(
+        &self,
+        queries: &[FlowBinding],
+    ) -> MultiEventStream<'_, FlowBinding, FlowConfigurationEvent> {
+        self.inner.get_events_multi(queries)
     }
 
     async fn save_events(
@@ -110,6 +117,40 @@ impl EventStore<FlowConfigurationState> for InMemoryFlowConfigurationEventStore 
         // ignore local event ID in the inner store
         Ok(global_event_id)
     }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<FlowBinding, FlowConfigurationEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Prepare data for FlowSystemEventStore - a merged stream per item
+        let merge_event_data_per_item: Vec<_> = items
+            .iter()
+            .map(|item| {
+                FlowEventDataHelper::prepare_merge_event_data(
+                    &item.events,
+                    FlowConfigurationEvent::event_time,
+                )
+            })
+            .collect();
+
+        // Save events to this store, all or nothing
+        self.inner.save_events_multi(items).await?;
+
+        // Save merged events to FlowSystemEventStore, returning global event IDs
+        Ok(merge_event_data_per_item
+            .iter()
+            .map(|merge_event_data| {
+                self.flow_system_event_store.save_events(
+                    FlowSystemEventSourceType::FlowConfiguration,
+                    merge_event_data,
+                )
+            })
+            .collect())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,7 +172,12 @@ impl FlowConfigurationEventStore for InMemoryFlowConfigurationEventStore {
                 continue;
             }
 
-            active_bindings.push(flow_binding.clone());
+            match event {
+                FlowConfigurationEvent::Created(_) | FlowConfigurationEvent::Modified(_) => {
+                    active_bindings.push(flow_binding.clone());
+                }
+                FlowConfigurationEvent::ScopeRemoved(_) => {}
+            }
         }
 
         // Convert into stream

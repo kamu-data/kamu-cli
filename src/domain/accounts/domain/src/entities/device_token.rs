@@ -31,7 +31,9 @@ impl DeviceToken {
                     token_last_used_at: None,
                 })
             }
-            _ => panic!("Cannot add token params part to a token that already has one"),
+            DeviceToken::DeviceCodeWithIssuedToken(_) => {
+                panic!("Cannot add token params part to a token that already has one")
+            }
         }
     }
 

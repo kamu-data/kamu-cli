@@ -11,5 +11,7 @@
 pub use kamu_task_system as domain;
 
 mod inmem_task_event_store;
+mod inmem_task_queue_wakeup_source;
 
 pub use inmem_task_event_store::*;
+pub use inmem_task_queue_wakeup_source::*;

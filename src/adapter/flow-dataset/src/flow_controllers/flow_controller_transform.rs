@@ -49,7 +49,7 @@ impl fs::FlowController for FlowControllerTransform {
     async fn ensure_flow_sensor(
         &self,
         flow_binding: &fs::FlowBinding,
-        activation_time: DateTime<Utc>,
+        activation: fs::FlowSensorActivation,
         reactive_rule: fs::ReactiveRule,
     ) -> Result<(), InternalError> {
         // Check if a sensor for this scope already exists
@@ -73,7 +73,7 @@ impl fs::FlowController for FlowControllerTransform {
         let sensor = DerivedDatasetFlowSensor::new(&dataset_id, reactive_rule);
 
         self.flow_sensor_dispatcher
-            .register_sensor(&self.catalog, activation_time, Arc::new(sensor))
+            .register_sensor(&self.catalog, activation, Arc::new(sensor))
             .await?;
 
         Ok(())

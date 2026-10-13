@@ -7,7 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::{EventID, EventStore, EventStoreStateImpl, GetEventsOpts, InMemoryEventStore};
+use event_sourcing::{
+    EventID,
+    EventStore,
+    EventStoreStateImpl,
+    GetEventsOpts,
+    InMemoryEventStore,
+    MultiEventStream,
+    SaveEventsError,
+    SaveEventsItem,
+};
 use internal_error::InternalError;
 
 use crate::domain::*;
@@ -52,6 +61,13 @@ impl EventStore<AccountQuotaState> for InMemoryAccountQuotaEventStore {
         self.inner.get_events(query, opts)
     }
 
+    fn get_events_multi(
+        &self,
+        queries: &[AccountQuotaQuery],
+    ) -> MultiEventStream<'_, AccountQuotaQuery, AccountQuotaEvent> {
+        self.inner.get_events_multi(queries)
+    }
+
     async fn save_events(
         &self,
         query: &AccountQuotaQuery,
@@ -63,8 +79,15 @@ impl EventStore<AccountQuotaState> for InMemoryAccountQuotaEventStore {
             .await
     }
 
-    async fn len(&self) -> Result<usize, InternalError> {
-        self.inner.len().await
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<AccountQuotaQuery, AccountQuotaEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        self.inner.save_events_multi(items).await
+    }
+
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
+        self.inner.total_events_stored().await
     }
 }
 

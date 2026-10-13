@@ -6,12 +6,24 @@
       {
         "ordinal": 0,
         "name": "downstream_dataset_id: _",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_dependencies",
+            "name": "downstream_dataset_id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "upstream_dataset_id: _",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_dependencies",
+            "name": "upstream_dataset_id"
+          }
+        }
       }
     ],
     "parameters": {

@@ -71,7 +71,10 @@ macro_rules! typed_search_single_typed_block_visitor_impl {
         pub struct $name {}
 
         impl $name {
-            #[expect(clippy::new_ret_no_self)]
+            #[expect(
+                clippy::new_ret_no_self,
+                reason = "the macro builds a named constructor for a generic visitor"
+            )]
             pub fn new() -> SearchSingleTypedBlockVisitor<$event_struct> {
                 SearchSingleTypedBlockVisitor::new($block_type_flags)
             }
@@ -86,7 +89,10 @@ macro_rules! typed_kind_based_search_single_typed_block_visitor_impl {
         pub struct $name {}
 
         impl $name {
-            #[expect(clippy::new_ret_no_self)]
+            #[expect(
+                clippy::new_ret_no_self,
+                reason = "the macro builds a named constructor for a generic visitor"
+            )]
             pub fn new(
                 actual_dataset_kind: DatasetKind,
             ) -> DatasetKindBasedVisitor<SearchSingleTypedBlockVisitor<$event_struct>, Infallible>
@@ -455,7 +461,15 @@ impl MetadataChainVisitor for SearchActivePushSourcesVisitor {
                 self.disabled_push_source_names
                     .insert(disable_push_source.source_name.clone());
             }
-            _ => {
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::SetDataSchema(_) => {
                 unreachable!()
             }
         }
@@ -506,7 +520,10 @@ impl MetadataChainVisitor for SearchActivePollingSourceVisitor {
     }
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        #[expect(clippy::match_same_arms)]
+        #[expect(
+            clippy::match_same_arms,
+            reason = "push and polling arms carry separate explanations"
+        )]
         match &block.event {
             MetadataEvent::AddPushSource(_) | MetadataEvent::DisablePushSource(_) => {
                 // > Push and polling sources are mutually exclusive.
@@ -524,7 +541,15 @@ impl MetadataChainVisitor for SearchActivePollingSourceVisitor {
             MetadataEvent::DisablePollingSource(_) => {
                 // No active one exists
             }
-            _ => unreachable!(),
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::SetDataSchema(_) => unreachable!(),
         }
 
         Ok(Decision::Stop)

@@ -329,11 +329,39 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
+        let deletion_result = self
+            .delete_dataset_entries(&[Cow::Borrowed(dataset_id)])
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetEntriesError::Internal(e) => DeleteEntryDatasetError::Internal(e),
+            })?;
+
+        if deletion_result.deleted_dataset_ids.is_empty() {
+            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+        }
+
+        Ok(())
+    }
+
+    async fn delete_dataset_entries<'a>(
+        &self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<DatasetEntriesDeletionResult, DeleteDatasetEntriesError> {
+        if dataset_ids.is_empty() {
+            return Ok(DatasetEntriesDeletionResult::default());
+        }
+
+        let mut deleted_dataset_ids = Vec::new();
+
         {
             let mut writable_state = self.state.write().await;
 
-            let maybe_removed_entry = writable_state.rows.remove(dataset_id);
-            if let Some(removed_entry) = maybe_removed_entry {
+            for dataset_id in dataset_ids {
+                let maybe_removed_entry = writable_state.rows.remove(dataset_id.as_ref());
+                let Some(removed_entry) = maybe_removed_entry else {
+                    continue;
+                };
+
                 writable_state
                     .rows_by_owner
                     .get_mut(&removed_entry.owner_id)
@@ -345,19 +373,26 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
                 {
                     owned_by_name.remove(&removed_entry.name);
                 }
-            } else {
-                return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+
+                deleted_dataset_ids.push(removed_entry.id);
             }
         }
 
-        for listener in &self.removal_listeners {
-            listener
-                .on_dataset_entry_removed(dataset_id)
-                .await
-                .int_err()?;
+        let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(
+            dataset_ids,
+            deleted_dataset_ids,
+        );
+
+        if !deletion_result.deleted_dataset_ids.is_empty() {
+            for listener in &self.removal_listeners {
+                listener
+                    .on_dataset_entries_removed(&deletion_result.deleted_dataset_ids)
+                    .await
+                    .int_err()?;
+            }
         }
 
-        Ok(())
+        Ok(deletion_result)
     }
 }
 

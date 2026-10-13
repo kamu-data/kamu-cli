@@ -171,7 +171,16 @@ impl VerificationListener for VerificationProgress {
             VerificationError::DataNotReproducible(..) => {
                 "Validation error (data is not reproducible)".to_string()
             }
-            _ => "Error during transformation".to_string(),
+            VerificationError::DatasetNotFound(_)
+            | VerificationError::RefNotFound(_)
+            | VerificationError::BlockNotFound(_)
+            | VerificationError::BlockVersion(_)
+            | VerificationError::BlockMalformed(_)
+            | VerificationError::InvalidInterval(_)
+            | VerificationError::CheckpointDoesNotMatchMetadata(_)
+            | VerificationError::VerifyTransform(_)
+            | VerificationError::Access(_)
+            | VerificationError::Internal(_) => "Error during transformation".to_string(),
         };
         self.curr_progress.finish_with_message(self.spinner_message(
             s.block_index + 1,

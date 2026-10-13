@@ -20,6 +20,7 @@ use kamu_flow_system::*;
 #[interface(dyn FlowQueryService)]
 pub struct FlowQueryServiceImpl {
     flow_event_store: Arc<dyn FlowEventStore>,
+    flow_activation_link_repository: Arc<dyn FlowActivationLinkRepository>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -115,6 +116,35 @@ impl FlowQueryService for FlowQueryServiceImpl {
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
         Ok(flow.into())
+    }
+
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_get_flows, skip_all, fields(?flow_ids))]
+    async fn get_flows(&self, flow_ids: &[FlowID]) -> Result<Vec<FlowState>, InternalError> {
+        let mut flow_states = Vec::with_capacity(flow_ids.len());
+
+        for res in Flow::try_load_multi(flow_ids, self.flow_event_store.as_ref()).await {
+            match res {
+                Ok(flow) => flow_states.push(flow.into()),
+                Err(LoadError::NotFound(e)) => {
+                    tracing::warn!(flow_id = %e.query, "Skipping a flow that does not exist");
+                }
+                Err(e @ (LoadError::ProjectionError(_) | LoadError::Internal(_))) => {
+                    return Err(e.int_err());
+                }
+            }
+        }
+
+        Ok(flow_states)
+    }
+
+    #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_get_downstream_links, skip_all, fields(%upstream_flow_id))]
+    async fn get_downstream_links(
+        &self,
+        upstream_flow_id: FlowID,
+    ) -> Result<Vec<FlowActivationLink>, InternalError> {
+        self.flow_activation_link_repository
+            .get_downstream_links(&[upstream_flow_id])
+            .await
     }
 }
 

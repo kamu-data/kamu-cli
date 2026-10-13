@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use kamu_flow_system::*;
+use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,6 +19,7 @@ use time_source::SystemTimeSource;
 pub struct FlowConfigurationServiceImpl {
     event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +31,12 @@ impl FlowConfigurationServiceImpl {
     pub fn new(
         event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
+        outbox: Arc<dyn Outbox>,
     ) -> Self {
         Self {
             event_store,
             time_source,
+            outbox,
         }
     }
 }
@@ -48,7 +52,9 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_binding, self.event_store.as_ref()).await?;
-        Ok(maybe_flow_configuration.map(Into::into))
+        Ok(maybe_flow_configuration
+            .filter(|flow_configuration| flow_configuration.is_active())
+            .map(Into::into))
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
@@ -68,25 +74,36 @@ impl FlowConfigurationService for FlowConfigurationServiceImpl {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref()).await?;
 
+        let now = self.time_source.now();
         let mut flow_configuration = match maybe_flow_configuration {
             // Modification
             Some(mut flow_configuration) => {
                 flow_configuration
-                    .modify_configuration(self.time_source.now(), rule, retry_policy)
+                    .modify_configuration(now, rule, retry_policy)
                     .int_err()?;
 
                 flow_configuration
             }
             // New configuration
-            None => {
-                FlowConfiguration::new(self.time_source.now(), flow_binding, rule, retry_policy)
-            }
+            None => FlowConfiguration::new(now, flow_binding, rule, retry_policy),
         };
 
         flow_configuration
             .save(self.event_store.as_ref())
             .await
             .int_err()?;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_FLOW_CONFIGURATION_SERVICE,
+                FlowConfigurationUpdatedMessage {
+                    event_time: now,
+                    flow_binding: flow_configuration.flow_binding.clone(),
+                    rule: flow_configuration.rule.clone(),
+                    retry_policy: flow_configuration.retry_policy,
+                },
+            )
+            .await?;
 
         Ok(flow_configuration.into())
     }
@@ -126,23 +143,27 @@ impl FlowScopeRemovalHandler for FlowConfigurationServiceImpl {
     async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
         let flow_bindings = self.event_store.all_bindings_for_scope(flow_scope).await?;
 
-        for flow_binding in flow_bindings {
-            let maybe_flow_configuration =
-                FlowConfiguration::try_load(&flow_binding, self.event_store.as_ref())
-                    .await
-                    .int_err()?;
+        let now = self.time_source.now();
 
-            if let Some(mut flow_configuration) = maybe_flow_configuration {
-                flow_configuration
-                    .notify_scope_removed(self.time_source.now())
-                    .int_err()?;
-
-                flow_configuration
-                    .save(self.event_store.as_ref())
-                    .await
-                    .int_err()?;
+        let mut flow_configurations = Vec::with_capacity(flow_bindings.len());
+        for load_result in
+            FlowConfiguration::try_load_multi(&flow_bindings, self.event_store.as_ref()).await
+        {
+            match load_result {
+                Ok(mut flow_configuration) => {
+                    flow_configuration.notify_scope_removed(now).int_err()?;
+                    flow_configurations.push(flow_configuration);
+                }
+                Err(LoadError::NotFound(_)) => {}
+                Err(e @ (LoadError::ProjectionError(_) | LoadError::Internal(_))) => {
+                    return Err(e.int_err());
+                }
             }
         }
+
+        FlowConfiguration::save_multi(&mut flow_configurations, self.event_store.as_ref())
+            .await
+            .int_err()?;
 
         Ok(())
     }

@@ -20,6 +20,7 @@ pub struct AccountMut {
     account: Account,
 }
 
+/// Mutations of a single account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AccountMut {
@@ -38,7 +39,8 @@ impl AccountMut {
         )
     }
 
-    /// Update account name
+    /// Update account name.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_rename, skip_all)]
     pub async fn rename(
         &self,
@@ -66,7 +68,8 @@ impl AccountMut {
         }
     }
 
-    /// Update account email
+    /// Update account email.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_update_email, skip_all)]
     pub async fn update_email(
         &self,
@@ -95,7 +98,8 @@ impl AccountMut {
         }
     }
 
-    /// Reset password for a selected account. Allowed only for admin users
+    /// Reset password for a selected account.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_modify_password, skip_all)]
     async fn modify_password(
         &self,
@@ -121,7 +125,8 @@ impl AccountMut {
         }
     }
 
-    /// Change password with confirmation
+    /// Change password with confirmation.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_modify_password_with_confirmation, skip_all)]
     async fn modify_password_with_confirmation(
         &self,
@@ -151,7 +156,8 @@ impl AccountMut {
         }
     }
 
-    /// Delete a selected account. Allowed only for admin users
+    /// Delete a selected account.
+    /// Allowed only to the account itself and to administrators.
     #[tracing::instrument(level = "info", name = AccountMut_delete, skip_all)]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteAccountResult> {
         // This operation is not allowed in single-tenant mode
@@ -168,22 +174,36 @@ impl AccountMut {
         }
     }
 
-    /// Access to the mutable flow configurations of this account
-    #[expect(clippy::unused_async)]
+    /// Access to the mutable flow configurations of this account.
+    /// Available only to the account itself.
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut<'_>> {
         utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
 
         Ok(AccountFlowsMut::new(&self.account))
     }
 
-    /// Access to the mutable flow configurations of this account
-    #[expect(clippy::unused_async)]
-    async fn access_tokens(&self) -> Result<AccountAccessTokensMut<'_>> {
+    /// Access to the access token management of this account.
+    /// Available only to the account itself.
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
+    async fn access_tokens(&self, ctx: &Context<'_>) -> Result<AccountAccessTokensMut<'_>> {
+        utils::check_logged_account_id_match(ctx, &self.account.id)?;
+
         Ok(AccountAccessTokensMut::new(&self.account))
     }
 
-    /// Access to the mutable quotas of this account
-    #[expect(clippy::unused_async)]
+    /// Access to the mutable quotas of this account.
+    /// Changes are allowed only to administrators.
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn quotas(&self) -> Result<AccountQuotasMut<'_>> {
         Ok(AccountQuotasMut::new(&self.account))
     }
@@ -193,8 +213,13 @@ impl AccountMut {
 // RenameAccountResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of renaming an account
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum RenameAccountResult {
     Success(RenameAccountSuccess),
     NonUniqueName(RenameAccountNameNotUnique),
@@ -202,14 +227,17 @@ pub enum RenameAccountResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was renamed
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct RenameAccountSuccess {
+    /// New name of the account
     pub new_name: String,
 }
 
 #[ComplexObject]
 impl RenameAccountSuccess {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Account renamed".to_string()
     }
@@ -217,8 +245,10 @@ impl RenameAccountSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was not renamed: the new name is already taken
 #[derive(SimpleObject, Debug)]
 pub struct RenameAccountNameNotUnique {
+    /// Human-readable outcome message
     message: String,
 }
 
@@ -234,8 +264,13 @@ impl Default for RenameAccountNameNotUnique {
 // UpdateEmailResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of updating an account email
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum UpdateEmailResult {
     Success(UpdateEmailSuccess),
     NonUniqueEmail(UpdateEmailNonUnique),
@@ -243,14 +278,17 @@ pub enum UpdateEmailResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account email was updated
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct UpdateEmailSuccess {
+    /// New email of the account
     pub new_email: String,
 }
 
 #[ComplexObject]
 impl UpdateEmailSuccess {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -258,8 +296,10 @@ impl UpdateEmailSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Email was not updated: it is already used by another account
 #[derive(SimpleObject, Debug)]
 pub struct UpdateEmailNonUnique {
+    /// Human-readable outcome message
     message: String,
 }
 
@@ -275,8 +315,13 @@ impl Default for UpdateEmailNonUnique {
 // ModifyPasswordResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of changing an account password
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "&String"))]
+#[graphql(field(
+    name = "message",
+    ty = "&String",
+    desc = "Human-readable outcome message"
+))]
 pub enum ModifyPasswordResult {
     Success(ModifyPasswordSuccess),
     WrongOldPassword(ModifyPasswordWrongOldPassword),
@@ -284,8 +329,10 @@ pub enum ModifyPasswordResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Password was changed
 #[derive(SimpleObject)]
 pub struct ModifyPasswordSuccess {
+    /// Human-readable outcome message
     pub message: String,
 }
 
@@ -297,8 +344,10 @@ impl Default for ModifyPasswordSuccess {
     }
 }
 
+/// Password was not changed: the old password is wrong
 #[derive(SimpleObject)]
 pub struct ModifyPasswordWrongOldPassword {
+    /// Human-readable outcome message
     pub message: String,
 }
 
@@ -314,16 +363,23 @@ impl Default for ModifyPasswordWrongOldPassword {
 // DeleteAccountResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of deleting an account
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum DeleteAccountResult {
     Success(DeleteAccountSuccess),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was deleted
 #[derive(SimpleObject)]
 pub struct DeleteAccountSuccess {
+    /// Human-readable outcome message
     message: String,
 }
 

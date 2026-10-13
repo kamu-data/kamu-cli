@@ -21,6 +21,7 @@ pub struct DatasetEndpoints<'a> {
     config: Arc<ServerUrlConfig>,
 }
 
+/// Ways to access a dataset over the supported protocols
 #[Object]
 impl<'a> DatasetEndpoints<'a> {
     #[graphql(skip)]
@@ -49,7 +50,11 @@ impl<'a> DatasetEndpoints<'a> {
         self.dataset_request_state.dataset_name().as_str()
     }
 
-    #[expect(clippy::unused_async)]
+    /// Link to the dataset page in the web UI
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn web_link(&self) -> Result<LinkProtocolDesc> {
         let url = format!(
             "{}{}/{}",
@@ -61,7 +66,11 @@ impl<'a> DatasetEndpoints<'a> {
         Ok(LinkProtocolDesc { url })
     }
 
-    #[expect(clippy::unused_async)]
+    /// Commands to pull and push the dataset with the kamu CLI
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn cli(&self) -> Result<CliProtocolDesc> {
         let url = format!(
             "odf+{}{}",
@@ -79,7 +88,11 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// REST API endpoints for the dataset
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn rest(&self) -> Result<RestProtocolDesc> {
         let dataset_base_url = format!(
             "{}{}",
@@ -102,14 +115,22 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// Arrow Flight SQL endpoint
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn flightsql(&self) -> Result<FlightSqlDesc> {
         Ok(FlightSqlDesc {
             url: self.config.protocols.base_url_flightsql.to_string(),
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// JDBC connection URL
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn jdbc(&self) -> Result<JdbcDesc> {
         let mut url = self.config.protocols.base_url_flightsql.clone();
 
@@ -120,28 +141,44 @@ impl<'a> DatasetEndpoints<'a> {
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// PostgreSQL protocol endpoint, currently a placeholder
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn postgresql(&self) -> Result<PostgreSqlDesl> {
         Ok(PostgreSqlDesl {
             url: "- coming soon -".to_string(),
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// Kafka protocol endpoint, currently a placeholder
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn kafka(&self) -> Result<KafkaProtocolDesc> {
         Ok(KafkaProtocolDesc {
             url: "- coming soon -".to_string(),
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// WebSocket endpoint, currently a placeholder
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn websocket(&self) -> Result<WebSocketProtocolDesc> {
         Ok(WebSocketProtocolDesc {
             url: "- coming soon -".to_string(),
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// `OData` API endpoints
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn odata(&self) -> Result<OdataProtocolDesc> {
         let mut url = format!("{}odata", self.config.protocols.base_url_rest);
         // to respect both kinds of workspaces: single-tenant & multi-tenant

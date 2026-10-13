@@ -38,10 +38,7 @@ impl DidSecretEncryptionConfig {
     }
 
     pub fn is_enabled(&self) -> bool {
-        if self.enabled && self.encryption_key.is_some() {
-            return true;
-        }
-        false
+        self.enabled && self.encryption_key.is_some()
     }
 
     pub fn get_encryption_key(&self) -> Option<&str> {

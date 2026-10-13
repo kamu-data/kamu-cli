@@ -559,7 +559,7 @@ async fn test_smart_push_no_alias_smart_pull_no_alias(
         let aliases = kamu_in_push_workspace
             .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
             .await;
-        assert!(aliases.is_empty());
+        assert_eq!(aliases, []);
 
         // Dataset push with storing alias
         kamu_in_push_workspace
@@ -620,7 +620,7 @@ async fn test_smart_push_no_alias_smart_pull_no_alias(
         let aliases = kamu_in_pull_workspace
             .get_list_of_repo_aliases(&dataset_alias.dataset_name.clone().into())
             .await;
-        assert!(aliases.is_empty());
+        assert_eq!(aliases, []);
 
         // Delete local dataset
         kamu_in_pull_workspace

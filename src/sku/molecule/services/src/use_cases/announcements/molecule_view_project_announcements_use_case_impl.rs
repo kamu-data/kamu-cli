@@ -110,7 +110,7 @@ impl MoleculeViewProjectAnnouncementsUseCaseImpl {
         let ctx = SearchContext {
             catalog: &self.catalog,
             security: SearchSecurityContext::Restricted {
-                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+                current_principal_ids: vec![molecule_subject.account_handle.did.to_string()],
             },
         };
 

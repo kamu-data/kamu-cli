@@ -19,7 +19,9 @@ use random_strings::get_random_name;
 
 use super::build_preliminary_request_ext;
 use crate::{
+    CollectUnprocessedInputBlocksError,
     GetTransformQueryInputError,
+    collect_unprocessed_input_blocks,
     get_transform_input_from_query_input,
     get_transform_query_input,
 };
@@ -310,6 +312,33 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             .map_err(|e| match e {
                 GetTransformQueryInputError::Internal(e) => TransformStatusError::Internal(e),
             })?;
+
+        // Offsets cannot be compared across a rewritten history, so divergence is
+        // checked first and takes precedence over any new data
+        let mut breaking_inputs = Vec::new();
+        for query_input in &query_inputs {
+            // Nothing was consumed yet, so there is nothing to diverge from
+            if query_input.prev_block_hash.is_none() {
+                continue;
+            }
+
+            let input_chain = plan
+                .datasets_map
+                .get_by_id(&query_input.dataset_id)
+                .as_metadata_chain();
+            match collect_unprocessed_input_blocks(query_input, input_chain).await {
+                Ok(_) => {}
+                Err(CollectUnprocessedInputBlocksError::InvalidInputInterval(_)) => {
+                    breaking_inputs.push(query_input.clone());
+                }
+                Err(CollectUnprocessedInputBlocksError::Internal(e)) => {
+                    return Err(TransformStatusError::Internal(e));
+                }
+            }
+        }
+        if !breaking_inputs.is_empty() {
+            return Ok(TransformStatus::InputBreakingChange { breaking_inputs });
+        }
 
         // Filter out query inputs that have no changes
         let filtered_query_inputs: Vec<_> = query_inputs

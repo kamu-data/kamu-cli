@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
@@ -16,18 +17,22 @@ use kamu::TransformRequestPlannerImpl;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_flow_webhook::webhook_deliver_binding;
 use kamu_core::TenancyConfig;
-use kamu_datasets::DatasetIncrementQueryService;
-use kamu_datasets_services::testing::{
-    FakeDependencyGraphIndexer,
+use kamu_datasets::{
+    DatasetIncrementQueryService,
+    DeleteDatasetUseCase,
     MockDatasetIncrementQueryService,
 };
+use kamu_datasets_services::DeleteDatasetUseCaseImpl;
+use kamu_datasets_services::testing::FakeDependencyGraphIndexer;
 use kamu_flow_system::*;
 use kamu_task_system::*;
-use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_webhooks::*;
 use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
 use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
+use time_source::SystemTimeSource;
+use wakeup_listener::WakeupListenerConfig;
 
 use crate::utils::{BaseGQLDatasetHarness, BaseGQLFlowHarness, GraphQLQueryRequest};
 
@@ -55,8 +60,15 @@ impl BaseGQLFlowRunsHarness {
     }
 
     pub async fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
+        Self::with_tenancy(TenancyConfig::SingleTenant, overrides).await
+    }
+
+    pub async fn with_tenancy(
+        tenancy_config: TenancyConfig,
+        overrides: FlowRunsHarnessOverrides,
+    ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
-            .tenancy_config(TenancyConfig::SingleTenant)
+            .tenancy_config(tenancy_config)
             .outbox_provider(messaging_outbox::OutboxProvider::Immediate {
                 force_immediate: true,
             })
@@ -81,12 +93,22 @@ impl BaseGQLFlowRunsHarness {
 
         b.add_value(dataset_changes_mock)
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
-            .add_value(FlowAgentConfig::test_default())
+            .add_value(FlowAgentConfig {
+                awaiting_step: Duration::seconds(1),
+                mandatory_throttling_period: Duration::minutes(1),
+                default_retry_policy_by_flow_type: HashMap::new(),
+            })
+            .add_value(FlowAgentActivationConfig {
+                batch_size: NonZeroUsize::new(20).unwrap(),
+            })
             .add_value(FlowSystemEventAgentConfig::local_default())
+            .add_value(WakeupListenerConfig::local_default())
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
+            .add::<InMemoryTaskQueueWakeupSource>()
             .add::<TransformRequestPlannerImpl>()
-            .add::<FakeDependencyGraphIndexer>();
+            .add::<FakeDependencyGraphIndexer>()
+            .add::<DeleteDatasetUseCaseImpl>();
 
         b.add::<InMemoryWebhookSubscriptionEventStore>()
             .add_value(WebhooksConfig::default());
@@ -567,24 +589,35 @@ impl BaseGQLFlowRunsHarness {
         dataset_id: &odf::DatasetID,
         subscription_id: WebhookSubscriptionID,
     ) -> FlowID {
-        let flow_run_service = self
-            .catalog_authorized
-            .get_one::<dyn FlowRunService>()
-            .unwrap();
-
         let flow_binding = webhook_deliver_binding(
             subscription_id,
             &WebhookEventTypeCatalog::dataset_ref_updated(),
             Some(dataset_id),
         );
 
+        self.run_flow_activated_by_upstream(&flow_binding, dataset_id, FlowID::new(1))
+            .await
+    }
+
+    /// Runs a flow the way a successful upstream flow activates it
+    pub async fn run_flow_activated_by_upstream(
+        &self,
+        flow_binding: &FlowBinding,
+        upstream_dataset_id: &odf::DatasetID,
+        upstream_flow_id: FlowID,
+    ) -> FlowID {
+        let flow_run_service = self
+            .catalog_authorized
+            .get_one::<dyn FlowRunService>()
+            .unwrap();
+
         let flow_state = flow_run_service
             .run_flow_automatically(
-                Utc::now(),
-                &flow_binding,
+                self.now(),
+                flow_binding,
                 vec![FlowActivationCause::ResourceUpdate(
                     FlowActivationCauseResourceUpdate {
-                        activation_time: Utc::now(),
+                        activation_time: self.now(),
                         resource_type: DATASET_RESOURCE_TYPE.to_string(),
                         changes: ResourceChanges::NewData(ResourceDataChanges {
                             blocks_added: 1,
@@ -592,10 +625,10 @@ impl BaseGQLFlowRunsHarness {
                             new_watermark: None,
                         }),
                         details: serde_json::to_value(DatasetResourceUpdateDetails {
-                            dataset_id: dataset_id.clone(),
+                            dataset_id: upstream_dataset_id.clone(),
                             source: DatasetUpdateSource::UpstreamFlow {
                                 flow_type: FLOW_TYPE_DATASET_INGEST.to_string(),
-                                flow_id: FlowID::new(1),
+                                flow_id: upstream_flow_id,
                                 maybe_flow_config_snapshot: None,
                             },
                             new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
@@ -613,14 +646,38 @@ impl BaseGQLFlowRunsHarness {
         flow_state.flow_id
     }
 
+    /// Applies flow system events to projections, such as activation links
+    pub async fn catchup_flow_system_events(&self) {
+        self.catalog_authorized
+            .get_one::<dyn FlowSystemEventAgent>()
+            .unwrap()
+            .catchup_remaining_events()
+            .await
+            .unwrap();
+    }
+
+    pub async fn delete_dataset(&self, dataset_handle: &odf::DatasetHandle) {
+        let delete_dataset = self
+            .catalog_authorized
+            .get_one::<dyn DeleteDatasetUseCase>()
+            .unwrap();
+
+        let plan = delete_dataset
+            .plan_delete(vec![dataset_handle.clone()], false)
+            .await
+            .unwrap()
+            .into_executable_plan(false)
+            .unwrap();
+        delete_dataset.execute_plan(plan).await.unwrap();
+    }
+
     /// Manually trigger a flow without a trigger configured
     pub async fn manually_trigger_flow(
         &self,
         dataset_id: &odf::DatasetID,
         flow_type: &str,
         task_outcome: TaskOutcome,
-    ) {
-        use chrono::Utc;
+    ) -> FlowID {
         use kamu_adapter_flow_dataset as afs;
         use kamu_flow_system as fs;
 
@@ -637,7 +694,7 @@ impl BaseGQLFlowRunsHarness {
 
         let account_id = self.logged_account_id();
 
-        let current_time = Utc::now();
+        let current_time = self.now();
         let flow_state = flow_run_service
             .run_flow_manually(
                 current_time,
@@ -650,6 +707,17 @@ impl BaseGQLFlowRunsHarness {
 
         self.mimic_flow_run_with_outcome(flow_state.flow_id.to_string().as_str(), task_outcome)
             .await;
+
+        flow_state.flow_id
+    }
+
+    /// Current time from the catalog's clock, so stubbed-time harnesses stay
+    /// deterministic
+    fn now(&self) -> DateTime<Utc> {
+        self.catalog_authorized
+            .get_one::<dyn SystemTimeSource>()
+            .unwrap()
+            .now()
     }
 
     pub async fn mimic_flow_run_with_outcome(
@@ -657,7 +725,7 @@ impl BaseGQLFlowRunsHarness {
         flow_id: &str,
         task_outcome: TaskOutcome,
     ) -> TaskID {
-        let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+        let schedule_time = self.now().duration_round(Duration::seconds(1)).unwrap();
         let flow_task_id = self.mimic_flow_scheduled(flow_id, schedule_time).await;
         let flow_task_metadata = TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, flow_id)]);
 
@@ -711,7 +779,7 @@ impl BaseGQLFlowRunsHarness {
         .await
         .unwrap();
 
-        flow.add_activation_cause_if_unique(Utc::now(), activation_cause)
+        flow.add_activation_cause_if_unique(self.now(), activation_cause)
             .unwrap();
         flow.save(flow_event_store.as_ref()).await.unwrap();
     }

@@ -11,10 +11,10 @@ use std::sync::Arc;
 
 use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use messaging_outbox::*;
 use sqlx::Postgres;
-
-use crate::PostgresMessageStoreWakeupDetector;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ const NOTIFY_CHANNEL_NAME: &str = "outbox_messages_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresOutboxMessageBridge {
-    wakeup_detector: PostgresMessageStoreWakeupDetector,
+    hub: Arc<PostgresNotificationHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,10 +32,8 @@ pub struct PostgresOutboxMessageBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn OutboxMessageBridge)]
 impl PostgresOutboxMessageBridge {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
-        Self {
-            wakeup_detector: PostgresMessageStoreWakeupDetector::new(pool, NOTIFY_CHANNEL_NAME),
-        }
+    pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
+        Self { hub }
     }
 }
 
@@ -43,8 +41,12 @@ impl PostgresOutboxMessageBridge {
 
 #[async_trait::async_trait]
 impl OutboxMessageBridge for PostgresOutboxMessageBridge {
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            NOTIFY_CHANNEL_NAME,
+            OUTBOX_AGENT_NAME,
+        ))
     }
 
     async fn push_message(
@@ -102,10 +104,8 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
         let mut tr = transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        // Ignore rows from txns that might still be in flight ("Usain Bolt") while
-        // still allowing rows from current transaction. Use pg_visible_in_snapshot
-        // instead of xmin threshold to avoid blocking on unrelated in-flight
-        // transactions (e.g. parallel test runs).
+        // Read only below the oldest in-flight transaction, so that a transaction
+        // committing late is never passed over; rows of the current one still count
 
         let rows = sqlx::query_as!(
             OutboxMessageRow,
@@ -130,8 +130,8 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
                 ON m.producer_name = b.producer_name
                 AND (m.tx_id::text::bigint, m.message_id) > (b.above_tx_id, b.above_message_id)
             WHERE
-                pg_visible_in_snapshot(m.tx_id, pg_current_snapshot())
-                OR m.tx_id = pg_current_xact_id()
+                m.tx_id < pg_snapshot_xmin(pg_current_snapshot())
+                OR m.tx_id = pg_current_xact_id_if_assigned()
             ORDER BY m.tx_id, m.message_id
             LIMIT $4
             "#,
@@ -201,10 +201,8 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        // Ignore rows from txns that might still be in flight ("Usain Bolt") while
-        // still allowing rows from current transaction. Use pg_visible_in_snapshot
-        // instead of xmin threshold to avoid blocking on unrelated in-flight
-        // transactions (e.g. parallel test runs).
+        // Read only below the oldest in-flight transaction, so that a transaction
+        // committing late is never passed over; rows of the current one still count
 
         let records = sqlx::query!(
             r#"
@@ -223,8 +221,8 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
                     ) AS rn
                 FROM outbox_messages
                 WHERE
-                    pg_visible_in_snapshot(tx_id, pg_current_snapshot())
-                    OR tx_id = pg_current_xact_id()
+                    tx_id < pg_snapshot_xmin(pg_current_snapshot())
+                    OR tx_id = pg_current_xact_id_if_assigned()
             ) ranked
             WHERE rn = 1
             "#,
@@ -272,6 +270,38 @@ impl OutboxMessageBridge for PostgresOutboxMessageBridge {
         .int_err()?;
 
         Ok(consumptions)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn has_held_back_messages(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        producer_names: &[&str],
+    ) -> Result<bool, InternalError> {
+        let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        // Committed, yet at or above the oldest running transaction
+        let has_held_back_messages = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM outbox_messages
+                WHERE
+                    producer_name = ANY($1)
+                    AND tx_id >= pg_snapshot_xmin(pg_current_snapshot())
+                    AND pg_visible_in_snapshot(tx_id, pg_current_snapshot())
+            ) AS "has_held_back_messages!"
+            "#,
+            producer_names as _,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(has_held_back_messages)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(producer_name, consumer_name, boundary = ?boundary))]

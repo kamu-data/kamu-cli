@@ -1,0 +1,31 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use kamu_resources as domain;
+pub use messaging_outbox;
+
+#[cfg(feature = "testing")]
+pub mod testing;
+
+mod crud_dispatchers;
+mod dependencies;
+mod event_stores;
+mod message_handlers;
+mod resource_extension_schemas;
+mod resources;
+mod services;
+mod use_cases;
+
+pub use crud_dispatchers::*;
+pub use dependencies::*;
+pub use event_stores::*;
+pub use message_handlers::*;
+pub use resource_extension_schemas::*;
+pub use services::*;
+pub use use_cases::*;

@@ -146,10 +146,22 @@ impl SimpleTransferProtocol {
                     }));
                 }
             }
+            CompareChainsResult::DifferentDatasets {
+                lhs_dataset_id: src_dataset_id,
+                rhs_dataset_id: dst_dataset_id,
+            } => {
+                // Even a forced sync must not replace a dataset with another one
+                return Err(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                    src_dataset_id,
+                    dst_dataset_id,
+                }));
+            }
         }
 
         let blocks_desc_ordered = match chains_comparison {
-            CompareChainsResult::Equal => unreachable!(),
+            CompareChainsResult::Equal | CompareChainsResult::DifferentDatasets { .. } => {
+                unreachable!()
+            }
             CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: src_ahead_blocks,
             } => src_ahead_blocks,
@@ -225,7 +237,7 @@ impl SimpleTransferProtocol {
         Ok(SyncResult::Updated {
             old_head,
             new_head: src_head,
-            num_blocks: num_blocks as u64,
+            num_blocks: u64::try_from(num_blocks).unwrap(),
         })
     }
 
@@ -511,7 +523,8 @@ impl SimpleTransferProtocol {
         mut stats: SyncStats,
     ) -> Result<(), SyncError> {
         // Update stats estimates based on metadata
-        stats.dst_estimated.metadata_blocks_written += blocks_desc_ordered.len() as u64;
+        stats.dst_estimated.metadata_blocks_written +=
+            u64::try_from(blocks_desc_ordered.len()).unwrap();
 
         use odf::metadata::IntoDataStreamBlock;
         for block in blocks_desc_ordered
@@ -621,7 +634,7 @@ impl SimpleTransferProtocol {
                                     e.actual, e.expected, block_sequence_number
                                 )
                             }
-                            _ => format!(
+                            odf::dataset::AppendValidationError::FirstBlockMustBeSeed | odf::dataset::AppendValidationError::AppendingSeedBlockToNonEmptyChain | odf::dataset::AppendValidationError::PrevBlockNotFound(_) | odf::dataset::AppendValidationError::SequenceIntegrity(_) | odf::dataset::AppendValidationError::SystemTimeIsNotMonotonic | odf::dataset::AppendValidationError::WatermarkIsNotMonotonic | odf::dataset::AppendValidationError::OffsetsAreNotSequential(_) | odf::dataset::AppendValidationError::InvalidEvent(_) | odf::dataset::AppendValidationError::NoOpEvent(_) => format!(
                                 "Source metadata chain is logically inconsistent at block \
                                  {block_hash}[{block_sequence_number}]"
                             ),

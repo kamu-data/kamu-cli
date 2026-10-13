@@ -19,6 +19,7 @@ pub struct DatasetFlowProcess {
     process_state: fs::FlowProcessState,
 }
 
+/// Recurring flow process of a dataset
 #[Object]
 impl DatasetFlowProcess {
     #[graphql(skip)]
@@ -32,10 +33,12 @@ impl DatasetFlowProcess {
         }
     }
 
+    /// Kind of flow this process runs
     pub async fn flow_type(&self) -> DatasetFlowType {
         decode_dataset_flow_type(&self.process_state.flow_binding().flow_type)
     }
 
+    /// Dataset the process belongs to
     pub async fn dataset(&self) -> Dataset {
         Dataset::new_access_checked(
             self.dataset_request_state.owner().clone(),
@@ -43,6 +46,7 @@ impl DatasetFlowProcess {
         )
     }
 
+    /// Health and timing of the process
     pub async fn summary(&self) -> FlowProcessSummary {
         self.process_state.clone().into()
     }

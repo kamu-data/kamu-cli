@@ -82,7 +82,7 @@ impl WorkspaceLayout {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Generalize this enum pattern
-#[allow(non_camel_case_types)]
+#[expect(non_camel_case_types, reason = "version names embed version numbers")]
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum WorkspaceVersion {

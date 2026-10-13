@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+#[allow(deprecated, reason = "TODO: Awaiting migration")]
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::prelude::ParquetReadOptions;
@@ -156,6 +157,7 @@ async fn read_data_slice_metadata(
     object_store: Arc<dyn object_store::ObjectStore>,
     data_slice_store_path: object_store::path::Path,
 ) -> Result<Arc<ParquetMetaData>, QueryError> {
+    #[allow(deprecated, reason = "TODO: Awaiting migration")]
     let mut parquet_object_reader = ParquetObjectReader::new(object_store, data_slice_store_path);
 
     use datafusion::parquet::arrow::async_reader::AsyncFileReader;

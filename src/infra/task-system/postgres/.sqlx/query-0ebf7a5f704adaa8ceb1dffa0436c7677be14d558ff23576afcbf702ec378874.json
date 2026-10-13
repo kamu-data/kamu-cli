@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO tasks (task_id, dataset_id, task_status, last_event_id)\n                    SELECT task_id, dataset_id, 'queued'::task_status_type, NULL\n                        FROM UNNEST($1::bigint[], $2::text[]) AS t(task_id, dataset_id)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8Array",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0ebf7a5f704adaa8ceb1dffa0436c7677be14d558ff23576afcbf702ec378874"
+}

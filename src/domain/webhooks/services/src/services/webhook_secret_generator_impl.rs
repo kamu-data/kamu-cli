@@ -22,7 +22,10 @@ pub struct WebhookSecretGeneratorImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn WebhookSecretGenerator)]
 impl WebhookSecretGeneratorImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(webhooks_config: Arc<WebhooksConfig>) -> Self {
         Self {
             webhook_secret_encryption_key: webhooks_config
@@ -37,7 +40,7 @@ impl WebhookSecretGeneratorImpl {
 
 impl WebhookSecretGenerator for WebhookSecretGeneratorImpl {
     fn generate_secret(&self) -> Result<WebhookSubscriptionSecret, EncryptionError> {
-        use rand::RngCore;
+        use rand::Rng;
 
         let mut bytes = [0u8; 32]; // 32 bytes = 256 bits
         rand::rng().fill_bytes(&mut bytes);

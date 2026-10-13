@@ -51,7 +51,12 @@ impl From<odf::IterBlocksError> for PrepareDatasetTransferEstimateError {
     fn from(v: odf::IterBlocksError) -> Self {
         match v {
             odf::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
-            _ => Self::Internal(v.int_err()),
+            odf::IterBlocksError::RefNotFound(_)
+            | odf::IterBlocksError::BlockNotFound(_)
+            | odf::IterBlocksError::BlockVersion(_)
+            | odf::IterBlocksError::BlockMalformed(_)
+            | odf::IterBlocksError::Access(_)
+            | odf::IterBlocksError::Internal(_) => Self::Internal(v.int_err()),
         }
     }
 }
@@ -159,7 +164,7 @@ pub async fn prepare_dataset_metadata_batch(
         let block_data: &[u8] = &block_bytes;
 
         let mut header = Header::new_gnu();
-        header.set_size(block_bytes.len() as u64);
+        header.set_size(u64::try_from(block_bytes.len()).unwrap());
 
         tarball_builder
             .append_data(
@@ -261,7 +266,12 @@ impl From<odf::IterBlocksError> for CollectMissingObjectReferencesFromIntervalEr
     fn from(v: odf::IterBlocksError) -> Self {
         match v {
             odf::IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
-            _ => Self::Internal(v.int_err()),
+            odf::IterBlocksError::RefNotFound(_)
+            | odf::IterBlocksError::BlockNotFound(_)
+            | odf::IterBlocksError::BlockVersion(_)
+            | odf::IterBlocksError::BlockMalformed(_)
+            | odf::IterBlocksError::Access(_)
+            | odf::IterBlocksError::Internal(_) => Self::Internal(v.int_err()),
         }
     }
 }

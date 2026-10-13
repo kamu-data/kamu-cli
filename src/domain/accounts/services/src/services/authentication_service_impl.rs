@@ -46,7 +46,10 @@ pub struct AuthenticationServiceImpl {
 #[dill::interface(dyn AuthenticationService)]
 #[dill::interface(dyn JwtTokenIssuer)]
 impl AuthenticationServiceImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
         account_service: Arc<dyn AccountService>,
@@ -166,9 +169,12 @@ impl AuthenticationServiceImpl {
         validation.set_issuer(&[KAMU_JWT_ISSUER]);
 
         decode::<JWTClaims>(access_token, &self.decoding_key, &validation)
-            .map_err(|e| match *e.kind() {
-                ErrorKind::ExpiredSignature => AccessTokenError::Expired,
-                _ => AccessTokenError::Invalid(Box::new(e)),
+            .map_err(|e| {
+                if matches!(e.kind(), ErrorKind::ExpiredSignature) {
+                    AccessTokenError::Expired
+                } else {
+                    AccessTokenError::Invalid(Box::new(e))
+                }
             })
             .map(AccessTokenType::JWTToken)
     }
@@ -304,7 +310,7 @@ impl AuthenticationServiceImpl {
         };
 
         self.create_account_use_case
-            .execute(&new_account_config)
+            .execute(&new_account_config, AccountResourceIdSource::Generated)
             .await
     }
 }

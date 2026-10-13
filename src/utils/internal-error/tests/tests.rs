@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
-#![feature(never_type)]
 
 use std::assert_matches;
 use std::backtrace::Backtrace;
@@ -140,6 +139,21 @@ fn test_creates_the_correct_reason_with_context() {
         Err(e)
             if e.reason() == "Internal error: Input value is not an integer (context: value 'λ')"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_extracts_root_source_message() {
+    let error = C {
+        source: B {
+            source: IntegerParsingError {}.into(),
+        }
+        .into(),
+    }
+    .int_err();
+
+    assert_eq!(root_source_message(&error), "Input value is not an integer");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

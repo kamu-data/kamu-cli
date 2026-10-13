@@ -21,8 +21,10 @@ use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_task_system::LogicalPlan;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use serde_json::json;
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,7 +78,7 @@ async fn test_compact_propagate_success_compacted_notifies_dispatcher() {
     let old_head = odf::Multihash::from_digest_sha3_256(b"old_head");
     let new_head = odf::Multihash::from_digest_sha3_256(b"new_head");
 
-    let mock_flow_sensor_dispatcher =
+    let mut mock_flow_sensor_dispatcher =
         MockFlowSensorDispatcher::with_dispatch_for_resource_update_cause(
             reset_to_metadata_dataset_binding(&foo_dataset_id),
             FlowActivationCauseResourceUpdate {
@@ -97,6 +99,11 @@ async fn test_compact_propagate_success_compacted_notifies_dispatcher() {
                 }),
             },
         );
+    FlowControllerResetToMetadataHarness::expect_own_sensor(
+        &mut mock_flow_sensor_dispatcher,
+        &foo_dataset_id,
+        None,
+    );
 
     let harness = FlowControllerResetToMetadataHarness::with_overrides(mock_flow_sensor_dispatcher);
 
@@ -110,6 +117,47 @@ async fn test_compact_propagate_success_compacted_notifies_dispatcher() {
             CompactionResult::Success {
                 old_head,
                 new_head,
+                old_num_blocks: 50,
+                new_num_blocks: 4,
+            },
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_reset_to_metadata_propagate_success_reactivates_own_sensor() {
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_own_sensor = MockFlowSensor::new();
+    mock_own_sensor
+        .expect_on_activated()
+        .times(1)
+        .returning(|_, _| Ok(()));
+
+    let mut mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::new();
+    mock_flow_sensor_dispatcher
+        .expect_dispatch_input_flow_success()
+        .returning(|_, _, _| Ok(()));
+    FlowControllerResetToMetadataHarness::expect_own_sensor(
+        &mut mock_flow_sensor_dispatcher,
+        &foo_dataset_id,
+        Some(mock_own_sensor),
+    );
+
+    let harness = FlowControllerResetToMetadataHarness::with_overrides(mock_flow_sensor_dispatcher);
+
+    let reset_to_metadata_flow = harness
+        .make_reset_to_metadata_flow(FlowID::new(1), &foo_dataset_id)
+        .await;
+
+    harness
+        .propagate_success(
+            &reset_to_metadata_flow,
+            CompactionResult::Success {
+                old_head: odf::Multihash::from_digest_sha3_256(b"old_head"),
+                new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
                 old_num_blocks: 50,
                 new_num_blocks: 4,
             },
@@ -134,6 +182,8 @@ impl FlowControllerResetToMetadataHarness {
         b.add::<FlowControllerResetToMetadata>()
             .add::<InMemoryFlowEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
             .add_value(mock_flow_sensor_dispatcher)
             .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
             .add::<FakeDatasetEntryService>()
@@ -144,6 +194,20 @@ impl FlowControllerResetToMetadataHarness {
             controller: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
         }
+    }
+
+    fn expect_own_sensor(
+        mock_flow_sensor_dispatcher: &mut MockFlowSensorDispatcher,
+        dataset_id: &odf::DatasetID,
+        own_sensor: Option<MockFlowSensor>,
+    ) {
+        let own_scope = FlowScopeDataset::make_scope(dataset_id);
+        let own_sensor = own_sensor.map(|sensor| Arc::new(sensor) as Arc<dyn FlowSensor>);
+        mock_flow_sensor_dispatcher
+            .expect_find_sensor()
+            .withf(move |scope| *scope == own_scope)
+            .times(1)
+            .return_once(move |_| own_sensor);
     }
 
     async fn make_reset_to_metadata_flow(

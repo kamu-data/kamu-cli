@@ -27,7 +27,7 @@ use crate::services::MoleculeDatasetWriterPushNdjsonDataOptions;
     feeding_producers: &[
         MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct MoleculeAsyncGlobalActivityWriter {

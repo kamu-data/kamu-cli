@@ -15,13 +15,12 @@ use thiserror::Error;
 use crate::{
     AccessTokenError,
     Account,
-    AuthenticationService,
     DEFAULT_ACCOUNT_NAME,
     DUMMY_ACCESS_TOKEN,
-    DeviceCode,
     GetAccountInfoError,
     LoginError,
     LoginResponse,
+    MockAuthenticationService,
     TEST_ACCOUNT_ID,
     UnsupportedLoginMethodError,
 };
@@ -29,28 +28,6 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const DUMMY_LOGIN_METHOD: &str = "oauth_github";
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-mockall::mock! {
-    pub AuthenticationService {}
-    #[async_trait::async_trait]
-    impl AuthenticationService for AuthenticationService {
-        fn supported_login_methods(&self) -> Vec<String>;
-
-        async fn login(
-            &self,
-            login_method: &str,
-            login_credentials_json: String,
-            device_code: Option<DeviceCode>,
-        ) -> Result<LoginResponse, LoginError>;
-
-        async fn account_by_token(
-            &self,
-            access_token: String,
-        ) -> Result<Account, GetAccountInfoError>;
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -56,7 +56,6 @@ pub struct PullPlanIteration {
     pub jobs: Vec<PullPlanIterationJob>,
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum PullPlanIterationJob {
     Ingest(PullIngestItem),

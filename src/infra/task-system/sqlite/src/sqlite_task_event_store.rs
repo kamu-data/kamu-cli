@@ -10,11 +10,17 @@
 use std::num::NonZeroUsize;
 
 use chrono::Utc;
-use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
+use database_common::{
+    PaginationOpts,
+    TransactionRefT,
+    sqlite_datetime_text,
+    sqlite_generate_placeholders_list,
+};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_task_system::*;
-use sqlx::{FromRow, QueryBuilder, Sqlite};
+use serde_json::json;
+use sqlx::{AssertSqlSafe, Sqlite};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,13 +73,16 @@ impl SqliteTaskEventStore {
         let last_event = events.last().expect("Non empty event list expected");
 
         let event_task_id: i64 = (last_event.task_id()).try_into().unwrap();
-        let latest_status = last_event.new_status();
+        // The stored status is unknown here: let the row pick the right outcome
+        let status_if_running = TaskEvent::status_after(events, TaskStatus::Running);
+        let status_otherwise = TaskEvent::status_after(events, TaskStatus::Queued);
 
         let affected_rows_count =
             sqlx::query!(
                 r#"
                 UPDATE tasks
-                    SET task_status = $2, last_event_id = $3
+                    SET task_status = CASE WHEN task_status = 'running' THEN $2 ELSE $5 END,
+                        last_event_id = $3
                     WHERE task_id = $1 AND (
                         last_event_id IS NULL AND CAST($4 as INT8) IS NULL OR
                         last_event_id IS NOT NULL AND CAST($4 as INT8) IS NOT NULL AND last_event_id = $4
@@ -81,9 +90,10 @@ impl SqliteTaskEventStore {
                     RETURNING task_id
                 "#,
                 event_task_id,
-                latest_status,
+                status_if_running,
                 last_event_id,
                 maybe_prev_stored_event_id,
+                status_otherwise,
             )
             .fetch_all(connection_mut)
             .await
@@ -106,34 +116,40 @@ impl SqliteTaskEventStore {
     ) -> Result<EventID, SaveEventsError> {
         let connection_mut = tr.connection_mut().await?;
 
-        #[derive(FromRow)]
-        struct ResultRow {
-            event_id: i64,
-        }
+        let events_json = serde_json::to_string(
+            &events
+                .iter()
+                .map(|event| {
+                    let event_task_id: i64 = event.task_id().try_into().unwrap();
+                    Ok(json!({
+                        "task_id": event_task_id,
+                        "event_time": sqlite_datetime_text(&event.event_time()),
+                        "event_type": event.typename(),
+                        "event_payload": serde_json::to_value(event).int_err()?.to_string(),
+                    }))
+                })
+                .collect::<Result<Vec<_>, InternalError>>()?,
+        )
+        .int_err()?;
 
-        let mut query_builder = QueryBuilder::<sqlx::Sqlite>::new(
+        let event_ids = sqlx::query_scalar!(
             r#"
             INSERT INTO task_events (task_id, event_time, event_type, event_payload)
+            SELECT value ->> 'task_id',
+                   value ->> 'event_time',
+                   value ->> 'event_type',
+                   value ->> 'event_payload'
+            FROM json_each($1)
+            ORDER BY key
+            RETURNING event_id AS "event_id!"
             "#,
-        );
+            events_json,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
 
-        query_builder.push_values(events, |mut b, event| {
-            let event_task_id: i64 = event.task_id().try_into().unwrap();
-            b.push_bind(event_task_id);
-            b.push_bind(event.event_time());
-            b.push_bind(event.typename());
-            b.push_bind(serde_json::to_value(event).unwrap());
-        });
-
-        query_builder.push("RETURNING event_id");
-
-        let rows = query_builder
-            .build_query_as::<ResultRow>()
-            .fetch_all(connection_mut)
-            .await
-            .int_err()?;
-
-        let last_event_id = rows.last().unwrap().event_id;
+        let last_event_id = event_ids.into_iter().max().unwrap();
         Ok(EventID::new(last_event_id))
     }
 }
@@ -263,7 +279,7 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
                 )
             );
 
-            let mut query = sqlx::query_as::<_, EventRow>(&query_str);
+            let mut query = sqlx::query_as::<_, EventRow>(AssertSqlSafe(query_str));
             for task_id in task_ids {
                 query = query.bind(task_id);
             }
@@ -321,7 +337,148 @@ impl EventStore<TaskState> for SqliteTaskEventStore {
         Ok(last_event_id)
     }
 
-    async fn len(&self) -> Result<usize, InternalError> {
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<TaskID, TaskEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        validate_multi_save_items(&items)?;
+
+        let mut new_tasks_json = Vec::new();
+        let mut events_json = Vec::new();
+        let mut item_event_counts = Vec::with_capacity(items.len());
+
+        for item in &items {
+            let task_id: i64 = item.query.try_into().unwrap();
+
+            // Newly created tasks must be registered before their events
+            let first_event = item.events.first().expect("Non empty event list expected");
+            if let TaskEvent::TaskCreated(e) = first_event {
+                assert_eq!(item.query, e.task_id);
+
+                // When creating a task, there is no way something was already stored
+                if item.maybe_prev_stored_event_id.is_some() {
+                    return Err(SaveEventsError::concurrent_modification());
+                }
+
+                new_tasks_json.push(json!({
+                    "task_id": task_id,
+                    "dataset_id": e.logical_plan.dataset_id().as_ref().map(ToString::to_string),
+                }));
+            }
+
+            item_event_counts.push(item.events.len());
+
+            for event in &item.events {
+                events_json.push(json!({
+                    "task_id": task_id,
+                    "event_time": sqlite_datetime_text(&event.event_time()),
+                    "event_type": event.typename(),
+                    "event_payload": serde_json::to_value(event).int_err()?.to_string(),
+                }));
+            }
+        }
+
+        let mut tr = self.transaction.lock().await;
+
+        if !new_tasks_json.is_empty() {
+            let new_tasks_json = serde_json::to_string(&new_tasks_json).int_err()?;
+
+            let connection_mut = tr.connection_mut().await?;
+            sqlx::query!(
+                r#"
+                INSERT INTO tasks (task_id, dataset_id, task_status, last_event_id)
+                    SELECT value ->> 'task_id', value ->> 'dataset_id', 'queued', NULL
+                        FROM json_each($1)
+                "#,
+                new_tasks_json,
+            )
+            .execute(connection_mut)
+            .await
+            .int_err()?;
+        }
+
+        let events_json = serde_json::to_string(&events_json).int_err()?;
+
+        let connection_mut = tr.connection_mut().await?;
+        let inserted_event_ids = sqlx::query_scalar!(
+            r#"
+            INSERT INTO task_events (task_id, event_time, event_type, event_payload)
+            SELECT value ->> 'task_id',
+                   value ->> 'event_time',
+                   value ->> 'event_type',
+                   value ->> 'event_payload'
+            FROM json_each($1)
+            ORDER BY key
+            RETURNING event_id AS "event_id!"
+            "#,
+            events_json,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        let last_event_ids = last_event_ids_per_item(inserted_event_ids, item_event_counts)?;
+
+        let task_updates_json = serde_json::to_string(
+            &items
+                .iter()
+                .zip(&last_event_ids)
+                .map(|(item, last_event_id)| {
+                    let task_id: i64 = item.query.try_into().unwrap();
+                    // The stored status is unknown here: let the row pick the right outcome
+                    let status_if_running: &'static str =
+                        TaskEvent::status_after(&item.events, TaskStatus::Running).into();
+                    let status_otherwise: &'static str =
+                        TaskEvent::status_after(&item.events, TaskStatus::Queued).into();
+
+                    json!({
+                        "task_id": task_id,
+                        "prev_event_id": item.maybe_prev_stored_event_id.map(EventID::into_inner),
+                        "last_event_id": last_event_id.into_inner(),
+                        "status_if_running": status_if_running,
+                        "status_otherwise": status_otherwise,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+        .int_err()?;
+
+        // Update denormalized task records: latest status and stored event.
+        // A previously stored event id that does not match the expected one
+        // leaves its row untouched, which means a concurrent modification
+        let connection_mut = tr.connection_mut().await?;
+        let updated_rows_count = sqlx::query!(
+            r#"
+            UPDATE tasks
+                SET task_status = CASE
+                        WHEN tasks.task_status = 'running' THEN u.value ->> 'status_if_running'
+                        ELSE u.value ->> 'status_otherwise'
+                    END,
+                    last_event_id = u.value ->> 'last_event_id'
+                FROM json_each($1) AS u
+                WHERE tasks.task_id = u.value ->> 'task_id'
+                    AND tasks.last_event_id IS (u.value ->> 'prev_event_id')
+                RETURNING tasks.task_id
+            "#,
+            task_updates_json,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?
+        .len();
+
+        if updated_rows_count != items.len() {
+            return Err(SaveEventsError::concurrent_modification());
+        }
+
+        Ok(last_event_ids)
+    }
+
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -349,7 +506,6 @@ impl TaskEventStore for SqliteTaskEventStore {
         let connection_mut = tr.connection_mut().await?;
 
         #[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
-        #[allow(dead_code)]
         pub struct NewTask {
             pub task_id: i64,
         }

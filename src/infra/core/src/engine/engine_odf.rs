@@ -19,7 +19,7 @@ use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDatasetsMap;
-use odf::metadata::engine::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
+use odf::metadata::engines::{EngineGrpcClient, ExecuteRawQueryError, ExecuteTransformError};
 
 use super::ODFEngineConfig;
 use super::engine_container::{EngineContainer, LogsConfig};
@@ -246,7 +246,7 @@ impl Engine for ODFEngine {
         let operation_id = request.operation_id.clone();
         let operation_dir = self
             .run_info_dir
-            .join(format!("raw-query-{}", &request.operation_id));
+            .join(format!("raw-query-{}", request.operation_id));
         let logs_dir = operation_dir.join("logs");
         std::fs::create_dir(&operation_dir).int_err()?;
         std::fs::create_dir(&logs_dir).int_err()?;
@@ -356,7 +356,7 @@ impl Engine for ODFEngine {
         let operation_id = request.operation_id.clone();
         let operation_dir = self
             .run_info_dir
-            .join(format!("transform-{}", &request.operation_id));
+            .join(format!("transform-{}", request.operation_id));
         let logs_dir = operation_dir.join("logs");
         std::fs::create_dir(&operation_dir).int_err()?;
         std::fs::create_dir(&logs_dir).int_err()?;

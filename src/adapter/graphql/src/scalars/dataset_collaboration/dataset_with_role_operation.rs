@@ -18,26 +18,37 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Change of an account's role in a dataset
 #[derive(InputObject)]
 pub struct AccountDatasetRelationOperation {
+    /// Account whose role changes
     pub account_id: AccountID<'static>,
+    /// Change to apply
     pub operation: DatasetRoleOperation,
+    /// Dataset the role applies to
     pub dataset_id: DatasetID<'static>,
 }
 
+/// Change to an account's role in a dataset
 #[derive(OneofObject, Copy, Clone)]
 pub enum DatasetRoleOperation {
+    /// Grant the role, replacing any existing one
     Set(DatasetRoleSetOperation),
+    /// Revoke the existing role
     Unset(DatasetRoleUnsetOperation),
 }
 
+/// Grants a role to an account
 #[derive(InputObject, Copy, Clone)]
 pub struct DatasetRoleSetOperation {
+    /// Role to grant
     role: DatasetAccessRole,
 }
 
+/// Revokes the role of an account
 #[derive(InputObject, Copy, Clone)]
 pub struct DatasetRoleUnsetOperation {
+    /// Placeholder field without meaning, its value is ignored
     _dummy: bool,
 }
 

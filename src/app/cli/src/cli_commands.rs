@@ -14,7 +14,7 @@ use kamu_accounts::CurrentAccountSubject;
 use crate::accounts::CurrentAccountIndication;
 use crate::commands::*;
 use crate::config::ConfigScope;
-use crate::{WorkspaceService, accounts, cli, odf_server};
+use crate::{WorkspaceService, accounts, cli, odf_server, resource_context};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,6 +42,19 @@ pub fn get_command(
                 c.visibility
                     .map(Into::into)
                     .unwrap_or(tenancy_config.default_dataset_visibility()),
+            )
+            .cast(),
+        ),
+
+        cli::Command::Apply(c) => Box::new(
+            ApplyCommand::builder(
+                c.resource_context.context,
+                c.manifest,
+                c.recursive,
+                c.dry_run,
+                c.stdin,
+                c.continue_on_error,
+                c.format,
             )
             .cast(),
         ),
@@ -80,11 +93,84 @@ pub fn get_command(
             ),
         },
 
+        cli::Command::Context(c) => match c.subcommand {
+            Some(cli::ContextSubCommand::Add(sc)) => {
+                // Clap's `requires` guarantees each credential pair arrives whole
+                let login_method = if let Some(access_token) = sc.access_token {
+                    Some(odf_server::LoginMethod::ExistingToken { access_token })
+                } else if let (Some(login), Some(password)) = (sc.password_login, sc.password) {
+                    Some(odf_server::LoginMethod::Password { login, password })
+                } else if let (Some(provider), Some(access_token)) =
+                    (sc.oauth_provider, sc.oauth_token)
+                {
+                    Some(odf_server::LoginMethod::OAuth {
+                        provider,
+                        access_token,
+                    })
+                } else {
+                    None
+                };
+
+                Box::new(
+                    ContextAddCommand::builder(
+                        sc.new_name,
+                        sc.url.into(),
+                        if sc.user {
+                            resource_context::ResourceContextStoreScope::User
+                        } else {
+                            resource_context::ResourceContextStoreScope::Workspace
+                        },
+                        login_method,
+                        sc.no_login,
+                        sc.repo_name,
+                        sc.skip_add_repo,
+                        sc.predefined_odf_backend_url.map(Into::into),
+                    )
+                    .cast(),
+                )
+            }
+            Some(cli::ContextSubCommand::List(_)) => Box::new(ContextListCommand::builder().cast()),
+            Some(cli::ContextSubCommand::Delete(sc)) => Box::new(
+                ContextDeleteCommand::builder(
+                    sc.name,
+                    sc.all,
+                    if sc.user {
+                        resource_context::ResourceContextStoreScope::User
+                    } else {
+                        resource_context::ResourceContextStoreScope::Workspace
+                    },
+                )
+                .cast(),
+            ),
+            Some(cli::ContextSubCommand::Check(sc)) => {
+                Box::new(ContextCheckCommand::builder(sc.name, sc.all).cast())
+            }
+            Some(cli::ContextSubCommand::ApiResources(sc)) => {
+                Box::new(ContextApiResourcesCommand::builder(sc.resource_context.context).cast())
+            }
+            Some(cli::ContextSubCommand::Use(sc)) => {
+                Box::new(ContextUseCommand::builder(sc.name).cast())
+            }
+            None => {
+                if let Some(name) = c.name {
+                    Box::new(ContextUseCommand::builder(name).cast())
+                } else {
+                    Box::new(ContextCommand::builder().cast())
+                }
+            }
+        },
+
         cli::Command::Delete(c) => Box::new(
             DeleteCommand::builder(
-                validate_many_dataset_patterns(cli_catalog, c.dataset)?,
+                c.target,
+                c.args,
+                c.resource_context.context,
                 c.all,
                 c.recursive,
+                c.force,
+                c.ignore_not_found,
+                c.dry_run,
+                c.label_selectors,
             )
             .cast(),
         ),
@@ -96,6 +182,21 @@ pub fn get_command(
                 c.output_format,
                 c.records_per_file,
                 args.quiet,
+            )
+            .cast(),
+        ),
+
+        cli::Command::Get(c) => Box::new(
+            GetResourceCommand::builder(
+                c.resource_context.context,
+                c.args,
+                c.output_format,
+                c.spec,
+                c.revealed,
+                c.ignore_not_found,
+                c.max_results,
+                c.unbounded,
+                c.label_selectors,
             )
             .cast(),
         ),
@@ -150,8 +251,13 @@ pub fn get_command(
                     c.target_account,
                     c.all_accounts,
                 ),
+                c.targets,
+                c.resource_context.context,
                 cli_catalog.get_one()?,
                 c.wide,
+                c.max_results,
+                c.unbounded,
+                c.label_selectors,
             )
             .cast(),
         ),
@@ -175,10 +281,10 @@ pub fn get_command(
                         odf_server::AccessTokenStoreScope::Workspace
                     },
                     sc.server.map(Into::into),
-                    LoginSilentMode::OAuth(LoginSilentModeOAuth {
+                    odf_server::LoginMethod::OAuth {
                         provider: sc.provider,
                         access_token: sc.access_token,
-                    }),
+                    },
                     c.repo_name,
                     c.skip_add_repo,
                 )
@@ -192,10 +298,10 @@ pub fn get_command(
                         odf_server::AccessTokenStoreScope::Workspace
                     },
                     sc.server.map(Into::into),
-                    LoginSilentMode::Password(LoginSilentModePassword {
+                    odf_server::LoginMethod::Password {
                         login: sc.login,
                         password: sc.password,
-                    }),
+                    },
                     c.repo_name,
                     c.skip_add_repo,
                 )
@@ -233,7 +339,7 @@ pub fn get_command(
         ),
 
         cli::Command::New(c) => {
-            Box::new(NewDatasetCommand::builder(c.name, c.root, c.derivative, None).cast())
+            Box::new(NewDatasetCommand::builder(c.dataset_name, c.root, c.derivative, None).cast())
         }
 
         cli::Command::Notebook(c) => Box::new(
@@ -304,12 +410,13 @@ pub fn get_command(
         ),
 
         cli::Command::Rename(c) => Box::new(
-            RenameCommand::builder(validate_dataset_ref(cli_catalog, c.dataset)?, c.name).cast(),
+            RenameCommand::builder(validate_dataset_ref(cli_catalog, c.dataset)?, c.new_name)
+                .cast(),
         ),
 
         cli::Command::Repo(c) => match c.subcommand {
             cli::RepoSubCommand::Add(sc) => {
-                Box::new(RepositoryAddCommand::builder(sc.name, sc.url).cast())
+                Box::new(RepositoryAddCommand::builder(sc.repo_name, sc.url).cast())
             }
             cli::RepoSubCommand::Delete(sc) => Box::new(
                 RepositoryDeleteCommand::builder(sc.repository.unwrap_or_default(), sc.all).cast(),
@@ -367,6 +474,10 @@ pub fn get_command(
                 .cast(),
             ),
         },
+
+        cli::Command::Summary(c) => {
+            Box::new(SummaryCommand::builder(c.resource_context.context, c.output_format).cast())
+        }
 
         cli::Command::System(c) => match c.subcommand {
             cli::SystemSubCommand::ApiServer(sc) => match sc.subcommand {
@@ -443,7 +554,7 @@ pub fn get_command(
             let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
 
             let current_account_name = match current_account_subject.as_ref() {
-                CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+                CurrentAccountSubject::Logged(l) => l.account_handle.name.clone(),
                 CurrentAccountSubject::Anonymous(_) => {
                     panic!("Cannot launch Web UI with anonymous account")
                 }
@@ -476,7 +587,6 @@ pub fn get_command(
     Ok(command)
 }
 
-#[allow(clippy::match_like_matches_macro)]
 pub fn command_needs_transaction(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
@@ -486,12 +596,51 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
                     Some(cli::SystemApiServerSubCommand::GqlQuery(_))
                 )
             }
-            _ => true,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::DebugToken(_)
+            | cli::SystemSubCommand::Depgraph(_)
+            | cli::SystemSubCommand::Decode(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::GenerateToken(_)
+            | cli::SystemSubCommand::Gc(_)
+            | cli::SystemSubCommand::Info(_)
+            | cli::SystemSubCommand::Ipfs(_)
+            | cli::SystemSubCommand::UpgradeWorkspace(_) => true,
         },
         // False for set_watermark option
         cli::Command::Pull(c) => c.set_watermark.is_some(),
-        cli::Command::Ui(_) | cli::Command::Login(_) | cli::Command::Push(_) => false,
-        _ => true,
+        cli::Command::Context(c) => {
+            matches!(&c.subcommand, Some(cli::ContextSubCommand::ApiResources(_)))
+        }
+        cli::Command::Apply(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Login(_)
+        | cli::Command::Push(_) => false,
+        cli::Command::Add(_)
+        | cli::Command::Complete(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Logout(_)
+        | cli::Command::New(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Verify(_)
+        | cli::Command::Version(_) => true,
     }
 }
 
@@ -508,16 +657,42 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
                 None | Some(cli::SystemApiServerSubCommand::GqlQuery(_)) => true,
                 Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => false,
             },
-            _ => true,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::Depgraph(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::Ipfs(_) => true,
         },
         cli::Command::Complete(_)
         | cli::Command::Completions(_)
         | cli::Command::Config(_)
+        | cli::Command::Context(_)
         | cli::Command::New(_)
         | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
         | cli::Command::Version(_)
         | cli::Command::Notebook(_) => false,
-        _ => true,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Login(_)
+        | cli::Command::Logout(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Verify(_) => true,
     }
 }
 
@@ -528,7 +703,15 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
         | cli::Command::Config(_)
         | cli::Command::Init(_)
         | cli::Command::New(_)
+        | cli::Command::Summary(_)
         | cli::Command::Version(_) => false,
+
+        // `context add` may store a workspace-scoped access token, which needs
+        // a workspace to write into — mirroring the `Login` rule below
+        cli::Command::Context(c) => match &c.subcommand {
+            Some(cli::ContextSubCommand::Add(sc)) => !sc.user,
+            _ => false,
+        },
 
         cli::Command::System(s) => match &s.subcommand {
             cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {
@@ -542,10 +725,33 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Info(_)
             | cli::SystemSubCommand::UpgradeWorkspace(_) => false,
-            _ => true,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::Gc(_)
+            | cli::SystemSubCommand::Ipfs(_) => true,
         },
         cli::Command::Login(l) => !l.user,
-        _ => true,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Logout(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Verify(_) => true,
     }
 }
 
@@ -563,19 +769,85 @@ pub fn command_needs_startup_jobs(args: &cli::Cli) -> bool {
             //       user accounts.
             true
         }
-        _ => false,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::Context(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Login(_)
+        | cli::Command::Logout(_)
+        | cli::Command::New(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
+        | cli::Command::System(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Verify(_)
+        | cli::Command::Version(_) => false,
     }
 }
 
-#[expect(clippy::match_like_matches_macro)]
 pub fn command_needs_server_components(args: &cli::Cli) -> bool {
     match &args.command {
         cli::Command::System(c) => match &c.subcommand {
             cli::SystemSubCommand::ApiServer(_) => true,
-            _ => false,
+            cli::SystemSubCommand::Compact(_)
+            | cli::SystemSubCommand::DebugToken(_)
+            | cli::SystemSubCommand::Depgraph(_)
+            | cli::SystemSubCommand::Decode(_)
+            | cli::SystemSubCommand::Diagnose(_)
+            | cli::SystemSubCommand::E2e(_)
+            | cli::SystemSubCommand::GenerateToken(_)
+            | cli::SystemSubCommand::Gc(_)
+            | cli::SystemSubCommand::Info(_)
+            | cli::SystemSubCommand::Ipfs(_)
+            | cli::SystemSubCommand::UpgradeWorkspace(_) => false,
         },
         cli::Command::Ui(_) => true,
-        _ => false,
+        cli::Command::Add(_)
+        | cli::Command::Apply(_)
+        | cli::Command::Complete(_)
+        | cli::Command::Completions(_)
+        | cli::Command::Config(_)
+        | cli::Command::Context(_)
+        | cli::Command::Delete(_)
+        | cli::Command::Export(_)
+        | cli::Command::Get(_)
+        | cli::Command::Ingest(_)
+        | cli::Command::Init(_)
+        | cli::Command::Inspect(_)
+        | cli::Command::List(_)
+        | cli::Command::Log(_)
+        | cli::Command::Login(_)
+        | cli::Command::Logout(_)
+        | cli::Command::New(_)
+        | cli::Command::Notebook(_)
+        | cli::Command::Pull(_)
+        | cli::Command::Push(_)
+        | cli::Command::Rename(_)
+        | cli::Command::Reset(_)
+        | cli::Command::Repo(_)
+        | cli::Command::Search(_)
+        | cli::Command::Sql(_)
+        | cli::Command::Summary(_)
+        | cli::Command::Tail(_)
+        | cli::Command::Verify(_)
+        | cli::Command::Version(_) => false,
     }
 }
 
@@ -587,29 +859,36 @@ fn validate_dataset_ref(
     catalog: &dill::Catalog,
     dataset_ref: odf::DatasetRef,
 ) -> Result<odf::DatasetRef, CLIError> {
-    if let odf::DatasetRef::Alias(ref alias) = dataset_ref {
-        let workspace_svc = catalog.get_one::<WorkspaceService>()?;
-        if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
-            return Err(MultiTenantRefUnexpectedError {
-                dataset_ref_pattern: odf::DatasetRefPattern::Ref(dataset_ref),
-            }
-            .into());
+    let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+    validate_dataset_ref_with_workspace(workspace_svc.as_ref(), dataset_ref)
+}
+
+pub(crate) fn validate_dataset_ref_with_workspace(
+    workspace_svc: &WorkspaceService,
+    dataset_ref: odf::DatasetRef,
+) -> Result<odf::DatasetRef, CLIError> {
+    if let odf::DatasetRef::Alias(ref alias) = dataset_ref
+        && !workspace_svc.is_multi_tenant_workspace()
+        && alias.is_multi_tenant()
+    {
+        return Err(MultiTenantRefUnexpectedError {
+            dataset_ref_pattern: odf::DatasetRefPattern::Ref(dataset_ref),
         }
+        .into());
     }
     Ok(dataset_ref)
 }
 
-fn validate_dataset_ref_pattern(
-    catalog: &dill::Catalog,
+pub(crate) fn validate_dataset_ref_pattern_with_workspace(
+    workspace_svc: &WorkspaceService,
     dataset_ref_pattern: odf::DatasetRefPattern,
 ) -> Result<odf::DatasetRefPattern, CLIError> {
     match dataset_ref_pattern {
         odf::DatasetRefPattern::Ref(dsr) => {
-            let valid_ref = validate_dataset_ref(catalog, dsr)?;
+            let valid_ref = validate_dataset_ref_with_workspace(workspace_svc, dsr)?;
             Ok(odf::DatasetRefPattern::Ref(valid_ref))
         }
         odf::DatasetRefPattern::Pattern(drp) => {
-            let workspace_svc = catalog.get_one::<WorkspaceService>()?;
             if !workspace_svc.is_multi_tenant_workspace() && drp.account_name.is_some() {
                 return Err(MultiTenantRefUnexpectedError {
                     dataset_ref_pattern: odf::DatasetRefPattern::Pattern(drp),
@@ -619,6 +898,19 @@ fn validate_dataset_ref_pattern(
             Ok(odf::DatasetRefPattern::Pattern(drp))
         }
     }
+}
+
+pub(crate) fn validate_many_dataset_patterns_with_workspace<I>(
+    workspace_svc: &WorkspaceService,
+    dataset_ref_patterns: I,
+) -> Result<Vec<odf::DatasetRefPattern>, CLIError>
+where
+    I: IntoIterator<Item = odf::DatasetRefPattern>,
+{
+    dataset_ref_patterns
+        .into_iter()
+        .map(|p| validate_dataset_ref_pattern_with_workspace(workspace_svc, p))
+        .collect()
 }
 
 fn validate_many_dataset_refs<I>(
@@ -643,10 +935,8 @@ fn validate_many_dataset_patterns<I>(
 where
     I: IntoIterator<Item = odf::DatasetRefPattern>,
 {
-    dataset_ref_patterns
-        .into_iter()
-        .map(|p| validate_dataset_ref_pattern(catalog, p))
-        .collect()
+    let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+    validate_many_dataset_patterns_with_workspace(workspace_svc.as_ref(), dataset_ref_patterns)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

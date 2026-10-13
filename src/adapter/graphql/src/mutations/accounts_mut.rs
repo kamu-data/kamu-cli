@@ -25,6 +25,7 @@ use crate::queries;
 
 pub struct AccountsMut;
 
+/// Mutations of accounts
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl AccountsMut {
@@ -39,7 +40,7 @@ impl AccountsMut {
         match subject.as_ref() {
             CurrentAccountSubject::Logged(account) => {
                 let account = account_service
-                    .try_get_account_by_id(&account.account_id)
+                    .try_get_account_by_id(&account.account_handle.did)
                     .await?
                     .expect("Account exists");
 
@@ -237,8 +238,13 @@ impl AccountsMut {
 // CreateAccountResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of creating an account
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum CreateAccountResult {
     Success(CreateAccountSuccess),
     NonUniqueAccountField(AccountFieldNonUnique),
@@ -246,14 +252,17 @@ pub enum CreateAccountResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was created
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateAccountSuccess {
+    /// The created account
     pub account: queries::Account,
 }
 
 #[ComplexObject]
 impl CreateAccountSuccess {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Account created".to_string()
     }
@@ -261,14 +270,17 @@ impl CreateAccountSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Account was not created: a unique field value is already taken
 #[derive(Debug, SimpleObject)]
 #[graphql(complex)]
 pub struct AccountFieldNonUnique {
+    /// Name of the field whose value is already taken
     field: String,
 }
 
 #[ComplexObject]
 impl AccountFieldNonUnique {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         format!("Non-unique account field '{}'", self.field)
     }
@@ -278,22 +290,30 @@ impl AccountFieldNonUnique {
 // CreateWalletAccountsResult
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of creating wallet accounts
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum CreateWalletAccountsResult {
     Success(CreateWalletAccountsSuccess),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Wallet accounts exist for all given addresses
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct CreateWalletAccountsSuccess {
+    /// Accounts of the given wallets, including already existing ones
     pub accounts: Vec<queries::Account>,
 }
 
 #[ComplexObject]
 impl CreateWalletAccountsSuccess {
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Wallet accounts created".to_string()
     }

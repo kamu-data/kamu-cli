@@ -22,7 +22,8 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
 
 [dependencies]
@@ -45,17 +46,21 @@ time-source = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "54", default-features = false }
-dill = { version = "0.15", default-features = false }
+datafusion = { version = "55", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = { version = "0.3", default-features = false }
 indoc = { version = "2", default-features = false }
 nonempty = { version = "0.12", default-features = false }
 serde_json = { version = "1.0", default-features = false }
 thiserror = { version = "2", default-features = false }
-tokio = { version = "1", default-features = false, features = ["macros"] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+] }
 tracing = { version = "0.1", default-features = false }
-uuid = { version = "1", default-features = false, features = ["v4"] }
 url = { version = "2", default-features = false }
+uuid = { version = "1", default-features = false, features = [
+    "v4",
+] }
 
 
 [dev-dependencies]

@@ -12,5 +12,5 @@ pub use crate::{
     MessageConsumer,
     MessageConsumerMeta,
     MessageConsumerT,
-    MessageDeliveryMechanism,
+    MessageConsumptionMode,
 };

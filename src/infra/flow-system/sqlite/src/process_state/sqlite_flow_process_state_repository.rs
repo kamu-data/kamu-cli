@@ -35,7 +35,7 @@ impl SqliteFlowProcessStateRepository {
         let scope_json = serde_json::to_value(&process_state.flow_binding().scope).int_err()?;
         let scope_data_json = canonical_json::to_string(&scope_json).int_err()?;
 
-        let stop_policy_kind = process_state.stop_policy().kind_to_string();
+        let stop_policy_kind: &str = process_state.stop_policy().into();
         let stop_policy_json = serde_json::to_value(process_state.stop_policy()).int_err()?;
         let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
 
@@ -136,7 +136,7 @@ impl SqliteFlowProcessStateRepository {
         let effective_state_str = state.effective_state().to_string();
 
         let user_intent_str = state.user_intent().to_string();
-        let stop_policy_kind = state.stop_policy().kind_to_string();
+        let stop_policy_kind: &str = state.stop_policy().into();
         let stop_policy_json = serde_json::to_value(state.stop_policy()).int_err()?;
         let stop_policy_data = canonical_json::to_string(&stop_policy_json).int_err()?;
         let consecutive_failures = i32::try_from(state.consecutive_failures()).unwrap();

@@ -10,30 +10,147 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
+use crate::ClassifyByAllowanceDatasetActionUnauthorizedError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DeleteDatasetUseCase: Send + Sync {
-    async fn execute_via_ref(
+    async fn plan_delete(
         &self,
-        dataset_ref: &odf::DatasetRef,
-    ) -> Result<(), DeleteDatasetError>;
+        seed_dataset_handles: Vec<odf::DatasetHandle>,
+        recursive: bool,
+    ) -> Result<DeleteDatasetPlanningResult, DeleteDatasetPlanningError>;
 
-    async fn execute_via_handle(
+    async fn execute_plan(
         &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), DeleteDatasetError>;
+        plan: DeleteDatasetPlan,
+    ) -> Result<DeleteDatasetExecutionSummary, DeleteDatasetError>;
+}
 
-    async fn execute_via_handle_preauthorized(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-    ) -> Result<(), DeleteDatasetError>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct DeleteDatasetPlanningResult {
+    pub plan: DeleteDatasetPlan,
+    pub issues: DeleteDatasetPlanIssues,
+}
+
+impl DeleteDatasetPlanningResult {
+    pub fn has_blocking_issues(&self, allow_orphan: bool) -> bool {
+        self.issues.has_blockers(allow_orphan)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.plan.authorized_targets.is_empty() && self.issues.is_empty()
+    }
+
+    pub fn into_executable_plan(
+        self,
+        allow_orphan: bool,
+    ) -> Result<DeleteDatasetPlan, DeleteDatasetPlanEvaluationError> {
+        self.issues.evaluate_blockers(allow_orphan)?;
+        Ok(self.plan)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct DeleteDatasetPlan {
+    pub authorized_targets: Vec<DeleteDatasetPlanTarget>,
+}
+
+#[derive(Debug)]
+pub struct DeleteDatasetPlanTarget {
+    pub dataset_handle: odf::DatasetHandle,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct DeleteDatasetPlanIssues {
+    /// Directly specified targets that we cannot delete (access denied or not
+    /// found), which are hard errors we can't proceed with even with --force.
+    pub unauthorized_selected_handles: Vec<(
+        odf::DatasetHandle,
+        ClassifyByAllowanceDatasetActionUnauthorizedError,
+    )>,
+
+    /// Downstream datasets pulled in by recursive expansion that we cannot
+    /// delete (access denied). These will be left behind as orphans when
+    /// `--force` is used.
+    pub inaccessible_downstream_handles: Vec<(
+        odf::DatasetHandle,
+        ClassifyByAllowanceDatasetActionUnauthorizedError,
+    )>,
+
+    /// Authorized targets whose direct downstream datasets will not be deleted
+    /// (and are not in `inaccessible_downstream_handles`), leaving them with a
+    /// broken upstream reference.
+    pub directly_dangling_references: Vec<DanglingReferenceError>,
+}
+
+impl DeleteDatasetPlanIssues {
+    pub fn is_empty(&self) -> bool {
+        self.unauthorized_selected_handles.is_empty()
+            && self.inaccessible_downstream_handles.is_empty()
+            && self.directly_dangling_references.is_empty()
+    }
+
+    pub fn has_blockers(&self, allow_orphan: bool) -> bool {
+        !self.unauthorized_selected_handles.is_empty()
+            || (!allow_orphan && !self.directly_dangling_references.is_empty())
+            || (!allow_orphan && !self.inaccessible_downstream_handles.is_empty())
+    }
+
+    pub fn evaluate_blockers(
+        mut self,
+        allow_orphan: bool,
+    ) -> Result<(), DeleteDatasetPlanEvaluationError> {
+        if !self.unauthorized_selected_handles.is_empty() {
+            let (_, error) = self.unauthorized_selected_handles.remove(0);
+            return Err(classify_error_to_delete_plan_evaluation_error(error));
+        }
+
+        if !self.directly_dangling_references.is_empty() && !allow_orphan {
+            return Err(DeleteDatasetPlanEvaluationError::DanglingReference(
+                self.directly_dangling_references.remove(0),
+            ));
+        }
+
+        if !allow_orphan && !self.inaccessible_downstream_handles.is_empty() {
+            let (_, error) = self.inaccessible_downstream_handles.remove(0);
+            return Err(classify_error_to_delete_plan_evaluation_error(error));
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default)]
+pub struct DeleteDatasetExecutionSummary {
+    pub deleted_dataset_handles: Vec<odf::DatasetHandle>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum DeleteDatasetError {
+pub enum DeleteDatasetPlanningError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteDatasetPlanEvaluationError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 
@@ -53,6 +170,22 @@ pub enum DeleteDatasetError {
         #[backtrace]
         InternalError,
     ),
+}
+
+fn classify_error_to_delete_plan_evaluation_error(
+    error: ClassifyByAllowanceDatasetActionUnauthorizedError,
+) -> DeleteDatasetPlanEvaluationError {
+    match error {
+        ClassifyByAllowanceDatasetActionUnauthorizedError::NotFound(e) => {
+            DeleteDatasetPlanEvaluationError::NotFound(e)
+        }
+        ClassifyByAllowanceDatasetActionUnauthorizedError::Access(e) => {
+            DeleteDatasetPlanEvaluationError::Access(e)
+        }
+        ClassifyByAllowanceDatasetActionUnauthorizedError::Internal(e) => {
+            DeleteDatasetPlanEvaluationError::Internal(e)
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,13 +211,14 @@ impl std::fmt::Display for DanglingReferenceError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<odf::dataset::DeleteStoredDatasetError> for DeleteDatasetError {
-    fn from(value: odf::dataset::DeleteStoredDatasetError) -> Self {
-        match value {
-            odf::dataset::DeleteStoredDatasetError::UnresolvedId(e) => Self::NotFound(e.into()),
-            odf::dataset::DeleteStoredDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
+#[derive(Error, Debug)]
+pub enum DeleteDatasetError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

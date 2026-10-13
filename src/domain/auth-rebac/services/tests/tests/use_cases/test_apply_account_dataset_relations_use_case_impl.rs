@@ -24,8 +24,7 @@ use kamu_auth_rebac::{
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
-use kamu_datasets::DatasetActionAuthorizer;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{DatasetActionAuthorizer, MockDatasetActionAuthorizer};
 use messaging_outbox::{DummyOutboxImpl, MockOutbox, Outbox};
 use pretty_assertions::{assert_eq, assert_matches};
 

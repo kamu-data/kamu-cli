@@ -64,7 +64,6 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[expect(clippy::cast_possible_wrap)]
 fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrameExt
 where
     I: IntoIterator<Item = (Op, i32, S, i64)>,
@@ -87,7 +86,7 @@ where
     let mut population = Vec::new();
 
     for (off, (o, y, c, p)) in rows.into_iter().enumerate() {
-        offset.push(off as i64);
+        offset.push(i64::try_from(off).unwrap());
         op.push(o as i32);
         year.push(y);
         city.push(c.into());

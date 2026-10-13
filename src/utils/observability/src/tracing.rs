@@ -92,17 +92,17 @@ impl<E: opentelemetry_sdk::trace::SpanExporter> opentelemetry_sdk::trace::SpanEx
     }
 
     fn shutdown_with_timeout(
-        &mut self,
+        &self,
         timeout: std::time::Duration,
     ) -> opentelemetry_sdk::error::OTelSdkResult {
         self.0.shutdown_with_timeout(timeout)
     }
 
-    fn shutdown(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
+    fn shutdown(&self) -> opentelemetry_sdk::error::OTelSdkResult {
         self.0.shutdown()
     }
 
-    fn force_flush(&mut self) -> opentelemetry_sdk::error::OTelSdkResult {
+    fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
         self.0.force_flush()
     }
 

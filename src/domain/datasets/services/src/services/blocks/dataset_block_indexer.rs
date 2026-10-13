@@ -59,7 +59,10 @@ impl DatasetBlockIndexer {
         // migration stage
 
         // Repository can build a report of unindexed dataset branches (id->blockRef)
-        #[allow(clippy::zero_sized_map_values)]
+        #[expect(
+            clippy::zero_sized_map_values,
+            reason = "repository API returns a map with zero-sized values"
+        )]
         let unindexed_dataset_branches = dataset_key_block_repo
             .list_unindexed_dataset_branches()
             .await?
@@ -79,7 +82,10 @@ impl DatasetBlockIndexer {
             .int_err()?;
 
         assert!(dataset_handles_map.unresolved_datasets.is_empty());
-        assert!(dataset_handles_map.resolved_handles.len() == unindexed_dataset_branches.len());
+        assert_eq!(
+            dataset_handles_map.resolved_handles.len(),
+            unindexed_dataset_branches.len()
+        );
 
         // Combine handles with block refs
 

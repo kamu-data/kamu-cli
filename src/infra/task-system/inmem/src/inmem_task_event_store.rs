@@ -9,15 +9,20 @@
 
 use std::collections::BTreeMap;
 use std::collections::hash_map::{Entry, HashMap};
+use std::sync::Arc;
 
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_task_system::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+
+use crate::TASKS_QUEUED_CHANNEL;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryTaskEventStore {
     inner: InMemoryEventStore<TaskState, State>,
+    wakeup_hub: Arc<InMemoryWakeupHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,9 +68,10 @@ impl EventStoreState<TaskState> for State {
 #[interface(dyn TaskEventStore)]
 #[scope(Singleton)]
 impl InMemoryTaskEventStore {
-    pub fn new() -> Self {
+    pub fn new(wakeup_hub: Arc<InMemoryWakeupHub>) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
+            wakeup_hub,
         }
     }
 
@@ -80,9 +86,14 @@ impl InMemoryTaskEventStore {
             entries.push(event.task_id());
         }
 
+        let current_status = state
+            .task_statuses
+            .get(&event.task_id())
+            .copied()
+            .unwrap_or(TaskStatus::Queued);
         state
             .task_statuses
-            .insert(event.task_id(), event.new_status());
+            .insert(event.task_id(), event.next_status(current_status));
     }
 }
 
@@ -90,8 +101,8 @@ impl InMemoryTaskEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<TaskState> for InMemoryTaskEventStore {
-    async fn len(&self) -> Result<usize, InternalError> {
-        self.inner.len().await
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
+        self.inner.total_events_stored().await
     }
 
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, TaskEvent> {
@@ -100,6 +111,10 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
 
     fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<'_, TaskEvent> {
         self.inner.get_events(task_id, opts)
+    }
+
+    fn get_events_multi(&self, queries: &[TaskID]) -> MultiEventStream<'_, TaskID, TaskEvent> {
+        self.inner.get_events_multi(queries)
     }
 
     async fn save_events(
@@ -112,6 +127,20 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
             return Err(SaveEventsError::NothingToSave);
         }
 
+        let has_queued_tasks = events.iter().any(|event| {
+            matches!(
+                event,
+                TaskEvent::TaskCreated(_) | TaskEvent::TaskRequeued(_)
+            )
+        });
+
+        let last_event_id = self
+            .inner
+            .save_events(task_id, maybe_prev_stored_event_id, events.clone())
+            .await?;
+
+        // Indexed only once the save passed the concurrent modification check,
+        // as a rejected save must leave them intact
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
@@ -120,9 +149,50 @@ impl EventStore<TaskState> for InMemoryTaskEventStore {
             }
         }
 
-        self.inner
-            .save_events(task_id, maybe_prev_stored_event_id, events)
-            .await
+        if has_queued_tasks {
+            self.wakeup_hub.signal(TASKS_QUEUED_CHANNEL);
+        }
+
+        Ok(last_event_id)
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<TaskID, TaskEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let events: Vec<TaskEvent> = items
+            .iter()
+            .flat_map(|item| item.events.iter().cloned())
+            .collect();
+
+        let has_queued_tasks = events.iter().any(|event| {
+            matches!(
+                event,
+                TaskEvent::TaskCreated(_) | TaskEvent::TaskRequeued(_)
+            )
+        });
+
+        let last_event_ids = self.inner.save_events_multi(items).await?;
+
+        // Indexed only once the save passed the concurrent modification check,
+        // as a rejected save must leave them intact
+        {
+            let state = self.inner.as_state();
+            let mut g = state.lock().unwrap();
+            for event in &events {
+                Self::update_index(&mut g, event);
+            }
+        }
+
+        if has_queued_tasks {
+            self.wakeup_hub.signal(TASKS_QUEUED_CHANNEL);
+        }
+
+        Ok(last_event_ids)
     }
 }
 

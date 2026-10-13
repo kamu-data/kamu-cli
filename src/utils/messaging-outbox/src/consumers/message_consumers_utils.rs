@@ -18,7 +18,7 @@ use super::{
     ConsumerFilter,
     MessageConsumer,
     MessageConsumerMeta,
-    MessageDeliveryMechanism,
+    MessageConsumptionMode,
     MessageDispatcher,
 };
 use crate::{Message, MessageConsumerT, MessageSubscription};
@@ -83,7 +83,7 @@ fn immediate_consumers_for<TMessage: Message + 'static>(
     consumers_from_builders(
         catalog,
         catalog.builders_for_with_meta::<dyn MessageConsumerT<TMessage>, _>(
-            |meta: &MessageConsumerMeta| meta.delivery == MessageDeliveryMechanism::Immediate,
+            |meta: &MessageConsumerMeta| meta.consumption_mode.is_immediate(),
         ),
     )
 }
@@ -104,24 +104,32 @@ fn particular_consumers_for<TMessage: Message + 'static>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn particular_consumer_metadata_for(
+pub(crate) fn consumer_metadata_by_consumer_name(
     catalog: &Catalog,
-    consumer_name: &str,
-) -> Option<MessageConsumerMeta> {
-    catalog
-        .builders_for_with_meta::<dyn MessageConsumer, _>(|meta: &MessageConsumerMeta| {
-            meta.consumer_name == consumer_name
-        })
-        .next()
-        .and_then(|consumer_builder| {
-            let all_metadata: Vec<&MessageConsumerMeta> = consumer_builder.metadata_get_all();
+) -> HashMap<String, MessageConsumerMeta> {
+    let mut metadata_by_consumer_name = HashMap::new();
+
+    let all_consumer_builders = catalog.builders_for::<dyn MessageConsumer>();
+    for consumer_builder in all_consumer_builders {
+        let all_metadata: Vec<&MessageConsumerMeta> = consumer_builder.metadata_get_all();
+        assert!(
+            all_metadata.len() <= 1,
+            "Multiple consumer metadata records unexpected for {}",
+            consumer_builder.instance_type().name
+        );
+
+        if let Some(metadata) = all_metadata.first() {
             assert!(
-                all_metadata.len() <= 1,
-                "Multiple consumer metadata records unexpected for {}",
-                consumer_builder.instance_type().name
+                metadata_by_consumer_name
+                    .insert(metadata.consumer_name.to_string(), (**metadata).clone())
+                    .is_none(),
+                "Duplicate consumer metadata for '{}'",
+                metadata.consumer_name
             );
-            all_metadata.first().map(|meta| (**meta).clone())
-        })
+        }
+    }
+
+    metadata_by_consumer_name
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,7 +169,7 @@ pub(crate) fn group_message_dispatchers_by_producer(
 
 pub(crate) fn enumerate_messaging_routes(
     catalog: &Catalog,
-    durability: MessageDeliveryMechanism,
+    consumption_mode: MessageConsumptionMode,
 ) -> Vec<MessageSubscription> {
     let mut res = Vec::new();
 
@@ -174,7 +182,7 @@ pub(crate) fn enumerate_messaging_routes(
             consumer_builder.instance_type().name
         );
         for metadata in all_metadata {
-            if metadata.delivery == durability {
+            if metadata.consumption_mode == consumption_mode {
                 for producer_name in metadata.feeding_producers {
                     res.push(MessageSubscription::new(
                         producer_name,

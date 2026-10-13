@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_task_system as ts;
 
-use crate::{FlowBinding, FlowState, ReactiveRule};
+use crate::{FlowBinding, FlowSensorActivation, FlowState, ReactiveRule};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,7 @@ pub trait FlowController: Send + Sync {
     async fn ensure_flow_sensor(
         &self,
         flow_binding: &FlowBinding,
-        _activation_time: DateTime<Utc>,
+        _activation: FlowSensorActivation,
         _reactive_rule: ReactiveRule,
     ) -> Result<(), InternalError> {
         tracing::error!(

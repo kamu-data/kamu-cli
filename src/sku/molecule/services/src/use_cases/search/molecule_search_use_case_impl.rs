@@ -137,7 +137,7 @@ impl MoleculeSearchUseCaseImpl {
         // Get read access to global activities dataset
         let data_room_activities_reader = match self
             .global_data_room_activities_service
-            .reader(&molecule_subject.account_name)
+            .reader(&molecule_subject.account_handle.name)
             .await
         {
             Ok(reader) => Ok(reader),
@@ -214,7 +214,7 @@ impl MoleculeSearchUseCaseImpl {
         // Get read access to global announcements dataset
         let announcements_reader = match self
             .announcements_service
-            .global_reader(&molecule_subject.account_name)
+            .global_reader(&molecule_subject.account_handle.name)
             .await
         {
             Ok(reader) => Ok(reader),
@@ -293,7 +293,7 @@ impl MoleculeSearchUseCaseImpl {
         let ctx = SearchContext {
             catalog: &self.catalog,
             security: SearchSecurityContext::Restricted {
-                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+                current_principal_ids: vec![molecule_subject.account_handle.did.to_string()],
             },
         };
 

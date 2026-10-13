@@ -9,15 +9,18 @@
 
 use async_graphql::value;
 use kamu::MetadataQueryServiceImpl;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::*;
 use kamu_flow_system_inmem::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use odf::metadata::testing::MetadataFactory;
+use wakeup_listener::WakeupListenerMetrics;
 
 use crate::utils::{
     BaseGQLDatasetHarness,
     GraphQLQueryRequest,
     PredefinedAccountOpts,
-    authentication_catalogs,
+    authentication_catalogs_ext,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,20 +28,28 @@ use crate::utils::{
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 pub struct BaseGQLFlowHarness {
     base_gql_harness: BaseGQLDatasetHarness,
+    catalog_no_subject: dill::Catalog,
     pub catalog_anonymous: dill::Catalog,
     pub catalog_authorized: dill::Catalog,
 }
 
 impl BaseGQLFlowHarness {
     pub async fn new(base_gql_harness: BaseGQLDatasetHarness, catalog: dill::Catalog) -> Self {
-        let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&catalog, PredefinedAccountOpts::default()).await;
+        let auth_catalogs =
+            authentication_catalogs_ext(&catalog, None, PredefinedAccountOpts::default()).await;
 
         Self {
             base_gql_harness,
-            catalog_anonymous,
-            catalog_authorized,
+            catalog_no_subject: auth_catalogs.catalog_no_subject,
+            catalog_anonymous: auth_catalogs.catalog_anonymous,
+            catalog_authorized: auth_catalogs.catalog_authorized,
         }
+    }
+
+    pub fn catalog_for_subject(&self, subject: CurrentAccountSubject) -> dill::Catalog {
+        dill::CatalogBuilder::new_chained(&self.catalog_no_subject)
+            .add_value(subject)
+            .build()
     }
 
     pub fn make_base_gql_flow_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {
@@ -49,14 +60,19 @@ impl BaseGQLFlowHarness {
             .add::<InMemoryFlowTriggerEventStore>()
             .add::<InMemoryFlowConfigurationEventStore>()
             .add::<InMemoryFlowSystemEventBridge>()
-            .add::<InMemoryFlowProcessState>();
+            .add::<InMemoryFlowActivationWakeupSource>()
+            .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
+            .add::<InMemoryFlowProcessState>()
+            .add::<InMemoryFlowActivationLinkRepository>();
 
         b.build()
     }
 
     pub fn logged_account_id(&self) -> odf::AccountID {
         self.logged_account_from_catalog(&self.catalog_authorized)
-            .account_id
+            .account_handle
+            .did
     }
 
     pub async fn create_root_dataset(
@@ -150,7 +166,6 @@ impl BaseGQLFlowHarness {
             .unwrap()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     pub fn set_time_delta_trigger(
         &self,
         dataset_id: &odf::DatasetID,
@@ -237,7 +252,6 @@ impl BaseGQLFlowHarness {
         GraphQLQueryRequest::new(mutation_code, Variables::from_value(vars))
     }
 
-    #[allow(clippy::needless_pass_by_value)]
     pub fn set_cron_trigger(
         &self,
         dataset_id: &odf::DatasetID,

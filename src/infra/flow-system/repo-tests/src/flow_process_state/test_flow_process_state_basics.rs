@@ -37,7 +37,7 @@ pub async fn test_empty_state_table_initially(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert!(listing.processes.is_empty());
+    assert_eq!(listing.processes, []);
 
     let rollup = flow_process_state_query
         .rollup(FlowProcessListFilter::all())
@@ -662,7 +662,7 @@ pub async fn test_delete_process(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert!(listing_after.processes.is_empty());
+    assert_eq!(listing_after.processes, []);
 
     let rollup_after = flow_process_state_query
         .rollup(FlowProcessListFilter::all())
@@ -847,7 +847,7 @@ pub async fn test_delete_multiple_process_types_by_scope(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    assert!(listing_after.processes.is_empty());
+    assert_eq!(listing_after.processes, []);
 
     // Verify rollup shows everything is gone
     let rollup_after = flow_process_state_query

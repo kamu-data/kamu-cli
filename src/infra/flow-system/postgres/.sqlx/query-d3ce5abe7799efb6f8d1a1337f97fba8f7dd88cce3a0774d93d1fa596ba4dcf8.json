@@ -6,17 +6,35 @@
       {
         "ordinal": 0,
         "name": "flow_id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_events",
+            "name": "flow_id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "event_id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "flow_events",
+            "name": "event_id"
+          }
+        }
       },
       {
         "ordinal": 2,
         "name": "event_payload",
-        "type_info": "Jsonb"
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "flow_events",
+            "name": "event_payload"
+          }
+        }
       }
     ],
     "parameters": {

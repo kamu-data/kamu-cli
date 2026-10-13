@@ -12,7 +12,7 @@ use std::future::Future;
 use chrono::{DateTime, NaiveTime, TimeZone, Utc};
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 use kamu_cli_puppet::{KamuCliPuppet, NewWorkspaceOptions};
-use sqlx::{MySqlPool, PgPool};
+use sqlx::PgPool;
 
 use crate::{KamuApiServerClient, api_server_e2e_test};
 
@@ -48,6 +48,23 @@ pub const MULTITENANT_KAMU_CONFIG_WITH_RESTRICTED_ANONYMOUS: &str = indoc::indoc
               password: kamu.dev
               email: kamu@example.com
               properties: [ admin ]
+    "#
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Lets scenarios that wait for flows, including reactive downstream ones,
+/// finish within seconds
+pub const KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      flowSystem:
+        awaitingStepSecs: 1
+        mandatoryThrottlingPeriodSecs: 5
+      backgroundAgents:
+        maxListeningTimeout: 1s
     "#
 );
 
@@ -152,32 +169,6 @@ impl KamuCliApiServerHarness {
         Self::new(options, Some(kamu_config))
     }
 
-    pub fn mysql(mysql_pool: &MySqlPool, options: KamuCliApiServerHarnessOptions) -> Self {
-        let db = mysql_pool.connect_options();
-        let kamu_config = indoc::formatdoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-                database:
-                    provider: mySql
-                    host: {host}
-                    credentialsPolicy:
-                        source:
-                            kind: rawPassword
-                            userName: {user}
-                            rawPassword: {password}
-                    databaseName: {database}
-                "#,
-            host = db.get_host(),
-            user = db.get_username(),
-            password = db.get_username(), // It's intended: password is same as user for tests
-            database = db.get_database().unwrap(),
-        );
-
-        Self::new(options, Some(kamu_config))
-    }
-
     pub fn sqlite(options: KamuCliApiServerHarnessOptions) -> Self {
         // We don't need to specify sqlite database in config,
         // because kamu-cli will create the database on its own
@@ -234,7 +225,7 @@ impl KamuCliApiServerHarness {
 
         let mut kamu = match potential_workspace {
             PotentialWorkspace::NoWorkspace => KamuCliPuppet::new("."),
-            ws => {
+            ws @ (PotentialWorkspace::SingleTenant | PotentialWorkspace::MultiTenant) => {
                 let is_multi_tenant = ws == PotentialWorkspace::MultiTenant;
 
                 KamuCliPuppet::new_workspace_tmp_with(NewWorkspaceOptions {
@@ -261,17 +252,35 @@ fn merge_yaml(
 ) -> Option<serde_yaml::Value> {
     match (target, source) {
         (Some(mut target), Some(source)) => {
-            let target_mapping = target.as_mapping_mut().unwrap();
-            let serde_yaml::Value::Mapping(source_mapping) = source else {
-                panic!("source is not a mapping: {source:?}")
-            };
+            assert!(source.is_mapping(), "source is not a mapping: {source:?}");
 
-            target_mapping.extend(source_mapping);
+            merge_yaml_values(&mut target, source);
 
             Some(target)
         }
         (target, None) => target,
         (None, generated_kamu_config) => generated_kamu_config,
+    }
+}
+
+/// Merges mappings recursively, so that a source `content.flowSystem` keeps the
+/// target `content.database`. Any other source value replaces the target one
+fn merge_yaml_values(target: &mut serde_yaml::Value, source: serde_yaml::Value) {
+    match (target, source) {
+        (
+            serde_yaml::Value::Mapping(target_mapping),
+            serde_yaml::Value::Mapping(source_mapping),
+        ) => {
+            for (key, source_value) in source_mapping {
+                match target_mapping.get_mut(&key) {
+                    Some(target_value) => merge_yaml_values(target_value, source_value),
+                    None => {
+                        target_mapping.insert(key, source_value);
+                    }
+                }
+            }
+        }
+        (target, source) => *target = source,
     }
 }
 

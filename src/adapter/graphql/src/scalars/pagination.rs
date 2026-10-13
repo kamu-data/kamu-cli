@@ -17,6 +17,7 @@ use crate::prelude::*;
 #[macro_export]
 macro_rules! page_based_connection {
     ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
+        #[doc = concat!("A page of `", stringify!($node_type), "` items")]
         #[derive(async_graphql::SimpleObject)]
         #[graphql(complex)]
         pub struct $connection_type {
@@ -65,13 +66,16 @@ macro_rules! page_based_connection {
                 }
             }
 
+            /// Items of this page, each wrapped in an edge
             async fn edges(&self) -> Vec<$edge_type<'_>> {
                 self.nodes.iter().map(|node| $edge_type { node }).collect()
             }
         }
 
+        #[doc = concat!("An edge wrapping a single `", stringify!($node_type), "` item")]
         #[derive(async_graphql::SimpleObject)]
         pub struct $edge_type<'a> {
+            /// The item itself
             pub node: &'a $node_type,
         }
     };
@@ -85,6 +89,7 @@ pub(crate) use page_based_connection;
 #[macro_export]
 macro_rules! page_based_stream_connection {
     ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
+        #[doc = concat!("A page of `", stringify!($node_type), "` items")]
         #[derive(async_graphql::SimpleObject)]
         #[graphql(complex)]
         pub struct $connection_type {
@@ -113,13 +118,16 @@ macro_rules! page_based_stream_connection {
                 }
             }
 
+            /// Items of this page, each wrapped in an edge
             async fn edges(&self) -> Vec<$edge_type<'_>> {
                 self.nodes.iter().map(|node| $edge_type { node }).collect()
             }
         }
 
+        #[doc = concat!("An edge wrapping a single `", stringify!($node_type), "` item")]
         #[derive(async_graphql::SimpleObject)]
         pub struct $edge_type<'a> {
+            /// The item itself
             pub node: &'a $node_type,
         }
     };
@@ -129,6 +137,7 @@ pub(crate) use page_based_stream_connection;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Position of a page within a page-based listing
 #[derive(SimpleObject)]
 pub struct PageBasedInfo {
     /// When paginating backwards, are there more items?

@@ -91,17 +91,13 @@ impl MoleculeSearchSchemaProvider {
             };
 
             let logged_account = LoggedAccount {
-                account_id: org_account.id.clone(),
-                account_name: org_account.account_name.clone(),
+                account_handle: (&org_account).into(),
             };
 
             // Create catalog scoped to organization account
             let org_account_catalog =
                 dill::CatalogBuilder::new_chained(background_catalog.base_catalog())
-                    .add_value(CurrentAccountSubject::logged(
-                        org_account.id,
-                        org_account.account_name,
-                    ))
+                    .add_value(CurrentAccountSubject::Logged(logged_account.clone()))
                     .build();
 
             // Run indexing on behalf of organization account under a dedicated transaction

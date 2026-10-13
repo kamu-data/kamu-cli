@@ -185,29 +185,24 @@ async fn test_login_generate_busy_account_name() {
             }) if *account_name == odf::AccountName::new_unchecked("kamu-method-d")
         );
 
-        // NOTE: сlippy doesn't recognize value assignments within assert_matches!()
-        #[expect(unused_assignments)]
-        let mut expected_third_account_name = None;
-
+        let third_login = harness
+            .authentication_service
+            .login(
+                DummyAuthenticationProviderD {}.provider_name(),
+                "dummy".to_string(),
+                None,
+            )
+            .await;
+        // Account name isn't known yet, but the format is
         assert_matches!(
-            harness.authentication_service
-                .login(
-                    DummyAuthenticationProviderD {}.provider_name(),
-                    "dummy".to_string(),
-                    None
-                )
-                .await,
-            Ok(LoginResponse {
-                ref account_name,
-                ..
-            }) if {
-                expected_third_account_name = Some(account_name.clone());
-
-                // Account name isn't known yet, but the format is it
-                let re = regex::Regex::new(r"^kamu-method-d-[A-Za-z0-9]{4}$").unwrap();
-                re.is_match(account_name.as_str())
-            }
+            &third_login,
+            Ok(LoginResponse { account_name, .. })
+                if regex::Regex::new(r"^kamu-method-d-[A-Za-z0-9]{4}$")
+                    .unwrap()
+                    .is_match(account_name.as_str())
         );
+        let expected_third_account_name = third_login.unwrap().account_name;
+
         // Re-login when the third account is created
         assert_matches!(
             harness.authentication_service
@@ -220,7 +215,7 @@ async fn test_login_generate_busy_account_name() {
             Ok(LoginResponse {
                 ref account_name,
                 ..
-            }) if expected_third_account_name == Some(account_name.clone())
+            }) if *account_name == expected_third_account_name
         );
     }
 }

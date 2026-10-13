@@ -32,7 +32,7 @@ use crate::search::indexers::index_activity_from_data_room_publication_record;
     feeding_producers: &[
         MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct MoleculeActivitySearchUpdater {

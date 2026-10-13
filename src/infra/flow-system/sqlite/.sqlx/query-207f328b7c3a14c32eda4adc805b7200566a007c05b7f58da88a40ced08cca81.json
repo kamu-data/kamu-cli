@@ -6,87 +6,189 @@
       {
         "name": "flow_type",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "flow_type"
+          }
+        }
       },
       {
         "name": "scope_data: _",
         "ordinal": 1,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "scope_data"
+          }
+        }
       },
       {
         "name": "user_intent",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "user_intent"
+          }
+        }
       },
       {
         "name": "stop_policy_kind",
         "ordinal": 3,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "stop_policy_kind"
+          }
+        }
       },
       {
         "name": "stop_policy_data: _",
         "ordinal": 4,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "stop_policy_data"
+          }
+        }
       },
       {
         "name": "consecutive_failures",
         "ordinal": 5,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "consecutive_failures"
+          }
+        }
       },
       {
         "name": "last_success_at: _",
         "ordinal": 6,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "last_success_at"
+          }
+        }
       },
       {
         "name": "last_failure_at: _",
         "ordinal": 7,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "last_failure_at"
+          }
+        }
       },
       {
         "name": "last_attempt_at: _",
         "ordinal": 8,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "last_attempt_at"
+          }
+        }
       },
       {
         "name": "next_planned_at: _",
         "ordinal": 9,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "next_planned_at"
+          }
+        }
       },
       {
         "name": "paused_at: _",
         "ordinal": 10,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "paused_at"
+          }
+        }
       },
       {
         "name": "running_since: _",
         "ordinal": 11,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "running_since"
+          }
+        }
       },
       {
         "name": "auto_stopped_at: _",
         "ordinal": 12,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "auto_stopped_at"
+          }
+        }
       },
       {
         "name": "effective_state",
         "ordinal": 13,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "effective_state"
+          }
+        }
       },
       {
         "name": "auto_stopped_reason",
         "ordinal": 14,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "auto_stopped_reason"
+          }
+        }
       },
       {
         "name": "updated_at: _",
         "ordinal": 15,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "updated_at"
+          }
+        }
       },
       {
         "name": "last_applied_flow_system_event_id",
         "ordinal": 16,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "flow_process_states",
+            "name": "last_applied_flow_system_event_id"
+          }
+        }
       }
     ],
     "parameters": {

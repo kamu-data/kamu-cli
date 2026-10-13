@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use rand::Rng;
+use rand::RngExt;
 use tonic::Status;
 
 use crate::{SessionAuth, SessionToken};
@@ -47,7 +47,7 @@ impl SessionAuth for SessionAuthAnonymous {
         // TODO: SEC: Anonymous tokens should be validated on subsequent requests,
         // otherwise malicious clients can just generate them. This will require
         // storing tokens in a cache (e.g. alongside rate limiting data).
-        let session_token = SessionToken(format!("anon_{}", &base32_token));
+        let session_token = SessionToken(format!("anon_{base32_token}"));
         Ok(session_token)
     }
 }

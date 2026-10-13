@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::{Path, PathBuf};
-use std::{ffi, fs};
+use std::{env, ffi, fs};
 
 use chrono::{DateTime, Utc};
 
@@ -184,7 +184,7 @@ impl KamuCliPuppet {
         EnvIt: IntoIterator<Item = (EnvItem, EnvItem)>,
         EnvItem: AsRef<ffi::OsStr>,
     {
-        let mut command = assert_cmd::Command::cargo_bin("kamu-cli").unwrap();
+        let mut command = assert_cmd::Command::new(kamu_cli_bin_path());
 
         if let Some(env) = options.env {
             for (name, value) in env {
@@ -257,6 +257,30 @@ where
             env: None,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Replace with `assert_cmd::Command::cargo_bin` once it supports new cargo layout
+fn kamu_cli_bin_path() -> PathBuf {
+    // `CARGO_BIN_EXE_kamu-cli` is only set for tests of the `kamu-cli` package, and
+    // `assert_cmd`'s fallback expects test executables in `<profile>/deps/`, while cargo's
+    // build-dir layout places them in `<profile>/build/<pkg>/<hash>/out/`. Searching the
+    // ancestors of the test executable covers both layouts.
+    let bin_name = format!("kamu-cli{}", env::consts::EXE_SUFFIX);
+    let test_exe = env::current_exe().unwrap();
+
+    test_exe
+        .ancestors()
+        .skip(1)
+        .map(|dir| dir.join(&bin_name))
+        .find(|path| path.is_file())
+        .unwrap_or_else(|| {
+            panic!(
+                "Binary {bin_name} not found in any parent directory of {}",
+                test_exe.display()
+            )
+        })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,9 +13,11 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::InternalError;
 use kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::*;
 use serde::{Deserialize, Serialize};
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 use crate::{test_message_consumer, test_message_type};
 
@@ -30,9 +32,9 @@ test_message_type!(B);
 test_message_type!(C);
 
 test_message_consumer!(A, A, TEST_PRODUCER_A, Immediate, All);
-test_message_consumer!(B, B, TEST_PRODUCER_B, Transactional, All);
+test_message_consumer!(B, B, TEST_PRODUCER_B, TransactionalWrapped, All);
 test_message_consumer!(C, CB, TEST_PRODUCER_C, Immediate, All);
-test_message_consumer!(C, CD, TEST_PRODUCER_C, Transactional, All);
+test_message_consumer!(C, CD, TEST_PRODUCER_C, TransactionalWrapped, All);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -219,6 +221,8 @@ impl DispatchingOutboxHarness {
         b.add::<OutboxDispatchingImpl>();
         b.bind::<dyn Outbox, OutboxDispatchingImpl>();
         b.add::<InMemoryOutboxMessageBridge>();
+        b.add::<InMemoryWakeupHub>();
+        b.add::<WakeupListenerMetrics>();
         b.add::<SystemTimeSourceDefault>();
         b.add::<TestMessageConsumerA>();
         b.add::<TestMessageConsumerB>();

@@ -56,7 +56,7 @@ pub struct IngestParams {
     path = "/ingest",
     params(IngestParams, DatasetAliasInPath),
     request_body = Vec<u8>,
-    responses((status = OK, body = ())),
+    responses((status = OK, description = "data ingested", body = ())),
     tag = "kamu",
     security(
         ("api_key" = []),
@@ -167,7 +167,9 @@ pub async fn dataset_ingest_handler(
             PushIngestDataError::Execution(PushIngestError::QuotaExceeded(_)) => {
                 ApiError::new_forbidden()
             }
-            e => e.int_err().api_err(),
+            e @ (PushIngestDataError::Planning(_)
+            | PushIngestDataError::Execution(_)
+            | PushIngestDataError::Internal(_)) => e.int_err().api_err(),
         })?;
 
     Ok(())

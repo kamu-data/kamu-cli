@@ -21,19 +21,26 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-simple_scalar!(FlowID, fs::FlowID);
+simple_scalar!(
+    /// Unique identifier of a flow
+    FlowID,
+    fs::FlowID
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Key moments in the lifecycle of a flow
 #[derive(SimpleObject, Debug)]
 pub struct FlowTimingRecords {
     /// Initiation time
     pub initiated_at: DateTime<Utc>,
 
-    /// First scheduling time
+    /// Time when the first attempt's task was scheduled; unset while the flow
+    /// waits for activation
     pub first_attempt_scheduled_at: Option<DateTime<Utc>>,
 
-    /// Planned scheduling time (different than first in case of retries)
+    /// Planned activation time of the next attempt; moved by manual runs,
+    /// batching and retries
     pub scheduled_at: Option<DateTime<Utc>>,
 
     /// Recorded time of last task scheduling
@@ -51,23 +58,34 @@ pub struct FlowTimingRecords {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Lifecycle status of a flow
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 #[graphql(remote = "kamu_flow_system::FlowStatus")]
 pub enum FlowStatus {
+    /// Flow waits for its start condition or for its task to start
     Waiting,
+    /// Flow task is running
     Running,
+    /// Previous attempt failed and the flow waits for the next one
     Retrying,
+    /// Flow has completed with an outcome
     Finished,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Kind of a flow that operates on a dataset
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DatasetFlowType {
+    /// Ingests new data into a root dataset
     Ingest,
+    /// Runs the transformation of a derivative dataset
     ExecuteTransform,
+    /// Compacts data slices of a dataset
     HardCompaction,
+    /// Moves the dataset head to an earlier block, by default its seed
     Reset,
+    /// Drops the dataset's data while keeping its metadata
     ResetToMetadata,
 }
 
@@ -114,17 +132,25 @@ pub(crate) fn decode_dataset_flow_type(flow_type: &str) -> DatasetFlowType {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Time interval expressed as a number of units
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct TimeDelta {
+    /// Number of units in the interval
     pub every: i64,
+    /// Unit of the interval
     pub unit: TimeUnit,
 }
 
+/// Unit of a time interval
 #[derive(Debug, Enum, Clone, Copy, PartialEq, Eq)]
 pub enum TimeUnit {
+    /// Minutes
     Minutes,
+    /// Hours
     Hours,
+    /// Days
     Days,
+    /// Weeks
     Weeks,
 }
 
@@ -180,10 +206,13 @@ impl From<chrono::Duration> for TimeDelta {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// How to react to a breaking change (history rewrite) of a dataset
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 #[graphql(remote = "kamu_flow_system::BreakingChangeRule")]
 pub enum FlowTriggerBreakingChangeRule {
+    /// Ignore breaking changes
     NoAction,
+    /// React to breaking changes, e.g. reset a derivative dataset to metadata
     Recover,
 }
 

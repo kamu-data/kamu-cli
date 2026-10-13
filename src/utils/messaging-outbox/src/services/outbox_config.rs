@@ -7,30 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::time::Duration;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+use std::num::NonZeroUsize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct OutboxAgentConfig {
-    pub min_debounce_interval: Duration,
-    pub max_listening_timeout: Duration,
-    pub batch_size: usize,
+    /// How many messages are relayed per transaction
+    pub batch_size: NonZeroUsize,
+    /// Consumers handling messages at once, across all producers. Each one
+    /// typically holds a pooled connection while it runs
+    pub consumer_concurrency: NonZeroUsize,
 }
 
 impl OutboxAgentConfig {
+    // On Sqlite each batch holds the only connection, so small batches keep API
+    // requests from waiting; concurrent consumers would only queue and time out
     pub fn local_default() -> Self {
         Self {
-            min_debounce_interval: Duration::from_millis(100),
-            max_listening_timeout: Duration::from_secs(2),
-            batch_size: 20,
+            batch_size: NonZeroUsize::new(20).unwrap(),
+            consumer_concurrency: NonZeroUsize::MIN,
         }
     }
 
+    // Postgres pools connections: larger batches save round trips on a backlog,
+    // and consumers run in parallel, well below the default pool size
     pub fn production_default() -> Self {
         Self {
-            min_debounce_interval: Duration::from_millis(100),
-            max_listening_timeout: Duration::from_mins(1),
-            batch_size: 100,
+            batch_size: NonZeroUsize::new(100).unwrap(),
+            consumer_concurrency: NonZeroUsize::new(8).unwrap(),
         }
     }
 }

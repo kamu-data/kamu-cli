@@ -13,7 +13,7 @@ use kamu_adapter_flow_dataset as afs;
 use kamu_flow_system as fs;
 
 use super::flow_description::{FlowDescription, FlowDescriptionBuilder};
-use super::{FlowActivationCause, FlowEvent, FlowOutcome, FlowStartCondition};
+use super::{FlowActivationCause, FlowDownstreamLink, FlowEvent, FlowOutcome, FlowStartCondition};
 use crate::prelude::*;
 use crate::queries::Account;
 
@@ -25,6 +25,7 @@ pub struct Flow {
     description: FlowDescription,
 }
 
+/// One run of a flow, possibly over several task attempts
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Flow {
@@ -132,7 +133,7 @@ impl Flow {
     async fn timing(&self) -> FlowTimingRecords {
         FlowTimingRecords {
             initiated_at: self.flow_state.primary_activation_cause().activation_time(),
-            first_attempt_scheduled_at: self.flow_state.timing.first_scheduled_at,
+            first_attempt_scheduled_at: self.flow_state.timing.first_activated_at,
             scheduled_at: self.flow_state.timing.scheduled_for_activation_at,
             awaiting_executor_since: self.flow_state.timing.awaiting_executor_since,
             running_since: self.flow_state.timing.running_since,
@@ -170,6 +171,13 @@ impl Flow {
         Ok(history)
     }
 
+    /// Flows activated by this flow's completion. Filled asynchronously, so
+    /// the list may lag briefly behind the completion
+    #[tracing::instrument(level = "info", name = Flow_downstream_flows, skip_all)]
+    async fn downstream_flows(&self, ctx: &Context<'_>) -> Result<Vec<FlowDownstreamLink>> {
+        FlowDownstreamLink::build_list(ctx, self.flow_state.flow_id).await
+    }
+
     /// A user, who initiated the flow run. None for system-initiated flows
     async fn initiator(&self, ctx: &Context<'_>) -> Result<Option<Account>> {
         let maybe_initiator = self
@@ -184,15 +192,15 @@ impl Flow {
     }
 
     /// Primary flow activation cause
-    async fn primary_activation_cause(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<FlowActivationCause, InternalError> {
+    async fn primary_activation_cause(&self, ctx: &Context<'_>) -> Result<FlowActivationCause> {
         FlowActivationCause::build(self.flow_state.primary_activation_cause(), ctx).await
     }
 
     /// Start condition
-    #[allow(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn start_condition(&self) -> Result<Option<FlowStartCondition>> {
         let maybe_condition = self
             .flow_state
@@ -219,7 +227,10 @@ impl Flow {
     }
 
     /// Associated flow trigger
-    #[allow(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn related_trigger(&self) -> Result<Option<FlowTrigger>, InternalError> {
         Ok(self
             .maybe_related_flow_trigger_state

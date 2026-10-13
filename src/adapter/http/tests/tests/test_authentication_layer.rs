@@ -12,12 +12,12 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_accounts::testing::MockAuthenticationService;
 use kamu_accounts::{
     AnonymousAccountReason,
     AuthenticationService,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_NAME_STR,
+    MockAuthenticationService,
 };
 use url::Url;
 
@@ -151,7 +151,6 @@ const TEST_ENDPOINT: &str = "/foo";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
 struct ServerHarness {
     server_future: Box<dyn std::future::Future<Output = Result<(), std::io::Error>> + Unpin>,
     local_addr: SocketAddr,
@@ -214,14 +213,14 @@ impl ServerHarness {
         Url::from_str(format!("http://{}{}", self.local_addr, TEST_ENDPOINT).as_str()).unwrap()
     }
 
-    #[allow(clippy::unused_async)]
+    #[expect(clippy::unused_async, reason = "axum handlers must be async")]
     async fn foo_handler(
         axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     ) -> Result<String, http::StatusCode> {
         let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(r) => Ok(format!("{r:?}")),
-            CurrentAccountSubject::Logged(l) => Ok(l.account_name.to_string()),
+            CurrentAccountSubject::Logged(l) => Ok(l.account_handle.name.to_string()),
         }
     }
 }

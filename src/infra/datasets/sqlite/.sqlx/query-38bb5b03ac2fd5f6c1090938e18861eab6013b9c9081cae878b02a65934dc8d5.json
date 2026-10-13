@@ -6,32 +6,68 @@
       {
         "name": "id: _",
         "ordinal": 0,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_id"
+          }
+        }
       },
       {
         "name": "owner_id: _",
         "ordinal": 1,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_id"
+          }
+        }
       },
       {
         "name": "owner_name",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "owner_name"
+          }
+        }
       },
       {
         "name": "name",
         "ordinal": 3,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "dataset_name"
+          }
+        }
       },
       {
         "name": "created_at: _",
         "ordinal": 4,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "created_at"
+          }
+        }
       },
       {
         "name": "kind: _",
         "ordinal": 5,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "dataset_entries",
+            "name": "kind"
+          }
+        }
       }
     ],
     "parameters": {

@@ -20,6 +20,7 @@ use crate::queries::*;
 
 pub struct Query;
 
+/// Root of all read-only queries
 #[Object]
 impl Query {
     /// Returns the version of the GQL API
@@ -66,6 +67,11 @@ impl Query {
         Search
     }
 
+    /// Resource-related functionality group
+    async fn resources(&self) -> Resources {
+        Resources
+    }
+
     /// Querying and data manipulations
     async fn data(&self) -> DataQueries {
         DataQueries
@@ -88,6 +94,7 @@ impl Query {
 
 pub struct Mutation;
 
+/// Root of all mutations
 #[Object]
 impl Mutation {
     /// Authentication and authorization-related functionality group
@@ -121,6 +128,11 @@ impl Mutation {
     /// Allows setting permissions for multiple datasets in batch mode
     async fn collaboration(&self) -> CollaborationMut {
         CollaborationMut
+    }
+
+    /// Resource-related functionality group
+    async fn resources(&self) -> ResourcesMut {
+        ResourcesMut
     }
 
     /// Admin-related functionality group

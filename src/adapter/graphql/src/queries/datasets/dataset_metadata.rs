@@ -91,6 +91,7 @@ impl<'a> DatasetMetadata<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Metadata of a dataset and its current state derived from the metadata chain
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetMetadata<'a> {
@@ -147,12 +148,12 @@ impl<'a> DatasetMetadata<'a> {
     async fn current_upstream_dependencies(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<Vec<DependencyDatasetResult<'_>>> {
+    ) -> Result<Vec<DatasetAccessResult<'_>>> {
         let get_dataset_upstream_dependencies_use_case =
             from_catalog_n!(ctx, dyn GetDatasetUpstreamDependenciesUseCase);
 
         let upstream_dependencies = get_dataset_upstream_dependencies_use_case
-            .execute(&self.readable_state.dataset_handle().id)
+            .execute(self.readable_state.dataset_id())
             .await
             .int_err()?
             .into_iter()
@@ -161,9 +162,9 @@ impl<'a> DatasetMetadata<'a> {
                     let account = Account::new(r.owner_id.into(), r.owner_name.into());
                     let dataset = Dataset::new_access_checked(account, r.dataset_handle);
 
-                    DependencyDatasetResult::accessible(dataset)
+                    DatasetAccessResult::accessible(dataset)
                 }
-                DatasetDependency::Unresolved(id) => DependencyDatasetResult::not_accessible(id),
+                DatasetDependency::Unresolved(id) => DatasetAccessResult::not_accessible(id),
             })
             .collect::<Vec<_>>();
 
@@ -176,12 +177,12 @@ impl<'a> DatasetMetadata<'a> {
     async fn current_downstream_dependencies(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<Vec<DependencyDatasetResult<'_>>> {
+    ) -> Result<Vec<DatasetAccessResult<'_>>> {
         let get_dataset_downstream_dependencies_use_case =
             from_catalog_n!(ctx, dyn GetDatasetDownstreamDependenciesUseCase);
 
         let downstream_dependencies = get_dataset_downstream_dependencies_use_case
-            .execute(&self.readable_state.dataset_handle().id)
+            .execute(self.readable_state.dataset_id())
             .await
             .int_err()?
             .into_iter()
@@ -190,9 +191,9 @@ impl<'a> DatasetMetadata<'a> {
                     let account = Account::new(r.owner_id.into(), r.owner_name.into());
                     let dataset = Dataset::new_access_checked(account, r.dataset_handle);
 
-                    DependencyDatasetResult::accessible(dataset)
+                    DatasetAccessResult::accessible(dataset)
                 }
-                DatasetDependency::Unresolved(id) => DependencyDatasetResult::not_accessible(id),
+                DatasetDependency::Unresolved(id) => DatasetAccessResult::not_accessible(id),
             })
             .collect::<Vec<_>>();
 
@@ -321,6 +322,8 @@ impl<'a> DatasetMetadata<'a> {
             .map(Into::into))
     }
 
+    /// Blocks holding the currently effective events of the requested types,
+    /// as of the given head or the latest block
     #[tracing::instrument(level = "info", name = DatasetMetadata_metadata_projection, skip_all)]
     async fn metadata_projection(
         &self,
@@ -328,10 +331,10 @@ impl<'a> DatasetMetadata<'a> {
         event_types: Vec<MetadataEventType>,
         head: Option<Multihash<'_>>,
     ) -> Result<Vec<MetadataBlockExtended>> {
-        let account = Account::from_dataset_alias(ctx, &self.readable_state.dataset_handle().alias)
+        let account = Account::from_dataset_alias(ctx, self.readable_state.dataset_alias())
             .await?
             .expect("Account must exist");
-        let dataset_kind = self.readable_state.dataset_handle().kind;
+        let dataset_kind = self.readable_state.dataset_kind();
 
         let mut attachments_visitor = event_types
             .contains(&MetadataEventType::SetAttachments)
@@ -443,53 +446,6 @@ impl<'a> DatasetMetadata<'a> {
     async fn current_archetype(&self, ctx: &Context<'_>) -> Result<Option<DatasetArchetype>> {
         let archetype = self.readable_state.archetype(ctx).await?;
         Ok(archetype.map(Into::into))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
-enum DependencyDatasetResult<'a> {
-    Accessible(DependencyDatasetResultAccessible),
-    NotAccessible(DependencyDatasetResultNotAccessible<'a>),
-}
-
-impl DependencyDatasetResult<'_> {
-    pub fn accessible(dataset: Dataset) -> Self {
-        Self::Accessible(DependencyDatasetResultAccessible { dataset })
-    }
-
-    pub fn not_accessible(dataset_id: odf::DatasetID) -> Self {
-        Self::NotAccessible(DependencyDatasetResultNotAccessible {
-            id: dataset_id.into(),
-        })
-    }
-}
-
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
-pub struct DependencyDatasetResultAccessible {
-    pub dataset: Dataset,
-}
-
-#[ComplexObject]
-impl DependencyDatasetResultAccessible {
-    async fn message(&self) -> String {
-        "Found".to_string()
-    }
-}
-
-#[derive(SimpleObject, Debug)]
-#[graphql(complex)]
-pub struct DependencyDatasetResultNotAccessible<'a> {
-    pub id: DatasetID<'a>,
-}
-
-#[ComplexObject]
-impl DependencyDatasetResultNotAccessible<'_> {
-    async fn message(&self) -> String {
-        "Not Accessible".to_string()
     }
 }
 

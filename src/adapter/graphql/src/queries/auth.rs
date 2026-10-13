@@ -20,12 +20,13 @@ use crate::queries::{Account, Dataset};
 
 pub struct Auth;
 
+/// Authentication and authorization queries
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Auth {
     const DEFAULT_ENTRIES_PER_PAGE: usize = 100;
 
-    #[allow(clippy::unused_async)]
+    /// Login methods enabled on this node
     #[tracing::instrument(level = "info", name = Auth_enabled_providers, skip_all)]
     async fn enabled_providers(&self, ctx: &Context<'_>) -> Result<Vec<AccountProvider>> {
         use std::str::FromStr;
@@ -43,7 +44,7 @@ impl Auth {
         Ok(providers)
     }
 
-    #[allow(clippy::unused_async)]
+    /// Dataset roles granted to the given accounts
     #[tracing::instrument(level = "info", name = Auth_relations, skip_all)]
     #[graphql(guard = "AdminGuard::new()")]
     async fn relations(

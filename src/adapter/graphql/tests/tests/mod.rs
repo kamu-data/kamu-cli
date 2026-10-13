@@ -12,6 +12,7 @@ mod flows;
 mod test_accounts;
 mod test_auth;
 mod test_error_handling;
+mod test_gql_account_access;
 mod test_gql_account_quotas;
 mod test_gql_custom_molecule;
 mod test_gql_data;

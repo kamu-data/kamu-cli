@@ -10,7 +10,9 @@
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_flow_system_inmem::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use time_source::SystemTimeSourceDefault;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,7 +43,48 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_event_store_concurrent_modification,
+    harness = InMemoryFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_has_active_trigger_for_datasets,
+    harness = InMemoryFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_latest_event_is_last_saved,
+    harness = InMemoryFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_event_store_get_events_multi,
+    harness = InMemoryFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_event_store_save_events_multi,
+    harness = InMemoryFlowTriggerEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_event_store_save_events_multi_rejects_invalid_items,
     harness = InMemoryFlowTriggerEventStoreHarness
 );
 
@@ -56,6 +99,8 @@ impl InMemoryFlowTriggerEventStoreHarness {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryFlowTriggerEventStore>();
         catalog_builder.add::<InMemoryFlowSystemEventBridge>();
+        catalog_builder.add::<InMemoryWakeupHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
         catalog_builder.add::<SystemTimeSourceDefault>();
 
         Self {

@@ -16,10 +16,15 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_core::*;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
@@ -251,6 +256,10 @@ impl PushIngestDataUseCaseHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
             .add::<DummyOutboxImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<EngineProvisionerNull>();

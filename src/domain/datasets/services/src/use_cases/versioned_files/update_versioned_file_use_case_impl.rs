@@ -134,7 +134,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                         content_stream,
                         odf::storage::InsertOpts {
                             precomputed_hash: Some(&result.content_hash),
-                            size_hint: Some(result.content_length as u64),
+                            size_hint: Some(u64::try_from(result.content_length).unwrap()),
                             ..Default::default()
                         },
                     )
@@ -184,7 +184,11 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
                 PushIngestDataError::Execution(PushIngestError::QuotaExceeded(e)) => {
                     UpdateVersionFileUseCaseError::QuotaExceeded(e)
                 }
-                err => UpdateVersionFileUseCaseError::Internal(err.int_err()),
+                err @ (PushIngestDataError::Planning(_)
+                | PushIngestDataError::Execution(_)
+                | PushIngestDataError::Internal(_)) => {
+                    UpdateVersionFileUseCaseError::Internal(err.int_err())
+                }
             })?;
 
         match ingest_result {

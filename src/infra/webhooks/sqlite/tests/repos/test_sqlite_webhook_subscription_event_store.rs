@@ -95,6 +95,22 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_save_multiple_subscriptions_at_once,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_webhooks_repo_tests::webhook_subscription_event_store_test_suite::test_save_multiple_subscriptions_concurrent_modification,
+    harness = SqliteWebhookSubscriptionEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteWebhookSubscriptionEventStoreHarness {
     catalog: Catalog,
 }

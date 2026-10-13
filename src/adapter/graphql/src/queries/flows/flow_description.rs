@@ -39,9 +39,11 @@ use kamu_flow_system::{FLOW_SCOPE_TYPE_SYSTEM, FLOW_TYPE_SYSTEM_GC};
 use kamu_task_system as ts;
 
 use crate::prelude::*;
+use crate::queries::load_webhook_subscriptions_by_ids;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// What a flow does, with its result once it succeeded
 #[derive(Union)]
 pub(crate) enum FlowDescription {
     #[graphql(flatten)]
@@ -57,8 +59,10 @@ pub(crate) enum FlowDescriptionSystem {
     GC(FlowDescriptionSystemGC),
 }
 
+/// System garbage collection flow
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionSystemGC {
+    /// Placeholder without meaning, always true
     dummy: bool,
 }
 
@@ -67,10 +71,14 @@ pub(crate) enum FlowDescriptionWebhook {
     Deliver(FlowDescriptionWebhookDeliver),
 }
 
+/// Flow that delivers an event to a webhook subscription
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionWebhookDeliver {
+    /// URL the event is delivered to
     target_url: url::Url,
+    /// Label of the webhook subscription
     label: String,
+    /// Type of the delivered event
     event_type: String,
 }
 
@@ -85,48 +93,67 @@ pub(crate) enum FlowDescriptionDataset {
     ResetToMetadata(FlowDescriptionDatasetResetToMetadata),
 }
 
+/// Dataset flow whose details could not be determined
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionUnknown {
+    /// Why the details are unavailable
     message: String,
 }
 
+/// Flow that ingests data from the dataset's polling source
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPollingIngest {
+    /// Result of the ingest, null until the flow succeeds
     ingest_result: Option<FlowDescriptionUpdateResult>,
+    /// Polling source the data is fetched from
     polling_source: SetPollingSource,
 }
 
+/// Flow that ingests data pushed into the dataset
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetPushIngest {
+    /// Name of the push source, null for the default source or when unknown
     source_name: Option<String>,
+    /// Result of the ingest, null until the flow succeeds
     ingest_result: Option<FlowDescriptionUpdateResult>,
+    /// Human-readable description of what started the flow
     message: String,
     // TODO: SetPushSource
 }
 
+/// Flow that runs the transformation of a derivative dataset
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetExecuteTransform {
+    /// Result of the transformation, null until the flow succeeds
     transform_result: Option<FlowDescriptionUpdateResult>,
+    /// Transformation the flow runs
     transform: SetTransform,
 }
 
+/// Flow that compacts data slices of a dataset
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetHardCompaction {
+    /// Result of the compaction, null until the flow succeeds
     compaction_result: Option<FlowDescriptionDatasetReorganizationResult>,
 }
 
+/// Flow that moves the dataset head to an earlier block
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetReset {
+    /// Result of the reset, null until the flow succeeds
     reset_result: Option<FlowDescriptionResetResult>,
 }
 
+/// Flow that drops the dataset's data while keeping its metadata
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionDatasetResetToMetadata {
+    /// Result of the reset, null until the flow succeeds
     reset_to_metadata_result: Option<FlowDescriptionDatasetReorganizationResult>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of a flow that updates a dataset
 #[derive(Union)]
 pub(crate) enum FlowDescriptionUpdateResult {
     UpToDate(FlowDescriptionUpdateResultUpToDate),
@@ -134,22 +161,30 @@ pub(crate) enum FlowDescriptionUpdateResult {
     Unknown(FlowDescriptionUpdateResultUnknown),
 }
 
+/// Dataset was updated, but the added data could not be determined
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionUpdateResultUnknown {
+    /// Why the added data could not be determined
     message: String,
 }
 
+/// Dataset was already up to date, nothing was added
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionUpdateResultUpToDate {
     /// The value indicates whether the api cache was used
     uncacheable: bool,
 }
 
+/// Dataset was updated with new data
 #[derive(SimpleObject)]
 pub(crate) struct FlowDescriptionUpdateResultSuccess {
+    /// Number of metadata blocks added
     num_blocks: u64,
+    /// Number of data records added
     num_records: u64,
+    /// New watermark of the dataset, null if it did not change
     updated_watermark: Option<DateTime<Utc>>,
+    /// Whether the source has more data to fetch
     has_more: bool,
 }
 
@@ -192,7 +227,13 @@ impl FlowDescriptionUpdateResult {
                                                 "Unable to fetch increment. Block is missing: {}",
                                                 e.hash
                                             ),
-                                            _ => "Unable to fetch increment".to_string(),
+                                            GetIncrementError::DatasetNotFound(_)
+                                            | GetIncrementError::RefNotFound(_)
+                                            | GetIncrementError::InvalidInterval(_)
+                                            | GetIncrementError::Access(_)
+                                            | GetIncrementError::Internal(_) => {
+                                                "Unable to fetch increment".to_string()
+                                            }
                                         };
                                         return Ok(Some(Self::Unknown(
                                             FlowDescriptionUpdateResultUnknown {
@@ -241,7 +282,7 @@ impl FlowDescriptionUpdateResult {
                         Ok(None)
                     }
                 },
-                _ => Ok(None),
+                fs::FlowOutcome::Failed(_) | fs::FlowOutcome::Aborted => Ok(None),
             }
         } else {
             Ok(None)
@@ -251,27 +292,35 @@ impl FlowDescriptionUpdateResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Result of a flow that rewrites the dataset's history
 #[derive(Union, Debug)]
 enum FlowDescriptionDatasetReorganizationResult {
     NothingToDo(FlowDescriptionReorganizationNothingToDo),
     Success(FlowDescriptionReorganizationSuccess),
 }
 
+/// Dataset history was rewritten
 #[derive(SimpleObject, Debug)]
 struct FlowDescriptionReorganizationSuccess {
+    /// Number of metadata blocks before the rewrite
     original_blocks_count: u64,
+    /// Number of metadata blocks after the rewrite
     resulting_blocks_count: u64,
+    /// Hash of the new head block
     new_head: Multihash<'static>,
 }
 
+/// Dataset needed no changes
 #[derive(SimpleObject, Debug, Default)]
 #[graphql(complex)]
 pub struct FlowDescriptionReorganizationNothingToDo {
+    /// Placeholder without meaning, always null
     _dummy: Option<String>,
 }
 
 #[ComplexObject]
 impl FlowDescriptionReorganizationNothingToDo {
+    /// Fixed status text
     async fn message(&self) -> String {
         "Nothing to do".to_string()
     }
@@ -300,8 +349,8 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 old_num_blocks,
                                 new_num_blocks,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
-                                original_blocks_count: old_num_blocks as u64,
-                                resulting_blocks_count: new_num_blocks as u64,
+                                original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
+                                resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),
                                 new_head: new_head.clone().into(),
                             }))),
                         }
@@ -319,8 +368,8 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 old_num_blocks,
                                 new_num_blocks,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
-                                original_blocks_count: old_num_blocks as u64,
-                                resulting_blocks_count: new_num_blocks as u64,
+                                original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
+                                resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),
                                 new_head: new_head.clone().into(),
                             }))),
                         }
@@ -336,7 +385,7 @@ impl FlowDescriptionDatasetReorganizationResult {
                     }
                 },
 
-                _ => Ok(None),
+                fs::FlowOutcome::Failed(_) | fs::FlowOutcome::Aborted => Ok(None),
             }
         } else {
             Ok(None)
@@ -346,8 +395,10 @@ impl FlowDescriptionDatasetReorganizationResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Dataset head was moved
 #[derive(SimpleObject)]
 struct FlowDescriptionResetResult {
+    /// Hash of the new head block
     new_head: Multihash<'static>,
 }
 
@@ -377,7 +428,7 @@ impl FlowDescriptionResetResult {
                         Ok(None)
                     }
                 },
-                _ => Ok(None),
+                fs::FlowOutcome::Failed(_) | fs::FlowOutcome::Aborted => Ok(None),
             }
         } else {
             Ok(None)
@@ -390,6 +441,8 @@ impl FlowDescriptionResetResult {
 pub struct FlowDescriptionBuilder {
     polling_sources_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetPollingSource>,
     transforms_by_dataset_id: HashMap<odf::DatasetID, odf::metadata::SetTransform>,
+    webhook_subscriptions_by_id:
+        HashMap<kamu_webhooks::WebhookSubscriptionID, kamu_webhooks::WebhookSubscription>,
 }
 
 impl FlowDescriptionBuilder {
@@ -398,6 +451,8 @@ impl FlowDescriptionBuilder {
         flow_states: &[fs::FlowState],
     ) -> Result<Self, InternalError> {
         let unique_dataset_ids = FlowDescriptionBuilder::collect_unique_dataset_ids(flow_states);
+        let unique_subscription_ids =
+            FlowDescriptionBuilder::collect_unique_subscription_ids(flow_states);
 
         Ok(Self {
             polling_sources_by_dataset_id: HashMap::from_iter(
@@ -411,7 +466,27 @@ impl FlowDescriptionBuilder {
                 FlowDescriptionBuilder::detect_datasets_with_transforms(ctx, &unique_dataset_ids)
                     .await?,
             ),
+            webhook_subscriptions_by_id: load_webhook_subscriptions_by_ids(
+                ctx,
+                &unique_subscription_ids,
+            )
+            .await?,
         })
+    }
+
+    fn collect_unique_subscription_ids(
+        flow_states: &[fs::FlowState],
+    ) -> Vec<kamu_webhooks::WebhookSubscriptionID> {
+        flow_states
+            .iter()
+            .filter_map(|flow_state| {
+                FlowScopeSubscription::maybe_subscription_id_in_scope(
+                    &flow_state.flow_binding.scope,
+                )
+            })
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
     }
 
     fn collect_unique_dataset_ids(flow_states: &[fs::FlowState]) -> Vec<odf::DatasetID> {
@@ -523,8 +598,7 @@ impl FlowDescriptionBuilder {
             FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
                 let subscription_id =
                     FlowScopeSubscription::new(&flow_state.flow_binding.scope).subscription_id();
-                self.webhook_flow_description(ctx, flow_state, flow_type, subscription_id)
-                    .await?
+                self.webhook_flow_description(flow_state, flow_type, subscription_id)?
             }
 
             FLOW_SCOPE_TYPE_SYSTEM => {
@@ -544,25 +618,17 @@ impl FlowDescriptionBuilder {
         })
     }
 
-    async fn webhook_flow_description(
+    fn webhook_flow_description(
         &self,
-        ctx: &Context<'_>,
         flow_state: &fs::FlowState,
         flow_type: &str,
         subscription_id: kamu_webhooks::WebhookSubscriptionID,
     ) -> Result<FlowDescription> {
         match flow_type {
             FLOW_TYPE_WEBHOOK_DELIVER => {
-                let webhook_subscription_query_svc =
-                    from_catalog_n!(ctx, dyn kamu_webhooks::WebhookSubscriptionQueryService);
-
-                let subscription = webhook_subscription_query_svc
-                    .find_webhook_subscription(
-                        subscription_id,
-                        kamu_webhooks::WebhookSubscriptionQueryMode::IncludingRemoved,
-                    )
-                    .await
-                    .int_err()?
+                let subscription = self
+                    .webhook_subscriptions_by_id
+                    .get(&subscription_id)
                     .ok_or_else(|| {
                         GqlError::Internal(InternalError::new(format!(
                             "Webhook subscription not found: {subscription_id}",

@@ -17,6 +17,7 @@ pub struct DatasetFlows<'a> {
     dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
+/// Flow queries scoped to a dataset
 #[Object]
 impl<'a> DatasetFlows<'a> {
     #[graphql(skip)]

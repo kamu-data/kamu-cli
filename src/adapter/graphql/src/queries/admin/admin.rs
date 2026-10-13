@@ -14,10 +14,15 @@ use crate::prelude::*;
 
 pub struct Admin;
 
+/// Administrative queries, available only to administrators
 #[Object]
 impl Admin {
-    #[allow(clippy::unused_async)]
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     #[graphql(guard = "AdminGuard::new()")]
+    /// Checks that the caller has administrator access, returns "OK"
     async fn self_test(&self) -> Result<String> {
         Ok("OK".to_string())
     }

@@ -218,13 +218,13 @@ impl AccountConfig {
 
     #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
-        let email = Email::parse(&format!("{}@example.com", subject.account_name)).unwrap();
-        let password = Self::generate_password(&subject.account_name);
+        let email = Email::parse(&format!("{}@example.com", subject.account_handle.name)).unwrap();
+        let password = Self::generate_password(&subject.account_handle.name);
 
         Self {
-            id: Some(subject.account_id),
+            id: Some(subject.account_handle.did),
             private_key: None,
-            account_name: subject.account_name,
+            account_name: subject.account_handle.name,
             password,
             email,
             display_name: None,
@@ -378,7 +378,9 @@ impl AccountConfig {
                         account_name: self.account_name.clone(),
                     });
                 }
-                _ => { /* nothing */ }
+                AccountProvider::Password
+                | AccountProvider::OAuthGitHub
+                | AccountProvider::Web3Wallet => { /* nothing */ }
             }
         }
 

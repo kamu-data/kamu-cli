@@ -49,6 +49,11 @@ deny = [
     { name = "tonic", deny-multiple-versions = true },
 ]
 
+# Detect crates that enable this feature accidentally
+[[bans.features]]
+crate = "serde_json"
+deny = ["preserve_order"]
+
 
 [licenses]
 allow = [
@@ -102,6 +107,9 @@ ignore = [
     # Unmaintained: proc-macro-error
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
+    # Unmaintained: proc-macro-error2
+    # https://rustsec.org/advisories/RUSTSEC-2026-0173.html
+    "RUSTSEC-2026-0173",
     # Unmaintained: paste
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",
@@ -146,7 +154,9 @@ ignore = [
     # Dependency of the unmaintained `im` crate
     # https://rustsec.org/advisories/RUSTSEC-2026-0251
     "RUSTSEC-2026-0251",
-    # h2 (0.3.27): unbounded empty DATA frames
-    # https://rustsec.org/advisories/RUSTSEC-2026-0258
-    "RUSTSEC-2026-0258",
+    # Unmaintained: unsafe-libyaml
+    # Used by serde_yaml_ng, both directly and via `setty` (fmt-yaml); migrating to
+    # serde-saphyr requires a `setty` release first
+    # https://rustsec.org/advisories/RUSTSEC-2024-0449
+    "RUSTSEC-2024-0449",
 ]

@@ -219,16 +219,17 @@ where
 
 pub mod base64 {
     use ::base64::Engine;
+    use ::base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use serde::{Deserialize, Deserializer, Serializer};
 
     pub fn serialize<S: Serializer>(data: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error> {
-        let s = ::base64::engine::general_purpose::STANDARD.encode(data);
+        let s = BASE64_STANDARD.encode(data);
         serializer.serialize_str(&s)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
         let s = String::deserialize(deserializer)?;
-        ::base64::engine::general_purpose::STANDARD
+        BASE64_STANDARD
             .decode(s)
             .map_err(|e| serde::de::Error::custom(e.to_string()))
     }
@@ -314,8 +315,7 @@ pub mod datetime_rfc3339_opt {
 ///
 /// We use the fact that JSON is a valid subset of YAML and:
 /// - serialize data to JSON
-/// - deserialize it into `serde_yaml::Value` which doesn't handle arbitrary
-///   precision
+/// - deserialize it into `serde_yaml::Value` which doesn't handle arbitrary precision
 /// - serialize it again into desired format
 ///
 /// This is obviously horrible. Solving this correctly likely requires arbitrary

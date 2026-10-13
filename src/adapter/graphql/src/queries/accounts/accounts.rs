@@ -15,6 +15,7 @@ use crate::utils;
 
 pub struct Accounts;
 
+/// Account lookup queries
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Accounts {
@@ -27,8 +28,8 @@ impl Accounts {
 
         match subject.as_ref() {
             CurrentAccountSubject::Logged(account) => Ok(Account::new(
-                account.account_id.clone().into(),
-                account.account_name.clone().into(),
+                account.account_handle.did.clone().into(),
+                account.account_handle.name.clone().into(),
             )),
             CurrentAccountSubject::Anonymous(_) => {
                 Err(GqlError::gql(ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE))

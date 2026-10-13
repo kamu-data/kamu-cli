@@ -22,7 +22,8 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
 
 [dependencies]
@@ -34,9 +35,9 @@ odf = { workspace = true, default-features = false }
 time-source = { workspace = true, default-features = false }
 
 async-trait = { version = "0.1", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 hex = { version = "0.4", default-features = false }
-nutype = { version = "0.7", default-features = false }
+nutype = { version = "0.8", default-features = false }
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 siwe = { version = "0.6", default-features = false }
@@ -55,5 +56,8 @@ pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",
 ] }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }

@@ -15,6 +15,7 @@ use async_graphql::{InputValueError, InputValueResult, Scalar, ScalarType, Value
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GqlUrl(pub url::Url);
 
+/// Absolute URL
 #[Scalar(name = "URL")]
 impl ScalarType for GqlUrl {
     fn parse(value: Value) -> InputValueResult<Self> {

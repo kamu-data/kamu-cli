@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_inmem_flow_activation_link_repository;
 mod test_inmem_flow_configuration_event_store;
 mod test_inmem_flow_event_store;
 mod test_inmem_flow_process_state;

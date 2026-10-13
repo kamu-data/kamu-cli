@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod db_password_refresher;
-mod mysql_password_refresher;
 mod postgres_password_refresher;
 
 pub use db_password_refresher::*;
-pub use mysql_password_refresher::*;
 pub use postgres_password_refresher::*;

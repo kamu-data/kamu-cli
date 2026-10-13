@@ -8,14 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
+use chrono::{DateTime, Utc};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
+use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::TenancyConfig;
-use kamu_datasets::{DatasetAction, DatasetEnvVarsConfig};
+use kamu_datasets::{DatasetAction, SecretsEncryptionConfig};
 use kamu_task_system as ts;
+use time_source::SystemTimeSource;
 
 use crate::data_loader::{AccountEntityDataLoader, DatasetHandleDataLoader};
-use crate::prelude::{AccessTokenID, AccountID};
+use crate::prelude::AccessTokenID;
 use crate::queries::DatasetRequestState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,6 +58,13 @@ pub(crate) use from_catalog_n;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Current time of the system time source, which tests and e2e runs may freeze
+pub(crate) fn system_time_now(ctx: &Context<'_>) -> DateTime<Utc> {
+    from_catalog_n!(ctx, dyn SystemTimeSource).now()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn get_account_entity_data_loader<'a>(
     ctx: &'a Context<'a>,
 ) -> &'a AccountEntityDataLoader {
@@ -81,22 +91,6 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[expect(dead_code)]
-pub(crate) async fn check_dataset_read_access(
-    ctx: &Context<'_>,
-    dataset_request_state: &DatasetRequestState,
-) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_request_state, DatasetAction::Read).await
-}
-
-#[expect(dead_code)]
-pub(crate) async fn check_dataset_write_access(
-    ctx: &Context<'_>,
-    dataset_request_state: &DatasetRequestState,
-) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_request_state, DatasetAction::Write).await
-}
 
 pub(crate) async fn check_dataset_maintain_access(
     ctx: &Context<'_>,
@@ -146,10 +140,10 @@ pub(crate) async fn get_task(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn ensure_dataset_env_vars_enabled(ctx: &Context<'_>) -> Result<(), GqlError> {
-    let dataset_env_vars_config = from_catalog_n!(ctx, DatasetEnvVarsConfig);
+pub(crate) fn ensure_secrets_encryption_enabled(ctx: &Context<'_>) -> Result<(), GqlError> {
+    let secrets_encryption_config = from_catalog_n!(ctx, SecretsEncryptionConfig);
 
-    if dataset_env_vars_config.is_enabled() {
+    if secrets_encryption_config.is_enabled() {
         Ok(())
     } else {
         Err(GqlError::gql("API is unavailable"))
@@ -160,13 +154,50 @@ pub(crate) fn ensure_dataset_env_vars_enabled(ctx: &Context<'_>) -> Result<(), G
 
 pub(crate) fn check_logged_account_id_match(
     ctx: &Context<'_>,
-    account_id: &AccountID,
+    account_id: &odf::AccountID,
 ) -> Result<(), GqlError> {
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
-        && logged_account.account_id == **account_id
+        && logged_account.account_handle.did == *account_id
     {
+        return Ok(());
+    }
+
+    Err(GqlError::gql_extended("Account access error", |eev| {
+        eev.set("account_id", account_id.to_string());
+    }))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn is_logged_account_id_match_or_admin(
+    ctx: &Context<'_>,
+    account_id: &odf::AccountID,
+) -> Result<bool, InternalError> {
+    let (current_account_subject, rebac_service) =
+        from_catalog_n!(ctx, CurrentAccountSubject, dyn RebacService);
+
+    let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref() else {
+        return Ok(false);
+    };
+
+    let logged_account_id = &logged_account.account_handle.did;
+    if logged_account_id == account_id {
+        return Ok(true);
+    }
+
+    rebac_service
+        .is_account_admin(logged_account_id)
+        .await
+        .int_err()
+}
+
+pub(crate) async fn check_logged_account_id_match_or_admin(
+    ctx: &Context<'_>,
+    account_id: &odf::AccountID,
+) -> Result<(), GqlError> {
+    if is_logged_account_id_match_or_admin(ctx, account_id).await? {
         return Ok(());
     }
 
@@ -196,7 +227,7 @@ pub(crate) async fn check_access_token_valid(
         })?;
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
-        && logged_account.account_id == existing_access_token.account_id
+        && logged_account.account_handle.did == existing_access_token.account_id
     {
         return Ok(());
     }
@@ -215,7 +246,7 @@ pub(crate) fn check_logged_account_name_match(
     let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
     if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
-        && logged_account.account_name == *account_name
+        && logged_account.account_handle.name == *account_name
     {
         return Ok(());
     }
@@ -251,13 +282,13 @@ pub(crate) fn logged_account(ctx: &Context<'_>) -> bool {
 /// This wrapper is unfortunately necessary because of poor error handling
 /// strategy of async-graphql that:
 ///
-/// - prevents ? operator from quietly wrapping any Display value in query
-///   handler into an error thus putting us in danger of leaking sensitive info
+/// - prevents ? operator from quietly wrapping any Display value in query handler into an error
+///   thus putting us in danger of leaking sensitive info
 ///
 /// - ensures that only `InternalError` can be returned via ? operator
 ///
-/// - ensures that original error is preserved as `source` so it can be
-///   inspected and logged by the tracing middleware
+/// - ensures that original error is preserved as `source` so it can be inspected and logged by the
+///   tracing middleware
 
 #[derive(Debug)]
 pub enum GqlError {

@@ -9,7 +9,9 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
-use kamu_task_system_inmem::InMemoryTaskEventStore;
+use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,7 +81,32 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_task_status_on_cancellation,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_task_system_repo_tests::test_event_store_concurrent_modification,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = kamu_task_system_repo_tests::test_event_store_save_events_multi,
+    harness = InMemoryTaskSystemEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_task_system_repo_tests::test_event_store_save_events_multi_concurrent_modification,
     harness = InMemoryTaskSystemEventStoreHarness
 );
 
@@ -93,6 +120,9 @@ impl InMemoryTaskSystemEventStoreHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryTaskEventStore>();
+        catalog_builder.add::<InMemoryWakeupHub>();
+        catalog_builder.add::<WakeupListenerMetrics>();
+        catalog_builder.add::<InMemoryTaskQueueWakeupSource>();
 
         Self {
             catalog: catalog_builder.build(),

@@ -15,6 +15,8 @@ use kamu_flow_system::*;
 use kamu_task_system::TaskScheduler;
 use time_source::SystemTimeSource;
 
+use crate::FlowCompletionMetrics;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -23,6 +25,7 @@ pub(crate) struct FlowAbortHelper {
     catalog: dill::Catalog,
     flow_event_store: Arc<dyn FlowEventStore>,
     flow_sensor_dispatcher: Arc<dyn FlowSensorDispatcher>,
+    completion_metrics: Arc<FlowCompletionMetrics>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
 }
@@ -42,6 +45,9 @@ impl FlowAbortHelper {
                 for task_id in &flow.task_ids {
                     self.task_scheduler.cancel_task(*task_id).await.int_err()?;
                 }
+
+                // Last, as a failure above rolls the abort back
+                self.completion_metrics.on_flow_finished(flow);
             }
             FlowStatus::Finished => {
                 /* Skip, idempotence */

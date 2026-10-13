@@ -130,8 +130,8 @@ pub(crate) async fn index_data_room_entries(
     repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         "Indexing data room entries for Molecule organization account",
     );
 
@@ -157,8 +157,8 @@ pub(crate) async fn index_data_room_entries(
     .await?;
 
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         indexed_documents_count = total_documents_count,
         "Indexed data room entries for Molecule organization account",
     );
@@ -374,7 +374,7 @@ async fn index_project_data(
 
     // Create indexing helper
     let indexing_helper = MoleculeDataRoomEntryIndexingHelper {
-        molecule_account_id: &project_data.molecule_subject.account_id,
+        molecule_account_id: &project_data.molecule_subject.account_handle.did,
         embeddings_provider: dependencies.embeddings_provider.as_ref(),
     };
 

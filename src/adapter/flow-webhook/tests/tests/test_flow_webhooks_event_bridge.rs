@@ -613,7 +613,7 @@ impl TestWebhooksEventBridgeHarness {
                     late_activation_causes: vec![],
                     outcome: None,
                     timing: FlowTimingRecords {
-                        first_scheduled_at: Some(now),
+                        first_activated_at: None,
                         scheduled_for_activation_at: Some(now),
                         running_since: None,
                         awaiting_executor_since: None,

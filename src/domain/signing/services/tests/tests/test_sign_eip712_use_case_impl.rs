@@ -36,8 +36,11 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetActionAuthorizer};
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{
+    AlwaysHappyDatasetActionAuthorizer,
+    DatasetActionAuthorizer,
+    MockDatasetActionAuthorizer,
+};
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{SignEip712UseCase, SignEip712UseCaseOptions};
 use kamu_signing::utils::b256;
@@ -138,6 +141,7 @@ async fn test_execute_matrix() {
         // 1. Admin has access to all datasets / accounts
         (
             CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(ADMIN),
                 admin_account_id(),
                 odf::AccountName::new_unchecked(ADMIN),
             ),
@@ -153,27 +157,27 @@ async fn test_execute_matrix() {
                 (
                     "1) Test 1",
                     odf::metadata::DidOdf::from(molecule_dataset_id()),
-                    expected_ok_response_for_molecule_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_dataset_id()),
                 ),
                 (
                     "1) Test 2",
                     molecule_project_dataset_id().into(),
-                    expected_ok_response_for_molecule_project_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_project_dataset_id()),
                 ),
                 (
                     "1) Test 3",
                     molecule_dev_dataset_id().into(),
-                    expected_ok_response_for_molecule_dev_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_dev_dataset_id()),
                 ),
                 (
                     "1) Test 4",
                     molecule_dev_project_dataset_id().into(),
-                    expected_ok_response_for_molecule_dev_project_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_dev_project_dataset_id()),
                 ),
                 (
                     "1) Test 5",
                     user_dataset_id().into(),
-                    expected_ok_response_for_user_dataset_id(),
+                    Ok(expected_ok_response_for_user_dataset_id()),
                 ),
                 (
                     "1) Test 6",
@@ -184,27 +188,27 @@ async fn test_execute_matrix() {
                 (
                     "1) Test 7",
                     to_odf_did(&molecule_account_id()),
-                    expected_ok_response_for_molecule_account_id(),
+                    Ok(expected_ok_response_for_molecule_account_id()),
                 ),
                 (
                     "1) Test 8",
                     to_odf_did(&molecule_project_account_id()),
-                    expected_ok_response_for_molecule_project_account_id(),
+                    Ok(expected_ok_response_for_molecule_project_account_id()),
                 ),
                 (
                     "1) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
-                    expected_ok_response_for_molecule_dev_account_id(),
+                    Ok(expected_ok_response_for_molecule_dev_account_id()),
                 ),
                 (
                     "1) Test 10",
                     to_odf_did(&molecule_dev_project_account_id()),
-                    expected_ok_response_for_molecule_dev_project_account_id(),
+                    Ok(expected_ok_response_for_molecule_dev_project_account_id()),
                 ),
                 (
                     "1) Test 11",
                     to_odf_did(&user_account_id()),
-                    expected_ok_response_for_user_account_id(),
+                    Ok(expected_ok_response_for_user_account_id()),
                 ),
                 (
                     "1) Test 12",
@@ -216,6 +220,7 @@ async fn test_execute_matrix() {
         // 2. Molecule has access to own/project datasets / accounts
         (
             CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(MOLECULE),
                 molecule_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE),
             ),
@@ -231,12 +236,12 @@ async fn test_execute_matrix() {
                 (
                     "2) Test 1",
                     odf::metadata::DidOdf::from(molecule_dataset_id()),
-                    expected_ok_response_for_molecule_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_dataset_id()),
                 ),
                 (
                     "2) Test 2",
                     molecule_project_dataset_id().into(),
-                    expected_ok_response_for_molecule_project_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_project_dataset_id()),
                 ),
                 (
                     "2) Test 3",
@@ -262,12 +267,12 @@ async fn test_execute_matrix() {
                 (
                     "2) Test 7",
                     to_odf_did(&molecule_account_id()),
-                    expected_ok_response_for_molecule_account_id(),
+                    Ok(expected_ok_response_for_molecule_account_id()),
                 ),
                 (
                     "2) Test 8",
                     to_odf_did(&molecule_project_account_id()),
-                    expected_ok_response_for_molecule_project_account_id(),
+                    Ok(expected_ok_response_for_molecule_project_account_id()),
                 ),
                 (
                     "2) Test 9",
@@ -294,6 +299,7 @@ async fn test_execute_matrix() {
         // 3. Molecule.dev has access to own/project datasets / accounts
         (
             CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(MOLECULE_DEV),
                 molecule_dev_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE_DEV),
             ),
@@ -319,12 +325,12 @@ async fn test_execute_matrix() {
                 (
                     "3) Test 3",
                     molecule_dev_dataset_id().into(),
-                    expected_ok_response_for_molecule_dev_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_dev_dataset_id()),
                 ),
                 (
                     "3) Test 4",
                     molecule_dev_project_dataset_id().into(),
-                    expected_ok_response_for_molecule_dev_project_dataset_id(),
+                    Ok(expected_ok_response_for_molecule_dev_project_dataset_id()),
                 ),
                 (
                     "3) Test 5",
@@ -350,12 +356,12 @@ async fn test_execute_matrix() {
                 (
                     "3) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
-                    expected_ok_response_for_molecule_dev_account_id(),
+                    Ok(expected_ok_response_for_molecule_dev_account_id()),
                 ),
                 (
                     "3) Test 10",
                     to_odf_did(&molecule_dev_project_account_id()),
-                    expected_ok_response_for_molecule_dev_project_account_id(),
+                    Ok(expected_ok_response_for_molecule_dev_project_account_id()),
                 ),
                 (
                     "3) Test 11",
@@ -371,7 +377,11 @@ async fn test_execute_matrix() {
         ),
         // 4. User has access to their own datasets / accounts
         (
-            CurrentAccountSubject::logged(user_account_id(), odf::AccountName::new_unchecked(USER)),
+            CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(USER),
+                user_account_id(),
+                odf::AccountName::new_unchecked(USER),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
@@ -404,7 +414,7 @@ async fn test_execute_matrix() {
                 (
                     "4) Test 5",
                     user_dataset_id().into(),
-                    expected_ok_response_for_user_dataset_id(),
+                    Ok(expected_ok_response_for_user_dataset_id()),
                 ),
                 (
                     "4) Test 6",
@@ -435,7 +445,7 @@ async fn test_execute_matrix() {
                 (
                     "4) Test 11",
                     to_odf_did(&user_account_id()),
-                    expected_ok_response_for_user_account_id(),
+                    Ok(expected_ok_response_for_user_account_id()),
                 ),
                 (
                     "4) Test 12",
@@ -839,9 +849,8 @@ fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
 
 // Accounts
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_account_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
         "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
@@ -850,12 +859,11 @@ fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, S
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_project_account_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6Mko9hTggMwjSTEaJaPUfE6tqcy2xvU6BnNq3e3o8qVBiyH",
         "signature": "uNMrt0vM--o3MG4Oz39lBtSVSJ9gZYAY5a-kM6IJqCEAyrHXlqkrvV4Jo4V0NwbXssrL9QkN-nWwG83kkk7mbAw",
@@ -864,12 +872,11 @@ fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0xc5058b3334b01617293815af7fb8d8db17cba8b8140f497bc0adaf3e71d570777e7b55ac818898114ad1eeb4ad9a2afd2a653b3ab208141ce223c788ec0f9e6a1c"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_dev_account_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
         "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
@@ -878,12 +885,11 @@ fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Valu
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_dev_project_account_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6Mkt6316e2PN3mZdB6N9CrzomJYUd1s5yBZi1XYHmwT9TUP",
         "signature": "ulIf24QdmjFyuBJMopZpTZ6Ehjpk8z1i0Am8rxBP6_9S23YNsnVCnHIhtjrbIuR76mACCFQfE1gjW75pKgjaSAw",
@@ -892,12 +898,11 @@ fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_js
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0xe47b0b9f0017e32fd0de8f3378b2252f29fec678725e8937df5d3d07801d3cc749012a21722b96b53a46f1c64dab0cad3340aa18fc93965eab056740198155331b"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_user_account_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_user_account_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
         "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
@@ -906,16 +911,15 @@ fn expected_ok_response_for_user_account_id() -> Result<serde_json::Value, Strin
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
         }
-    }))
+    })
 }
 
 // Datasets
 
 // 1) Ok
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_dataset_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_dataset_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
         "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
@@ -924,12 +928,11 @@ fn expected_ok_response_for_molecule_dataset_id() -> Result<serde_json::Value, S
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_project_dataset_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_project_dataset_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6Mko9hTggMwjSTEaJaPUfE6tqcy2xvU6BnNq3e3o8qVBiyH",
         "signature": "uNMrt0vM--o3MG4Oz39lBtSVSJ9gZYAY5a-kM6IJqCEAyrHXlqkrvV4Jo4V0NwbXssrL9QkN-nWwG83kkk7mbAw",
@@ -938,12 +941,11 @@ fn expected_ok_response_for_molecule_project_dataset_id() -> Result<serde_json::
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0xc5058b3334b01617293815af7fb8d8db17cba8b8140f497bc0adaf3e71d570777e7b55ac818898114ad1eeb4ad9a2afd2a653b3ab208141ce223c788ec0f9e6a1c"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_dev_dataset_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_dev_dataset_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
         "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
@@ -952,12 +954,11 @@ fn expected_ok_response_for_molecule_dev_dataset_id() -> Result<serde_json::Valu
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_molecule_dev_project_dataset_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_molecule_dev_project_dataset_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6Mkt6316e2PN3mZdB6N9CrzomJYUd1s5yBZi1XYHmwT9TUP",
         "signature": "ulIf24QdmjFyuBJMopZpTZ6Ehjpk8z1i0Am8rxBP6_9S23YNsnVCnHIhtjrbIuR76mACCFQfE1gjW75pKgjaSAw",
@@ -966,12 +967,11 @@ fn expected_ok_response_for_molecule_dev_project_dataset_id() -> Result<serde_js
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0xe47b0b9f0017e32fd0de8f3378b2252f29fec678725e8937df5d3d07801d3cc749012a21722b96b53a46f1c64dab0cad3340aa18fc93965eab056740198155331b"
         }
-    }))
+    })
 }
 
-#[expect(clippy::unnecessary_wraps)]
-fn expected_ok_response_for_user_dataset_id() -> Result<serde_json::Value, String> {
-    Ok(json!({
+fn expected_ok_response_for_user_dataset_id() -> serde_json::Value {
+    json!({
         "type": "Ed25519Signature2020",
         "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
         "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
@@ -980,7 +980,7 @@ fn expected_ok_response_for_user_dataset_id() -> Result<serde_json::Value, Strin
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
             "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
         }
-    }))
+    })
 }
 
 // 2) Err

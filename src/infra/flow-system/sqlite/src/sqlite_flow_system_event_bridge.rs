@@ -14,18 +14,26 @@ use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     EventID,
+    FLOW_SYSTEM_EVENT_AGENT_NAME,
     FlowSystemEvent,
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_messaging_outbox_sqlite::SqliteMessageStoreWakeupDetector;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_sqlite::{SqlitePollingChannel, SqlitePollingHub};
 use sqlx::Sqlite;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const POLLING_CHANNEL: SqlitePollingChannel = SqlitePollingChannel {
+    name: "flow_system_events",
+    max_id_query: "SELECT MAX(event_id) FROM flow_system_events",
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SqliteFlowSystemEventBridge {
-    wakeup_detector: SqliteMessageStoreWakeupDetector,
+    hub: Arc<SqlitePollingHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,13 +42,8 @@ pub struct SqliteFlowSystemEventBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl SqliteFlowSystemEventBridge {
-    pub fn new(pool: Arc<sqlx::SqlitePool>) -> Self {
-        Self {
-            wakeup_detector: SqliteMessageStoreWakeupDetector::new(
-                pool,
-                "SELECT MAX(event_id) FROM flow_system_events",
-            ),
-        }
+    pub fn new(hub: Arc<SqlitePollingHub>) -> Self {
+        Self { hub }
     }
 }
 
@@ -48,9 +51,12 @@ impl SqliteFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            POLLING_CHANNEL,
+            FLOW_SYSTEM_EVENT_AGENT_NAME,
+        ))
     }
 
     /// Fetch next batch for the given projector; order by global id.
@@ -111,6 +117,14 @@ impl FlowSystemEventBridge for SqliteFlowSystemEventBridge {
             .collect();
 
         Ok(events)
+    }
+
+    async fn has_held_back_events(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+    ) -> Result<bool, InternalError> {
+        // One connection: no transaction runs while another reads
+        Ok(false)
     }
 
     /// Mark these events as applied for this projector (idempotent).

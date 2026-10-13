@@ -35,7 +35,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCaseImpl {
         let roughly_estimated_size = activity_record.roughly_estimated_size_in_bytes() as u64;
 
         self.account_quota_storage_checker
-            .ensure_within_quota(&molecule_subject.account_id, roughly_estimated_size)
+            .ensure_within_quota(&molecule_subject.account_handle.did, roughly_estimated_size)
             .await
     }
 }
@@ -61,7 +61,7 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
         // Check dataset access before sending the message
         let _ = self
             .global_data_room_activities_service
-            .writer(&molecule_subject.account_name, true) // TODO: try to create once as start-up job?
+            .writer(&molecule_subject.account_handle.name, true) // TODO: try to create once as start-up job?
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeAppendDataRoomActivityError>)?;
 
@@ -73,8 +73,8 @@ impl MoleculeAppendGlobalDataRoomActivityUseCase
             .post_message(
                 MESSAGE_PRODUCER_MOLECULE_ACTIVITY_SERVICE,
                 MoleculeActivityMessage::write_requested(
-                    molecule_subject.account_name.clone(),
-                    molecule_subject.account_id.clone(),
+                    molecule_subject.account_handle.name.clone(),
+                    molecule_subject.account_handle.did.clone(),
                     source_event_time,
                     activity_record,
                 ),

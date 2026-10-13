@@ -13,8 +13,8 @@ use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_config_set_value(kamu: KamuCliPuppet) {
-    // 0. CI sets container runtime to podman for some targets, so we simulate this
-    //    behavior for all others.
+    // 0. CI sets container runtime to podman for some targets, so we simulate this behavior for all
+    //    others.
     kamu.assert_success_command_execution(
         [
             "config",
@@ -153,7 +153,7 @@ pub async fn test_config_reset_key(kamu: KamuCliPuppet) {
     kamu.assert_success_command_execution(
         ["config", "set", "--scope", "workspace", "engine.networkNs"],
         None,
-        Some(["Removed engine.networkNs from workspace scope"]),
+        Some(["Deleted engine.networkNs from workspace scope"]),
     )
     .await;
 

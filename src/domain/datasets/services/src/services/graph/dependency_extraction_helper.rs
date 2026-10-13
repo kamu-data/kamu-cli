@@ -64,10 +64,9 @@ pub(crate) async fn extract_modified_dependencies_in_interval(
     let mut new_upstream_ids: HashSet<odf::DatasetID> = HashSet::new();
 
     // Prepare visitors:
-    // - We need to search for SetTransform in any case, as we need data from the
-    //   event itself,
-    // - For Seed we only need to know its presence: we search only if we don't
-    //   initially know if it exists.
+    // - We need to search for SetTransform in any case, as we need data from the event itself,
+    // - For Seed we only need to know its presence: we search only if we don't initially know if it
+    //   exists.
     let mut set_transform_visitor =
         odf::dataset::SearchSetTransformVisitor::new(odf::DatasetKind::Derivative);
     let mut seed_presence = match maybe_hint_flags {

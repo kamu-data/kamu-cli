@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.resource_id as \"resource_id!: _\",\n                    a.account_name,\n                    a.email,\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    registered_at as \"registered_at: _\",\n                    a.avatar_url,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON at.account_id = a.id\n                WHERE at.id = $1 and at.revoked_at IS null\n                ",
+  "describe": {
+    "columns": [
+      {
+        "name": "token_hash",
+        "ordinal": 0,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "access_tokens",
+            "name": "token_hash"
+          }
+        }
+      },
+      {
+        "name": "id: _",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "resource_id!: _",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "resource_id"
+          }
+        }
+      },
+      {
+        "name": "account_name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "account_name"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "display_name",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "name": "account_type: AccountType",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "account_type"
+          }
+        }
+      },
+      {
+        "name": "registered_at: _",
+        "ordinal": 7,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "registered_at"
+          }
+        }
+      },
+      {
+        "name": "avatar_url",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "name": "provider",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "name": "provider_identity_key",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "provider_identity_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "c198020fac8a0459919e05d519cc46fccf347b4700326bc8fb73e5c88f92bfb1"
+}

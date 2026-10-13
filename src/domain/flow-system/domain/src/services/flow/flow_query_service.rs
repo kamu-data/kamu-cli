@@ -12,36 +12,45 @@ use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{FlowFilters, FlowID, FlowOrder, FlowScope, FlowScopeQuery, FlowState};
+use crate::{
+    FlowActivationLink,
+    FlowFilters,
+    FlowID,
+    FlowOrder,
+    FlowScope,
+    FlowScopeQuery,
+    FlowState,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait FlowQueryService: Sync + Send {
     /// Returns state of all flows, regardless of the scope,
     /// ordered by creation time from newest to oldest
-    async fn list_all_flows(
-        &self,
+    async fn list_all_flows<'a>(
+        &'a self,
         order: FlowOrder,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, InternalError>;
+    ) -> Result<FlowStateListing<'a>, InternalError>;
 
     /// Returns states of flows matching scope and other filters
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
-    async fn list_scoped_flows(
-        &self,
+    async fn list_scoped_flows<'a>(
+        &'a self,
         scope_query: FlowScopeQuery,
         filters: FlowFilters,
         order: FlowOrder,
         pagination: PaginationOpts,
-    ) -> Result<FlowStateListing, InternalError>;
+    ) -> Result<FlowStateListing<'a>, InternalError>;
 
     /// Returns initiators of flows associated with matching scopes
-    async fn list_scoped_flow_initiators(
-        &self,
+    async fn list_scoped_flow_initiators<'a>(
+        &'a self,
         scope_query: FlowScopeQuery,
-    ) -> Result<FlowInitiatorListing, InternalError>;
+    ) -> Result<FlowInitiatorListing<'a>, InternalError>;
 
     /// Returns subset of input scopes that have at least one flow
     async fn filter_flow_scopes_having_flows(
@@ -51,6 +60,15 @@ pub trait FlowQueryService: Sync + Send {
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
+
+    /// Returns current states of the given flows that exist, in input order
+    async fn get_flows(&self, flow_ids: &[FlowID]) -> Result<Vec<FlowState>, InternalError>;
+
+    /// Returns links to the flows that the given flow has activated
+    async fn get_downstream_links(
+        &self,
+        upstream_flow_id: FlowID,
+    ) -> Result<Vec<FlowActivationLink>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

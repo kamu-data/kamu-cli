@@ -11,7 +11,7 @@
 
 use chrono::{DateTime, Utc};
 use jsonwebtoken::TokenData;
-use rand::{self, Rng};
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -63,7 +63,7 @@ impl KamuAccessToken {
                 .try_into()
                 .unwrap(),
             checksum: token_checksum,
-            composed_token: format!("{ACCESS_TOKEN_PREFIX}_{}", &base32_token),
+            composed_token: format!("{ACCESS_TOKEN_PREFIX}_{base32_token}"),
             base32_token,
         }
     }
@@ -139,7 +139,6 @@ pub struct JWTClaims {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum AccessTokenType {
     KamuAccessToken(KamuAccessToken),

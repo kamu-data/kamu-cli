@@ -1,0 +1,24 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+// Re-export
+
+// Combine this module's types with generated DTOs
+pub use crate::dtos::datasets::*;
+
+mod dataset_id;
+mod dataset_selector;
+pub mod legacy;
+mod metadata_block_types;
+mod metadata_event_type;
+
+pub use dataset_id::*;
+pub use dataset_selector::*;
+pub use metadata_block_types::*;
+pub use metadata_event_type::*;

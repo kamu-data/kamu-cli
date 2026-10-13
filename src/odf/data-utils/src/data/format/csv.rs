@@ -291,12 +291,12 @@ mod tests {
     fn test_csv_empty() {
         let batch = get_empty_batch();
         assert_csv_output(
-            batch.clone(),
+            &batch,
             CsvWriterOptions::default(),
             "nullable,uint64,decimal,utf8,utf8_special,bin,bin_fixed,ts_milli",
         );
         assert_csv_output(
-            batch,
+            &batch,
             CsvWriterOptions {
                 header: false,
                 ..Default::default()
@@ -309,7 +309,7 @@ mod tests {
     fn test_csv_simple() {
         let batch = get_sample_batch();
         assert_csv_output(
-            batch,
+            &batch,
             CsvWriterOptions::default(),
             indoc::indoc!(
                 r#"
@@ -327,7 +327,7 @@ mod tests {
     fn test_csv_nested() {
         let batch = get_nested_batch();
         assert_csv_output(
-            batch,
+            &batch,
             CsvWriterOptions::default(),
             indoc::indoc!(
                 r#"
@@ -445,12 +445,11 @@ mod tests {
         .unwrap()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn assert_csv_output(batch: RecordBatch, opts: CsvWriterOptions, expected: &str) {
+    fn assert_csv_output(batch: &RecordBatch, opts: CsvWriterOptions, expected: &str) {
         let mut buf = Vec::new();
         {
             let mut writer = CsvWriter::new(&mut buf, opts);
-            writer.write_batch(&batch).unwrap();
+            writer.write_batch(batch).unwrap();
             writer.finish().unwrap();
         }
         let actual = std::str::from_utf8(&buf).unwrap();

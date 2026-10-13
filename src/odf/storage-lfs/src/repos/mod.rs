@@ -10,7 +10,9 @@
 mod named_object_repository_local_fs;
 mod object_repository_caching_local_fs;
 mod object_repository_local_fs;
+mod staging_file;
 
 pub use named_object_repository_local_fs::*;
 pub use object_repository_caching_local_fs::*;
 pub use object_repository_local_fs::*;
+pub(crate) use staging_file::*;

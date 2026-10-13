@@ -6,7 +6,13 @@
       {
         "name": "task_id: _",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "task_ids",
+            "name": "task_id"
+          }
+        }
       }
     ],
     "parameters": {

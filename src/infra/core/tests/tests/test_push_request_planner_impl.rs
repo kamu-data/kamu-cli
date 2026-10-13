@@ -240,7 +240,7 @@ async fn test_push_remote_no_target_no_alias_multiple_repos_exist() {
         .push_request_planner
         .collect_plan(std::slice::from_ref(&foo.dataset_handle), None)
         .await;
-    assert!(items.is_empty());
+    assert_eq!(items, []);
 
     assert_eq!(1, errors.len());
     assert_matches!(
@@ -266,7 +266,7 @@ async fn test_push_remote_no_target_no_alias_no_repositories() {
         .push_request_planner
         .collect_plan(std::slice::from_ref(&foo.dataset_handle), None)
         .await;
-    assert!(items.is_empty());
+    assert_eq!(items, []);
 
     assert_eq!(1, errors.len());
     assert_matches!(

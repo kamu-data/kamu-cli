@@ -43,7 +43,7 @@ impl DatasetStorageUnitS3 {
     fn get_dataset_impl(&self, dataset_id: &DatasetID) -> Arc<dyn Dataset> {
         let s3_context = self
             .s3_context
-            .sub_context(&format!("{}/", &dataset_id.as_multibase()));
+            .sub_context(&format!("{}/", dataset_id.as_multibase()));
 
         self.dataset_s3_builder
             .build_s3_dataset(dataset_id, s3_context)
@@ -172,10 +172,9 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         }?;
 
         // If so, there are 2 possibilities:
-        // - Dataset was partially created before (no head yet) and was not GC'd - so we
-        //   assume ownership
-        // - Dataset existed before (has valid head) - we should error out with ref
-        //   collision
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we assume
+        //   ownership
+        // - Dataset existed before (has valid head) - we should error out with ref collision
         if let Some(existing_dataset) = maybe_existing_dataset {
             match existing_dataset
                 .as_metadata_chain()
@@ -294,7 +293,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitS3 {
         let head_key = self.s3_context.get_key(
             format!(
                 "{}/refs/{}",
-                &dataset_id.as_multibase().to_stack_string(),
+                dataset_id.as_multibase().to_stack_string(),
                 BlockRef::Head.as_str()
             )
             .as_str(),

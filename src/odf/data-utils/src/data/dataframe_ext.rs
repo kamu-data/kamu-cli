@@ -220,6 +220,10 @@ impl DataFrameExt {
     /// the data frame schema. All extra columns in target shcema will be
     /// ignored, columns that are missing in the target schema or have
     /// incompatible types will be returned as-is.
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Arrow's DataType is foreign; only list nullability is coerced"
+    )]
     pub fn coerce_columns_nullability(
         self,
         target: &datafusion::arrow::datatypes::Schema,

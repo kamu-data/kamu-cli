@@ -90,7 +90,7 @@ impl MoleculeCreateDataRoomEntryUseCase for MoleculeCreateDataRoomEntryUseCaseIm
                 MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
                 MoleculeDataRoomMessage::created(
                     data_room_entry.system_time,
-                    molecule_subject.account_id.clone(),
+                    molecule_subject.account_handle.did.clone(),
                     molecule_project.account_id.clone(),
                     molecule_project.ocl_id.clone(),
                     data_room_entry.clone(),

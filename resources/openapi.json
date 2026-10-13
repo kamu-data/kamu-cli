@@ -1104,7 +1104,7 @@
     },
     "termsOfService": "https://docs.kamu.dev/terms-of-service/",
     "title": "Kamu REST API",
-    "version": "0.266.1"
+    "version": "0.270.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1120,7 +1120,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "current account"
           },
           "401": {
             "content": {
@@ -1130,7 +1130,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "not authenticated"
           }
         },
         "security": [
@@ -1167,7 +1167,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "dataset info"
           },
           "401": {
             "content": {
@@ -1177,7 +1177,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "not authenticated"
           },
           "404": {
             "content": {
@@ -1187,7 +1187,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "dataset not found"
           }
         },
         "security": [
@@ -1213,7 +1213,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "node info"
           }
         },
         "security": [
@@ -1240,7 +1240,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "service document"
           }
         },
         "security": [
@@ -1267,7 +1267,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "service metadata"
           }
         },
         "security": [
@@ -1305,7 +1305,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "collection entries"
           }
         },
         "security": [
@@ -1359,7 +1359,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "upload prepared"
           }
         },
         "security": [
@@ -1445,7 +1445,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "file uploaded"
           }
         },
         "security": [
@@ -1481,7 +1481,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "logged in"
           },
           "400": {
             "content": {
@@ -1491,7 +1491,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "malformed request"
           },
           "401": {
             "content": {
@@ -1501,7 +1501,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "invalid credentials"
           }
         },
         "security": [
@@ -1535,7 +1535,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "access token issued"
           },
           "400": {
             "content": {
@@ -1545,7 +1545,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "authorization pending or failed"
           }
         },
         "security": [
@@ -1581,7 +1581,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "device authorization started"
           }
         },
         "security": [
@@ -1607,7 +1607,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "token is valid"
           },
           "401": {
             "content": {
@@ -1617,7 +1617,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "token is missing or invalid"
           }
         },
         "security": [
@@ -1714,7 +1714,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "query result"
           }
         },
         "security": [
@@ -1750,7 +1750,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "query result"
           }
         },
         "security": [
@@ -1811,7 +1811,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "signature"
           },
           "404": {
             "content": {
@@ -1821,7 +1821,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "signing key not found"
           }
         },
         "security": [
@@ -1887,7 +1887,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "verification result"
           },
           "400": {
             "content": {
@@ -1897,7 +1897,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "malformed request"
           }
         },
         "security": [
@@ -2078,7 +2078,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "checkpoint file stored"
           }
         },
         "security": [
@@ -2203,7 +2203,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "data file stored"
           }
         },
         "security": [
@@ -2281,7 +2281,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "data ingested"
           }
         },
         "security": [
@@ -2345,7 +2345,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "dataset metadata"
           }
         },
         "security": [
@@ -2392,7 +2392,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "websocket upgrade for pull protocol"
           }
         },
         "security": [
@@ -2439,7 +2439,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "websocket upgrade for push protocol"
           }
         },
         "security": [
@@ -2495,7 +2495,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "block hash the reference points to"
           }
         },
         "security": [
@@ -2582,7 +2582,7 @@
                 }
               }
             },
-            "description": ""
+            "description": "last records of the dataset"
           }
         },
         "security": [

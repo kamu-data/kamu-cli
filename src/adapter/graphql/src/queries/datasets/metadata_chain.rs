@@ -17,9 +17,12 @@ use crate::queries::{Account, DatasetRequestState};
 // MetadataRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Named reference to a metadata block
 #[derive(SimpleObject)]
 pub struct BlockRef {
+    /// Name of the reference, e.g. `head`
     name: String,
+    /// Hash of the block the reference points to
     block_hash: Multihash<'static>,
 }
 
@@ -31,6 +34,7 @@ pub struct MetadataChain<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Chain of metadata blocks of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> MetadataChain<'a> {
@@ -70,10 +74,9 @@ impl<'a> MetadataChain<'a> {
             .as_metadata_chain()
             .try_get_block(&hash)
             .await?;
-        let account =
-            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
-                .await?
-                .expect("Account must exist");
+        let account = Account::from_dataset_alias(ctx, self.dataset_request_state.dataset_alias())
+            .await?
+            .expect("Account must exist");
         Ok(if let Some(block) = block_maybe {
             Some(MetadataBlockExtended::new(ctx, hash, block, account).await?)
         } else {
@@ -132,10 +135,9 @@ impl<'a> MetadataChain<'a> {
         let head_block = chain.get_block(&head).await.int_err()?;
         let total_count = usize::try_from(head_block.sequence_number).unwrap() + 1;
 
-        let account =
-            Account::from_dataset_alias(ctx, &self.dataset_request_state.dataset_handle().alias)
-                .await?
-                .expect("Account must exist");
+        let account = Account::from_dataset_alias(ctx, self.dataset_request_state.dataset_alias())
+            .await?
+            .expect("Account must exist");
 
         // Special case: head block request
         if page == 0 && per_page == 1 {

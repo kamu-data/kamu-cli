@@ -40,6 +40,46 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_concurrent_modification,
+    harness = SqliteFlowConfigurationEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_existing_bindings_exclude_removed_scopes,
+    harness = SqliteFlowConfigurationEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_get_events_multi,
+    harness = SqliteFlowConfigurationEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_save_events_multi,
+    harness = SqliteFlowConfigurationEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_flow_system_repo_tests::test_flow_configuration_event_store::test_event_store_save_events_multi_rejects_invalid_items,
+    harness = SqliteFlowConfigurationEventStoreHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteFlowConfigurationEventStoreHarness {
     catalog: Catalog,
 }

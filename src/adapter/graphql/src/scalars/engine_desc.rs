@@ -13,6 +13,7 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Data processing engine available on the node
 #[derive(SimpleObject)]
 pub struct EngineDesc {
     /// A short name of the engine, e.g. "Spark", "Flink".
@@ -38,12 +39,16 @@ impl From<domain::EngineDesc> for EngineDesc {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::enum_variant_names)]
+/// Query language and dialect
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryDialect {
+    /// Apache Spark SQL
     SqlSpark,
+    /// Apache Flink SQL
     SqlFlink,
+    /// Apache `DataFusion` SQL
     SqlDataFusion,
+    /// `RisingWave` SQL
     SqlRisingWave,
 }
 

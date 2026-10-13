@@ -62,12 +62,12 @@ impl CreateDatasetUseCaseHelper {
                         None,
                         raw_alias.dataset_name.clone(),
                     )),
-                    subject.account_id.clone(),
+                    subject.account_handle.did.clone(),
                 ))
             }
             TenancyConfig::MultiTenant => {
                 if let Some(account_name) = &raw_alias.account_name
-                    && *account_name != subject.account_name
+                    && *account_name != subject.account_handle.name
                 {
                     // Creating dataset for account different that the subject
                     //
@@ -83,12 +83,12 @@ impl CreateDatasetUseCaseHelper {
                         .int_err()?
                         .account_by_name(account_name)
                         .await?
-                        && (subject.account_name == "kamu"
-                            || subject.account_name == "molecule"
-                            || subject.account_name == "molecule.dev")
+                        && (subject.account_handle.name == "kamu"
+                            || subject.account_handle.name == "molecule"
+                            || subject.account_handle.name == "molecule.dev")
                         && account
                             .account_name
-                            .starts_with(subject.account_name.as_str())
+                            .starts_with(subject.account_handle.name.as_str())
                     {
                         Ok((CanonicalDatasetAlias::new(raw_alias.clone()), account.id))
                     } else {
@@ -100,10 +100,10 @@ impl CreateDatasetUseCaseHelper {
                 } else {
                     Ok((
                         CanonicalDatasetAlias::new(odf::DatasetAlias::new(
-                            Some(subject.account_name.clone()),
+                            Some(subject.account_handle.name.clone()),
                             raw_alias.dataset_name.clone(),
                         )),
-                        subject.account_id.clone(),
+                        subject.account_handle.did.clone(),
                     ))
                 }
             }
@@ -272,7 +272,10 @@ impl CreateDatasetUseCaseHelper {
                     }))
                 }
                 odf::dataset::SetChainRefError::Internal(e) => CreateDatasetError::Internal(e),
-                _ => CreateDatasetError::Internal(e.int_err()),
+                odf::dataset::SetChainRefError::BlockNotFound(_)
+                | odf::dataset::SetChainRefError::Access(_) => {
+                    CreateDatasetError::Internal(e.int_err())
+                }
             })
     }
 }

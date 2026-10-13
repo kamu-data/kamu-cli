@@ -6,12 +6,24 @@
       {
         "name": "secret_key",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "did_secret_keys",
+            "name": "secret_key"
+          }
+        }
       },
       {
         "name": "secret_nonce",
         "ordinal": 1,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "did_secret_keys",
+            "name": "secret_nonce"
+          }
+        }
       }
     ],
     "parameters": {

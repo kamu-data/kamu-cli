@@ -205,12 +205,12 @@ impl<'a> DataSchemaDiff<'a> {
         item: &DataSchemaDiffItem<'a>,
         opts: &DataSchemaCmpOptions,
     ) -> Option<DataSchemaDiffItem<'a>> {
-        #[expect(clippy::match_same_arms)]
         let eq = match item {
-            DataSchemaDiffItem::SchemaAttributesChanged => opts.ignore_attributes,
-            DataSchemaDiffItem::FieldAttributesChanged { .. } => opts.ignore_attributes,
-            DataSchemaDiffItem::FieldAdded { .. } => false,
-            DataSchemaDiffItem::FieldRemoved { .. } => false,
+            DataSchemaDiffItem::SchemaAttributesChanged
+            | DataSchemaDiffItem::FieldAttributesChanged { .. } => opts.ignore_attributes,
+            DataSchemaDiffItem::FieldAdded { .. } | DataSchemaDiffItem::FieldRemoved { .. } => {
+                false
+            }
             DataSchemaDiffItem::FieldReordered { .. } => opts.ignore_order,
             DataSchemaDiffItem::FieldTypeChanged {
                 type_diff,
@@ -247,11 +247,11 @@ impl<'a> DataSchemaDiff<'a> {
         type_diff: &DataTypeDiffItem<'a>,
         opts: &DataSchemaCmpOptions,
     ) -> Option<DataTypeDiffItem<'a>> {
-        #[expect(clippy::match_same_arms)]
         let eq = match type_diff {
             DataTypeDiffItem::Changed { .. } => false,
-            DataTypeDiffItem::BecameOptional { .. } => opts.ignore_optionality,
-            DataTypeDiffItem::BecameRequired { .. } => opts.ignore_optionality,
+            DataTypeDiffItem::BecameOptional { .. } | DataTypeDiffItem::BecameRequired { .. } => {
+                opts.ignore_optionality
+            }
             DataTypeDiffItem::StructDiff {
                 fields_diff,
                 lhs,
@@ -298,10 +298,9 @@ impl<'a> DataSchemaDiff<'a> {
     }
 
     fn is_superset_schema_diff(item: &DataSchemaDiffItem<'a>, opts: &DataSchemaCmpOptions) -> bool {
-        #[expect(clippy::match_same_arms)]
         match item {
-            DataSchemaDiffItem::SchemaAttributesChanged => opts.ignore_attributes,
-            DataSchemaDiffItem::FieldAttributesChanged { .. } => opts.ignore_attributes,
+            DataSchemaDiffItem::SchemaAttributesChanged
+            | DataSchemaDiffItem::FieldAttributesChanged { .. } => opts.ignore_attributes,
             DataSchemaDiffItem::FieldAdded { .. } => false,
             DataSchemaDiffItem::FieldRemoved { .. } => true, // !
             DataSchemaDiffItem::FieldReordered { .. } => opts.ignore_order,
@@ -315,11 +314,11 @@ impl<'a> DataSchemaDiff<'a> {
         type_diff: &DataTypeDiffItem<'a>,
         opts: &DataSchemaCmpOptions,
     ) -> bool {
-        #[expect(clippy::match_same_arms)]
         match type_diff {
             DataTypeDiffItem::Changed { .. } => false,
-            DataTypeDiffItem::BecameOptional { .. } => opts.ignore_optionality,
-            DataTypeDiffItem::BecameRequired { .. } => opts.ignore_optionality,
+            DataTypeDiffItem::BecameOptional { .. } | DataTypeDiffItem::BecameRequired { .. } => {
+                opts.ignore_optionality
+            }
             DataTypeDiffItem::StructDiff { fields_diff, .. } => {
                 Self::is_superset_rec(fields_diff, opts)
             }
@@ -333,7 +332,10 @@ impl<'a> DataSchemaDiff<'a> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataSchema {
-    #[expect(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "comparison options are passed by value as part of the public API"
+    )]
     pub fn compare<'a>(&'a self, other: &'a Self, opts: DataSchemaCmpOptions) -> DataSchemaCmp<'a> {
         self.diff(other).compare(&opts)
     }
@@ -440,7 +442,10 @@ impl DataSchema {
     }
 
     /// Checks whether current schema contains all fields of another
-    #[expect(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "comparison options are passed by value as part of the public API"
+    )]
     pub fn is_superset_of(&self, other: &Self, opts: DataSchemaCmpOptions) -> bool {
         Self::diff(self, other).is_superset(&opts)
     }
@@ -711,87 +716,65 @@ mod test {
     }
 
     #[test]
-    #[allow(clippy::bool_assert_comparison)]
     fn test_schema_cmp_is_superset() {
         // Empty
-        assert_eq!(
-            DataSchema::is_superset_of(
-                &DataSchema::new(vec![]),
-                &DataSchema::new(vec![]),
-                DataSchemaCmpOptions::default(),
-            ),
-            true
-        );
+        assert!(DataSchema::is_superset_of(
+            &DataSchema::new(vec![]),
+            &DataSchema::new(vec![]),
+            DataSchemaCmpOptions::default(),
+        ));
 
         // Identical
-        assert_eq!(
-            DataSchema::is_superset_of(
-                &DataSchema::new(vec![DataField::u32("foo")]),
-                &DataSchema::new(vec![DataField::u32("foo")]),
-                DataSchemaCmpOptions::default(),
-            ),
-            true
-        );
+        assert!(DataSchema::is_superset_of(
+            &DataSchema::new(vec![DataField::u32("foo")]),
+            &DataSchema::new(vec![DataField::u32("foo")]),
+            DataSchemaCmpOptions::default(),
+        ));
 
         // Different attributes (check attributes)
-        assert_eq!(
-            DataSchema::is_superset_of(
-                &DataSchema::new(vec![DataField::u32("foo")]),
-                &DataSchema::new(vec![
-                    DataField::u32("foo").extra_json(json!({"foo.com/bar": "a"}))
-                ]),
-                DataSchemaCmpOptions::default(),
-            ),
-            false
-        );
+        assert!(!DataSchema::is_superset_of(
+            &DataSchema::new(vec![DataField::u32("foo")]),
+            &DataSchema::new(vec![
+                DataField::u32("foo").extra_json(json!({"foo.com/bar": "a"}))
+            ]),
+            DataSchemaCmpOptions::default(),
+        ));
 
         // Different attributes (ignore attributes)
-        assert_eq!(
-            DataSchema::is_superset_of(
-                &DataSchema::new(vec![DataField::u32("foo")]),
-                &DataSchema::new(vec![
-                    DataField::u32("foo").extra_json(json!({"foo.com/bar": "a"}))
-                ]),
-                DataSchemaCmpOptions {
-                    ignore_attributes: true,
-                    ..Default::default()
-                },
-            ),
-            true
-        );
+        assert!(DataSchema::is_superset_of(
+            &DataSchema::new(vec![DataField::u32("foo")]),
+            &DataSchema::new(vec![
+                DataField::u32("foo").extra_json(json!({"foo.com/bar": "a"}))
+            ]),
+            DataSchemaCmpOptions {
+                ignore_attributes: true,
+                ..Default::default()
+            },
+        ));
 
         // One new field at the end
-        assert_eq!(
-            DataSchema::is_superset_of(
-                &DataSchema::new(vec![DataField::u32("foo"), DataField::u32("bar")]),
-                &DataSchema::new(vec![DataField::u32("foo")]),
-                DataSchemaCmpOptions::default(),
-            ),
-            true
-        );
+        assert!(DataSchema::is_superset_of(
+            &DataSchema::new(vec![DataField::u32("foo"), DataField::u32("bar")]),
+            &DataSchema::new(vec![DataField::u32("foo")]),
+            DataSchemaCmpOptions::default(),
+        ));
 
         // One new field at the start (check order)
-        assert_eq!(
-            DataSchema::is_superset_of(
-                &DataSchema::new(vec![DataField::u32("bar"), DataField::u32("foo")]),
-                &DataSchema::new(vec![DataField::u32("foo")]),
-                DataSchemaCmpOptions::default(),
-            ),
-            false
-        );
+        assert!(!DataSchema::is_superset_of(
+            &DataSchema::new(vec![DataField::u32("bar"), DataField::u32("foo")]),
+            &DataSchema::new(vec![DataField::u32("foo")]),
+            DataSchemaCmpOptions::default(),
+        ));
 
         // One new field at the start (ignore order)
-        assert_eq!(
-            DataSchema::is_superset_of(
-                &DataSchema::new(vec![DataField::u32("bar"), DataField::u32("foo")]),
-                &DataSchema::new(vec![DataField::u32("foo")]),
-                DataSchemaCmpOptions {
-                    ignore_order: true,
-                    ..Default::default()
-                },
-            ),
-            true
-        );
+        assert!(DataSchema::is_superset_of(
+            &DataSchema::new(vec![DataField::u32("bar"), DataField::u32("foo")]),
+            &DataSchema::new(vec![DataField::u32("foo")]),
+            DataSchemaCmpOptions {
+                ignore_order: true,
+                ..Default::default()
+            },
+        ));
     }
 
     #[test]

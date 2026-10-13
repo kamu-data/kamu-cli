@@ -196,7 +196,7 @@ impl ElasticsearchQueryBuilder {
         query_json
     }
 
-    #[expect(dead_code)]
+    #[expect(dead_code, reason = "kept for simple debug scenarios")]
     fn simple_textual_query(prompt: &str) -> serde_json::Value {
         let query = prompt.trim();
         if !query.is_empty() {
@@ -413,7 +413,6 @@ impl ElasticsearchQueryBuilder {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
-    use kamu_search::*;
     use pretty_assertions::assert_eq;
 
     use super::*;

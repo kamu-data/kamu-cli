@@ -13,7 +13,12 @@ use crate::{TaskError, TaskResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::EnumDiscriminants)]
+#[strum_discriminants(
+    name(TaskOutcomeKind),
+    derive(strum::IntoStaticStr, strum::EnumIter),
+    strum(serialize_all = "snake_case")
+)]
 pub enum TaskOutcome {
     /// Task succeeded
     Success(TaskResult),

@@ -22,6 +22,7 @@ pub struct DatasetFlowConfigsMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Mutations that change flow configurations of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowConfigsMut<'a> {
@@ -32,6 +33,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         }
     }
 
+    /// Sets the ingest flow configuration of a root dataset
     #[tracing::instrument(level = "info", name = DatasetFlowConfigsMut_set_ingest_config, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn set_ingest_config(
@@ -61,7 +63,17 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         let ingest_config_rule: afs::FlowConfigRuleIngest = ingest_config_input.into();
         let configuration_rule = ingest_config_rule.into_flow_config();
 
-        let retry_policy: Option<fs::RetryPolicy> = retry_policy_input.map(Into::into);
+        let retry_policy = match retry_policy_input
+            .map(fs::RetryPolicy::try_from)
+            .transpose()
+        {
+            Ok(retry_policy) => retry_policy,
+            Err(e) => {
+                return Ok(SetFlowConfigResult::FlowInvalidConfigInput(
+                    FlowInvalidConfigInputError { reason: e },
+                ));
+            }
+        };
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
@@ -79,6 +91,7 @@ impl<'a> DatasetFlowConfigsMut<'a> {
         }))
     }
 
+    /// Sets the compaction flow configuration of a root dataset
     #[tracing::instrument(level = "info", name = DatasetFlowConfigsMut_set_ingest_config, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn set_compaction_config(
@@ -115,7 +128,17 @@ impl<'a> DatasetFlowConfigsMut<'a> {
                 }
             };
         let configuration_rule = compact_config_rule.into_flow_config();
-        let retry_policy: Option<fs::RetryPolicy> = retry_policy_input.map(Into::into);
+        let retry_policy = match retry_policy_input
+            .map(fs::RetryPolicy::try_from)
+            .transpose()
+        {
+            Ok(retry_policy) => retry_policy,
+            Err(e) => {
+                return Ok(SetFlowConfigResult::FlowInvalidConfigInput(
+                    FlowInvalidConfigInputError { reason: e },
+                ));
+            }
+        };
 
         let flow_config_service = from_catalog_n!(ctx, dyn fs::FlowConfigurationService);
 
@@ -134,8 +157,13 @@ impl<'a> DatasetFlowConfigsMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of setting a flow configuration
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
@@ -143,14 +171,17 @@ pub enum SetFlowConfigResult {
     FlowInvalidConfigInput(FlowInvalidConfigInputError),
 }
 
+/// Flow configuration was set
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct SetFlowConfigSuccess {
+    /// Configuration that is now in effect
     pub config: FlowConfiguration,
 }
 
 #[ComplexObject]
 impl SetFlowConfigSuccess {
+    /// Human-readable success message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -159,21 +190,26 @@ impl SetFlowConfigSuccess {
 #[derive(Debug)]
 pub struct FlowTypeIsNotSupported;
 
+/// Flow type is not supported for this operation
 #[Object]
 impl FlowTypeIsNotSupported {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         "Flow type is not supported".to_string()
     }
 }
 
+/// Provided flow configuration input is invalid
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowInvalidConfigInputError {
+    /// Explanation of what is invalid in the input
     reason: String,
 }
 
 #[ComplexObject]
 impl FlowInvalidConfigInputError {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         self.reason.clone()
     }

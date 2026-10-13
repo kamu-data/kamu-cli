@@ -25,6 +25,7 @@ use crate::*;
 // Service
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait PollingIngestService: Send + Sync {
     /// Uses polling source definition in metadata to ingest data from an

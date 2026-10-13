@@ -146,9 +146,7 @@ where
                 }
                 Some(token) => {
                     match Self::get_account_by_token(base_catalog, token.clone()).await {
-                        Ok(account) => {
-                            CurrentAccountSubject::logged(account.id, account.account_name)
-                        }
+                        Ok(account) => CurrentAccountSubject::logged_from_account(&account),
                         Err(e @ GetAccountInfoError::AccessToken(_)) => {
                             tracing::warn!("{e}");
                             return Ok(Status::unauthenticated(e.to_string()).into_http());

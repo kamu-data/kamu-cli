@@ -17,6 +17,7 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TransformRequestPlanner: Send + Sync {
     async fn build_transform_preliminary_plan(
@@ -103,6 +104,11 @@ pub enum TransformStatus {
     UpToDate,
     NewInputDataAvailable {
         input_advancements: Vec<odf::metadata::ExecuteTransformInput>,
+    },
+    /// The history of at least one input was rewritten: its head no longer
+    /// descends from the block the last transform consumed.
+    InputBreakingChange {
+        breaking_inputs: Vec<odf::metadata::ExecuteTransformInput>,
     },
 }
 

@@ -15,6 +15,7 @@ use crate::{Account, DeviceCode, FindAccountIdByProviderIdentityKeyError, Provid
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait AuthenticationService: Sync + Send {
     fn supported_login_methods(&self) -> Vec<String>;

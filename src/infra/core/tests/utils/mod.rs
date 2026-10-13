@@ -14,8 +14,6 @@ mod ipfs_daemon;
 #[cfg(feature = "ingest-mqtt")]
 mod mqtt_broker;
 
-pub mod mock_engine_provisioner;
-
 #[cfg(feature = "ingest-ftp")]
 pub use ftp_server::*;
 pub use http_server::*;

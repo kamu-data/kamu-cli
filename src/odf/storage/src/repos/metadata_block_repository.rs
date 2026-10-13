@@ -9,7 +9,7 @@
 
 use async_trait::async_trait;
 use internal_error::{BoxedError, InternalError};
-use odf_metadata::dataset::MetadataBlockBytes;
+use odf_metadata::datasets::MetadataBlockBytes;
 use odf_metadata::*;
 use thiserror::Error;
 
@@ -25,6 +25,7 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait]
 pub trait MetadataBlockRepository: Send + Sync {
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError>;

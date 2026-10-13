@@ -67,8 +67,14 @@ type DatasetImplLocalFS = DatasetImpl<
 #[component(pub)]
 #[interface(dyn DatasetFactory)]
 impl DatasetFactoryImpl {
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(unused_variables)]
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "the gateway is moved into the struct only with the `http` feature"
+    )]
+    #[allow(
+        unused_variables,
+        reason = "parameters are used only by feature-gated storage backends"
+    )]
     pub fn new(
         ipfs_gateway: IpfsGateway,
         access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
@@ -88,8 +94,8 @@ impl DatasetFactoryImpl {
 #[component(pub)]
 #[interface(dyn DatasetFactory)]
 impl DatasetFactoryImpl {
-    #[allow(clippy::needless_pass_by_value)]
-    #[allow(unused_variables)]
+    #[expect(clippy::needless_pass_by_value)]
+    #[expect(unused_variables)]
     pub fn new(
         ipfs_gateway: IpfsGateway,
         access_token_resolver: Arc<dyn OdfServerAccessTokenResolver>,
@@ -346,7 +352,10 @@ impl DatasetFactoryImpl {
 // schema
 #[async_trait::async_trait]
 impl DatasetFactory for DatasetFactoryImpl {
-    #[allow(unused_variables)]
+    #[allow(
+        unused_variables,
+        reason = "parameters are used only by feature-gated storage backends"
+    )]
     async fn get_dataset<'a, 'b>(
         &'a self,
         url: &'b Url,

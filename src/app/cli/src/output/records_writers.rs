@@ -93,6 +93,10 @@ impl RecordsFormat {
     }
 
     // TODO: PERF: Rethink into a columnar approach
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Arrow's DataType is foreign; types without a dedicated formatter use Arrow's own"
+    )]
     pub fn format(&self, row: usize, col: usize, array: &ArrayRef) -> String {
         use datafusion::arrow::array::*;
 
@@ -258,6 +262,10 @@ impl ColumnFormat {
         }
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Arrow's DataType is foreign; custom value formatters exist only for these types"
+    )]
     fn value_fmt_t(
         array: &ArrayRef,
         row: usize,
@@ -296,7 +304,7 @@ impl ColumnFormat {
                     let value = DateTime::from_naive_utc_and_offset(value, Utc);
                     t_value_fmt(value)
                 }
-                _ => unimplemented!(),
+                TimeUnit::Second | TimeUnit::Millisecond | TimeUnit::Nanosecond => unimplemented!(),
             },
             DataType::Utf8 => format_typed!(StringArray, &str, type_name, array, value_fmt, row),
             DataType::LargeUtf8 => {

@@ -186,7 +186,9 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
                 use ViewCollectionEntriesError as E;
                 match e {
                     E::Access(e) => MoleculeDataRoomCollectionReadError::Access(e),
-                    E::UnknownExtraDataFieldFilterNames(_) | E::Internal(_) => e.int_err().into(),
+                    E::MaxDepthTooLarge(_)
+                    | E::UnknownExtraDataFieldFilterNames(_)
+                    | E::Internal(_) => e.int_err().into(),
                 }
             })?;
 

@@ -34,9 +34,11 @@ use kamu_search_elasticsearch::testing::{
     SearchTestResponse,
 };
 use kamu_search_services::{DummyEmbeddingsEncoder, EmbeddingsProviderImpl, SearchIndexerImpl};
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use messaging_outbox::*;
 use odf::metadata::testing::MetadataFactory;
 use time_source::{SystemTimeSource, SystemTimeSourceProvider, SystemTimeSourceStub};
+use wakeup_listener::WakeupListenerMetrics;
 
 use crate::tests::use_cases::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
@@ -116,6 +118,8 @@ impl ElasticsearchDatasetBaseHarness {
             let mut b = dill::CatalogBuilder::new_chained(es_base_harness.catalog());
             // Outbox repositories
             b.add::<InMemoryOutboxMessageBridge>();
+            b.add::<InMemoryWakeupHub>();
+            b.add::<WakeupListenerMetrics>();
 
             // Search
             b.add::<DatasetSearchSchemaProvider>();

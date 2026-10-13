@@ -15,17 +15,27 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-simple_scalar!(WebhookSubscriptionID, kamu_webhooks::WebhookSubscriptionID);
+simple_scalar!(
+    /// Unique identifier of a webhook subscription
+    WebhookSubscriptionID,
+    kamu_webhooks::WebhookSubscriptionID
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Lifecycle status of a webhook subscription
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 #[graphql(remote = "kamu_webhooks::WebhookSubscriptionStatus")]
 pub enum WebhookSubscriptionStatus {
+    /// Created but not yet enabled
     Unverified,
+    /// Events are being delivered
     Enabled,
+    /// Deliveries were paused by a user
     Paused,
+    /// Deliveries kept failing, reactivation is required to resume them
     Unreachable,
+    /// Subscription was removed
     Removed,
 }
 
@@ -52,6 +62,7 @@ impl FromStr for WebhookEventType {
     }
 }
 
+/// Type of event a webhook subscription delivers (e.g. `DATASET.REF.UPDATED`)
 #[Scalar()]
 impl ScalarType for WebhookEventType {
     fn parse(value: Value) -> InputValueResult<Self> {
@@ -82,6 +93,7 @@ impl FromStr for WebhookSubscriptionLabel {
     }
 }
 
+/// Human-readable label of a webhook subscription
 #[Scalar()]
 impl ScalarType for WebhookSubscriptionLabel {
     fn parse(value: Value) -> InputValueResult<Self> {

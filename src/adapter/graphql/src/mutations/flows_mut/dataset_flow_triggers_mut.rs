@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_adapter_flow_dataset::FlowScopeDataset;
 use kamu_flow_system::{FlowBinding, FlowTriggerRule, FlowTriggerService, FlowTriggerStopPolicy};
 
@@ -18,9 +17,9 @@ use super::{
     ensure_expected_dataset_kind,
     ensure_flow_preconditions,
 };
-use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
+use crate::{LoggedInGuard, utils};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,6 +27,7 @@ pub struct DatasetFlowTriggersMut<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Mutations that manage flow triggers of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowTriggersMut<'a> {
@@ -38,6 +38,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }
     }
 
+    /// Creates or replaces the trigger of a flow type
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_set_trigger, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn set_trigger(
@@ -83,7 +84,12 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         let res = flow_trigger_service
-            .set_trigger(Utc::now(), flow_binding, trigger_rule, triggest_stop_policy)
+            .set_trigger(
+                utils::system_time_now(ctx),
+                flow_binding,
+                trigger_rule,
+                triggest_stop_policy,
+            )
             .await
             .int_err()?;
 
@@ -92,6 +98,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         }))
     }
 
+    /// Pauses the trigger of a flow type
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn pause_flow(
@@ -107,12 +114,13 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         flow_trigger_service
-            .pause_flow_trigger(Utc::now(), &flow_binding)
+            .pause_flow_trigger(utils::system_time_now(ctx), &flow_binding)
             .await?;
 
         Ok(true)
     }
 
+    /// Pauses triggers of all flow types of the dataset
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_pause_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn pause_flows(&self, ctx: &Context<'_>) -> Result<bool> {
@@ -120,12 +128,13 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
         let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
         flow_trigger_service
-            .pause_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
+            .pause_flow_triggers_for_scopes(utils::system_time_now(ctx), &[flow_scope])
             .await?;
 
         Ok(true)
     }
 
+    /// Resumes the trigger of a flow type
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flow, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn resume_flow(
@@ -141,12 +150,13 @@ impl<'a> DatasetFlowTriggersMut<'a> {
         );
 
         flow_trigger_service
-            .resume_flow_trigger(Utc::now(), &flow_binding)
+            .resume_flow_trigger(utils::system_time_now(ctx), &flow_binding)
             .await?;
 
         Ok(true)
     }
 
+    /// Resumes triggers of all flow types of the dataset
     #[tracing::instrument(level = "info", name = DatasetFlowTriggersMut_resume_flows, skip_all)]
     #[graphql(guard = "LoggedInGuard::new()")]
     pub async fn resume_flows(&self, ctx: &Context<'_>) -> Result<bool> {
@@ -154,7 +164,7 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
         let flow_scope = FlowScopeDataset::make_scope(self.dataset_request_state.dataset_id());
         flow_trigger_service
-            .resume_flow_triggers_for_scopes(Utc::now(), &[flow_scope])
+            .resume_flow_triggers_for_scopes(utils::system_time_now(ctx), &[flow_scope])
             .await?;
 
         Ok(true)
@@ -163,8 +173,13 @@ impl<'a> DatasetFlowTriggersMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of setting a flow trigger
 #[derive(Interface)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum SetFlowTriggerResult {
     Success(SetFlowTriggerSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
@@ -174,40 +189,49 @@ pub enum SetFlowTriggerResult {
     InvalidTriggerStopPolicyInput(FlowInvalidTriggerStopPolicyInputError),
 }
 
+/// Flow trigger was set
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct SetFlowTriggerSuccess {
+    /// Trigger that is now in effect
     pub trigger: FlowTrigger,
 }
 
 #[ComplexObject]
 impl SetFlowTriggerSuccess {
+    /// Human-readable success message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
+/// Provided trigger rule is invalid
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowInvalidTriggerInputError {
+    /// Explanation of what is invalid in the rule
     pub reason: String,
 }
 
 #[ComplexObject]
 impl FlowInvalidTriggerInputError {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         self.reason.clone()
     }
 }
 
+/// Provided trigger stop policy is invalid
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct FlowInvalidTriggerStopPolicyInputError {
+    /// Explanation of what is invalid in the stop policy
     pub reason: String,
 }
 
 #[ComplexObject]
 impl FlowInvalidTriggerStopPolicyInputError {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         self.reason.clone()
     }

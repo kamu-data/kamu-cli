@@ -14,13 +14,13 @@ use digest::Digest;
 use opendatafabric_metadata::config::*;
 use opendatafabric_metadata::data::ext::*;
 use opendatafabric_metadata::data::*;
-use opendatafabric_metadata::dataset::*;
-use opendatafabric_metadata::engine::*;
+use opendatafabric_metadata::datasets::*;
+use opendatafabric_metadata::engines::*;
 use opendatafabric_metadata::legacy::*;
-use opendatafabric_metadata::resource::*;
+use opendatafabric_metadata::resources::*;
 use opendatafabric_metadata::serde::flatbuffers::{proxies_generated as fb, *};
 use opendatafabric_metadata::serde::*;
-use opendatafabric_metadata::source::*;
+use opendatafabric_metadata::sources::*;
 use opendatafabric_metadata::*;
 use serde_json::json;
 
@@ -110,10 +110,11 @@ fn test_flatbuffers_maps() {
 #[test]
 fn test_flatbuffers_any_json_property() {
     // String
-    let expected = auth::AttributeInput {
-        object: "X:x".parse().unwrap(),
-        name: "my-attr".to_string(),
-        value: json!("some-attr"),
+    let expected = auth::RelationInput {
+        subject: "X:x".parse().unwrap(),
+        object: "Y:y".parse().unwrap(),
+        relation: "my-rel".to_string(),
+        value: Some(json!("some-values")),
     };
 
     let mut fb = ::flatbuffers::FlatBufferBuilder::new();
@@ -122,14 +123,15 @@ fn test_flatbuffers_any_json_property() {
     let data = fb.finished_data();
 
     let actual =
-        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
+        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Int
-    let expected = auth::AttributeInput {
-        object: "X:x".parse().unwrap(),
-        name: "my-attr".to_string(),
-        value: json!(123),
+    let expected = auth::RelationInput {
+        subject: "X:x".parse().unwrap(),
+        object: "Y:y".parse().unwrap(),
+        relation: "my-rel".to_string(),
+        value: Some(json!(123)),
     };
 
     let mut fb = ::flatbuffers::FlatBufferBuilder::new();
@@ -138,14 +140,15 @@ fn test_flatbuffers_any_json_property() {
     let data = fb.finished_data();
 
     let actual =
-        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
+        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Nested
-    let expected = auth::AttributeInput {
-        object: "X:x".parse().unwrap(),
-        name: "my-attr".to_string(),
-        value: json!({"a": "x", "b": "y"}),
+    let expected = auth::RelationInput {
+        subject: "X:x".parse().unwrap(),
+        object: "Y:y".parse().unwrap(),
+        relation: "my-rel".to_string(),
+        value: Some(json!({"a": "x", "b": "y"})),
     };
 
     let mut fb = ::flatbuffers::FlatBufferBuilder::new();
@@ -154,7 +157,7 @@ fn test_flatbuffers_any_json_property() {
     let data = fb.finished_data();
 
     let actual =
-        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
+        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 }
 
@@ -420,7 +423,7 @@ fn test_serializer_stability() {
             .write_manifest(&wrap_into_block(event))
             .unwrap();
 
-        let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+        let hash_actual = hex::encode(sha3::Sha3_256::digest(&buffer));
 
         assert_eq!(hash_actual, hash_expected, "Case {i}");
     }
@@ -458,7 +461,7 @@ fn serde_set_data_schema() {
 
     assert_eq!(expected_block, actual_block);
 
-    let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+    let hash_actual = hex::encode(sha3::Sha3_256::digest(&buffer));
     let hash_expected = "80865248519d55fa04598e24ba42884728efe70956e640dca4df5ec8043c69ca";
 
     assert_eq!(hash_actual, hash_expected);
@@ -476,7 +479,10 @@ fn serde_set_data_schema() {
 
 #[cfg(feature = "arrow")]
 #[test]
-#[expect(deprecated)]
+#[expect(
+    deprecated,
+    reason = "exercises the deprecated legacy format on purpose"
+)]
 fn serde_set_data_schema_legacy() {
     use arrow::datatypes::*;
 
@@ -499,7 +505,7 @@ fn serde_set_data_schema_legacy() {
 
     assert_eq!(expected_block, actual_block);
 
-    let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+    let hash_actual = hex::encode(sha3::Sha3_256::digest(&buffer));
     let hash_expected = "a7e79d088ca7bac689f12d71ae64b93e7bab62a7db2fec83ea89e9bf90dd89ed";
 
     assert_eq!(hash_actual, hash_expected);
@@ -540,4 +546,93 @@ fn serde_execute_transform_response() {
             .unwrap();
         assert_eq!(actual, expected);
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `ResourceSelector`'s flatbuffers conversions are hand-written
+// (`rust.dtoType`), so nothing but these round-trips checks them.
+// `ResourceRef`'s are generated, but its round-trip still runs through the
+// hand-written `ResourceID::as_bytes`/`from_bytes`.
+#[test]
+fn test_flatbuffers_resource_selectors() {
+    fn account_ref() -> opendatafabric_metadata::auth::AccountRef {
+        opendatafabric_metadata::auth::AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }
+    }
+
+    // ResourceRef — exercises `ResourceID::as_bytes` / `from_bytes`
+    let expected = ResourceRef {
+        account: Some(account_ref()),
+        r#type: Some(TypeName::new_unchecked("SecretSet").into()),
+        id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        did: None,
+        name: Some("my-secrets".parse().unwrap()),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual = ResourceRef::deserialize(::flatbuffers::root::<fb::ResourceRef>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // ResourceSelector — every field populated
+    let expected = ResourceSelector {
+        account: Some(account_ref()),
+        id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        did: None,
+        r#type: Some(TypeName::new_unchecked("SecretSet").into()),
+        name: Some("app-%".to_string()),
+        labels: Some(LabelFilter {
+            entries: BTreeMap::from_iter([("environment".to_string(), json!("production"))]),
+        }),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceSelector::deserialize(::flatbuffers::root::<fb::ResourceSelector>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // ResourceSelector — a type-scoped selector and nothing else, so every
+    // optional field must survive as `None` rather than materializing a default
+    let expected = ResourceSelector {
+        account: None,
+        id: None,
+        did: None,
+        r#type: Some(TypeName::new_unchecked("VariableSet").into()),
+        name: None,
+        labels: None,
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceSelector::deserialize(::flatbuffers::root::<fb::ResourceSelector>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // ResourceSelector — wholly empty, the "every resource of every type" form.
+    // `type` is optional since ODF adopted the type-less selector, so an absent
+    // one must round-trip as `None` instead of panicking on deserialize.
+    let expected = ResourceSelector::default();
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceSelector::deserialize(::flatbuffers::root::<fb::ResourceSelector>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
 }

@@ -13,7 +13,7 @@ use std::num::NonZeroUsize;
 use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use kamu_flow_system::*;
-use sqlx::Sqlite;
+use sqlx::{AssertSqlSafe, Sqlite};
 
 use crate::SqliteFlowProcessStateRowModel;
 use crate::helpers::{form_scope_query_condition_values, generate_scope_query_condition_clauses};
@@ -159,7 +159,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .unwrap_or_default(),
         );
 
-        let mut count_query = sqlx::query_scalar::<sqlx::Sqlite, i64>(&count_sql)
+        let mut count_query = sqlx::query_scalar::<sqlx::Sqlite, i64>(AssertSqlSafe(count_sql))
             .bind(i32::from(
                 filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
             ))
@@ -266,7 +266,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
         );
 
         let mut list_query =
-            sqlx::query_as::<sqlx::Sqlite, SqliteFlowProcessStateRowModel>(&list_sql)
+            sqlx::query_as::<sqlx::Sqlite, SqliteFlowProcessStateRowModel>(AssertSqlSafe(list_sql))
                 .bind(i32::from(
                     filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
                 ))
@@ -374,7 +374,7 @@ impl FlowProcessStateQuery for SqliteFlowProcessStateQuery {
                 .unwrap_or_default(),
         );
 
-        let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(&sql)
+        let mut query = sqlx::query_as::<_, FlowProcessGroupRollupRowModel>(AssertSqlSafe(sql))
             .bind(i32::from(
                 filter.for_flow_types.is_some_and(|fts| !fts.is_empty()),
             ))

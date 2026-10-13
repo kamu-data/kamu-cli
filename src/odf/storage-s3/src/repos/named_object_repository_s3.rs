@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use aws_sdk_s3::operation::get_object::GetObjectError;
 use bytes::Bytes;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use odf_storage::*;
@@ -45,13 +44,17 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
 
         let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
-            Err(err) => match err.into_service_error() {
+            Err(err) => {
+                let err = err.into_service_error();
                 // TODO: Detect credentials error
-                GetObjectError::NoSuchKey(_) => Err(GetNamedError::NotFound(NotFoundError {
-                    name: name.to_owned(),
-                })),
-                err => Err(err.int_err().into()),
-            },
+                if err.is_no_such_key() {
+                    Err(GetNamedError::NotFound(NotFoundError {
+                        name: name.to_owned(),
+                    }))
+                } else {
+                    Err(err.int_err().into())
+                }
+            }
         }?;
 
         let mut stream = resp.body.into_async_read();

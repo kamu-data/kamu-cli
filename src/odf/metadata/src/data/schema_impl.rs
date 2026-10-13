@@ -9,7 +9,7 @@
 
 use super::{ExtraAttribute, IntoExtraAttribute};
 use crate::data::*;
-use crate::dtos::dataset::DatasetVocabulary;
+use crate::dtos::datasets::DatasetVocabulary;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSchema
@@ -69,7 +69,10 @@ impl DataSchemaBuilder {
         Self::default()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "builder-style public API takes the vocabulary by value"
+    )]
     pub fn with_changelog_system_fields(
         mut self,
         vocab: DatasetVocabulary,
@@ -421,9 +424,10 @@ impl DataType {
 
     /// Transforms Option<T> into T, leaving already non-optional types as-is
     pub fn required(self) -> Self {
-        match self {
-            DataType::Option(t) => *t.inner,
-            _ => self,
+        if let DataType::Option(t) = self {
+            *t.inner
+        } else {
+            self
         }
     }
 }

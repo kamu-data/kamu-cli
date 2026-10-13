@@ -13,6 +13,226 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- The local disk cache of S3 metadata blocks writes entries atomically, so a failed or interrupted download
+  no longer leaves a truncated block that breaks the node until the cache is cleared
+
+## [0.270.0] - 2026-10-12
+### Added
+- GraphQL: `FlowEventRetryPolicyModified` flow history event, recorded when a waiting flow gets a new retry policy
+### Changed
+- Flow configuration and trigger changes now apply to an already waiting flow, not only the next one:
+  - ingest, compaction and reset options and the retry policy apply until the first task is formed, so a
+    retrying flow keeps its original retry policy; manual runs keep their options
+  - a changed schedule moves a waiting scheduled flow earlier or later
+  - a changed batching rule re-evaluates a derived flow waiting for inputs: it may run at once or wait longer
+  - a stop policy already reached by consecutive failures stops the trigger at once
+- Flow triggers, configurations, tasks and webhook subscriptions are loaded and saved in bulk (startup,
+  pausing or resuming account flows, dataset deletion, flow listings) instead of one round-trip per item
+- SQLite bulk writes (ReBAC relations, dataset blocks and dependencies, flow and task events) are checked at
+  compile time
+- Storage quotas no longer apply to admin accounts, even when set
+- GraphQL (breaking): `AccountQuotasUsageStorage.limitTotalBytes` is nullable, null when storage is unlimited
+- Service trait mocks use `mockall::automock` behind each crate's `testing` feature instead of hand-written
+  `mock!` copies; `messaging-outbox` gained a `testing` feature
+- Upgraded to `datafusion v55`, `arrow v59` and `sqlx v0.9`
+### Fixed
+- Multi-tenant workspaces work for OS user names that are not valid account names (`john_doe` on Linux,
+  `_www` on macOS, `John Doe` on Windows): separators become `-` and other invalid characters are dropped.
+  If nothing valid remains or the OS user is unknown, kamu asks for `--account` instead of using an
+  `unknown` account. Names given with `--account` are used as typed and rejected if invalid
+- `--account` with an unknown account is a usage error, not an internal error
+- An older kamu on a database migrated by a newer version reports both schema versions and asks to upgrade,
+  instead of crashing with "Migration failed: VersionMissing"
+- A workspace with a newer layout version asks to upgrade kamu instead of suggesting
+  `kamu system upgrade-workspace`
+- SQLite: workspaces created before v0.267.0 failed to start with "One or more predefined accounts failed to
+  register/update"; a migration repairs the stored account and legacy env-var resource IDs
+- SQLite: indexing more than ~5,400 new blocks at once failed with "too many SQL variables"
+- Pull or push into an existing dataset with a different ID fails with "Source and destination are different
+  datasets" and both IDs, instead of a misleading divergence or invalid interval error; `--force` refuses
+  such a dataset before transferring anything
+- API server and Web UI: panics return a 500 response to browser clients instead of a failed request
+  without details
+- GraphQL: `CollectionProjection.entries(maxDepth)` above 64 returns an error instead of crashing the
+  request; the argument description explains that depth counts from the root
+- Flaky GraphQL flow process card ordering test
+
+## [0.269.0] - 2026-10-06
+### Added
+- Agent harness for Claude Code and Codex:
+  - hooks in `scripts/agents/` deny commands that discard uncommitted work and `SQLX_OFFLINE` overrides, ask
+    before commits, pushes and `-p`-scoped cargo builds, refuse hand edits to generated files, require loading
+    the governing skill before editing guarded paths, and run `rustfmt` plus rule checks on edited Rust
+  - new skills: Rust style (required before any `.rs` edit), renaming a concept, adding a bounded context,
+    prose and comments
+  - `make lint-harness` (part of `make lint`, and run by CI on every PR) checks the hooks, skill registration
+    and routing, and documentation links
+- Flows: GraphQL lists the flows a completed flow started downstream (`FlowEventCompleted.downstreamFlows`,
+  `Flow.downstreamFlows`), including history recorded before this release. Datasets the caller cannot read
+  show only their ID, and webhook deliveries are shown only to dataset maintainers
+### Changed
+- Outbox and flow-system event delivery on Postgres wait for older in-flight transactions to commit before
+  moving past them, so a long transaction delays delivery instead of risking a skipped message
+- Agent guidance consolidated: `AGENTS.md` is the single source of rules, skills moved to `.claude/skills/`
+  with `.agents/skills/` symlinks for Codex, and DEVELOPER.md gained an "Agent Harness" section
+- Database migrations are forward-only: `make sqlx-add-migration` no longer creates down migrations
+- Stricter Clippy policy: `match_wildcard_for_single_variants`, `wildcard_enum_match_arm` (no catch-all `_`
+  arms over enums) and `allow_attributes_without_reason` are enforced workspace-wide; lint suppressions are
+  `#[expect]` with a reason (halved in number), and `usize` casts use checked conversions
+- GraphQL (breaking): `FlowActivationCauseDatasetUpdate.dataset` is nullable, null when the dataset was
+  deleted or is not readable by the caller; the new `datasetId` is always set. `DependencyDatasetResult`
+  and its variants are renamed to `DatasetAccessResult`, `DatasetAccessResultAccessible` and
+  `DatasetAccessResultNotAccessible`, with the same fields
+### Fixed
+- Flows: enabling a transform trigger now detects inputs whose history was rewritten while the trigger was off
+  (reset, reset to metadata, compaction), instead of treating the derived dataset as up to date. With recovery
+  enabled for breaking changes, the derived dataset is reset to metadata and then rebuilt from its inputs.
+- Concurrent modifications of flow triggers, flow configurations, account quotas and resources are detected
+  instead of one writer silently overwriting the other
+- Flows: the history of a flow activated by a now-deleted upstream dataset no longer fails to load, and it no
+  longer reveals upstream datasets the caller cannot read
+- Outbox and flow-system events of a transaction that commits after a later one no longer go undelivered
+- Reactive flow triggers whose flow was pending at restart react to input changes again
+- Flow configurations of a deleted dataset are no longer returned, and a dataset re-added with the same ID can
+  be configured again
+- Resource update activation causes are deduplicated against all earlier causes of a flow, not only the first
+- Retry policies with a zero minimum delay or very long delays no longer panic; GraphQL rejects a minimum delay
+  over `u32::MAX` seconds with a validation error
+- Webhook delivery flows return an error instead of panicking on an unsupported event type or payload
+- Unregistering a flow sensor no longer drops the routing of downstream sensors that listened to it
+
+## [0.268.1] - 2026-10-01
+### Fixed
+- OpenTelemetry stabilization after upgrade
+- CI: compile `observability` with all features to catch breakages in downstream-only features like `opentelemetry`
+
+## [0.268.0] - 2026-09-30
+### Added
+- Prometheus metrics for background agents, with recommended alerts in `docs/internal/metrics.md`:
+  - `wakeup_listener_last_heartbeat_timestamp_seconds`: heartbeat of every wakeup-driven agent's loop, recorded by
+    the shared wakeup listener on start, every wait and every processed batch, labelled by agent
+  - task agent: task duration by outcome (also counting finished tasks), queue wait, running task start time
+  - flow agent: activations by outcome, activation delay
+  - flows: duration and retries of completed flows by outcome (also counting them), aborted flows
+  - flow system event agent: projector failing state
+### Changed
+- Task agent no longer polls the task queue when idle:
+  - Postgres: tasks table notifies the agent via NOTIFY/LISTEN when a task is created or requeued
+  - SQLite: incremental listening timeout approach, In-memory: explicit signals
+- Flow agent no longer polls for due flows every `awaitingStepSecs`:
+  - it sleeps until the nearest flow activation moment, and wakes up earlier when a flow gets scheduled
+    (Postgres: NOTIFY/LISTEN on `flows`, SQLite: polling of flow events, In-memory: explicit signals)
+  - `flowSystem.awaitingStepSecs` keeps its meaning of scheduling granularity, and also sets the retry
+    delay for flows whose activation failed
+  - due flows are loaded in pages of `backgroundAgents.batching.flowActivations` (default `20`), and
+    each is activated in its own transaction
+- Outbox consumers handling messages at once, across all producers, are limited by
+  `backgroundAgents.concurrency.outboxConsumers` (default `1` for SQLite, `8` suggested for
+  Postgres); previously unbounded, a burst could exhaust the database connection pool
+- Postgres connection pool defaults to 20 connections (`database.maxConnections`), was 10:
+  with 8 outbox consumers on Postgres, background agents alone may hold up to 12
+- **Breaking config change:** background agents are configured in one top-level `backgroundAgents` section:
+  - `minDebounceInterval` (default `20ms`, was `100ms`) and `maxListeningTimeout` (default `2s`) replace
+    the per-agent settings in `outbox`, `flowSystem.flowSystemEventAgent` and `flowSystem.taskAgent`
+    (the latter also dropping `checkingIntervalSecs`)
+  - `batching.outboxMessages` and `batching.flowSystemEvents` replace `outbox.batchSize` and
+    `flowSystem.flowSystemEventAgent.batchSize`
+  - `flowSystem.flowAgent.*` settings moved one level up to `flowSystem.*`
+- Extracted the wakeup detector abstraction from the messaging outbox into a standalone `wakeup-listener`
+  utility crate (`WakeupListener`), as it's now shared by the outbox, flow system and task system agents.
+  Implementations live in `kamu-wakeup-listener-{inmem,postgres,sqlite}` infra crates, with own unit tests.
+  Flow and task system infra crates no longer depend on outbox infra crates.
+  Postgres listeners share a single `LISTEN` connection via `PostgresNotificationHub`, instead of one each.
+  SQLite listeners share a single polling loop via `SqlitePollingHub`, with one connection acquire per tick
+  and a common backoff, instead of a polling timer each.
+  In-memory stores signal channels through `InMemoryWakeupHub`, and every agent creates its own listener
+  handle (`new_wakeup_listener()`), so several listeners can watch the same changes.
+  Architecture is documented in `docs/internal/wakeup-listeners.md`
+### Removed
+- **Breaking config change:** MySQL/MariaDB support is dropped: `database.provider: mySql` and `mariaDB`
+  are no longer accepted, use Postgres or SQLite instead.
+  Removed `kamu-accounts-mysql`, `kamu-datasets-mysql` and `kamu-cli-e2e-mysql` crates, MySQL migrations,
+  `sqlx-*-mariadb` Makefile targets and the MariaDB CI service
+### Fixed
+- Flow agent: a flow failing to activate no longer blocks activation of flows scheduled after it,
+  and its partial writes (task, flow events) are rolled back instead of committed
+- In-memory flow system event bridge: a projector that failed to apply a batch of events no longer
+  skips those events on the next attempt
+- GQL: `FlowTimingRecords.firstAttemptScheduledAt` is the time the flow's first task was scheduled,
+  unset while the flow waits. It used to be the first planned activation time, which stays put when
+  a manual run or satisfied batching activates the flow earlier, so run durations counted from it
+  came out too short
+- Task cancellation (e.g. aborting a flow):
+  - a queued task is finished with the `Cancelled` outcome, instead of staying queued forever
+  - a task cancelled while being taken is no longer started, nor stops the task agent
+  - a running task is still stored as running until its run ends, so a restart meanwhile finishes it
+    as `Cancelled` instead of leaving it running forever
+
+## [0.267.0] - 2026-09-19
+### Added
+- **Resources Framework** - a new declarative, Kubernetes-inspired subsystem for managing server-side
+  objects from manifests, implementing [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md).
+  A manifest declares desired state (`$schema` + `headers` + `spec`); the server owns identity,
+  timestamps, `generation` and status, then asynchronously reconciles the resource toward that state
+  (`Pending` -> `Reconciling` -> `Ready`/`Failed`). This is the foundation for infrastructure-as-code
+  workflows in Kamu, and the mechanism that configuration and future object types are built on.
+- New CLI verbs for working with resources:
+  - `kamu apply` - apply manifests from files, directories, or `--stdin`, in YAML or JSON.
+    Renders a structured diff of what changed; re-applying an unchanged manifest reports
+    `Unchanged` instead of a spurious update. Supports `--dry-run` to preview, and
+    `--continue-on-error` to apply each manifest independently instead of as one transaction
+  - `kamu get` - read one or many resources; `--revealed` opts in to sensitive values
+  - `kamu summary` - per-type counts and reconciliation phase breakdown
+  - `kamu list` and `kamu delete` now operate on resources in addition to datasets
+- Flexible ways to address resources, shared by all of the above:
+  - By type and name (`kamu get vs my-vars` or `kamu get vs/my-vars`), by ID, by bare UUID with no
+    type, or by `%` wildcard to span every type
+  - Short type aliases (`vs`, `ss`, `st`) alongside canonical names (`VariableSet`, `SecretSet`)
+  - Label filtering with `-l/--label`, pushed down into the database rather than filtered in memory
+- `kamu ctx` command group for named remote contexts - `add`, `use`, `list`, `delete`, `check`, and
+  `api-resources`. The same commands run unchanged against a local workspace or a remote node, so
+  resources can be managed remotely without a separate toolchain
+- Full GraphQL API for resources: queries (`bySelectors`, `byRefs`, `handlesBySelectors`,
+  `handlesByRefs`, `summary`, `renderManifests`, `supportedResourceTypes`) and mutations
+  (`applyManifest`, `applyManifests`, `delete`). Batch applies run as a single transaction by
+  default, so a rejected item rolls back its predecessors
+- Extensible labels and annotations: resource types register schemas that canonicalize short names
+  to stable URIs, validate values, and reject unknown URIs. Unknown short names are preserved as
+  free-form with a warning
+- Server-side validation and linting of manifests, with warnings for specs that are legal and
+  storable but probably not what the author intended (a credential in a plaintext `VariableSet`,
+  names that differ only by case, values with suspicious whitespace or unexpanded interpolation)
+- Storage backends for Postgres, SQLite, and in-memory, with event-sourced history, soft-delete,
+  optimistic concurrency, and strict per-account isolation
+### Changed
+- **Dataset environment variables and secrets are now resources.** The new `VariableSet` and
+  `SecretSet` types replace the previous per-dataset env-var mechanism:
+  - Existing `dataset_env_vars` rows are migrated automatically into managed `VariableSet` /
+    `SecretSet` resources - no user action is required, and the previous GraphQL env-var API keeps
+    working against the migrated data
+  - Secrets are converted to an encrypted canonical form before the first durable write, and are
+    never returned in plaintext unless explicitly requested
+  - A dataset resolves its variables and secrets through resource labels, so one set can now serve
+    several datasets instead of being copied per dataset
+  - Deleting a dataset cleans up after itself: the auto-managed sets created for it are removed, and
+    the now-dangling association is retracted from any other set that pointed at it, so no resource
+    is left referring to a dataset that no longer exists
+- A third resource type, `Storage`, ships as a prototype to validate the framework against a
+  non-configuration object. Its shape and CLI surface are real, but it is not yet wired to actual
+  storage provisioning
+### Fixed
+- `kamu pull` now expands dataset environment variables - `${{ env.KEY }}` was silently left
+  unexpanded on a local pull, while the same dataset ingested correctly as a server flow
+- `kamu system api-server gql-query` no longer panics on any query that reaches a dataset resolver -
+  the command did not register the GraphQL dataloaders that the HTTP handler attaches
+- Generated dataset names now respect the `DatasetName` length limit
+- Container runtime no longer leaks containers that are killed before they finish starting - `run --rm` does not reap those, so they accumulated in `Created` state until the runtime could no longer start new ones
+- SELinux presence detection if fixed and no longer spams warnings (#1692)
+- CLI: `kamu completions` no longer panics when the output pipe is closed early, e.g. `source <(kamu completions bash)` (#1068)
+- CLI: `kamu complete` no longer reports an internal error when the output pipe is closed early, and propagates other output errors instead of panicking (#1068)
+
 ## [0.266.1] - 2026-08-19
 ### Fixed
 - Login, OAuth: login error if system (local) username matches GitHub username (#1684)

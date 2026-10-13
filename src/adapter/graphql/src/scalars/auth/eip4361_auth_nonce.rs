@@ -12,6 +12,7 @@ use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 simple_string_scalar!(
+    /// Single-use nonce of a Sign-In with Ethereum message
     Eip4361AuthNonce,
     kamu_auth_web3::Web3AuthenticationEip4361Nonce,
     try_from

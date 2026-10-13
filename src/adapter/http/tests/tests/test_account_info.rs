@@ -72,8 +72,7 @@ async fn test_get_account_info() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct AccountInfoHarness {
-    #[allow(dead_code)]
-    run_info_dir: tempfile::TempDir,
+    _run_info_dir: tempfile::TempDir,
     root_url: url::Url,
     server_harness: ServerSideLocalFsHarness,
 }
@@ -99,7 +98,7 @@ impl AccountInfoHarness {
         .unwrap();
 
         Self {
-            run_info_dir,
+            _run_info_dir: run_info_dir,
             root_url,
             server_harness,
         }

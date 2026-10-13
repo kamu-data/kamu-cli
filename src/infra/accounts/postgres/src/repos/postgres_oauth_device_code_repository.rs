@@ -44,11 +44,12 @@ impl OAuthDeviceCodeRepository for PostgresOAuthDeviceCodeRepository {
         .await
         .map_err(|e: sqlx::Error| {
             use CreateDeviceCodeError as E;
-            match e {
-                sqlx::Error::Database(e) if e.is_unique_violation() => {
-                    E::Duplicate(DeviceCodeDuplicateError { device_code: device_code_created.device_code.clone() })
-                }
-                _ => E::Internal(e.int_err())
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                E::Duplicate(DeviceCodeDuplicateError { device_code: device_code_created.device_code.clone() })
+            } else {
+                E::Internal(e.int_err())
             }
         })?;
 

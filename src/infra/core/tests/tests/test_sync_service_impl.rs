@@ -578,6 +578,81 @@ async fn do_test_sync(
         if src_head == b4_alt && dst_head == b5 && uncommon_blocks_in_src ==
     1 && uncommon_blocks_in_dst == 2 );
 
+    // Datasets with different IDs //////////////////////////////////////////////
+
+    let dataset_alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
+    let stored_baz = create_test_dataset_from_snapshot(
+        dataset_registry_foo.as_ref(),
+        storage_unit_foo.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(dataset_alias_baz.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_data_schema().build())
+            .build(),
+        did_generator_foo.generate_dataset_id().0,
+        time_source_foo.now(),
+    )
+    .await
+    .unwrap();
+
+    for force in [false, true] {
+        let sync_err = sync_svc_foo
+            .sync(
+                sync_request_builder_foo
+                    .build_sync_request(
+                        dataset_alias_baz.as_any_ref(),
+                        push_ref.as_any_ref(),
+                        false,
+                    )
+                    .await
+                    .unwrap(),
+                SyncOptions {
+                    force,
+                    ..SyncOptions::default()
+                },
+                None,
+            )
+            .await
+            .err()
+            .unwrap();
+        assert_matches!(
+            sync_err,
+            SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                src_dataset_id,
+                dst_dataset_id,
+            })
+            if src_dataset_id == stored_baz.dataset_id && dst_dataset_id == stored_foo.dataset_id
+        );
+
+        let sync_err = sync_svc_foo
+            .sync(
+                sync_request_builder_foo
+                    .build_sync_request(
+                        pull_ref.as_any_ref(),
+                        dataset_alias_baz.as_any_ref(),
+                        false,
+                    )
+                    .await
+                    .unwrap(),
+                SyncOptions {
+                    force,
+                    ..SyncOptions::default()
+                },
+                None,
+            )
+            .await
+            .err()
+            .unwrap();
+        assert_matches!(
+            sync_err,
+            SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                src_dataset_id,
+                dst_dataset_id,
+            })
+            if src_dataset_id == stored_foo.dataset_id && dst_dataset_id == stored_baz.dataset_id
+        );
+    }
+
     // Datasets corrupted transfer flow /////////////////////////////////////////
     if is_ipfs {
         let _b6 = DatasetTestHelper::append_random_data(

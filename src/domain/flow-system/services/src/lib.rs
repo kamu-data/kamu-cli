@@ -12,6 +12,7 @@ pub use kamu_flow_system as domain;
 
 mod dependencies;
 mod flow;
+mod flow_activation_links;
 mod flow_configuration;
 mod flow_process;
 mod flow_sensor;
@@ -20,6 +21,7 @@ mod flow_trigger;
 
 pub use dependencies::*;
 pub use flow::*;
+pub use flow_activation_links::*;
 pub use flow_configuration::*;
 pub use flow_process::*;
 pub use flow_sensor::*;

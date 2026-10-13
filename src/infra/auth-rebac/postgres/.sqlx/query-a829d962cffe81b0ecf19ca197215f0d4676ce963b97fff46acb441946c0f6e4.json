@@ -6,12 +6,24 @@
       {
         "ordinal": 0,
         "name": "property_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "property_name"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "property_value",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "auth_rebac_properties",
+            "name": "property_value"
+          }
+        }
       }
     ],
     "parameters": {

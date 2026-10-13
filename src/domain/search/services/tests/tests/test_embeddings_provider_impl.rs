@@ -695,7 +695,6 @@ impl EmbeddingsEncoder for TestEmbeddingsEncoder {
         128 // Smaller than real models for testing
     }
 
-    #[allow(clippy::cast_precision_loss)]
     async fn encode(&self, input: Vec<String>) -> Result<Vec<Vec<f32>>, InternalError> {
         ENCODER_CALL_COUNT.fetch_add(1, Ordering::SeqCst);
 
@@ -719,8 +718,8 @@ impl EmbeddingsEncoder for TestEmbeddingsEncoder {
 
             // Fill embedding with deterministic values based on hash
             for (i, val) in embedding.iter_mut().enumerate() {
-                let seed = hash.wrapping_add(i as u64);
-                *val = ((seed % 1000) as f32) / 1000.0; // Values in [0, 1)
+                let seed = hash.wrapping_add(u64::try_from(i).unwrap());
+                *val = f32::from(u16::try_from(seed % 1000).unwrap()) / 1000.0; // Values in [0, 1)
             }
 
             result.push(embedding);

@@ -13,6 +13,7 @@ use crate::{LogicalPlan, TaskDefinition, TaskID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TaskDefinitionPlanner: Send + Sync {
     async fn prepare_task_definition(

@@ -139,6 +139,10 @@ impl ScalarUDFImpl for AssertListElementsNotNull {
         unreachable!("return_field_from_args should be called instead")
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Arrow's DataType is foreign; only list types are accepted"
+    )]
     fn return_field_from_args(&self, args: ReturnFieldArgs) -> datafusion::error::Result<FieldRef> {
         if args.arg_fields.len() != 1 {
             return datafusion::common::plan_err!(
@@ -168,6 +172,10 @@ impl ScalarUDFImpl for AssertListElementsNotNull {
         Ok(Arc::new(f.as_ref().clone().with_data_type(data_type)))
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Arrow's DataType is foreign; return_field_from_args admits only list types"
+    )]
     fn invoke_with_args(
         &self,
         args: ScalarFunctionArgs,

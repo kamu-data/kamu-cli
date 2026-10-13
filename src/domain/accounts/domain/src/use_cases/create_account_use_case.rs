@@ -20,7 +20,11 @@ use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 #[async_trait::async_trait]
 pub trait CreateAccountUseCase: Send + Sync {
-    async fn execute(&self, account_config: &AccountConfig) -> Result<Account, CreateAccountError>;
+    async fn execute(
+        &self,
+        account_config: &AccountConfig,
+        resource_id_source: AccountResourceIdSource,
+    ) -> Result<Account, CreateAccountError>;
 
     async fn execute_derived(
         &self,
@@ -33,6 +37,25 @@ pub trait CreateAccountUseCase: Send + Sync {
         &self,
         wallet_addresses: HashSet<DidPkh>,
     ) -> Result<Vec<Account>, CreateMultiWalletAccountsError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Chooses how a new account's *resource* id is minted.
+///
+/// TODO: interim measure -- goes away once account resources are reconciled by
+/// the resources framework rather than allocated during account creation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccountResourceIdSource {
+    /// Deterministically seeded from the account name. Used for predefined /
+    /// config-driven accounts, whose resource id must stay stable across
+    /// restarts and re-registration (the CLI derives the same id for its
+    /// pre-workspace subject).
+    SeededFromName,
+    /// Freshly minted at random. Used for accounts created at runtime, e.g. via
+    /// OAuth/Web3 login, where the account name may have been auto-renamed on
+    /// collision and carries no identity guarantee.
+    Generated,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

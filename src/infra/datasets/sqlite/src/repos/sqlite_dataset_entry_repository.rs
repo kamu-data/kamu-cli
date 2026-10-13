@@ -16,6 +16,7 @@ use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placehold
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -175,7 +176,7 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
 
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let mut query = sqlx::query_as::<_, DatasetEntryRowModel>(&query_str);
+        let mut query = sqlx::query_as::<_, DatasetEntryRowModel>(AssertSqlSafe(query_str));
         for dataset_id in dataset_ids {
             query = query.bind(dataset_id.to_string());
         }
@@ -376,9 +377,11 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
-                let sqlite_error_message = e.message();
+        .map_err(|e| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
+                let sqlite_error_message = db_err.message();
                 tracing::error!(sqlite_error_message);
 
                 if sqlite_error_message.contains("idx_dataset_entries_owner_id_dataset_name") {
@@ -386,8 +389,9 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
                 } else {
                     SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into()
                 }
+            } else {
+                SaveDatasetEntryError::Internal(e.int_err())
             }
-            _ => SaveDatasetEntryError::Internal(e.int_err()),
         })?;
 
         Ok(())
@@ -417,11 +421,14 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         )
         .execute(&mut *connection_mut)
         .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
+        .map_err(|e| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
                 DatasetEntryNameCollisionError::new(new_name.clone()).into()
+            } else {
+                UpdateDatasetEntryNameError::Internal(e.int_err())
             }
-            _ => UpdateDatasetEntryNameError::Internal(e.int_err()),
         })?;
 
         if update_result.rows_affected() == 0 {
@@ -465,38 +472,75 @@ impl DatasetEntryRepository for SqliteDatasetEntryRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteEntryDatasetError> {
-        {
+        let deletion_result = self
+            .delete_dataset_entries(&[Cow::Borrowed(dataset_id)])
+            .await
+            .map_err(|e| match e {
+                DeleteDatasetEntriesError::Internal(e) => DeleteEntryDatasetError::Internal(e),
+            })?;
+
+        if deletion_result.deleted_dataset_ids.is_empty() {
+            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+        }
+
+        Ok(())
+    }
+
+    async fn delete_dataset_entries<'a>(
+        &self,
+        dataset_ids: &[Cow<'a, odf::DatasetID>],
+    ) -> Result<DatasetEntriesDeletionResult, DeleteDatasetEntriesError> {
+        if dataset_ids.is_empty() {
+            return Ok(DatasetEntriesDeletionResult::default());
+        }
+
+        let deleted_dataset_ids = {
             let mut tr = self.transaction.lock().await;
 
             let connection_mut = tr.connection_mut().await?;
 
-            let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
-            let dataset_id_as_str = stack_dataset_id.as_str();
-            let delete_result = sqlx::query!(
+            let dataset_ids_json = serde_json::to_string(
+                &dataset_ids
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>(),
+            )
+            .int_err()?;
+
+            let deleted_dataset_ids = sqlx::query_scalar!(
                 r#"
                 DELETE
                 FROM dataset_entries
-                WHERE dataset_id = $1
+                WHERE dataset_id IN (SELECT value FROM json_each($1))
+                RETURNING dataset_id
                 "#,
-                dataset_id_as_str,
+                dataset_ids_json,
             )
-            .execute(&mut *connection_mut)
+            .fetch_all(&mut *connection_mut)
             .await
             .int_err()?;
 
-            if delete_result.rows_affected() == 0 {
-                return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+            deleted_dataset_ids
+                .iter()
+                .map(|dataset_id| odf::DatasetID::from_did_str(dataset_id).int_err())
+                .collect::<Result<Vec<_>, _>>()?
+        };
+
+        let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(
+            dataset_ids,
+            deleted_dataset_ids,
+        );
+
+        if !deletion_result.deleted_dataset_ids.is_empty() {
+            for listener in &self.removal_listeners {
+                listener
+                    .on_dataset_entries_removed(&deletion_result.deleted_dataset_ids)
+                    .await
+                    .int_err()?;
             }
         }
 
-        for listener in &self.removal_listeners {
-            listener
-                .on_dataset_entry_removed(dataset_id)
-                .await
-                .int_err()?;
-        }
-
-        Ok(())
+        Ok(deletion_result)
     }
 }
 

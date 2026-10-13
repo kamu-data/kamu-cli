@@ -25,7 +25,7 @@ use crate::DatasetAliasInPath;
     get,
     path = "/tail",
     params(DatasetTailParams, DatasetAliasInPath),
-    responses((status = OK, body = DatasetTailResponse)),
+    responses((status = OK, description = "last records of the dataset", body = DatasetTailResponse)),
     tag = "odf-query",
     security(
         (),

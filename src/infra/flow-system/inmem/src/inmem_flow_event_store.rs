@@ -10,21 +10,24 @@
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::ops::Bound;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 use dill::*;
 use kamu_flow_system::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 
-use crate::InMemoryFlowSystemEventBridge;
 use crate::flow_event_data_helper::FlowEventDataHelper;
+use crate::{FLOW_ACTIVATION_SCHEDULED_CHANNEL, InMemoryFlowSystemEventBridge};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowEventStore {
     inner: InMemoryEventStore<FlowState, State>,
     flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>,
+    wakeup_hub: Arc<InMemoryWakeupHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,10 +127,31 @@ impl FlowIndexEntry {
 #[interface(dyn FlowEventStore)]
 #[scope(Singleton)]
 impl InMemoryFlowEventStore {
-    pub fn new(flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>) -> Self {
+    pub fn new(
+        flow_system_event_store: Arc<InMemoryFlowSystemEventBridge>,
+        wakeup_hub: Arc<InMemoryWakeupHub>,
+    ) -> Self {
         Self {
             inner: InMemoryEventStore::new(),
             flow_system_event_store,
+            wakeup_hub,
+        }
+    }
+
+    /// Whether the event sets a new activation time for the flow
+    fn schedules_activation(event: &FlowEvent) -> bool {
+        match event {
+            FlowEvent::ScheduledForActivation(_) => true,
+            FlowEvent::TaskFinished(e) => e.next_attempt_at.is_some(),
+            FlowEvent::Initiated(_)
+            | FlowEvent::StartConditionUpdated(_)
+            | FlowEvent::ConfigSnapshotModified(_)
+            | FlowEvent::RetryPolicyModified(_)
+            | FlowEvent::ActivationCauseAdded(_)
+            | FlowEvent::TaskScheduled(_)
+            | FlowEvent::TaskRunning(_)
+            | FlowEvent::Completed(_)
+            | FlowEvent::Aborted(_) => false,
         }
     }
 
@@ -324,8 +348,8 @@ impl InMemoryFlowEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<FlowState> for InMemoryFlowEventStore {
-    async fn len(&self) -> Result<usize, InternalError> {
-        self.inner.len().await
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
+        self.inner.total_events_stored().await
     }
 
     fn get_all_events(&self, opts: GetEventsOpts) -> EventStream<'_, FlowEvent> {
@@ -334,6 +358,10 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
 
     fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<'_, FlowEvent> {
         self.inner.get_events(query, opts)
+    }
+
+    fn get_events_multi(&self, queries: &[FlowID]) -> MultiEventStream<'_, FlowID, FlowEvent> {
+        self.inner.get_events_multi(queries)
     }
 
     async fn save_events(
@@ -351,7 +379,15 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
         let merge_event_data =
             FlowEventDataHelper::prepare_merge_event_data(&events, FlowEvent::event_time);
 
-        // Update in-memory indexes
+        let schedules_activation = events.iter().any(Self::schedules_activation);
+
+        // Save events to this store
+        self.inner
+            .save_events(query, maybe_prev_stored_event_id, events.clone())
+            .await?;
+
+        // Update in-memory indexes only once the save passed the concurrent
+        // modification check, as a rejected save must leave them intact
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
@@ -360,19 +396,69 @@ impl EventStore<FlowState> for InMemoryFlowEventStore {
             }
         }
 
-        // Save events to this store
-        self.inner
-            .save_events(query, maybe_prev_stored_event_id, events)
-            .await?;
-
         // Save merged events to FlowSystemEventStore
         let global_event_id = self
             .flow_system_event_store
             .save_events(FlowSystemEventSourceType::Flow, &merge_event_data);
 
+        if schedules_activation {
+            self.wakeup_hub.signal(FLOW_ACTIVATION_SCHEDULED_CHANNEL);
+        }
+
         // Return the global event ID as the result of this operation,
         // ignore local event ID in the inner store
         Ok(global_event_id)
+    }
+
+    async fn save_events_multi(
+        &self,
+        items: Vec<SaveEventsItem<FlowID, FlowEvent>>,
+    ) -> Result<Vec<EventID>, SaveEventsError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Prepare data for FlowSystemEventStore - a merged stream per item
+        let merge_event_data_per_item: Vec<_> = items
+            .iter()
+            .map(|item| {
+                FlowEventDataHelper::prepare_merge_event_data(&item.events, FlowEvent::event_time)
+            })
+            .collect();
+
+        let events: Vec<FlowEvent> = items
+            .iter()
+            .flat_map(|item| item.events.iter().cloned())
+            .collect();
+        let schedules_activation = events.iter().any(Self::schedules_activation);
+
+        // Save events to this store, all or nothing
+        self.inner.save_events_multi(items).await?;
+
+        // Update in-memory indexes only once the save passed the concurrent
+        // modification check, as a rejected save must leave them intact
+        {
+            let state = self.inner.as_state();
+            let mut g = state.lock().unwrap();
+            for event in &events {
+                Self::update_index(&mut g, event);
+            }
+        }
+
+        // Save merged events to FlowSystemEventStore, returning global event IDs
+        let global_event_ids = merge_event_data_per_item
+            .iter()
+            .map(|merge_event_data| {
+                self.flow_system_event_store
+                    .save_events(FlowSystemEventSourceType::Flow, merge_event_data)
+            })
+            .collect();
+
+        if schedules_activation {
+            self.wakeup_hub.signal(FLOW_ACTIVATION_SCHEDULED_CHANNEL);
+        }
+
+        Ok(global_event_ids)
     }
 }
 
@@ -393,7 +479,11 @@ impl FlowEventStore for InMemoryFlowEventStore {
 
         let pending_filter = FlowFilters {
             by_flow_types: Some(vec![flow_binding.flow_type.clone()]),
-            by_flow_statuses: Some(vec![FlowStatus::Waiting, FlowStatus::Running]),
+            by_flow_statuses: Some(vec![
+                FlowStatus::Waiting,
+                FlowStatus::Running,
+                FlowStatus::Retrying,
+            ]),
             by_initiator: None,
         };
 
@@ -449,18 +539,38 @@ impl FlowEventStore for InMemoryFlowEventStore {
             .copied())
     }
 
-    /// Returns flows scheduled for activation at the given time
-    async fn get_flows_scheduled_for_activation_at(
+    async fn get_flows_due_for_activation(
         &self,
-        scheduled_for_activation_at: DateTime<Utc>,
-    ) -> Result<Vec<FlowID>, InternalError> {
+        up_to: DateTime<Utc>,
+        after: Option<DueFlowActivation>,
+        limit: usize,
+    ) -> Result<Vec<DueFlowActivation>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
 
+        let from = match after {
+            // A range starting past its end panics
+            Some(after) if after.activation_time > up_to => return Ok(Vec::new()),
+            Some(after) => Bound::Included(after.activation_time),
+            None => Bound::Unbounded,
+        };
+
         Ok(g.flows_by_scheduled_for_activation_time
-            .get(&scheduled_for_activation_at)
-            .map(|flow_ids| flow_ids.iter().copied().collect())
-            .unwrap_or_default())
+            .range((from, Bound::Included(up_to)))
+            .flat_map(|(activation_time, flow_ids)| {
+                flow_ids.iter().map(|flow_id| DueFlowActivation {
+                    flow_id: *flow_id,
+                    activation_time: *activation_time,
+                })
+            })
+            .filter(|due_flow| {
+                after.is_none_or(|after| {
+                    (due_flow.activation_time, due_flow.flow_id)
+                        > (after.activation_time, after.flow_id)
+                })
+            })
+            .take(limit)
+            .collect())
     }
 
     async fn get_count_flows_matching_scope_query(

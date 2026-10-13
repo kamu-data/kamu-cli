@@ -21,6 +21,7 @@ pub struct DatasetEnvVars<'a> {
     dataset_request_state: &'a DatasetRequestState,
 }
 
+/// Environment variables of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetEnvVars<'a> {
@@ -31,7 +32,7 @@ impl<'a> DatasetEnvVars<'a> {
         ctx: &Context<'_>,
         dataset_request_state: &'a DatasetRequestState,
     ) -> Result<Self> {
-        utils::ensure_dataset_env_vars_enabled(ctx)?;
+        utils::ensure_secrets_encryption_enabled(ctx)?;
         utils::check_dataset_maintain_access(ctx, dataset_request_state).await?;
 
         Ok(Self {
@@ -39,15 +40,18 @@ impl<'a> DatasetEnvVars<'a> {
         })
     }
 
+    /// Returns the value of a variable, decrypting it if it is secret
     #[tracing::instrument(level = "info", name = DatasetEnvVars_exposed_value, skip_all)]
     async fn exposed_value(
         &self,
         ctx: &Context<'_>,
-        dataset_env_var_id: DatasetEnvVarID<'_>,
+        dataset_env_var_key: String,
     ) -> Result<String> {
+        let dataset_id = self.dataset_request_state.dataset_id();
+
         let dataset_env_var_service = from_catalog_n!(ctx, dyn DatasetEnvVarService);
         let dataset_env_var = dataset_env_var_service
-            .get_dataset_env_var_by_id(&dataset_env_var_id)
+            .get_dataset_env_var_by_key(dataset_id, &dataset_env_var_key)
             .await
             .map_err(|err| match err {
                 GetDatasetEnvVarError::NotFound(err) => GqlError::Gql(err.into()),
@@ -59,6 +63,7 @@ impl<'a> DatasetEnvVars<'a> {
             .await?)
     }
 
+    /// Lists environment variables of the dataset
     #[tracing::instrument(level = "info", name = DatasetEnvVars_list_env_variables, skip_all, fields(?page, ?per_page))]
     async fn list_env_variables(
         &self,
@@ -71,9 +76,11 @@ impl<'a> DatasetEnvVars<'a> {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
+        let dataset_id = self.dataset_request_state.dataset_id();
+
         let dataset_env_var_listing = dataset_env_var_service
             .get_all_dataset_env_vars_by_dataset_id(
-                &self.dataset_request_state.dataset_handle().id,
+                dataset_id,
                 Some(PaginationOpts::from_page(page, per_page)),
             )
             .await

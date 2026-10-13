@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
-
 pub mod entities;
 pub mod jobs;
 pub mod services;
+#[cfg(feature = "testing")]
+mod testing;
 pub mod use_cases;
 pub mod utils;
 

@@ -61,6 +61,13 @@ test_client_server_s3_harness_permutations!(
 
 test_client_server_s3_harness_permutations!(
     test_smart_pull_shared,
+    test_smart_pull_existing_different_dataset_fails
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_s3_harness_permutations!(
+    test_smart_pull_shared,
     test_smart_pull_aborted_read_of_new_reread_succeeds
 );
 

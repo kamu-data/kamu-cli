@@ -23,8 +23,8 @@ use kamu_datasets::{
     CreateDatasetResult,
     DatasetRegistry,
     DatasetRegistryExt,
+    MockDatasetActionAuthorizer,
 };
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use kamu_molecule_domain::{MoleculeCreateProjectUseCase, OclId, Symbol};
 use kamu_search::*;
 use kamu_search_cache_inmem::InMemoryEmbeddingsCacheRepository;
@@ -767,7 +767,10 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
     let announcements_did = res["project"]["announcements"]["dataset"]["id"]
         .as_str()
         .unwrap();
-    assert_ne!(project_account_id, harness.molecule_account_id.to_string());
+    assert_ne!(
+        project_account_id,
+        harness.molecule_account_handle.id.to_string()
+    );
     pretty_assertions::assert_eq!(project_account_name, "molecule.vitafast");
     pretty_assertions::assert_eq!(
         *res,
@@ -1020,8 +1023,7 @@ async fn test_molecule_disable_enable_project(search_variant: GraphQLMoleculeHar
         .await;
 
     let molecule_subject = LoggedAccount {
-        account_id: harness.molecule_account_id.clone(),
-        account_name: "molecule".parse().unwrap(),
+        account_handle: harness.molecule_account_handle.clone(),
     };
 
     let create_project_uc = harness
@@ -12067,7 +12069,7 @@ struct GraphQLMoleculeHarness {
     schema: kamu_adapter_graphql::Schema,
     catalog_authorized: dill::Catalog,
     outbox_agent: Arc<dyn OutboxAgent>,
-    molecule_account_id: odf::AccountID,
+    molecule_account_handle: odf::AccountHandle,
 }
 
 #[bon]
@@ -12136,6 +12138,8 @@ impl GraphQLMoleculeHarness {
             .add::<kamu::PushIngestPlannerImpl>()
             .add::<kamu::PushIngestExecutorImpl>()
             .add::<kamu::PushIngestDataUseCaseImpl>()
+            .add::<kamu_wakeup_listener_inmem::InMemoryWakeupHub>()
+            .add::<wakeup_listener::WakeupListenerMetrics>()
             .add::<kamu_adapter_http::platform::UploadServiceLocal>()
             .add_value(kamu_core::utils::paths::CacheDir::new(cache_dir))
             .add_value(kamu_core::ServerUrlConfig::new_test(None))
@@ -12164,7 +12168,11 @@ impl GraphQLMoleculeHarness {
         // Finalize catalog
         let base_catalog = base_builder.build();
 
-        let molecule_account_id = odf::AccountID::new_generated_ed25519().1;
+        let molecule_account_handle = odf::AccountHandle {
+            id: odf::ResourceID::new(uuid::Uuid::new_v4()),
+            did: odf::AccountID::new_generated_ed25519().1,
+            name: "molecule".parse().unwrap(),
+        };
 
         let AuthenticationCatalogsResult {
             catalog_no_subject,
@@ -12173,8 +12181,7 @@ impl GraphQLMoleculeHarness {
         } = authentication_catalogs_ext(
             &base_catalog,
             Some(CurrentAccountSubject::Logged(LoggedAccount {
-                account_id: molecule_account_id.clone(),
-                account_name: "molecule".parse().unwrap(),
+                account_handle: molecule_account_handle.clone(),
             })),
             predefined_account_opts,
         )
@@ -12201,7 +12208,7 @@ impl GraphQLMoleculeHarness {
             schema: kamu_adapter_graphql::schema_quiet(),
             catalog_authorized,
             outbox_agent: base_catalog.get_one::<dyn OutboxAgent>().unwrap(),
-            molecule_account_id,
+            molecule_account_handle,
         }
     }
 

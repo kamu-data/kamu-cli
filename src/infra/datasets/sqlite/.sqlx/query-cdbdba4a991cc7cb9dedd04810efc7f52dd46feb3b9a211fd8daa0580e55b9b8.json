@@ -6,32 +6,68 @@
       {
         "name": "last_pulled: _",
         "ordinal": 0,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "dataset_statistics",
+            "name": "last_pulled"
+          }
+        }
       },
       {
         "name": "num_records",
         "ordinal": 1,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "dataset_statistics",
+            "name": "num_records"
+          }
+        }
       },
       {
         "name": "data_size",
         "ordinal": 2,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "dataset_statistics",
+            "name": "data_size"
+          }
+        }
       },
       {
         "name": "checkpoints_size",
         "ordinal": 3,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "dataset_statistics",
+            "name": "checkpoints_size"
+          }
+        }
       },
       {
         "name": "num_object_links",
         "ordinal": 4,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "dataset_statistics",
+            "name": "num_object_links"
+          }
+        }
       },
       {
         "name": "object_links_size",
         "ordinal": 5,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "dataset_statistics",
+            "name": "object_links_size"
+          }
+        }
       }
     ],
     "parameters": {

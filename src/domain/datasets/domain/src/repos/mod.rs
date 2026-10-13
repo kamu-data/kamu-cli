@@ -10,7 +10,6 @@
 mod dataset_data_blocks_repository;
 mod dataset_dependency_repository;
 mod dataset_entry_repository;
-mod dataset_env_var_repository;
 mod dataset_key_blocks_repository;
 mod dataset_reference_repository;
 mod dataset_statistics_repository;
@@ -18,7 +17,6 @@ mod dataset_statistics_repository;
 pub use dataset_data_blocks_repository::*;
 pub use dataset_dependency_repository::*;
 pub use dataset_entry_repository::*;
-pub use dataset_env_var_repository::*;
 pub use dataset_key_blocks_repository::*;
 pub use dataset_reference_repository::*;
 pub use dataset_statistics_repository::*;

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO webhook_subscriptions (id, dataset_id, event_types, status, label)\n                    SELECT\n                        u.id,\n                        u.dataset_id,\n                        ARRAY(SELECT jsonb_array_elements_text(u.event_types)),\n                        'UNVERIFIED'::webhook_subscription_status,\n                        u.label\n                    FROM UNNEST($1::uuid[], $2::text[], $3::jsonb[], $4::text[])\n                        AS u(id, dataset_id, event_types, label)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray",
+        "JsonbArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0f1311b55496066218fe9b123b0bc0b380aa67766f5b4c648a952f0b091d951e"
+}

@@ -13,8 +13,12 @@ use internal_error::InternalError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const OUTBOX_AGENT_NAME: &str = "dev.kamu.utils.messaging.OutboxAgent";
+
 #[async_trait::async_trait]
 pub trait OutboxAgent: BackgroundAgent + InitOnStartup {
+    /// Delivers until no committed message is left, including messages held
+    /// back while an older transaction runs: waits for that transaction to end
     async fn run_while_has_tasks(&self) -> Result<(), InternalError>;
 
     // To be used by tests only!

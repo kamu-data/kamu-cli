@@ -14,10 +14,29 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-simple_string_scalar!(AccountID, odf::AccountID, from_did_str);
-simple_string_scalar!(AccountName, odf::AccountName);
-simple_string_scalar!(Email, email_utils::Email, parse);
-simple_string_scalar!(AccountPassword, kamu_accounts::Password, try_new);
+simple_string_scalar!(
+    /// Unique and stable identifier of an account (`did:...`)
+    AccountID,
+    odf::AccountID,
+    from_did_str
+);
+simple_string_scalar!(
+    /// Unique symbolic name of an account
+    AccountName,
+    odf::AccountName
+);
+simple_string_scalar!(
+    /// Email address
+    Email,
+    email_utils::Email,
+    parse
+);
+simple_string_scalar!(
+    /// Account password
+    AccountPassword,
+    kamu_accounts::Password,
+    try_new
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountDisplayName
@@ -51,6 +70,7 @@ impl Deref for AccountDisplayName<'_> {
     }
 }
 
+/// Account name to display
 #[Scalar]
 impl ScalarType for AccountDisplayName<'_> {
     fn parse(value: Value) -> InputValueResult<Self> {
@@ -69,13 +89,17 @@ impl ScalarType for AccountDisplayName<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Method an account uses to log in
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 #[graphql(remote = "kamu_accounts::AccountProvider")]
 pub enum AccountProvider {
+    /// Login with account name and password
     #[graphql(name = "PASSWORD")]
     Password,
+    /// Login via GitHub OAuth
     #[graphql(name = "OAUTH_GITHUB")]
     OAuthGitHub,
+    /// Login by signing a message with an Ethereum wallet
     #[graphql(name = "WEB3_WALLET")]
     Web3Wallet,
 }

@@ -66,7 +66,7 @@ impl kamu_search::SearchEntitySchemaProvider for DatasetSearchSchemaProvider {
         search_repo: Arc<dyn SearchRepository>,
         schema: &SearchEntitySchema,
     ) -> Result<usize, InternalError> {
-        assert!(schema.schema_name == dataset_search_schema::SCHEMA_NAME);
+        assert_eq!(schema.schema_name, dataset_search_schema::SCHEMA_NAME);
         self.index_datasets(search_repo).await
     }
 }

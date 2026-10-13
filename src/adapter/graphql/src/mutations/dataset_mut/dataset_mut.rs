@@ -9,7 +9,12 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::{self as domain, SetWatermarkPlanningError, SetWatermarkUseCase};
-use kamu_datasets::{DeleteDatasetError, RenameDatasetError};
+use kamu_datasets::{
+    DeleteDatasetError,
+    DeleteDatasetPlanEvaluationError,
+    DeleteDatasetPlanningError,
+    RenameDatasetError,
+};
 
 use crate::LoggedInGuard;
 use crate::mutations::*;
@@ -24,6 +29,7 @@ pub struct DatasetMut {
     dataset_request_state: DatasetRequestState,
 }
 
+/// Mutations of a single dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl DatasetMut {
@@ -125,28 +131,41 @@ impl DatasetMut {
 
         let dataset_handle = self.dataset_request_state.dataset_handle();
 
-        match delete_dataset_use_case
-            .execute_via_handle(dataset_handle)
+        let planning_result = delete_dataset_use_case
+            .plan_delete(vec![dataset_handle.clone()], false)
             .await
-        {
+            .map_err(|e| -> GqlError {
+                match e {
+                    DeleteDatasetPlanningError::Internal(e) => e.into(),
+                }
+            })?;
+
+        let plan = match planning_result.into_executable_plan(false) {
+            Ok(plan) => plan,
+            Err(DeleteDatasetPlanEvaluationError::DanglingReference(e)) => {
+                return Ok(DeleteResult::DanglingReference(
+                    DeleteResultDanglingReference {
+                        not_deleted_dataset: (&dataset_handle.alias).into(),
+                        dangling_child_refs: e
+                            .children
+                            .iter()
+                            .map(|child_dataset| child_dataset.as_local_ref().into())
+                            .collect(),
+                    },
+                ));
+            }
+            Err(DeleteDatasetPlanEvaluationError::Access(_)) => {
+                return Err(utils::make_dataset_access_error(dataset_handle));
+            }
+            // "Not found" should not be reachable, since we've just resolved the dataset by ID
+            Err(DeleteDatasetPlanEvaluationError::NotFound(e)) => return Err(e.int_err().into()),
+            Err(DeleteDatasetPlanEvaluationError::Internal(e)) => return Err(e.into()),
+        };
+
+        match delete_dataset_use_case.execute_plan(plan).await {
             Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
                 deleted_dataset: (&dataset_handle.alias).into(),
             })),
-            Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(
-                DeleteResultDanglingReference {
-                    not_deleted_dataset: (&dataset_handle.alias).into(),
-                    dangling_child_refs: e
-                        .children
-                        .iter()
-                        .map(|child_dataset| child_dataset.as_local_ref().into())
-                        .collect(),
-                },
-            )),
-            Err(DeleteDatasetError::Access(_)) => {
-                Err(utils::make_dataset_access_error(dataset_handle))
-            }
-            // "Not found" should not be reachable, since we've just resolved the dataset by ID
-            Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
         }
     }
@@ -243,49 +262,64 @@ impl DatasetMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of renaming a dataset
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum RenameResult<'a> {
     Success(RenameResultSuccess<'a>),
     NoChanges(RenameResultNoChanges<'a>),
     NameCollision(RenameResultNameCollision<'a>),
 }
 
+/// Dataset was renamed
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RenameResultSuccess<'a> {
+    /// Name of the dataset before the rename
     pub old_name: DatasetName<'a>,
+    /// Name of the dataset after the rename
     pub new_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
 impl RenameResultSuccess<'_> {
+    /// Human-readable outcome message
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
+/// New name equals the current one, nothing was changed
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RenameResultNoChanges<'a> {
+    /// Current name of the dataset
     pub preserved_name: DatasetName<'a>,
 }
 
 #[ComplexObject]
 impl RenameResultNoChanges<'_> {
+    /// Human-readable outcome message
     async fn message(&self) -> String {
         "No changes".to_string()
     }
 }
 
+/// Another dataset with the requested name already exists
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct RenameResultNameCollision<'a> {
+    /// Alias of the existing dataset that holds the name
     pub colliding_alias: DatasetAlias<'a>,
 }
 
 #[ComplexObject]
 impl RenameResultNameCollision<'_> {
+    /// Human-readable error message
     async fn message(&self) -> String {
         format!("Dataset '{}' already exists", self.colliding_alias)
     }
@@ -293,35 +327,47 @@ impl RenameResultNameCollision<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of deleting a dataset
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum DeleteResult<'a> {
     Success(DeleteResultSuccess<'a>),
     DanglingReference(DeleteResultDanglingReference<'a>),
 }
 
+/// Dataset was deleted
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteResultSuccess<'a> {
+    /// Alias of the deleted dataset
     pub deleted_dataset: DatasetAlias<'a>,
 }
 
 #[ComplexObject]
 impl DeleteResultSuccess<'_> {
+    /// Human-readable outcome message
     async fn message(&self) -> String {
         "Success".to_string()
     }
 }
 
+/// Dataset was not deleted because downstream datasets still use it as input
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct DeleteResultDanglingReference<'a> {
+    /// Alias of the dataset that was not deleted
     pub not_deleted_dataset: DatasetAlias<'a>,
+    /// Downstream datasets that reference this dataset as input
     pub dangling_child_refs: Vec<DatasetRef<'a>>,
 }
 
 #[ComplexObject]
 impl DeleteResultDanglingReference<'_> {
+    /// Human-readable error message
     async fn message(&self) -> String {
         format!(
             "Dataset '{}' has {} dangling reference(s)",
@@ -333,22 +379,32 @@ impl DeleteResultDanglingReference<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// New visibility of a dataset
 #[derive(OneofObject)]
 pub enum DatasetVisibilityInput {
+    /// Dataset is visible only to accounts with explicit access
     Private(PrivateDatasetVisibility),
+    /// Dataset is readable by all authenticated users, optionally anonymous too
     Public(PublicDatasetVisibility),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of changing dataset visibility
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum SetDatasetVisibilityResult {
     Success(SetDatasetVisibilityResultSuccess),
 }
 
+/// Dataset visibility was changed
 #[derive(SimpleObject, Debug)]
 pub struct SetDatasetVisibilityResultSuccess {
+    /// Human-readable outcome message
     message: String,
 }
 
@@ -362,16 +418,23 @@ impl Default for SetDatasetVisibilityResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of advancing the dataset watermark
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum SetWatermarkResult<'a> {
     UpToDate(SetWatermarkUpToDate),
     Updated(SetWatermarkUpdated<'a>),
     IsDerivative(SetWatermarkIsDerivative),
 }
 
+/// Watermark already had the requested value
 #[derive(SimpleObject, Debug)]
 pub struct SetWatermarkUpToDate {
+    /// Human-readable outcome message
     message: String,
 }
 
@@ -383,21 +446,26 @@ impl Default for SetWatermarkUpToDate {
     }
 }
 
+/// Watermark was advanced
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct SetWatermarkUpdated<'a> {
+    /// Hash of the new metadata chain head
     pub new_head: Multihash<'a>,
 }
 
 #[ComplexObject]
 impl SetWatermarkUpdated<'_> {
+    /// Human-readable outcome message
     async fn message(&self) -> String {
         "Updated".to_string()
     }
 }
 
+/// Watermark cannot be set manually on a derivative dataset
 #[derive(SimpleObject, Debug)]
 pub struct SetWatermarkIsDerivative {
+    /// Human-readable error message
     pub message: String,
 }
 

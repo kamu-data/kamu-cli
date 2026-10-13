@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{HashSet, LinkedList};
+use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 
 use kamu::domain::*;
@@ -156,10 +156,9 @@ impl AddCommand {
         ret
     }
 
-    #[allow(clippy::linkedlist)]
     fn sort_snapshots_in_dependency_order(
         &self,
-        mut snapshots: LinkedList<odf::DatasetSnapshot>,
+        mut snapshots: VecDeque<odf::DatasetSnapshot>,
     ) -> Vec<odf::DatasetSnapshot> {
         let mut ordered = Vec::with_capacity(snapshots.len());
         let mut pending: HashSet<odf::DatasetRef> =
@@ -267,15 +266,23 @@ impl Command for AddCommand {
             }
 
             if !already_exist.is_empty() {
+                let delete_plan = self
+                    .delete_dataset
+                    .plan_delete(already_exist, false)
+                    .await?
+                    .into_executable_plan(false)?;
+
+                let delete_dataset_handles = delete_plan
+                    .authorized_targets
+                    .iter()
+                    .map(|target| target.dataset_handle.clone())
+                    .collect::<Vec<_>>();
+
                 self.confirm_delete_service
-                    .confirm_delete(&already_exist)
+                    .confirm_delete(&delete_dataset_handles)
                     .await?;
 
-                // TODO: Private Datasets: delete permissions should be checked in multi-tenant
-                //                         scenario
-                for hdl in already_exist {
-                    self.delete_dataset.execute_via_handle(&hdl).await?;
-                }
+                self.delete_dataset.execute_plan(delete_plan).await?;
             }
         }
 

@@ -10,8 +10,7 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu::*;
-use kamu_accounts::testing::MockAuthenticationService;
-use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME, MockAuthenticationService};
 use kamu_core::*;
 use kamu_datasets::*;
 use odf::metadata::testing::MetadataFactory;

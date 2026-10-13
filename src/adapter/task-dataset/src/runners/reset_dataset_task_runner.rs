@@ -55,7 +55,8 @@ impl ResetDatasetTaskRunner {
                 ) => Ok(TaskOutcome::Failed(
                     TaskErrorDatasetReset::ResetHeadNotFound.into_task_error(),
                 )),
-                err => {
+                err @ (ResetExecutionError::SetReferenceFailed(_)
+                | ResetExecutionError::Internal(_)) => {
                     tracing::error!(
                         error = ?err,
                         error_msg = %err,

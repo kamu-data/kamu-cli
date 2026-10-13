@@ -144,9 +144,9 @@ impl PrettyCLIError<'_> {
         use itertools::Itertools;
         for (first, second) in (0..errors.len()).tuple_windows() {
             if errors[first] == errors[second] {
-                errors[first].truncate(0);
+                errors[first].clear();
             } else {
-                let suffix = format!(": {}", &errors[second]);
+                let suffix = format!(": {}", errors[second]);
                 if errors[first].ends_with(&suffix) {
                     let new_len = errors[first].len() - suffix.len();
                     errors[first].truncate(new_len);
@@ -163,7 +163,11 @@ impl std::fmt::Display for PrettyCLIError<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.error {
             CLIError::BatchError(batch) => self.write_batch_error(batch, f),
-            _ => self.write_error(f),
+            CLIError::UsageError(_)
+            | CLIError::Aborted
+            | CLIError::Failure { .. }
+            | CLIError::PartialFailure
+            | CLIError::CriticalFailure { .. } => self.write_error(f),
         }
     }
 }

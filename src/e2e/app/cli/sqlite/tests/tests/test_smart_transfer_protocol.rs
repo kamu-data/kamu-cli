@@ -406,19 +406,7 @@ kamu_cli_run_api_server_e2e_test!(
     fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_st,
     options = Options::default()
         .with_multi_tenant()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              flowSystem:
-                flowAgent:
-                  awaitingStepSecs: 1
-                  mandatoryThrottlingPeriodSecs: 5
-                taskAgent:
-                  checkingIntervalSecs: 1
-            "#
-        )),
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 
@@ -429,19 +417,7 @@ kamu_cli_run_api_server_e2e_test!(
     fixture = kamu_cli_e2e_repo_tests::test_smart_push_trigger_dependent_dataset_update_mt,
     options = Options::default()
         .with_multi_tenant()
-        .with_kamu_config(indoc::indoc!(
-            r#"
-            kind: CLIConfig
-            version: 1
-            content:
-              flowSystem:
-                flowAgent:
-                  awaitingStepSecs: 1
-                  mandatoryThrottlingPeriodSecs: 5
-                taskAgent:
-                  checkingIntervalSecs: 1
-            "#
-        )),
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
     extra_test_groups = "containerized, engine, ingest, transform, datafusion"
 );
 

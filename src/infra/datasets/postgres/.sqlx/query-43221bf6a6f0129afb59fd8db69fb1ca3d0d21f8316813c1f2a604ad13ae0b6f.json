@@ -6,12 +6,24 @@
       {
         "ordinal": 0,
         "name": "block_ref_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "dataset_references",
+            "name": "block_ref_name"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "block_hash_bin",
-        "type_info": "Bytea"
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "dataset_references",
+            "name": "block_hash_bin"
+          }
+        }
       }
     ],
     "parameters": {

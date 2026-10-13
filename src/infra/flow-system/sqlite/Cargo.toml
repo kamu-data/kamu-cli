@@ -25,27 +25,27 @@ doctest = false
 database-common = { workspace = true }
 database-common-macros = { workspace = true }
 internal-error = { workspace = true }
-messaging-outbox = { workspace = true }
+kamu-flow-system = { workspace = true, features = [
+    "sqlx",
+] }
+kamu-wakeup-listener-sqlite = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
-
-kamu-flow-system = { workspace = true, features = ["sqlx"] }
-kamu-messaging-outbox-sqlite = { workspace = true }
-
+wakeup-listener = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 canonical_json = { version = "0.7", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = "0.3"
 serde_json = "1"
-sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+sqlx = { version = "0.9", default-features = false, features = [
+    "chrono",
     "json",
     "macros",
+    "runtime-tokio",
     "sqlite",
-    "chrono"
 ] }
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
@@ -55,6 +55,9 @@ tracing = { version = "0.1", default-features = false }
 database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 kamu-flow-system-repo-tests = { workspace = true }
+kamu-task-system = { workspace = true }
 
-test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

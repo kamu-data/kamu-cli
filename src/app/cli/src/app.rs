@@ -43,8 +43,10 @@ use crate::output::*;
 use crate::{
     ConfirmDeleteService,
     GcService,
+    WorkspaceFutureVersionError,
     WorkspaceLayout,
     WorkspaceService,
+    WorkspaceVersion,
     build_db_connection_settings,
     cli,
     cli_commands,
@@ -57,6 +59,8 @@ use crate::{
     get_app_database_config,
     move_initial_database_to_workspace,
     odf_server,
+    resource_context,
+    resources,
     spawn_password_refreshing_job,
 };
 
@@ -89,9 +93,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     // Sometimes (in the case of predefined users), we need to know whether the
     // workspace to be created will be multi-tenant or not right away, even before
     // the `kamu init` command itself is processed.
-    let maybe_init_command = match &args.command {
-        Command::Init(c) if c.creates_workspace() => Some(c.clone()),
-        _ => None,
+    let maybe_init_command = if let Command::Init(c) = &args.command
+        && c.creates_workspace()
+    {
+        Some(c.clone())
+    } else {
+        None
     };
     let init_multi_tenant_workspace = matches!(&maybe_init_command, Some(c) if c.multi_tenant);
     let workspace_svc = WorkspaceService::new(
@@ -132,6 +139,15 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         let current_account =
             AccountService::current_account_indication(args.account.clone(), tenancy_config)
                 .map_err(CLIError::usage_error_from)?;
+
+        // Checked before the account lookup: a single-tenant workspace has only the
+        // default account, so naming any other one is a usage error, not a missing account
+        if is_in_workspace
+            && tenancy_config == TenancyConfig::SingleTenant
+            && current_account.account_name != *DEFAULT_ACCOUNT_NAME
+        {
+            return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));
+        }
 
         prepare_run_dir(&workspace_layout.run_info_dir);
 
@@ -212,7 +228,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                     current_account_indication
                         .to_current_account_subject(workspace_status, account_service)
                         .await
-                        .int_err()
+                        .map_err(CLIError::from)
                 },
             )
             .await?;
@@ -255,11 +271,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         if cli_commands::command_needs_workspace(&args) {
             if !is_in_workspace {
                 Err(CLIError::usage_error_from(NotInWorkspace))
+            } else if let Some(v @ WorkspaceVersion::Unknown(_)) = workspace_version {
+                Err(CLIError::usage_error_from(
+                    WorkspaceFutureVersionError::new(v, WorkspaceVersion::LATEST),
+                ))
             } else if is_workspace_upgrade_needed {
                 Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-            } else if current_account.is_explicit() && tenancy_config == TenancyConfig::SingleTenant
-            {
-                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
             } else {
                 Ok(())
             }
@@ -544,6 +561,11 @@ pub fn configure_base_catalog(
         },
     );
 
+    kamu_resources_facade::register_dependencies(&mut b);
+    kamu_resources_services::register_dependencies(&mut b);
+    kamu_configuration_services::register_dependencies(&mut b);
+    kamu_storage_services::register_dependencies(&mut b);
+
     kamu_auth_rebac_services::register_dependencies(&mut b, workspace_status.is_indexing_needed());
 
     b.add::<DatabaseTransactionRunner>();
@@ -566,6 +588,7 @@ pub fn configure_base_catalog(
     b.bind::<dyn Outbox, OutboxDispatchingImpl>();
     b.add::<messaging_outbox::OutboxAgentImpl>();
     b.add::<messaging_outbox::OutboxAgentMetrics>();
+    b.add::<wakeup_listener::WakeupListenerMetrics>();
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
@@ -622,6 +645,11 @@ pub fn configure_base_catalog(
         kamu_auth_rebac::MESSAGE_PRODUCER_KAMU_REBAC_DATASET_RELATIONS_SERVICE,
     );
 
+    register_message_dispatcher::<kamu_resources::ResourceLifecycleMessage>(
+        &mut b,
+        kamu_resources::MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    );
+
     b
 }
 
@@ -640,6 +668,9 @@ pub fn configure_cli_catalog(
         WorkspaceService::builder().with_multi_tenant(tenancy_config == TenancyConfig::MultiTenant),
     );
     b.add::<ConfirmDeleteService>();
+
+    resource_context::register_dependencies(&mut b);
+    resources::register_dependencies(&mut b);
 
     b
 }
@@ -824,15 +855,27 @@ pub fn register_config_in_catalog(
         let accounts_config = if tenancy_config == TenancyConfig::MultiTenant {
             let mut accounts_config = config.auth.users.clone();
 
-            let mt_account = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
-                AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
-            ))
-            .set_display_name(AccountService::default_user_name(
-                TenancyConfig::MultiTenant,
-            ))
-            .set_properties(vec![AccountPropertyName::IsAdmin]);
+            // The implicit OS-user account is a fallback, not an override: a
+            // config entry of the same name is authoritative, and appending a
+            // second one collides on `idx_accounts_name`, aborting the shared
+            // registration transaction and with it startup. An OS user name
+            // with no usable account name gets no implicit account; the run
+            // then selects a configured one with `--account`.
+            if let Ok(os_account_name) =
+                AccountService::default_account_name(TenancyConfig::MultiTenant)
+                && !accounts_config
+                    .predefined
+                    .iter()
+                    .any(|account| account.account_name == os_account_name)
+            {
+                let mt_account = AccountConfig::test_config_from_name(os_account_name)
+                    .set_display_name(AccountService::default_user_name(
+                        TenancyConfig::MultiTenant,
+                    ))
+                    .set_properties(vec![AccountPropertyName::IsAdmin]);
 
-            accounts_config.predefined.push(mt_account);
+                accounts_config.predefined.push(mt_account);
+            }
 
             if is_e2e_testing {
                 let e2e_user_config = AccountConfig::test_config_from_name(
@@ -865,27 +908,27 @@ pub fn register_config_in_catalog(
     ));
     //
 
-    // Dataset env vars configuration
-    catalog_builder.add_value(config.dataset_env_vars.clone());
+    // Secrets encryption configuration
+    catalog_builder.add_value(config.secrets_encryption.clone());
 
-    match &config.dataset_env_vars.encryption_key {
+    match &config.secrets_encryption.encryption_key {
         None => {
-            if config.dataset_env_vars.enabled {
-                panic!("Dataset env vars encryption key is required");
-            } else {
-                warn!("Dataset env vars configuration is missing. Feature will be disabled");
-            }
+            assert!(
+                !config.secrets_encryption.enabled,
+                "Secrets encryption key is required"
+            );
+            warn!("Secrets encryption configuration is missing. Feature will be disabled");
             catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
         Some(encryption_key) => {
-            if config.dataset_env_vars.enabled {
+            if config.secrets_encryption.enabled {
                 assert!(
                     AesGcmEncryptor::try_new(encryption_key).is_ok(),
-                    "Invalid dataset env var encryption key",
+                    "Invalid secrets encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
-                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceImpl>();
+                catalog_builder.add::<kamu_datasets_services::DatasetEnvVarCompatServiceImpl>();
             } else {
                 warn!("Dataset env vars feature will be disabled");
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
@@ -920,8 +963,11 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(config.auth.clone());
     //
 
-    // Outbox configuration
-    catalog_builder.add_value(config.outbox.into_system());
+    // Background agents configuration
+    catalog_builder.add_value(config.background_agents.wakeup_listener_config());
+    catalog_builder.add_value(config.background_agents.outbox_agent_config());
+    catalog_builder.add_value(config.background_agents.flow_system_event_agent_config());
+    catalog_builder.add_value(config.background_agents.flow_agent_activation_config());
     //
 
     // Password hashing mode configuration
@@ -936,9 +982,7 @@ pub fn register_config_in_catalog(
     //
 
     // Flow system configuration
-    catalog_builder.add_value(config.flow_system.flow_agent.into_system());
-    catalog_builder.add_value(config.flow_system.flow_system_event_agent.into_system());
-    catalog_builder.add_value(config.flow_system.task_agent.into_system());
+    catalog_builder.add_value(config.flow_system.into_system());
 
     // Webhooks configuration
     assert!(
@@ -948,11 +992,11 @@ pub fn register_config_in_catalog(
 
     match &config.webhooks.secret_encryption_key {
         None => {
-            if config.webhooks.secret_encryption_enabled {
-                panic!("Webhook secrets encryption key is required")
-            } else {
-                warn!("Webhook encryption configuration is missing. Secrets will not be encrypted");
-            }
+            assert!(
+                !config.webhooks.secret_encryption_enabled,
+                "Webhook secrets encryption key is required"
+            );
+            warn!("Webhook encryption configuration is missing. Secrets will not be encrypted");
         }
         Some(encryption_key) => {
             if config.webhooks.secret_encryption_enabled {
@@ -1007,11 +1051,10 @@ pub fn register_config_in_catalog(
     }
 
     // Note: this is specific to CLI:
-    // - we are not registering SearchIndexer startup job here to avoid heavyweight
-    //   load in CLI commands
-    // - lazy init wrapper encapsulates the indexing launch on first search API use
-    //   (could be quite a long startup time, indexing itself + container start, if
-    //   containers are used)
+    // - we are not registering SearchIndexer startup job here to avoid heavyweight load in CLI
+    //   commands
+    // - lazy init wrapper encapsulates the indexing launch on first search API use (could be quite
+    //   a long startup time, indexing itself + container start, if containers are used)
     // - lazy init wrapper is unnecessary in server mode
 
     match &config.search.repo {
@@ -1141,7 +1184,7 @@ fn configure_logging(
     let env_filter = match EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => EnvFilter::new(
-            LOG_LEVELS[(output_config.verbosity_level as usize).clamp(0, LOG_LEVELS.len() - 1)],
+            LOG_LEVELS[usize::from(output_config.verbosity_level).min(LOG_LEVELS.len() - 1)],
         ),
     };
 
@@ -1192,8 +1235,8 @@ fn configure_logging(
     tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 
     Guards {
-        appender: Some(appender_guard),
-        perfetto: perfetto_guard,
+        _appender: Some(appender_guard),
+        _perfetto: perfetto_guard,
     }
 }
 
@@ -1247,11 +1290,10 @@ fn configure_output_format(args: &cli::Cli, workspace_svc: &WorkspaceService) ->
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
 #[derive(Default)]
 struct Guards {
-    appender: Option<tracing_appender::non_blocking::WorkerGuard>,
-    perfetto: Option<tracing_perfetto::FlushGuard>,
+    _appender: Option<tracing_appender::non_blocking::WorkerGuard>,
+    _perfetto: Option<tracing_perfetto::FlushGuard>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

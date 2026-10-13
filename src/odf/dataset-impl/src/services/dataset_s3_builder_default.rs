@@ -81,7 +81,7 @@ impl DatasetS3Builder for DatasetS3BuilderDefault {
                 MetadataChainImpl::new(
                     Self::build_meta_block_repo(ObjectRepositoryCachingLocalFs::new(
                         Self::build_base_block_repo(&s3_context),
-                        metadata_cache_local_fs_path.clone(),
+                        metadata_cache_local_fs_path,
                     )),
                     Self::build_meta_ref_repo(Self::build_refs_repo(&s3_context)),
                 ),

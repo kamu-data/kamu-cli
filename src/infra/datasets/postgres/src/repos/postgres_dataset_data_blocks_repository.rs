@@ -260,7 +260,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
 
-        let mut builder: QueryBuilder<'_, sqlx::Postgres> = QueryBuilder::new(
+        let mut builder: QueryBuilder<sqlx::Postgres> = QueryBuilder::new(
             "INSERT INTO dataset_data_blocks (
                 dataset_id,
                 block_ref_name,
@@ -282,29 +282,33 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
                 .push_bind(block.block_payload.as_ref());
         });
 
-        builder.build().execute(conn).await.map_err(|e| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
-                tracing::warn!(
-                    "Unique constraint violation while batch inserting key blocks: {}",
-                    e.message()
-                );
-                // TODO: might be a unique violation on block hash as well
-                DatasetDataBlockSaveError::DuplicateSequenceNumber(
-                    // We can't know which block caused it in batch insert
-                    blocks.iter().map(|b| b.sequence_number).collect(),
-                )
-            }
-            sqlx::Error::Database(e) if e.is_foreign_key_violation() => {
-                tracing::warn!(
-                    "Foreign key constraint failed while batch inserting key blocks: {}",
-                    e.message()
-                );
-                DatasetDataBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
-                    dataset_id: dataset_id.clone(),
-                })
-            }
-            other => other.int_err().into(),
-        })?;
+        builder
+            .build()
+            .execute(conn)
+            .await
+            .map_err(|e| match e.as_database_error() {
+                Some(db_err) if db_err.is_unique_violation() => {
+                    tracing::warn!(
+                        "Unique constraint violation while batch inserting key blocks: {}",
+                        db_err.message()
+                    );
+                    // TODO: might be a unique violation on block hash as well
+                    DatasetDataBlockSaveError::DuplicateSequenceNumber(
+                        // We can't know which block caused it in batch insert
+                        blocks.iter().map(|b| b.sequence_number).collect(),
+                    )
+                }
+                Some(db_err) if db_err.is_foreign_key_violation() => {
+                    tracing::warn!(
+                        "Foreign key constraint failed while batch inserting key blocks: {}",
+                        db_err.message()
+                    );
+                    DatasetDataBlockSaveError::UnmatchedDatasetEntry(DatasetUnmatchedEntryError {
+                        dataset_id: dataset_id.clone(),
+                    })
+                }
+                _ => e.int_err().into(),
+            })?;
 
         Ok(())
     }

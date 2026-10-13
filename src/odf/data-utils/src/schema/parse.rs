@@ -319,6 +319,10 @@ fn do_force_utc_time(schema: DFSchema) -> DFSchema {
     DFSchema::new_with_metadata(fields, metadata).unwrap()
 }
 
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "Arrow's DataType is foreign; only timestamps and structs are rewritten"
+)]
 fn force_utc_time_rec(field: &Arc<Field>, tz: &Arc<str>) -> Arc<Field> {
     match field.data_type() {
         DataType::Timestamp(unit, None) => {
@@ -337,6 +341,10 @@ fn force_utc_time_rec(field: &Arc<Field>, tz: &Arc<str>) -> Arc<Field> {
     }
 }
 
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "Arrow's DataType is foreign; only timestamps and structs are rewritten"
+)]
 fn force_utc_time_field_rec(field: Field, tz: &Arc<str>) -> Field {
     match field.data_type().clone() {
         DataType::Timestamp(unit, None) => {
@@ -362,6 +370,10 @@ fn force_utc_time_applies(schema: &DFSchema) -> bool {
     false
 }
 
+#[expect(
+    clippy::wildcard_enum_match_arm,
+    reason = "Arrow's DataType is foreign; only timestamps and structs can need rewriting"
+)]
 fn force_utc_time_applies_rec(data_type: &DataType) -> bool {
     match data_type {
         DataType::Timestamp(_, None) => true,

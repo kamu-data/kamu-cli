@@ -136,7 +136,7 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
                         MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
                         MoleculeDataRoomMessage::removed(
                             success.system_time,
-                            molecule_subject.account_id.clone(),
+                            molecule_subject.account_handle.did.clone(),
                             molecule_project.account_id.clone(),
                             molecule_project.ocl_id.clone(),
                             path,

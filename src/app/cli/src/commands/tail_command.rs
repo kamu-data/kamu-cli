@@ -64,6 +64,11 @@ impl Command for TailCommand {
                 ColumnFormat::default(),
                 ColumnFormat::default().with_value_fmt(|array, row, _| {
                     let err = Err(odf::metadata::InvalidOperationType(0));
+                    #[expect(
+                        clippy::wildcard_enum_match_arm,
+                        reason = "Arrow's DataType is foreign; the operation type column is \
+                                  UInt8, or Int32 in older datasets"
+                    )]
                     let op = match array.data_type() {
                         DataType::UInt8 => array
                             .as_any()

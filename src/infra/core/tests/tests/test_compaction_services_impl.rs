@@ -22,6 +22,12 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
@@ -35,7 +41,7 @@ use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
-use crate::{TransformTestHelper, mock_engine_provisioner};
+use crate::TransformTestHelper;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -965,7 +971,7 @@ async fn test_compact_offsets_are_sequential_impl() {
                 r#"
                 Optimized physical plan:
                 DataSinkExec: sink=ParquetSink(file_groups=[])
-                  DataSourceExec: file_groups={1 group: [[...]]}, projection=[offset, op, system_time, date, city, population], output_ordering=[offset@0 ASC NULLS LAST], file_type=parquet
+                  DataSourceExec: file_groups={1 group: [[...]]}, projection=[offset, op, system_time, date, city, population], output_ordering=[offset@0 ASC], file_type=parquet
                 "#
             )
             .trim(),
@@ -1406,6 +1412,10 @@ impl CompactTestHarness {
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
             .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
@@ -1414,10 +1424,8 @@ impl CompactTestHarness {
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
             .add::<TransformExecutorImpl>()
-            .add_value(
-                mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
-            )
-            .bind::<dyn EngineProvisioner, mock_engine_provisioner::MockEngineProvisioner>()
+            .add_value(MockEngineProvisioner::new().stub_provision_engine())
+            .bind::<dyn EngineProvisioner, MockEngineProvisioner>()
             .add::<VerificationServiceImpl>()
             .build();
 
@@ -1474,6 +1482,10 @@ impl CompactTestHarness {
             .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
             .add::<DummyOutboxImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add::<TransformElaborationServiceImpl>()
@@ -1732,15 +1744,12 @@ impl CompactTestHarness {
     // Ensures that there are no odf::metadata::AddData/Executetransform blocks
     async fn check_is_data_slices_exist(&self, dataset_ref: &odf::DatasetRef) -> bool {
         let blocks = self.get_dataset_blocks(dataset_ref).await;
-        for block in &blocks {
-            match block.event {
-                odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_) => {
-                    return true;
-                }
-                _ => (),
-            }
-        }
-        false
+        blocks.iter().any(|block| {
+            matches!(
+                block.event,
+                odf::MetadataEvent::AddData(_) | odf::MetadataEvent::ExecuteTransform(_)
+            )
+        })
     }
 
     fn assert_offset_interval_eq(

@@ -25,16 +25,14 @@ use syn::{FnArg, ItemFn, Pat, PatIdent, ReturnType, parse_macro_input};
 /// { ... }
 ///
 /// The macro expands into:
-///   - An inner function `my_test__inner(ctx: Arc<EsTestContext>)` with the
-///     original body
+///   - An inner function `my_test__inner(ctx: Arc<EsTestContext>)` with the original body
 ///   - An outer `#[tokio::test] async fn my_test()` wrapper that calls
 ///     `::kamu_search_elasticsearch::testing::elasticsearch_test(...)`
 ///
 /// Notes:
 /// - This macro assumes the runtime harness is located at:
 ///   `::kamu_search_elasticsearch::testing::elasticsearch_test`
-/// - It assumes `elasticsearch_test` returns a `Result<(), _>` and will panic
-///   on Err.
+/// - It assumes `elasticsearch_test` returns a `Result<(), _>` and will panic on Err.
 #[proc_macro_attribute]
 pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     const HARNESS_PATH: &str = "::kamu_search_elasticsearch::testing::elasticsearch_test";
@@ -67,18 +65,18 @@ pub fn test(_attr: TokenStream, item: TokenStream) -> TokenStream {
     // Extract the parameter pattern name to ensure it's a simple identifier, and
     // also to avoid surprises when we call the inner function.
     let ctx_ident = match f.sig.inputs.first().unwrap() {
-        FnArg::Typed(pat_ty) => match pat_ty.pat.as_ref() {
-            Pat::Ident(PatIdent { ident, .. }) => ident.clone(),
-            other => {
+        FnArg::Typed(pat_ty) => {
+            let Pat::Ident(PatIdent { ident, .. }) = pat_ty.pat.as_ref() else {
                 return syn::Error::new(
-                    other.span(),
+                    pat_ty.pat.span(),
                     "expected parameter pattern to be an identifier, e.g. `ctx: \
                      Arc<EsTestContext>`",
                 )
                 .to_compile_error()
                 .into();
-            }
-        },
+            };
+            ident.clone()
+        }
         FnArg::Receiver(r) => {
             return syn::Error::new(
                 r.span(),

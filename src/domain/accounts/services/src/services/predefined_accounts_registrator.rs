@@ -45,7 +45,10 @@ pub struct PredefinedAccountsRegistrator {
     requires_transaction: true,
 })]
 impl PredefinedAccountsRegistrator {
-    #[expect(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         predefined_accounts_config: Arc<PredefinedAccountsConfig>,
         account_service: Arc<dyn AccountService>,
@@ -186,8 +189,8 @@ impl PredefinedAccountsRegistrator {
                 Err(e) => return Err(e.int_err()),
             }
         } else {
-            // 3) We were previously unable to find the ID based on the fields, which means
-            //    an account does not exist. Register it
+            // 3) We were previously unable to find the ID based on the fields, which means an
+            //    account does not exist. Register it
             self.register_unknown_account(account_config).await?
         };
 
@@ -228,7 +231,7 @@ impl PredefinedAccountsRegistrator {
     ) -> Result<odf::AccountID, InternalError> {
         let created = self
             .create_account_use_case
-            .execute(account_config)
+            .execute(account_config, AccountResourceIdSource::SeededFromName)
             .await
             .int_err()?;
 
@@ -243,6 +246,9 @@ impl PredefinedAccountsRegistrator {
     ) -> Result<(), InternalError> {
         let updated_account = Account {
             id: resolved_account_id.clone(),
+            // Preserve the stable account-resource id of the existing account
+            // rather than minting a fresh one on every re-registration.
+            resource_id: original_account.resource_id,
             account_name: account_config.account_name.clone(),
             email: account_config.email.clone(),
             display_name: account_config.get_display_name(),

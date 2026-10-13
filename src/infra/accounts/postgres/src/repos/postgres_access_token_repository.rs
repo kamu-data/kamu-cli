@@ -79,13 +79,16 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
                 CreateAccessTokenError::Duplicate(CreateAccessTokenErrorDuplicate {
                     access_token_name: access_token.token_name.clone(),
                 })
+            } else {
+                CreateAccessTokenError::Internal(e.int_err())
             }
-            _ => CreateAccessTokenError::Internal(e.int_err()),
         })?;
 
         Ok(())
@@ -215,6 +218,7 @@ impl AccessTokenRepository for PostgresAccessTokenRepository {
                 SELECT
                     at.token_hash,
                     a.id as "id: _",
+                    a.resource_id as "resource_id: _",
                     a.account_name,
                     a.email,
                     a.display_name,

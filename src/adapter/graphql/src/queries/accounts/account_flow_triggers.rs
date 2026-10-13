@@ -20,6 +20,7 @@ pub struct AccountFlowTriggers<'a> {
     account: &'a AccountEntity,
 }
 
+/// Flow trigger queries across datasets owned by an account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountFlowTriggers<'a> {

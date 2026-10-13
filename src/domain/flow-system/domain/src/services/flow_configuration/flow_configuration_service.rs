@@ -17,7 +17,8 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait FlowConfigurationService: Sync + Send {
-    /// Find current configuration of a certain type
+    /// Find current configuration of a certain type; a configuration whose
+    /// scope was removed is not returned
     async fn find_configuration(
         &self,
         flow_binding: &FlowBinding,

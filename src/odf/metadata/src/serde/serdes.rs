@@ -14,8 +14,8 @@ use chrono::{DateTime, Utc};
 use thiserror::Error;
 
 use crate::data::OperationType;
-use crate::dataset::{MetadataBlock, MetadataBlockHeader};
-use crate::engine::{RawQueryRequest, RawQueryResponse, TransformRequest, TransformResponse};
+use crate::datasets::{MetadataBlock, MetadataBlockHeader};
+use crate::engines::{RawQueryRequest, RawQueryResponse, TransformRequest, TransformResponse};
 use crate::errors::ValidationError;
 use crate::legacy::DatasetSnapshot;
 

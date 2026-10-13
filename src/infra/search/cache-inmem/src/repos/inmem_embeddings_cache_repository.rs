@@ -44,8 +44,6 @@ struct State {
 
 #[derive(Clone)]
 struct CacheMetadata {
-    #[allow(dead_code)]
-    created_at: DateTime<Utc>,
     last_seen_at: DateTime<Utc>,
     hit_count: i64,
 }
@@ -136,7 +134,6 @@ impl EmbeddingsCacheRepository for InMemoryEmbeddingsCacheRepository {
                 guard.cache_metadata.insert(
                     key.clone(),
                     CacheMetadata {
-                        created_at: now,
                         last_seen_at: now,
                         hit_count: 0,
                     },

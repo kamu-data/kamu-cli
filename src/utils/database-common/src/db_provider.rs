@@ -11,37 +11,20 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, strum::Display)]
 #[serde(rename_all = "camelCase")]
+#[strum(serialize_all = "lowercase")]
 pub enum DatabaseProvider {
     Postgres,
-    MySql,
-    MariaDB,
     Sqlite,
 }
 
 impl DatabaseProvider {
     pub fn default_port(&self) -> u16 {
         match self {
-            DatabaseProvider::MariaDB | DatabaseProvider::MySql => 3306,
             DatabaseProvider::Postgres => 5432,
             DatabaseProvider::Sqlite => unreachable!(),
         }
-    }
-}
-
-impl std::fmt::Display for DatabaseProvider {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                DatabaseProvider::Postgres => "postgres",
-                DatabaseProvider::MySql => "mysql",
-                DatabaseProvider::MariaDB => "mariadb",
-                DatabaseProvider::Sqlite => "sqlite",
-            }
-        )
     }
 }
 

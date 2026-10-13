@@ -14,7 +14,8 @@ use database_common::{TransactionRefT, sqlite_generate_placeholders_tuple_list_2
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::*;
-use sqlx::QueryBuilder;
+use serde_json::json;
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -195,7 +196,7 @@ impl RebacRepository for SqliteRebacRepository {
             )
         );
 
-        let mut query = sqlx::query_as::<_, EntityPropertyRowModel>(&query_str);
+        let mut query = sqlx::query_as::<_, EntityPropertyRowModel>(AssertSqlSafe(query_str));
         for entity in entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -229,29 +230,41 @@ impl RebacRepository for SqliteRebacRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = QueryBuilder::new(
+        let rows_json = serde_json::to_string(
+            &operations
+                .iter()
+                .map(|op| {
+                    json!({
+                        "subject_entity_type": <&str>::from(op.subject_entity.entity_type),
+                        "subject_entity_id": op.subject_entity.entity_id,
+                        "relationship": op.relationship.to_string(),
+                        "object_entity_type": <&str>::from(op.object_entity.entity_type),
+                        "object_entity_id": op.object_entity.entity_id,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+        .int_err()?;
+
+        sqlx::query!(
             r#"
             REPLACE INTO auth_rebac_relations (subject_entity_type,
                                                subject_entity_id,
                                                relationship,
                                                object_entity_type,
                                                object_entity_id)
+            SELECT value ->> 'subject_entity_type',
+                   value ->> 'subject_entity_id',
+                   value ->> 'relationship',
+                   value ->> 'object_entity_type',
+                   value ->> 'object_entity_id'
+            FROM json_each($1)
             "#,
-        );
-
-        query_builder.push_values(operations, |mut b, op| {
-            b.push_bind(op.subject_entity.entity_type);
-            b.push_bind(op.subject_entity.entity_id.as_ref());
-            b.push_bind(op.relationship.to_string());
-            b.push_bind(op.object_entity.entity_type);
-            b.push_bind(op.object_entity.entity_id.as_ref());
-        });
-
-        query_builder
-            .build()
-            .execute(connection_mut)
-            .await
-            .int_err()?;
+            rows_json,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
 
         Ok(())
     }
@@ -353,7 +366,7 @@ impl RebacRepository for SqliteRebacRepository {
             )
         );
 
-        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(AssertSqlSafe(query_str));
         for entity in object_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -400,7 +413,7 @@ impl RebacRepository for SqliteRebacRepository {
             )
         );
 
-        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(AssertSqlSafe(query_str));
         for entity in subject_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -521,7 +534,7 @@ impl RebacRepository for SqliteRebacRepository {
             )
         );
 
-        let mut query = sqlx::query(&query_str)
+        let mut query = sqlx::query(AssertSqlSafe(query_str))
             .bind(object_entity.entity_type)
             .bind(&object_entity.entity_id);
         for subject_entity in &subject_entities {
@@ -553,29 +566,39 @@ impl RebacRepository for SqliteRebacRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = QueryBuilder::new(
+        let keys_json = serde_json::to_string(
+            &operations
+                .iter()
+                .map(|op| {
+                    json!({
+                        "subject_entity_type": <&str>::from(op.subject_entity.entity_type),
+                        "subject_entity_id": op.subject_entity.entity_id,
+                        "object_entity_type": <&str>::from(op.object_entity.entity_type),
+                        "object_entity_id": op.object_entity.entity_id,
+                    })
+                })
+                .collect::<Vec<_>>(),
+        )
+        .int_err()?;
+
+        sqlx::query!(
             r#"
             DELETE
             FROM auth_rebac_relations
             WHERE (subject_entity_type,
                    subject_entity_id,
                    object_entity_type,
-                   object_entity_id) IN
+                   object_entity_id) IN (SELECT value ->> 'subject_entity_type',
+                                                value ->> 'subject_entity_id',
+                                                value ->> 'object_entity_type',
+                                                value ->> 'object_entity_id'
+                                         FROM json_each($1))
             "#,
-        );
-
-        query_builder.push_tuples(operations, |mut b, op| {
-            b.push_bind(op.subject_entity.entity_type);
-            b.push_bind(op.subject_entity.entity_id.as_ref());
-            b.push_bind(op.object_entity.entity_type);
-            b.push_bind(op.object_entity.entity_id.as_ref());
-        });
-
-        query_builder
-            .build()
-            .execute(connection_mut)
-            .await
-            .int_err()?;
+            keys_json,
+        )
+        .execute(connection_mut)
+        .await
+        .int_err()?;
 
         Ok(())
     }

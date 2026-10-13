@@ -48,7 +48,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         // Gain write access to projects dataset
         let projects_writer = self
             .projects_service
-            .writer(&molecule_subject.account_name, false)
+            .writer(&molecule_subject.account_handle.name, false)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?;
 
@@ -101,7 +101,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
                         MoleculeProjectMessage::disabled(
                             source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
-                            molecule_subject.account_id.clone(),
+                            molecule_subject.account_handle.did.clone(),
                             new_changelog_record.payload.odf_account_id.clone(),
                             new_changelog_record.payload.ocl_id.clone(),
                             new_changelog_record.payload.symbol.clone(),

@@ -8,21 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use wakeup_listener::WakeupListener;
 
-use crate::{
-    MessageStoreWakeupDetector,
-    NewOutboxMessage,
-    OutboxMessage,
-    OutboxMessageBoundary,
-    OutboxMessageID,
-};
+use crate::{NewOutboxMessage, OutboxMessage, OutboxMessageBoundary, OutboxMessageID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait OutboxMessageBridge: Send + Sync {
-    /// Provides outbox message store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector;
+    /// The agent's own listener handle, kept for its lifetime: a shared one
+    /// would lose wakeups. Its heartbeat is labelled with the agent's name
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 
     /// Pushes new message to the outbox
     async fn push_message(
@@ -63,6 +59,16 @@ pub trait OutboxMessageBridge: Send + Sync {
         &self,
         transaction_catalog: &dill::Catalog,
     ) -> Result<Vec<OutboxMessageConsumptionBoundary>, InternalError>;
+
+    /// Whether committed messages of these producers exist that the fetches do
+    /// not return yet, because a transaction that started earlier is still
+    /// running. They become readable once it ends, so a caller draining the
+    /// queue should wait for them
+    async fn has_held_back_messages(
+        &self,
+        transaction_catalog: &dill::Catalog,
+        producer_names: &[&str],
+    ) -> Result<bool, InternalError>;
 
     /// Mark this message boundary as consumed for this producer-consumer pair
     async fn mark_consumed(

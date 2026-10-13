@@ -6,7 +6,13 @@
       {
         "name": "activation_time: _",
         "ordinal": 0,
-        "type_info": "Null"
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "flows",
+            "name": "scheduled_for_activation_at"
+          }
+        }
       }
     ],
     "parameters": {

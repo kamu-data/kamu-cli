@@ -52,23 +52,30 @@ impl TaskOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Task completed successfully
 #[derive(SimpleObject, Debug)]
 pub struct TaskOutcomeSuccess {
+    /// Human-readable success message
     message: String,
 }
 
+/// Task was cancelled before completing
 #[derive(SimpleObject, Debug)]
 pub struct TaskOutcomeCancelled {
+    /// Human-readable cancellation message
     message: String,
 }
 
+/// Task failed
 #[derive(SimpleObject, Debug)]
 pub struct TaskOutcomeFailed {
+    /// Why the task failed
     reason: TaskFailureReason,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Cause of a task failure
 #[derive(Union, Debug)]
 pub enum TaskFailureReason {
     General(TaskFailureReasonGeneral),
@@ -76,21 +83,30 @@ pub enum TaskFailureReason {
     WebhookDeliveryProblem(TaskFailureReasonWebhookDeliveryProblem),
 }
 
+/// Task failed for a reason without a dedicated type
 #[derive(SimpleObject, Debug)]
 pub struct TaskFailureReasonGeneral {
+    /// Human-readable description of the failure
     message: String,
+    /// Whether the failure is transient and the task may be retried
     recoverable: bool,
 }
 
+/// Transform failed because an input dataset was compacted
 #[derive(SimpleObject, Debug)]
 pub struct TaskFailureReasonInputDatasetCompacted {
+    /// Input dataset that was compacted
     input_dataset: Dataset,
+    /// Human-readable description of the failure
     message: String,
 }
 
+/// Webhook could not be delivered to its target
 #[derive(SimpleObject, Debug)]
 pub struct TaskFailureReasonWebhookDeliveryProblem {
+    /// URL the delivery was sent to
     target_url: url::Url,
+    /// Description of the delivery problem
     message: String,
 }
 

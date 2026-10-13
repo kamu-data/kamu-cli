@@ -137,11 +137,10 @@ impl KamuFlightSqlService {
             .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
-    #[expect(clippy::trivially_copy_pass_by_ref)]
     fn get_catalogs(
         &self,
         ctx: &SessionContext,
-        _query: &CommandGetCatalogs,
+        _query: CommandGetCatalogs,
         schema_only: bool,
     ) -> Result<RecordBatch, Status> {
         let batch_schema = Arc::new(Schema::new(vec![Field::new(
@@ -624,7 +623,6 @@ impl KamuFlightSqlService {
 // FlightSqlService
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[expect(unused_variables)]
 #[tonic::async_trait]
 impl FlightSqlService for KamuFlightSqlService {
     type FlightService = KamuFlightSqlService;
@@ -690,7 +688,7 @@ impl FlightSqlService for KamuFlightSqlService {
     #[tracing::instrument(level = "debug", skip_all, fields(type_url = %message.type_url))]
     async fn do_get_fallback(
         &self,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
         message: arrow_flight::sql::Any,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         Err(Status::unimplemented(format!(
@@ -701,10 +699,10 @@ impl FlightSqlService for KamuFlightSqlService {
 
     /// Get a `FlightDataStream` containing the data related to the supported
     /// XDBC types.
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_get_xdbc_type_info(
         &self,
-        query: CommandGetXdbcTypeInfo,
+        _query: CommandGetXdbcTypeInfo,
         _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         Err(Status::unimplemented("Implement do_get_xdbc_type_info"))
@@ -714,7 +712,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_statement(
         &self,
         query: CommandStatementQuery,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let plan = Self::prepare_statement(&query.query, &ctx).await?;
@@ -735,7 +733,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_prepared_statement(
         &self,
         query: CommandPreparedStatementQuery,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let plan_id = PlanId(
             String::from_utf8(query.prepared_statement_handle.to_vec())
@@ -759,10 +757,10 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_catalogs(
         &self,
         query: CommandGetCatalogs,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.session_manager.get_context().await?;
-        let data = self.get_catalogs(&ctx, &query, true)?;
+        let data = self.get_catalogs(&ctx, query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
@@ -770,7 +768,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_schemas(
         &self,
         query: CommandGetDbSchemas,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_schemas(&ctx, &query, true)?;
@@ -781,7 +779,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_tables(
         &self,
         query: CommandGetTables,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_tables(ctx, &query, true).await?;
@@ -792,7 +790,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_table_types(
         &self,
         query: CommandGetTableTypes,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let _ctx = self.session_manager.get_context().await?;
         let data = self.get_table_types(true)?;
@@ -803,7 +801,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_sql_info(
         &self,
         query: CommandGetSqlInfo,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let _ctx = self.session_manager.get_context().await?;
         let data = self.get_sql_info(&query, true)?;
@@ -814,7 +812,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_primary_keys(
         &self,
         query: CommandGetPrimaryKeys,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_primary_keys(&ctx, &query, true)?;
@@ -825,7 +823,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_exported_keys(
         &self,
         query: CommandGetExportedKeys,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_exported_keys(&ctx, &query, true)?;
@@ -836,17 +834,17 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn get_flight_info_imported_keys(
         &self,
         query: CommandGetImportedKeys,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_imported_keys(&ctx, &query, true)?;
         self.record_batch_to_flight_info(&data, &query.as_any(), true)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn get_flight_info_cross_reference(
         &self,
-        query: CommandGetCrossReference,
+        _query: CommandGetCrossReference,
         _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         Err(Status::unimplemented(
@@ -856,10 +854,10 @@ impl FlightSqlService for KamuFlightSqlService {
 
     /// Get a `FlightInfo` to extract information about the supported XDBC
     /// types.
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn get_flight_info_xdbc_type_info(
         &self,
-        query: CommandGetXdbcTypeInfo,
+        _query: CommandGetXdbcTypeInfo,
         _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         Err(Status::unimplemented(
@@ -871,7 +869,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_statement(
         &self,
         ticket: TicketStatementQuery,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.session_manager.get_context().await?;
 
@@ -893,7 +891,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_prepared_statement(
         &self,
         query: CommandPreparedStatementQuery,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let plan_id = PlanId(
             String::from_utf8(query.prepared_statement_handle.to_vec())
@@ -916,10 +914,10 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_catalogs(
         &self,
         query: CommandGetCatalogs,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.session_manager.get_context().await?;
-        let data = self.get_catalogs(&ctx, &query, false)?;
+        let data = self.get_catalogs(&ctx, query, false)?;
         self.record_batch_to_stream(data)
     }
 
@@ -927,7 +925,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_schemas(
         &self,
         query: CommandGetDbSchemas,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_schemas(&ctx, &query, false)?;
@@ -938,18 +936,18 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_tables(
         &self,
         query: CommandGetTables,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_tables(ctx, &query, false).await?;
         self.record_batch_to_stream(data)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_get_table_types(
         &self,
-        query: CommandGetTableTypes,
-        request: Request<Ticket>,
+        _query: CommandGetTableTypes,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let _ctx = self.session_manager.get_context().await?;
         let data = self.get_table_types(false)?;
@@ -960,7 +958,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_sql_info(
         &self,
         query: CommandGetSqlInfo,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let _ctx = self.session_manager.get_context().await?;
         let data = self.get_sql_info(&query, false)?;
@@ -971,7 +969,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_primary_keys(
         &self,
         query: CommandGetPrimaryKeys,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_primary_keys(&ctx, &query, false)?;
@@ -982,7 +980,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_exported_keys(
         &self,
         query: CommandGetExportedKeys,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_exported_keys(&ctx, &query, false)?;
@@ -993,35 +991,35 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_get_imported_keys(
         &self,
         query: CommandGetImportedKeys,
-        request: Request<Ticket>,
+        _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.session_manager.get_context().await?;
         let data = self.get_imported_keys(&ctx, &query, false)?;
         self.record_batch_to_stream(data)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_get_cross_reference(
         &self,
-        query: CommandGetCrossReference,
+        _query: CommandGetCrossReference,
         _request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         Err(Status::unimplemented("Implement do_get_cross_reference"))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?ticket))]
+    #[tracing::instrument(level = "debug", skip_all, fields(ticket = ?_ticket))]
     async fn do_put_statement_update(
         &self,
-        ticket: CommandStatementUpdate,
+        _ticket: CommandStatementUpdate,
         _request: Request<PeekableFlightDataStream>,
     ) -> Result<i64, Status> {
         Err(Status::unimplemented("Implement do_put_statement_update"))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_put_prepared_statement_query(
         &self,
-        query: CommandPreparedStatementQuery,
+        _query: CommandPreparedStatementQuery,
         _request: Request<PeekableFlightDataStream>,
     ) -> Result<DoPutPreparedStatementResult, Status> {
         Err(Status::unimplemented(
@@ -1029,10 +1027,10 @@ impl FlightSqlService for KamuFlightSqlService {
         ))
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?handle))]
+    #[tracing::instrument(level = "debug", skip_all, fields(handle = ?_handle))]
     async fn do_put_prepared_statement_update(
         &self,
-        handle: CommandPreparedStatementUpdate,
+        _handle: CommandPreparedStatementUpdate,
         _request: Request<PeekableFlightDataStream>,
     ) -> Result<i64, Status> {
         Err(Status::unimplemented(
@@ -1044,7 +1042,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_action_create_prepared_statement(
         &self,
         query: ActionCreatePreparedStatementRequest,
-        request: Request<Action>,
+        _request: Request<Action>,
     ) -> Result<ActionCreatePreparedStatementResult, Status> {
         let ctx = self.session_manager.get_context().await?;
 
@@ -1066,7 +1064,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_action_close_prepared_statement(
         &self,
         query: ActionClosePreparedStatementRequest,
-        request: Request<Action>,
+        _request: Request<Action>,
     ) -> Result<(), Status> {
         let plan_id = PlanId(
             String::from_utf8(query.prepared_statement_handle.to_vec())
@@ -1079,10 +1077,10 @@ impl FlightSqlService for KamuFlightSqlService {
     }
 
     /// Get a `FlightInfo` for executing a substrait plan.
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn get_flight_info_substrait_plan(
         &self,
-        query: CommandStatementSubstraitPlan,
+        _query: CommandStatementSubstraitPlan,
         _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         Err(Status::unimplemented(
@@ -1091,20 +1089,20 @@ impl FlightSqlService for KamuFlightSqlService {
     }
 
     /// Execute a substrait plan
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_put_substrait_plan(
         &self,
-        query: CommandStatementSubstraitPlan,
+        _query: CommandStatementSubstraitPlan,
         _request: Request<PeekableFlightDataStream>,
     ) -> Result<i64, Status> {
         Err(Status::unimplemented("Implement do_put_substrait_plan"))
     }
 
     /// Create a prepared substrait plan.
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_action_create_prepared_substrait_plan(
         &self,
-        query: ActionCreatePreparedSubstraitPlanRequest,
+        _query: ActionCreatePreparedSubstraitPlanRequest,
         _request: Request<Action>,
     ) -> Result<ActionCreatePreparedStatementResult, Status> {
         Err(Status::unimplemented(
@@ -1113,10 +1111,10 @@ impl FlightSqlService for KamuFlightSqlService {
     }
 
     /// Begin a transaction
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_action_begin_transaction(
         &self,
-        query: ActionBeginTransactionRequest,
+        _query: ActionBeginTransactionRequest,
         _request: Request<Action>,
     ) -> Result<ActionBeginTransactionResult, Status> {
         Err(Status::unimplemented(
@@ -1125,40 +1123,40 @@ impl FlightSqlService for KamuFlightSqlService {
     }
 
     /// End a transaction
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_action_end_transaction(
         &self,
-        query: ActionEndTransactionRequest,
+        _query: ActionEndTransactionRequest,
         _request: Request<Action>,
     ) -> Result<(), Status> {
         Err(Status::unimplemented("Implement do_action_end_transaction"))
     }
 
     /// Begin a savepoint
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_action_begin_savepoint(
         &self,
-        query: ActionBeginSavepointRequest,
+        _query: ActionBeginSavepointRequest,
         _request: Request<Action>,
     ) -> Result<ActionBeginSavepointResult, Status> {
         Err(Status::unimplemented("Implement do_action_begin_savepoint"))
     }
 
     /// End a savepoint
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_action_end_savepoint(
         &self,
-        query: ActionEndSavepointRequest,
+        _query: ActionEndSavepointRequest,
         _request: Request<Action>,
     ) -> Result<(), Status> {
         Err(Status::unimplemented("Implement do_action_end_savepoint"))
     }
 
     /// Cancel a query
-    #[tracing::instrument(level = "debug", skip_all, fields(?query))]
+    #[tracing::instrument(level = "debug", skip_all, fields(query = ?_query))]
     async fn do_action_cancel_query(
         &self,
-        query: ActionCancelQueryRequest,
+        _query: ActionCancelQueryRequest,
         _request: Request<Action>,
     ) -> Result<ActionCancelQueryResult, Status> {
         Err(Status::unimplemented("Implement do_action_cancel_query"))
@@ -1166,8 +1164,8 @@ impl FlightSqlService for KamuFlightSqlService {
 
     /// Register a new `SqlInfo` result, making it available when calling
     /// `GetSqlInfo`.
-    #[tracing::instrument(level = "debug", skip_all, fields(%id, ?result))]
-    async fn register_sql_info(&self, id: i32, result: &SqlInfo) {}
+    #[tracing::instrument(level = "debug", skip_all, fields(id = %_id, ?result))]
+    async fn register_sql_info(&self, _id: i32, result: &SqlInfo) {}
 
     async fn do_action_fallback(
         &self,

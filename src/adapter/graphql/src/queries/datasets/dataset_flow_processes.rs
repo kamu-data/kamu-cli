@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
 use kamu_adapter_flow_dataset::{ingest_dataset_binding, transform_dataset_binding};
 use kamu_adapter_flow_webhook::FlowScopeSubscription;
 use kamu_flow_system::FlowProcessStateQuery;
@@ -18,6 +17,7 @@ use crate::queries::{
     DatasetRequestStateWithOwner,
     WebhookFlowSubProcessGroup,
 };
+use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,6 +25,7 @@ pub struct DatasetFlowProcesses<'a> {
     dataset_request_state: &'a DatasetRequestStateWithOwner,
 }
 
+/// Recurring flow processes of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetFlowProcesses<'a> {
@@ -35,6 +36,8 @@ impl<'a> DatasetFlowProcesses<'a> {
         }
     }
 
+    /// Main update process: ingest for a root dataset, transform for a
+    /// derivative
     #[tracing::instrument(level = "info", name = DatasetFlowProcesses_primary, skip_all)]
     pub async fn primary(&self, ctx: &Context<'_>) -> Result<DatasetFlowProcess> {
         let flow_process_state_query = from_catalog_n!(ctx, dyn FlowProcessStateQuery);
@@ -66,14 +69,21 @@ impl<'a> DatasetFlowProcesses<'a> {
             // Or synthesize unconfigured state if no process state exists
             Ok(DatasetFlowProcess::new(
                 self.dataset_request_state.clone(),
-                kamu_flow_system::FlowProcessState::unconfigured(Utc::now(), flow_binding),
+                kamu_flow_system::FlowProcessState::unconfigured(
+                    utils::system_time_now(ctx),
+                    flow_binding,
+                ),
             ))
         }
     }
 
     // TODO: other secondary processes in future
 
-    #[allow(clippy::unused_async)]
+    /// Webhook delivery processes of subscriptions to this dataset
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     pub async fn webhooks(&self) -> Result<WebhookFlowSubProcessGroup<'_>> {
         // Form a subprocess group from those that point to
         // webhooks bound to this dataset

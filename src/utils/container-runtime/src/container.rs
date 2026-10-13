@@ -476,6 +476,21 @@ impl Drop for ContainerProcess {
             );
 
             let _ = self.child.terminate_blocking(self.terminate_timeout);
+
+            // `run --rm` only reaps a container that actually started, so one
+            // killed before that point stays behind in `Created` state forever.
+            // Those accumulate across runs until the runtime can no longer start
+            // new ones, which surfaces as unrelated tests failing instantly.
+            //
+            // Only reached on the un-awaited path above: when the process was
+            // awaited normally, `--rm` has already done this, and `rm` costs a
+            // process spawn we would otherwise pay per container.
+            let _ = self
+                .runtime
+                .remove_container_cmd_std(&self.container_name)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
         }
     }
 }

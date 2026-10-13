@@ -18,6 +18,7 @@ pub struct AccountFlows<'a> {
     account: &'a Account,
 }
 
+/// Flow queries scoped to an account
 #[Object]
 impl<'a> AccountFlows<'a> {
     #[graphql(skip)]

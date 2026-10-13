@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 
 use crate::*;
@@ -24,7 +23,7 @@ pub trait FlowSensorDispatcher: Send + Sync {
     async fn register_sensor(
         &self,
         catalog: &dill::Catalog,
-        activation_time: DateTime<Utc>,
+        activation: FlowSensorActivation,
         flow_sensor: Arc<dyn FlowSensor>,
     ) -> Result<(), InternalError>;
 

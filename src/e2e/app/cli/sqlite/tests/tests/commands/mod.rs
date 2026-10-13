@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod resources;
 mod test_add_command;
 mod test_compact_command;
 mod test_complete_command;
@@ -20,6 +21,7 @@ mod test_list_command;
 mod test_log_command;
 mod test_login_command;
 mod test_new_command;
+mod test_newer_workspace_version;
 mod test_pull_command;
 mod test_rename_command;
 mod test_repo_command;

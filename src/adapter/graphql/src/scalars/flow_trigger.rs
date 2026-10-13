@@ -18,11 +18,16 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Rule that defines when a flow runs automatically
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTrigger {
+    /// Whether the trigger is inactive: paused by a user or auto-stopped
     pub paused: bool,
+    /// Schedule rule, null if the trigger is reactive
     pub schedule: Option<FlowTriggerScheduleRule>,
+    /// Reactive rule, null if the trigger runs on a schedule
     pub reactive: Option<FlowTriggerReactiveRule>,
+    /// When the trigger stops itself after failures
     pub stop_policy: FlowTriggerStopPolicy,
 }
 
@@ -35,15 +40,19 @@ impl From<fs::Schedule> for FlowTriggerScheduleRule {
     }
 }
 
+/// Schedule of a trigger: a fixed interval or a cron expression
 #[derive(Union, PartialEq, Eq)]
 pub enum FlowTriggerScheduleRule {
     TimeDelta(TimeDelta),
     Cron(Cron5ComponentExpression),
 }
 
+/// Rule that runs a flow in reaction to changes of its inputs
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTriggerReactiveRule {
+    /// How new input data is batched before the flow runs
     pub for_new_data: FlowTriggerBatchingRule,
+    /// How to react when an input's history is rewritten
     pub for_breaking_change: FlowTriggerBreakingChangeRule,
 }
 
@@ -56,20 +65,27 @@ impl From<fs::ReactiveRule> for FlowTriggerReactiveRule {
     }
 }
 
+/// How new input data is accumulated before a reactive flow runs
 #[derive(Union, PartialEq, Eq)]
 pub enum FlowTriggerBatchingRule {
     Immediate(FlowTriggerBatchingRuleImmediate),
     Buffering(FlowTriggerBatchingRuleBuffering),
 }
 
+/// Run the flow as soon as new input data appears
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTriggerBatchingRuleImmediate {
+    /// Placeholder without meaning, always true
     pub dummy: bool,
 }
 
+/// Accumulate new input data until enough records arrive or the interval
+/// passes
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTriggerBatchingRuleBuffering {
+    /// Number of new input records that runs the flow
     pub min_records_to_await: u64,
+    /// Longest wait after the first new data before the flow runs anyway
     pub max_batching_interval: TimeDelta,
 }
 
@@ -90,19 +106,24 @@ impl From<fs::BatchingRule> for FlowTriggerBatchingRule {
     }
 }
 
+/// When a trigger stops itself after failed runs
 #[derive(Union, PartialEq, Eq)]
 pub enum FlowTriggerStopPolicy {
     Never(FlowTriggerStopPolicyNever),
     AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailures),
 }
 
+/// Trigger never stops because of failures
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTriggerStopPolicyNever {
+    /// Placeholder without meaning, always true
     pub dummy: bool,
 }
 
+/// Trigger stops after a number of failed runs in a row
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct FlowTriggerStopPolicyAfterConsecutiveFailures {
+    /// Number of failed runs in a row that stops the trigger
     pub max_failures: u32,
 }
 
@@ -142,9 +163,12 @@ impl From<kamu_flow_system::FlowTriggerState> for FlowTrigger {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// When a trigger stops itself after failed runs
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerStopPolicyInput {
+    /// Never stop the trigger because of failures
     Never(FlowTriggerStopPolicyNeverInput),
+    /// Stop the trigger after a number of failed runs in a row
     AfterConsecutiveFailures(FlowTriggerStopPolicyAfterConsecutiveFailuresInput),
 }
 
@@ -157,13 +181,17 @@ impl Default for FlowTriggerStopPolicyInput {
     }
 }
 
+/// Trigger never stops because of failures
 #[derive(InputObject, Debug)]
 pub struct FlowTriggerStopPolicyNeverInput {
+    /// Placeholder without meaning, the value is ignored
     pub dummy: bool,
 }
 
+/// Trigger stops after a number of failed runs in a row
 #[derive(InputObject, Debug)]
 pub struct FlowTriggerStopPolicyAfterConsecutiveFailuresInput {
+    /// Number of failed runs in a row that stops the trigger, from 1 to 10
     pub max_failures: u32,
 }
 
@@ -189,45 +217,65 @@ impl TryFrom<FlowTriggerStopPolicyInput> for fs::FlowTriggerStopPolicy {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Rule that defines when a flow runs automatically
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerRuleInput {
+    /// Run on a schedule
     Schedule(FlowTriggerRuleScheduleInput),
+    /// Run in reaction to changes of inputs
     Reactive(FlowTriggerRuleReactiveInput),
 }
 
+/// Schedule of a trigger: a fixed interval or a cron expression
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerRuleScheduleInput {
+    /// Run at a fixed interval
     TimeDelta(TimeDeltaInput),
     /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
     Cron5ComponentExpression(String),
 }
 
+/// Rule that runs a flow in reaction to changes of its inputs
 #[derive(InputObject, Debug)]
 pub struct FlowTriggerRuleReactiveInput {
+    /// How new input data is batched before the flow runs
     pub for_new_data: FlowTriggerBatchingRuleInput,
+    /// How to react when an input's history is rewritten
     pub for_breaking_change: FlowTriggerBreakingChangeRule,
 }
 
+/// How new input data is accumulated before a reactive flow runs
 #[derive(OneofObject, Debug)]
 pub enum FlowTriggerBatchingRuleInput {
+    /// Run as soon as new input data appears
     Immediate(FlowTriggerBatchingRuleImmediateInput),
+    /// Accumulate new input data first
     Buffering(FlowTriggerBatchingRuleBufferingInput),
 }
 
+/// Run the flow as soon as new input data appears
 #[derive(InputObject, Debug)]
 pub struct FlowTriggerBatchingRuleImmediateInput {
+    /// Placeholder without meaning, the value is ignored
     pub dummy: bool,
 }
 
+/// Accumulate new input data until enough records arrive or the interval
+/// passes
 #[derive(InputObject, Debug)]
 pub struct FlowTriggerBatchingRuleBufferingInput {
+    /// Number of new input records that runs the flow
     pub min_records_to_await: u64,
+    /// Longest wait after the first new data before the flow runs anyway
     pub max_batching_interval: TimeDeltaInput,
 }
 
+/// Time interval expressed as a number of units
 #[derive(InputObject, Debug)]
 pub struct TimeDeltaInput {
+    /// Number of units in the interval
     pub every: u32,
+    /// Unit of the interval
     pub unit: TimeUnit,
 }
 
@@ -257,8 +305,10 @@ impl From<&TimeDeltaInput> for chrono::Duration {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Cron schedule of a trigger
 #[derive(SimpleObject, PartialEq, Eq)]
 pub struct Cron5ComponentExpression {
+    /// Cron expression: min hour dayOfMonth month dayOfWeek
     pub cron_5component_expression: String,
 }
 
@@ -280,7 +330,9 @@ impl FlowTriggerRuleInput {
         match self {
             Self::Schedule(_) => match flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::HardCompaction => return Ok(()),
-                _ => {}
+                DatasetFlowType::ExecuteTransform
+                | DatasetFlowType::Reset
+                | DatasetFlowType::ResetToMetadata => {}
             },
             Self::Reactive(_) => {
                 if flow_type == DatasetFlowType::ExecuteTransform {

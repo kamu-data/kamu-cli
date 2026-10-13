@@ -8,18 +8,22 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{BTreeSet, HashMap};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use kamu_flow_system::*;
-use kamu_messaging_outbox_inmem::InMemoryMessageStoreWakeupDetector;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const WAKEUP_CHANNEL: &str = "flow_system_events_ready";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryFlowSystemEventBridge {
     state: Mutex<State>,
-    wakeup_detector: InMemoryMessageStoreWakeupDetector,
+    wakeup_hub: Arc<InMemoryWakeupHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +33,7 @@ struct State {
     events: Vec<FlowSystemEvent>,
     // projector name -> applied event ids
     applied: HashMap<&'static str, BTreeSet<EventID>>,
-    // projector name -> next scan position in `merged`
+    // projector name -> length of the applied prefix of `events`
     next_pos: HashMap<&'static str, usize>,
 }
 
@@ -39,12 +43,10 @@ struct State {
 #[dill::scope(dill::Singleton)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl InMemoryFlowSystemEventBridge {
-    pub fn new() -> Self {
-        let wakeup_detector = InMemoryMessageStoreWakeupDetector::new();
-
+    pub fn new(wakeup_hub: Arc<InMemoryWakeupHub>) -> Self {
         Self {
             state: Mutex::new(State::default()),
-            wakeup_detector,
+            wakeup_hub,
         }
     }
 
@@ -73,8 +75,7 @@ impl InMemoryFlowSystemEventBridge {
 
         let max_event_id = EventID::new(i64::try_from(state.events.len()).unwrap());
 
-        // Wake up listeners
-        self.wakeup_detector.notify_new_message_arrived();
+        self.wakeup_hub.signal(WAKEUP_CHANNEL);
 
         max_event_id
     }
@@ -84,9 +85,12 @@ impl InMemoryFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.wakeup_hub.clone(),
+            WAKEUP_CHANNEL,
+            FLOW_SYSTEM_EVENT_AGENT_NAME,
+        ))
     }
 
     /// Fetch next batch for the given projector; order by global id.
@@ -96,28 +100,26 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         projector_name: &'static str,
         batch_size: usize,
     ) -> Result<Vec<FlowSystemEvent>, InternalError> {
-        let mut state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap();
 
         let pos = state.next_pos.get(projector_name).copied().unwrap_or(0);
-        let applied = state.applied.entry(projector_name).or_default().clone();
+        let applied = state.applied.get(projector_name);
 
-        let mut res = Vec::with_capacity(batch_size);
-        let mut i = pos;
+        // The cursor stays put: a batch that fails to apply is fetched again,
+        // as a rolled back transaction would leave it in a database
+        Ok(state.events[pos..]
+            .iter()
+            .filter(|e| applied.is_none_or(|applied| !applied.contains(&e.event_id)))
+            .take(batch_size)
+            .cloned()
+            .collect())
+    }
 
-        while i < state.events.len() && res.len() < batch_size {
-            let e = &state.events[i];
-
-            if !applied.contains(&e.event_id) {
-                res.push(e.clone());
-            }
-            i += 1;
-        }
-
-        // Advance the scan cursor to where we stopped scanning.
-        // (Safe because we only ever consume in order.)
-        state.next_pos.insert(projector_name, i);
-
-        Ok(res)
+    async fn has_held_back_events(
+        &self,
+        _transaction_catalog: &dill::Catalog,
+    ) -> Result<bool, InternalError> {
+        Ok(false)
     }
 
     /// Mark these events as applied for this projector (idempotent).
@@ -134,6 +136,14 @@ impl FlowSystemEventBridge for InMemoryFlowSystemEventBridge {
         for (id, _) in event_ids_with_tx_ids {
             set.insert(*id);
         }
+
+        // Skip the applied prefix on later scans
+        let applied = &state.applied[projector_name];
+        let mut pos = state.next_pos.get(projector_name).copied().unwrap_or(0);
+        while pos < state.events.len() && applied.contains(&state.events[pos].event_id) {
+            pos += 1;
+        }
+        state.next_pos.insert(projector_name, pos);
 
         Ok(())
     }

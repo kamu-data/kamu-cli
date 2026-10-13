@@ -11,7 +11,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures::{Future, Stream, TryStreamExt, future};
-use odf_metadata::dataset::MetadataBlockBytes;
+use odf_metadata::datasets::MetadataBlockBytes;
 use odf_metadata::*;
 use pin_project::pin_project;
 
@@ -65,10 +65,9 @@ type FilteredDataStreamBlocksStream<'a> =
 ///
 /// These combinators can be implemented differently by various metadata chains
 /// to make certain operations more efficient, for example:
-/// - Filters can use the raw block representations (e.g. flatbuffers) to skip
-///   undesired blocks without constructing DTOs
-/// - Implementations can use skip lists and lookup tables to traverse the chain
-///   faster.
+/// - Filters can use the raw block representations (e.g. flatbuffers) to skip undesired blocks
+///   without constructing DTOs
+/// - Implementations can use skip lists and lookup tables to traverse the chain faster.
 pub trait MetadataStream<'a>: Stream<Item = MetadataStreamItem> {
     // TODO: Reconsider this method as it may result in incorrect logic of
     // checkpoint propagation. In cases when AddData is followed by SetWatermark

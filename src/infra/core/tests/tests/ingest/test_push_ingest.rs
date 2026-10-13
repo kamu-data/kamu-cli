@@ -20,6 +20,12 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryAccountRepository};
 use kamu_accounts_services::{AccountQuotaServiceImpl, AccountServiceImpl};
+use kamu_auth_rebac_inmem::InMemoryRebacRepository;
+use kamu_auth_rebac_services::{
+    DefaultAccountProperties,
+    DefaultDatasetProperties,
+    RebacServiceImpl,
+};
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
@@ -444,7 +450,7 @@ async fn test_ingest_push_schema_stability() {
 
     odf::utils::testing::assert_arrow_schema_eq(
         &schema_in_metadata_as_arrow,
-        json!({
+        &json!({
             "fields": [{
                 "name": "offset",
                 "data_type": "Int64",
@@ -505,7 +511,7 @@ async fn test_ingest_push_schema_stability() {
 
     odf::utils::testing::assert_arrow_schema_eq(
         &schema_on_parquet_read,
-        json!({
+        &json!({
             "fields": [{
                 "name": "offset",
                 "data_type": "Int64",
@@ -1363,6 +1369,10 @@ impl IngestTestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()
+            .add::<RebacServiceImpl>()
+            .add::<InMemoryRebacRepository>()
+            .add_value(DefaultAccountProperties::default())
+            .add_value(DefaultDatasetProperties::default())
             .add::<ObjectStoreBuilderLocalFs>()
             .add::<DataFormatRegistryImpl>()
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())

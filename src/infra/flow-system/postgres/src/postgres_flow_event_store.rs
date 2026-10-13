@@ -12,7 +12,7 @@ use database_common::{PaginationOpts, TransactionRefT};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
-use sqlx::{FromRow, Postgres, QueryBuilder};
+use sqlx::{AssertSqlSafe, FromRow, Postgres, QueryBuilder};
 
 use crate::helpers::*;
 
@@ -138,7 +138,13 @@ impl PostgresFlowEventStore {
                     maybe_scheduled_for_activation_at = None;
                     reset_scheduled_for_activation_at = true;
                 }
-                _ => {
+                FlowEvent::Initiated(_)
+                | FlowEvent::StartConditionUpdated(_)
+                | FlowEvent::ConfigSnapshotModified(_)
+                | FlowEvent::RetryPolicyModified(_)
+                | FlowEvent::ActivationCauseAdded(_)
+                | FlowEvent::TaskRunning(_)
+                | FlowEvent::Completed(_) => {
                     reset_scheduled_for_activation_at = false;
                 }
             }
@@ -391,7 +397,7 @@ impl EventStore<FlowState> for PostgresFlowEventStore {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn len(&self) -> Result<usize, InternalError> {
+    async fn total_events_stored(&self) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -521,32 +527,50 @@ impl FlowEventStore for PostgresFlowEventStore {
         Ok(maybe_activation_time)
     }
 
-    /// Returns flows scheduled for activation at the given time
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn get_flows_scheduled_for_activation_at(
+    async fn get_flows_due_for_activation(
         &self,
-        scheduled_for_activation_at: DateTime<Utc>,
-    ) -> Result<Vec<FlowID>, InternalError> {
+        up_to: DateTime<Utc>,
+        after: Option<DueFlowActivation>,
+        limit: usize,
+    ) -> Result<Vec<DueFlowActivation>, InternalError> {
+        let after_activation_time = after.map(|after| after.activation_time);
+        let after_flow_id: Option<i64> = after.map(|after| after.flow_id.try_into().unwrap());
+        let limit = i64::try_from(limit).unwrap();
+
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
-        let flow_ids = sqlx::query!(
+        let due_flows = sqlx::query!(
             r#"
-            SELECT f.flow_id as flow_id
+            SELECT
+                f.flow_id as flow_id,
+                f.scheduled_for_activation_at as "activation_time!"
                 FROM flows f
                 WHERE
-                    f.scheduled_for_activation_at = $1 AND
-                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type)
-                ORDER BY f.flow_id
+                    f.scheduled_for_activation_at <= $1 AND
+                    (f.flow_status = 'waiting'::flow_status_type OR f.flow_status = 'retrying'::flow_status_type) AND
+                    (
+                        $2::timestamptz IS NULL OR
+                        (f.scheduled_for_activation_at, f.flow_id) > ($2::timestamptz, $3::bigint)
+                    )
+                ORDER BY f.scheduled_for_activation_at, f.flow_id
+                LIMIT $4
             "#,
-            scheduled_for_activation_at,
+            up_to,
+            after_activation_time,
+            after_flow_id,
+            limit,
         )
-        .map(|row| FlowID::try_from(row.flow_id).unwrap())
+        .map(|row| DueFlowActivation {
+            flow_id: FlowID::try_from(row.flow_id).unwrap(),
+            activation_time: row.activation_time,
+        })
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        Ok(flow_ids)
+        Ok(due_flows)
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -594,7 +618,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(by_flow_types as Option<Vec<String>>)
                 .bind(by_flow_statuses as Option<Vec<FlowStatus>>)
                 .bind(maybe_initiators as Option<Vec<String>>)
@@ -642,7 +666,7 @@ impl FlowEventStore for PostgresFlowEventStore {
             "#,
         );
 
-        let mut query = sqlx::query_scalar::<_, i64>(&query_str)
+        let mut query = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
             .bind(filters.by_flow_types.clone())
             .bind(filters.by_flow_statuses.clone())
             .bind(maybe_initiators as Option<Vec<String>>);
@@ -678,7 +702,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query = sqlx::query_scalar::<_, String>(&query_str);
+            let mut query = sqlx::query_scalar::<_, String>(AssertSqlSafe(query_str));
             for values in scope_values {
                 query = query.bind(values);
             }
@@ -727,7 +751,7 @@ impl FlowEventStore for PostgresFlowEventStore {
                 "#,
             );
 
-            let mut query_stream = sqlx::query_scalar::<_, i64>(&query_str)
+            let mut query_stream = sqlx::query_scalar::<_, i64>(AssertSqlSafe(query_str))
                 .bind(maybe_by_flow_types as Option<Vec<String>>)
                 .bind(maybe_by_flow_statuses as Option<Vec<FlowStatus>>)
                 .bind(maybe_initiators as Option<Vec<String>>)

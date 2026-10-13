@@ -12,7 +12,12 @@ use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::EnumDiscriminants)]
+#[strum_discriminants(
+    name(FlowOutcomeKind),
+    derive(strum::IntoStaticStr),
+    strum(serialize_all = "snake_case")
+)]
 pub enum FlowOutcome {
     /// Flow succeeded
     Success(ts::TaskResult),
@@ -26,7 +31,7 @@ impl FlowOutcome {
     pub fn try_task_result_as_ref(&self) -> Option<&ts::TaskResult> {
         match self {
             Self::Success(task_result) => Some(task_result),
-            _ => None,
+            Self::Failed(_) | Self::Aborted => None,
         }
     }
 

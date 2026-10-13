@@ -57,7 +57,6 @@ const CLIENT_ACCOUNT_NAME: &str = "kamu-client";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
 pub(crate) struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
@@ -107,6 +106,7 @@ impl ClientSideHarness {
             }
             TenancyConfig::MultiTenant => {
                 b.add_value(CurrentAccountSubject::logged(
+                    kamu_accounts::Account::seed_resource_id_from_name(CLIENT_ACCOUNT_NAME),
                     odf::metadata::testing::account_id(&CLIENT_ACCOUNT_NAME),
                     odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
                 ));
@@ -127,8 +127,8 @@ impl ClientSideHarness {
         if options.authenticated_remotely {
             b.add::<odf::dataset::DummyOdfServerAccessTokenResolver>();
         } else {
-            b.add_value(odf::dataset::testing::MockOdfServerAccessTokenResolver::empty());
-            b.bind::<dyn odf::dataset::OdfServerAccessTokenResolver, odf::dataset::testing::MockOdfServerAccessTokenResolver>();
+            b.add_value(odf::dataset::MockOdfServerAccessTokenResolver::empty());
+            b.bind::<dyn odf::dataset::OdfServerAccessTokenResolver, odf::dataset::MockOdfServerAccessTokenResolver>();
         }
 
         b.add::<SystemTimeSourceDefault>();

@@ -86,6 +86,7 @@ impl<'a> VersionedFile<'a> {
     }
 }
 
+/// Versioned file archetype view of a dataset, where each version is a file
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl VersionedFile<'_> {
@@ -110,10 +111,7 @@ impl VersionedFile<'_> {
             .execute(
                 ReadCheckedDataset::from_ref(file_dataset),
                 max_version,
-                Some(PaginationOpts {
-                    offset: page * per_page,
-                    limit: per_page,
-                }),
+                Some(PaginationOpts::from_page(page, per_page)),
             )
             .await
             .map_err(|e| match e {

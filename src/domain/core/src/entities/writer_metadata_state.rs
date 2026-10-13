@@ -37,9 +37,9 @@ pub struct DataWriterMetadataState {
 impl DataWriterMetadataState {
     /// Scans metadata chain to populate the needed metadata
     ///
-    /// * `source_name` - name of the source to use when extracting the metadata
-    ///   needed for writing. Leave empty for polling sources or to use the only
-    ///   push source defined when there is no ambiguity.
+    /// * `source_name` - name of the source to use when extracting the metadata needed for writing.
+    ///   Leave empty for polling sources or to use the only push source defined when there is no
+    ///   ambiguity.
     #[tracing::instrument(
         level = "debug",
         name="DataWriterMetadataState::build",

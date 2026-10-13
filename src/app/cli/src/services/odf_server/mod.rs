@@ -9,10 +9,12 @@
 
 mod access_token_registry_service;
 mod dependencies;
+mod login_flow_service;
 mod login_service;
 mod models;
 
 pub use access_token_registry_service::*;
 pub use dependencies::*;
+pub use login_flow_service::*;
 pub use login_service::*;
 pub use models::*;

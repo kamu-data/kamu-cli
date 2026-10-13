@@ -23,7 +23,7 @@ pub fn make_search_security_context(
                 SearchSecurityContext::Unrestricted
             } else {
                 SearchSecurityContext::Restricted {
-                    current_principal_ids: vec![logged_account.account_id.to_string()],
+                    current_principal_ids: vec![logged_account.account_handle.id.to_string()],
                 }
             }
         }

@@ -6,6 +6,7 @@
   - [Working with Elasticsearch](#working-with-elasticsearch)
   - [Run Linters](#run-linters)
   - [Run Tests](#run-tests)
+    - [Troubleshooting: instant failures in unrelated containerized tests](#troubleshooting-instant-failures-in-unrelated-containerized-tests)
   - [Build Speed Tweaks (Optional)](#build-speed-tweaks-optional)
     - [Artifact reuse (shared target dir)](#artifact-reuse-shared-target-dir)
     - [Artifact reuse (sscache)](#artifact-reuse-sscache)
@@ -25,6 +26,7 @@
   - [Major Dependencies Update](#major-dependencies-update)
   - [Building Multi-platform Images](#building-multi-platform-images)
   - [Upgrading Datafusion stack](#upgrading-datafusion-stack)
+- [Agent Harness](#agent-harness)
 - [Tips](#tips)
   - [IDE Configuration](#ide-configuration)
   - [Debugging](#debugging)
@@ -58,6 +60,8 @@ Prerequisites:
     * `cargo binstall bunyan -y` - for pretty-printing the JSON logs
     * `cargo binstall cargo-llvm-cov -y` - for test coverage
     * `cargo binstall cargo-cache -y` - to keep track of cargo cache usage
+    * `cargo install taplo-cli` - for formatting `Cargo.toml` files
+    * `cargo install cargo-sort` - for sorting `Cargo.toml` files
   * Optional - if you will be doing releases:
     * `cargo binstall cargo-edit -y` - for setting crate versions during release
     * `cargo binstall cargo-update -y` - for keeping up with major dependency updates
@@ -68,9 +72,6 @@ Prerequisites:
   * Install Postgres command line client `psql`:
     * deb: `sudo apt install -y postgresql-client`
     * rpm: `sudo dnf install -y postgresql`
-  * Install MariaDB command line client `mariadb`: 
-    * deb: `sudo apt install -y mariadb-client`
-    * rpm: `sudo dnf install -y mariadb`
   <!-- Installation using `cargo install` (rather than `cargo binstall`) is used intentionally -->
   <!-- Details: https://github.com/launchbadge/sqlx/issues/3396 -->
   * Install `sqlx-cli`: `cargo install sqlx-cli`
@@ -114,7 +115,7 @@ KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test <some_test>
 
 ### Build with Databases
 
-By default, we define `SQLX_OFFLINE=true` environment variable to ensure the compilation succeeds without access to a live database.
+By default, no `DATABASE_URL` is set, so SQLx checks queries against the committed `.sqlx` cache and the compilation succeeds without access to a live database.
 The default mode is fine in most of the cases, assuming the developer's assignment is not related to databases/repositories directly.
 
 When databases have to be touched, the setup of local database containers must be configured using the following script:
@@ -125,8 +126,7 @@ make sqlx-local-setup
 This mode:
  * creates Docker containers with empty databases
  * applies all database migrations from scratch
- * generates `.env` files in specific crates to point to databases running in Docker containers by setting `DATABASE_URL` variables
-   as well as to disable `SQLX_OFFLINE` variable in those crates
+ * generates `.env` files in specific crates to point to databases running in containers by setting `DATABASE_URL` variables
 
 This setup ensures any SQL queries are automatically checked against live database schema at compile-time.
 This is highly useful when queries have to be written or modified.
@@ -146,18 +146,22 @@ Otherwise, GitHub CI flows will likely fail to build the project due to database
 
 The second step, `make sqlx-local-clean` would reverse `make sqlx-local-setup` by:
  * stopping and removing Docker containers with the databases
- * removing `.env` files in database-specific crates, which re-enables `SQLX_OFFLINE=true` for the entire repository.
+ * removing `.env` files in database-specific crates, which returns them to checking queries against the `.sqlx` cache.
 
 
 ### Database migrations
 Any change to the database structure requires writing SQL migration scripts.
+Migrations are forward-only: each is a single `.sql` file, with no down migration.
+`make sqlx-add-migration NAME=<name>` adds one for every database engine at once.
 The scripts are stored in `./migrations/<db-engine>/` folders, and they are unique per database type.
-The migration commands should be launched within database-specific crate folders, such as `./src/database/sqlx-postgres`. Alternatively, you will need to define `DATABASE_URL` variable manually.
+The migration commands should be launched within a database-specific crate folder that `make sqlx-local-setup` wrote a `.env` file into, such as `./src/infra/accounts/postgres` (the full list is `POSTGRES_CRATES` / `SQLITE_CRATES` in the [`Makefile`](./Makefile)). Alternatively, you will need to define `DATABASE_URL` variable manually.
 
 Typical commands to work with migrations include:
 * `sqlx migrate add --source <migrations_dir_path> <description>` to add a new migration
 * `sqlx migrate run --source <migrations_dir_path>` to apply migrations to the database
 * `sqlx migrate info --source <migrations_dir_path> ` to print information about currently applied migration within the database
+
+After you are happy with your migration run `make resources-db-schema` to update the final schema snapshots in `/resources/db` directory.
 
 
 ### Working with Elasticsearch
@@ -184,12 +188,18 @@ Healthy instance of Elasticsearch is required to execute Elasticsearch-related t
 This test group is included into the full test suite as well.
 
 ### Run Linters
-Use the following command:
+To format Rust code and all `Cargo.toml` files in place:
+```sh
+make fmt
+```
+
+To run the linters, use the following command:
 ```sh
 make lint
 ```
 This will do a number of highly useful checks:
 * Rust formatting check
+* `Cargo.toml` sorting and formatting check (`cargo sort`, `taplo`)
 * License headers check
 * Dependencies check: detecting issues with existing dependencies, detecting unused dependencies
 * Rust coding practices checks (`clippy`)
@@ -233,6 +243,28 @@ To run tests for a specific crate, e.g. `opendatafabric` use:
 ```sh
 cargo nextest run -p opendatafabric
 ```
+
+Scoping with `-p` is only cheap for crates with a small dependency tree: with workspace-wide feature unification a `-p` build does not reuse full-workspace artifacts and may recompile heavy dependencies like DataFusion. Prefer filtering a workspace run by test name (`cargo nextest run -E 'test(name)'`). See [`AGENTS.md`](./AGENTS.md#build-scope--p).
+
+#### Troubleshooting: instant failures in unrelated containerized tests
+
+If a full test run reports a handful of failures that:
+* take near-zero time (e.g. `FAIL [ 0.003s]`),
+* differ from run to run, and
+* pass when executed on their own,
+
+then the container runtime is likely out of capacity rather than the tests being
+broken. Containers that are killed before they finish starting are left behind in
+`Created` state (`run --rm` only reaps containers that actually started), and they
+accumulate across runs until no new container can start.
+
+Check for leftovers and clear them:
+```sh
+podman ps -a --format '{{.Status}}' | awk '{print $1}' | sort | uniq -c
+podman rm $(podman ps -aq --filter status=created)
+```
+This removes only never-started containers, leaving running database/Elasticsearch
+containers untouched. Use `docker` in place of `podman` if that is your runtime.
 
 
 ### Build Speed Tweaks (Optional)
@@ -320,7 +352,7 @@ Many core types in `kamu` are generated from schemas and IDLs in the [open-data-
 make codegen
 ```
 
-Make sure you have all related dependencies installed (see above) and that ODF repo is checked out in the same directory as `kamu-cli` repo.
+Make sure you have all related dependencies installed (see above) and that ODF repo is checked out in the same directory as `kamu-cli` repo and on the same revision as pinned by `ODF_SPEC_REF` in the `Makefile`.
 
 
 ## Code Structure
@@ -368,7 +400,6 @@ With these ideas in mind:
 We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate to organize tests in groups. The complete set of groups is:
 - `containerized` - for tests that spawn Docker/Podman containers
 - `database` - for tests that involve any database interaction, subsequently grouped by:
-  - `mysql` - tests that use MySQL/MariaDB
   - `postgres` - tests that use PostreSQL
 - `engine` - for tests that involve any data engine or data framework (query, ingest, or transform paths), subsequently grouped by:
   - `datafusion` - tests that use Apache DataFusion
@@ -499,6 +530,59 @@ The usual upgrade procedure looks like this:
 6. Ensure `Cargo.lock` does not contain duplicate versions of major crates (or run `cargo deny check --hide-inclusion-graph`)
 7. Follow the steps in `src/utils/datafusion-cli/README.md` to update the SQL shell
 8. Fix any compilation errors and warnings and ensure tests are green
+
+
+## Agent Harness
+Coding agents (Claude Code, Codex) working in this repository are guided by documents and held to them by hooks. This section is for the humans who maintain that machinery; the rules themselves live in [`AGENTS.md`](./AGENTS.md).
+
+| What | Where |
+|---|---|
+| Canonical agent rules, skill and document routing | [`AGENTS.md`](./AGENTS.md) |
+| Claude Code specifics | [`CLAUDE.md`](./CLAUDE.md) |
+| Task procedures (skills) | `.claude/skills/<name>/SKILL.md` |
+| The same skills for Codex | `.agents/skills/<name>` — relative symlinks into `.claude/skills/` |
+| Which paths need which skill; which files are generated | [`.claude/hooks/governed_paths.json`](./.claude/hooks/governed_paths.json) |
+| Hook wiring | [`.claude/settings.json`](./.claude/settings.json), [`.codex/hooks.json`](./.codex/hooks.json) |
+| Hook code and its tests | `scripts/agents/` (Python standard library only), `scripts/agents/tests/` |
+| Consistency lints | `src/utils/repo-tools/tests/lints/agent_harness.rs` |
+| Runtime state (gitignored) | `.claude/state/`, `.codex/state/` |
+
+The hooks require Python 3 and a POSIX host; formatting also requires `rustfmt` for Rust and `cargo-sort` and `taplo` for `Cargo.toml`.
+Policy and agent instructions are owned by [`AGENTS.md`](./AGENTS.md) and the routed skills.
+
+What the hooks do:
+* **Command guard** — denies commands that discard uncommitted work (`git reset --hard`, `git checkout -- <path>`, `git restore`, `git stash`, `git clean -f`), `SQLX_OFFLINE=...` on the command line, and build/test output piped into `head`/`tail`; asks for approval on `git commit`/`push`/`merge`/`rebase`/`tag` and on `-p`-scoped cargo builds.
+* **Edit guard** — refuses hand edits to generated files (naming the regeneration command) and edits under a guarded path until the session has loaded the governing skill; asks before writes to agent memory.
+* **Post-edit** — runs `rustfmt` on an edited `.rs` file, then checks only the added lines (`assert!(matches!(..))`, lint suppressions, `dbg!`, plan/ticket citations and change narration in comments, license header, dividing lines); runs `cargo sort` and `taplo fmt` on an edited `Cargo.toml`, or asks for `make fmt` when either tool is missing; reminds about `make sqlx-prepare`, schema regeneration and the e2e SQLite/Postgres lockstep.
+* **Post-shell** — the same pass over every file a shell command changed (`sed -i`, heredocs, scripts), judged against its committed version. The changed files are found by fingerprinting the working tree before and after the command; files brought in by git commands that rewrite the tree (`switch`, `pull`, `stash`, `rebase`, ...) are left alone. A guarded path changed without its skill gets a reminder.
+* **Session start** — injects a short contract generated from `governed_paths.json`; after compaction or `/clear` skills must be loaded again.
+* **Stop** (Claude only) — if the session edited Rust and the tree changed since the last green foreground `make clippy`, reminds the agent once to run it.
+
+Limitations — the rules in `AGENTS.md` still apply where the hooks cannot see:
+* Files written through the shell are only checked after the command, and the edit guard cannot refuse them: a guarded path written that way gets a reminder instead of a refusal, and a hand-edited generated file is not told apart from a regenerated one. A command run in the background is compared when it is handed off, not when it finishes.
+* `git checkout <path>` without `--` is indistinguishable from a branch switch and passes the guard.
+* Commands assembled at runtime (variables, generated scripts) are not inspected.
+* Codex hooks cannot ask: its adapters deny `-p` builds outright and leave commit approval to `AGENTS.md`.
+
+For Codex, trust the project and review the repository hook definitions with `/hooks`; new or
+changed definitions are skipped until trusted, and hooks must be enabled in the Codex configuration.
+
+Typical changes:
+* **Add a skill:** create `.claude/skills/<name>/SKILL.md` with `name` and `description` front matter, `ln -s ../../.claude/skills/<name> .agents/skills/<name>`, and add a row to the skills table in `AGENTS.md`.
+* **Guard a path with a skill:** add the glob to the skill's rule in `governed_paths.json` **and** to the "Guarded paths" column in `AGENTS.md` — a lint keeps the two identical, including order (the first matching rule wins). A rule with `"baseline": true` applies in addition to the first match — `kamu-rust-style` on every `.rs` file is one.
+* **Add a design doc:** put it in `docs/internal/` and add a row to the documents table in `AGENTS.md`.
+* **Change a hook rule:** edit the policy module in `scripts/agents/` and add a case to its test.
+
+Before pushing changes to any of the above, run:
+```sh
+make lint-harness
+```
+It runs the hook tests, including Codex handlers invoked from a nested directory with JSON on
+stdin, and the repository lints (skills declared, routed and symlinked; guarded paths in sync;
+documentation links and anchors resolve; every design doc routed). The handler tests exercise
+policy and payload handling without a model request; they do not verify Codex trust decisions or
+runtime event dispatch. CI runs the same target on pull requests that touch any of the files above,
+including documentation-only ones; code changes get the repository lints from the build workflow.
 
 
 ## Tips

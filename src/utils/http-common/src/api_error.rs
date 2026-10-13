@@ -271,7 +271,16 @@ impl ApiErrorCategorizable for PushIngestError {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
+            Self::UnsupportedMediaType(_)
+            | Self::EngineError(_)
+            | Self::ReadError(_)
+            | Self::BadInputSchema(_)
+            | Self::IncompatibleSchema(_)
+            | Self::MergeError(_)
+            | Self::ExecutionError(_)
+            | Self::DataValidation(_)
+            | Self::CommitError(_)
+            | Self::QuotaExceeded(_) => ApiErrorCategory::Other,
         }
     }
 }
@@ -280,7 +289,7 @@ impl ApiErrorCategorizable for odf::DatasetRefUnresolvedError {
     fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
+            Self::NotFound(_) => ApiErrorCategory::Other,
         }
     }
 }
@@ -290,7 +299,7 @@ impl ApiErrorCategorizable for odf::GetRefError {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
+            Self::NotFound(_) => ApiErrorCategory::Other,
         }
     }
 }
@@ -300,7 +309,9 @@ impl ApiErrorCategorizable for odf::GetBlockError {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
+            Self::NotFound(_) | Self::BlockVersion(_) | Self::BlockMalformed(_) => {
+                ApiErrorCategory::Other
+            }
         }
     }
 }
@@ -310,7 +321,7 @@ impl ApiErrorCategorizable for odf::storage::GetError {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
+            Self::NotFound(_) => ApiErrorCategory::Other,
         }
     }
 }
@@ -320,7 +331,7 @@ impl ApiErrorCategorizable for odf::storage::InsertError {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
+            Self::HashMismatch(_) => ApiErrorCategory::Other,
         }
     }
 }
@@ -330,7 +341,9 @@ impl ApiErrorCategorizable for QueryError {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
-            _ => ApiErrorCategory::Other,
+            Self::DatasetNotFound(_) | Self::DatasetBlockNotFound(_) | Self::BadQuery(_) => {
+                ApiErrorCategory::Other
+            }
         }
     }
 }

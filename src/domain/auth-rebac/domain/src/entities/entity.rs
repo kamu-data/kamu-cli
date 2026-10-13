@@ -13,7 +13,8 @@ use crate::Relation;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, strum::IntoStaticStr)]
+#[strum(serialize_all = "lowercase")]
 #[cfg_attr(
     feature = "sqlx",
     derive(sqlx::Type),

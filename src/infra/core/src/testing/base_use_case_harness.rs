@@ -11,8 +11,7 @@ use dill::Catalog;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{MockDidGenerator, TenancyConfig};
-use kamu_datasets::DatasetActionAuthorizer;
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{DatasetActionAuthorizer, MockDatasetActionAuthorizer};
 use messaging_outbox::{MockOutbox, Outbox};
 use time_source::SystemTimeSourceStub;
 

@@ -102,7 +102,8 @@ impl From<odf::dataset::SetChainRefError> for CompactionError {
         match v {
             odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
             odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
-            _ => Self::Internal(v.int_err()),
+            odf::dataset::SetChainRefError::BlockNotFound(_)
+            | odf::dataset::SetChainRefError::CASFailed(_) => Self::Internal(v.int_err()),
         }
     }
 }

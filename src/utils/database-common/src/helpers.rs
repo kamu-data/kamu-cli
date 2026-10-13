@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Display;
 use std::num::NonZeroUsize;
+
+use chrono::{DateTime, SecondsFormat, TimeZone};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SQLite
@@ -86,40 +89,114 @@ fn test_sqlite_generate_placeholders_tuple_list_2() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MySQL
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn mysql_generate_placeholders_list(arguments_count: usize) -> String {
-    if arguments_count == 0 {
-        // MySQL does not consider the "IN ()" syntax correct,
-        // so we add a subquery that has nothing rows in the result:
-        //
-        // ```sql
-        // SELECT *
-        // FROM table
-        // WHERE id IN (SELECT NULL WHERE FALSE);
-        // -- output: empty (nothing included)
-        //
-        // SELECT *
-        // FROM table
-        // WHERE id NOT IN (SELECT NULL WHERE FALSE);
-        // -- output: all rows (nothing excluded)
-        // ```
-        return "(SELECT NULL WHERE FALSE)".to_string();
-    }
-
-    (0..arguments_count).map(|_| "?").intersperse(",").collect()
+/// Formats a timestamp as the exact text `sqlx` stores for a bound
+/// `DateTime` in `SQLite`.
+///
+/// Bulk inserts that pass rows as one JSON parameter (`json_each($1)`) must
+/// format timestamps with this, not with `serde`: `serde` writes `Z` where
+/// `sqlx` writes `+00:00`, and text comparisons on the column would break.
+pub fn sqlite_datetime_text<Tz>(dt: &DateTime<Tz>) -> String
+where
+    Tz: TimeZone,
+    Tz::Offset: Display,
+{
+    dt.to_rfc3339_opts(SecondsFormat::AutoSi, false)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_mysql_generate_placeholders_list() {
-    use mysql_generate_placeholders_list as f;
+fn test_sqlite_datetime_text() {
+    use chrono::{TimeDelta, Utc};
 
-    pretty_assertions::assert_eq!("(SELECT NULL WHERE FALSE)", f(0));
-    pretty_assertions::assert_eq!("?", f(1));
-    pretty_assertions::assert_eq!("?,?", f(2));
+    let dt = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
+    pretty_assertions::assert_eq!("2024-01-02T03:04:05+00:00", sqlite_datetime_text(&dt));
+
+    let dt = dt + TimeDelta::microseconds(123_456);
+    pretty_assertions::assert_eq!(
+        "2024-01-02T03:04:05.123456+00:00",
+        sqlite_datetime_text(&dt)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LIKE pattern helpers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Escapes special SQL `LIKE` characters (`_` and `\`) while preserving `%` as
+/// a caller-controlled wildcard.
+///
+/// Use this when the caller intentionally supplies `%` wildcards in the
+/// pattern (e.g. `"prefix%"` for a prefix search).
+///
+/// The resulting string should be paired with `ESCAPE '\'` in the SQL query.
+pub fn sql_like_escape_pattern(pattern: &str) -> String {
+    let mut out = String::with_capacity(pattern.len());
+    for ch in pattern.chars() {
+        match ch {
+            '%' => out.push('%'),
+            '_' | '\\' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+/// Escapes all special SQL `LIKE` characters (`%`, `_`, and `\`) so the input
+/// is treated as a literal search term.
+///
+/// Two uses, both of which need the literal neutralised before it travels as a
+/// pattern:
+///
+/// - **Substring search**, where the surrounding `%` wildcards are added by the SQL itself (e.g.
+///   `LIKE '%' || $1 || '%'`).
+/// - **Exact match through a pattern-typed field**, where the escaped literal *is* the whole
+///   pattern. A resource selector's `name` is a `LIKE` pattern by ODF definition, so an exact name
+///   spelled by the user has to be escaped or it silently widens: `100%-done` would start matching
+///   its neighbours.
+///
+/// The resulting string should be paired with `ESCAPE '\'` in the SQL query.
+pub fn sql_like_escape_literal(pattern: &str) -> String {
+    let mut out = String::with_capacity(pattern.len());
+    for ch in pattern.chars() {
+        match ch {
+            '%' | '_' | '\\' => {
+                out.push('\\');
+                out.push(ch);
+            }
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_sql_like_escape_pattern() {
+    use sql_like_escape_pattern as f;
+
+    pretty_assertions::assert_eq!("foo%", f("foo%"));
+    pretty_assertions::assert_eq!("foo\\_bar", f("foo_bar"));
+    pretty_assertions::assert_eq!("foo\\\\bar", f("foo\\bar"));
+    pretty_assertions::assert_eq!("foo\\_bar%", f("foo_bar%"));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_sql_like_escape_literal() {
+    use sql_like_escape_literal as f;
+
+    pretty_assertions::assert_eq!("foo", f("foo"));
+    pretty_assertions::assert_eq!("foo\\_bar", f("foo_bar"));
+    pretty_assertions::assert_eq!("foo\\%bar", f("foo%bar"));
+    pretty_assertions::assert_eq!("foo\\\\bar", f("foo\\bar"));
+    pretty_assertions::assert_eq!("foo\\_\\%\\\\bar", f("foo_%\\bar"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

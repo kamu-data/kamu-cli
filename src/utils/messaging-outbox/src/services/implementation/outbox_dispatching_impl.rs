@@ -13,7 +13,7 @@ use std::sync::Arc;
 use internal_error::InternalError;
 
 use super::{OutboxImmediateImpl, OutboxTransactionalImpl};
-use crate::{MessageConsumer, MessageConsumerMeta, MessageDeliveryMechanism, Outbox};
+use crate::{MessageConsumer, MessageConsumerMeta, MessageConsumptionMode, Outbox};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +26,6 @@ pub struct OutboxDispatchingImpl {
 
 #[dill::component(pub)]
 impl OutboxDispatchingImpl {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         catalog: &dill::Catalog,
         immediate_outbox: Arc<OutboxImmediateImpl>,
@@ -60,12 +59,13 @@ impl OutboxDispatchingImpl {
             );
             for metadata in all_metadata {
                 for producer_name in metadata.feeding_producers {
-                    match metadata.delivery {
-                        MessageDeliveryMechanism::Transactional => {
-                            transactional_producers.insert((*producer_name).to_string());
-                        }
-                        MessageDeliveryMechanism::Immediate => {
+                    match metadata.consumption_mode {
+                        MessageConsumptionMode::Immediate => {
                             immediate_producers.insert((*producer_name).to_string());
+                        }
+                        MessageConsumptionMode::TransactionalWrapped
+                        | MessageConsumptionMode::TransactionalSelfManaged => {
+                            transactional_producers.insert((*producer_name).to_string());
                         }
                     }
                 }

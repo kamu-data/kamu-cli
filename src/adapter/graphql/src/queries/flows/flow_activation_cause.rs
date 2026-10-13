@@ -12,7 +12,6 @@ use kamu_adapter_flow_dataset::{
     DatasetResourceUpdateDetails,
     DatasetUpdateSource,
 };
-use kamu_datasets::DatasetRegistry;
 use kamu_flow_system::{self as fs};
 
 use crate::prelude::*;
@@ -20,6 +19,7 @@ use crate::queries::{Account, Dataset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reason a flow was started
 #[derive(Union)]
 pub(crate) enum FlowActivationCause {
     Manual(FlowActivationCauseManual),
@@ -32,7 +32,7 @@ impl FlowActivationCause {
     pub async fn build(
         activation_cause: &fs::FlowActivationCause,
         ctx: &Context<'_>,
-    ) -> Result<Self, InternalError> {
+    ) -> Result<Self> {
         Ok(match activation_cause {
             fs::FlowActivationCause::Manual(manual) => {
                 let initiator =
@@ -46,28 +46,22 @@ impl FlowActivationCause {
                 Self::IterationFinished(iteration_finished.clone().into())
             }
             fs::FlowActivationCause::ResourceUpdate(update) => {
-                assert!(
-                    update.resource_type == DATASET_RESOURCE_TYPE,
-                    "Unexpected resource type: {}",
-                    update.resource_type
-                );
+                if update.resource_type != DATASET_RESOURCE_TYPE {
+                    return Err(GqlError::Internal(InternalError::new(format!(
+                        "Unexpected resource type in flow activation cause: {}",
+                        update.resource_type
+                    ))));
+                }
 
                 let update_dataset_details: DatasetResourceUpdateDetails =
                     serde_json::from_value(update.details.clone()).int_err()?;
 
-                let dataset_registry = from_catalog_n!(ctx, dyn DatasetRegistry);
+                let dataset_id = update_dataset_details.dataset_id;
+                let dataset = Dataset::try_from_ref(ctx, &dataset_id.as_local_ref()).await?;
 
-                let hdl = dataset_registry
-                    .resolve_dataset_handle_by_ref(
-                        &update_dataset_details.dataset_id.as_local_ref(),
-                    )
-                    .await
-                    .int_err()?;
-                let account = Account::from_dataset_alias(ctx, &hdl.alias)
-                    .await?
-                    .expect("Account must exist");
                 Self::DatasetUpdate(FlowActivationCauseDatasetUpdate {
-                    dataset: Dataset::new_access_checked(account, hdl),
+                    dataset_id: dataset_id.into(),
+                    dataset,
                     source: match update_dataset_details.source {
                         DatasetUpdateSource::UpstreamFlow { flow_id, .. } => {
                             FlowActivationCauseDatasetUpdateSource::UpstreamFlow(
@@ -104,13 +98,17 @@ impl FlowActivationCause {
     }
 }
 
+/// Flow was started manually by a user
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseManual {
+    /// Account that started the flow
     initiator: Account,
 }
 
+/// Flow was started by a schedule or after a restart
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseAutoPolling {
+    /// Placeholder without meaning, always true
     dummy: bool,
 }
 
@@ -120,8 +118,10 @@ impl From<fs::FlowActivationCauseAutoPolling> for FlowActivationCauseAutoPolling
     }
 }
 
+/// Flow was started because the previous ingest left more data to fetch
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseIterationFinished {
+    /// Placeholder without meaning, always true
     dummy: bool,
 }
 
@@ -131,12 +131,18 @@ impl From<fs::FlowActivationCauseIterationFinished> for FlowActivationCauseItera
     }
 }
 
+/// Flow was started by an update of a dataset
 #[derive(SimpleObject)]
 pub(crate) struct FlowActivationCauseDatasetUpdate {
-    dataset: Dataset,
+    /// Identifier of the updated dataset
+    dataset_id: DatasetID<'static>,
+    /// Null when the dataset was deleted or is not readable by the caller
+    dataset: Option<Dataset>,
+    /// What updated the dataset
     source: FlowActivationCauseDatasetUpdateSource,
 }
 
+/// What updated the dataset
 #[derive(Union, Debug, Clone, Eq, PartialEq)]
 pub(crate) enum FlowActivationCauseDatasetUpdateSource {
     UpstreamFlow(FlowActivationCauseDatasetUpdateSourceUpstreamFlow),
@@ -145,24 +151,33 @@ pub(crate) enum FlowActivationCauseDatasetUpdateSource {
     ExternallyDetectedChange(FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange),
 }
 
+/// Dataset was updated by another flow
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceUpstreamFlow {
+    /// Identifier of the flow that updated the dataset
     flow_id: FlowID,
 }
 
+/// Dataset was updated by data pushed over HTTP
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceHttpIngest {
+    /// Name of the push source, null for the default source
     source_name: Option<String>,
 }
 
+/// Dataset was updated by a push over the smart transfer protocol
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceSmartProtocolPush {
+    /// Account that pushed the data, null if unknown
     account_name: Option<AccountName<'static>>,
+    /// Whether the push was forced, possibly rewriting history
     is_force: bool,
 }
 
+/// Dataset was changed outside of the flow system
 #[derive(SimpleObject, Debug, Clone, Eq, PartialEq)]
 pub(crate) struct FlowActivationCauseDatasetUpdateSourceExternallyDetectedChange {
+    /// Placeholder without meaning, always true
     dummy: bool,
 }
 

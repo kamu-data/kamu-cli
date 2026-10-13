@@ -19,6 +19,7 @@ use crate::entities::engine::Engine;
 // EngineProvisioner
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait EngineProvisioner: Send + Sync {
     async fn provision_engine(

@@ -14,13 +14,14 @@ use database_common::TransactionRefT;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_flow_system::{
     EventID,
+    FLOW_SYSTEM_EVENT_AGENT_NAME,
     FlowSystemEvent,
     FlowSystemEventBridge,
     FlowSystemEventSourceType,
 };
-use kamu_messaging_outbox_postgres::PostgresMessageStoreWakeupDetector;
-use messaging_outbox::MessageStoreWakeupDetector;
+use kamu_wakeup_listener_postgres::PostgresNotificationHub;
 use sqlx::Postgres;
+use wakeup_listener::{HubWakeupListener, WakeupListener};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +30,7 @@ const NOTIFY_CHANNEL_NAME: &str = "flow_system_events_ready";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresFlowSystemEventBridge {
-    wakeup_detector: PostgresMessageStoreWakeupDetector,
+    hub: Arc<PostgresNotificationHub>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,10 +39,8 @@ pub struct PostgresFlowSystemEventBridge {
 #[dill::scope(dill::scopes::Agnostic)]
 #[dill::interface(dyn FlowSystemEventBridge)]
 impl PostgresFlowSystemEventBridge {
-    pub fn new(pool: Arc<sqlx::PgPool>) -> Self {
-        Self {
-            wakeup_detector: PostgresMessageStoreWakeupDetector::new(pool, NOTIFY_CHANNEL_NAME),
-        }
+    pub fn new(hub: Arc<PostgresNotificationHub>) -> Self {
+        Self { hub }
     }
 }
 
@@ -49,9 +48,12 @@ impl PostgresFlowSystemEventBridge {
 
 #[async_trait::async_trait]
 impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector {
-        &self.wakeup_detector
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener> {
+        Box::new(HubWakeupListener::new(
+            self.hub.clone(),
+            NOTIFY_CHANNEL_NAME,
+            FLOW_SYSTEM_EVENT_AGENT_NAME,
+        ))
     }
 
     /// Fetch next batch for the given projector; order by global id.
@@ -67,9 +69,8 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
         let mut guard = transaction.lock().await;
         let connection_mut = guard.connection_mut().await?;
 
-        // Note: ignore rows from txns that might still be in flight ("Usain Bolt")
-        // Use pg_visible_in_snapshot instead of xmin threshold to avoid blocking on
-        //  unrelated in-flight transactions (e.g. parallel test runs).
+        // Deliver only below the oldest in-flight transaction: a transaction that
+        // started writing earlier may still commit, and the cursor must not pass it
 
         let rows = sqlx::query!(
             r#"
@@ -93,7 +94,7 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
                 event_payload       AS "event_payload!"
             FROM flow_system_events e, projected_offsets
             WHERE
-                pg_visible_in_snapshot(e.tx_id, pg_current_snapshot()) AND (
+                e.tx_id < pg_snapshot_xmin(pg_current_snapshot()) AND (
                     (
                         -- Same transaction as last projected event, but higher event id
                         e.tx_id = projected_offsets.last_tx_id AND
@@ -131,6 +132,35 @@ impl FlowSystemEventBridge for PostgresFlowSystemEventBridge {
             .collect();
 
         Ok(events)
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn has_held_back_events(
+        &self,
+        transaction_catalog: &dill::Catalog,
+    ) -> Result<bool, InternalError> {
+        let transaction: Arc<TransactionRefT<Postgres>> = transaction_catalog.get_one().unwrap();
+
+        let mut guard = transaction.lock().await;
+        let connection_mut = guard.connection_mut().await?;
+
+        // Committed, yet at or above the oldest running transaction
+        let has_held_back_events = sqlx::query_scalar!(
+            r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM flow_system_events
+                WHERE
+                    tx_id >= pg_snapshot_xmin(pg_current_snapshot())
+                    AND pg_visible_in_snapshot(tx_id, pg_current_snapshot())
+            ) AS "has_held_back_events!"
+            "#,
+        )
+        .fetch_one(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(has_held_back_events)
     }
 
     /// Mark these events as applied for this projector (idempotent).

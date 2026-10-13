@@ -8,16 +8,21 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::sync::Arc;
 
 use chrono::Utc;
 use kamu_task_system_inmem::*;
 use kamu_task_system_services::domain::*;
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+use wakeup_listener::WakeupListenerMetrics;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_create_new() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryWakeupHub::new(Arc::new(
+        WakeupListenerMetrics::new(),
+    ))));
 
     let metadata = TaskMetadata::from(vec![("foo", "x"), ("bar", "y")]);
 
@@ -30,13 +35,13 @@ async fn test_task_agg_create_new() {
         Some(metadata.clone()),
     );
 
-    assert_eq!(event_store.len().await.unwrap(), 0);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 0);
 
     task.save(&event_store).await.unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 1);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 1);
 
     task.save(&event_store).await.unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 1);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 1);
 
     let task = Task::load(task.task_id, &event_store).await.unwrap();
     assert_eq!(task.status(), TaskStatus::Queued);
@@ -48,7 +53,9 @@ async fn test_task_agg_create_new() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_save_load_update() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryWakeupHub::new(Arc::new(
+        WakeupListenerMetrics::new(),
+    ))));
     let task_id = event_store.new_task_id().await.unwrap();
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
@@ -61,12 +68,12 @@ async fn test_task_save_load_update() {
 
     task.save(&event_store).await.unwrap();
     let cancel_event = task.last_stored_event_id().unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 3);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 3);
 
     task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
 
     task.save(&event_store).await.unwrap();
-    assert_eq!(event_store.len().await.unwrap(), 4);
+    assert_eq!(event_store.total_events_stored().await.unwrap(), 4);
 
     // Full load
     let task = Task::load(task_id, &event_store).await.unwrap();
@@ -96,7 +103,9 @@ async fn test_task_save_load_update() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_load_multi() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryWakeupHub::new(Arc::new(
+        WakeupListenerMetrics::new(),
+    ))));
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
@@ -118,7 +127,7 @@ async fn test_task_load_multi() {
 
     for (i, task_res) in tasks.into_iter().enumerate() {
         assert!(task_res.is_ok());
-        let expected_id = TaskID::new(i as u64 + delta);
+        let expected_id = TaskID::new(u64::try_from(i).unwrap() + delta);
         let task = task_res.unwrap();
         assert_eq!(task.task_id, expected_id);
         assert_eq!(task.status(), TaskStatus::Finished);
@@ -130,7 +139,9 @@ async fn test_task_load_multi() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_illegal_transition() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryWakeupHub::new(Arc::new(
+        WakeupListenerMetrics::new(),
+    ))));
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 
@@ -150,7 +161,9 @@ async fn test_task_agg_illegal_transition() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_requeue() {
-    let event_store = InMemoryTaskEventStore::new();
+    let event_store = InMemoryTaskEventStore::new(Arc::new(InMemoryWakeupHub::new(Arc::new(
+        WakeupListenerMetrics::new(),
+    ))));
 
     let logical_plan = LogicalPlanProbe::default().into_logical_plan();
 

@@ -1,0 +1,134 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                resource_id as \"resource_id!: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at as \"registered_at: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower($1)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "resource_id!: _",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "resource_id"
+          }
+        }
+      },
+      {
+        "name": "account_name",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "account_name"
+          }
+        }
+      },
+      {
+        "name": "email",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "name": "display_name",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "name": "account_type: AccountType",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "account_type"
+          }
+        }
+      },
+      {
+        "name": "avatar_url",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "avatar_url"
+          }
+        }
+      },
+      {
+        "name": "registered_at: _",
+        "ordinal": 7,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "registered_at"
+          }
+        }
+      },
+      {
+        "name": "provider",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "name": "provider_identity_key",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "accounts",
+            "name": "provider_identity_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "15a3314334508a67e69115e24f8f2663064175b136a9b8319db12fbf67cb0358"
+}

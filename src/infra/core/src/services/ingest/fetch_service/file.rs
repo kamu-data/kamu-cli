@@ -115,11 +115,12 @@ impl FetchService {
     ) -> Result<FetchResult, PollingIngestError> {
         tracing::info!(?path, "Ingesting file");
 
-        let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => {
+        let meta = std::fs::metadata(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
                 PollingIngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
+            } else {
+                e.int_err().into()
             }
-            _ => e.int_err().into(),
         })?;
 
         let mod_time: DateTime<Utc> = meta

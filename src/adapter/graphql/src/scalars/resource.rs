@@ -11,10 +11,47 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-simple_string_scalar!(ResourceID, odf::metadata::resource::ResourceID);
-simple_string_scalar!(ResourceName, odf::metadata::resource::ResourceName);
-simple_string_scalar!(TypeName, odf::metadata::resource::TypeName);
-simple_string_scalar!(TypeUri, odf::metadata::resource::TypeUri);
-simple_string_scalar!(TypeRef, odf::metadata::resource::TypeRef);
+simple_string_scalar!(
+    /// Unique and stable identifier of a resource
+    ResourceID,
+    odf::metadata::resources::ResourceID
+);
+simple_string_scalar!(
+    /// Name of a resource
+    ResourceName,
+    odf::metadata::resources::ResourceName
+);
+simple_string_scalar!(
+    /// Short name that selects a resource type (e.g. in `kind` filters)
+    ResourceSelectorName,
+    kamu_resources::ResourceSelectorName
+);
+simple_string_scalar!(
+    /// Resource type selector as authored: a selector name, an alias, a type
+    /// name or a schema URI
+    ResourceTypeSelectorRaw,
+    kamu_resources::ResourceTypeSelectorRaw
+);
+simple_string_scalar!(
+    /// Name of a resource type
+    TypeName,
+    odf::metadata::resources::TypeName
+);
+simple_string_scalar!(
+    /// URI of a resource type schema
+    TypeUri,
+    odf::metadata::resources::TypeUri
+);
+simple_string_scalar!(
+    /// Reference to a resource type by name or by schema URI
+    TypeRef,
+    odf::metadata::resources::TypeRef
+);
+simple_string_scalar!(
+    /// Decentralized identifier (DID)
+    Did,
+    odf::metadata::formats::Did,
+    from_did_str
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

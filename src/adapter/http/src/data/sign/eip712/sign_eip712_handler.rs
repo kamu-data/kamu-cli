@@ -32,8 +32,8 @@ use crate::data::query_handler::ResponseSigningNotConfigured;
     params(SignEip712QueryParams),
     request_body = Eip712TypedDataSchema,
     responses(
-        (status = OK, body = SignEip712Response),
-        (status = NOT_FOUND, body = ApiErrorResponse),
+        (status = OK, description = "signature", body = SignEip712Response),
+        (status = NOT_FOUND, description = "signing key not found", body = ApiErrorResponse),
     ),
     tag = "odf-sign",
     security(

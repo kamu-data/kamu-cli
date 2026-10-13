@@ -18,7 +18,7 @@ RUN apk add --no-cache \
 # sqlx: build
 RUN cargo install "sqlx-cli@$SQLX_VERSION"  \
     --no-default-features \
-    --features postgres,sqlite,mysql,rustls
+    --features postgres,sqlite,rustls
 
 ################################################################################
 # Image

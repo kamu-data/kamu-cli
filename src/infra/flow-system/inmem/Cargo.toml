@@ -23,22 +23,25 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+kamu-wakeup-listener-inmem = { workspace = true }
 odf = { workspace = true }
-messaging-outbox = { workspace = true }
 time-source = { workspace = true }
+wakeup-listener = { workspace = true }
 
 kamu-flow-system = { workspace = true }
-kamu-messaging-outbox-inmem = { workspace = true }
 
 async-stream = "0.3.6"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = { version = "0.15", default-features = false }
+dill = { version = "0.17", default-features = false }
 futures = "0.3"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
-strum = { version = "0.28", features = ["derive"] }
-tokio = { version = "1", default-features = false, features = [] }
+strum = { version = "0.28", features = [
+    "derive",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }
 tracing = { version = "0.1", default-features = false }
 
 
@@ -47,4 +50,6 @@ database-common-macros = { workspace = true }
 kamu-flow-system-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

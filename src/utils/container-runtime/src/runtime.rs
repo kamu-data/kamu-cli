@@ -39,17 +39,11 @@ impl ContainerRuntime {
     }
 
     pub(crate) fn new_command(&self) -> Command {
-        Command::new(match self.config.runtime {
-            ContainerRuntimeType::Docker => "docker",
-            ContainerRuntimeType::Podman => "podman",
-        })
+        Command::new(self.config.runtime.to_string())
     }
 
     pub(crate) fn new_command_std(&self) -> std::process::Command {
-        std::process::Command::new(match self.config.runtime {
-            ContainerRuntimeType::Docker => "docker",
-            ContainerRuntimeType::Podman => "podman",
-        })
+        std::process::Command::new(self.config.runtime.to_string())
     }
 
     pub async fn has_image(&self, image: &str) -> Result<bool, ContainerRuntimeError> {
@@ -274,6 +268,12 @@ impl ContainerRuntime {
     pub(crate) fn remove_network_cmd_std(&self, network_name: &str) -> std::process::Command {
         let mut cmd = self.new_command_std();
         cmd.arg("network").arg("rm").arg(network_name);
+        cmd
+    }
+
+    pub(crate) fn remove_container_cmd_std(&self, container_name: &str) -> std::process::Command {
+        let mut cmd = self.new_command_std();
+        cmd.arg("rm").arg("--force").arg(container_name);
         cmd
     }
 
@@ -557,6 +557,10 @@ fn is_selinux_present() -> bool {
     false
 }
 
+/// Mount point of the `SELinux` pseudo-filesystem (`selinuxfs`)
+#[cfg(target_os = "linux")]
+const SELINUX_FS_PATH: &str = "/sys/fs/selinux";
+
 #[cfg(target_os = "linux")]
 fn is_selinux_present() -> bool {
     use once_cell::sync::OnceCell;
@@ -564,26 +568,49 @@ fn is_selinux_present() -> bool {
     static FLAG: OnceCell<bool> = OnceCell::new();
 
     *FLAG.get_or_init(|| {
-        let output = std::process::Command::new("command")
-            .arg("-v")
-            .arg("sestatus")
-            .output();
+        let is_present = is_selinux_fs_mounted(Path::new(SELINUX_FS_PATH));
 
-        match output {
-            Ok(output) => {
-                let is_present = output.status.success();
+        tracing::debug!("SELinux present: {is_present}");
 
-                tracing::debug!("SELinux present: {is_present}");
-
-                is_present
-            }
-            Err(e) => {
-                tracing::warn!(error = ?e, "Error detecting SELinux presence");
-
-                false
-            }
-        }
+        is_present
     })
 }
 
+/// `SELinux` is enabled only when the `selinuxfs` pseudo-filesystem is mounted.
+/// The mount point directory itself exists on many distributions even when
+/// `SELinux` is disabled, so we probe for one of the attribute files that
+/// appears only once the filesystem is actually mounted.
+#[cfg(target_os = "linux")]
+fn is_selinux_fs_mounted(selinux_fs_path: &Path) -> bool {
+    selinux_fs_path.join("enforce").exists()
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selinux_not_detected_when_mount_point_is_missing() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+
+        assert!(!is_selinux_fs_mounted(&tmp_dir.path().join("selinux")));
+    }
+
+    #[test]
+    fn selinux_not_detected_when_fs_is_not_mounted() {
+        // The mount point directory exists, but `selinuxfs` is not mounted into it
+        let tmp_dir = tempfile::tempdir().unwrap();
+
+        assert!(!is_selinux_fs_mounted(tmp_dir.path()));
+    }
+
+    #[test]
+    fn selinux_detected_when_fs_is_mounted() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        std::fs::write(tmp_dir.path().join("enforce"), "0").unwrap();
+
+        assert!(is_selinux_fs_mounted(tmp_dir.path()));
+    }
+}

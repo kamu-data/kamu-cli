@@ -22,10 +22,10 @@ pub struct WebhookFlowSubProcess {
     flow_process_state: fs::FlowProcessState,
 }
 
+/// Webhook delivery process of a single subscription
 #[Object]
 impl WebhookFlowSubProcess {
     #[graphql(skip)]
-    #[allow(dead_code)]
     pub fn new(
         subscription: &wh::WebhookSubscription,
         parent_dataset_request_state: Option<DatasetRequestStateWithOwner>,
@@ -46,21 +46,28 @@ impl WebhookFlowSubProcess {
         }
     }
 
+    /// Identifier of the webhook subscription
     pub async fn id(&self) -> WebhookSubscriptionID {
         self.id.into()
     }
 
+    /// Subscription label, or its target URL when the label is empty
     pub async fn name(&self) -> String {
         self.name.clone()
     }
 
+    /// Dataset the subscription belongs to, null for non-dataset subscriptions
     pub async fn parent_dataset(&self) -> Option<Dataset> {
         self.parent_dataset_request_state.as_ref().map(|state| {
             Dataset::new_access_checked(state.owner().clone(), state.dataset_handle().clone())
         })
     }
 
-    #[allow(clippy::unused_async)]
+    /// Current state summary of the delivery process
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     pub async fn summary(&self) -> Result<FlowProcessSummary> {
         Ok(self.flow_process_state.clone().into())
     }

@@ -6,22 +6,46 @@
       {
         "name": "model_id: i64",
         "ordinal": 0,
-        "type_info": "Integer"
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "model_id"
+          }
+        }
       },
       {
         "name": "input_hash",
         "ordinal": 1,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "input_hash"
+          }
+        }
       },
       {
         "name": "input_text",
         "ordinal": 2,
-        "type_info": "Text"
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "input_text"
+          }
+        }
       },
       {
         "name": "embedding",
         "ordinal": 3,
-        "type_info": "Blob"
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "embeddings_cache",
+            "name": "embedding"
+          }
+        }
       }
     ],
     "parameters": {

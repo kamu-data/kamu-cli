@@ -19,16 +19,12 @@ pub struct ViewDatasetEnvVar {
     env_var: DatasetEnvVar,
 }
 
+/// Environment variable of a dataset
 #[Object]
 impl ViewDatasetEnvVar {
     #[graphql(skip)]
     pub fn new(env_var: DatasetEnvVar) -> Self {
         Self { env_var }
-    }
-
-    /// Unique identifier of the dataset environment variable
-    async fn id(&self) -> DatasetEnvVarID<'_> {
-        self.env_var.id.into()
     }
 
     /// Key of the dataset environment variable
@@ -37,7 +33,6 @@ impl ViewDatasetEnvVar {
     }
 
     /// Non secret value of dataset environment variable
-    #[allow(clippy::unused_async)]
     async fn value(&self) -> Option<String> {
         self.env_var.get_non_secret_value()
     }
@@ -47,6 +42,7 @@ impl ViewDatasetEnvVar {
         self.env_var.created_at
     }
 
+    /// Whether the value is stored encrypted and hidden from listings
     async fn is_secret(&self) -> bool {
         self.env_var.secret_nonce.is_some()
     }

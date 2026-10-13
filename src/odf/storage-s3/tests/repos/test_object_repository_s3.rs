@@ -78,7 +78,7 @@ async fn test_insert_bytes_long() {
     let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
-    use rand::RngCore;
+    use rand::Rng;
 
     let mut data = [0u8; 16000];
     rand::rng().fill_bytes(&mut data);
@@ -142,7 +142,7 @@ async fn test_insert_stream_long() {
     let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
-    use rand::RngCore;
+    use rand::Rng;
 
     let mut data = [0u8; 16000];
     rand::rng().fill_bytes(&mut data);

@@ -13,14 +13,17 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Flow does not exist or does not belong to this dataset
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub(crate) struct FlowNotFound {
+    /// Identifier of the flow that was requested
     pub flow_id: FlowID,
 }
 
 #[ComplexObject]
 impl FlowNotFound {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         let flow_id: fs::FlowID = self.flow_id.into();
         format!("Flow '{flow_id}' was not found")

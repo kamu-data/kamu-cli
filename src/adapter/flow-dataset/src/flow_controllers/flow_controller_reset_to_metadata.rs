@@ -115,6 +115,17 @@ impl fs::FlowController for FlowControllerResetToMetadata {
                     .await
                     .int_err()?;
 
+                // A derived dataset with enabled updates rebuilds from its inputs' current
+                // state right away, instead of waiting for the next input change
+                if let Some(own_sensor) = self
+                    .flow_sensor_dispatcher
+                    .find_sensor(&success_flow_state.flow_binding.scope)
+                    .await
+                {
+                    tracing::debug!(flow_id = %success_flow_state.flow_id, %dataset_id, "Re-activating own flow sensor after reset to metadata");
+                    own_sensor.on_activated(&self.catalog, finish_time).await?;
+                }
+
                 Ok(())
             }
         }

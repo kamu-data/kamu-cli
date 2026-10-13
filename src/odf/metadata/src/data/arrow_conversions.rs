@@ -431,6 +431,10 @@ impl DataType {
                 )
             }
             ArrowDataType::RunEndEncoded(run_ends, values) => {
+                #[expect(
+                    clippy::wildcard_enum_match_arm,
+                    reason = "Arrow's DataType is foreign; run ends are only Int32 or Int64"
+                )]
                 let run_ends_bit_width = match run_ends.data_type() {
                     ArrowDataType::Int32 => 32,
                     ArrowDataType::Int64 => 64,
@@ -761,7 +765,9 @@ impl DataType {
                     ArrowBufferEncoding::View {
                         offset_bit_width: None | Some(32),
                     } => ArrowDataType::BinaryView,
-                    _ => return unsupported(),
+                    ArrowBufferEncoding::Contiguous { .. }
+                    | ArrowBufferEncoding::View { .. }
+                    | ArrowBufferEncoding::RunEnd { .. } => return unsupported(),
                 },
                 DataType::List(DataTypeList {
                     item_type,
@@ -782,7 +788,9 @@ impl DataType {
                         ArrowBufferEncoding::View {
                             offset_bit_width: Some(64),
                         } => ArrowDataType::LargeListView(list_field.into()),
-                        _ => return unsupported(),
+                        ArrowBufferEncoding::Contiguous { .. }
+                        | ArrowBufferEncoding::View { .. }
+                        | ArrowBufferEncoding::RunEnd { .. } => return unsupported(),
                     }
                 }
                 DataType::String(DataTypeString {}) => match buffer {
@@ -795,7 +803,9 @@ impl DataType {
                     ArrowBufferEncoding::View {
                         offset_bit_width: None | Some(32),
                     } => ArrowDataType::Utf8View,
-                    _ => return unsupported(),
+                    ArrowBufferEncoding::Contiguous { .. }
+                    | ArrowBufferEncoding::View { .. }
+                    | ArrowBufferEncoding::RunEnd { .. } => return unsupported(),
                 },
                 DataType::Binary(_)
                 | DataType::Bool(_)

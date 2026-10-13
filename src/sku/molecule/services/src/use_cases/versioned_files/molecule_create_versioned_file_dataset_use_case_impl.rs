@@ -103,7 +103,7 @@ impl MoleculeCreateVersionedFileDatasetUseCase for MoleculeCreateVersionedFileDa
         // Give maintainer permissions to molecule
         self.rebac_service
             .set_account_dataset_relation(
-                &molecule_subject.account_id,
+                &molecule_subject.account_handle.did,
                 kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
                 versioned_file_dataset.get_id(),
             )

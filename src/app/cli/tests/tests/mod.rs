@@ -8,10 +8,16 @@
 // by the Apache License, Version 2.0.
 
 mod test_access_token_registry_svc;
+mod test_complete_command;
+mod test_completions_command;
 mod test_config;
+mod test_current_account_indication;
 mod test_di_graph;
 mod test_generate_cli_markdown;
+mod test_login_flow_service;
 mod test_new_dataset_command;
 mod test_output;
+mod test_resource_context_service;
+mod test_resource_selection_resolution_service;
 mod test_system_info_command;
 mod test_workspace_svc;

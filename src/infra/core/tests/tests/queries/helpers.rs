@@ -24,8 +24,12 @@ use kamu::{
 };
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::{DatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{
+    DatasetActionAuthorizer,
+    DatasetRegistry,
+    MockDatasetActionAuthorizer,
+    ResolvedDataset,
+};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
@@ -113,7 +117,7 @@ pub(crate) async fn create_test_dataset(
         ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
 
         let start_offset = prev_offset.map_or(0, |v| v + 1);
-        let end_offset = start_offset + record_batch.num_rows() as u64 - 1;
+        let end_offset = start_offset + u64::try_from(record_batch.num_rows()).unwrap() - 1;
 
         stored
             .dataset

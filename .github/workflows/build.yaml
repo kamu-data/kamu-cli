@@ -27,37 +27,43 @@ on:
   # manual trigger
   workflow_dispatch: { }
 env:
+  # Decide crate freshness by file checksums, not mtimes, so that unchanged workspace crates
+  # restored from the cache are reused after `actions/checkout` resets all mtimes
+  CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
   RUST_LOG: "debug"
   RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
+  # Note: embed a tiny folder only to test the "web-ui" feature building
+  KAMU_WEB_UI_DIR: "../../../.github"
 jobs:
   lint_fmt:
     name: Lint / Code
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-      - name: cargo fmt --check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --check
+          cache: false
+      - uses: cargo-bins/cargo-binstall@main
+      - name: cargo fmt
+        run: cargo fmt --check
+      - name: cargo sort
+        run: |
+          cargo binstall cargo-sort -y
+          cargo sort -g -w -n -c
+      - name: taplo fmt
+        run: |
+          cargo binstall taplo-cli -y
+          taplo fmt --check
       - name: Lint dividing lines
-        run: |
-          cargo test -p kamu-repo-tools -- dividing_lines
+        run: cargo test -p kamu-repo-tools -- dividing_lines
       - name: Lint license headers
-        run: |
-          cargo test -p kamu-repo-tools -- license_header
+        run: cargo test -p kamu-repo-tools -- license_header
       - name: Lint OpenAPI spec
-        run: |
-          make lint-openapi
+        run: make lint-openapi
       - name: clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   lint_codegen:
     name: Lint / Codegen
@@ -68,14 +74,19 @@ jobs:
           repository: kamu-data/kamu-cli
           path: kamu-cli
       - name: Copy rust-toolchain file
-        run: cp kamu-cli/rust-toolchain ./rust-toolchain
+        run: cp kamu-cli/rust-toolchain.toml ./rust-toolchain.toml
+      - name: Read pinned ODF spec version
+        id: odf
+        run: echo "ref=$(make -s -C kamu-cli print-odf-spec-ref)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
         with:
           repository: open-data-fabric/open-data-fabric
+          ref: ${{ steps.odf.outputs.ref }}
           path: open-data-fabric
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt
+          cache: false
       # We use nix flake to install flatc, protoc and other tools needed for codegen
       - uses: cachix/install-nix-action@v31
       - uses: cachix/cachix-action@v16
@@ -85,7 +96,7 @@ jobs:
       - name: Generate artifacts
         run: |
           cd kamu-cli
-          nix develop .config -c make codegen
+          nix develop ./images/nix-dev -c make codegen
       - name: Check generated files
         run: cd kamu-cli && git diff && git diff-index --quiet HEAD
 
@@ -94,7 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
       - uses: cargo-bins/cargo-binstall@main
       - run: cargo binstall cargo-deny -y
       - run: cargo deny check --hide-inclusion-graph
@@ -154,6 +167,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     services:
       postgres:
+        # Keep in sync with `POSTGRES_IMAGE` in `Makefile`
         image: ${{ matrix.database && 'postgres:18' || '' }}
         env:
           POSTGRES_USER: root
@@ -161,13 +175,6 @@ jobs:
           POSTGRES_DB: kamu-test
         ports:
           - 5432:5432
-      mariadb:
-        image: ${{ matrix.database && 'mariadb:11' || '' }}
-        env:
-          MARIADB_ROOT_PASSWORD: root
-          MARIADB_DATABASE: kamu-test
-        ports:
-          - 3306:3306
       elasticsearch:
         image: ${{ matrix.elasticsearch && 'elasticsearch:9.2.1' || '' }}
         env:
@@ -209,12 +216,14 @@ jobs:
           sudo apt-get install -y mold
           echo 'RUSTFLAGS=-C linker=clang -C link-arg=-fuse-ld=mold' >> $GITHUB_ENV
 
-      - uses: actions-rs/toolchain@v1
-
-      - uses: swatinem/rust-cache@v2
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          cache-on-failure: true
+          cache: true
+          # Prevents branch builds from evicting master cache
+          cache-save-if: ${{ github.ref == 'refs/heads/master' }}
+          # Requires CARGO_UNSTABLE_CHECKSUM_FRESHNESS
           cache-workspace-crates: true
+          cache-on-failure: true
 
       - uses: cargo-bins/cargo-binstall@main
 
@@ -227,19 +236,20 @@ jobs:
         run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "${{ matrix.container-runtime }}" } } }' > ~/.kamuconfig
           echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
+          echo "KAMU_CONTAINER_RUNTIME_TYPE_DB=docker" >> $GITHUB_ENV
+          echo "KAMU_POSTGRES_IMAGE=postgres:18" >> $GITHUB_ENV
 
       - name: Build
-        # Note: only be used to test the "web-ui" feature building
-        env:
-          # To test just building, we embed a tiny folder
-          KAMU_WEB_UI_DIR: '../../../.github'
         run: |
           cargo test ${{ matrix.cargo-flags }} --no-run
+    
+          # Features used only by downstream (e.g. kamu-node) are not compiled by the workspace build
+          cargo check -p observability --all-features
 
       - name: Assert mold linker was used
         if: runner.os == 'Linux'
         run: |
-          binary=$(find target/ci/deps -maxdepth 1 -type f -executable | head -1)
+          binary="target/ci/kamu-cli"
           echo "Checking: $binary"
           readelf -p .comment "$binary"
           readelf -p .comment "$binary" | grep mold
@@ -290,16 +300,8 @@ jobs:
       - name: Postgres database tests
         if: matrix.database
         env:
-          SQLX_OFFLINE: false
           DATABASE_URL: postgres://root:root@127.0.0.1:5432/kamu-test
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::) ${{ matrix.nextest-exclusions-database-set-part }}'
-
-      - name: MariaDB database tests
-        if: matrix.database
-        env:
-          SQLX_OFFLINE: false
-          DATABASE_URL: mariadb://root:root@127.0.0.1:3306/kamu-test
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::) ${{ matrix.nextest-exclusions-database-set-part }}'
 
       # Note: Not running on windows due to line ending differences
       - name: Check generated files

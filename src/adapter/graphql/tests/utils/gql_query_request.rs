@@ -51,20 +51,6 @@ impl GraphQLQueryRequest {
         .await
     }
 
-    #[expect(unused)]
-    pub(crate) async fn execute_without_data_loaders<Query, Mutation, Subscription>(
-        self,
-        schema: &async_graphql::Schema<Query, Mutation, Subscription>,
-        catalog: &dill::Catalog,
-    ) -> async_graphql::Response
-    where
-        Query: async_graphql::ObjectType + 'static,
-        Mutation: async_graphql::ObjectType + 'static,
-        Subscription: async_graphql::SubscriptionType + 'static,
-    {
-        self.execute_ext(schema, catalog, |r| r).await
-    }
-
     pub(crate) async fn execute_ext<Query, Mutation, Subscription, F>(
         self,
         schema: &async_graphql::Schema<Query, Mutation, Subscription>,
@@ -126,7 +112,12 @@ pub(crate) fn get_gql_value_string_property(
         .and_then(|v| match v {
             async_graphql::Value::String(s) => Some(s.as_str()),
             async_graphql::Value::Enum(e) => Some(e.as_str()),
-            _ => None,
+            async_graphql::Value::Null
+            | async_graphql::Value::Number(_)
+            | async_graphql::Value::Boolean(_)
+            | async_graphql::Value::Binary(_)
+            | async_graphql::Value::List(_)
+            | async_graphql::Value::Object(_) => None,
         })
         .map(ToString::to_string)
 }

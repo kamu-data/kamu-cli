@@ -73,7 +73,7 @@ pub struct PlatformFileUploadQuery {
     post,
     path = "/file/upload/prepare",
     params(PlatformFileUploadQuery),
-    responses((status = OK, body = UploadContext)),
+    responses((status = OK, description = "upload prepared", body = UploadContext)),
     tag = "kamu",
     security(
         ("api_key" = []),
@@ -119,13 +119,12 @@ pub struct UploadFromPath {
     path = "/file/upload/{upload_token}",
     params(UploadFromPath),
     request_body = Vec<u8>,
-    responses((status = OK, body = UploadContext)),
+    responses((status = OK, description = "file uploaded", body = UploadContext)),
     tag = "kamu",
     security(
         ("api_key" = []),
     )
 )]
-#[allow(clippy::unused_async)]
 pub async fn file_upload_post_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,
@@ -178,7 +177,6 @@ pub async fn file_upload_post_handler(
         ("api_key" = []),
     )
 )]
-#[allow(clippy::unused_async)]
 pub async fn file_upload_get_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
     axum::extract::Path(upload_param): axum::extract::Path<UploadFromPath>,

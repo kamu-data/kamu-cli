@@ -14,11 +14,11 @@ pub mod formats;
 pub mod auth;
 pub mod config;
 pub mod data;
-pub mod dataset;
+pub mod datasets;
 pub mod dtos;
-pub mod engine;
+pub mod engines;
 pub mod errors;
-pub mod resource;
+pub mod resources;
 pub mod serde;
 pub mod storage;
 
@@ -51,20 +51,11 @@ pub use data::{
     OperationType,
     ToArrowSettings,
 };
-pub use dataset::{
-    AddData,
-    AsTypedBlock,
-    AttachmentEmbedded,
-    Attachments,
-    AttachmentsEmbedded,
-    Checkpoint,
-    DataSlice,
+pub use datasets::legacy::{
     DatasetAlias,
     DatasetAliasRemote,
     DatasetHandle,
     DatasetHandleRemote,
-    DatasetID,
-    DatasetKind,
     DatasetName,
     DatasetPushTarget,
     DatasetRef,
@@ -72,6 +63,17 @@ pub use dataset::{
     DatasetRefAnyPattern,
     DatasetRefPattern,
     DatasetRefRemote,
+};
+pub use datasets::{
+    AddData,
+    AsTypedBlock,
+    AttachmentEmbedded,
+    Attachments,
+    AttachmentsEmbedded,
+    Checkpoint,
+    DataSlice,
+    DatasetID,
+    DatasetKind,
     DatasetVocabulary,
     ExecuteTransform,
     ExecuteTransformInput,
@@ -103,7 +105,7 @@ pub use dataset::{
     Watermark,
 };
 pub use ed25519_dalek as ed25519;
-pub use engine::{
+pub use engines::{
     RawQueryRequest,
     RawQueryResponse,
     RawQueryResponseInternalError,
@@ -132,7 +134,7 @@ pub use legacy::{
     Manifest,
     SetPollingSource,
 };
-pub use source::{
+pub use sources::{
     CompressionFormat,
     EnvVar,
     EventTimeSource,

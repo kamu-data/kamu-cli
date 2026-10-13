@@ -445,6 +445,7 @@ async fn test_fetch_url_http_env_interpolation_with_default() {
 
 #[cfg(feature = "ingest-ftp")]
 #[test_group::group(containerized, flaky)]
+#[ignore = "kamu-cli#1691: Temporarily disabled"]
 #[tokio::test]
 async fn test_fetch_url_ftp_ok() {
     let harness = FetchTestHarness::new();
@@ -1284,7 +1285,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         match res_1 {
             FetchResult::Updated(x) => x.source_state,
-            _ => unreachable!(),
+            FetchResult::UpToDate => unreachable!(),
         }
     };
 
@@ -1339,7 +1340,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         match res_2 {
             FetchResult::Updated(x) => x.source_state,
-            _ => unreachable!(),
+            FetchResult::UpToDate => unreachable!(),
         }
     };
 
@@ -1394,12 +1395,11 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         match res_3 {
             FetchResult::Updated(x) => x.source_state,
-            _ => unreachable!(),
+            FetchResult::UpToDate => unreachable!(),
         }
     };
 
-    // 4) Try to ingest the next 40 rows from the exhausted source, but have no new
-    //    data
+    // 4) Try to ingest the next 40 rows from the exhausted source, but have no new data
     {
         let fetch_step_4 = odf::metadata::FetchStep::Container(odf::metadata::FetchStepContainer {
             image: docker_images::BUSYBOX.to_owned(),

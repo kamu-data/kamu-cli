@@ -157,7 +157,7 @@ impl FetchService {
                     break;
                 }
 
-                fetched_bytes += read as u64;
+                fetched_bytes += u64::try_from(read).unwrap();
                 listener.on_progress(&FetchProgress {
                     fetched_bytes,
                     total_bytes: TotalBytes::Unknown,

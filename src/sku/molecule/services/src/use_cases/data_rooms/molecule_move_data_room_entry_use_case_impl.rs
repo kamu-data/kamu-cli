@@ -113,7 +113,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                     MESSAGE_PRODUCER_MOLECULE_DATA_ROOM_SERVICE,
                     MoleculeDataRoomMessage::moved(
                         success.system_time,
-                        molecule_subject.account_id.clone(),
+                        molecule_subject.account_handle.did.clone(),
                         molecule_project.account_id.clone(),
                         molecule_project.ocl_id.clone(),
                         path_from,

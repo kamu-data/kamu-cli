@@ -12,6 +12,7 @@ use std::sync::Arc;
 use kamu_accounts::{
     Account,
     AccountConfig,
+    AccountResourceIdSource,
     AccountService,
     CreateAccountUseCase,
     CurrentAccountSubject,
@@ -105,7 +106,10 @@ impl AccountBaseUseCaseHarness {
         };
 
         let create_account_uc = catalog.get_one::<dyn CreateAccountUseCase>().unwrap();
-        create_account_uc.execute(&account_config).await.unwrap()
+        create_account_uc
+            .execute(&account_config, AccountResourceIdSource::SeededFromName)
+            .await
+            .unwrap()
     }
 
     pub async fn rename_account(&self, catalog: &dill::Catalog, old_name: &str, new_name: &str) {
@@ -126,6 +130,7 @@ impl AccountBaseUseCaseHarness {
         {
             let mut b = dill::CatalogBuilder::new_chained(catalog);
             b.add_value(CurrentAccountSubject::logged(
+                account.resource_id,
                 account.id.clone(),
                 account.account_name.clone(),
             ));
@@ -151,6 +156,7 @@ impl AccountBaseUseCaseHarness {
         {
             let mut b = dill::CatalogBuilder::new_chained(catalog);
             b.add_value(CurrentAccountSubject::logged(
+                account.resource_id,
                 account.id.clone(),
                 account.account_name.clone(),
             ));

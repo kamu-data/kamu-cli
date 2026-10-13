@@ -11,20 +11,34 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Build details of the running server; fields are null when unknown
 #[derive(async_graphql::SimpleObject)]
 pub struct BuildInfo {
+    /// Version of the application
     app_version: &'static str,
+    /// Time the binary was built
     build_timestamp: Option<&'static str>,
+    /// Output of `git describe` for the built revision
     git_describe: Option<&'static str>,
+    /// Git commit hash the binary was built from
     git_sha: Option<&'static str>,
+    /// Date of the git commit the binary was built from
     git_commit_date: Option<&'static str>,
+    /// Git branch the binary was built from
     git_branch: Option<&'static str>,
+    /// Version of the Rust compiler
     rustc_semver: Option<&'static str>,
+    /// Release channel of the Rust compiler
     rustc_channel: Option<&'static str>,
+    /// Host target triple of the Rust compiler
     rustc_host_triple: Option<&'static str>,
+    /// Commit hash of the Rust compiler
     rustc_commit_sha: Option<&'static str>,
+    /// Target triple the binary was built for
     cargo_target_triple: Option<&'static str>,
+    /// Cargo features enabled in the build
     cargo_features: Option<&'static str>,
+    /// Compiler optimization level of the build
     cargo_opt_level: Option<&'static str>,
 }
 

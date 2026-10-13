@@ -6,32 +6,63 @@
       {
         "ordinal": 0,
         "name": "message_id",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "outbox_messages",
+            "name": "message_id"
+          }
+        }
       },
       {
         "ordinal": 1,
         "name": "tx_id!: i64",
-        "type_info": "Int8"
+        "type_info": "Int8",
+        "origin": "Expression"
       },
       {
         "ordinal": 2,
         "name": "producer_name",
-        "type_info": "Varchar"
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "outbox_messages",
+            "name": "producer_name"
+          }
+        }
       },
       {
         "ordinal": 3,
         "name": "content_json",
-        "type_info": "Jsonb"
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "outbox_messages",
+            "name": "content_json"
+          }
+        }
       },
       {
         "ordinal": 4,
         "name": "occurred_on",
-        "type_info": "Timestamptz"
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "outbox_messages",
+            "name": "occurred_on"
+          }
+        }
       },
       {
         "ordinal": 5,
         "name": "version!",
-        "type_info": "Int4"
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "outbox_messages",
+            "name": "version"
+          }
+        }
       }
     ],
     "parameters": {

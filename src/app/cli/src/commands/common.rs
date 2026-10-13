@@ -10,6 +10,8 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
+use chrono_humanize::HumanTime;
 use kamu::domain::PullImageListener;
 
 use crate::OutputConfig;
@@ -53,6 +55,63 @@ impl PullImageListener for PullImageProgress {
 
     fn success(&self) {
         self.progress_bar.lock().unwrap().take();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn humanize_relative_date(timestamp: DateTime<Utc>) -> String {
+    format!("{}", HumanTime::from(timestamp - Utc::now()))
+}
+
+pub(crate) fn humanize_data_size(size: u64) -> String {
+    if size == 0 {
+        return "-".to_owned();
+    }
+
+    use humansize::{BINARY, format_size};
+    format_size(size, BINARY)
+}
+
+pub(crate) fn humanize_quantity(num: u64) -> String {
+    if num == 0 {
+        return "-".to_owned();
+    }
+
+    use num_format::{Locale, ToFormattedString};
+    num.to_formatted_string(&Locale::en)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn json_to_yaml_value(value: &serde_json::Value) -> serde_yaml::Value {
+    match value {
+        serde_json::Value::Null => serde_yaml::Value::Null,
+        serde_json::Value::Bool(value) => serde_yaml::Value::Bool(*value),
+        serde_json::Value::Number(value) => {
+            if let Some(value) = value.as_u64() {
+                serde_yaml::to_value(value).unwrap()
+            } else if let Some(value) = value.as_i64() {
+                serde_yaml::to_value(value).unwrap()
+            } else {
+                serde_yaml::to_value(value.as_f64().unwrap()).unwrap()
+            }
+        }
+        serde_json::Value::String(value) => serde_yaml::Value::String(value.clone()),
+        serde_json::Value::Array(values) => {
+            serde_yaml::Value::Sequence(values.iter().map(json_to_yaml_value).collect())
+        }
+        serde_json::Value::Object(entries) => serde_yaml::Value::Mapping(
+            entries
+                .iter()
+                .map(|(key, value)| {
+                    (
+                        serde_yaml::Value::String(key.clone()),
+                        json_to_yaml_value(value),
+                    )
+                })
+                .collect(),
+        ),
     }
 }
 

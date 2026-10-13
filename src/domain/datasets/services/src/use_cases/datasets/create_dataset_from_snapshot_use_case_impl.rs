@@ -49,7 +49,10 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
 #[dill::component(pub)]
 #[dill::interface(dyn CreateDatasetFromSnapshotUseCase)]
 impl CreateDatasetFromSnapshotUseCaseImpl {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "dill passes injected dependencies by value"
+    )]
     pub fn new(
         current_account_subject: Arc<CurrentAccountSubject>,
         system_time_source: Arc<dyn SystemTimeSource>,
@@ -170,13 +173,13 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // into organization-level permissions.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
-        if target_account_id != subject.account_id {
+        if target_account_id != subject.account_handle.did {
             let _ = self
                 .rebac_svc
                 .get()
                 .int_err()?
                 .set_account_dataset_relation(
-                    &subject.account_id,
+                    &subject.account_handle.did,
                     kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
                     &store_result.dataset_id,
                 )

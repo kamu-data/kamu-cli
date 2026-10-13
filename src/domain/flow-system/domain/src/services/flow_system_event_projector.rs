@@ -15,7 +15,7 @@ use crate::FlowSystemEvent;
 
 #[async_trait::async_trait]
 pub trait FlowSystemEventProjector: Send + Sync {
-    /// Stable name; used as key in the `flow_system_projected_events` ledger.
+    /// Stable name; used as key in the `flow_system_projected_offsets` table.
     fn name(&self) -> &'static str;
 
     /// Apply a *single* event using the open transaction.

@@ -57,13 +57,16 @@ impl WebhookDeliveryRepository for PostgresWebhookDeliveryRepository {
         )
         .execute(connection_mut)
         .await
-        .map_err(|e: sqlx::Error| match e {
-            sqlx::Error::Database(e) if e.is_unique_violation() => {
+        .map_err(|e: sqlx::Error| {
+            if let Some(db_err) = e.as_database_error()
+                && db_err.is_unique_violation()
+            {
                 CreateWebhookDeliveryError::DeliveryExists(WebhookDeliveryAlreadyExistsError {
                     webhook_delivery_id: delivery.webhook_delivery_id,
                 })
+            } else {
+                CreateWebhookDeliveryError::Internal(e.int_err())
             }
-            _ => CreateWebhookDeliveryError::Internal(e.int_err()),
         })?;
 
         Ok(())

@@ -277,7 +277,7 @@ impl InspectSchemaCommand {
                     self.print_schema_ddl_rec(field, 0);
                 }
             }
-            _ => unreachable!(),
+            Type::PrimitiveType { .. } => unreachable!(),
         }
     }
 

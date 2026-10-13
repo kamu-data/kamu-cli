@@ -19,16 +19,23 @@ use crate::queries::Account;
 // MetadataBlockExtended
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Metadata block with its hash and author
 #[derive(Debug, SimpleObject)]
 #[graphql(complex)]
 pub struct MetadataBlockExtended {
     #[graphql(skip)]
     pub block: odf::metadata::MetadataBlock,
+    /// Hash of this block
     pub block_hash: Multihash<'static>,
+    /// Hash of the preceding block, null for the first block
     pub prev_block_hash: Option<Multihash<'static>>,
+    /// System time when this block was created
     pub system_time: DateTime<Utc>,
+    /// Author of the block, reported as the dataset owner
     pub author: Account,
+    /// Metadata event recorded in this block
     pub event: MetadataEvent,
+    /// Position of this block in the chain, starting from zero
     pub sequence_number: u64,
 }
 
@@ -56,7 +63,11 @@ impl MetadataBlockExtended {
         })
     }
 
-    #[expect(clippy::unused_async)]
+    /// Block serialized in the requested format
+    #[expect(
+        clippy::unused_async,
+        reason = "async-graphql resolvers are async by framework contract"
+    )]
     async fn encoded(
         &self,
         encoding: MetadataManifestFormat,
@@ -69,9 +80,12 @@ impl MetadataBlockExtended {
 // EncodedBlock
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Metadata block serialized in a manifest format
 #[derive(Debug, SimpleObject)]
 pub struct EncodedBlock {
+    /// Format the block is serialized in
     pub encoding: MetadataManifestFormat,
+    /// Serialized block
     pub content: String,
 }
 
@@ -106,8 +120,10 @@ impl EncodedBlock {
 // MetadataFormat
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Serialization format of metadata manifests
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetadataManifestFormat {
+    /// YAML manifest
     Yaml,
 }
 
@@ -115,14 +131,17 @@ pub enum MetadataManifestFormat {
 // MetadataFormat serde errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Manifest could not be parsed
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct MetadataManifestMalformed {
+    /// Description of the problem
     pub message: String,
 }
 
 #[ComplexObject]
 impl MetadataManifestMalformed {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
@@ -137,11 +156,15 @@ pub struct MetadataManifestUnsupportedVersion {
     pub supported_version_to: i32,
 }
 
+/// Manifest version is not supported by this node
 #[Object]
 impl MetadataManifestUnsupportedVersion {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }
+
+    /// Description of the problem with the supported version range
     pub async fn message(&self) -> String {
         format!(
             "Unsupported manifest version {}, supported range is [{}, {}]",
@@ -232,26 +255,37 @@ impl MetadataEvent {
         ctx: &Context<'_>,
         event: odf::metadata::MetadataEvent,
     ) -> Result<odf::metadata::MetadataEvent, InternalError> {
-        Ok(match event {
-            odf::metadata::MetadataEvent::SetTransform(v) => {
+        Ok(
+            if let odf::metadata::MetadataEvent::SetTransform(v) = event {
                 SetTransform::with_extended_aliases(ctx, v).await?.into()
-            }
-            _ => event,
-        })
+            } else {
+                event
+            },
+        )
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Type of a metadata event
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MetadataEventType {
+    /// Event that establishes the identity of a dataset
     Seed,
+    /// Event that defines a source polled for new data
     SetPollingSource,
+    /// Event that defines column names with special meaning
     SetVocab,
+    /// Event that sets attached files
     SetAttachments,
+    /// Event that sets the description, keywords and similar info
     SetInfo,
+    /// Event that sets the license
     SetLicense,
+    /// Event that sets the schema of the data
     SetDataSchema,
+    /// Event that defines how a derivative dataset is computed
     SetTransform,
+    /// Event that adds a source data can be pushed into
     AddPushSource,
 }

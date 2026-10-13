@@ -178,7 +178,10 @@ impl SqlShellCommand {
                     OutputFormat::Csv => ExportFormat::Csv,
                     OutputFormat::NdJson => ExportFormat::NdJson,
                     OutputFormat::Parquet => ExportFormat::Parquet,
-                    not_supported => {
+                    not_supported @ (OutputFormat::Json
+                    | OutputFormat::JsonSoA
+                    | OutputFormat::JsonAoA
+                    | OutputFormat::Table) => {
                         // Normally should be unreachable, as the case should be caught by
                         // `validate_args` function.
                         unimplemented!("Format {:?} is not supported.", &not_supported)
@@ -228,7 +231,7 @@ impl Command for SqlShellCommand {
                     .join(", ");
                 return Err(CLIError::usage_error(format!(
                     "Invalid output format for export '{}'. Supported formats: {}",
-                    &self.output_config.format, supported_str
+                    self.output_config.format, supported_str
                 )));
             }
         } else if self.records_per_file.is_some() {

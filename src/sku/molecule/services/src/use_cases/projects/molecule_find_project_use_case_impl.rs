@@ -42,7 +42,7 @@ impl MoleculeFindProjectUseCaseImpl {
         // Gain read access to projects dataset
         let projects_reader = self
             .projects_service
-            .reader(&molecule_subject.account_name)
+            .reader(&molecule_subject.account_handle.name)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeFindProjectError>)?;
 
@@ -65,7 +65,7 @@ impl MoleculeFindProjectUseCaseImpl {
         let ctx = SearchContext {
             catalog: &self.catalog,
             security: SearchSecurityContext::Restricted {
-                current_principal_ids: vec![molecule_subject.account_id.to_string()],
+                current_principal_ids: vec![molecule_subject.account_handle.did.to_string()],
             },
         };
 

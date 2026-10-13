@@ -22,6 +22,7 @@ pub struct MetadataChainMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Mutations of the dataset metadata chain
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> MetadataChainMut<'a> {
@@ -103,10 +104,19 @@ impl<'a> MetadataChainMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of committing an event to the metadata chain
 #[derive(Interface, Debug)]
 #[graphql(
-    field(name = "is_success", ty = "bool"),
-    field(name = "message", ty = "String")
+    field(
+        name = "is_success",
+        ty = "bool",
+        desc = "Whether the operation succeeded"
+    ),
+    field(
+        name = "message",
+        ty = "String",
+        desc = "Human-readable outcome message"
+    )
 )]
 pub enum CommitResult<'a> {
     Success(CommitResultSuccess<'a>),
@@ -118,18 +128,23 @@ pub enum CommitResult<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Event was committed to the metadata chain
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CommitResultSuccess<'a> {
+    /// Hash of the chain head before the commit, null if the chain was empty
     pub old_head: Option<Multihash<'a>>,
+    /// Hash of the new chain head
     pub new_head: Multihash<'a>,
 }
 
 #[ComplexObject]
 impl CommitResultSuccess<'_> {
+    /// Always true
     pub async fn is_success(&self) -> bool {
         true
     }
+    /// Human-readable outcome message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -137,13 +152,16 @@ impl CommitResultSuccess<'_> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Request did not change the dataset
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct NoChanges {
+    /// Explanation of why nothing changed
     pub message: String,
 }
 #[ComplexObject]
 impl NoChanges {
+    /// Always true
     pub async fn is_success(&self) -> bool {
         true
     }
@@ -151,13 +169,16 @@ impl NoChanges {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Event could not be appended to the metadata chain
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CommitResultAppendError {
+    /// Reason the append failed
     pub message: String,
 }
 #[ComplexObject]
 impl CommitResultAppendError {
+    /// Always false
     pub async fn is_success(&self) -> bool {
         false
     }

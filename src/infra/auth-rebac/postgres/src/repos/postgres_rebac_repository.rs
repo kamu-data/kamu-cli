@@ -14,6 +14,7 @@ use database_common::{TransactionRefT, postgres_generate_placeholders_tuple_list
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_auth_rebac::*;
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -374,7 +375,7 @@ impl RebacRepository for PostgresRebacRepository {
             )
         );
 
-        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(AssertSqlSafe(query_str));
         for entity in object_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -421,7 +422,7 @@ impl RebacRepository for PostgresRebacRepository {
             )
         );
 
-        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(&query_str);
+        let mut query = sqlx::query_as::<_, EntitiesWithRelationRowModel>(AssertSqlSafe(query_str));
         for entity in subject_entities {
             query = query.bind(entity.entity_type);
             query = query.bind(&entity.entity_id);
@@ -542,7 +543,7 @@ impl RebacRepository for PostgresRebacRepository {
             )
         );
 
-        let mut query = sqlx::query(&query_str)
+        let mut query = sqlx::query(AssertSqlSafe(query_str))
             .bind(object_entity.entity_type)
             .bind(&object_entity.entity_id);
         for subject_entity in &subject_entities {

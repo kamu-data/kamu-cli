@@ -122,7 +122,10 @@ impl ExtraAttributes {
     }
 }
 
-#[expect(clippy::derivable_impls)]
+#[expect(
+    clippy::derivable_impls,
+    reason = "the struct is generated, so a derive cannot be added there"
+)]
 impl Default for ExtraAttributes {
     fn default() -> Self {
         Self {

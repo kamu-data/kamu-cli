@@ -64,7 +64,7 @@ impl odf::dataset::DatasetS3Builder for DatasetS3BuilderDatabaseBackedImpl {
                         DatasetS3BuilderDefault::build_meta_block_repo(
                             odf::storage::lfs::ObjectRepositoryCachingLocalFs::new(
                                 DatasetS3BuilderDefault::build_base_block_repo(&s3_context),
-                                metadata_cache_local_fs_path.clone(),
+                                metadata_cache_local_fs_path,
                             ),
                         ),
                         MetadataChainRefRepositoryDatabaseBackedImpl::new(

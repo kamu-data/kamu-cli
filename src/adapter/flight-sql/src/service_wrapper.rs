@@ -130,7 +130,6 @@ impl KamuFlightSqlServiceWrapper {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Replace with a macro
-#[expect(unused_variables)]
 #[tonic::async_trait]
 impl FlightSqlService for KamuFlightSqlServiceWrapper {
     type FlightService = KamuFlightSqlServiceWrapper;
@@ -574,7 +573,7 @@ impl FlightSqlService for KamuFlightSqlServiceWrapper {
         .await
     }
 
-    async fn register_sql_info(&self, id: i32, result: &SqlInfo) {}
+    async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
 
     async fn do_action_fallback(
         &self,

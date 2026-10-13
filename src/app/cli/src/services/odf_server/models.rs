@@ -53,6 +53,10 @@ impl ServerAccessTokensRecord {
         }
     }
 
+    pub fn has_tokens(&self) -> bool {
+        !self.tokens.is_empty()
+    }
+
     pub fn token_for_account(&self, account_name: &odf::AccountName) -> Option<&AccessToken> {
         self.token_position(account_name)
             .map(|i| self.tokens.get(i).unwrap())
@@ -91,6 +95,9 @@ pub struct AccessTokenFindReport {
     pub frontend_url: Option<Url>,
     pub backend_url: Url,
     pub access_token: AccessToken,
+    /// The store the token was found in, which is not necessarily the scope the
+    /// caller asked for — lookups search workspace before user.
+    pub scope: AccessTokenStoreScope,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,8 +13,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
-use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use kamu_datasets::{CreateDatasetResult, MockDatasetActionAuthorizer, ResolvedDataset};
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

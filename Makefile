@@ -1,4 +1,6 @@
 ODF_SPEC_DIR=../open-data-fabric
+# Version of the ODF spec used by codegen; CI checks out this ref via `make print-odf-spec-ref`
+ODF_SPEC_REF=v0.40.0
 ODF_METADATA_CRATE_DIR=./src/odf/metadata
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
@@ -8,41 +10,61 @@ POSTGRES_CRATES := \
 	./src/infra/accounts/postgres \
 	./src/infra/auth-rebac/postgres \
 	./src/infra/auth-web3/postgres \
+	./src/infra/configuration/postgres \
 	./src/infra/datasets/postgres \
 	./src/infra/flow-system/postgres \
 	./src/infra/messaging-outbox/postgres \
+	./src/infra/resources/postgres \
 	./src/infra/search/cache-postgres \
 	./src/infra/task-system/postgres \
-	./src/infra/webhooks/postgres
-
-MYSQL_CRATES := \
-	./src/e2e/app/cli/mysql \
-	./src/infra/accounts/mysql \
-	./src/infra/datasets/mysql
+	./src/infra/webhooks/postgres \
+	./src/infra/wakeup-listener/postgres
 
 SQLITE_CRATES := \
 	./src/e2e/app/cli/sqlite \
 	./src/infra/accounts/sqlite \
 	./src/infra/auth-rebac/sqlite \
 	./src/infra/auth-web3/sqlite \
+	./src/infra/configuration/sqlite \
 	./src/infra/datasets/sqlite \
 	./src/infra/flow-system/sqlite \
 	./src/infra/messaging-outbox/sqlite \
+	./src/infra/resources/sqlite \
 	./src/infra/search/cache-sqlite \
 	./src/infra/task-system/sqlite \
-	./src/infra/webhooks/sqlite
+	./src/infra/webhooks/sqlite \
+	./src/infra/wakeup-listener/sqlite
 
-ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES) $(SQLITE_CRATES)
-MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
+ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(SQLITE_CRATES)
+MIGRATION_DIRS := ./migrations/postgres ./migrations/sqlite
 
 KAMU_CONTAINER_RUNTIME_TYPE ?= podman
+
+# Keep in sync with `services.postgres.image` in `.github/workflows/build.yaml`
+POSTGRES_IMAGE ?= postgres:18
+
+###############################################################################
+# Formatting
+###############################################################################
+
+.PHONY: fmt
+fmt:
+	cargo fmt --all
+	cargo sort -g -w -n
+	taplo fmt
 
 ###############################################################################
 # Lint
 ###############################################################################
 
 .PHONY: lint
-lint: lint-rustfmt lint-repo lint-deps clippy lint-openapi lint-sqlx
+lint: lint-rustfmt lint-cargo-toml lint-repo lint-harness lint-deps clippy lint-openapi lint-sqlx
+
+
+# Includes every repo lint: the agent harness lints live in kamu-repo-tools
+.PHONY: lint-harness
+lint-harness:
+	python3 -m unittest discover -s scripts/agents/tests -t .
 
 
 .PHONY: lint-rustfmt
@@ -63,6 +85,11 @@ lint-deps:
 .PHONY: lint-sqlx
 lint-sqlx:
 	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
+
+
+.PHONY: check
+check:
+	cargo check --workspace --all-targets
 
 
 .PHONY: clippy
@@ -86,15 +113,23 @@ lint-openapi:
 lint-udeps:
 	cargo udeps --all-targets
 
+
+.PHONY: lint-cargo-toml
+lint-cargo-toml:
+	cargo sort -g -w -n -c
+	taplo fmt --check
+
 ###############################################################################
 # Lint (with fixes)
 ###############################################################################
 
-.PHONY: lint-fix
-lint-fix:
+.PHONY: lint-fix-сlippy
+lint-fix-сlippy:
 	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
-	cargo fmt --all
 
+
+.PHONY: lint-fix
+lint-fix: lint-fix-сlippy fmt
 
 ###############################################################################
 # Sqlx Local Setup (create databases for local work)
@@ -102,38 +137,26 @@ lint-fix:
 
 define Setup_EnvFile
 echo "DATABASE_URL=$(1)://root:root@localhost:$(2)/kamu" > $(3)/.env;
-echo "SQLX_OFFLINE=false" >> $(3)/.env;
+echo "KAMU_POSTGRES_IMAGE=$(POSTGRES_IMAGE)" >> $(3)/.env;
 endef
 
 define Setup_EnvFile_Sqlite
 echo "DATABASE_URL=sqlite://$(1)/kamu.sqlite.db" > $(2)/.env;
-echo "SQLX_OFFLINE=false" >> $(2)/.env;
 endef
 
 .PHONY: sqlx-local-setup
-sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-mariadb sqlx-local-setup-sqlite
+sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-sqlite
 
 .PHONY: sqlx-local-setup-postgres
 sqlx-local-setup-postgres:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) pull postgres:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) pull $(POSTGRES_IMAGE)
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
-	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
+	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d $(POSTGRES_IMAGE)
 	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
 	sleep 3  # Letting the container to start
 	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
 	sqlx database create --database-url postgres://root:root@localhost:5432/kamu
 	sqlx migrate run --source ./migrations/postgres --database-url postgres://root:root@localhost:5432/kamu
-
-.PHONY: sqlx-local-setup-mariadb
-sqlx-local-setup-mariadb:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) pull mariadb:latest
-	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
-	$(KAMU_CONTAINER_RUNTIME_TYPE) run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
-	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
-	sleep 10  # Letting the container to start
-	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done
-	sqlx database create --database-url mysql://root:root@localhost:3306/kamu
-	sqlx migrate run --source ./migrations/mysql --database-url mysql://root:root@localhost:3306/kamu
 
 .PHONY: sqlx-local-setup-sqlite
 sqlx-local-setup-sqlite:
@@ -143,17 +166,12 @@ sqlx-local-setup-sqlite:
 	$(foreach crate,$(SQLITE_CRATES),$(call Setup_EnvFile_Sqlite,$(shell pwd),$(crate)))
 
 .PHONY: sqlx-local-clean
-sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-mariadb sqlx-local-clean-sqlite
+sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-sqlite
 
 .PHONY: sqlx-local-clean-postgres
 sqlx-local-clean-postgres:
 	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-postgres || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-postgres || true
 	$(foreach crate,$(POSTGRES_CRATES),rm $(crate)/.env -f ;)
-
-.PHONY: sqlx-local-clean-mariadb
-sqlx-local-clean-mariadb:
-	$(KAMU_CONTAINER_RUNTIME_TYPE) stop kamu-mariadb || true && $(KAMU_CONTAINER_RUNTIME_TYPE) rm kamu-mariadb || true
-	$(foreach crate,$(MYSQL_CRATES),rm $(crate)/.env -f ;)
 
 .PHONY: sqlx-local-clean-sqlite
 sqlx-local-clean-sqlite:
@@ -172,10 +190,6 @@ sqlx-prepare:
 sqlx-prepare-postgres:
 	$(foreach crate,$(POSTGRES_CRATES),(cd $(crate) && cargo sqlx prepare);)
 
-.PHONY: sqlx-prepare-mariadb
-sqlx-prepare-mariadb:
-	$(foreach crate,$(MYSQL_CRATES),(cd $(crate) && cargo sqlx prepare);)
-
 .PHONY: sqlx-prepare-sqlite
 sqlx-prepare-sqlite:
 	$(foreach crate,$(SQLITE_CRATES),(cd $(crate) && cargo sqlx prepare);)
@@ -187,7 +201,7 @@ sqlx-prepare-sqlite:
 .PHONY: sqlx-add-migration
 sqlx-add-migration:
 	@@echo "Migration name: $${NAME:?Usage: make sqlx-add-migration NAME=new_table}"
-	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add -r $$NAME --source $(dir) );)
+	$(foreach dir,$(MIGRATION_DIRS),(sqlx migrate add $$NAME --source $(dir) );)
 
 ###############################################################################
 # Elasticsearch
@@ -583,6 +597,19 @@ resources:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::resourcegen::)'
 
 
+.PHONY: resources-cli-reference
+resources-cli-reference:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(generate_reference_markdown)'
+
+.PHONY: resources-graphql-schema
+resources-graphql-schema:
+	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-adapter-graphql -E 'test(update_graphql_schema)'
+
+.PHONY: resources-db-schema
+resources-db-schema:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(dump_sqlite_schema) | test(dump_postgres_schema)'
+
+
 ###############################################################################
 # Codegen
 ###############################################################################
@@ -602,22 +629,41 @@ define insert_text_into_beginning
 	mv tmp $(2)
 endef
 
+.PHONY: print-odf-spec-ref
+print-odf-spec-ref:
+	@echo $(ODF_SPEC_REF)
+
+
+# Warns (without failing) when the ODF checkout differs from the pinned ref, so local schema work is not blocked
+.PHONY: codegen-odf-check-version
+codegen-odf-check-version:
+	@expected=$$(git -C $(ODF_SPEC_DIR) rev-parse -q --verify "$(ODF_SPEC_REF)^{commit}") || \
+		{ echo "WARNING: $(ODF_SPEC_REF) not found in $(ODF_SPEC_DIR) (try: git fetch --tags)"; exit 0; }; \
+	actual=$$(git -C $(ODF_SPEC_DIR) rev-parse HEAD); \
+	if [ "$$expected" != "$$actual" ]; then \
+		echo "WARNING: $(ODF_SPEC_DIR) is at $$(git -C $(ODF_SPEC_DIR) describe --tags --always), expected $(ODF_SPEC_REF)"; \
+	fi; \
+	if [ -n "$$(git -C $(ODF_SPEC_DIR) status --porcelain)" ]; then \
+		echo "WARNING: $(ODF_SPEC_DIR) has uncommitted changes"; \
+	fi
+
+
 .PHONY: codegen-odf-dtos
-codegen-odf-dtos:
+codegen-odf-dtos: codegen-odf-check-version
 	$(call odf_codegen, rust-dtos, $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/dtos/dtos_generated.rs
 
 
 .PHONY: codegen-odf-flatbuffers-schema
-codegen-odf-flatbuffers-schema:
+codegen-odf-flatbuffers-schema: codegen-odf-check-version
 	$(call odf_codegen, flatbuffers-schema, $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs)
 
 
 # Requires `flatbuffers` package
 # TODO: Consider using devbox to pin specific versions
 .PHONY: codegen-odf-serde-flatbuffers
-codegen-odf-serde-flatbuffers:
+codegen-odf-serde-flatbuffers: codegen-odf-check-version
 	flatc -o $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_METADATA_CRATE_DIR)/schemas/odf.fbs
 	mv $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 	$(call insert_text_into_beginning, "// Generated with flatc=$(shell flatc --version)", "$(ODF_METADATA_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
@@ -631,7 +677,7 @@ codegen-odf-serde-flatbuffers:
 
 
 .PHONY: codegen-odf-serde-yaml
-codegen-odf-serde-yaml:
+codegen-odf-serde-yaml: codegen-odf-check-version
 	$(call odf_codegen, rust-serde, $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs)
 	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
 	rustfmt $(ODF_METADATA_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
@@ -644,23 +690,23 @@ codegen-engine-tonic:
 	protoc \
 		-I $(ODF_METADATA_CRATE_DIR)/schemas \
 		$(ODF_METADATA_CRATE_DIR)/schemas/engine.proto \
-		--prost_out=$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated \
-		--tonic_out=$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated \
+		--prost_out=$(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated \
+		--tonic_out=$(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated \
 		--tonic_opt=compile_well_known_types
 
-	$(call insert_text_into_beginning, "// Generated with protoc=$(shell protoc --version)", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
-	$(call insert_text_into_beginning, "// Generated with protoc-gen-prost=$(strip $(shell protoc-gen-prost --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
-	$(call insert_text_into_beginning, "// Generated with protoc-gen-tonic=$(strip $(shell protoc-gen-tonic --version))", "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc=$(shell protoc --version)", "$(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated/engine/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc-gen-prost=$(strip $(shell protoc-gen-prost --version))", "$(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated/engine/engine.rs")
+	$(call insert_text_into_beginning, "// Generated with protoc-gen-tonic=$(strip $(shell protoc-gen-tonic --version))", "$(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated/engine/engine.rs")
 
-	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs
-	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.tonic.rs
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated/engine/engine.rs
+	rustfmt $(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated/engine/engine.tonic.rs
 
-	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.rs")
-	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engine/grpc_generated/engine/engine.tonic.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated/engine/engine.rs")
+	$(call add_license_header, "$(ODF_METADATA_CRATE_DIR)/src/engines/grpc_generated/engine/engine.tonic.rs")
 
 
 .PHONY: codegen-graphql
-codegen-graphql:
+codegen-graphql: codegen-odf-check-version
 	$(call odf_codegen, rust-graphql, src/adapter/graphql/src/scalars/odf_generated.rs)
 	$(call add_license_header, "src/adapter/graphql/src/scalars/odf_generated.rs")
 	rustfmt src/adapter/graphql/src/scalars/odf_generated.rs
@@ -678,4 +724,8 @@ codegen: codegen-odf-dtos \
 # Executes codegen action in a nix flake environment that contains necessary tools like `flatc` and `protoc`
 .PHONY: codegen-nix
 codegen-nix:
-	nix develop .config -c make codegen
+	nix develop ./images/nix-dev -c make codegen
+
+.PHONY: nix
+nix:
+	nix develop ./images/nix-dev

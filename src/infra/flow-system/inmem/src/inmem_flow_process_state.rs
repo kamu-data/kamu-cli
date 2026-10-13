@@ -35,7 +35,6 @@ impl InMemoryFlowProcessState {
         }
     }
 
-    #[allow(clippy::collapsible_if)]
     fn apply_filters<'a>(
         &self,
         state: &'a State,
@@ -45,13 +44,12 @@ impl InMemoryFlowProcessState {
             .list_matching_process_states(&filter.scope)
             .filter(|ps| {
                 // Flow types filter
-                if let Some(types) = filter.for_flow_types {
-                    if !types
+                if let Some(types) = filter.for_flow_types
+                    && !types
                         .iter()
                         .any(|&t| t == ps.flow_binding().flow_type.as_str())
-                    {
-                        return false;
-                    }
+                {
+                    return false;
                 }
 
                 // Effective state filter
@@ -112,10 +110,10 @@ impl InMemoryFlowProcessState {
                 }
 
                 // Minimum consecutive failures filter
-                if let Some(min_failures) = filter.min_consecutive_failures {
-                    if ps.consecutive_failures() < min_failures {
-                        return false;
-                    }
+                if let Some(min_failures) = filter.min_consecutive_failures
+                    && ps.consecutive_failures() < min_failures
+                {
+                    return false;
                 }
 
                 true
@@ -126,8 +124,7 @@ impl InMemoryFlowProcessState {
     fn apply_ordering(&self, states: &mut [&FlowProcessState], order: FlowProcessOrder) {
         // Apply ordering with multi-level sort criteria:
         // 1. Primary field (user-defined)
-        // 2. Last attempt time (newest first as tie-breaker, unless it's the primary
-        //    field)
+        // 2. Last attempt time (newest first as tie-breaker, unless it's the primary field)
         // 3. Flow type (for additional stability, unless it's the primary field)
         // 4. Sort key (final tie-breaker for stable pagination)
         states.sort_by(|a, b| {
@@ -229,7 +226,7 @@ impl InMemoryFlowProcessState {
                     // Tie-breaker 2: Last update event ID
                     a.last_applied_event_id().cmp(&b.last_applied_event_id())
                 }
-                primary_order => primary_order,
+                primary_order @ (Ordering::Less | Ordering::Greater) => primary_order,
             }
         });
     }

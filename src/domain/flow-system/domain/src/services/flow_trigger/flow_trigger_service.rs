@@ -41,7 +41,10 @@ pub trait FlowTriggerService: Sync + Send {
     ) -> Result<FlowTriggerState, SetFlowTriggerError>;
 
     /// Lists all flow triggers, which are currently enabled
-    #[allow(clippy::elidable_lifetime_names)] // due to mock
+    #[expect(
+        clippy::elidable_lifetime_names,
+        reason = "mockall::automock needs the named lifetime"
+    )]
     fn list_enabled_triggers<'a>(&'a self) -> FlowTriggerStateStream<'a>;
 
     /// Pauses particular flow trigger (user initiative)

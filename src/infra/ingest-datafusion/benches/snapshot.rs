@@ -13,7 +13,7 @@ use std::sync::Arc;
 use criterion::{Criterion, criterion_group, criterion_main};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,7 +55,7 @@ async fn setup(
     let mut new_aux2 = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows + added_rows);
 
     for i in 0..orig_rows {
-        offset.append_value(i as u64);
+        offset.append_value(u64::try_from(i).unwrap());
         op.append_value(odf::metadata::OperationType::Append as u8);
     }
 

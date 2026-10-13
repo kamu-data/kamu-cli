@@ -11,7 +11,12 @@ use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-simple_string_scalar!(DeviceCode, uuid::Uuid, try_parse);
+simple_string_scalar!(
+    /// Code that identifies a device during the device authorization flow
+    DeviceCode,
+    uuid::Uuid,
+    try_parse
+);
 
 impl From<DeviceCode<'_>> for kamu_accounts::DeviceCode {
     fn from(value: DeviceCode) -> Self {

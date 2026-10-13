@@ -89,7 +89,7 @@ use crate::data::verify_types::{
     request_body = VerifyRequest,
     responses(
         (
-            status = OK, body = VerifyResponse, examples(
+            status = OK, description = "verification result", body = VerifyResponse, examples(
                 ("Success" = (summary = "Verified successfully", value = json!(
                     VerifyResponse { ok: true, error: None}
                 ))),
@@ -114,7 +114,7 @@ use crate::data::verify_types::{
                 ))),
             )
         ),
-        (status = BAD_REQUEST, body = ApiErrorResponse),
+        (status = BAD_REQUEST, description = "malformed request", body = ApiErrorResponse),
     ),
     tag = "odf-query",
     security(
@@ -162,9 +162,7 @@ async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyRespon
     let signature = request.proof.proof_value;
     if let Err(err) = did.verify(&query::to_canonical_json(&request.commitment), &signature) {
         return Ok(VerifyResponse::from(InvalidRequestBadSignature::new(
-            &err.source()
-                .map(std::string::ToString::to_string)
-                .unwrap_or_default(),
+            &err.to_string(),
         )));
     }
 

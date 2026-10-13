@@ -37,7 +37,7 @@ use crate::{
         MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_EVENT_CHANGES_SERVICE,
         MESSAGE_PRODUCER_KAMU_FLOW_TRIGGER_SERVICE,
     ],
-    delivery: MessageDeliveryMechanism::Transactional,
+    consumption_mode: MessageConsumptionMode::TransactionalWrapped,
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct FlowWebhooksEventBridge {

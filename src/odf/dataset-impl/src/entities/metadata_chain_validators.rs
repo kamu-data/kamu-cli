@@ -21,15 +21,13 @@ pub struct ValidateSeedBlockOrderVisitor {}
 
 impl ValidateSeedBlockOrderVisitor {
     pub fn new(block: &MetadataBlock) -> Result<Self, AppendValidationError> {
-        match block.event {
-            MetadataEvent::Seed(_) if block.prev_block_hash.is_some() => {
-                return Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain);
-            }
-            MetadataEvent::Seed(_) => (),
-            _ if block.prev_block_hash.is_none() => {
-                return Err(AppendValidationError::FirstBlockMustBeSeed);
-            }
-            _ => (),
+        let is_seed = matches!(block.event, MetadataEvent::Seed(_));
+        let is_first = block.prev_block_hash.is_none();
+        if is_seed && !is_first {
+            return Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain);
+        }
+        if !is_seed && is_first {
+            return Err(AppendValidationError::FirstBlockMustBeSeed);
         }
 
         Ok(Self {})
@@ -338,25 +336,24 @@ pub struct ValidateAddPushSourceVisitor<'a> {
 impl<'a> ValidateAddPushSourceVisitor<'a> {
     // NOTE: Using the fact that Option<Visitor> implements Visitor
     pub fn new(block: &'a MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
-        match &block.event {
-            MetadataEvent::AddPushSource(e) => {
-                // Queries must be normalized
-                if let Some(transform) = &e.preprocess {
-                    validate_transform(&block.event, transform)?;
-                }
+        let MetadataEvent::AddPushSource(e) = &block.event else {
+            return Ok(None);
+        };
 
-                // Should not provide deprecated DDL and ODF schema at the same time
-                if e.read.schema().is_some() && e.read.ddl_schema().is_some() {
-                    invalid_event!(
-                        block.event.clone(),
-                        "Cannot specify both DDL and ODF schemas at once"
-                    );
-                }
-
-                Ok(Some(Self { new_source: e }))
-            }
-            _ => Ok(None),
+        // Queries must be normalized
+        if let Some(transform) = &e.preprocess {
+            validate_transform(&block.event, transform)?;
         }
+
+        // Should not provide deprecated DDL and ODF schema at the same time
+        if e.read.schema().is_some() && e.read.ddl_schema().is_some() {
+            invalid_event!(
+                block.event.clone(),
+                "Cannot specify both DDL and ODF schemas at once"
+            );
+        }
+
+        Ok(Some(Self { new_source: e }))
     }
 }
 
@@ -377,7 +374,6 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
         &mut self,
         (_, block): HashedMetadataBlockRef,
     ) -> Result<MetadataVisitorDecision, Self::Error> {
-        #[allow(clippy::match_same_arms)]
         match &block.event {
             MetadataEvent::AddPushSource(prev_source) => {
                 if prev_source.source_name == self.new_source.source_name {
@@ -398,7 +394,7 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
                     ))
                 }
             }
-            MetadataEvent::DisablePushSource(_) => {
+            MetadataEvent::DisablePushSource(_) | MetadataEvent::DisablePollingSource(_) => {
                 invalid_event!(
                     self.new_source.clone(),
                     "Source evolution is not yet fully supported",
@@ -410,57 +406,55 @@ impl MetadataChainVisitor for ValidateAddPushSourceVisitor<'_> {
                     "Cannot add a push source while polling source is still active",
                 );
             }
-            MetadataEvent::DisablePollingSource(_) => {
-                invalid_event!(
-                    self.new_source.clone(),
-                    "Source evolution is not yet fully supported",
-                );
-            }
-            _ => unreachable!(),
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::SetDataSchema(_) => unreachable!(),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateSetPollingSourceVisitor<'a> {
-    #[expect(unused)]
-    new_source: &'a SetPollingSource,
-}
+pub struct ValidateSetPollingSourceVisitor;
 
-impl<'a> ValidateSetPollingSourceVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
-        match &block.event {
-            MetadataEvent::SetPollingSource(e) => {
-                // Queries must be normalized
-                if let Some(transform) = &e.preprocess {
-                    validate_transform(&block.event, transform)?;
-                }
+impl ValidateSetPollingSourceVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
+        let MetadataEvent::SetPollingSource(e) = &block.event else {
+            return Ok(None);
+        };
 
-                // Eth source must identify the chain
-                if let FetchStep::EthereumLogs(f) = &e.fetch
-                    && f.chain_id.is_none()
-                    && f.node_url.is_none()
-                {
-                    invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
-                }
-
-                // Should not provide deprecated DDL and ODF schema at the same time
-                if e.read.schema().is_some() && e.read.ddl_schema().is_some() {
-                    invalid_event!(
-                        block.event.clone(),
-                        "Cannot specify both DDL and ODF schemas at once"
-                    );
-                }
-
-                Ok(Some(Self { new_source: e }))
-            }
-            _ => Ok(None),
+        // Queries must be normalized
+        if let Some(transform) = &e.preprocess {
+            validate_transform(&block.event, transform)?;
         }
+
+        // Eth source must identify the chain
+        if let FetchStep::EthereumLogs(f) = &e.fetch
+            && f.chain_id.is_none()
+            && f.node_url.is_none()
+        {
+            invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
+        }
+
+        // Should not provide deprecated DDL and ODF schema at the same time
+        if e.read.schema().is_some() && e.read.ddl_schema().is_some() {
+            invalid_event!(
+                block.event.clone(),
+                "Cannot specify both DDL and ODF schemas at once"
+            );
+        }
+
+        Ok(Some(Self))
     }
 }
 
-impl MetadataChainVisitor for ValidateSetPollingSourceVisitor<'_> {
+impl MetadataChainVisitor for ValidateSetPollingSourceVisitor {
     type Error = AppendValidationError;
 
     fn initial_decision(&self) -> MetadataVisitorDecision {
@@ -559,7 +553,19 @@ impl ValidateEventIsNotEmptyVisitor {
             MetadataEvent::ExecuteTransform(e) if e.is_empty() => {
                 return Err(AppendValidationError::empty_event(e.clone()));
             }
-            _ => (),
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::SetDataSchema(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::DisablePushSource(_)
+            | MetadataEvent::DisablePollingSource(_) => (),
         }
 
         Ok(Self {})
@@ -589,16 +595,17 @@ pub struct ValidateAddDataVisitor<'a> {
 
 impl<'a> ValidateAddDataVisitor<'a> {
     pub fn new(block: &'a MetadataBlock) -> Option<Self> {
-        match &block.event {
-            MetadataEvent::AddData(e) => Some(Self {
-                new_add_data: e,
-                prev_schema: None,
-                prev_add_data: None,
-                next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
-                    | MetadataEventTypeFlags::ADD_DATA,
-            }),
-            _ => None,
-        }
+        let MetadataEvent::AddData(e) = &block.event else {
+            return None;
+        };
+
+        Some(Self {
+            new_add_data: e,
+            prev_schema: None,
+            prev_add_data: None,
+            next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
+                | MetadataEventTypeFlags::ADD_DATA,
+        })
     }
 }
 
@@ -622,7 +629,17 @@ impl MetadataChainVisitor for ValidateAddDataVisitor<'_> {
                 self.prev_schema = Some(e.clone());
                 self.next_block_flags -= MetadataEventTypeFlags::SET_DATA_SCHEMA;
             }
-            _ => unreachable!(),
+            MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::DisablePushSource(_)
+            | MetadataEvent::DisablePollingSource(_) => unreachable!(),
         }
 
         Ok(MetadataVisitorDecision::NextOfType(self.next_block_flags))
@@ -697,18 +714,19 @@ pub struct ValidateExecuteTransformVisitor<'a> {
 
 impl<'a> ValidateExecuteTransformVisitor<'a> {
     pub fn new(block: &'a MetadataBlock) -> Option<Self> {
-        match &block.event {
-            MetadataEvent::ExecuteTransform(e) => Some(Self {
-                new_transform: e,
-                prev_transform: None,
-                prev_schema: None,
-                prev_query: None,
-                next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
-                    | MetadataEventTypeFlags::SET_TRANSFORM
-                    | MetadataEventTypeFlags::EXECUTE_TRANSFORM,
-            }),
-            _ => None,
-        }
+        let MetadataEvent::ExecuteTransform(e) = &block.event else {
+            return None;
+        };
+
+        Some(Self {
+            new_transform: e,
+            prev_transform: None,
+            prev_schema: None,
+            prev_query: None,
+            next_block_flags: MetadataEventTypeFlags::SET_DATA_SCHEMA
+                | MetadataEventTypeFlags::SET_TRANSFORM
+                | MetadataEventTypeFlags::EXECUTE_TRANSFORM,
+        })
     }
 }
 
@@ -736,7 +754,16 @@ impl MetadataChainVisitor for ValidateExecuteTransformVisitor<'_> {
                 self.prev_query = Some(e.clone());
                 self.next_block_flags -= MetadataEventTypeFlags::EXECUTE_TRANSFORM;
             }
-            _ => unreachable!(),
+            MetadataEvent::AddData(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::DisablePushSource(_)
+            | MetadataEvent::DisablePollingSource(_) => unreachable!(),
         }
 
         // Note: `prev_transform` is optional
@@ -886,14 +913,15 @@ pub struct ValidateSetDataSchemaVisitor<'a> {
 
 impl<'a> ValidateSetDataSchemaVisitor<'a> {
     pub fn new(block: &'a MetadataBlock) -> Result<Option<Self>, AppendValidationError> {
-        match &block.event {
-            MetadataEvent::SetDataSchema(new_schema) => Ok(Some(Self {
-                new_schema,
-                prev_schema: None,
-                vocab: None,
-            })),
-            _ => Ok(None),
-        }
+        let MetadataEvent::SetDataSchema(new_schema) = &block.event else {
+            return Ok(None);
+        };
+
+        Ok(Some(Self {
+            new_schema,
+            prev_schema: None,
+            vocab: None,
+        }))
     }
 
     // TODO: Replace with visitor pattern
@@ -907,13 +935,10 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
     }
 
     fn check_allowed_schema_migration_item(diff: &mut DataSchemaDiffItem<'_>) -> bool {
-        #[expect(clippy::match_same_arms)]
         match diff {
-            DataSchemaDiffItem::SchemaAttributesChanged => true,
-            DataSchemaDiffItem::FieldAttributesChanged {
-                field_lhs: _,
-                field_rhs: _,
-            } => true,
+            DataSchemaDiffItem::SchemaAttributesChanged
+            | DataSchemaDiffItem::FieldAttributesChanged { .. }
+            | DataSchemaDiffItem::FieldReordered { .. } => true,
             DataSchemaDiffItem::FieldAdded { field_rhs } => {
                 if field_rhs.is_optional() {
                     // It's OK to introduce a new optional field as this maintains compatibility
@@ -924,7 +949,6 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
                 }
             }
             DataSchemaDiffItem::FieldRemoved { field_lhs: _ } => false,
-            DataSchemaDiffItem::FieldReordered { .. } => true,
             DataSchemaDiffItem::FieldTypeChanged {
                 field_lhs: _,
                 field_rhs: _,
@@ -939,7 +963,10 @@ impl<'a> ValidateSetDataSchemaVisitor<'a> {
     }
 
     fn check_allowed_schema_migration_type(diff: &mut DataTypeDiffItem<'_>) -> bool {
-        #[expect(clippy::match_same_arms)]
+        #[expect(
+            clippy::match_same_arms,
+            reason = "per-variant TODOs explain why each type change is not allowed yet"
+        )]
         match diff {
             DataTypeDiffItem::Changed { lhs: _, rhs: _ } => false,
             // TODO: Field becoming optional is relaxing the schema and a compatibile change from
@@ -982,7 +1009,17 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
             MetadataEvent::SetVocab(e) => {
                 self.vocab = Some(e.clone().into());
             }
-            _ => unreachable!(),
+            MetadataEvent::AddData(_)
+            | MetadataEvent::ExecuteTransform(_)
+            | MetadataEvent::Seed(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::DisablePushSource(_)
+            | MetadataEvent::DisablePollingSource(_) => unreachable!(),
         }
 
         let decision = match (&self.prev_schema, &self.vocab) {

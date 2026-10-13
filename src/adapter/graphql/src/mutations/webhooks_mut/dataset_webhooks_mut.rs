@@ -24,6 +24,7 @@ pub struct DatasetWebhooksMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Webhook subscription mutations of a dataset
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> DatasetWebhooksMut<'a> {
@@ -39,6 +40,7 @@ impl<'a> DatasetWebhooksMut<'a> {
         })
     }
 
+    /// Creates a webhook subscription for this dataset
     pub async fn create_subscription(
         &self,
         ctx: &Context<'_>,
@@ -135,17 +137,26 @@ impl<'a> DatasetWebhooksMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Settings of a webhook subscription
 #[derive(InputObject, Debug)]
 pub struct WebhookSubscriptionInput {
+    /// URL that receives webhook deliveries
     pub target_url: GqlUrl,
+    /// Event types to deliver, at least one is required
     pub event_types: Vec<WebhookEventType>,
+    /// Label to identify the subscription, unique within the dataset
     pub label: WebhookSubscriptionLabel,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of creating a webhook subscription
 #[derive(Interface, Debug)]
-#[graphql(field(name = "message", ty = "String"))]
+#[graphql(field(
+    name = "message",
+    ty = "String",
+    desc = "Human-readable outcome message"
+))]
 pub enum CreateWebhookSubscriptionResult {
     Success(CreateWebhookSubscriptionResultSuccess),
     DuplicateLabel(WebhookSubscriptionDuplicateLabel),
@@ -153,15 +164,19 @@ pub enum CreateWebhookSubscriptionResult {
     NoEventTypesProvided(WebhookSubscriptionNoEventTypesProvided),
 }
 
+/// Webhook subscription was created
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct CreateWebhookSubscriptionResultSuccess {
+    /// Unique identifier of the new subscription
     subscription_id: String,
+    /// Secret for verifying delivery signatures, returned only once
     secret: String,
 }
 
 #[ComplexObject]
 impl CreateWebhookSubscriptionResultSuccess {
+    /// Human-readable success message
     pub async fn message(&self) -> String {
         "Success".to_string()
     }
@@ -169,14 +184,17 @@ impl CreateWebhookSubscriptionResultSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Another subscription of the dataset already uses this label
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct WebhookSubscriptionDuplicateLabel {
+    /// Label that is already taken
     pub label: String,
 }
 
 #[ComplexObject]
 impl WebhookSubscriptionDuplicateLabel {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         format!("Label '{}' is not unique", self.label)
     }
@@ -184,14 +202,17 @@ impl WebhookSubscriptionDuplicateLabel {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Target URL is not acceptable for webhook delivery
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct WebhookSubscriptionInvalidTargetUrl {
+    /// Explanation of why the URL was rejected
     pub inner_message: String,
 }
 
 #[ComplexObject]
 impl WebhookSubscriptionInvalidTargetUrl {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         self.inner_message.clone()
     }
@@ -199,14 +220,17 @@ impl WebhookSubscriptionInvalidTargetUrl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// No event types were provided for the subscription
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct WebhookSubscriptionNoEventTypesProvided {
+    /// Number of event types provided, always zero
     pub num_event_types: usize,
 }
 
 #[ComplexObject]
 impl WebhookSubscriptionNoEventTypesProvided {
+    /// Human-readable error message
     pub async fn message(&self) -> String {
         "At least one event type must be provided".to_string()
     }

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO dataset_dependencies(downstream_dataset_id, upstream_dataset_id)\n            SELECT $1, value\n            FROM json_each($2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "4e485739ffb2b47199d24508d1d2f0b9c08bff99de34594456f9ea99deba0170"
+}

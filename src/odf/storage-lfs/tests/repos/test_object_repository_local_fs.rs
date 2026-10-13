@@ -14,6 +14,8 @@ use odf_storage::testing::test_object_repository_shared;
 use odf_storage::*;
 use opendatafabric_storage_lfs::ObjectRepositoryLocalFSSha3;
 
+use super::test_streams::{InterruptedStream, StalledStream};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
@@ -27,6 +29,8 @@ async fn test_protocol() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_insert_bytes() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
@@ -34,6 +38,8 @@ async fn test_insert_bytes() {
 
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_insert_stream() {
@@ -64,6 +70,53 @@ async fn test_insert_stream() {
     assert_eq!(data, b"foobar");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_interrupted_insert_stream_leaves_no_staging_file() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let repo = ObjectRepositoryLocalFSSha3::new(tmp_repo_dir.path());
+
+    assert_matches!(
+        repo.insert_stream(
+            Box::new(InterruptedStream::new(b"foo")),
+            InsertOpts::default()
+        )
+        .await,
+        Err(InsertError::Internal(_)),
+    );
+
+    assert_eq!(std::fs::read_dir(tmp_repo_dir.path()).unwrap().count(), 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_cancelled_insert_stream_leaves_no_staging_file() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let repo = ObjectRepositoryLocalFSSha3::new(tmp_repo_dir.path());
+
+    let mut insert =
+        Box::pin(repo.insert_stream(Box::new(StalledStream::new(b"foo")), InsertOpts::default()));
+
+    // Drive the write until the staging file exists, then cancel it
+    let mut polls = 0;
+    while std::fs::read_dir(tmp_repo_dir.path()).unwrap().count() == 0 {
+        tokio::select! {
+            biased;
+            res = &mut insert => panic!("Stalled insert completed: {res:?}"),
+            () = tokio::task::yield_now() => {}
+        }
+        polls += 1;
+        assert!(polls < 10_000, "Staging file never appeared");
+    }
+    drop(insert);
+
+    assert_eq!(std::fs::read_dir(tmp_repo_dir.path()).unwrap().count(), 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_delete() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
@@ -72,6 +125,8 @@ async fn test_delete() {
     test_object_repository_shared::test_delete(&repo).await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_insert_precomputed() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
@@ -79,6 +134,8 @@ async fn test_insert_precomputed() {
 
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_insert_expect() {

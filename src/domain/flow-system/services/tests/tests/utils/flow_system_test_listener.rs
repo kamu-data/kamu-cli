@@ -9,6 +9,7 @@
 
 use core::panic;
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
@@ -30,6 +31,8 @@ use kamu_flow_system::*;
 use time_source::FakeSystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) const FLOW_SYSTEM_TEST_LISTENER_NAME: &str = "FlowSystemTestListener";
 
 pub(crate) struct FlowSystemTestListener {
     fake_time_source: Arc<FakeSystemTimeSource>,
@@ -119,6 +122,87 @@ impl FlowSystemTestListener {
         state.dataset_display_names.insert(id, display_name);
     }
 
+    fn display_flow_binding(
+        state: &FlowSystemTestListenerState,
+        flow_binding: &FlowBinding,
+    ) -> String {
+        match flow_binding.scope.scope_type() {
+            FLOW_SCOPE_TYPE_DATASET => {
+                let dataset_id = FlowScopeDataset::new(&flow_binding.scope).dataset_id();
+                format!(
+                    "\"{}\" {}",
+                    state
+                        .dataset_display_names
+                        .get(&dataset_id)
+                        .cloned()
+                        .unwrap_or_else(|| dataset_id.to_string()),
+                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                )
+            }
+            FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
+                let subscription_scope = FlowScopeSubscription::new(&flow_binding.scope);
+                let subscription_id = subscription_scope.subscription_id();
+                let maybe_dataset_id = subscription_scope.maybe_dataset_id();
+
+                format!(
+                    "\"{}\" Subscription: {} {}",
+                    match maybe_dataset_id {
+                        Some(dataset_id) => state
+                            .dataset_display_names
+                            .get(&dataset_id)
+                            .cloned()
+                            .unwrap_or_else(|| dataset_id.to_string()),
+                        None => "<None>".to_string(),
+                    },
+                    subscription_id,
+                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                )
+            }
+            FLOW_SCOPE_TYPE_SYSTEM => {
+                format!(
+                    "System {}",
+                    Self::display_flow_type(flow_binding.flow_type.as_str())
+                )
+            }
+            _ => panic!(
+                "Unexpected flow scope type: {}",
+                flow_binding.scope.scope_type()
+            ),
+        }
+    }
+
+    /// One line per link, upstream flow first, named like the snapshot headings
+    pub(crate) fn display_activation_links(&self, links: &[FlowActivationLink]) -> String {
+        let state = self.state.lock().unwrap();
+
+        let display_flow = |flow_id: &FlowID| {
+            let flow = state.latest_flow_aggregates.get(flow_id).unwrap();
+            format!(
+                "{} Flow ID = {flow_id}",
+                Self::display_flow_binding(&state, &flow.flow_binding)
+            )
+        };
+
+        let mut report = String::new();
+        for link in links {
+            writeln!(
+                report,
+                "{} => {}",
+                display_flow(&link.upstream_flow_id),
+                display_flow(&link.downstream_flow_id)
+            )
+            .unwrap();
+        }
+        report
+    }
+
+    pub(crate) fn flow_ids(&self) -> Vec<FlowID> {
+        let state = self.state.lock().unwrap();
+        let mut flow_ids: Vec<_> = state.latest_flow_aggregates.keys().copied().collect();
+        flow_ids.sort();
+        flow_ids
+    }
+
     fn display_flow_type(flow_type_label: &str) -> &'static str {
         match flow_type_label {
             FLOW_TYPE_DATASET_INGEST => "Ingest",
@@ -164,51 +248,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                     .map(|flow_binding| {
                         (
                             flow_binding,
-                            match flow_binding.scope.scope_type() {
-                                FLOW_SCOPE_TYPE_DATASET => {
-                                    let dataset_id =
-                                        FlowScopeDataset::new(&flow_binding.scope).dataset_id();
-                                    format!(
-                                        "\"{}\" {}",
-                                        state
-                                            .dataset_display_names
-                                            .get(&dataset_id)
-                                            .cloned()
-                                            .unwrap_or_else(|| dataset_id.to_string()),
-                                        Self::display_flow_type(flow_binding.flow_type.as_str())
-                                    )
-                                }
-                                FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
-                                    let subscription_scope =
-                                        FlowScopeSubscription::new(&flow_binding.scope);
-                                    let subscription_id = subscription_scope.subscription_id();
-                                    let maybe_dataset_id = subscription_scope.maybe_dataset_id();
-
-                                    format!(
-                                        "\"{}\" Subscription: {} {}",
-                                        match maybe_dataset_id {
-                                            Some(dataset_id) => state
-                                                .dataset_display_names
-                                                .get(&dataset_id)
-                                                .cloned()
-                                                .unwrap_or_else(|| dataset_id.to_string()),
-                                            None => "<None>".to_string(),
-                                        },
-                                        subscription_id,
-                                        Self::display_flow_type(flow_binding.flow_type.as_str())
-                                    )
-                                }
-                                FLOW_SCOPE_TYPE_SYSTEM => {
-                                    format!(
-                                        "System {}",
-                                        Self::display_flow_type(flow_binding.flow_type.as_str())
-                                    )
-                                }
-                                _ => panic!(
-                                    "Unexpected flow scope type: {}",
-                                    flow_binding.scope.scope_type()
-                                ),
-                            },
+                            Self::display_flow_binding(&state, flow_binding),
                         )
                     })
                     .collect::<Vec<_>>();
@@ -240,7 +280,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                                         - initial_time)
                                         .num_milliseconds()
                                 ),
-                                _ => format!("{:?}", flow_state.status()),
+                                FlowStatus::Finished => format!("{:?}", flow_state.status()),
                             }
                         )?;
 
@@ -371,7 +411,7 @@ impl std::fmt::Display for FlowSystemTestListener {
 #[async_trait::async_trait]
 impl FlowSystemEventProjector for FlowSystemTestListener {
     fn name(&self) -> &'static str {
-        "FlowSystemTestListener"
+        FLOW_SYSTEM_TEST_LISTENER_NAME
     }
 
     /// Apply a *single* event using the open transaction.
@@ -415,6 +455,7 @@ impl FlowSystemEventProjector for FlowSystemTestListener {
 
                     FlowEvent::ActivationCauseAdded(_)
                     | FlowEvent::ConfigSnapshotModified(_)
+                    | FlowEvent::RetryPolicyModified(_)
                     | FlowEvent::Completed(_)
                     | FlowEvent::Initiated(_)
                     | FlowEvent::TaskScheduled(_) => { /* Ignore */ }

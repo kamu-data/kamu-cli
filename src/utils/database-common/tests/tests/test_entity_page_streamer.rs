@@ -393,22 +393,12 @@ struct TestEntity {
     id: usize,
 }
 
+#[mockall::automock]
 #[async_trait::async_trait]
 trait EntitySource {
     async fn init_arguments(&self) -> NoArgs;
 
     async fn entities(&self, pagination: PaginationOpts) -> EntityPageListing<TestEntity>;
-}
-
-mockall::mock! {
-    pub EntitySource {}
-
-    #[async_trait::async_trait]
-    impl EntitySource for EntitySource {
-        async fn init_arguments(&self) -> NoArgs;
-
-        async fn entities(&self, pagination: PaginationOpts) -> EntityPageListing<TestEntity>;
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

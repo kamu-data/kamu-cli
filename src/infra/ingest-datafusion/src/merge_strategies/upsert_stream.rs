@@ -8,10 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Fields};
-use datafusion::common::DFSchema;
+use datafusion::common::{DFSchema, TableReference};
 use datafusion::logical_expr::{LogicalPlanBuilder, Operator, SortExpr};
 use datafusion::prelude::*;
-use datafusion::sql::TableReference;
 use internal_error::*;
 use odf::utils::data::DataFrameExt;
 

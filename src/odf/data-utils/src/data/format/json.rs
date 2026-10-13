@@ -424,11 +424,9 @@ impl<'a, E: Encoder + 'a> Encoder for JsonNullableEncoder<'a, E> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(clippy::unnecessary_wraps)]
-fn write_string_quoted_escaped(s: &str, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
+fn write_string_quoted_escaped(s: &str, buf: &mut dyn std::io::Write) {
     let mut serializer = serde_json::Serializer::new(buf);
     serializer.serialize_str(s).unwrap();
-    Ok(())
 }
 
 struct JsonEscapeStringEncoder<E: Encoder>(E, Vec<u8>);
@@ -440,7 +438,7 @@ impl<E: Encoder> JsonEscapeStringEncoder<E> {
 impl<E: Encoder> Encoder for JsonEscapeStringEncoder<E> {
     fn encode(&mut self, idx: usize, buf: &mut dyn std::io::Write) -> Result<(), WriterError> {
         self.0.encode(idx, &mut self.1)?;
-        write_string_quoted_escaped(std::str::from_utf8(&self.1).unwrap(), buf)?;
+        write_string_quoted_escaped(std::str::from_utf8(&self.1).unwrap(), buf);
         self.1.clear();
         Ok(())
     }
@@ -510,7 +508,7 @@ impl Encoder for JsonStructAoSEncoder<'_> {
                 buf.write_all(b",")?;
             }
 
-            write_string_quoted_escaped(f.name(), buf)?;
+            write_string_quoted_escaped(f.name(), buf);
             buf.write_all(b":")?;
             e.encode(idx, buf)?;
         }
@@ -581,15 +579,15 @@ mod tests {
     #[test_log::test]
     fn test_json_aos_empty() {
         let batch = get_empty_batch();
-        assert_aos_output(batch, json!([]));
+        assert_aos_output(&batch, &json!([]));
     }
 
     #[test_log::test]
     fn test_json_aos_simple() {
         let batch = get_sample_batch();
         assert_aos_output(
-            batch,
-            json!([
+            &batch,
+            &json!([
                 {
                     "bin": "666f6f",
                     "bin_fixed": "0102",
@@ -626,8 +624,8 @@ mod tests {
     fn test_json_aos_lists() {
         let batch = get_batch_lists();
         assert_aos_output(
-            batch,
-            json!([
+            &batch,
+            &json!([
                 {
                     "list_fixed_i32": null,
                     "list_str": null,
@@ -652,8 +650,8 @@ mod tests {
     fn test_json_aos_structs() {
         let batch = get_batch_structs();
         assert_aos_output(
-            batch,
-            json!([
+            &batch,
+            &json!([
                 {
                     "struct": {"a": "foo", "b": "baz"},
                 },
@@ -671,15 +669,15 @@ mod tests {
     #[test_log::test]
     fn test_json_aoa_empty() {
         let batch = get_empty_batch();
-        assert_aoa_output(batch, json!([]));
+        assert_aoa_output(&batch, &json!([]));
     }
 
     #[test_log::test]
     fn test_json_aoa_simple() {
         let batch = get_sample_batch();
         assert_aoa_output(
-            batch,
-            json!([
+            &batch,
+            &json!([
                 [
                     1,
                     100,
@@ -716,8 +714,8 @@ mod tests {
     fn test_json_aoa_lists() {
         let batch = get_batch_lists();
         assert_aoa_output(
-            batch,
-            json!([
+            &batch,
+            &json!([
                 [null, null],
                 [[1, 2], []],
                 [null, ["foo", "bar"]],
@@ -729,7 +727,7 @@ mod tests {
     #[test_log::test]
     fn test_json_aoa_structs() {
         let batch = get_batch_structs();
-        assert_aoa_output(batch, json!([[["foo", "baz"]], [["bar", null]], [null]]));
+        assert_aoa_output(&batch, &json!([[["foo", "baz"]], [["bar", null]], [null]]));
     }
 
     // SoA
@@ -737,8 +735,8 @@ mod tests {
     fn test_json_soa_empty() {
         let batch = get_empty_batch();
         assert_soa_output(
-            batch,
-            json!({
+            &batch,
+            &json!({
                 "bin": [],
                 "bin_fixed": [],
                 "bin_large": [],
@@ -759,8 +757,8 @@ mod tests {
     fn test_json_soa_simple() {
         let batch = get_sample_batch();
         assert_soa_output(
-            batch,
-            json!({
+            &batch,
+            &json!({
                 "bin": ["666f6f", "626172"],
                 "bin_fixed": ["0102", "0304"],
                 "bin_large": ["6c666f6f", "6c626172"],
@@ -784,8 +782,8 @@ mod tests {
     fn test_json_soa_lists() {
         let batch = get_batch_lists();
         assert_soa_output(
-            batch,
-            json!({
+            &batch,
+            &json!({
                 "list_fixed_i32": [null, [1, 2], null, null],
                 "list_str": [null, [], ["foo", "bar"], ["baz", null]],
             }),
@@ -808,15 +806,15 @@ mod tests {
     #[test_log::test]
     fn test_json_ld_empty() {
         let batch = get_empty_batch();
-        assert_ld_output(batch, vec![]);
+        assert_ld_output(&batch, &[]);
     }
 
     #[test_log::test]
     fn test_json_ld_simple() {
         let batch = get_sample_batch();
         assert_ld_output(
-            batch,
-            vec![
+            &batch,
+            &[
                 json!({
                     "bin": "666f6f",
                     "bin_fixed": "0102",
@@ -986,54 +984,50 @@ mod tests {
         .unwrap()
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn assert_aos_output(batch: RecordBatch, expected: serde_json::Value) {
+    fn assert_aos_output(batch: &RecordBatch, expected: &serde_json::Value) {
         let mut buf = Vec::new();
         {
             let mut writer = JsonArrayOfStructsWriter::new(&mut buf);
-            writer.write_batch(&batch).unwrap();
+            writer.write_batch(batch).unwrap();
             writer.finish().unwrap();
         }
         tracing::debug!("Raw result:\n{}", std::str::from_utf8(&buf).unwrap());
 
         let actual: serde_json::Value = serde_json::from_slice(&buf).unwrap();
-        pretty_assertions::assert_eq!(actual, expected);
+        pretty_assertions::assert_eq!(&actual, expected);
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn assert_soa_output(batch: RecordBatch, expected: serde_json::Value) {
+    fn assert_soa_output(batch: &RecordBatch, expected: &serde_json::Value) {
         let mut buf = Vec::new();
         {
             let mut writer = JsonStructOfArraysWriter::new(&mut buf, usize::MAX);
-            writer.write_batch(&batch).unwrap();
+            writer.write_batch(batch).unwrap();
             writer.finish().unwrap();
         }
         tracing::debug!("Raw result:\n{}", std::str::from_utf8(&buf).unwrap());
 
         let actual: serde_json::Value = serde_json::from_slice(&buf).unwrap();
-        pretty_assertions::assert_eq!(actual, expected);
+        pretty_assertions::assert_eq!(&actual, expected);
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn assert_aoa_output(batch: RecordBatch, expected: serde_json::Value) {
+    fn assert_aoa_output(batch: &RecordBatch, expected: &serde_json::Value) {
         let mut buf = Vec::new();
         {
             let mut writer = JsonArrayOfArraysWriter::new(&mut buf);
-            writer.write_batch(&batch).unwrap();
+            writer.write_batch(batch).unwrap();
             writer.finish().unwrap();
         }
         tracing::debug!("Raw result:\n{}", std::str::from_utf8(&buf).unwrap());
 
         let actual: serde_json::Value = serde_json::from_slice(&buf).unwrap();
-        pretty_assertions::assert_eq!(actual, expected);
+        pretty_assertions::assert_eq!(&actual, expected);
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn assert_ld_output(batch: RecordBatch, expected: Vec<serde_json::Value>) {
+    fn assert_ld_output(batch: &RecordBatch, expected: &[serde_json::Value]) {
         let mut buf = Vec::new();
         {
             let mut writer = JsonLineDelimitedWriter::new(&mut buf);
-            writer.write_batch(&batch).unwrap();
+            writer.write_batch(batch).unwrap();
             writer.finish().unwrap();
         }
         let actual_str = std::str::from_utf8(&buf).unwrap();
@@ -1047,6 +1041,6 @@ mod tests {
                 .collect()
         };
 
-        pretty_assertions::assert_eq!(actual, expected);
+        pretty_assertions::assert_eq!(actual.as_slice(), expected);
     }
 }

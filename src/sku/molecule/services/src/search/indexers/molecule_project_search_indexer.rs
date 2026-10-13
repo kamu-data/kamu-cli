@@ -99,8 +99,8 @@ pub(crate) async fn index_projects(
     repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         "Indexing projects for Molecule organization account",
     );
 
@@ -124,7 +124,8 @@ pub(crate) async fn index_projects(
     // Index each project
     for project in projects_listing.list {
         // Serialize project into search document
-        let document = index_project_from_entity(&organization_account.account_id, &project);
+        let document =
+            index_project_from_entity(&organization_account.account_handle.did, &project);
 
         // Note: for now, use OCL ID as document ID
         // This should be revised after implementing non-tokenized projects
@@ -159,8 +160,8 @@ pub(crate) async fn index_projects(
     }
 
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         indexed_documents_count = total_documents_count,
         "Indexed projects for Molecule organization account",
     );

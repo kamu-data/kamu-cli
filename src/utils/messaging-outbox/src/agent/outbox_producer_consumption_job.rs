@@ -12,11 +12,13 @@ use std::sync::{Arc, Mutex};
 
 use database_common_macros::transactional_method;
 use internal_error::{InternalError, ResultIntoInternal};
+use tokio::sync::Semaphore;
 use tracing::Instrument;
 
 use super::{OutboxAgentMetrics, OutboxRoutesStaticInfo, ProducerConsumptionTask};
 use crate::{
     ConsumerFilter,
+    MessageConsumptionMode,
     MessageDispatcher,
     OutboxMessage,
     OutboxMessageBoundary,
@@ -36,6 +38,7 @@ pub(crate) struct ProducerConsumptionJob {
     consumer_names: Vec<String>,
     failed_consumer_names: Mutex<HashSet<String>>,
     metrics: Arc<OutboxAgentMetrics>,
+    consumer_permits: Arc<Semaphore>,
 }
 
 impl ProducerConsumptionJob {
@@ -45,6 +48,7 @@ impl ProducerConsumptionJob {
         producer_name: String,
         consumer_names: Vec<String>,
         metrics: Arc<OutboxAgentMetrics>,
+        consumer_permits: Arc<Semaphore>,
     ) -> Self {
         Self {
             catalog,
@@ -53,6 +57,7 @@ impl ProducerConsumptionJob {
             consumer_names,
             metrics,
             failed_consumer_names: Mutex::new(HashSet::new()),
+            consumer_permits,
         }
     }
 
@@ -80,10 +85,11 @@ impl ProducerConsumptionJob {
         consumption_task: ProducerConsumptionTask,
     ) -> Result<ProcessedConsumerTasksCount, InternalError> {
         // Clone names of failing consumers before this iteration.
-        let mut failing_consumer_names = {
+        let mut permanently_failed_consumer_names = {
             let g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
             g_failed_consumer_names.clone()
         };
+        let mut blocked_consumer_names = permanently_failed_consumer_names.clone();
 
         let mut processed_consumer_tasks_count = 0;
 
@@ -95,7 +101,7 @@ impl ProducerConsumptionJob {
             let mut consumer_tasks = Vec::new();
             for consumer_name in &self.consumer_names {
                 // Skip consumers, which are failing
-                if failing_consumer_names.contains(consumer_name) {
+                if blocked_consumer_names.contains(consumer_name) {
                     continue;
                 }
 
@@ -119,12 +125,15 @@ impl ProducerConsumptionJob {
 
             // Create individual transaction objects
             let catalog = self.catalog.upgrade();
-            let transactions: Vec<ConsumeMessageTransaction> = consumer_tasks
+            let consume_message_tasks: Vec<ConsumeMessageTask> = consumer_tasks
                 .into_iter()
-                .map(|(consumer_name, message)| ConsumeMessageTransaction {
+                .map(|(consumer_name, message)| ConsumeMessageTask {
                     catalog: catalog.clone(),
                     consumer_name: consumer_name.to_string(),
                     message: Arc::clone(message),
+                    consumption_mode: self
+                        .routes_static_info
+                        .consumer_consumption_mode(consumer_name),
                     dispatcher: Arc::clone(
                         self.routes_static_info
                             .message_dispatchers_by_producers
@@ -134,14 +143,22 @@ impl ProducerConsumptionJob {
                 })
                 .collect();
 
-            // Spawn message consumption transactions as concurrent tokio tasks
+            // Spawn per-consumer message processing tasks as concurrent tokio tasks,
+            // each waiting for a permit before opening its transaction
             let mut join_set = tokio::task::JoinSet::new();
-            for tx in transactions {
-                join_set.spawn(tx.invoke());
+            for consume_message_task in consume_message_tasks {
+                let consumer_permits = self.consumer_permits.clone();
+                join_set.spawn(async move {
+                    let _permit = consumer_permits
+                        .acquire_owned()
+                        .await
+                        .expect("Consumer permits are never closed");
+                    consume_message_task.invoke().await
+                });
             }
 
-            // Report errors and disable failing consumers, as they cannot advance to the
-            // next messages without success of processing the current one
+            // Report errors and block consumers from advancing to later messages in
+            // this iteration, as they cannot skip over a failed message.
             while let Some(res) = join_set.join_next().await {
                 match res.int_err()? {
                     Ok(tx) => {
@@ -153,23 +170,25 @@ impl ProducerConsumptionJob {
                             .inc();
                     }
                     Err(err) => {
+                        blocked_consumer_names.insert(err.task.consumer_name.clone());
+
                         self.metrics
                             .failed_consumers_total
-                            .with_label_values(&[&self.producer_name, &err.tx.consumer_name])
+                            .with_label_values(&[&self.producer_name, &err.task.consumer_name])
                             .set(1);
 
-                        failing_consumer_names.insert(err.tx.consumer_name);
+                        permanently_failed_consumer_names.insert(err.task.consumer_name);
                     }
                 }
             }
 
-            // If all consumers are failing, time to interrupt this iteration
-            assert!(failing_consumer_names.len() <= self.consumer_names.len());
-            if failing_consumer_names.len() == self.consumer_names.len() {
+            // If all consumers are blocked, time to interrupt this iteration
+            assert!(blocked_consumer_names.len() <= self.consumer_names.len());
+            if blocked_consumer_names.len() == self.consumer_names.len() {
                 tracing::error!(
                     producer_name = self.producer_name,
                     message_id = ?message.message_id,
-                    "Outbox consumption iteration interrupted, all consumers are failing"
+                    "Outbox consumption iteration interrupted, all consumers are blocked"
                 );
                 break;
             }
@@ -177,7 +196,7 @@ impl ProducerConsumptionJob {
 
         // Update list of failing consumer names for this job
         let mut g_failed_consumer_names = self.failed_consumer_names.lock().unwrap();
-        *g_failed_consumer_names = failing_consumer_names;
+        *g_failed_consumer_names = permanently_failed_consumer_names;
 
         Ok(processed_consumer_tasks_count)
     }
@@ -185,27 +204,29 @@ impl ProducerConsumptionJob {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A wrapper that represents a consumption of a single message and advancement
-/// of the last consumed record under one DB transaction
-struct ConsumeMessageTransaction {
+/// A wrapper that represents handling a single consumer/message pair and
+/// advancing the consumer boundary after successful processing.
+struct ConsumeMessageTask {
     catalog: dill::Catalog,
     consumer_name: String,
     message: Arc<OutboxMessage>,
+    consumption_mode: MessageConsumptionMode,
     dispatcher: Arc<dyn MessageDispatcher>,
 }
 
-impl ConsumeMessageTransaction {
-    /// This is a root-level transaction and is expected to run in a dedicated
-    /// tokio task
+impl ConsumeMessageTask {
+    /// This is a root-level processing task and is expected to run in a
+    /// dedicated tokio task.
     async fn invoke(self) -> Result<Self, ConsumeMessageError> {
         let span = observability::tracing::root_span!(
             "Outbox::consume_message",
             producer = %self.message.producer_name,
             consumer = %self.consumer_name,
             message_id = %self.message.message_id,
+            consumption_mode = ?self.consumption_mode,
         );
 
-        match self.invoke_transactional().instrument(span).await {
+        match self.invoke_with_mode().instrument(span).await {
             Ok(()) => Ok(self),
             Err(err) => {
                 tracing::error!(
@@ -213,20 +234,29 @@ impl ConsumeMessageTransaction {
                     error_msg = %err,
                     consumer_name = %self.consumer_name,
                     outbox_message = ?self.message,
-                    "Consuming outbox message failed - pausing further \
-                     message processing for consumer until restart."
+                    "Consuming outbox message failed"
                 );
 
                 Err(ConsumeMessageError {
-                    tx: self,
+                    task: self,
                     source: err,
                 })
             }
         }
     }
 
+    async fn invoke_with_mode(&self) -> Result<(), InternalError> {
+        match self.consumption_mode {
+            MessageConsumptionMode::Immediate => Err(InternalError::new(
+                "Immediate consumers are not expected in durable outbox processing",
+            )),
+            MessageConsumptionMode::TransactionalWrapped => self.invoke_wrapped().await,
+            MessageConsumptionMode::TransactionalSelfManaged => self.invoke_self_managed().await,
+        }
+    }
+
     #[transactional_method]
-    async fn invoke_transactional(&self) -> Result<(), InternalError> {
+    async fn invoke_wrapped(&self) -> Result<(), InternalError> {
         tracing::debug!(
             outbox_message = ?self.message,
             "Consuming message"
@@ -252,13 +282,51 @@ impl ConsumeMessageTransaction {
             "Shifting consumption record"
         );
 
-        let outbox_message_bridge = transaction_catalog
-            .get_one::<dyn OutboxMessageBridge>()
-            .unwrap();
+        self.mark_consumed(&transaction_catalog).await?;
+
+        Ok(())
+    }
+
+    async fn invoke_self_managed(&self) -> Result<(), InternalError> {
+        tracing::debug!(
+            outbox_message = ?self.message,
+            "Consuming message without framework transaction"
+        );
+
+        let content_json = self.message.content_json.to_string();
+
+        self.dispatcher
+            .dispatch_message(
+                &self.catalog,
+                ConsumerFilter::SelectedConsumer(&self.consumer_name),
+                &content_json,
+                self.message.version,
+            )
+            .await?;
+
+        self.mark_consumed_transactionally().await
+    }
+
+    #[transactional_method]
+    async fn mark_consumed_transactionally(&self) -> Result<(), InternalError> {
+        tracing::debug!(
+            consumer_name = %self.consumer_name,
+            producer_name = %self.message.producer_name,
+            last_consumed_message_id = %self.message.message_id,
+            "Shifting consumption record"
+        );
+
+        self.mark_consumed(&transaction_catalog).await?;
+
+        Ok(())
+    }
+
+    async fn mark_consumed(&self, target_catalog: &dill::Catalog) -> Result<(), InternalError> {
+        let outbox_message_bridge = target_catalog.get_one::<dyn OutboxMessageBridge>().unwrap();
 
         outbox_message_bridge
             .mark_consumed(
-                &transaction_catalog,
+                target_catalog,
                 &self.message.producer_name,
                 &self.consumer_name,
                 OutboxMessageBoundary {
@@ -267,15 +335,13 @@ impl ConsumeMessageTransaction {
                 },
             )
             .await
-            .int_err()?;
-
-        Ok(())
+            .int_err()
     }
 }
 
-impl std::fmt::Debug for ConsumeMessageTransaction {
+impl std::fmt::Debug for ConsumeMessageTask {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ConsumeMessageTransaction")
+        f.debug_struct("ConsumeMessageTask")
             .field("consumer_name", &self.consumer_name)
             .field("message", &self.message)
             .finish_non_exhaustive()
@@ -287,7 +353,7 @@ impl std::fmt::Debug for ConsumeMessageTransaction {
 #[derive(Debug, thiserror::Error)]
 #[error("Consuming outbox message failed")]
 struct ConsumeMessageError {
-    pub tx: ConsumeMessageTransaction,
+    pub task: ConsumeMessageTask,
     pub source: InternalError,
 }
 

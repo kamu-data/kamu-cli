@@ -18,6 +18,7 @@ pub struct AccountAccessTokens<'a> {
     account_id: &'a AccountID<'a>,
 }
 
+/// Access tokens of an account
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl<'a> AccountAccessTokens<'a> {
@@ -28,6 +29,7 @@ impl<'a> AccountAccessTokens<'a> {
         Self { account_id }
     }
 
+    /// Lists access tokens of this account, including revoked ones
     #[tracing::instrument(level = "info", name = AccountAccessTokens_list_access_tokens, skip_all)]
     async fn list_access_tokens(
         &self,

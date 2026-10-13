@@ -303,7 +303,7 @@ impl SearchRepository for ElasticsearchRepository {
                     entity_kind = %schema.schema_name,
                     "Search entity schema is already registered, skipping",
                 );
-                assert!(registered_schema.version == schema.version);
+                assert_eq!(registered_schema.version, schema.version);
                 return Ok(());
             }
         }

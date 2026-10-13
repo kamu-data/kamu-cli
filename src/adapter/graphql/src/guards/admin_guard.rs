@@ -35,7 +35,7 @@ impl Guard for AdminGuard {
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(a) => {
                 if rebac_service
-                    .is_account_admin(&a.account_id)
+                    .is_account_admin(&a.account_handle.did)
                     .await
                     .int_err()?
                 {
@@ -43,7 +43,9 @@ impl Guard for AdminGuard {
                 }
                 Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))
             }
-            _ => Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE)),
+            CurrentAccountSubject::Anonymous(_) => {
+                Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE))
+            }
         }
     }
 }

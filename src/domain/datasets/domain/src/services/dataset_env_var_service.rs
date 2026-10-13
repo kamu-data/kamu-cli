@@ -9,30 +9,18 @@
 
 use database_common::PaginationOpts;
 use internal_error::InternalError;
-use uuid::Uuid;
+use thiserror::Error;
 
-use crate::{
-    DatasetEnvVar,
-    DatasetEnvVarValue,
-    DeleteDatasetEnvVarError,
-    GetDatasetEnvVarError,
-    UpsertDatasetEnvVarStatus,
-};
+use crate::{DatasetEnvVar, DatasetEnvVarValue};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatasetEnvVarService: Sync + Send {
-    async fn upsert_dataset_env_var(
+    async fn get_dataset_env_var_by_key(
         &self,
-        dataset_env_var_key: &str,
-        dataset_env_var_value: &DatasetEnvVarValue,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetEnvVarUpsertResult, InternalError>;
-
-    async fn get_dataset_env_var_by_id(
-        &self,
-        dataset_env_var_id: &Uuid,
+        dataset_env_var_key: &str,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError>;
 
     async fn get_exposed_value(
@@ -46,9 +34,17 @@ pub trait DatasetEnvVarService: Sync + Send {
         pagination: Option<PaginationOpts>,
     ) -> Result<DatasetEnvVarListing, GetDatasetEnvVarError>;
 
+    async fn upsert_dataset_env_var(
+        &self,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
+        dataset_env_var_value: &DatasetEnvVarValue,
+    ) -> Result<DatasetEnvVarUpsertResult, InternalError>;
+
     async fn delete_dataset_env_var(
         &self,
-        dataset_env_var_id: &Uuid,
+        dataset_id: &odf::DatasetID,
+        dataset_env_var_key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError>;
 }
 
@@ -63,6 +59,49 @@ pub struct DatasetEnvVarListing {
 pub struct DatasetEnvVarUpsertResult {
     pub dataset_env_var: DatasetEnvVar,
     pub status: UpsertDatasetEnvVarStatus,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetEnvVarError {
+    #[error(transparent)]
+    NotFound(DatasetEnvVarNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+#[error("Dataset environment variable not found: '{dataset_env_var_key}'")]
+pub struct DatasetEnvVarNotFoundError {
+    pub dataset_env_var_key: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteDatasetEnvVarError {
+    #[error(transparent)]
+    NotFound(DatasetEnvVarNotFoundError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct UpsertDatasetEnvVarResult {
+    pub key: String,
+    pub status: UpsertDatasetEnvVarStatus,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum UpsertDatasetEnvVarStatus {
+    Created,
+    Updated,
+    UpToDate,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_resource_upstream_flow_extractor;
 mod flow_datasets_event_bridge;
 mod transform_flow_evaluator_impl;
 
+pub use dataset_resource_upstream_flow_extractor::*;
 pub use flow_datasets_event_bridge::*;
 pub use transform_flow_evaluator_impl::*;

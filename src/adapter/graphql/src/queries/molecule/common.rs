@@ -19,7 +19,7 @@ pub fn molecule_subject(ctx: &Context<'_>) -> Result<LoggedAccount> {
     let subject = from_catalog_n!(ctx, CurrentAccountSubject);
     let subject_molecule = match subject.as_ref() {
         CurrentAccountSubject::Logged(subj)
-            if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_name.as_str()) =>
+            if MOLECULE_ORG_ACCOUNTS.contains(&subj.account_handle.name.as_str()) =>
         {
             subj
         }

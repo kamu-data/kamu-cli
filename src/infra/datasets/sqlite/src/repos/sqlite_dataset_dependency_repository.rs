@@ -13,7 +13,7 @@ use database_common::{TransactionRefT, sqlite_generate_placeholders_list};
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use sqlx::{QueryBuilder, Sqlite};
+use sqlx::AssertSqlSafe;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,28 +109,39 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let mut query_builder = QueryBuilder::<Sqlite>::new(
+        let downstream_dataset_id_str = downstream_dataset_id.as_did_str().to_string();
+        let upstream_dataset_ids_json = serde_json::to_string(
+            &new_upstream_dataset_ids
+                .iter()
+                .map(|id| id.as_did_str().to_string())
+                .collect::<Vec<_>>(),
+        )
+        .int_err()?;
+
+        let query_result = sqlx::query!(
             r#"
             INSERT INTO dataset_dependencies(downstream_dataset_id, upstream_dataset_id)
+            SELECT $1, value
+            FROM json_each($2)
             "#,
-        );
-
-        query_builder.push_values(new_upstream_dataset_ids, |mut b, upsteam_dataset_id| {
-            b.push_bind(downstream_dataset_id.as_did_str().to_string());
-            b.push_bind(upsteam_dataset_id.as_did_str().to_string());
-        });
-
-        let query_result = query_builder.build().execute(connection_mut).await;
+            downstream_dataset_id_str,
+            upstream_dataset_ids_json,
+        )
+        .execute(connection_mut)
+        .await;
         if let Err(e) = query_result {
-            return Err(match e {
-                sqlx::Error::Database(e) if e.is_unique_violation() => {
+            return Err(
+                if let Some(db_err) = e.as_database_error()
+                    && db_err.is_unique_violation()
+                {
                     AddDependencyDuplicateError {
                         downstream_dataset_id: downstream_dataset_id.clone(),
                     }
                     .into()
-                }
-                _ => AddDependenciesError::Internal(e.int_err()),
-            });
+                } else {
+                    AddDependenciesError::Internal(e.int_err())
+                },
+            );
         }
 
         Ok(())
@@ -164,7 +175,7 @@ impl DatasetDependencyRepository for SqliteDatasetDependencyRepository {
 
         // ToDo replace it by macro once sqlx will support it
         // https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
-        let mut query = sqlx::query(&query_str);
+        let mut query = sqlx::query(AssertSqlSafe(query_str));
 
         let stack_downstream_dataset_id = downstream_dataset_id.as_did_str().to_stack_string();
         query = query.bind(stack_downstream_dataset_id.as_str());

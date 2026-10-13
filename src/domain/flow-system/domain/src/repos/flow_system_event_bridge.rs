@@ -9,7 +9,7 @@
 
 use event_sourcing::EventID;
 use internal_error::InternalError;
-use messaging_outbox::MessageStoreWakeupDetector;
+use wakeup_listener::WakeupListener;
 
 use crate::FlowSystemEvent;
 
@@ -17,8 +17,9 @@ use crate::FlowSystemEvent;
 
 #[async_trait::async_trait]
 pub trait FlowSystemEventBridge: Send + Sync {
-    /// Provides event store wakeup detector instance
-    fn wakeup_detector(&self) -> &dyn MessageStoreWakeupDetector;
+    /// The agent's own listener handle, kept for its lifetime: a shared one
+    /// would lose wakeups. Its heartbeat is labelled with the agent's name
+    fn new_wakeup_listener(&self) -> Box<dyn WakeupListener>;
 
     /// Fetch next batch for the given projector; order by global id.
     async fn fetch_next_batch(
@@ -27,6 +28,13 @@ pub trait FlowSystemEventBridge: Send + Sync {
         projector_name: &'static str,
         batch_size: usize,
     ) -> Result<Vec<FlowSystemEvent>, InternalError>;
+
+    /// Whether committed events exist that fetches do not return yet, because a
+    /// transaction that started earlier is still running
+    async fn has_held_back_events(
+        &self,
+        transaction_catalog: &dill::Catalog,
+    ) -> Result<bool, InternalError>;
 
     /// Mark these events as applied for this projector (should be idempotent!).
     async fn mark_applied(

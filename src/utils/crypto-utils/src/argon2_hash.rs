@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use aes_gcm::aead::OsRng;
-use argon2::{Algorithm, Argon2, Params, PasswordHash, Version};
+use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
 use internal_error::{InternalError, ResultIntoInternal};
-use password_hash::{PasswordHasher, PasswordVerifier, SaltString};
 
 use crate::Hasher;
 
@@ -42,9 +40,7 @@ impl Argon2Hasher<'_> {
     }
 
     fn hash_impl(&self, value: &[u8]) -> String {
-        let salt = SaltString::generate(&mut OsRng);
-
-        self.argon2.hash_password(value, &salt).unwrap().to_string()
+        self.argon2.hash_password(value).unwrap().to_string()
     }
 
     fn verify_impl(&self, value: &[u8], hashed_value: &str) -> bool {

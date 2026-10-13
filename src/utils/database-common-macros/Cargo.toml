@@ -23,7 +23,7 @@ proc-macro = true
 
 [dependencies]
 quote = "1"
-syn = { version = "2", default-features = false, features = [
+syn = { version = "3", default-features = false, features = [
     "full",
     "parsing",
     "printing",

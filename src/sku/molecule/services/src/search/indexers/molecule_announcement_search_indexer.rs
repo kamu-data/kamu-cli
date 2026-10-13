@@ -143,8 +143,8 @@ pub(crate) async fn index_announcements(
     repo: &dyn SearchRepository,
 ) -> Result<usize, InternalError> {
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         "Indexing global announcements for Molecule organization account",
     );
 
@@ -187,7 +187,7 @@ pub(crate) async fn index_announcements(
             // Serialize announcement into search document
             let document = indexing_helper
                 .index_announcement_from_global_entity(
-                    &organization_account.account_id,
+                    &organization_account.account_handle.did,
                     &announcement,
                 )
                 .await?;
@@ -216,8 +216,8 @@ pub(crate) async fn index_announcements(
     }
 
     tracing::info!(
-        organization_account_name = organization_account.account_name.as_str(),
-        organization_account_id = organization_account.account_id.to_string(),
+        organization_account_name = organization_account.account_handle.name.as_str(),
+        organization_account_id = organization_account.account_handle.did.to_string(),
         indexed_documents_count = total_documents_count,
         "Indexed global announcements for Molecule organization account",
     );

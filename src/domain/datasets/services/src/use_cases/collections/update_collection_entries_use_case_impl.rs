@@ -292,7 +292,7 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
                             collection_dataset.get_alias(),
                         );
                         retry_count += 1;
-                        sleep(Duration::from_secs(retry_count as u64)).await;
+                        sleep(Duration::from_secs(u64::try_from(retry_count).unwrap())).await;
                         continue;
                     }
 
