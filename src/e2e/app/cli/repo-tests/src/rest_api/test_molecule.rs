@@ -37,7 +37,7 @@ pub const MULTITENANT_MOLECULE_CONFIG: &str = indoc::indoc!(
             - accountName: molecule
               password: molecule.dev
               email: molecule@example.com
-              properties: [ admin, canProvisionAccounts ]
+              properties: [ canProvisionAccounts ]
       quotaDefaults:
         storage: 1000000000
     "#
@@ -94,6 +94,8 @@ pub async fn test_molecule_data_room_quota_exceeded(
 ) {
     const ACCOUNT: &str = "molecule";
     const PASSWORD: &str = "molecule.dev";
+    const ADMIN_ACCOUNT: &str = "kamu";
+    const ADMIN_PASSWORD: &str = "kamu.dev";
 
     kamu_api_server_client
         .auth()
@@ -119,9 +121,18 @@ pub async fn test_molecule_data_room_quota_exceeded(
         "Project creation failed: {create_project_res:?}"
     );
 
+    // Only an admin can set quotas
+    kamu_api_server_client
+        .auth()
+        .login_with_password(ADMIN_ACCOUNT, ADMIN_PASSWORD)
+        .await;
     kamu_api_server_client
         .account()
         .set_account_quota_bytes(ACCOUNT, 1)
+        .await;
+    kamu_api_server_client
+        .auth()
+        .login_with_password(ACCOUNT, PASSWORD)
         .await;
 
     let encoded = base64::engine::general_purpose::STANDARD_NO_PAD.encode(b"hello");
@@ -158,6 +169,8 @@ pub async fn test_molecule_announcements_quota_exceeded(
 ) {
     const ACCOUNT: &str = "molecule";
     const PASSWORD: &str = "molecule.dev";
+    const ADMIN_ACCOUNT: &str = "kamu";
+    const ADMIN_PASSWORD: &str = "kamu.dev";
 
     kamu_api_server_client
         .auth()
@@ -183,9 +196,18 @@ pub async fn test_molecule_announcements_quota_exceeded(
         "Project creation failed: {create_project_res:?}"
     );
 
+    // Only an admin can set quotas
+    kamu_api_server_client
+        .auth()
+        .login_with_password(ADMIN_ACCOUNT, ADMIN_PASSWORD)
+        .await;
     kamu_api_server_client
         .account()
         .set_account_quota_bytes(ACCOUNT, 1)
+        .await;
+    kamu_api_server_client
+        .auth()
+        .login_with_password(ACCOUNT, PASSWORD)
         .await;
 
     let announcement_res = kamu_api_server_client

@@ -14,7 +14,7 @@ use base64::Engine as _;
 use bon::bon;
 use chrono::Utc;
 use indoc::indoc;
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_accounts::{AccountQuotaService, CurrentAccountSubject, LoggedAccount, QuotaType};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_core::*;
@@ -1304,10 +1304,6 @@ async fn test_molecule_data_room_quota_exceeded(
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
-        .predefined_account_opts(PredefinedAccountOpts {
-            is_admin: true,
-            ..Default::default()
-        })
         .build()
         .await;
 
@@ -1323,27 +1319,7 @@ async fn test_molecule_data_room_quota_exceeded(
     assert!(create_project_res.is_ok(), "{create_project_res:#?}");
 
     // Cap storage to force quota failure
-    let set_quota_res = harness
-        .execute_authorized_query(
-            async_graphql::Request::new(indoc!(
-                r#"
-            mutation ($limit: Int!) {
-              accounts {
-                me {
-                  quotas {
-                    setAccountQuotas(quotas: { storage: { limitTotalBytes: $limit } }) {
-                      isSuccess
-                    }
-                  }
-                }
-              }
-            }
-            "#
-            ))
-            .variables(async_graphql::Variables::from_json(json!({ "limit": 1 }))),
-        )
-        .await;
-    assert!(set_quota_res.is_ok(), "{set_quota_res:#?}");
+    harness.set_own_storage_quota(1).await;
 
     // Try uploading a file - should fail with quota exceeded
     let upload_res = harness
@@ -4633,10 +4609,6 @@ async fn test_molecule_announcements_quota_exceeded(
     let harness = GraphQLMoleculeHarness::builder()
         .search_variant(search_variant)
         .tenancy_config(TenancyConfig::MultiTenant)
-        .predefined_account_opts(PredefinedAccountOpts {
-            is_admin: true,
-            ..Default::default()
-        })
         .build()
         .await;
 
@@ -4652,24 +4624,7 @@ async fn test_molecule_announcements_quota_exceeded(
     assert!(create_project_res.is_ok(), "{create_project_res:#?}");
 
     // Set very small quota
-    let set_quota_res = harness
-        .execute_authorized_query(async_graphql::Request::new(indoc!(
-            r#"
-            mutation {
-              accounts {
-                me {
-                  quotas {
-                    setAccountQuotas(quotas: { storage: { limitTotalBytes: 1 } }) {
-                      isSuccess
-                    }
-                  }
-                }
-              }
-            }
-            "#
-        )))
-        .await;
-    assert!(set_quota_res.is_ok(), "{set_quota_res:#?}");
+    harness.set_own_storage_quota(1).await;
 
     // Attempt to create announcement - expect quota error surfaced
     let announcement_res = harness
@@ -12241,6 +12196,24 @@ impl GraphQLMoleculeHarness {
                     .data(catalog),
             )
             .await
+    }
+
+    /// Sets the storage quota directly: the `setAccountQuotas` mutation is
+    /// admin-only, and admin accounts are never limited by quota.
+    async fn set_own_storage_quota(&self, limit_bytes: u64) {
+        let quota_service = self
+            .catalog_authorized
+            .get_one::<dyn AccountQuotaService>()
+            .unwrap();
+
+        quota_service
+            .set_account_quota(
+                &self.molecule_account_handle.did,
+                limit_bytes,
+                QuotaType::storage_space(),
+            )
+            .await
+            .unwrap();
     }
 
     async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
