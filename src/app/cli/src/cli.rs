@@ -1468,6 +1468,10 @@ Show detailed content of all blocks:
 Using a filter to inspect blocks containing query changes of a derivative dataset:
 
     kamu log -o yaml --filter source org.example.data
+
+Print the event kind of every block as one JSON object per line, for scripts:
+
+    kamu log -o ndjson org.example.data | jq .content.event.kind
 "#)]
 pub struct Log {
     /// Format of the output

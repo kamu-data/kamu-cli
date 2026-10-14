@@ -246,7 +246,8 @@ pub async fn test_log_command(kamu: KamuCliPuppet) {
                                player_id,
                                score
                         FROM player_scores
-                        LIMIT 2"#
+                        LIMIT 2
+                        "#
                     )
                     .into(),
                 }]),
@@ -271,6 +272,90 @@ pub async fn test_log_command(kamu: KamuCliPuppet) {
             pretty_assertions::assert_eq!(&expected_set_vocab, actual_set_vocab);
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_log_command_json_output(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.execute_with_input(
+        ["ingest", "player-scores", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await
+    .success();
+
+    kamu.execute_with_input(
+        ["ingest", "player-scores", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await
+    .success();
+
+    let ndjson_records = kamu
+        .log_stdout(&DATASET_ROOT_PLAYER_NAME, &["-o", "ndjson"])
+        .await
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).unwrap())
+        .collect::<Vec<_>>();
+
+    assert!(ndjson_records.iter().all(|r| r["kind"] == "MetadataBlock"));
+    pretty_assertions::assert_eq!(
+        vec![
+            (5, "AddData"),
+            (4, "AddData"),
+            (3, "SetDataSchema"),
+            (2, "SetVocab"),
+            (1, "AddPushSource"),
+            (0, "Seed"),
+        ],
+        ndjson_records
+            .iter()
+            .map(|r| (
+                r["content"]["sequenceNumber"].as_u64().unwrap(),
+                r["content"]["event"]["kind"].as_str().unwrap(),
+            ))
+            .collect::<Vec<_>>()
+    );
+
+    // Each record is the YAML document as JSON, with the hash from its `# Block:` comment
+    let yaml_records = kamu
+        .log_stdout(&DATASET_ROOT_PLAYER_NAME, &["-o", "yaml"])
+        .await
+        .split("---\n")
+        .skip(1)
+        .map(|doc| {
+            let (hash_line, manifest) = doc.split_once('\n').unwrap();
+            let block_hash = hash_line.strip_prefix("# Block: ").unwrap();
+
+            let mut record: serde_json::Value = serde_yaml::from_str(manifest).unwrap();
+            record["blockHash"] = serde_json::Value::from(block_hash);
+            record
+        })
+        .collect::<Vec<_>>();
+
+    pretty_assertions::assert_eq!(yaml_records, ndjson_records);
+
+    let json_records: Vec<serde_json::Value> = serde_json::from_str(
+        &kamu
+            .log_stdout(&DATASET_ROOT_PLAYER_NAME, &["-o", "json"])
+            .await,
+    )
+    .unwrap();
+
+    pretty_assertions::assert_eq!(ndjson_records, json_records);
+
+    let limited_json_records: Vec<serde_json::Value> = serde_json::from_str(
+        &kamu
+            .log_stdout(&DATASET_ROOT_PLAYER_NAME, &["-o", "json", "--limit", "2"])
+            .await,
+    )
+    .unwrap();
+
+    pretty_assertions::assert_eq!(&ndjson_records[..2], &limited_json_records[..]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
