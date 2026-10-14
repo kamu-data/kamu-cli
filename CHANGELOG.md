@@ -29,6 +29,7 @@ Recommendation: for ease of reading, use the following format:
 - Collection entries are filtered by extra data and found by linked dataset using their current values
 - SQL `to_table()` reads datasets at the query's pinned blocks and includes them in the query state
 - SQL `to_table()` on a missing dataset is a bad query error instead of an internal error
+- Concurrent uploads to a versioned file fail with a conflict instead of creating duplicate versions
 
 ## [0.270.0] - 2026-10-12
 ### Added
