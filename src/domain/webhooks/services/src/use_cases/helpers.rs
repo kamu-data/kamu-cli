@@ -17,36 +17,38 @@ pub(crate) fn validate_webhook_target_url(
     target_url: &url::Url,
     webhooks_config: &WebhooksConfig,
 ) -> Result<(), WebhookSubscriptionInvalidTargetUrlError> {
-    if webhooks_config.allow_insecure_targets {
-        return Ok(());
-    }
+    let resolved_ips = resolve_target_host(target_url);
 
-    if target_url.scheme() != "https" {
-        return Err(WebhookSubscriptionInvalidTargetUrlError {
+    let is_valid = if webhooks_config.loopback_targets_only {
+        // An unresolvable host is rejected too
+        !resolved_ips.is_empty() && resolved_ips.iter().all(std::net::IpAddr::is_loopback)
+    } else {
+        // Reject localhost, ::1, etc. A resolution failure is not an error
+        target_url.scheme() == "https" && !resolved_ips.iter().any(std::net::IpAddr::is_loopback)
+    };
+
+    if is_valid {
+        Ok(())
+    } else {
+        Err(WebhookSubscriptionInvalidTargetUrlError {
             url: target_url.clone(),
-        });
+        })
     }
+}
 
-    // Try resolving the hostname
-    if let Some(host) = target_url.host_str() {
-        use std::net::ToSocketAddrs;
-        let clean_host = host.trim_matches(['[', ']'].as_ref());
-        if let Ok(addrs) =
-            (clean_host, target_url.port_or_known_default().unwrap_or(80)).to_socket_addrs()
-        {
-            for addr in addrs {
-                let ip = addr.ip();
-                if ip.is_loopback() {
-                    // Reject localhost, ::1, etc.
-                    return Err(WebhookSubscriptionInvalidTargetUrlError {
-                        url: target_url.clone(),
-                    });
-                }
-            }
-        }
-    }
+/// Addresses the target host resolves to, empty when it does not resolve
+fn resolve_target_host(target_url: &url::Url) -> Vec<std::net::IpAddr> {
+    use std::net::ToSocketAddrs;
 
-    Ok(())
+    let Some(host) = target_url.host_str() else {
+        return Vec::new();
+    };
+    let clean_host = host.trim_matches(['[', ']'].as_ref());
+
+    (clean_host, target_url.port_or_known_default().unwrap_or(80))
+        .to_socket_addrs()
+        .map(|addrs| addrs.map(|addr| addr.ip()).collect())
+        .unwrap_or_default()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

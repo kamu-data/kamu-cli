@@ -86,7 +86,7 @@ async fn test_invalid_target_url_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_insecure_target_url_accepted_when_allowed() {
+async fn test_loopback_target_url_accepted_when_loopback_only() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
     let mut mock_outbox = MockOutbox::new();
@@ -94,27 +94,68 @@ async fn test_insecure_target_url_accepted_when_allowed() {
         &mut mock_outbox,
         &WebhookEventTypeCatalog::test(),
         Some(&dataset_id),
-        1,
+        2,
     );
 
     let harness = CreateWebhookSubscriptionUseCaseHarness::with_config(
         mock_outbox,
         WebhooksConfig {
-            allow_insecure_targets: true,
+            loopback_targets_only: true,
             ..WebhooksConfig::default()
         },
     );
 
-    let res = harness
-        .use_case
-        .execute(
-            Some(dataset_id),
-            url::Url::parse("http://127.0.0.1:8080/hook").unwrap(),
-            vec![WebhookEventTypeCatalog::test()],
-            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
-        )
-        .await;
-    assert!(res.is_ok(), "Failed to create subscription: {res:?}");
+    for (label, loopback_url) in [
+        ("http_ip", "http://127.0.0.1:8080/hook"),
+        ("https_localhost", "https://localhost/hook"),
+    ] {
+        let res = harness
+            .use_case
+            .execute(
+                Some(dataset_id.clone()),
+                url::Url::parse(loopback_url).unwrap(),
+                vec![WebhookEventTypeCatalog::test()],
+                WebhookSubscriptionLabel::try_new(label).unwrap(),
+            )
+            .await;
+        assert!(res.is_ok(), "Failed to create subscription: {res:?}");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_external_target_url_rejected_when_loopback_only() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::with_config(
+        MockOutbox::new(),
+        WebhooksConfig {
+            loopback_targets_only: true,
+            ..WebhooksConfig::default()
+        },
+    );
+
+    // Rejected whether or not the host resolves where the test runs
+    for external_url in [
+        "https://example.com/hook",
+        "http://192.0.2.1/hook",
+        "https://unresolvable.invalid/hook",
+    ] {
+        let res = harness
+            .use_case
+            .execute(
+                Some(dataset_id.clone()),
+                url::Url::parse(external_url).unwrap(),
+                vec![WebhookEventTypeCatalog::test()],
+                WebhookSubscriptionLabel::try_new("test_label").unwrap(),
+            )
+            .await;
+        assert_matches!(
+            res,
+            Err(kamu_webhooks::CreateWebhookSubscriptionError::InvalidTargetUrl(_))
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

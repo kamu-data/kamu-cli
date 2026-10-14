@@ -15,6 +15,7 @@ mod test_flow;
 mod test_private_datasets;
 mod test_selftest;
 mod test_smart_transfer_protocol;
+mod test_webhooks;
 pub mod utils;
 
 pub mod private_datasets {
@@ -23,3 +24,4 @@ pub mod private_datasets {
 pub use test_flow::*;
 pub use test_selftest::*;
 pub use test_smart_transfer_protocol::*;
+pub use test_webhooks::*;

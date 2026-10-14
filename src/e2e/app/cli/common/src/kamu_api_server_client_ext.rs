@@ -249,6 +249,8 @@ pub trait KamuApiServerClientExt {
     fn swagger(&self) -> SwaggerApi<'_>;
 
     fn upload(&self) -> UploadApi<'_>;
+
+    fn webhook(&self) -> WebhookApi<'_>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -293,6 +295,10 @@ impl KamuApiServerClientExt for KamuApiServerClient {
 
     fn upload(&self) -> UploadApi<'_> {
         UploadApi { client: self }
+    }
+
+    fn webhook(&self) -> WebhookApi<'_> {
+        WebhookApi { client: self }
     }
 }
 
@@ -2566,6 +2572,273 @@ pub enum UploadFileError {
     Unauthorized,
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API: Webhook
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct WebhookApi<'a> {
+    client: &'a KamuApiServerClient,
+}
+
+impl WebhookApi<'_> {
+    /// Subscribes the target URL to updates of the dataset. The server really
+    /// delivers to it, so only loopback targets are accepted.
+    pub async fn create_subscription(
+        &self,
+        dataset_id: &odf::DatasetID,
+        target_url: &Url,
+        label: &str,
+    ) -> CreatedWebhookSubscription {
+        let is_loopback_ip = target_url
+            .host_str()
+            .and_then(|host| {
+                host.trim_matches(['[', ']'])
+                    .parse::<std::net::IpAddr>()
+                    .ok()
+            })
+            .is_some_and(|ip| ip.is_loopback());
+        assert!(
+            is_loopback_ip,
+            "E2E webhooks must target a loopback IP, got: {target_url}"
+        );
+
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation($datasetId: DatasetID!, $targetUrl: String!, $label: String!) {
+                      datasets {
+                        byId(datasetId: $datasetId) {
+                          webhooks {
+                            createSubscription(
+                              input: {
+                                targetUrl: $targetUrl
+                                eventTypes: ["DATASET.REF.UPDATED"]
+                                label: $label
+                              }
+                            ) {
+                              message
+                              ... on CreateWebhookSubscriptionResultSuccess {
+                                subscriptionId
+                                secret
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                ),
+                Some(serde_json::json!({
+                    "datasetId": dataset_id.to_string(),
+                    "targetUrl": target_url.as_str(),
+                    "label": label,
+                })),
+            )
+            .await
+            .data();
+
+        let result = &response["datasets"]["byId"]["webhooks"]["createSubscription"];
+        assert_eq!(result["message"], "Success", "{response:#}");
+
+        CreatedWebhookSubscription {
+            subscription_id: result["subscriptionId"].as_str().unwrap().to_owned(),
+            secret: result["secret"].as_str().unwrap().to_owned(),
+        }
+    }
+
+    /// Status of the subscription, such as `ENABLED` or `UNREACHABLE`
+    pub async fn subscription_status(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: &str,
+    ) -> String {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query($datasetId: DatasetID!, $subscriptionId: WebhookSubscriptionID!) {
+                      datasets {
+                        byId(datasetId: $datasetId) {
+                          webhooks {
+                            subscription(id: $subscriptionId) {
+                              status
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                ),
+                Some(serde_json::json!({
+                    "datasetId": dataset_id.to_string(),
+                    "subscriptionId": subscription_id,
+                })),
+            )
+            .await
+            .data();
+
+        response["datasets"]["byId"]["webhooks"]["subscription"]["status"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    pub async fn reactivate_subscription(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: &str,
+    ) {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation($datasetId: DatasetID!, $subscriptionId: WebhookSubscriptionID!) {
+                      datasets {
+                        byId(datasetId: $datasetId) {
+                          webhooks {
+                            subscription(id: $subscriptionId) {
+                              reactivate {
+                                message
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                ),
+                Some(serde_json::json!({
+                    "datasetId": dataset_id.to_string(),
+                    "subscriptionId": subscription_id,
+                })),
+            )
+            .await
+            .data();
+
+        assert_eq!(
+            response["datasets"]["byId"]["webhooks"]["subscription"]["reactivate"]["message"],
+            "Success",
+            "{response:#}"
+        );
+    }
+
+    /// Delivery flows of the subscription, newest first
+    pub async fn list_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: &str,
+    ) -> Vec<WebhookFlowSummary> {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    query($datasetId: DatasetID!, $subscriptionId: WebhookSubscriptionID!) {
+                      datasets {
+                        byId(datasetId: $datasetId) {
+                          flows {
+                            runs {
+                              listFlows(
+                                filters: {
+                                  byProcessType: {
+                                    webhooks: { subscriptionIds: [$subscriptionId] }
+                                  }
+                                }
+                              ) {
+                                nodes {
+                                  status
+                                  taskIds
+                                  outcome {
+                                    __typename
+                                    ... on FlowFailedError {
+                                      reason {
+                                        ... on TaskFailureReasonWebhookDeliveryProblem {
+                                          message
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                ),
+                Some(serde_json::json!({
+                    "datasetId": dataset_id.to_string(),
+                    "subscriptionId": subscription_id,
+                })),
+            )
+            .await
+            .data();
+
+        response["datasets"]["byId"]["flows"]["runs"]["listFlows"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|node| WebhookFlowSummary {
+                status: node["status"].as_str().unwrap().to_owned(),
+                task_count: node["taskIds"].as_array().unwrap().len(),
+                outcome: node["outcome"]["__typename"]
+                    .as_str()
+                    .map(ToOwned::to_owned),
+                failure_message: node["outcome"]["reason"]["message"]
+                    .as_str()
+                    .map(ToOwned::to_owned),
+            })
+            .collect()
+    }
+
+    /// Waits until the subscription has `expected_flow_count` delivery flows,
+    /// all finished, and returns them newest first
+    pub async fn wait_for_finished_flows(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: &str,
+        expected_flow_count: usize,
+    ) -> Vec<WebhookFlowSummary> {
+        let retry_strategy = FixedInterval::from_millis(500).take(60); // 30s
+
+        Retry::start(retry_strategy, || async {
+            let flows = self.list_flows(dataset_id, subscription_id).await;
+            if flows.len() == expected_flow_count
+                && flows.iter().all(|flow| flow.status == "FINISHED")
+            {
+                Ok(flows)
+            } else {
+                Err(())
+            }
+        })
+        .await
+        .unwrap_or_else(|()| panic!("Expected {expected_flow_count} finished webhook flows"))
+    }
+}
+
+#[derive(Debug)]
+pub struct CreatedWebhookSubscription {
+    pub subscription_id: String,
+    /// Key the deliveries are signed with, shown once
+    pub secret: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct WebhookFlowSummary {
+    pub status: String,
+    /// Attempts made, retries included
+    pub task_count: usize,
+    /// GraphQL type name of the outcome, if the flow finished
+    pub outcome: Option<String>,
+    /// Message of a delivery problem, if the flow failed with one
+    pub failure_message: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
