@@ -19,7 +19,8 @@ use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const FUNCTION_NAME: &str = "to_table";
+/// Name under which the function is registered in a session
+pub const TO_TABLE_FUNCTION_NAME: &str = "to_table";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +38,7 @@ where
 {
     pub fn register(ctx: &SessionContext, on_resolve_dataset_callback: F) {
         ctx.register_udtf(
-            FUNCTION_NAME,
+            TO_TABLE_FUNCTION_NAME,
             Arc::new(Self::new(on_resolve_dataset_callback)),
         );
     }
@@ -93,19 +94,21 @@ impl TryFrom<&[Expr]> for ToTableFunctionArgs {
 
     fn try_from(args: &[Expr]) -> Result<Self, Self::Error> {
         if args.len() != 1 {
-            return plan_err!("{FUNCTION_NAME}() accepts only one argument: dataset_ref");
+            return plan_err!("{TO_TABLE_FUNCTION_NAME}() accepts only one argument: dataset_ref");
         }
 
         let dataset_ref_as_str = match args.first() {
             Some(Expr::Column(c)) if c.relation.is_none() && !c.name.is_empty() => &c.name,
             _ => {
-                return plan_err!("{FUNCTION_NAME}(): dataset_ref must be a table reference");
+                return plan_err!(
+                    "{TO_TABLE_FUNCTION_NAME}(): dataset_ref must be a table reference"
+                );
             }
         };
 
         let Ok(dataset_ref) = dataset_ref_as_str.parse::<odf::DatasetRef>() else {
             return plan_err!(
-                "{FUNCTION_NAME}() requires correct dataset_ref format but got: \
+                "{TO_TABLE_FUNCTION_NAME}() requires correct dataset_ref format but got: \
                  \"{dataset_ref_as_str}\""
             );
         };

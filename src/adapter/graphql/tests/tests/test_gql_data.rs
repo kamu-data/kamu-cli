@@ -290,6 +290,64 @@ async fn test_to_table_udtf_loaded() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_multi_tenant_alias() {
+    let harness = GraphQLDataHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    harness.create_changelog_dataset("bar").await;
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(indoc::indoc!(
+            r#"
+            {
+              data {
+                query(
+                  query: "SELECT offset, op, city, population FROM to_table(\"kamu/bar\") ORDER BY city"
+                  queryDialect: SQL_DATA_FUSION
+                  schemaFormat: ARROW_JSON
+                  dataFormat: JSON
+                ) {
+                  ... on DataQueryResultSuccess {
+                    data {
+                      content
+                    }
+                    datasets {
+                      alias
+                    }
+                  }
+                }
+              }
+            }
+            "#
+        )))
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let json = serde_json::to_value(&res.data).unwrap();
+    let data_content = &json["data"]["query"]["data"]["content"];
+    let data_content_json =
+        serde_json::from_str::<serde_json::Value>(data_content.as_str().unwrap()).unwrap();
+
+    pretty_assertions::assert_eq!(
+        json!([
+            {"offset": 2, "op": 3, "city": "A", "population": 2},
+            {"offset": 3, "op": 0, "city": "B", "population": 5},
+        ]),
+        data_content_json
+    );
+    // The dataset read by `to_table()` is a part of the query state
+    pretty_assertions::assert_eq!(
+        json!([{"alias": "kamu/bar"}]),
+        json["data"]["query"]["datasets"]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_error_sql_unparsable() {
     let harness = GraphQLDataHarness::builder()
@@ -428,6 +486,89 @@ impl GraphQLDataHarness {
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
         self.execute_query(query, &self.catalog_authorized).await
+    }
+
+    /// Creates a `ChangelogStream` dataset of the current account with a correction of key `A`
+    pub async fn create_changelog_dataset(&self, name: &str) {
+        let create_dataset = self
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetUseCase>()
+            .unwrap();
+
+        let dataset = create_dataset
+            .execute(
+                &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(name)),
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(odf::DatasetKind::Root).build(),
+                )
+                .build_typed(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
+            .dataset;
+
+        dataset
+            .commit_event(
+                MetadataFactory::set_polling_source()
+                    .merge(odf::metadata::MergeStrategyChangelogStream {
+                        primary_key: vec!["city".to_string()],
+                    })
+                    .build()
+                    .into(),
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap();
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("offset", DataType::Int64, false),
+            Field::new("op", DataType::Int32, false),
+            Field::new("city", DataType::Utf8, false),
+            Field::new("population", DataType::Int64, false),
+        ]));
+
+        dataset
+            .commit_event(
+                MetadataFactory::set_data_schema()
+                    .schema_from_arrow(&schema)
+                    .build()
+                    .into(),
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap();
+
+        let record_batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(vec![0, 1, 2, 3])),
+                Arc::new(Int32Array::from(vec![0, 2, 3, 0])),
+                Arc::new(StringArray::from(vec!["A", "A", "A", "B"])),
+                Arc::new(Int64Array::from(vec![1, 1, 2, 5])),
+            ],
+        )
+        .unwrap();
+
+        let tmp_data_path = self.base_gql_harness.temp_dir().join("data");
+        ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
+
+        dataset
+            .commit_add_data(
+                odf::dataset::AddDataParams {
+                    prev_checkpoint: None,
+                    prev_offset: None,
+                    new_offset_interval: Some(odf::metadata::OffsetInterval { start: 0, end: 3 }),
+                    new_linked_objects: None,
+                    new_watermark: None,
+                    new_source_state: None,
+                },
+                Some(OwnedFile::new(tmp_data_path)),
+                None,
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap();
     }
 
     pub async fn create_test_dataset(&self, account_name: Option<odf::AccountName>) {

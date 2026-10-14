@@ -28,7 +28,6 @@ use kamu_datasets::{
 use odf::utils::data::DataFrameExt;
 
 use crate::SessionContextBuilder;
-use crate::use_cases::helpers;
 use crate::utils::docker_images;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +39,6 @@ pub struct QueryServiceImpl {
     session_context_builder: Arc<SessionContextBuilder>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    rebac_dataset_registry_facade: Arc<dyn kamu_auth_rebac::RebacDatasetRegistryFacade>,
 }
 
 impl CheapClone for QueryServiceImpl {}
@@ -350,6 +348,8 @@ impl QueryServiceImpl {
         &self,
         options: QueryOptions,
     ) -> Result<SessionContext, InternalError> {
+        let input_datasets = Arc::new(options.input_datasets.clone().unwrap_or_default());
+
         let ctx = self
             .session_context_builder
             .session_context(options)
@@ -366,14 +366,19 @@ impl QueryServiceImpl {
             //       Therefore, to satisfy the borrow checker, we need to make
             //       a second clone. Fortunately, this is a cheap operation.
             let self_clone = self_clone.cheap_clone();
+            let input_datasets = input_datasets.clone();
             async move {
-                let source = helpers::resolve_dataset_for_querying(
-                    self_clone.rebac_dataset_registry_facade.as_ref(),
-                    &dataset_ref,
-                )
-                .await?;
+                let (source, block_hash) = self_clone
+                    .resolve_to_table_input(&input_datasets, &dataset_ref)
+                    .await?;
                 let data_response = self_clone
-                    .get_changelog_projection(source, Default::default())
+                    .get_changelog_projection(
+                        source,
+                        GetChangelogProjectionOptions {
+                            block_hash,
+                            ..Default::default()
+                        },
+                    )
                     .await?;
 
                 Ok(data_response.df)
@@ -381,6 +386,42 @@ impl QueryServiceImpl {
         });
 
         Ok(ctx)
+    }
+
+    /// `to_table()` reads only the datasets of the query, at the blocks the query
+    /// state pinned them to, so that its result is consistent with the rest of the
+    /// query and reproducible from that state. Other datasets are reported as not
+    /// found, as plain table references are.
+    async fn resolve_to_table_input(
+        &self,
+        input_datasets: &BTreeMap<odf::DatasetID, QueryOptionsDataset>,
+        dataset_ref: &odf::DatasetRef,
+    ) -> Result<(ResolvedDataset, Option<odf::Multihash>), QueryError> {
+        let input = match dataset_ref {
+            odf::DatasetRef::ID(id) => input_datasets.get_key_value(id),
+            odf::DatasetRef::Handle(hdl) => input_datasets.get_key_value(&hdl.id),
+            odf::DatasetRef::Alias(_) => input_datasets.iter().find(|(_, opts)| {
+                opts.alias.parse::<odf::DatasetRef>().ok().as_ref() == Some(dataset_ref)
+            }),
+        };
+
+        let Some((id, opts)) = input else {
+            return Err(odf::DatasetNotFoundError::new(dataset_ref.clone()).into());
+        };
+
+        let source = if let Some(source) = &opts.hints.source_dataset {
+            source.clone()
+        } else if let Some(hdl) = &opts.hints.handle {
+            self.dataset_registry.get_dataset_by_handle(hdl).await
+        } else {
+            let hdl = self
+                .dataset_registry
+                .resolve_dataset_handle_by_ref(&id.as_local_ref())
+                .await?;
+            self.dataset_registry.get_dataset_by_handle(&hdl).await
+        };
+
+        Ok((source, opts.block_hash.clone()))
     }
 }
 
@@ -797,6 +838,15 @@ fn extract_table_refs_rec_table_factor(
         reason = "sqlparser's TableFactor is foreign; only tables and subqueries are resolved"
     )]
     match expr {
+        TableFactor::Table {
+            name,
+            args: Some(args),
+            ..
+        } if is_to_table_function(name) => {
+            // The dataset read by `to_table()` is a part of the query state like any table
+            tables.extend(to_table_dataset_arg(args));
+            Ok(())
+        }
         TableFactor::Table { name, .. } => {
             tables.push(name.clone());
             Ok(())
@@ -804,4 +854,35 @@ fn extract_table_refs_rec_table_factor(
         TableFactor::Derived { subquery, .. } => extract_table_refs_rec(subquery, tables),
         _ => Ok(()),
     }
+}
+
+fn is_to_table_function(name: &datafusion::sql::sqlparser::ast::ObjectName) -> bool {
+    matches!(
+        name.0.as_slice(),
+        [part] if part
+            .as_ident()
+            .is_some_and(|ident| ident.value.eq_ignore_ascii_case(kamu_datafusion_udf::TO_TABLE_FUNCTION_NAME))
+    )
+}
+
+/// Returns the dataset reference passed to `to_table()`, if it is a single identifier.
+/// Other argument shapes are rejected when the function is planned.
+fn to_table_dataset_arg(
+    args: &datafusion::sql::sqlparser::ast::TableFunctionArgs,
+) -> Option<datafusion::sql::sqlparser::ast::ObjectName> {
+    use datafusion::sql::sqlparser::ast::{
+        Expr,
+        FunctionArg,
+        FunctionArgExpr,
+        ObjectName,
+        ObjectNamePart,
+    };
+
+    let [FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident)))] =
+        args.args.as_slice()
+    else {
+        return None;
+    };
+
+    Some(ObjectName(vec![ObjectNamePart::Identifier(ident.clone())]))
 }
