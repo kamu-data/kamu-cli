@@ -135,7 +135,7 @@ async fn test_find_collection_entry_by_ref_after_correction_of_ref() {
 
     // The update use case never corrects the ref of an entry, but other writers can
     harness
-        .push_raw_records(
+        .push_ndjson(
             &collection,
             vec![
                 json!({"op": 2, "path": "/a", "ref": foo.to_string()}),
