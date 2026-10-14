@@ -68,6 +68,15 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::test_webhook_signed_with_rotated_secret,
+    options = Options::default().with_kamu_config(kamu_cli_e2e_repo_tests::WEBHOOKS_E2E_CONFIG),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = postgres,
     fixture = kamu_cli_e2e_repo_tests::test_webhook_external_target_rejected,
     options = Options::default().with_kamu_config(kamu_cli_e2e_repo_tests::WEBHOOKS_E2E_CONFIG),
     extra_test_groups = "engine, ingest, datafusion"

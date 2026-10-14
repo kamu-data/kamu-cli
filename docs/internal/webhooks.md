@@ -392,7 +392,8 @@ The startup checks are in `src/app/cli/src/app.rs`; the full reference is genera
 | Flow agent running delivery flows: activation by push and by an upstream ingest flow, batching, retries, stop policy, breaking changes | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
 | GraphQL subscription management | `src/adapter/graphql/tests/tests/test_gql_webhook_subscriptions.rs` |
 | GraphQL view of delivery flows: description, failure reasons, history, unreachable and reactivated subscriptions | `src/adapter/graphql/tests/tests/flows/test_gql_webhook_flow_runs.rs` |
-| End to end against a local `wiremock` receiver: signed delivery, failure reasons, retry, unreachable and reactivated subscriptions, external targets rejected | `src/e2e/app/cli/repo-tests/src/test_webhooks.rs`, wired in `src/e2e/app/cli/{sqlite,postgres}/tests/tests/test_webhooks.rs` |
+| End to end against a local `wiremock` receiver: signed delivery, tampering rejected, secret rotation, failure reasons, retry, unreachable and reactivated subscriptions, external targets rejected | `src/e2e/app/cli/repo-tests/src/test_webhooks.rs`, wired in `src/e2e/app/cli/{sqlite,postgres}/tests/tests/test_webhooks.rs` |
+| Receiver-side verification, as a customer implements it from [§6](#6-delivery), checked against a real recorded delivery | `src/e2e/app/cli/repo-tests/src/webhook_receiver.rs` |
 
 ### Behaviour by design
 

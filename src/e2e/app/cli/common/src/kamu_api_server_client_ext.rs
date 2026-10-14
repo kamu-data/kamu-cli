@@ -2728,6 +2728,48 @@ impl WebhookApi<'_> {
         );
     }
 
+    /// Replaces the signing secret and returns the new one
+    pub async fn rotate_secret(
+        &self,
+        dataset_id: &odf::DatasetID,
+        subscription_id: &str,
+    ) -> String {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation($datasetId: DatasetID!, $subscriptionId: WebhookSubscriptionID!) {
+                      datasets {
+                        byId(datasetId: $datasetId) {
+                          webhooks {
+                            subscription(id: $subscriptionId) {
+                              rotateSecret {
+                                message
+                                ... on RotateWebhookSubscriptionSecretSuccess {
+                                  newSecret
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#
+                ),
+                Some(serde_json::json!({
+                    "datasetId": dataset_id.to_string(),
+                    "subscriptionId": subscription_id,
+                })),
+            )
+            .await
+            .data();
+
+        let result = &response["datasets"]["byId"]["webhooks"]["subscription"]["rotateSecret"];
+        assert_eq!(result["message"], "Success", "{response:#}");
+        result["newSecret"].as_str().unwrap().to_owned()
+    }
+
     /// Delivery flows of the subscription, newest first
     pub async fn list_flows(
         &self,

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -25,6 +26,8 @@ use sha2::Digest as _;
 use url::Url;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
+
+use crate::webhook_receiver::{VerifiedWebhookSignature, WebhookVerificationError, verify_webhook};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -103,7 +106,53 @@ pub async fn test_webhook_delivered_signed(kamu_api_server_client: KamuApiServer
             "Kamu-Webhook/1.0",
         ],
     );
-    WebhookScenario::assert_signed_with(request, &scenario.receiver_url(), &subscription.secret);
+
+    // A receiver holding the secret accepts the delivery, and the signature
+    // covers the request line, the timestamp and the body digest
+    let receiver_url = scenario.receiver_url();
+    pretty_assertions::assert_eq!(
+        verify_webhook(request, &receiver_url, &subscription.secret),
+        Ok(WebhookScenario::expected_signature(request)),
+    );
+
+    // Anything else is rejected
+    assert_eq!(
+        verify_webhook(request, &receiver_url, "not-the-secret"),
+        Err(WebhookVerificationError::SignatureMismatch)
+    );
+    assert_eq!(
+        verify_webhook(
+            &WebhookScenario::with_body(request, b"{}", false),
+            &receiver_url,
+            &subscription.secret
+        ),
+        Err(WebhookVerificationError::DigestMismatch)
+    );
+    // The digest is signed, so recomputing it for a new body does not help
+    assert_eq!(
+        verify_webhook(
+            &WebhookScenario::with_body(request, b"{}", true),
+            &receiver_url,
+            &subscription.secret
+        ),
+        Err(WebhookVerificationError::SignatureMismatch)
+    );
+    assert_eq!(
+        verify_webhook(
+            &WebhookScenario::with_header(request, "x-webhook-timestamp", "0"),
+            &receiver_url,
+            &subscription.secret
+        ),
+        Err(WebhookVerificationError::SignatureMismatch)
+    );
+    assert_eq!(
+        verify_webhook(
+            request,
+            &Url::parse("http://127.0.0.1:1/elsewhere").unwrap(),
+            &subscription.secret
+        ),
+        Err(WebhookVerificationError::SignatureMismatch)
+    );
 
     pretty_assertions::assert_eq!(
         serde_json::from_slice::<serde_json::Value>(&request.body).unwrap(),
@@ -251,6 +300,43 @@ pub async fn test_webhook_subscription_unreachable_until_reactivated(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_webhook_signed_with_rotated_secret(kamu_api_server_client: KamuApiServerClient) {
+    let scenario = WebhookScenario::new(kamu_api_server_client).await;
+    scenario.receiver_responds(ResponseTemplate::new(200)).await;
+    let receiver_url = scenario.receiver_url();
+    let subscription = scenario.subscribe(&receiver_url).await;
+
+    scenario.ingest_match(1).await;
+    scenario.wait_for_finished_flows(&subscription, 1).await;
+
+    let new_secret = scenario.rotate_secret(&subscription).await;
+    assert_ne!(new_secret, subscription.secret);
+
+    scenario.ingest_match(2).await;
+    scenario.wait_for_finished_flows(&subscription, 2).await;
+
+    let requests = scenario.received_requests().await;
+    assert_eq!(requests.len(), 2);
+
+    // Before the rotation: the original secret
+    assert_matches!(
+        verify_webhook(&requests[0], &receiver_url, &subscription.secret),
+        Ok(_)
+    );
+
+    // After it: only the new secret
+    assert_matches!(
+        verify_webhook(&requests[1], &receiver_url, &new_secret),
+        Ok(_)
+    );
+    assert_eq!(
+        verify_webhook(&requests[1], &receiver_url, &subscription.secret),
+        Err(WebhookVerificationError::SignatureMismatch)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_webhook_external_target_rejected(kamu_api_server_client: KamuApiServerClient) {
     let scenario = WebhookScenario::new(kamu_api_server_client).await;
 
@@ -385,6 +471,13 @@ impl WebhookScenario {
             .to_owned()
     }
 
+    async fn rotate_secret(&self, subscription: &CreatedWebhookSubscription) -> String {
+        self.client
+            .webhook()
+            .rotate_secret(&self.dataset.dataset_id, &subscription.subscription_id)
+            .await
+    }
+
     async fn reactivate(&self, subscription: &CreatedWebhookSubscription) {
         self.client
             .webhook()
@@ -491,49 +584,44 @@ impl WebhookScenario {
             .unwrap()
     }
 
-    /// Verifies the request as a receiver would, following the scheme in
-    /// `docs/internal/webhooks.md`: the body digest, then the HMAC-SHA256 of
-    /// the signature base, keyed with the secret's bytes
-    fn assert_signed_with(request: &Request, target_url: &Url, secret: &str) {
-        let content_digest = Self::header(request, "content-digest");
-        assert_eq!(
-            content_digest,
-            format!(
-                "sha-256=:{}:",
-                BASE64.encode(sha2::Sha256::digest(&request.body))
-            )
-        );
+    /// The signature Kamu puts on every delivery
+    fn expected_signature(request: &Request) -> VerifiedWebhookSignature {
+        VerifiedWebhookSignature {
+            covered_components: [
+                "@method",
+                "@path",
+                "@authority",
+                "x-webhook-timestamp",
+                "content-digest",
+            ]
+            .map(ToString::to_string)
+            .to_vec(),
+            params: [
+                ("keyid", "default"),
+                ("alg", "hmac-sha256"),
+                ("created", Self::header(request, "x-webhook-timestamp")),
+            ]
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .to_vec(),
+        }
+    }
 
-        let created = Self::header(request, "x-webhook-timestamp");
-        let covered_fields = r#"(@method @path @authority "x-webhook-timestamp" "content-digest")"#;
-        let params = format!(r#"keyid="default";alg="hmac-sha256";created={created}"#);
-        assert_eq!(
-            Self::header(request, "signature-input"),
-            format!("sig1={covered_fields}; {}", params.replace(';', "; "))
-        );
+    /// The request with another body, and optionally a `Content-Digest` that
+    /// matches it
+    fn with_body(request: &Request, body: &[u8], recompute_digest: bool) -> Request {
+        let mut tampered = request.clone();
+        tampered.body = body.to_vec();
+        if recompute_digest {
+            let digest = format!("sha-256=:{}:", BASE64.encode(sha2::Sha256::digest(body)));
+            tampered = Self::with_header(&tampered, "content-digest", &digest);
+        }
+        tampered
+    }
 
-        let authority = format!(
-            "{}:{}",
-            target_url.host_str().unwrap(),
-            target_url.port().unwrap()
-        );
-        let signature_base = [
-            "@method: POST".to_string(),
-            format!("@path: {}", target_url.path()),
-            format!("@authority: {authority}"),
-            format!("\"x-webhook-timestamp\": {created}"),
-            format!("\"content-digest\": {content_digest}"),
-            format!("\"@signature-params\": {covered_fields}"),
-            format!(";{params}"),
-        ]
-        .join("\n");
-
-        let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, secret.as_bytes());
-        let expected_signature = BASE64.encode(ring::hmac::sign(&key, signature_base.as_bytes()));
-        assert_eq!(
-            Self::header(request, "signature"),
-            format!("sig1=:{expected_signature}:")
-        );
+    fn with_header(request: &Request, name: &'static str, value: &str) -> Request {
+        let mut tampered = request.clone();
+        tampered.headers.insert(name, value.parse().unwrap());
+        tampered
     }
 }
 

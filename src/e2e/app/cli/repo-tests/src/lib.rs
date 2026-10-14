@@ -17,6 +17,7 @@ mod test_selftest;
 mod test_smart_transfer_protocol;
 mod test_webhooks;
 pub mod utils;
+mod webhook_receiver;
 
 pub mod private_datasets {
     pub use crate::test_private_datasets::*;
