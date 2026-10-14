@@ -390,6 +390,7 @@ The startup checks are in `src/app/cli/src/app.rs`; the full reference is genera
 | Sensor, deliver controller (payload shape), event bridge, recovery job | `src/adapter/flow-webhook/tests/tests/` |
 | Flow agent running delivery flows: batching, retries, stop policy, breaking changes | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
 | GraphQL subscription management | `src/adapter/graphql/tests/tests/test_gql_webhook_subscriptions.rs` |
+| GraphQL view of delivery flows: description, failure reasons, history, unreachable and reactivated subscriptions | `src/adapter/graphql/tests/tests/flows/test_gql_webhook_flow_runs.rs` |
 
 ### Behaviour by design
 
