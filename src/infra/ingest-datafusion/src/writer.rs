@@ -339,19 +339,25 @@ impl DataWriterDataFusion {
             )
             .int_err()?;
 
-        // Assign offset based on the merge strategy's sort order
+        // Assign offset based on the merge strategy's sort order, or in the order of
+        // records when the strategy defines none
         // TODO: For some reason this adds two columns: the expected
         // "offset", but also "ROW_NUMBER()" for now we simply filter out the
         // latter.
+        let sort_order = self.merge_strategy.sort_order();
+        let row_number = if sort_order.is_empty() {
+            Self::ensure_order_preserving_session(&df)?;
+            datafusion::functions_window::row_number::row_number()
+        } else {
+            datafusion::functions_window::row_number::row_number()
+                .order_by(sort_order)
+                .partition_by(vec![lit(1)])
+                .build()
+                .int_err()?
+        };
+
         let df = df
-            .with_column(
-                self.meta.vocab.offset_column(),
-                datafusion::functions_window::row_number::row_number()
-                    .order_by(self.merge_strategy.sort_order())
-                    .partition_by(vec![lit(1)])
-                    .build()
-                    .int_err()?,
-            )
+            .with_column(self.meta.vocab.offset_column(), row_number)
             .int_err()?;
 
         let df = df
@@ -386,6 +392,20 @@ impl DataWriterDataFusion {
             .int_err()?;
 
         Ok(df)
+    }
+
+    /// Natural record order survives only in a single partition: a partitioned scan
+    /// splits the input into ranges that are later interleaved
+    fn ensure_order_preserving_session(df: &DataFrameExt) -> Result<(), InternalError> {
+        let target_partitions = df.task_ctx().session_config().target_partitions();
+        if target_partitions != 1 {
+            return InternalError::bail(format!(
+                "Merge strategy requires the input order of records to be preserved, which needs \
+                 `datafusion.execution.target_partitions` = 1 in the ingest configuration, but it \
+                 is {target_partitions}"
+            ));
+        }
+        Ok(())
     }
 
     fn coerce_schema(

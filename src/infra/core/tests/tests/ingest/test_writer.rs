@@ -831,15 +831,6 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
     ])
     .await;
 
-    let mut writer = DataWriterDataFusion::from_metadata_chain(
-        ctx.clone(),
-        harness.dataset.clone(),
-        &odf::BlockRef::Head,
-        None,
-    )
-    .await
-    .unwrap();
-
     let mut event_time = Utc.with_ymd_and_hms(2010, 1, 1, 0, 0, 0).unwrap();
     let data_path = harness.temp_dir.path().join("data.ndjson");
     let mut file = std::fs::File::create_new(&data_path).unwrap();
@@ -876,59 +867,13 @@ async fn test_data_writer_offsets_are_sequential_impl(ctx: SessionContext) -> St
     .await
     .unwrap();
 
-    let write_result = writer
-        .write(
-            Some(df),
-            WriteDataOpts {
-                system_time: harness.system_time,
-                source_event_time: harness.source_event_time,
-                new_watermark: None,
-                new_source_state: None,
-                data_staging_path: harness.temp_dir.path().join("data.parquet"),
-            },
-        )
-        .await
-        .unwrap();
-
-    harness
-        .dataset
-        .as_metadata_chain()
-        .set_ref(
-            &odf::BlockRef::Head,
-            &write_result.new_head,
-            odf::dataset::SetRefOpts {
-                validate_block_present: true,
-                check_ref_is: Some(Some(&write_result.old_head)),
-            },
-        )
-        .await
-        .unwrap();
+    harness.write_df_with_ctx(ctx, df).await.unwrap();
 
     let data_path = harness.get_last_data_file().await;
 
     odf::utils::testing::assert_parquet_offsets_are_in_order(&data_path);
 
-    let plan = std::sync::Mutex::new(String::new());
-    testing_logger::validate(|capture| {
-        let p = capture
-            .iter()
-            .find(|c| c.body.contains("Optimized physical plan:"))
-            .unwrap()
-            .body
-            .trim()
-            .replace(
-                harness
-                    .temp_dir
-                    .path()
-                    .display()
-                    .to_string()
-                    .trim_start_matches('/'),
-                "tmp",
-            );
-
-        *plan.lock().unwrap() = p;
-    });
-    plan.into_inner().unwrap()
+    harness.captured_physical_plan()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1147,6 +1092,255 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             .map(DateTime::to_rfc3339),
         Some("2000-01-02T12:00:00+00:00".to_string())
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_changelog_stream_preserves_input_order() {
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyChangelogStream {
+                primary_key: vec!["city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    // Round 1: several changes to the same key within one chunk
+    harness
+        .write(
+            indoc!(
+                r#"
+                op,event_time,city,population
+                0,2020-01-01,A,1000
+                1,2020-01-01,A,1000
+                0,2020-01-01,A,2000
+                0,2020-01-01,B,10
+                2,2020-01-01,B,10
+                3,2020-01-01,B,20
+                2,2020-01-01,B,20
+                3,2020-01-01,B,30
+                "#
+            ),
+            "op INT NOT NULL, event_time DATE, city STRING NOT NULL, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2020-01-01 | A    | 1000       |
+            | 1      | 1  | 2010-01-01T12:00:00Z | 2020-01-01 | A    | 1000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2020-01-01 | A    | 2000       |
+            | 3      | 0  | 2010-01-01T12:00:00Z | 2020-01-01 | B    | 10         |
+            | 4      | 2  | 2010-01-01T12:00:00Z | 2020-01-01 | B    | 10         |
+            | 5      | 3  | 2010-01-01T12:00:00Z | 2020-01-01 | B    | 20         |
+            | 6      | 2  | 2010-01-01T12:00:00Z | 2020-01-01 | B    | 20         |
+            | 7      | 3  | 2010-01-01T12:00:00Z | 2020-01-01 | B    | 30         |
+            +--------+----+----------------------+------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_data_eq(
+        harness.get_projected_state(&["city"]).await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2020-01-01 | A    | 2000       |
+            | 7      | 3  | 2010-01-01T12:00:00Z | 2020-01-01 | B    | 30         |
+            +--------+----+----------------------+------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // Round 2: order holds when offsets continue from the previous block
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
+
+    harness
+        .write(
+            indoc!(
+                r#"
+                op,event_time,city,population
+                1,2020-01-02,A,2000
+                0,2020-01-02,A,3000
+                "#
+            ),
+            "op INT NOT NULL, event_time DATE, city STRING NOT NULL, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    assert_data_eq(
+        harness.get_last_data().await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 8      | 1  | 2010-01-02T12:00:00Z | 2020-01-02 | A    | 2000       |
+            | 9      | 0  | 2010-01-02T12:00:00Z | 2020-01-02 | A    | 3000       |
+            +--------+----+----------------------+------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_data_eq(
+        harness.get_projected_state(&["city"]).await,
+        indoc!(
+            r#"
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 9      | 0  | 2010-01-02T12:00:00Z | 2020-01-02 | A    | 3000       |
+            | 7      | 3  | 2010-01-01T12:00:00Z | 2020-01-01 | B    | 30         |
+            +--------+----+----------------------+------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test]
+fn test_data_writer_changelog_stream_rejects_partitioned_session() {
+    // Splitting the input into partitions would interleave records and lose their order
+    let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
+
+    let res = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .build()
+        .unwrap()
+        .block_on(test_data_writer_changelog_stream_natural_order_impl(ctx));
+
+    assert_matches!(res, Err(WriteDataError::Internal(_)));
+}
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test]
+fn test_data_writer_changelog_stream_preserves_input_order_serialized() {
+    let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
+
+    // Ensure we run with multiple threads
+    let plan = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .build()
+        .unwrap()
+        .block_on(test_data_writer_changelog_stream_natural_order_impl(ctx))
+        .unwrap();
+
+    // No sort may precede the window that assigns offsets
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            Optimized physical plan:
+            DataSinkExec: sink=ParquetSink(file_groups=[])
+              SortExec: expr=[offset@0 ASC], preserve_partitioning=[false]
+                ProjectionExec: expr=[CAST(CAST(row_number() ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING@6 AS Decimal128(20, 0)) + -1 AS Int64) as offset, op@1 as op, system_time@5 as system_time, event_time@4 as event_time, seq@0 as seq, city@2 as city, population@3 as population]
+                  BoundedWindowAggExec: wdw=[row_number() ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING: Field { "row_number() ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING": UInt64 }, frame: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING], mode=[Sorted]
+                    ProjectionExec: expr=[seq@0 as seq, op@1 as op, city@2 as city, population@3 as population, CASE WHEN event_time@4 IS NOT NULL THEN event_time@4 ELSE 946728000000 END as event_time, 1262347200000 as system_time]
+                      DataSourceExec: file_groups={1 group: [[tmp/data.ndjson:0..8672053]]}, projection=[seq, op, city, population, NULL as event_time], file_type=json
+            "#
+        ).trim(),
+        plan
+    );
+}
+
+async fn test_data_writer_changelog_stream_natural_order_impl(
+    ctx: SessionContext,
+) -> Result<String, WriteDataError> {
+    use std::io::Write;
+
+    testing_logger::setup();
+
+    let harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyChangelogStream {
+                primary_key: vec!["city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    let data_path = harness.temp_dir.path().join("data.ndjson");
+    let mut file = std::fs::File::create_new(&data_path).unwrap();
+
+    // Generate a lot of data to make the scan split into byte ranges when partitioned.
+    // Keys are interleaved, so sorting by primary key would break the `seq` order.
+    let mut seq = 0;
+    let mut write_row = |op: odf::metadata::OperationType, city: &str, population: i64| {
+        writeln!(
+            &mut file,
+            "{{\"seq\": {seq}, \"op\": {}, \"city\": \"{city}\", \"population\": {population}}}",
+            op as i32,
+        )
+        .unwrap();
+        seq += 1;
+    };
+
+    for city in ["A", "B", "C"] {
+        write_row(odf::metadata::OperationType::Append, city, 0);
+    }
+    for i in 1..25_000 {
+        for city in ["A", "B", "C"] {
+            write_row(odf::metadata::OperationType::CorrectFrom, city, i - 1);
+            write_row(odf::metadata::OperationType::CorrectTo, city, i);
+        }
+    }
+
+    let df = ReaderNdJson::new(
+        ctx.clone(),
+        odf::metadata::ReadStepNdJson {
+            schema: Some(odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::i64("seq"),
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ])),
+            ..Default::default()
+        },
+        &odf::schema::ToArrowSettings::default(),
+    )
+    .unwrap()
+    .read(&data_path)
+    .await
+    .unwrap();
+
+    harness.write_df_with_ctx(ctx, df).await?;
+
+    let data_path = harness.get_last_data_file().await;
+    odf::utils::testing::assert_parquet_offsets_are_in_order(&data_path);
+
+    assert_eq!(
+        harness
+            .get_last_data()
+            .await
+            .filter(col("offset").not_eq(col("seq")))
+            .unwrap()
+            .count()
+            .await
+            .unwrap(),
+        0,
+        "Offsets must follow the input order"
+    );
+
+    Ok(harness.captured_physical_plan())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2590,5 +2784,131 @@ impl Harness {
             .await
             .unwrap()
             .into()
+    }
+
+    async fn get_all_data(&self) -> DataFrameExt {
+        use futures::TryStreamExt;
+        use odf::dataset::MetadataChainExt;
+
+        let blocks: Vec<_> = self
+            .dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .try_collect()
+            .await
+            .unwrap();
+
+        let mut data_paths = Vec::new();
+        for (_, block) in blocks.into_iter().rev() {
+            if let odf::MetadataEvent::AddData(add_data) = block.event
+                && let Some(new_data) = add_data.new_data
+            {
+                let url = self
+                    .dataset
+                    .as_data_repo()
+                    .get_internal_url(&new_data.physical_hash)
+                    .await;
+                data_paths.push(url.to_string());
+            }
+        }
+
+        self.ctx
+            .read_parquet(
+                data_paths,
+                ParquetReadOptions {
+                    file_extension: "",
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .into()
+    }
+
+    /// Current state of the changelog, sorted by primary key
+    async fn get_projected_state(&self, primary_key: &[&str]) -> DataFrameExt {
+        let primary_key: Vec<String> = primary_key.iter().map(ToString::to_string).collect();
+
+        odf::utils::data::changelog::project(
+            self.get_all_data().await,
+            &primary_key,
+            &odf::metadata::DatasetVocabulary::default(),
+        )
+        .unwrap()
+        .sort(
+            primary_key
+                .iter()
+                .map(|c| col(Column::from_name(c)).sort(true, true))
+                .collect(),
+        )
+        .unwrap()
+    }
+
+    /// Writes data with a dedicated writer that uses the specified session context
+    async fn write_df_with_ctx(
+        &self,
+        ctx: SessionContext,
+        df: DataFrameExt,
+    ) -> Result<WriteDataResult, WriteDataError> {
+        let mut writer = DataWriterDataFusion::from_metadata_chain(
+            ctx,
+            self.dataset.clone(),
+            &odf::BlockRef::Head,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let write_result = writer
+            .write(
+                Some(df),
+                WriteDataOpts {
+                    system_time: self.system_time,
+                    source_event_time: self.source_event_time,
+                    new_watermark: None,
+                    new_source_state: None,
+                    data_staging_path: self.temp_dir.path().join("data.parquet"),
+                },
+            )
+            .await?;
+
+        self.dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &write_result.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(&write_result.old_head)),
+                },
+            )
+            .await
+            .unwrap();
+
+        Ok(write_result)
+    }
+
+    /// Physical plan logged by `DataFusion`; requires `testing_logger::setup()`
+    fn captured_physical_plan(&self) -> String {
+        let plan = std::sync::Mutex::new(String::new());
+        testing_logger::validate(|capture| {
+            let p = capture
+                .iter()
+                .find(|c| c.body.contains("Optimized physical plan:"))
+                .unwrap()
+                .body
+                .trim()
+                .replace(
+                    self.temp_dir
+                        .path()
+                        .display()
+                        .to_string()
+                        .trim_start_matches('/'),
+                    "tmp",
+                );
+
+            *plan.lock().unwrap() = p;
+        });
+        plan.into_inner().unwrap()
     }
 }

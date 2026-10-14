@@ -141,8 +141,13 @@ where
         .unwrap();
     let actual = strat.merge(prev, new).unwrap();
 
-    // Sort events according to the strategy
-    let actual = actual.sort(strat.sort_order()).unwrap();
+    // Sort events according to the strategy, unless it keeps the input order
+    let sort_order = strat.sort_order();
+    let actual = if sort_order.is_empty() {
+        actual
+    } else {
+        actual.sort(sort_order).unwrap()
+    };
 
     testing::assert_dfs_equivalent(expected, actual, false, false, true).await;
 }
@@ -162,9 +167,9 @@ async fn test_changelog_merge_to_empty() {
             (Op::CorrectTo, 2020, "vancouver", 2),
         ],
         [
-            (Op::Append, 2020, "kyiv", 3),
-            (Op::Append, 2020, "seattle", 2),
             (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
             (Op::CorrectFrom, 2020, "vancouver", 1),
             (Op::CorrectTo, 2020, "vancouver", 2),
         ],
@@ -192,6 +197,31 @@ async fn test_changelog_merge_unseen() {
             (Op::Append, 2020, "odessa", 4),
             (Op::CorrectFrom, 2020, "vancouver", 1),
             (Op::CorrectTo, 2020, "vancouver", 2),
+        ],
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_changelog_merge_keeps_retract_before_append() {
+    test_changelog_merge(
+        [(Op::Append, 2020, "vancouver", 1)],
+        [
+            (Op::Retract, 2020, "vancouver", 1),
+            (Op::Append, 2020, "vancouver", 2),
+            (Op::Append, 2020, "seattle", 3),
+            (Op::Retract, 2020, "seattle", 3),
+            (Op::Append, 2020, "seattle", 4),
+        ],
+        [
+            (Op::Retract, 2020, "vancouver", 1),
+            (Op::Append, 2020, "vancouver", 2),
+            (Op::Append, 2020, "seattle", 3),
+            (Op::Retract, 2020, "seattle", 3),
+            (Op::Append, 2020, "seattle", 4),
         ],
     )
     .await;
