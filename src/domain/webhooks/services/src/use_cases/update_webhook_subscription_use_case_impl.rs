@@ -20,6 +20,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub struct UpdateWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     outbox: Arc<dyn Outbox>,
+    webhooks_config: Arc<WebhooksConfig>,
 }
 
 impl UpdateWebhookSubscriptionUseCaseImpl {
@@ -98,7 +99,7 @@ impl UpdateWebhookSubscriptionUseCase for UpdateWebhookSubscriptionUseCaseImpl {
             "Initiating update of webhook subscription",
         );
 
-        validate_webhook_target_url(&target_url)?;
+        validate_webhook_target_url(&target_url, &self.webhooks_config)?;
         validate_webhook_event_types(&event_types)?;
         deduplicate_event_types(&mut event_types);
 
