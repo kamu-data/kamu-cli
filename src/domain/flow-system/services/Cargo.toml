@@ -67,6 +67,7 @@ kamu-adapter-flow-dataset = { workspace = true, features = [
 ] }
 kamu-adapter-flow-webhook = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
+kamu-adapter-task-webhook = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
@@ -80,6 +81,7 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
+kamu-webhooks = { workspace = true }
 messaging-outbox = { workspace = true, features = [
     "testing",
 ] }
@@ -90,6 +92,7 @@ odf = { workspace = true, features = [
 cron = { version = "0.17", default-features = false }
 indoc = "2"
 mockall = "0.15"
+oop = "0.0.2"
 pretty_assertions = "1"
 serde_json = { version = "1", default-features = false }
 test-log = { version = "0.2", features = [
@@ -99,3 +102,5 @@ tokio = { version = "1", default-features = false, features = [
     "macros",
     "rt",
 ] }
+url = { version = "2", default-features = false }
+uuid = { version = "1", default-features = false }

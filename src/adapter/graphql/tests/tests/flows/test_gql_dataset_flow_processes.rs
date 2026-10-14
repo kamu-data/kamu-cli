@@ -625,11 +625,19 @@ async fn test_ingest_process_with_multiple_webhooks() {
     let delta_id = webhook_subscription_ids.get("delta").unwrap();
 
     harness
-        .mimic_webhook_flow_failure(&foo_result.dataset_handle.id, *alpha_id, false)
+        .mimic_webhook_flow_failure(
+            &foo_result.dataset_handle.id,
+            *alpha_id,
+            TaskError::empty_recoverable(),
+        )
         .await;
     harness.pause_webhook_subscription(*beta_id).await;
     harness
-        .mimic_webhook_flow_failure(&foo_result.dataset_handle.id, *gamma_id, true)
+        .mimic_webhook_flow_failure(
+            &foo_result.dataset_handle.id,
+            *gamma_id,
+            TaskError::empty_unrecoverable(),
+        )
         .await;
     harness
         .mimic_webhook_flow_success(&foo_result.dataset_handle.id, *delta_id)

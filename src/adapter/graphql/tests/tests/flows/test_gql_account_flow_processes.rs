@@ -715,10 +715,18 @@ impl AccountFlowProcessesHarness {
             .execute(schema, &self.catalog_authorized)
             .await;
 
-        self.mimic_webhook_flow_failure(&foo.dataset_handle.id, subscription_id_foo, false)
-            .await;
-        self.mimic_webhook_flow_failure(&bar.dataset_handle.id, subscription_id_bar, true)
-            .await;
+        self.mimic_webhook_flow_failure(
+            &foo.dataset_handle.id,
+            subscription_id_foo,
+            TaskError::empty_recoverable(),
+        )
+        .await;
+        self.mimic_webhook_flow_failure(
+            &bar.dataset_handle.id,
+            subscription_id_bar,
+            TaskError::empty_unrecoverable(),
+        )
+        .await;
 
         self.pause_webhook_subscription(subscription_id_baz).await;
 

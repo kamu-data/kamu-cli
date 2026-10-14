@@ -14,4 +14,5 @@ mod test_private_datasets;
 mod test_schema_dump;
 mod test_selftest;
 mod test_smart_transfer_protocol;
+mod test_webhooks;
 mod use_cases;

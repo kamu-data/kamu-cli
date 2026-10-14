@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::net::{IpAddr, ToSocketAddrs};
+
 use internal_error::InternalError;
 use kamu_webhooks::*;
 use thiserror::Error;
@@ -15,33 +17,42 @@ use thiserror::Error;
 
 pub(crate) fn validate_webhook_target_url(
     target_url: &url::Url,
+    webhooks_config: &WebhooksConfig,
 ) -> Result<(), WebhookSubscriptionInvalidTargetUrlError> {
-    if target_url.scheme() != "https" {
-        return Err(WebhookSubscriptionInvalidTargetUrlError {
-            url: target_url.clone(),
-        });
-    }
-
-    // Try resolving the hostname
-    if let Some(host) = target_url.host_str() {
-        use std::net::ToSocketAddrs;
-        let clean_host = host.trim_matches(['[', ']'].as_ref());
-        if let Ok(addrs) =
-            (clean_host, target_url.port_or_known_default().unwrap_or(80)).to_socket_addrs()
-        {
-            for addr in addrs {
-                let ip = addr.ip();
-                if ip.is_loopback() {
-                    // Reject localhost, ::1, etc.
-                    return Err(WebhookSubscriptionInvalidTargetUrlError {
-                        url: target_url.clone(),
-                    });
-                }
-            }
+    let is_valid = if webhooks_config.loopback_targets_only {
+        // An unresolvable host is rejected too
+        matches!(target_url.scheme(), "http" | "https") && {
+            let resolved_ips = resolve_target_host(target_url);
+            !resolved_ips.is_empty() && resolved_ips.iter().all(IpAddr::is_loopback)
         }
-    }
+    } else {
+        // Reject localhost, ::1, etc. A resolution failure is not an error
+        target_url.scheme() == "https"
+            && !resolve_target_host(target_url)
+                .iter()
+                .any(IpAddr::is_loopback)
+    };
 
-    Ok(())
+    if is_valid {
+        Ok(())
+    } else {
+        Err(WebhookSubscriptionInvalidTargetUrlError {
+            url: target_url.clone(),
+        })
+    }
+}
+
+/// Addresses the target host resolves to, empty when it does not resolve
+fn resolve_target_host(target_url: &url::Url) -> Vec<IpAddr> {
+    let Some(host) = target_url.host_str() else {
+        return Vec::new();
+    };
+    let clean_host = host.trim_matches(['[', ']'].as_ref());
+
+    (clean_host, target_url.port_or_known_default().unwrap_or(80))
+        .to_socket_addrs()
+        .map(|addrs| addrs.map(|addr| addr.ip()).collect())
+        .unwrap_or_default()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

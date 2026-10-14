@@ -16,6 +16,7 @@ use kamu_webhooks::{
     WebhookEventTypeCatalog,
     WebhookSubscriptionLabel,
     WebhookSubscriptionQueryMode,
+    WebhooksConfig,
 };
 use kamu_webhooks_services::UpdateWebhookSubscriptionUseCaseImpl;
 use messaging_outbox::{MockOutbox, Outbox};
@@ -260,6 +261,7 @@ impl UpdateWebhookSubscriptionUseCaseHarness {
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<UpdateWebhookSubscriptionUseCaseImpl>();
+        b.add_value(WebhooksConfig::default());
         b.add_value(mock_outbox);
         b.bind::<dyn Outbox, MockOutbox>();
 

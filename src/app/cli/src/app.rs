@@ -1005,6 +1005,7 @@ pub fn register_config_in_catalog(
         config.webhooks.max_consecutive_failures,
         Duration::seconds(config.webhooks.delivery_timeout.into()),
         config.webhooks.secret_encryption_key.clone(),
+        is_e2e_testing,
     ));
     //
 

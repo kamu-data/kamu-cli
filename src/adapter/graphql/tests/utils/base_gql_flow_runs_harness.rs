@@ -569,19 +569,17 @@ impl BaseGQLFlowRunsHarness {
         &self,
         dataset_id: &odf::DatasetID,
         subscription_id: WebhookSubscriptionID,
-        unrecoverable: bool,
-    ) {
+        task_error: TaskError,
+    ) -> FlowID {
         let flow_id = self.trigger_webhook_flow(dataset_id, subscription_id).await;
 
         self.mimic_flow_run_with_outcome(
             flow_id.to_string().as_str(),
-            TaskOutcome::Failed(if unrecoverable {
-                TaskError::empty_unrecoverable()
-            } else {
-                TaskError::empty_recoverable()
-            }),
+            TaskOutcome::Failed(task_error),
         )
         .await;
+
+        flow_id
     }
 
     pub async fn trigger_webhook_flow(

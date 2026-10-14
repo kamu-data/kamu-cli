@@ -163,6 +163,15 @@ macro calls — macro bodies are hard to read, debug and test.
   enums it references, each type's `impl` blocks immediately after the type.
 - When a function repeats a logical section, extract a named helper for it if it represents a
   coherent concept.
+- `mod.rs` holds no code: only submodule declarations, re-exports and an optional `//!` module
+  doc. Types, functions and constants live in named files. The exception is a `macro_rules!`
+  macro the module exports.
+- Model a concept as a type with methods. When several free functions work on the same data
+  (parse a header, then check a value against it), make that data a type:
+  `ContentDigest::parse(header)?.verify(body)`. A free function is for a helper that stands on its
+  own.
+- One concept per file. A module that grows several independent concepts becomes a directory with
+  a file per type, with its errors and its tests in files of their own.
 
 ### Visibility and re-exports
 
@@ -183,6 +192,7 @@ Do not re-propose these without new evidence.
 | Importing ODF types with `use odf::…` to shorten signatures | Loses the protocol-type marker and invites clashes with Kamu types of the same name. |
 | Hand-written `match` for enum ↔ string | Drifts from the variants; `strum` derives stay in sync. |
 | Catch-all `_` arm on an enum we own, "to keep the match short" | A new variant silently takes the fallback path instead of failing to compile where a decision is needed. |
+| One file of free functions passing the same data along, "since it is only a few helpers" | Reads as a procedure and hides which concepts exist; a type per concept, in its own file, names them and keeps each one's parsing and checks together. |
 | Silencing a lint instead of fixing it, or without a `reason` | Hides the problem; most suppressions removed in the cleanup turned out to be fixable or stale. |
 
 ## What lives elsewhere
