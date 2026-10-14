@@ -163,9 +163,9 @@ whatever the status.
 and update only: the scheme must be `https`, and the host is resolved with the blocking resolver;
 if any resolved address is loopback the URL is rejected. A resolution failure is not an error.
 Nothing is re-checked at delivery time. `WebhooksConfig::loopback_targets_only` inverts the host
-rule: any scheme is accepted, but every resolved address must be loopback, and a host that does not
-resolve is rejected. The CLI sets it only in E2E mode (`--e2e-output-data-path`), so tests deliver
-to a local receiver and can never reach an external host. It has no config key.
+rule: `http` is accepted besides `https`, every resolved address must be loopback, and a host that
+does not resolve is rejected. The CLI sets it only in E2E mode (`--e2e-output-data-path`), so tests
+deliver to a local receiver and can never reach an external host. It has no config key.
 
 **Event types** must be non-empty. Only the GraphQL scalar checks them against the catalog, and it
 accepts only the non-test types.
@@ -251,6 +251,35 @@ recomputes the digest of the raw body, compares it with `Content-Digest`, rebuil
 computes HMAC-SHA256 with the secret string's bytes, and compares the base64 result with
 `Signature`. Kamu enforces no freshness window and sends no `expires` or `nonce`; checking
 `X-Webhook-Timestamp` is up to the receiver. The test vector is in `test_webhook_signer_impl.rs`.
+
+### Standards behind the signature
+
+The headers follow three IETF specifications. Kamu implements the parts it needs by hand, without
+a library for any of them.
+
+| Specification | What it defines | What Kamu takes from it |
+| --- | --- | --- |
+| [RFC 9530, Digest Fields](https://www.rfc-editor.org/rfc/rfc9530) | [`Content-Digest`](https://www.rfc-editor.org/rfc/rfc9530#section-2): a hash of the message content, labelled with its algorithm | The header as specified, `sha-256` only |
+| [RFC 9421, HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421) | A signature over selected parts of a message: the signer lists the covered components in [`Signature-Input`](https://www.rfc-editor.org/rfc/rfc9421#section-4.1), builds a [signature base](https://www.rfc-editor.org/rfc/rfc9421#section-2.5) from their values, and puts the result in [`Signature`](https://www.rfc-editor.org/rfc/rfc9421#section-4.2) | The two header names, the `sig1` label, the [derived components](https://www.rfc-editor.org/rfc/rfc9421#section-2.2) `@method`, `@path` and `@authority`, the [signature parameters](https://www.rfc-editor.org/rfc/rfc9421#section-2.3) `keyid`, `alg` and `created`, and the [`hmac-sha256`](https://www.rfc-editor.org/rfc/rfc9421#section-3.3.3) algorithm, keyed with a shared secret |
+| [RFC 9651, Structured Field Values](https://www.rfc-editor.org/rfc/rfc9651) | The syntax of both RFCs' headers: dictionaries of labelled members, inner lists, parameters, and [byte sequences](https://www.rfc-editor.org/rfc/rfc9651#section-3.3.5) written as `:<base64>:` | The `:<base64>:` form of the digest and signature values |
+
+How the pieces fit: the digest binds the body to a header, and the signature covers that header.
+A receiver therefore checks the digest against the raw body first, then the signature over the
+base; changing the body breaks the digest, and recomputing the digest breaks the signature.
+`created` and `X-Webhook-Timestamp` are inside the signature too, so a receiver that rejects old
+timestamps also rejects a replayed delivery. RFC 9421 leaves that check to the verifier
+([§3.2](https://www.rfc-editor.org/rfc/rfc9421#section-3.2)), and so does Kamu.
+
+Where Kamu departs from RFC 9421, which is why a generic verifier rejects the signature:
+
+| RFC 9421 | Kamu |
+| --- | --- |
+| Component identifiers are quoted strings everywhere: `("@method" "@path" …)` in `Signature-Input` and `"@method": POST` in the base | Derived components are bare, in both places; header names are quoted. A strict RFC 9651 parser rejects the bare `@method` in `Signature-Input` |
+| The base ends with one line, `"@signature-params": ` followed by the exact `Signature-Input` member value, parameters included | The parameters go on a line of their own, `;keyid="default";alg="hmac-sha256";created=…`, without the spaces `Signature-Input` has after each `;` |
+
+Everything else, the component values in particular, matches the RFC. A receiver written from
+this section is in `src/e2e/app/cli/repo-tests/src/webhook_receiver/`, and the E2E tests check it
+against real deliveries.
 
 ### Payload
 

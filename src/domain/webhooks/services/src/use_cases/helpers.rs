@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::net::{IpAddr, ToSocketAddrs};
+
 use internal_error::InternalError;
 use kamu_webhooks::*;
 use thiserror::Error;
@@ -17,14 +19,18 @@ pub(crate) fn validate_webhook_target_url(
     target_url: &url::Url,
     webhooks_config: &WebhooksConfig,
 ) -> Result<(), WebhookSubscriptionInvalidTargetUrlError> {
-    let resolved_ips = resolve_target_host(target_url);
-
     let is_valid = if webhooks_config.loopback_targets_only {
         // An unresolvable host is rejected too
-        !resolved_ips.is_empty() && resolved_ips.iter().all(std::net::IpAddr::is_loopback)
+        matches!(target_url.scheme(), "http" | "https") && {
+            let resolved_ips = resolve_target_host(target_url);
+            !resolved_ips.is_empty() && resolved_ips.iter().all(IpAddr::is_loopback)
+        }
     } else {
         // Reject localhost, ::1, etc. A resolution failure is not an error
-        target_url.scheme() == "https" && !resolved_ips.iter().any(std::net::IpAddr::is_loopback)
+        target_url.scheme() == "https"
+            && !resolve_target_host(target_url)
+                .iter()
+                .any(IpAddr::is_loopback)
     };
 
     if is_valid {
@@ -37,9 +43,7 @@ pub(crate) fn validate_webhook_target_url(
 }
 
 /// Addresses the target host resolves to, empty when it does not resolve
-fn resolve_target_host(target_url: &url::Url) -> Vec<std::net::IpAddr> {
-    use std::net::ToSocketAddrs;
-
+fn resolve_target_host(target_url: &url::Url) -> Vec<IpAddr> {
     let Some(host) = target_url.host_str() else {
         return Vec::new();
     };

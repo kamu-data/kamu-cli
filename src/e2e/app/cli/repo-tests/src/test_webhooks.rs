@@ -27,7 +27,11 @@ use url::Url;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, Request, ResponseTemplate};
 
-use crate::webhook_receiver::{VerifiedWebhookSignature, WebhookVerificationError, verify_webhook};
+use crate::webhook_receiver::{
+    VerifiedWebhookSignature,
+    WebhookReceiver,
+    WebhookVerificationError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -83,7 +87,7 @@ pub async fn test_webhook_delivered_signed(kamu_api_server_client: KamuApiServer
     let new_head = scenario.head().await;
 
     let flows = scenario.wait_for_finished_flows(&subscription, 1).await;
-    pretty_assertions::assert_eq!(flows, [WebhookScenario::succeeded_flow(1)],);
+    pretty_assertions::assert_eq!(flows, [WebhookScenario::succeeded_flow(1)]);
 
     let requests = scenario.received_requests().await;
     assert_eq!(requests.len(), 1);
@@ -110,47 +114,37 @@ pub async fn test_webhook_delivered_signed(kamu_api_server_client: KamuApiServer
     // A receiver holding the secret accepts the delivery, and the signature
     // covers the request line, the timestamp and the body digest
     let receiver_url = scenario.receiver_url();
+    let receiver = WebhookReceiver::new(&receiver_url, &subscription.secret);
     pretty_assertions::assert_eq!(
-        verify_webhook(request, &receiver_url, &subscription.secret),
+        receiver.verify(request),
         Ok(WebhookScenario::expected_signature(request)),
     );
 
     // Anything else is rejected
     assert_eq!(
-        verify_webhook(request, &receiver_url, "not-the-secret"),
+        WebhookReceiver::new(&receiver_url, "not-the-secret").verify(request),
         Err(WebhookVerificationError::SignatureMismatch)
     );
     assert_eq!(
-        verify_webhook(
-            &WebhookScenario::with_body(request, b"{}", false),
-            &receiver_url,
-            &subscription.secret
-        ),
+        receiver.verify(&WebhookScenario::with_body(request, b"{}", false)),
         Err(WebhookVerificationError::DigestMismatch)
     );
     // The digest is signed, so recomputing it for a new body does not help
     assert_eq!(
-        verify_webhook(
-            &WebhookScenario::with_body(request, b"{}", true),
-            &receiver_url,
-            &subscription.secret
-        ),
+        receiver.verify(&WebhookScenario::with_body(request, b"{}", true)),
         Err(WebhookVerificationError::SignatureMismatch)
     );
     assert_eq!(
-        verify_webhook(
-            &WebhookScenario::with_header(request, "x-webhook-timestamp", "0"),
-            &receiver_url,
-            &subscription.secret
-        ),
-        Err(WebhookVerificationError::SignatureMismatch)
-    );
-    assert_eq!(
-        verify_webhook(
+        receiver.verify(&WebhookScenario::with_header(
             request,
-            &Url::parse("http://127.0.0.1:1/elsewhere").unwrap(),
-            &subscription.secret
-        ),
+            "x-webhook-timestamp",
+            "0"
+        )),
+        Err(WebhookVerificationError::SignatureMismatch)
+    );
+    let other_receiver_url = Url::parse("http://127.0.0.1:1/elsewhere").unwrap();
+    assert_eq!(
+        WebhookReceiver::new(&other_receiver_url, &subscription.secret).verify(request),
         Err(WebhookVerificationError::SignatureMismatch)
     );
 
@@ -320,17 +314,17 @@ pub async fn test_webhook_signed_with_rotated_secret(kamu_api_server_client: Kam
 
     // Before the rotation: the original secret
     assert_matches!(
-        verify_webhook(&requests[0], &receiver_url, &subscription.secret),
+        WebhookReceiver::new(&receiver_url, &subscription.secret).verify(&requests[0]),
         Ok(_)
     );
 
     // After it: only the new secret
     assert_matches!(
-        verify_webhook(&requests[1], &receiver_url, &new_secret),
+        WebhookReceiver::new(&receiver_url, &new_secret).verify(&requests[1]),
         Ok(_)
     );
     assert_eq!(
-        verify_webhook(&requests[1], &receiver_url, &subscription.secret),
+        WebhookReceiver::new(&receiver_url, &subscription.secret).verify(&requests[1]),
         Err(WebhookVerificationError::SignatureMismatch)
     );
 }
@@ -340,8 +334,8 @@ pub async fn test_webhook_signed_with_rotated_secret(kamu_api_server_client: Kam
 pub async fn test_webhook_external_target_rejected(kamu_api_server_client: KamuApiServerClient) {
     let scenario = WebhookScenario::new(kamu_api_server_client).await;
 
-    // E2E mode accepts only loopback targets, whatever the scheme, so a test
-    // can never deliver to an external host
+    // E2E mode accepts only loopback targets, so a test can never deliver to an
+    // external host
     for external_url in [
         "https://example.com/hook",
         "http://192.0.2.1/hook",

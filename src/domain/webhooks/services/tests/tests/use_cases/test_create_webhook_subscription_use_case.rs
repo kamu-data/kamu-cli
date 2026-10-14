@@ -136,17 +136,19 @@ async fn test_external_target_url_rejected_when_loopback_only() {
         },
     );
 
-    // Rejected whether or not the host resolves where the test runs
-    for external_url in [
+    // Rejected whether or not the host resolves where the test runs, and on a
+    // scheme other than `http` or `https`
+    for rejected_url in [
         "https://example.com/hook",
         "http://192.0.2.1/hook",
         "https://unresolvable.invalid/hook",
+        "ftp://127.0.0.1/hook",
     ] {
         let res = harness
             .use_case
             .execute(
                 Some(dataset_id.clone()),
-                url::Url::parse(external_url).unwrap(),
+                url::Url::parse(rejected_url).unwrap(),
                 vec![WebhookEventTypeCatalog::test()],
                 WebhookSubscriptionLabel::try_new("test_label").unwrap(),
             )
