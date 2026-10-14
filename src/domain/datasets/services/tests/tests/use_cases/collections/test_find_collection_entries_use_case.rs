@@ -124,6 +124,36 @@ async fn test_find_collection_entry_by_ref() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_find_collection_entry_by_ref_after_correction_of_ref() {
+    let harness = FindCollectionEntriesUseCaseHarness::new();
+    let [foo, bar, _] = harness.linked_datasets();
+    let collection = harness.create_collection(Vec::new()).await;
+
+    harness
+        .update_success(&collection, vec![harness.add("/a", &foo)])
+        .await;
+
+    // The update use case never corrects the ref of an entry, but other writers can
+    harness
+        .push_raw_records(
+            &collection,
+            vec![
+                json!({"op": 2, "path": "/a", "ref": foo.to_string()}),
+                json!({"op": 3, "path": "/a", "ref": bar.to_string()}),
+            ],
+        )
+        .await;
+
+    assert_eq!(harness.find_by_ref(&collection, &foo).await, None);
+    assert_eq!(
+        harness.find_by_ref(&collection, &bar).await,
+        Some(harness.record("/a", &bar))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_find_collection_entries_by_multiple_refs() {
     let harness = FindCollectionEntriesUseCaseHarness::new();
     let [foo, bar, baz] = harness.linked_datasets();

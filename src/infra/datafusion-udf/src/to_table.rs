@@ -52,15 +52,16 @@ where
     async fn main(&self, dataset_ref: odf::DatasetRef) -> DfResult<Arc<dyn TableProvider>> {
         let maybe_df = (self.on_resolve_dataset_callback)(dataset_ref.clone())
             .await
-            .map_err(|e| {
-                // Rewrite access error
-                if let QueryError::Access(_) = e {
-                    odf::DatasetNotFoundError::new(dataset_ref).into()
-                } else {
-                    e
-                }
-            })
-            .map_err(|e| DFError::External(Box::new(e)))?;
+            .map_err(|e| match e {
+                // Reported like a missing table, and the same for inaccessible datasets to
+                // not reveal their existence
+                QueryError::DatasetNotFound(_) | QueryError::Access(_) => DFError::Plan(format!(
+                    "{TO_TABLE_FUNCTION_NAME}(): dataset '{dataset_ref}' not found"
+                )),
+                QueryError::DatasetBlockNotFound(_)
+                | QueryError::BadQuery(_)
+                | QueryError::Internal(_) => DFError::External(Box::new(e)),
+            })?;
 
         if let Some(df) = maybe_df {
             Ok(df.into_view())

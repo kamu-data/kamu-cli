@@ -17,9 +17,18 @@ Recommendation: for ease of reading, use the following format:
 ### Added
 - `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
   a `blockHash` field
+### Changed
+- SQL `to_table()` only reads datasets the query lists, like plain table references
+- `ChangelogStream` ingest requires `datafusion.execution.target_partitions` = 1 in the ingest configuration
 ### Fixed
 - The local disk cache of S3 metadata blocks writes entries atomically, so a failed or interrupted download
   no longer leaves a truncated block that breaks the node until the cache is cleared
+- `ChangelogStream` keeps the input order of records, so several changes to one key in a chunk produce the
+  correct state
+- Collection updates are committed as a single block
+- Collection entries are filtered by extra data and found by linked dataset using their current values
+- SQL `to_table()` reads datasets at the query's pinned blocks and includes them in the query state
+- SQL `to_table()` on a missing dataset is a bad query error instead of an internal error
 
 ## [0.270.0] - 2026-10-12
 ### Added

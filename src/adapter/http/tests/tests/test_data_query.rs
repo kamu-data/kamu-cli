@@ -893,8 +893,8 @@ async fn test_data_query_handler_error_to_table_dataset_does_not_exist() {
         let body = res.json::<serde_json::Value>().await.unwrap();
         pretty_assertions::assert_eq!(
             (
-                http::StatusCode::NOT_FOUND,
-                json!({"message": "Dataset not found: does-not-exist"})
+                http::StatusCode::BAD_REQUEST,
+                json!({"message": "to_table(): dataset 'does-not-exist' not found"})
             ),
             (status, body),
         );

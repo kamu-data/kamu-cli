@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
+use file_utils::MediaType;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
@@ -32,7 +33,14 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_core::{DidGenerator, GetDataOptions, QueryService};
+use kamu_core::{
+    DataSource,
+    DidGenerator,
+    GetDataOptions,
+    PushIngestDataUseCase,
+    PushIngestDataUseCaseOptions,
+    QueryService,
+};
 use kamu_datasets::{
     CollectionEntry,
     CollectionEntryRecord,
@@ -69,6 +77,7 @@ pub struct CollectionBaseUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
     catalog: dill::Catalog,
     update_use_case: Arc<dyn UpdateCollectionEntriesUseCase>,
+    push_ingest_use_case: Arc<dyn PushIngestDataUseCase>,
     query_svc: Arc<dyn QueryService>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
@@ -117,6 +126,7 @@ impl CollectionBaseUseCaseHarness {
         Self {
             base_use_case_harness,
             update_use_case: catalog.get_one().unwrap(),
+            push_ingest_use_case: catalog.get_one().unwrap(),
             query_svc: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
@@ -220,6 +230,37 @@ impl CollectionBaseUseCaseHarness {
         .unwrap();
 
         ResolvedDataset::from_stored(&store_result, &alias)
+    }
+
+    /// Writes changelog records directly to the push source of the collection, as any
+    /// client with write access can, bypassing the update use case
+    pub async fn push_raw_records(
+        &self,
+        collection: &ResolvedDataset,
+        records: Vec<serde_json::Value>,
+    ) {
+        let ndjson = records
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        self.push_ingest_use_case
+            .execute(
+                collection.clone(),
+                DataSource::Buffer(bytes::Bytes::from(ndjson)),
+                PushIngestDataUseCaseOptions {
+                    source_name: None,
+                    source_event_time: None,
+                    is_ingest_from_upload: false,
+                    media_type: Some(MediaType::NDJSON.to_owned()),
+                    expected_head: None,
+                    skip_quota_check: true,
+                },
+                None,
+            )
+            .await
+            .unwrap();
     }
 
     pub async fn update(
