@@ -258,6 +258,105 @@ async fn test_to_table_changelog_stream_custom_vocabulary() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_filter_on_non_key_column_applies_to_current_state() {
+    let harness = ToTableHarness::new();
+    let foo = harness
+        .create_dataset("foo", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+    let schema = "op INT NOT NULL, city STRING NOT NULL, population BIGINT";
+
+    harness
+        .write(
+            &foo,
+            indoc!(
+                r#"
+                op,city,population
+                0,A,1000
+                0,B,10
+                0,C,5
+                "#
+            ),
+            schema,
+        )
+        .await;
+
+    // Every newer record fails the filter below, while the records they replace pass it.
+    // Filtering before projecting would bring the stale ones back as the current state.
+    harness
+        .write(
+            &foo,
+            indoc!(
+                r#"
+                op,city,population
+                2,A,1000
+                3,A,2000
+                1,C,5
+                "#
+            ),
+            schema,
+        )
+        .await;
+
+    assert_data_eq(
+        harness
+            .sql(
+                "SELECT offset, op, city, population FROM to_table(foo) WHERE population < 1500 \
+                 ORDER BY city",
+            )
+            .await,
+        indoc!(
+            r#"
+            +--------+----+------+------------+
+            | offset | op | city | population |
+            +--------+----+------+------------+
+            | 1      | 0  | B    | 10         |
+            +--------+----+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_data_eq(
+        harness
+            .sql(
+                "SELECT COUNT(*) AS num, SUM(population) AS total FROM to_table(foo) WHERE \
+                 population < 1500",
+            )
+            .await,
+        indoc!(
+            r#"
+            +-----+-------+
+            | num | total |
+            +-----+-------+
+            | 1   | 10    |
+            +-----+-------+
+            "#
+        ),
+    )
+    .await;
+
+    // Filters on the primary key select whole keys, so they see the current state too
+    assert_data_eq(
+        harness
+            .sql("SELECT offset, op, city, population FROM to_table(foo) WHERE city IN ('A', 'C')")
+            .await,
+        indoc!(
+            r#"
+            +--------+----+------+------------+
+            | offset | op | city | population |
+            +--------+----+------+------------+
+            | 4      | 3  | A    | 2000       |
+            +--------+----+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_to_table_snapshot_from_push_source() {
     let harness = ToTableHarness::new();
     let foo = harness
