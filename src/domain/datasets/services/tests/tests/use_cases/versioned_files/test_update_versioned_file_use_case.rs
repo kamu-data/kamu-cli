@@ -54,6 +54,24 @@ async fn test_update_versioned_file_extra_data_only_keeps_content() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_update_versioned_file_extra_data_only_without_versions_fails() {
+    let harness = Harness::new();
+    let file = harness
+        .create_versioned_file(vec![odf::schema::DataField::string("tag").optional()])
+        .await;
+    let chain_len = harness.chain_len(&file).await;
+
+    let res = harness
+        .update_extra_data_res(&file, serde_json::json!({"tag": "x"}))
+        .await;
+
+    assert_matches!(res, Err(UpdateVersionFileUseCaseError::Internal(_)));
+    assert_eq!(harness.chain_len(&file).await, chain_len);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_update_versioned_file_stale_expected_head_fails() {
     let harness = Harness::new();
     let file = harness.create_versioned_file(Vec::new()).await;

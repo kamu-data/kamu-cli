@@ -105,11 +105,11 @@ impl VersionedFileBaseUseCaseHarness {
 
     /// Creates a new version that keeps the content of the latest one and replaces its
     /// extra data
-    pub async fn update_extra_data(
+    pub async fn update_extra_data_res(
         &self,
         file: &ResolvedDataset,
         extra_data: serde_json::Value,
-    ) -> UpdateVersionFileResult {
+    ) -> Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError> {
         self.update_use_case
             .execute(
                 WriteCheckedDataset::from_ref(file),
@@ -119,7 +119,14 @@ impl VersionedFileBaseUseCaseHarness {
                 Some(PushSourceDatasetBaseUseCaseHarness::extra_data(extra_data)),
             )
             .await
-            .unwrap()
+    }
+
+    pub async fn update_extra_data(
+        &self,
+        file: &ResolvedDataset,
+        extra_data: serde_json::Value,
+    ) -> UpdateVersionFileResult {
+        self.update_extra_data_res(file, extra_data).await.unwrap()
     }
 
     /// The parts of an entry tests compare: `(version, content hash, extra data)`

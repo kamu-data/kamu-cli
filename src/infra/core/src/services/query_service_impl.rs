@@ -137,7 +137,7 @@ impl QueryServiceImpl {
         } else {
             // We will inspect SQL to understand which datasets the query is using and
             // populate the block hashes and aliases for them
-            let mut table_refs = Vec::new();
+            let mut table_refs = QueryTableRefs::default();
 
             // Some queries like `show tables` will not be affixed to a specific set of
             // datasets and for now require populating session context with all datasets
@@ -209,7 +209,15 @@ impl QueryServiceImpl {
             } else {
                 // Resolve table references into datasets.
                 // We simply ignore unresolvable, letting a query fail at the execution stage.
-                for mut table in table_refs {
+                // Tables come first: a dataset used both as a table and by `to_table()` keeps
+                // the alias of the table, which the session registers it under
+                let tables = table_refs.tables.into_iter().map(|table| (table, false));
+                let to_table_datasets = table_refs
+                    .to_table_datasets
+                    .into_iter()
+                    .map(|table| (table, true));
+
+                for (mut table, is_to_table_dataset) in tables.chain(to_table_datasets) {
                     // Strip possible `kamu.kamu.` prefix
                     while table.0.len() > 1
                         && table.0[0].as_ident().map(|i| i.value.as_ref()) == Some("kamu")
@@ -242,6 +250,10 @@ impl QueryServiceImpl {
                         tracing::warn!(?dataset_ref, "Ignoring table with unresolvable alias");
                         continue;
                     };
+
+                    if is_to_table_dataset && new_dataset_opts.contains_key(&hdl.id) {
+                        continue;
+                    }
 
                     if !self
                         .dataset_action_authorizer
@@ -400,9 +412,28 @@ impl QueryServiceImpl {
         let input = match dataset_ref {
             odf::DatasetRef::ID(id) => input_datasets.get_key_value(id),
             odf::DatasetRef::Handle(hdl) => input_datasets.get_key_value(&hdl.id),
-            odf::DatasetRef::Alias(_) => input_datasets.iter().find(|(_, opts)| {
-                opts.alias.parse::<odf::DatasetRef>().ok().as_ref() == Some(dataset_ref)
-            }),
+            odf::DatasetRef::Alias(_) => {
+                let by_alias = input_datasets.iter().find(|(_, opts)| {
+                    opts.alias.parse::<odf::DatasetRef>().ok().as_ref() == Some(dataset_ref)
+                });
+
+                if by_alias.is_some() {
+                    by_alias
+                } else {
+                    // An input may be named differently elsewhere in the query, e.g. by ID
+                    match self
+                        .dataset_registry
+                        .resolve_dataset_handle_by_ref(dataset_ref)
+                        .await
+                    {
+                        Ok(hdl) => input_datasets.get_key_value(&hdl.id),
+                        Err(odf::DatasetRefUnresolvedError::NotFound(_)) => None,
+                        Err(odf::DatasetRefUnresolvedError::Internal(e)) => {
+                            return Err(e.into());
+                        }
+                    }
+                }
+            }
         };
 
         let Some((id, opts)) = input else {
@@ -772,11 +803,20 @@ impl QueryService for QueryServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Datasets a query reads
+#[derive(Debug, Default)]
+struct QueryTableRefs {
+    /// Datasets referenced as tables
+    tables: Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+    /// Datasets passed to `to_table()`
+    to_table_datasets: Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+}
+
 // TODO: This is too complex - we should explore better ways to associate a
 // query with a certain state
 fn extract_table_refs_rec(
     query: &datafusion::sql::sqlparser::ast::Query,
-    tables: &mut Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+    tables: &mut QueryTableRefs,
 ) -> Result<(), QueryError> {
     if let Some(with) = &query.with {
         for cte in &with.cte_tables {
@@ -789,7 +829,9 @@ fn extract_table_refs_rec(
     // TODO: This may fail in some tricky cases like nested CTEs
     if let Some(with) = &query.with {
         for cte in &with.cte_tables {
-            tables.retain(|tn| tn.0.len() != 1 || tn.0[0].as_ident() != Some(&cte.alias.name));
+            tables
+                .tables
+                .retain(|tn| tn.0.len() != 1 || tn.0[0].as_ident() != Some(&cte.alias.name));
         }
     }
 
@@ -798,7 +840,7 @@ fn extract_table_refs_rec(
 
 fn extract_table_refs_rec_set_expr(
     expr: &datafusion::sql::sqlparser::ast::SetExpr,
-    tables: &mut Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+    tables: &mut QueryTableRefs,
 ) -> Result<(), QueryError> {
     use datafusion::sql::sqlparser::ast::SetExpr;
 
@@ -829,7 +871,7 @@ fn extract_table_refs_rec_set_expr(
 
 fn extract_table_refs_rec_table_factor(
     expr: &datafusion::sql::sqlparser::ast::TableFactor,
-    tables: &mut Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+    tables: &mut QueryTableRefs,
 ) -> Result<(), QueryError> {
     use datafusion::sql::sqlparser::ast::TableFactor;
 
@@ -844,11 +886,11 @@ fn extract_table_refs_rec_table_factor(
             ..
         } if is_to_table_function(name) => {
             // The dataset read by `to_table()` is a part of the query state like any table
-            tables.extend(to_table_dataset_arg(args));
+            tables.to_table_datasets.extend(to_table_dataset_arg(args));
             Ok(())
         }
         TableFactor::Table { name, .. } => {
-            tables.push(name.clone());
+            tables.tables.push(name.clone());
             Ok(())
         }
         TableFactor::Derived { subquery, .. } => extract_table_refs_rec(subquery, tables),

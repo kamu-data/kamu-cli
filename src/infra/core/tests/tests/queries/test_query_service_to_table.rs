@@ -854,6 +854,58 @@ async fn test_to_table_requires_primary_key() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_of_dataset_named_differently_as_table() {
+    let harness = ToTableHarness::new();
+    let foo = harness
+        .create_dataset("foo", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+
+    harness
+        .write(
+            &foo,
+            indoc!(
+                r#"
+                op,city,population
+                0,A,1000
+                2,A,1000
+                3,A,2000
+                "#
+            ),
+            "op INT NOT NULL, city STRING NOT NULL, population BIGINT",
+        )
+        .await;
+
+    let id = ToTableHarness::dataset_id("foo");
+    let expected = indoc!(
+        r#"
+        +-----+---------+
+        | log | current |
+        +-----+---------+
+        | 0   | 2000    |
+        | 1   | 2000    |
+        | 2   | 2000    |
+        +-----+---------+
+        "#
+    );
+
+    for statement in [
+        format!(
+            "SELECT log.offset AS log, state.population AS current FROM foo AS log JOIN \
+             to_table(`{id}`) AS state ON log.city = state.city ORDER BY log.offset"
+        ),
+        format!(
+            "SELECT log.offset AS log, state.population AS current FROM to_table(foo) AS state \
+             JOIN `{id}` AS log ON log.city = state.city ORDER BY log.offset"
+        ),
+    ] {
+        assert_data_eq(harness.sql(&statement).await, expected).await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct ToTableHarness {
     temp_dir: tempfile::TempDir,
     query_svc: Arc<dyn QueryService>,
