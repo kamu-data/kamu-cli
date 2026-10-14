@@ -1180,7 +1180,13 @@ Shows dataset metadata history
 
 * `-o`, `--output-format <FMT>` — Format of the output
 
-  Possible values: `shell`, `yaml`
+  Possible values:
+  - `shell`
+  - `yaml`
+  - `json`:
+    Array of blocks, each in the YAML manifest shape plus its `blockHash`
+  - `ndjson`:
+    One Json block object per line - easily splittable format
 
 * `-f`, `--filter <FLT>` — Types of events to include
 * `--limit <LIMIT>` — Maximum number of blocks to display
@@ -1210,6 +1216,10 @@ Show detailed content of all blocks:
 Using a filter to inspect blocks containing query changes of a derivative dataset:
 
     kamu log -o yaml --filter source org.example.data
+
+Print the event kind of every block as one JSON object per line, for scripts:
+
+    kamu log -o ndjson org.example.data | jq .content.event.kind
 
 
 

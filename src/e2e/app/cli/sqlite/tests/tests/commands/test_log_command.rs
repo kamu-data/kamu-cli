@@ -18,4 +18,11 @@ kamu_cli_execute_command_e2e_test!(
     extra_test_groups = "engine, ingest, datafusion"
 );
 
+kamu_cli_execute_command_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_log_command_json_output,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

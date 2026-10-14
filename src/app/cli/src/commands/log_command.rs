@@ -27,8 +27,14 @@ use crate::output::OutputConfig;
 pub enum MetadataLogOutputFormat {
     Shell,
     Yaml,
-    // TODO: `kamu log`: support `--output-format json`
-    //       https://github.com/kamu-data/kamu-cli/issues/887
+
+    /// Array of blocks, each in the YAML manifest shape plus its `blockHash`
+    #[clap(name = "json")]
+    Json,
+
+    /// One Json block object per line - easily splittable format
+    #[clap(name = "ndjson")]
+    NdJson,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -120,6 +126,12 @@ impl Command for LogCommand {
                 Box::new(PagedYamlRenderer::new(self.limit))
             }
             (Some(MetadataLogOutputFormat::Yaml), false) => Box::new(YamlRenderer::new(self.limit)),
+            (Some(MetadataLogOutputFormat::Json), _) => {
+                Box::new(JsonRenderer::new(self.limit, JsonLayout::Array))
+            }
+            (Some(MetadataLogOutputFormat::NdJson), _) => {
+                Box::new(JsonRenderer::new(self.limit, JsonLayout::Lines))
+            }
         };
 
         let resolved_dataset = self
@@ -692,3 +704,104 @@ impl MetadataRenderer for PagedYamlRenderer {
         Ok(())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+enum JsonLayout {
+    Array,
+    Lines,
+}
+
+/// The YAML block manifest with the block hash that YAML keeps in a comment
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JsonBlockRecord {
+    block_hash: odf::Multihash,
+    #[serde(flatten)]
+    manifest: odf::serde::yaml::legacy::Manifest<odf::serde::yaml::datasets::MetadataBlock>,
+}
+
+impl JsonBlockRecord {
+    fn new(block_hash: odf::Multihash, block: odf::MetadataBlock) -> Self {
+        Self {
+            block_hash,
+            manifest: odf::serde::yaml::legacy::Manifest {
+                kind: "MetadataBlock".to_owned(),
+                version: odf::serde::METADATA_BLOCK_CURRENT_VERSION as i32,
+                content: odf::serde::yaml::datasets::MetadataBlock::from(block),
+            },
+        }
+    }
+}
+
+struct JsonRenderer {
+    limit: usize,
+    layout: JsonLayout,
+}
+
+impl JsonRenderer {
+    fn new(limit: usize, layout: JsonLayout) -> Self {
+        Self { limit, layout }
+    }
+
+    async fn render_blocks(
+        &self,
+        output: &mut impl Write,
+        blocks: odf::dataset::DynMetadataStream<'_>,
+    ) -> Result<(), CLIError> {
+        let mut blocks = blocks.take(self.limit);
+        let mut buf = Vec::new();
+        let mut is_first = true;
+
+        match self.layout {
+            JsonLayout::Array => output.write_all(b"[")?,
+            JsonLayout::Lines => {}
+        }
+
+        while let Some((hash, block)) = blocks.try_next().await? {
+            buf.clear();
+
+            match self.layout {
+                JsonLayout::Array if !is_first => buf.push(b','),
+                JsonLayout::Array | JsonLayout::Lines => {}
+            }
+
+            serde_json::to_writer(&mut buf, &JsonBlockRecord::new(hash, block))
+                .map_err(CLIError::critical)?;
+
+            match self.layout {
+                JsonLayout::Array => {}
+                JsonLayout::Lines => buf.push(b'\n'),
+            }
+
+            output.write_all(&buf)?;
+            is_first = false;
+        }
+
+        match self.layout {
+            JsonLayout::Array => output.write_all(b"]\n")?,
+            JsonLayout::Lines => {}
+        }
+
+        output.flush()?;
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl MetadataRenderer for JsonRenderer {
+    async fn show<'a>(
+        &'a mut self,
+        _dataset_handle: &odf::DatasetHandle,
+        blocks: odf::dataset::DynMetadataStream<'a>,
+    ) -> Result<(), CLIError> {
+        // Scripts often stop reading early (`| head`), and Rust ignores SIGPIPE, so
+        // the write would fail with `BrokenPipe` - `pipecheck` lets the signal
+        // terminate the process instead
+        self.render_blocks(&mut pipecheck::wrap(std::io::stdout()), blocks)
+            .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

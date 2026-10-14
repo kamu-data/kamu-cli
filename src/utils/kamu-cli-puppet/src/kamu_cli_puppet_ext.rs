@@ -85,6 +85,8 @@ pub trait KamuCliPuppetExt {
 
     async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord>;
 
+    async fn log_stdout(&self, dataset_name: &odf::DatasetName, args: &[&str]) -> String;
+
     async fn ingest_data(&self, dataset_name: &odf::DatasetName, data: &str);
 
     async fn get_list_of_repo_aliases(&self, dataset_ref: &odf::DatasetRef) -> Vec<RepoAlias>;
@@ -220,40 +222,35 @@ impl KamuCliPuppetExt for KamuCliPuppet {
     }
 
     async fn list_blocks(&self, dataset_name: &odf::DatasetName) -> Vec<BlockRecord> {
+        self.log_stdout(dataset_name, &["--output-format", "ndjson"])
+            .await
+            .lines()
+            .map(|line| {
+                let mut record: serde_json::Map<String, serde_json::Value> =
+                    serde_json::from_str(line).unwrap();
+
+                let block_hash = record.remove("blockHash").unwrap();
+                let block_hash =
+                    odf::Multihash::from_multibase(block_hash.as_str().unwrap()).unwrap();
+
+                // What remains is the YAML manifest, and JSON is valid YAML
+                let manifest = serde_json::to_vec(&record).unwrap();
+                let block = YamlMetadataBlockDeserializer {}
+                    .read_manifest(&manifest)
+                    .unwrap();
+
+                BlockRecord { block_hash, block }
+            })
+            .collect()
+    }
+
+    async fn log_stdout(&self, dataset_name: &odf::DatasetName, args: &[&str]) -> String {
         let assert = self
-            .execute(["log", dataset_name.as_str(), "--output-format", "yaml"])
+            .execute(["log"].iter().chain(args).chain(&[dataset_name.as_str()]))
             .await
             .success();
 
-        let stdout = std::str::from_utf8(&assert.get_output().stdout).unwrap();
-
-        // TODO: Don't parse the output, after implementation:
-        //       `kamu log`: support `--output-format json`
-        //       https://github.com/kamu-data/kamu-cli/issues/887
-
-        stdout
-            .split("---")
-            .skip(1)
-            .map(str::trim)
-            .map(|block_data| {
-                let Some(pos) = block_data.find('\n') else {
-                    unreachable!()
-                };
-                let (first_line_with_block_hash, metadata_block_str) = block_data.split_at(pos);
-
-                let block_hash = first_line_with_block_hash
-                    .strip_prefix("# Block: ")
-                    .unwrap();
-                let block = YamlMetadataBlockDeserializer {}
-                    .read_manifest(metadata_block_str.as_ref())
-                    .unwrap();
-
-                BlockRecord {
-                    block_hash: odf::Multihash::from_multibase(block_hash).unwrap(),
-                    block,
-                }
-            })
-            .collect()
+        String::from_utf8(assert.get_output().stdout.clone()).unwrap()
     }
 
     async fn start_api_server(self, e2e_data_file_path: PathBuf) -> ServerOutput {
