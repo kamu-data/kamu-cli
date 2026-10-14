@@ -11,8 +11,11 @@ use std::collections::HashMap;
 
 use chrono::Duration;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
+use kamu_adapter_flow_dataset::{FlowConfigRuleIngest, ingest_dataset_binding};
 use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, webhook_deliver_binding};
+use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
 use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, TaskErrorWebhookDelivery};
+use kamu_core::PullResult;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
@@ -35,6 +38,8 @@ use crate::tests::{
     FlowHarness,
     FlowHarnessOverrides,
     FlowSystemTestListener,
+    ManualFlowActivationArgs,
+    ManualFlowActivationDriver,
     TaskDriver,
     TaskDriverArgs,
 };
@@ -108,6 +113,112 @@ async fn test_webhook_delivered_after_dataset_ingested_over_http() {
     assert_eq!(
         harness.completed_flows(FLOW_TYPE_WEBHOOK_DELIVER, "success"),
         1
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_webhook_delivered_after_upstream_ingest_flow_succeeded() {
+    let harness = WebhookFlowHarness::new(3).await;
+    harness.configure_ingest().await;
+    let (head_0, head_1) = (WebhookFlowHarness::head(0), WebhookFlowHarness::head(1));
+
+    harness
+        .simulate_flow_scenario(|| async {
+            let trigger_handle = harness
+                .manual_ingest_driver(Duration::milliseconds(10))
+                .run();
+
+            // Task 0: ingest of "foo", start running at 20ms, update the head at 30ms
+            let task0_handle = harness
+                .ingest_task_driver(0, 0, Duration::milliseconds(20), &head_0, &head_1)
+                .run();
+
+            // Task 1: delivery of that update, start running at 40ms, finish at 50ms
+            let task1_handle = harness
+                .delivery_task_driver(
+                    1,
+                    1,
+                    Duration::milliseconds(40),
+                    (
+                        Duration::milliseconds(10),
+                        TaskOutcome::Success(TaskResult::empty()),
+                    ),
+                    harness.deliver_plan(&head_0, &head_1),
+                )
+                .run();
+
+            let main_handle = harness.advance_time(Duration::milliseconds(70));
+
+            tokio::join!(trigger_handle, task0_handle, task1_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual
+
+            #2: +10ms:
+              "foo" Ingest:
+                Flow ID = 0 Waiting Manual Executor(task=0, since=10ms)
+
+            #3: +20ms:
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #4: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+
+            #5: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Waiting Input(foo) Batching(3/0, until=30ms)
+
+            #6: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Waiting Input(foo) Batching(3/0, until=30ms) Activating(at=30ms)
+
+            #7: +30ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Waiting Input(foo) Executor(task=1, since=30ms)
+
+            #8: +40ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Running(task=1)
+
+            #9: +50ms:
+              "foo" Ingest:
+                Flow ID = 0 Finished Success
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Finished Success
+
+            "#
+        ),
+        harness.flows_report()
+    );
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            "foo" Ingest Flow ID = 0 => "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver Flow ID = 1
+            "#
+        ),
+        harness.activation_links_report().await
     );
 }
 
@@ -839,6 +950,67 @@ impl WebhookFlowHarness {
             )
             .await
             .unwrap();
+    }
+
+    /// Lets "foo" be ingested, by hand in these tests
+    async fn configure_ingest(&self) {
+        self.set_dataset_flow_ingest(
+            ingest_dataset_binding(&self.foo_id),
+            FlowConfigRuleIngest {
+                fetch_uncacheable: false,
+                fetch_next_iteration: false,
+            },
+            None,
+        )
+        .await;
+    }
+
+    fn manual_ingest_driver(&self, run_since_start: Duration) -> ManualFlowActivationDriver {
+        self.manual_flow_trigger_driver(ManualFlowActivationArgs {
+            flow_binding: ingest_dataset_binding(&self.foo_id),
+            run_since_start,
+            initiator_id: None,
+            maybe_forced_flow_config_rule: None,
+        })
+    }
+
+    /// An ingest task of "foo" that moves its head 10ms after it starts
+    fn ingest_task_driver(
+        &self,
+        task_id: u64,
+        flow_id: u64,
+        run_since_start: Duration,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) -> TaskDriver {
+        self.task_driver(TaskDriverArgs {
+            task_id: TaskID::new(task_id),
+            task_metadata: TaskMetadata::from(vec![(
+                METADATA_TASK_FLOW_ID,
+                FlowID::new(flow_id).to_string(),
+            )]),
+            dataset_id: Some(self.foo_id.clone()),
+            run_since_start,
+            finish_in_with: Some((
+                Duration::milliseconds(10),
+                TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
+                        pull_result: PullResult::Updated {
+                            old_head: Some(old_head.clone()),
+                            new_head: new_head.clone(),
+                            has_more: false,
+                        },
+                        data_increment: None,
+                    }
+                    .into_task_result(),
+                ),
+            )),
+            expected_logical_plan: LogicalPlanDatasetUpdate {
+                dataset_id: self.foo_id.clone(),
+                fetch_uncacheable: false,
+            }
+            .into_logical_plan(),
+        })
     }
 
     /// A delivery task of the given flow, checked against the expected plan

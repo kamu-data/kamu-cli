@@ -389,7 +389,7 @@ The startup checks are in `src/app/cli/src/app.rs`; the full reference is genera
 | Delivery worker (mocked sender), signer test vector, dataset removal handler | `src/domain/webhooks/services/tests/tests/services/` |
 | Event store and delivery repository suites, run against every backend | `src/infra/webhooks/repo-tests/src/`, invoked from `src/infra/webhooks/{inmem,postgres,sqlite}/tests/` |
 | Sensor, deliver controller (payload shape), event bridge, recovery job | `src/adapter/flow-webhook/tests/tests/` |
-| Flow agent running delivery flows: batching, retries, stop policy, breaking changes | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
+| Flow agent running delivery flows: activation by push and by an upstream ingest flow, batching, retries, stop policy, breaking changes | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
 | GraphQL subscription management | `src/adapter/graphql/tests/tests/test_gql_webhook_subscriptions.rs` |
 | GraphQL view of delivery flows: description, failure reasons, history, unreachable and reactivated subscriptions | `src/adapter/graphql/tests/tests/flows/test_gql_webhook_flow_runs.rs` |
 | End to end against a local `wiremock` receiver: signed delivery, failure reasons, retry, unreachable and reactivated subscriptions, external targets rejected | `src/e2e/app/cli/repo-tests/src/test_webhooks.rs`, wired in `src/e2e/app/cli/{sqlite,postgres}/tests/tests/test_webhooks.rs` |
