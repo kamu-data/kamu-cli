@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
+  a `blockHash` field
 ### Fixed
 - The local disk cache of S3 metadata blocks writes entries atomically, so a failed or interrupted download
   no longer leaves a truncated block that breaks the node until the cache is cleared
