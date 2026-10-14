@@ -162,7 +162,9 @@ whatever the status.
 **Target URL validation** (`validate_webhook_target_url` in `use_cases/helpers.rs`) runs on create
 and update only: the scheme must be `https`, and the host is resolved with the blocking resolver;
 if any resolved address is loopback the URL is rejected. A resolution failure is not an error.
-Nothing is re-checked at delivery time.
+Nothing is re-checked at delivery time. `WebhooksConfig::allow_insecure_targets` skips both checks;
+the CLI sets it only in E2E mode (`--e2e-output-data-path`), so tests can deliver to a local
+`http` receiver. It has no config key.
 
 **Event types** must be non-empty. Only the GraphQL scalar checks them against the catalog, and it
 accepts only the non-test types.

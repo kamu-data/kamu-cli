@@ -15,7 +15,12 @@ use thiserror::Error;
 
 pub(crate) fn validate_webhook_target_url(
     target_url: &url::Url,
+    webhooks_config: &WebhooksConfig,
 ) -> Result<(), WebhookSubscriptionInvalidTargetUrlError> {
+    if webhooks_config.allow_insecure_targets {
+        return Ok(());
+    }
+
     if target_url.scheme() != "https" {
         return Err(WebhookSubscriptionInvalidTargetUrlError {
             url: target_url.clone(),

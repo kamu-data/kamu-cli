@@ -23,6 +23,9 @@ pub struct WebhooksConfig {
     pub max_consecutive_failures: u32,
     pub delivery_timeout: Duration,
     pub secret_encryption_key: Option<String>,
+    /// Accepts `http` and loopback target URLs. Set only in E2E testing, where
+    /// webhooks are delivered to a local mock receiver.
+    pub allow_insecure_targets: bool,
 }
 
 impl WebhooksConfig {
@@ -30,11 +33,13 @@ impl WebhooksConfig {
         max_consecutive_failures: u32,
         delivery_timeout: Duration,
         secret_encryption_key: Option<String>,
+        allow_insecure_targets: bool,
     ) -> Self {
         Self {
             max_consecutive_failures,
             delivery_timeout,
             secret_encryption_key,
+            allow_insecure_targets,
         }
     }
 
@@ -54,6 +59,7 @@ impl Default for WebhooksConfig {
             max_consecutive_failures: DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES,
             delivery_timeout: Duration::seconds(i64::from(DEFAULT_WEBHOOK_DELIVERY_TIMEOUT)),
             secret_encryption_key: None,
+            allow_insecure_targets: false,
         }
     }
 }

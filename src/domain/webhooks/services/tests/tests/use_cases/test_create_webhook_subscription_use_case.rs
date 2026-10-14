@@ -86,6 +86,40 @@ async fn test_invalid_target_url_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_insecure_target_url_accepted_when_allowed() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&dataset_id),
+        1,
+    );
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::with_config(
+        mock_outbox,
+        WebhooksConfig {
+            allow_insecure_targets: true,
+            ..WebhooksConfig::default()
+        },
+    );
+
+    let res = harness
+        .use_case
+        .execute(
+            Some(dataset_id),
+            url::Url::parse("http://127.0.0.1:8080/hook").unwrap(),
+            vec![WebhookEventTypeCatalog::test()],
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
+        )
+        .await;
+    assert!(res.is_ok(), "Failed to create subscription: {res:?}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_no_event_types_rejected() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
@@ -227,12 +261,16 @@ struct CreateWebhookSubscriptionUseCaseHarness {
 
 impl CreateWebhookSubscriptionUseCaseHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
+        Self::with_config(mock_outbox, WebhooksConfig::default())
+    }
+
+    fn with_config(mock_outbox: MockOutbox, webhooks_config: WebhooksConfig) -> Self {
         let base_harness = WebhookSubscriptionUseCaseHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<CreateWebhookSubscriptionUseCaseImpl>();
         b.add::<WebhookSecretGeneratorImpl>();
-        b.add_value(WebhooksConfig::default());
+        b.add_value(webhooks_config);
         b.add_value(mock_outbox);
         b.bind::<dyn Outbox, MockOutbox>();
 
