@@ -9025,6 +9025,7 @@ dependencies = [
  "kamu-adapter-flow-dataset",
  "kamu-adapter-flow-webhook",
  "kamu-adapter-task-dataset",
+ "kamu-adapter-task-webhook",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -9035,9 +9036,11 @@ dependencies = [
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "kamu-wakeup-listener-inmem",
+ "kamu-webhooks",
  "messaging-outbox",
  "mockall",
  "observability",
+ "oop",
  "opendatafabric",
  "pretty_assertions",
  "prometheus",
@@ -9048,6 +9051,8 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "url",
+ "uuid",
  "wakeup-listener",
 ]
 

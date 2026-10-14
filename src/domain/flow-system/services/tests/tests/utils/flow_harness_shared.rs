@@ -18,6 +18,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME_STR, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::*;
+use kamu_adapter_flow_webhook::FlowControllerWebhookDeliver;
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
@@ -83,6 +84,7 @@ pub(crate) struct FlowHarnessOverrides {
     pub flow_system_event_batch_size: Option<usize>,
     pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
     pub mock_transform_flow_evaluator: Option<MockTransformFlowEvaluator>,
+    pub default_retry_policy_by_flow_type: HashMap<String, RetryPolicy>,
     /// Registers a projector that fails on every event
     pub with_failing_projector: bool,
     /// Registers a projector that fails on its first event only
@@ -136,7 +138,7 @@ impl FlowHarness {
             .add_value(FlowAgentConfig {
                 awaiting_step,
                 mandatory_throttling_period,
-                default_retry_policy_by_flow_type: HashMap::new(),
+                default_retry_policy_by_flow_type: overrides.default_retry_policy_by_flow_type,
             })
             .add_value(FlowAgentActivationConfig {
                 batch_size: NonZeroUsize::new(overrides.activation_batch_size.unwrap_or(20))
@@ -174,7 +176,8 @@ impl FlowHarness {
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryTaskQueueWakeupSource>()
             .add::<DatabaseTransactionRunner>()
-            .add::<FakeDatasetEntryService>();
+            .add::<FakeDatasetEntryService>()
+            .add::<FlowControllerWebhookDeliver>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
