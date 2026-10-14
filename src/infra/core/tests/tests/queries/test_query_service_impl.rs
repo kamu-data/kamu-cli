@@ -38,7 +38,6 @@ fn create_catalog_with_local_workspace(
 
     dill::CatalogBuilder::new_chained(&base_local_catalog)
         .add::<QueryServiceImpl>()
-        .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 
@@ -53,7 +52,6 @@ fn create_catalog_with_s3_workspace(
 
     dill::CatalogBuilder::new_chained(&base_s3_catalog)
         .add::<QueryServiceImpl>()
-        .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
         .build()
 }
 

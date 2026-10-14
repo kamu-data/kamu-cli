@@ -876,7 +876,6 @@ impl ToTableHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(&base_catalog)
             .add::<QueryServiceImpl>()
-            .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
             .build();
 
         Self {
