@@ -53,6 +53,60 @@ async fn test_create_in_dataset_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_create_starts_watermarks_of_event_types() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    for event_type in [
+        WebhookEventTypeCatalog::test(),
+        WebhookEventTypeCatalog::dataset_ref_updated(),
+    ] {
+        WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+            &mut mock_outbox,
+            &event_type,
+            Some(&dataset_id),
+            1,
+        );
+    }
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let res = harness
+        .use_case
+        .execute(
+            Some(dataset_id.clone()),
+            url::Url::parse("https://example.com").unwrap(),
+            vec![
+                WebhookEventTypeCatalog::test(),
+                WebhookEventTypeCatalog::dataset_ref_updated(),
+            ],
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        harness
+            .find_watermark(
+                res.subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated()
+            )
+            .await,
+        Some(WebhookSubscriptionUseCaseHarness::initial_watermark(
+            &dataset_id
+        ))
+    );
+    // No provider for this event type
+    assert_eq!(
+        harness
+            .find_watermark(res.subscription_id, &WebhookEventTypeCatalog::test())
+            .await,
+        None
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_invalid_target_url_rejected() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 

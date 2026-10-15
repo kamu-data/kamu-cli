@@ -36,9 +36,22 @@ async fn test_remove_subscription_success() {
 
     let harness = RemoveWebhookSubscriptionUseCaseHarness::new(mock_outbox);
     let mut subscription = harness.create_subscription_in_dataset(foo_id).await;
+    harness
+        .set_watermark(
+            subscription.id(),
+            &WebhookEventTypeCatalog::test(),
+            WebhookSubscriptionUseCaseHarness::stale_watermark(),
+        )
+        .await;
 
     let res = harness.use_case.execute(&mut subscription).await;
     assert!(res.is_ok(), "Failed to remove subscription: {res:?}");
+    assert_eq!(
+        harness
+            .find_watermark(subscription.id(), &WebhookEventTypeCatalog::test())
+            .await,
+        None
+    );
 
     let res = harness
         .find_subscription(subscription.id(), WebhookSubscriptionQueryMode::Active)

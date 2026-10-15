@@ -43,6 +43,7 @@ impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
             webhook_subscription_id: webhook_plan.webhook_subscription_id,
             webhook_event_type: webhook_plan.webhook_event_type,
             webhook_payload: webhook_plan.webhook_payload,
+            webhook_watermark: webhook_plan.webhook_watermark,
         }))
     }
 }

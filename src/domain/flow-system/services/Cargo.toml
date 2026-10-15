@@ -82,6 +82,7 @@ kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
 kamu-webhooks = { workspace = true }
+kamu-webhooks-inmem = { workspace = true }
 messaging-outbox = { workspace = true, features = [
     "testing",
 ] }

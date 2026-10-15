@@ -8,19 +8,26 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use chrono::Duration;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_adapter_flow_dataset::{FlowConfigRuleIngest, ingest_dataset_binding};
-use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, webhook_deliver_binding};
+use kamu_adapter_flow_webhook::{
+    DatasetRefUpdatedWatermark,
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    webhook_deliver_binding,
+};
 use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
 use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, TaskErrorWebhookDelivery};
 use kamu_core::PullResult;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
+    GetIncrementError,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     MockDatasetIncrementQueryService,
 };
+use kamu_datasets_services::testing::FakeDatasetReferenceService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use kamu_webhooks::{
@@ -29,6 +36,7 @@ use kamu_webhooks::{
     WebhookSendFailedToConnectError,
     WebhookSubscriptionID,
     WebhookUnsuccessfulResponseError,
+    WebhookWatermarkRepository,
 };
 use messaging_outbox::OutboxExt;
 use odf::dataset::MetadataChainIncrementInterval;
@@ -131,9 +139,8 @@ async fn test_webhook_delivered_after_upstream_ingest_flow_succeeded() {
                 .run();
 
             // Task 0: ingest of "foo", start running at 20ms, update the head at 30ms
-            let task0_handle = harness
-                .ingest_task_driver(0, 0, Duration::milliseconds(20), &head_0, &head_1)
-                .run();
+            let task0_handle =
+                harness.run_ingest_task(0, 0, Duration::milliseconds(20), &head_0, &head_1);
 
             // Task 1: delivery of that update, start running at 40ms, finish at 50ms
             let task1_handle = harness
@@ -553,14 +560,15 @@ async fn test_webhook_trigger_stopped_after_consecutive_failures() {
                 )
                 .run();
 
-            // Task 1: start running at 70ms, fail to connect at 80ms
+            // Task 1: start running at 70ms, fail to connect at 80ms. The receiver
+            // never got 0 -> 1, so this delivery covers it too
             let task1_handle = harness
                 .delivery_task_driver(
                     1,
                     1,
                     Duration::milliseconds(70),
                     (Duration::milliseconds(10), failed_to_connect()),
-                    harness.deliver_plan(&head_1, &head_2),
+                    harness.deliver_plan(&head_0, &head_2),
                 )
                 .run();
 
@@ -773,6 +781,190 @@ async fn test_webhook_delivered_on_breaking_change() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_webhook_catches_up_on_update_made_before_agent_started() {
+    let harness = WebhookFlowHarness::new(3).await;
+    let (head_0, head_1) = (WebhookFlowHarness::head(0), WebhookFlowHarness::head(1));
+
+    // Changed while the agent was down, so no update message reaches the sensor
+    harness.set_foo_head(&head_1);
+
+    harness
+        .simulate_flow_scenario(|| async {
+            let task0_handle = harness
+                .delivery_task_driver(
+                    0,
+                    0,
+                    Duration::milliseconds(10),
+                    (
+                        Duration::milliseconds(10),
+                        TaskOutcome::Success(TaskResult::empty()),
+                    ),
+                    harness.deliver_plan(&head_0, &head_1),
+                )
+                .run();
+
+            let main_handle = harness.advance_time(Duration::milliseconds(40));
+
+            tokio::join!(task0_handle, main_handle);
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Waiting ExternallyDetectedChange Batching(3/0, until=0ms) Activating(at=0ms)
+
+            #1: +0ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Waiting ExternallyDetectedChange Executor(task=0, since=0ms)
+
+            #2: +10ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        harness.flows_report()
+    );
+    assert_eq!(
+        harness.completed_flows(FLOW_TYPE_WEBHOOK_DELIVER, "success"),
+        1
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_webhook_update_made_while_paused_delivered_on_resume() {
+    let harness = WebhookFlowHarness::new(3).await;
+    let (head_0, head_1, head_2) = (
+        WebhookFlowHarness::head(0),
+        WebhookFlowHarness::head(1),
+        WebhookFlowHarness::head(2),
+    );
+
+    harness
+        .simulate_flow_scenario(|| async {
+            let push1_handle = harness.push_over_http(Duration::milliseconds(20), &head_0, &head_1);
+
+            // Task 0: delivery of the first push
+            let task0_handle = harness
+                .delivery_task_driver(
+                    0,
+                    0,
+                    Duration::milliseconds(30),
+                    (
+                        Duration::milliseconds(10),
+                        TaskOutcome::Success(TaskResult::empty()),
+                    ),
+                    harness.deliver_plan(&head_0, &head_1),
+                )
+                .run();
+
+            // The second push lands while the subscription is paused
+            let pause_handle = harness.pause_webhook(Duration::milliseconds(50));
+            let push2_handle = harness.push_over_http(Duration::milliseconds(60), &head_1, &head_2);
+            let resume_handle = harness.resume_webhook(Duration::milliseconds(80));
+
+            // Task 1: delivery of the second push, caught up on resume
+            let task1_handle = harness
+                .delivery_task_driver(
+                    1,
+                    1,
+                    Duration::milliseconds(90),
+                    (
+                        Duration::milliseconds(10),
+                        TaskOutcome::Success(TaskResult::empty()),
+                    ),
+                    harness.deliver_plan(&head_1, &head_2),
+                )
+                .run();
+
+            let main_handle = harness.advance_time(Duration::milliseconds(120));
+
+            tokio::join!(
+                push1_handle,
+                task0_handle,
+                pause_handle,
+                push2_handle,
+                resume_handle,
+                task1_handle,
+                main_handle
+            );
+        })
+        .await
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+
+            #1: +20ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Waiting HttpIngest Batching(3/0, until=20ms)
+
+            #2: +20ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Waiting HttpIngest Batching(3/0, until=20ms) Activating(at=20ms)
+
+            #3: +20ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Waiting HttpIngest Executor(task=0, since=20ms)
+
+            #4: +30ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Running(task=0)
+
+            #5: +40ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 0 Finished Success
+
+            #6: +80ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Waiting ExternallyDetectedChange Batching(3/0, until=80ms)
+                Flow ID = 0 Finished Success
+
+            #7: +80ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Waiting ExternallyDetectedChange Batching(3/0, until=80ms) Activating(at=80ms)
+                Flow ID = 0 Finished Success
+
+            #8: +80ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Waiting ExternallyDetectedChange Executor(task=1, since=80ms)
+                Flow ID = 0 Finished Success
+
+            #9: +90ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Running(task=1)
+                Flow ID = 0 Finished Success
+
+            #10: +100ms:
+              "foo" Subscription: 00000000-0000-0000-0000-000000000001 WebhookDeliver:
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            "#
+        ),
+        harness.flows_report()
+    );
+    assert_eq!(
+        harness.completed_flows(FLOW_TYPE_WEBHOOK_DELIVER, "success"),
+        2
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A "foo" root dataset with one dataset-updates webhook subscription, whose
 /// trigger is set as the webhooks event bridge sets it
 #[oop::extend(FlowHarness, base)]
@@ -812,15 +1004,29 @@ impl WebhookFlowHarness {
 
     /// The increment between the given heads is invalid, as after a force push
     async fn with_breaking_change(old_head: &odf::Multihash, new_head: &odf::Multihash) -> Self {
+        // A rewritten history: neither head is in the history of the other
+        let mut dataset_changes =
+            MockDatasetIncrementQueryService::with_increment_error_invalid_interval(
+                Self::foo_alias_id(),
+                old_head.clone(),
+                new_head.clone(),
+            );
+        let (old_head, new_head) = (old_head.clone(), new_head.clone());
+        dataset_changes
+            .expect_get_increment_between()
+            .withf(move |_, old, new| *old == Some(&new_head) && *new == old_head)
+            .returning(|_, old, new| {
+                Err(GetIncrementError::InvalidInterval(
+                    odf::dataset::InvalidIntervalError {
+                        head: new.clone(),
+                        tail: old.unwrap().clone(),
+                    },
+                ))
+            });
+
         Self::with_overrides(
             FlowHarnessOverrides {
-                mock_dataset_changes: Some(
-                    MockDatasetIncrementQueryService::with_increment_error_invalid_interval(
-                        Self::foo_alias_id(),
-                        old_head.clone(),
-                        new_head.clone(),
-                    ),
-                ),
+                mock_dataset_changes: Some(dataset_changes),
                 ..Default::default()
             },
             3,
@@ -841,8 +1047,10 @@ impl WebhookFlowHarness {
             })
             .await;
         assert_eq!(foo_id, Self::foo_alias_id());
+        Self::dataset_references(&base).set_head(&foo_id, &Self::head(0));
 
         let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::from_u128(1));
+        Self::start_watermark(&base, subscription_id).await;
         let webhook_binding = webhook_deliver_binding(
             subscription_id,
             &WebhookEventTypeCatalog::dataset_ref_updated(),
@@ -873,6 +1081,49 @@ impl WebhookFlowHarness {
             subscription_id,
             webhook_binding,
         }
+    }
+
+    /// The receiver of the subscription starts from `head(0)`
+    async fn start_watermark(base: &FlowHarness, subscription_id: WebhookSubscriptionID) {
+        let watermark_repo = base
+            .catalog
+            .get_one::<dyn WebhookWatermarkRepository>()
+            .unwrap();
+        watermark_repo
+            .set_watermark(
+                subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated(),
+                DatasetRefUpdatedWatermark {
+                    head: Self::head(0),
+                }
+                .into(),
+            )
+            .await
+            .unwrap();
+    }
+
+    fn dataset_references(base: &FlowHarness) -> Arc<FakeDatasetReferenceService> {
+        base.catalog
+            .get_one::<FakeDatasetReferenceService>()
+            .unwrap()
+    }
+
+    /// Moves the head of "foo" without announcing it, as a change made while
+    /// nothing listens
+    fn set_foo_head(&self, head: &odf::Multihash) {
+        Self::dataset_references(&self.base).set_head(&self.foo_id, head);
+    }
+
+    /// After `run_since_start` of virtual time, pauses the subscription's trigger
+    async fn pause_webhook(&self, run_since_start: Duration) {
+        self.fake_system_time_source.sleep(run_since_start).await;
+        self.pause_flow(self.now(), &self.webhook_binding).await;
+    }
+
+    /// After `run_since_start` of virtual time, resumes the subscription's trigger
+    async fn resume_webhook(&self, run_since_start: Duration) {
+        self.fake_system_time_source.sleep(run_since_start).await;
+        self.resume_flow(self.now(), &self.webhook_binding).await;
     }
 
     /// Known before the dataset is created, so mocks can be set up for it
@@ -922,7 +1173,9 @@ impl WebhookFlowHarness {
         old_head: &odf::Multihash,
         new_head: &odf::Multihash,
     ) {
-        self.issue_dataset_ingested_over_http(run_since_start, &self.foo_id, old_head, new_head)
+        self.fake_system_time_source.sleep(run_since_start).await;
+        self.set_foo_head(new_head);
+        self.issue_dataset_ingested_over_http(Duration::zero(), &self.foo_id, old_head, new_head)
             .await;
     }
 
@@ -936,6 +1189,7 @@ impl WebhookFlowHarness {
         new_head: &odf::Multihash,
     ) {
         self.fake_system_time_source.sleep(run_since_start).await;
+        self.set_foo_head(new_head);
 
         self.outbox
             .post_message(
@@ -974,7 +1228,27 @@ impl WebhookFlowHarness {
         })
     }
 
-    /// An ingest task of "foo" that moves its head 10ms after it starts
+    /// Runs an ingest task of "foo" that moves its head 10ms after it starts
+    async fn run_ingest_task(
+        &self,
+        task_id: u64,
+        flow_id: u64,
+        run_since_start: Duration,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) {
+        let commit = async {
+            self.fake_system_time_source
+                .sleep(run_since_start + Duration::milliseconds(10))
+                .await;
+            self.set_foo_head(new_head);
+        };
+        let task_driver =
+            self.ingest_task_driver(task_id, flow_id, run_since_start, old_head, new_head);
+
+        tokio::join!(task_driver.run(), commit);
+    }
+
     fn ingest_task_driver(
         &self,
         task_id: u64,
@@ -1068,6 +1342,12 @@ impl WebhookFlowHarness {
                 "old_hash": old_head.to_string(),
                 "is_breaking_change": is_breaking_change,
             }),
+            webhook_watermark: Some(
+                DatasetRefUpdatedWatermark {
+                    head: new_head.clone(),
+                }
+                .into(),
+            ),
         }
         .into_logical_plan()
     }
