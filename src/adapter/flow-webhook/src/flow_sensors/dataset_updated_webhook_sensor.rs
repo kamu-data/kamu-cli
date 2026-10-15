@@ -29,9 +29,7 @@ use crate::{
     DatasetRefUpdatedWatermarkProvider,
     FLOW_TYPE_WEBHOOK_DELIVER,
     FlowScopeSubscription,
-    HeadRelation,
     dataset_changes_between,
-    relation_between_heads,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,8 +43,8 @@ pub struct DatasetUpdatedWebhookSensor {
 
 struct State {
     reactive_rule: fs::ReactiveRule,
-    /// Head delivered by the last catch-up, until an update past it arrives:
-    /// updates it already covers may still be dispatched afterwards
+    /// Head delivered by the last catch-up, until an update made after it
+    /// arrives: updates it already covers may still be dispatched afterwards
     caught_up_head: Option<odf::Multihash>,
 }
 
@@ -103,30 +101,35 @@ impl DatasetUpdatedWebhookSensor {
         .await
     }
 
-    /// Whether an update to `new_head` was already delivered by the last
-    /// catch-up. Forgets the caught-up head once an update past it arrives
+    /// Whether the update was already delivered by the last catch-up. Forgets
+    /// the caught-up head once an update made after it arrives
     async fn is_covered_by_catch_up(
         &self,
         catalog: &dill::Catalog,
-        new_head: &odf::Multihash,
+        details: &DatasetResourceUpdateDetails,
     ) -> Result<bool, InternalError> {
         let Some(caught_up_head) = self.caught_up_head() else {
             return Ok(false);
         };
-        let dataset_increment_query_service = catalog
-            .get_one::<dyn DatasetIncrementQueryService>()
-            .unwrap();
-        let covered = match relation_between_heads(
-            dataset_increment_query_service.as_ref(),
-            &self.dataset_id,
-            &caught_up_head,
-            new_head,
-        )
-        .await?
-        {
-            HeadRelation::Same | HeadRelation::After => true,
-            HeadRelation::Before | HeadRelation::Diverged => false,
+
+        // References move by compare-and-swap, so the first change after the
+        // catch-up starts from the caught-up head, a reset included. Any other
+        // update was made before it, and is covered if it ends in the history
+        // the catch-up delivered
+        let covered = if details.old_head_maybe.as_ref() == Some(&caught_up_head) {
+            false
+        } else if details.new_head == caught_up_head {
+            true
+        } else {
+            match self
+                .changes_between(catalog, &details.new_head, &caught_up_head)
+                .await?
+            {
+                fs::ResourceChanges::NewData(_) => true,
+                fs::ResourceChanges::Breaking => false,
+            }
         };
+
         if !covered {
             self.set_caught_up_head(None);
         }
@@ -283,10 +286,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         let details =
             serde_json::from_value::<DatasetResourceUpdateDetails>(update.details.clone())
                 .int_err()?;
-        if self
-            .is_covered_by_catch_up(catalog, &details.new_head)
-            .await?
-        {
+        if self.is_covered_by_catch_up(catalog, &details).await? {
             tracing::info!(new_head = %details.new_head, "Update already delivered by catch-up");
             return Ok(());
         }

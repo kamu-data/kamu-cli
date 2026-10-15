@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, DatasetResourceUpdateDetails};
 use kamu_adapter_task_webhook as atw;
-use kamu_datasets::{DatasetEntryService, DatasetIncrementQueryService};
+use kamu_datasets::{DatasetEntryService, DatasetIncrementQueryService, DatasetReferenceService};
 use kamu_flow_system as fs;
 use kamu_task_system as ts;
 use kamu_webhooks::{
@@ -46,6 +46,7 @@ pub struct FlowControllerWebhookDeliver {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
+    dataset_reference_service: Arc<dyn DatasetReferenceService>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
     watermark_provider: Arc<DatasetRefUpdatedWatermarkProvider>,
 }
@@ -91,16 +92,9 @@ impl FlowControllerWebhookDeliver {
             .await
             .int_err()?;
 
-        // We need to build a summary of 1..N changes that happened to the input
-        // dataset, so that webhook was activated
-        struct ChangeSummary {
-            new_head: odf::Multihash,
-            old_head_maybe: Option<odf::Multihash>,
-            is_breaking_change: bool,
-        }
-        let mut summary: Option<ChangeSummary> = None;
-
-        // Scan activation causes for the flow, look for dataset updates only
+        // The causes are dataset updates; the first one's old head is where the
+        // receiver stands when there is no watermark
+        let mut first_old_head: Option<Option<odf::Multihash>> = None;
         for activation_cause in &flow.activation_causes {
             if let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause {
                 if update.resource_type != DATASET_RESOURCE_TYPE {
@@ -121,51 +115,42 @@ impl FlowControllerWebhookDeliver {
                     )));
                 }
 
-                if let Some(summary) = &mut summary {
-                    summary.new_head = dataset_update_details.new_head;
-                    summary.is_breaking_change |=
-                        matches!(update.changes, fs::ResourceChanges::Breaking);
-                } else {
-                    summary = Some(ChangeSummary {
-                        new_head: dataset_update_details.new_head,
-                        old_head_maybe: dataset_update_details.old_head_maybe,
-                        is_breaking_change: matches!(update.changes, fs::ResourceChanges::Breaking),
-                    });
-                }
+                first_old_head.get_or_insert(dataset_update_details.old_head_maybe);
             }
         }
-        let mut summary = summary.ok_or_else(|| {
+        let first_old_head = first_old_head.ok_or_else(|| {
             InternalError::new("No dataset updates found in the flow state for the input dataset")
         })?;
 
-        // Start from the head the receiver already has, so that changes lost with a
-        // failed delivery are covered by this one
+        // Report the dataset as it is now, from the head the receiver already has:
+        // changes lost with a failed delivery, or announced out of order, are covered
+        let new_head = self
+            .dataset_reference_service
+            .get_reference(input_dataset_id, &odf::BlockRef::Head)
+            .await
+            .int_err()?;
         let subscription_id =
             FlowScopeSubscription::new(&flow.flow_binding.scope).subscription_id();
-        if let Some(delivered_head) = self
+        let old_head = self
             .watermark_provider
             .find_delivered_head(subscription_id)
             .await?
-            && summary.old_head_maybe.as_ref() != Some(&delivered_head)
-        {
-            match relation_between_heads(
+            .or(first_old_head);
+
+        let is_breaking_change = match &old_head {
+            Some(old_head) => match relation_between_heads(
                 self.dataset_increment_query_service.as_ref(),
                 input_dataset_id,
-                &delivered_head,
-                &summary.new_head,
+                old_head,
+                &new_head,
             )
             .await?
             {
-                HeadRelation::Before => summary.old_head_maybe = Some(delivered_head),
-                HeadRelation::Diverged => {
-                    summary.old_head_maybe = Some(delivered_head);
-                    summary.is_breaking_change = true;
-                }
-                // The receiver already has these changes: a watermark seeded from the
-                // current head may be past the deliveries queued before it
-                HeadRelation::Same | HeadRelation::After => {}
-            }
-        }
+                HeadRelation::Same | HeadRelation::Before => false,
+                HeadRelation::After | HeadRelation::Diverged => true,
+            },
+            None => false,
+        };
 
         // Build webhook payload
         let webhook_payload = serde_json::to_value(WebhookDatasetRefUpdatedPayload {
@@ -173,20 +158,15 @@ impl FlowControllerWebhookDeliver {
             dataset_id: input_dataset_id.to_string(),
             owner_account_id: dataset_entry.owner_id.to_string(),
             block_ref: odf::BlockRef::Head.to_string(),
-            new_hash: summary.new_head.to_string(),
-            old_hash: summary.old_head_maybe.map(|h| h.to_string()),
-            is_breaking_change: summary.is_breaking_change,
+            new_hash: new_head.to_string(),
+            old_hash: old_head.map(|h| h.to_string()),
+            is_breaking_change,
         })
         .int_err()?;
 
         Ok(WebhookDeliveryContent {
             payload: webhook_payload,
-            watermark: Some(
-                DatasetRefUpdatedWatermark {
-                    head: summary.new_head,
-                }
-                .into(),
-            ),
+            watermark: Some(DatasetRefUpdatedWatermark { head: new_head }.into()),
         })
     }
 }

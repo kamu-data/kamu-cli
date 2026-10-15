@@ -651,8 +651,8 @@ The webhook deliver flow is entirely driven by flow-system machinery:
   `WebhookTriggerStartupRecoveryJob` reconciles triggers with subscription statuses on startup
   ([webhooks.md](webhooks.md#8-flow-integration)).
 - **Payload.** Built by `build_task_logical_plan` from all the flow's `ResourceUpdate` causes, so a
-  batch of updates is one delivery, starting from the head the receiver already knows; its shape is
-  in [webhooks.md](webhooks.md#payload).
+  batch of updates is one delivery, from the head the receiver already knows to the dataset's head
+  when the delivery is built; its shape is in [webhooks.md](webhooks.md#payload).
 - **Failure.** Delivery errors are recoverable task errors
   ([task-system.md](task-system.md#74-webhook-delivery)), retried only under a default retry policy
   for the flow type (`flowSystem.defaultRetryPolicies`, empty unless configured), since webhook

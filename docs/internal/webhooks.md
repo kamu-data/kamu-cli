@@ -297,13 +297,15 @@ against real deliveries.
 }
 ```
 
-One delivery may cover several updates batched into one flow: `new_hash` comes from the last
-update, and `old_hash` is the head the receiver already knows, taken from the subscription's
-**watermark** ([§8](#8-flow-integration)), so consecutive payloads form a contiguous range even after
-a failed delivery. `old_hash` comes from the first update instead when there is no watermark, or
-when the watermark is already at or past `new_hash` (omitted when the dataset had no previous
-head). `is_breaking_change` is true if any update was breaking or the watermark is no longer in the
-dataset's history. A breaking change (a history rewrite) is delivered like any other update.
+A payload describes the dataset when the delivery is built, not the update that triggered it:
+`new_hash` is the dataset's current head, and `old_hash` is the head the receiver already knows,
+taken from the subscription's **watermark** ([§8](#8-flow-integration)). Consecutive payloads
+therefore form a contiguous range, even after a failed delivery or when update notifications arrive
+out of order, and one delivery covers every update batched into its flow. Without a watermark,
+`old_hash` comes from the first update (omitted when the dataset had no previous head).
+`is_breaking_change` is true when `old_hash` is not in the history of `new_hash`: a history rewrite,
+or a reset to an earlier head. A breaking change is delivered like any other update. A delivery
+triggered when nothing changed since the watermark reports `old_hash` equal to `new_hash`.
 
 ---
 
@@ -372,9 +374,7 @@ Plans and tasks created before watermarks existed carry none and leave it unchan
 
 Subscriptions created before watermarks existed got one from the backfill migration: the `new_hash`
 (or version 1 `newHash`) of their newest 2xx delivery, else the dataset's current head; removed
-subscriptions and datasets without a head got none. Seeding from the current head can put the
-watermark past a delivery still queued at the upgrade, which is why the payload ignores a watermark
-at or past `new_hash`.
+subscriptions and datasets without a head got none.
 
 **Catching up.** Dataset updates reach the sensor only while it is registered, so updates made
 before it is (right after a subscription is created, while it is paused or unreachable, while the
@@ -385,8 +385,13 @@ the history, so `BreakingChangeRule` applies). Without a watermark nothing is ca
 
 A dataset-update message can still reach the sensor after a catch-up already covered its update,
 since the messages and the trigger activation come from different outbox producers. The sensor
-remembers the head it caught up to and skips updates that are that head or its ancestors, until an
-update past it arrives.
+remembers the head it caught up to. References move by compare-and-swap, so the first change made
+after the catch-up starts from that head, a reset included: it is delivered, and the head is
+forgotten. Any other update is taken as made before the catch-up, and is skipped when it ends at
+that head or one of its ancestors, checked by one interval query walking back from the caught-up
+head. Notifications can arrive out of order, so a later reset can be skipped this way; nothing is
+lost, because it was skipped while the first change after the catch-up was still undelivered, and
+that delivery reports the dataset's head as it is when the delivery is built.
 
 **Startup reconciliation.** `WebhookTriggerStartupRecoveryJob` runs on startup, inside a
 transaction, and repairs triggers that do not match their subscription:

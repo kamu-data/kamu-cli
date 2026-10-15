@@ -23,6 +23,7 @@ use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, TaskErrorWebhookDeliv
 use kamu_core::PullResult;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
+    GetIncrementError,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     MockDatasetIncrementQueryService,
 };
@@ -138,9 +139,8 @@ async fn test_webhook_delivered_after_upstream_ingest_flow_succeeded() {
                 .run();
 
             // Task 0: ingest of "foo", start running at 20ms, update the head at 30ms
-            let task0_handle = harness
-                .ingest_task_driver(0, 0, Duration::milliseconds(20), &head_0, &head_1)
-                .run();
+            let task0_handle =
+                harness.run_ingest_task(0, 0, Duration::milliseconds(20), &head_0, &head_1);
 
             // Task 1: delivery of that update, start running at 40ms, finish at 50ms
             let task1_handle = harness
@@ -1004,15 +1004,29 @@ impl WebhookFlowHarness {
 
     /// The increment between the given heads is invalid, as after a force push
     async fn with_breaking_change(old_head: &odf::Multihash, new_head: &odf::Multihash) -> Self {
+        // A rewritten history: neither head is in the history of the other
+        let mut dataset_changes =
+            MockDatasetIncrementQueryService::with_increment_error_invalid_interval(
+                Self::foo_alias_id(),
+                old_head.clone(),
+                new_head.clone(),
+            );
+        let (old_head, new_head) = (old_head.clone(), new_head.clone());
+        dataset_changes
+            .expect_get_increment_between()
+            .withf(move |_, old, new| *old == Some(&new_head) && *new == old_head)
+            .returning(|_, old, new| {
+                Err(GetIncrementError::InvalidInterval(
+                    odf::dataset::InvalidIntervalError {
+                        head: new.clone(),
+                        tail: old.unwrap().clone(),
+                    },
+                ))
+            });
+
         Self::with_overrides(
             FlowHarnessOverrides {
-                mock_dataset_changes: Some(
-                    MockDatasetIncrementQueryService::with_increment_error_invalid_interval(
-                        Self::foo_alias_id(),
-                        old_head.clone(),
-                        new_head.clone(),
-                    ),
-                ),
+                mock_dataset_changes: Some(dataset_changes),
                 ..Default::default()
             },
             3,
@@ -1214,7 +1228,27 @@ impl WebhookFlowHarness {
         })
     }
 
-    /// An ingest task of "foo" that moves its head 10ms after it starts
+    /// Runs an ingest task of "foo" that moves its head 10ms after it starts
+    async fn run_ingest_task(
+        &self,
+        task_id: u64,
+        flow_id: u64,
+        run_since_start: Duration,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) {
+        let commit = async {
+            self.fake_system_time_source
+                .sleep(run_since_start + Duration::milliseconds(10))
+                .await;
+            self.set_foo_head(new_head);
+        };
+        let task_driver =
+            self.ingest_task_driver(task_id, flow_id, run_since_start, old_head, new_head);
+
+        tokio::join!(task_driver.run(), commit);
+    }
+
     fn ingest_task_driver(
         &self,
         task_id: u64,

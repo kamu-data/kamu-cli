@@ -208,6 +208,126 @@ async fn test_sensor_skips_updates_delivered_by_catch_up() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_sensor_delivers_reset_made_after_catch_up() {
+    let [head_1, head_2, head_3] = [1, 2, 3].map(LinearDatasetHistory::head);
+
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    DatasetUpdatedWebhookSensorHarness::expect_delivery_flow_for_update(
+        &mut mock_flow_run_service,
+        &head_1,
+        &head_3,
+        ExpectedChanges::NewData,
+    );
+    DatasetUpdatedWebhookSensorHarness::expect_delivery_flow_for_update(
+        &mut mock_flow_run_service,
+        &head_3,
+        &head_2,
+        ExpectedChanges::Breaking,
+    );
+
+    let harness =
+        DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
+            mock_flow_run_service: Some(mock_flow_run_service),
+            delivered_head: Some(head_1),
+            dataset_head: Some(head_3.clone()),
+            ..Default::default()
+        })
+        .await;
+
+    // Catches up from 1 to 3, then the dataset is reset back to 2
+    harness.activate_sensor().await;
+    harness.sensitize_sensor_with_reset(&head_3, &head_2).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_sensor_delivers_first_change_after_catch_up_announced_out_of_order() {
+    let [head_1, head_2, head_3] = [1, 2, 3].map(LinearDatasetHistory::head);
+
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    DatasetUpdatedWebhookSensorHarness::expect_delivery_flow_for_update(
+        &mut mock_flow_run_service,
+        &head_1,
+        &head_3,
+        ExpectedChanges::NewData,
+    );
+    DatasetUpdatedWebhookSensorHarness::expect_delivery_flow_for_update(
+        &mut mock_flow_run_service,
+        &head_3,
+        &head_2,
+        ExpectedChanges::Breaking,
+    );
+
+    let harness =
+        DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
+            mock_flow_run_service: Some(mock_flow_run_service),
+            delivered_head: Some(head_1.clone()),
+            dataset_head: Some(head_3.clone()),
+            ..Default::default()
+        })
+        .await;
+
+    // Catches up from 1 to 3; the dataset is then reset to 2 and to 1, and the
+    // second reset is announced first. It looks like a late update and is
+    // skipped, while the first one is delivered: the delivery reports the head
+    // the dataset has by then
+    harness.activate_sensor().await;
+    harness.sensitize_sensor_with_reset(&head_2, &head_1).await;
+    harness.sensitize_sensor_with_reset(&head_3, &head_2).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_sensor_checks_late_update_against_caught_up_head_only() {
+    let [head_1, head_2, head_3] = [1, 2, 3].map(LinearDatasetHistory::head);
+
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    DatasetUpdatedWebhookSensorHarness::expect_delivery_flow_for_update(
+        &mut mock_flow_run_service,
+        &head_1,
+        &head_3,
+        ExpectedChanges::NewData,
+    );
+
+    // Walking back from the caught-up head reaches a late update's head soon;
+    // the other direction would walk the whole history
+    let mut increments = MockDatasetIncrementQueryService::new();
+    for (old_head, new_head) in [
+        (head_1.clone(), head_3.clone()),
+        (head_2.clone(), head_3.clone()),
+    ] {
+        increments
+            .expect_get_increment_between()
+            .withf(move |_, old, new| *old == Some(&old_head) && *new == new_head)
+            .times(1)
+            .returning(|_, _, _| {
+                Ok(odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 0,
+                    updated_watermark: None,
+                })
+            });
+    }
+
+    let harness =
+        DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
+            mock_flow_run_service: Some(mock_flow_run_service),
+            dataset_increments: Some(increments),
+            delivered_head: Some(head_1.clone()),
+            dataset_head: Some(head_3),
+            ..Default::default()
+        })
+        .await;
+
+    harness.activate_sensor().await;
+    harness.sensitize_sensor(&head_1, &head_2).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_sensor_sensitize_wrong_dataset() {
     let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
     let event_type = WebhookEventTypeCatalog::dataset_ref_updated();
@@ -337,6 +457,8 @@ struct DatasetUpdatedWebhookSensorHarness {
 #[derive(Default)]
 struct DatasetUpdatedWebhookSensorHarnessOverrides {
     mock_flow_run_service: Option<MockFlowRunService>,
+    /// History of the dataset, `LinearDatasetHistory` by default
+    dataset_increments: Option<MockDatasetIncrementQueryService>,
     /// Head the receiver already knows
     delivered_head: Option<odf::Multihash>,
     /// Current head of the dataset
@@ -365,7 +487,11 @@ impl DatasetUpdatedWebhookSensorHarness {
         DatasetWebhookWatermarks::register(&mut b);
         b.add_value(dataset_references);
         b.bind::<dyn DatasetReferenceService, FakeDatasetReferenceService>();
-        b.add_value(LinearDatasetHistory::increments());
+        b.add_value(
+            overrides
+                .dataset_increments
+                .unwrap_or_else(LinearDatasetHistory::increments),
+        );
         b.bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>();
 
         let catalog = b.build();
@@ -412,6 +538,34 @@ impl DatasetUpdatedWebhookSensorHarness {
 
     /// Dispatches a dataset update to the sensor
     async fn sensitize_sensor(&self, old_head: &odf::Multihash, new_head: &odf::Multihash) {
+        self.dispatch_update(
+            old_head,
+            new_head,
+            ResourceChanges::NewData(ResourceDataChanges {
+                blocks_added: 1,
+                records_added: 1,
+                new_watermark: None,
+            }),
+        )
+        .await;
+    }
+
+    /// Dispatches a reset of the dataset to an earlier head
+    async fn sensitize_sensor_with_reset(
+        &self,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) {
+        self.dispatch_update(old_head, new_head, ResourceChanges::Breaking)
+            .await;
+    }
+
+    async fn dispatch_update(
+        &self,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+        changes: ResourceChanges,
+    ) {
         self.sensor
             .on_sensitized(
                 &self.catalog,
@@ -419,11 +573,7 @@ impl DatasetUpdatedWebhookSensorHarness {
                 &FlowActivationCause::ResourceUpdate(FlowActivationCauseResourceUpdate {
                     activation_time: Utc::now(),
                     resource_type: DATASET_RESOURCE_TYPE.to_string(),
-                    changes: ResourceChanges::NewData(ResourceDataChanges {
-                        blocks_added: 1,
-                        records_added: 1,
-                        new_watermark: None,
-                    }),
+                    changes,
                     details: serde_json::to_value(DatasetResourceUpdateDetails {
                         dataset_id: Self::dataset_id(),
                         source: DatasetUpdateSource::HttpIngest { source_name: None },
