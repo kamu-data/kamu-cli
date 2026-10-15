@@ -21,6 +21,10 @@ pub trait DependencyGraphService: Sync + Send {
         dataset_id: &odf::DatasetID,
     ) -> DependencyDatasetIDStream;
 
+    /// Counts 1st level of dataset's downstream dependencies.
+    /// Returns 0 for a dataset unknown to the graph
+    async fn get_downstream_dependencies_count(&self, dataset_id: &odf::DatasetID) -> usize;
+
     /// Iterates over 1st level of dataset's upstream dependencies
     async fn get_upstream_dependencies(
         &self,
