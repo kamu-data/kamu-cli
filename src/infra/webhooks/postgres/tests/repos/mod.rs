@@ -9,3 +9,5 @@
 
 mod test_postgres_webhook_delivery_repository;
 mod test_postgres_webhook_subscription_event_store;
+mod test_postgres_webhook_watermark_repository;
+mod test_postgres_webhook_watermarks_backfill;

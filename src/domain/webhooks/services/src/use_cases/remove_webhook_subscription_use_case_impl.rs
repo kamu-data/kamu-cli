@@ -19,6 +19,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 #[interface(dyn RemoveWebhookSubscriptionUseCase)]
 pub struct RemoveWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    watermark_repo: Arc<dyn WebhookWatermarkRepository>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -46,6 +47,9 @@ impl RemoveWebhookSubscriptionUseCase for RemoveWebhookSubscriptionUseCaseImpl {
             .save(self.subscription_event_store.as_ref())
             .await
             .map_err(|e| RemoveWebhookSubscriptionError::Internal(e.int_err()))?;
+        self.watermark_repo
+            .remove_watermarks(subscription.id())
+            .await?;
 
         if previous_status != WebhookSubscriptionStatus::Removed {
             self.outbox

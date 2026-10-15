@@ -10,6 +10,7 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu_adapter_task_webhook::TaskErrorWebhookDelivery;
+use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_task_system::TaskError;
 use kamu_webhooks::{
     DEFAULT_MAX_WEBHOOK_CONSECUTIVE_FAILURES,
@@ -284,9 +285,19 @@ struct WebhookFlowRunsHarness {
 
 impl WebhookFlowRunsHarness {
     async fn new() -> Self {
+        // Delivery flows are activated by made-up dataset updates: any range of heads
+        // reads as new data
         let base_gql_flow_runs_harness =
             BaseGQLFlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-                dataset_changes_mock: None,
+                dataset_changes_mock: Some(
+                    MockDatasetIncrementQueryService::with_increment_between(
+                        odf::dataset::MetadataChainIncrementInterval {
+                            num_blocks: 1,
+                            num_records: 10,
+                            updated_watermark: None,
+                        },
+                    ),
+                ),
             })
             .await;
 

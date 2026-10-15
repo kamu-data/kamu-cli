@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_dataset_ref_updated_watermark_provider;
 mod test_dataset_updated_webhook_sensor;
 mod test_flow_controller_webhook_deliver;
 mod test_flow_webhooks_event_bridge;
 mod test_webhook_recovery_job;
+mod utils;

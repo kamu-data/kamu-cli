@@ -981,6 +981,17 @@ CREATE TABLE public.webhook_subscriptions (
 
 
 --
+-- Name: webhook_watermarks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.webhook_watermarks (
+    subscription_id uuid NOT NULL,
+    event_type character varying(64) NOT NULL,
+    watermark jsonb NOT NULL
+);
+
+
+--
 -- Name: account_quota_events id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1232,6 +1243,14 @@ ALTER TABLE ONLY public.webhook_subscription_events
 
 ALTER TABLE ONLY public.webhook_subscriptions
     ADD CONSTRAINT webhook_subscriptions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: webhook_watermarks webhook_watermarks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_watermarks
+    ADD CONSTRAINT webhook_watermarks_pkey PRIMARY KEY (subscription_id, event_type);
 
 
 --
@@ -1943,6 +1962,14 @@ ALTER TABLE ONLY public.webhook_deliveries
 
 ALTER TABLE ONLY public.webhook_subscription_events
     ADD CONSTRAINT webhook_subscription_events_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.webhook_subscriptions(id);
+
+
+--
+-- Name: webhook_watermarks webhook_watermarks_subscription_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.webhook_watermarks
+    ADD CONSTRAINT webhook_watermarks_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.webhook_subscriptions(id);
 
 
 --

@@ -150,13 +150,13 @@ whatever the status.
 
 | Use case | Effect | Outbox message |
 | --- | --- | --- |
-| `CreateWebhookSubscriptionUseCase` | validates the URL and event types, deduplicates event types, checks label uniqueness, generates a secret, records `Created` + `Enabled`; returns the ID and the new secret, which the GraphQL layer decrypts for the response | `EventEnabled` per event type |
-| `UpdateWebhookSubscriptionUseCase` | same validation; label uniqueness only if the label changed; records `Modified` | `EventDisabled` per removed event type, then `EventEnabled` per added one |
+| `CreateWebhookSubscriptionUseCase` | validates the URL and event types, deduplicates event types, checks label uniqueness, generates a secret, records `Created` + `Enabled`, starts the event types' watermarks ([§8](#8-flow-integration)); returns the ID and the new secret, which the GraphQL layer decrypts for the response | `EventEnabled` per event type |
+| `UpdateWebhookSubscriptionUseCase` | same validation; label uniqueness only if the label changed; records `Modified`; starts the watermarks of added event types and removes those of removed ones | `EventDisabled` per removed event type, then `EventEnabled` per added one |
 | `PauseWebhookSubscriptionUseCase` | `Paused` | `EventDisabled` per event type |
 | `ResumeWebhookSubscriptionUseCase` | `Resumed` | `EventEnabled` per event type |
 | `ReactivateWebhookSubscriptionUseCase` | `Reactivated` | `EventEnabled` per event type |
 | `MarkWebhookSubscriptionUnreachableUseCase` | `MarkedUnreachable`; called only by the flow system ([§8](#8-flow-integration)) | `WebhookSubscriptionLifecycleMessage::MarkedUnreachable` |
-| `RemoveWebhookSubscriptionUseCase` | `Removed` | `WebhookSubscriptionLifecycleMessage::Deleted` |
+| `RemoveWebhookSubscriptionUseCase` | `Removed`; removes the watermarks | `WebhookSubscriptionLifecycleMessage::Deleted` |
 | `RotateWebhookSubscriptionSecretUseCase` | generates a secret, records `SecretRotated`, returns it for the GraphQL layer to decrypt | none |
 
 **Target URL validation** (`validate_webhook_target_url` in `use_cases/helpers.rs`) runs on create
@@ -171,9 +171,9 @@ deliver to a local receiver and can never reach an external host. It has no conf
 accepts only the non-test types.
 
 **Dataset deletion.** `WebhookDatasetRemovalHandler` consumes `DatasetLifecycleMessage::Deleted`
-and records `Removed` on each of the dataset's subscriptions directly on the aggregate, not through
-`RemoveWebhookSubscriptionUseCase`, so no `Deleted` lifecycle message is posted for them
-([§8](#8-flow-integration)).
+and, in the same transaction, records `Removed` on each of the dataset's subscriptions, removes
+their watermarks and posts a `Deleted` lifecycle message for each, as
+`RemoveWebhookSubscriptionUseCase` does, so their flows are cleaned up ([§8](#8-flow-integration)).
 
 ---
 
@@ -297,10 +297,15 @@ against real deliveries.
 }
 ```
 
-One delivery may cover several updates batched into one flow: `old_hash` comes from the first
-update (omitted when the dataset had no previous head), `new_hash` from the last, and
-`is_breaking_change` is true if any of them was breaking. A breaking change (a history rewrite) is
-delivered like any other update.
+A payload describes the dataset when the delivery is built, not the update that triggered it:
+`new_hash` is the dataset's current head, and `old_hash` is the head the receiver already knows,
+taken from the subscription's **watermark** ([§8](#8-flow-integration)). Consecutive payloads
+therefore form a contiguous range, even after a failed delivery or when update notifications arrive
+out of order, and one delivery covers every update batched into its flow. Without a watermark,
+`old_hash` comes from the first update (omitted when the dataset had no previous head).
+`is_breaking_change` is true when `old_hash` is not in the history of `new_hash`: a history rewrite,
+or a reset to an earlier head. A breaking change is delivered like any other update. A delivery
+triggered when nothing changed since the watermark reports `old_hash` equal to `new_hash`.
 
 ---
 
@@ -311,6 +316,7 @@ delivered like any other update.
 | `webhook_subscription_events` | the event store: `event_id`, `subscription_id`, `created_at`, `event_type`, `event_payload` |
 | `webhook_subscriptions` | a projection for lookups: `dataset_id`, `event_types`, `status`, `label`, `last_event_id` |
 | `webhook_deliveries` | one row per delivery: request payload and headers, `requested_at`, and the nullable response code, body, headers and `response_at` |
+| `webhook_watermarks` | one row per (subscription, event type) with a watermark ([§8](#8-flow-integration)): the opaque `watermark` JSON |
 
 | Rule | Where |
 | --- | --- |
@@ -346,6 +352,47 @@ The sensor and the worker do not look at the subscription's status; a subscripti
 deliveries only because its trigger is paused, stopped or removed; a task already running at that
 point still delivers ([flow-system.md](flow-system.md#11-scope-removal-and-external-events)).
 
+**Watermarks.** A watermark records the position the receiver of a (subscription, event type) has
+acknowledged. The webhooks core stores it (`WebhookWatermarkRepository`) without reading it; the
+event type's `WebhookEventWatermarkProvider` defines its contents and its starting value. Event types
+without a provider have none. For `DATASET.REF.UPDATED` the watermark is
+`{ "head": "<multihash>" }` (`DatasetRefUpdatedWatermark`). It only ever holds a starting value or a
+position the receiver answered with 2xx:
+
+| Operation | Watermark |
+| --- | --- |
+| Create the subscription | starting value from the provider (the dataset's current head) for each event type, in the same transaction (`WebhookWatermarkInitializer`) |
+| Update, event type enabled | starting value, replacing any old one |
+| Update, event type disabled | removed |
+| Pause, resume, mark unreachable, reactivate | kept, so activation catches up from it |
+| Remove the subscription, by the use case or with its dataset | removed; subscription rows are kept with status `REMOVED`, so this is not a cascade |
+| Delivery answered 2xx | set to the watermark the delivery plan carries, in the transaction that records the response |
+
+The deliver controller puts the new watermark (`{ "head": new_hash }`) into the logical plan next
+to the payload, and `WebhookDeliveryWorkerImpl` stores it once the receiver accepts the delivery.
+Plans and tasks created before watermarks existed carry none and leave it unchanged.
+
+Subscriptions created before watermarks existed got one from the backfill migration: the `new_hash`
+(or version 1 `newHash`) of their newest 2xx delivery, else the dataset's current head; removed
+subscriptions and datasets without a head got none.
+
+**Catching up.** Dataset updates reach the sensor only while it is registered, so updates made
+before it is (right after a subscription is created, while it is paused or unreachable, while the
+server is down) are caught up when the trigger is activated: `DatasetUpdatedWebhookSensor::on_activated`
+compares the dataset's head with the watermark and, if they differ, runs one deliver flow covering
+the range, with an `ExternallyDetectedChange` cause (`Breaking` when the watermark is no longer in
+the history, so `BreakingChangeRule` applies). Without a watermark nothing is caught up.
+
+A dataset-update message can still reach the sensor after a catch-up already covered its update,
+since the messages and the trigger activation come from different outbox producers. The sensor
+remembers the head it caught up to. References move by compare-and-swap, so the first change made
+after the catch-up starts from that head, a reset included: it is delivered, and the head is
+forgotten. Any other update is taken as made before the catch-up, and is skipped when it ends at
+that head or one of its ancestors, checked by one interval query walking back from the caught-up
+head. Notifications can arrive out of order, so a later reset can be skipped this way; nothing is
+lost, because it was skipped while the first change after the catch-up was still undelivered, and
+that delivery reports the dataset's head as it is when the delivery is built.
+
 **Startup reconciliation.** `WebhookTriggerStartupRecoveryJob` runs on startup, inside a
 transaction, and repairs triggers that do not match their subscription:
 
@@ -361,9 +408,9 @@ transaction, and repairs triggers that do not match their subscription:
 
 Every other combination, and `Removed` subscriptions, are left alone.
 
-**After a dataset is deleted**, its subscriptions are `Removed` without a `Deleted` message
-([§4](#4-subscription-lifecycle)), and the dataset's own scope removal matches only the
-`Dataset` scope, so the subscriptions' triggers, sensors and process states are not removed.
+**After a dataset is deleted**, the dataset's own scope removal matches only the `Dataset` scope;
+the subscriptions' scopes are removed through the `Deleted` messages the removal handler posts
+([§4](#4-subscription-lifecycle)).
 
 ---
 
@@ -415,10 +462,10 @@ The startup checks are in `src/app/cli/src/app.rs`; the full reference is genera
 | What | Where |
 | --- | --- |
 | Use cases, with a shared harness | `src/domain/webhooks/services/tests/tests/use_cases/` (`webhook_subscription_use_case_harness.rs`) |
-| Delivery worker (mocked sender), signer test vector, dataset removal handler | `src/domain/webhooks/services/tests/tests/services/` |
-| Event store and delivery repository suites, run against every backend | `src/infra/webhooks/repo-tests/src/`, invoked from `src/infra/webhooks/{inmem,postgres,sqlite}/tests/` |
-| Sensor, deliver controller (payload shape), event bridge, recovery job | `src/adapter/flow-webhook/tests/tests/` |
-| Flow agent running delivery flows: activation by push and by an upstream ingest flow, batching, retries, stop policy, breaking changes | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
+| Delivery worker (mocked sender, watermark on 2xx), signer test vector, dataset removal handler | `src/domain/webhooks/services/tests/tests/services/` |
+| Event store, delivery and watermark repository suites, run against every backend; the watermarks backfill migration on Postgres and SQLite | `src/infra/webhooks/repo-tests/src/`, invoked from `src/infra/webhooks/{inmem,postgres,sqlite}/tests/` |
+| Sensor (including catch-up), dataset watermark provider, deliver controller (payload shape), event bridge, recovery job | `src/adapter/flow-webhook/tests/tests/` |
+| Flow agent running delivery flows: activation by push and by an upstream ingest flow, batching, retries, stop policy, breaking changes, catch-up at startup and on resume | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
 | GraphQL subscription management | `src/adapter/graphql/tests/tests/test_gql_webhook_subscriptions.rs` |
 | GraphQL view of delivery flows: description, failure reasons, history, unreachable and reactivated subscriptions | `src/adapter/graphql/tests/tests/flows/test_gql_webhook_flow_runs.rs` |
 | End to end against a local `wiremock` receiver: signed delivery, tampering rejected, secret rotation, failure reasons, retry, unreachable and reactivated subscriptions, external targets rejected | `src/e2e/app/cli/repo-tests/src/test_webhooks.rs`, wired in `src/e2e/app/cli/{sqlite,postgres}/tests/tests/test_webhooks.rs` |

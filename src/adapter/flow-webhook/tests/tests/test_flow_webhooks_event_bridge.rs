@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use chrono::{Duration, Utc};
+use internal_error::InternalError;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_webhook::{
     FLOW_TYPE_WEBHOOK_DELIVER,
@@ -19,13 +20,18 @@ use kamu_adapter_flow_webhook::{
 };
 use kamu_datasets::{
     DatasetEntry,
+    DatasetLifecycleMessage,
     DatasetReferenceMessage,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+    MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
 use kamu_webhooks::*;
-use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_inmem::{
+    InMemoryWebhookSubscriptionEventStore,
+    InMemoryWebhookWatermarkRepository,
+};
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::SystemTimeSourceDefault;
 
@@ -403,12 +409,42 @@ async fn test_subscription_marked_unreachable_on_trigger_stop() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_flow_scopes_removed_with_dataset() {
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    let bar_id = odf::DatasetID::new_seeded_ed25519(b"bar");
+    let foo_subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+    let bar_subscription_id = WebhookSubscriptionID::new(uuid::Uuid::new_v4());
+
+    let harness = TestWebhooksEventBridgeHarness::new(Default::default());
+    harness
+        .create_subscription(&foo_id, foo_subscription_id, true, false)
+        .await;
+    harness
+        .create_subscription(&bar_id, bar_subscription_id, true, false)
+        .await;
+
+    harness.delete_dataset(&foo_id).await;
+
+    pretty_assertions::assert_eq!(
+        harness.removed_flow_scopes(),
+        vec![FlowScopeSubscription::make_scope(
+            foo_subscription_id,
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
+            Some(&foo_id),
+        )],
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct TestWebhooksEventBridgeHarness {
     catalog: dill::Catalog,
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     outbox: Arc<dyn Outbox>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
+    flow_scope_removals: Arc<TestFlowScopeRemovalRecorder>,
 }
 
 #[derive(Default)]
@@ -430,6 +466,8 @@ impl TestWebhooksEventBridgeHarness {
             ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<InMemoryWebhookSubscriptionEventStore>()
+            .add::<InMemoryWebhookWatermarkRepository>()
+            .add::<TestFlowScopeRemovalRecorder>()
             .add::<FakeDatasetEntryService>()
             .add::<SystemTimeSourceDefault>()
             .add_value(mock_flow_run_service)
@@ -439,6 +477,11 @@ impl TestWebhooksEventBridgeHarness {
             .add_value(WebhooksConfig::default());
 
         kamu_webhooks_services::register_dependencies(&mut b);
+
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
 
         register_message_dispatcher::<DatasetReferenceMessage>(
             &mut b,
@@ -467,8 +510,23 @@ impl TestWebhooksEventBridgeHarness {
             outbox: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
             webhook_secret_generator: catalog.get_one().unwrap(),
+            flow_scope_removals: catalog.get_one().unwrap(),
             catalog,
         }
+    }
+
+    async fn delete_dataset(&self, dataset_id: &odf::DatasetID) {
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+                DatasetLifecycleMessage::deleted(Utc::now(), dataset_id.clone()),
+            )
+            .await
+            .unwrap();
+    }
+
+    fn removed_flow_scopes(&self) -> Vec<FlowScope> {
+        self.flow_scope_removals.removed_scopes()
     }
 
     fn register_dataset_entry(&self, dataset_id: &odf::DatasetID, dataset_name: &str) {
@@ -624,6 +682,36 @@ impl TestWebhooksEventBridgeHarness {
                     retry_policy: None,
                 })
             });
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records the flow scopes removed
+struct TestFlowScopeRemovalRecorder {
+    removed_scopes: Mutex<Vec<FlowScope>>,
+}
+
+#[dill::component]
+#[dill::scope(dill::Singleton)]
+#[dill::interface(dyn FlowScopeRemovalHandler)]
+impl TestFlowScopeRemovalRecorder {
+    fn new() -> Self {
+        Self {
+            removed_scopes: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn removed_scopes(&self) -> Vec<FlowScope> {
+        self.removed_scopes.lock().unwrap().clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl FlowScopeRemovalHandler for TestFlowScopeRemovalRecorder {
+    async fn handle_flow_scope_removal(&self, flow_scope: &FlowScope) -> Result<(), InternalError> {
+        self.removed_scopes.lock().unwrap().push(flow_scope.clone());
+        Ok(())
     }
 }
 

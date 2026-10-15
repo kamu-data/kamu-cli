@@ -54,6 +54,9 @@ uuid = { version = "1", default-features = false }
 
 [dev-dependencies]
 kamu-accounts = { workspace = true }
+kamu-datasets = { workspace = true, features = [
+    "testing",
+] }
 kamu-datasets-services = { workspace = true, features = [
     "testing",
 ] }
@@ -68,6 +71,7 @@ kamu-webhooks-services = { workspace = true }
 wakeup-listener = { workspace = true }
 
 pretty_assertions = { version = "1" }
+secrecy = { version = "0.10", default-features = false }
 test-log = { version = "0.2", features = [
     "trace",
 ] }

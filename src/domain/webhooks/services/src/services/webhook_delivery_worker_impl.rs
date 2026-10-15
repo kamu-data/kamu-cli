@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common_macros::{transactional_method1, transactional_method2};
+use database_common_macros::transactional_method2;
 use dill::{component, interface};
 use kamu_webhooks::*;
 
@@ -154,17 +154,34 @@ impl WebhookDeliveryWorkerImpl {
         Ok(headers)
     }
 
+    /// Records the response; a successful one also moves the watermark
     #[tracing::instrument(level = "debug", skip_all, fields(%webhook_delivery_id))]
-    #[transactional_method1(webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>)]
+    #[transactional_method2(
+        webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>,
+        webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>
+    )]
     async fn write_delivery_response(
         &self,
         webhook_delivery_id: WebhookDeliveryID,
+        webhook_subscription_id: WebhookSubscriptionID,
+        event_type: &WebhookEventType,
         webhook_response: WebhookResponse,
+        watermark: Option<WebhookWatermark>,
     ) -> Result<(), InternalError> {
+        let is_success = webhook_response.status_code.is_success();
+
         webhook_delivery_repo
             .update_response(webhook_delivery_id, webhook_response)
             .await
-            .int_err()
+            .int_err()?;
+
+        if is_success && let Some(watermark) = watermark {
+            webhook_watermark_repo
+                .set_watermark(webhook_subscription_id, event_type, watermark)
+                .await?;
+        }
+
+        Ok(())
     }
 }
 
@@ -178,13 +195,14 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
         webhook_subscription_id: WebhookSubscriptionID,
         event_type: WebhookEventType,
         payload: serde_json::Value,
+        watermark: Option<WebhookWatermark>,
     ) -> Result<(), WebhookDeliveryError> {
         // Prepare delivery, headers
         let delivery_data = self
             .prepare_delivery(
                 webhook_delivery_id,
                 webhook_subscription_id,
-                event_type,
+                event_type.clone(),
                 payload,
             )
             .await?;
@@ -201,8 +219,14 @@ impl WebhookDeliveryWorker for WebhookDeliveryWorkerImpl {
 
         // Write the response back to the database
         let response_status = webhook_response.status_code;
-        self.write_delivery_response(webhook_delivery_id, webhook_response)
-            .await?;
+        self.write_delivery_response(
+            webhook_delivery_id,
+            webhook_subscription_id,
+            &event_type,
+            webhook_response,
+            watermark,
+        )
+        .await?;
 
         // Fail delivery, unless the response is successful
         if response_status.is_success() {
