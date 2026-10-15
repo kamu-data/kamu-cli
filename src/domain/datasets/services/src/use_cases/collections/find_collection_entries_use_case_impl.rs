@@ -134,26 +134,18 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
             return Ok(Vec::new());
         };
 
-        // Apply filters
-        // Note: we are still working with a changelog here in hope to narrow down the
-        // record set before projecting
-        let predicate = {
-            let as_of_event_time_predicate = as_of_event_time.map_or_else(
-                || lit(true),
-                |t| {
-                    col("event_time").lt_eq(lit(ScalarValue::TimestampMillisecond(
-                        Some(t.timestamp_millis()),
-                        Some("UTC".into()),
-                    )))
-                },
-            );
-            let refs_predicate =
-                col("ref").in_list(refs.iter().map(|r| lit(r.to_string())).collect(), false);
-
-            as_of_event_time_predicate.and(refs_predicate)
+        // The state as of an event time is projected from the records up to that time
+        let df = if let Some(as_of_event_time) = as_of_event_time {
+            df.filter(
+                col("event_time").lt_eq(lit(ScalarValue::TimestampMillisecond(
+                    Some(as_of_event_time.timestamp_millis()),
+                    Some("UTC".into()),
+                ))),
+            )
+            .int_err()?
+        } else {
+            df
         };
-
-        let df = df.filter(predicate).int_err()?;
 
         // Project changelog into a state
         let df = odf::utils::data::changelog::project(
@@ -162,6 +154,11 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
             &odf::metadata::DatasetVocabulary::default(),
         )
         .int_err()?;
+
+        // Refs are filtered on the current state of entries, as a correction can change them
+        let df = df
+            .filter(col("ref").in_list(refs.iter().map(|r| lit(r.to_string())).collect(), false))
+            .int_err()?;
 
         let df = df.sort(vec![col("path").sort(true, false)]).int_err()?;
 

@@ -10,14 +10,26 @@
 use async_graphql::value;
 use indoc::indoc;
 use kamu::*;
-use kamu_accounts::{AuthenticationService, DEFAULT_ACCOUNT_NAME, MockAuthenticationService};
+use kamu_accounts::{
+    AuthenticationService,
+    CurrentAccountSubject,
+    DEFAULT_ACCOUNT_NAME,
+    MockAuthenticationService,
+};
 use kamu_core::*;
 use kamu_datasets::*;
+use kamu_datasets_services::GetDatasetDownstreamDependenciesUseCaseImpl;
+use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
-use crate::utils::{BaseGQLDatasetHarness, PredefinedAccountOpts, authentication_catalogs};
+use crate::utils::{
+    AuthenticationCatalogsResult,
+    BaseGQLDatasetHarness,
+    PredefinedAccountOpts,
+    authentication_catalogs_ext,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -585,22 +597,60 @@ async fn test_metadata_blocks_in_range() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_current_downstream_dependencies_count_hides_private_from_readers() {
+    let harness = DatasetMetadataHarness::new().await;
+
+    let create_root_result = harness
+        .create_root_dataset_with_visibility(odf::DatasetVisibility::Public)
+        .await;
+    harness
+        .create_derived_dataset_with_visibility("bar", odf::DatasetVisibility::Public)
+        .await;
+    harness
+        .create_derived_dataset_with_visibility("baz", odf::DatasetVisibility::Private)
+        .await;
+
+    let root_id = &create_root_result.dataset_handle.id;
+
+    // Another account sees neither the private downstream nor its count
+    assert_eq!(
+        harness
+            .get_downstream_dependencies(&harness.catalog_other_account, root_id)
+            .await,
+        (vec!["bar".to_string()], 1)
+    );
+    assert_eq!(
+        harness
+            .get_downstream_dependencies(&harness.catalog_authorized, root_id)
+            .await,
+        (vec!["bar".to_string(), "baz".to_string()], 2)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct DatasetMetadataHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
+    catalog_other_account: dill::Catalog,
 }
 
 impl DatasetMetadataHarness {
     async fn new() -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(TenancyConfig::MultiTenant)
+            .outbox_provider(OutboxProvider::Immediate {
+                force_immediate: true,
+            })
             .build();
 
         let catalog_base = {
             let mut b = dill::CatalogBuilder::new_chained(base_gql_harness.catalog());
 
             b.add::<MetadataQueryServiceImpl>()
+                .add::<GetDatasetDownstreamDependenciesUseCaseImpl>()
                 .add::<EngineProvisionerNull>()
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<DataFormatRegistryImpl>()
@@ -610,12 +660,21 @@ impl DatasetMetadataHarness {
             b.build()
         };
 
-        let (_, catalog_authorized) =
-            authentication_catalogs(&catalog_base, PredefinedAccountOpts::default()).await;
+        let AuthenticationCatalogsResult {
+            catalog_no_subject,
+            catalog_authorized,
+            ..
+        } = authentication_catalogs_ext(&catalog_base, None, PredefinedAccountOpts::default())
+            .await;
+
+        let catalog_other_account = dill::CatalogBuilder::new_chained(&catalog_no_subject)
+            .add_value(CurrentAccountSubject::new_test_with(&"other-account"))
+            .build();
 
         Self {
             base_gql_harness,
             catalog_authorized,
+            catalog_other_account,
         }
     }
 
@@ -627,6 +686,14 @@ impl DatasetMetadataHarness {
     }
 
     async fn create_root_dataset(&self) -> CreateDatasetResult {
+        self.create_root_dataset_with_visibility(odf::DatasetVisibility::default())
+            .await
+    }
+
+    async fn create_root_dataset_with_visibility(
+        &self,
+        visibility: odf::DatasetVisibility,
+    ) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -641,13 +708,25 @@ impl DatasetMetadataHarness {
                         odf::DatasetName::new_unchecked("foo"),
                     ))
                     .build(),
-                Default::default(),
+                CreateDatasetUseCaseOptions {
+                    dataset_visibility: visibility,
+                    seed_block_bytes: None,
+                },
             )
             .await
             .unwrap()
     }
 
     async fn create_derived_dataset(&self) -> CreateDatasetResult {
+        self.create_derived_dataset_with_visibility("bar", odf::DatasetVisibility::default())
+            .await
+    }
+
+    async fn create_derived_dataset_with_visibility(
+        &self,
+        name: &str,
+        visibility: odf::DatasetVisibility,
+    ) -> CreateDatasetResult {
         let create_dataset_from_snapshot = self
             .catalog_authorized
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
@@ -658,7 +737,7 @@ impl DatasetMetadataHarness {
                 MetadataFactory::dataset_snapshot()
                     .name(odf::DatasetAlias::new(
                         Some(DEFAULT_ACCOUNT_NAME.clone()),
-                        odf::DatasetName::new_unchecked("bar"),
+                        odf::DatasetName::new_unchecked(name),
                     ))
                     .kind(odf::DatasetKind::Derivative)
                     .push_event(
@@ -670,10 +749,64 @@ impl DatasetMetadataHarness {
                             .build(),
                     )
                     .build(),
-                Default::default(),
+                CreateDatasetUseCaseOptions {
+                    dataset_visibility: visibility,
+                    seed_block_bytes: None,
+                },
             )
             .await
             .unwrap()
+    }
+
+    /// Returns sorted names of the listed downstreams and the downstreams count
+    async fn get_downstream_dependencies(
+        &self,
+        catalog: &dill::Catalog,
+        dataset_id: &odf::DatasetID,
+    ) -> (Vec<String>, u64) {
+        let request = async_graphql::Request::new(indoc!(
+            r#"
+            query ($datasetId: DatasetID!) {
+                datasets {
+                    byId(datasetId: $datasetId) {
+                        metadata {
+                            currentDownstreamDependencies {
+                                ... on DatasetAccessResultAccessible {
+                                    dataset {
+                                        name
+                                    }
+                                }
+                            }
+                            currentDownstreamDependenciesCount
+                        }
+                    }
+                }
+            }
+            "#
+        ))
+        .variables(async_graphql::Variables::from_json(json!({
+            "datasetId": dataset_id.to_string(),
+        })));
+
+        let res = self.execute_query(request, catalog).await;
+        assert!(res.is_ok(), "{res:?}");
+
+        let json = res.data.into_json().unwrap();
+        let metadata = &json["datasets"]["byId"]["metadata"];
+
+        let mut names = metadata["currentDownstreamDependencies"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|dependency| dependency["dataset"]["name"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>();
+        names.sort();
+
+        let count = metadata["currentDownstreamDependenciesCount"]
+            .as_u64()
+            .unwrap();
+
+        (names, count)
     }
 
     fn get_dataset_set_transform_metadata_request(dataset_id: &str) -> async_graphql::Request {

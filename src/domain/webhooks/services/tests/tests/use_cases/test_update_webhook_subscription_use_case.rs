@@ -16,6 +16,7 @@ use kamu_webhooks::{
     WebhookEventTypeCatalog,
     WebhookSubscriptionLabel,
     WebhookSubscriptionQueryMode,
+    WebhooksConfig,
 };
 use kamu_webhooks_services::UpdateWebhookSubscriptionUseCaseImpl;
 use messaging_outbox::{MockOutbox, Outbox};
@@ -65,6 +66,116 @@ async fn test_update_in_dataset_success() {
         vec![WebhookEventTypeCatalog::dataset_ref_updated()]
     );
     assert_eq!(subscription.label().as_ref(), "test_label_updated");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_update_event_types_moves_watermarks() {
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_disabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&foo_id),
+        1,
+    );
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::dataset_ref_updated(),
+        Some(&foo_id),
+        1,
+    );
+
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let mut subscription = harness.create_subscription_in_dataset(foo_id.clone()).await;
+    // Positions left from before: the disabled type's is dropped, the enabled
+    // type starts from the current position
+    for event_type in [
+        WebhookEventTypeCatalog::test(),
+        WebhookEventTypeCatalog::dataset_ref_updated(),
+    ] {
+        harness
+            .set_watermark(
+                subscription.id(),
+                &event_type,
+                WebhookSubscriptionUseCaseHarness::stale_watermark(),
+            )
+            .await;
+    }
+
+    harness
+        .use_case
+        .execute(
+            &mut subscription,
+            url::Url::parse("https://example.com/updated").unwrap(),
+            vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        harness
+            .find_watermark(subscription.id(), &WebhookEventTypeCatalog::test())
+            .await,
+        None
+    );
+    assert_eq!(
+        harness
+            .find_watermark(
+                subscription.id(),
+                &WebhookEventTypeCatalog::dataset_ref_updated()
+            )
+            .await,
+        Some(WebhookSubscriptionUseCaseHarness::initial_watermark(
+            &foo_id
+        ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_update_keeps_watermarks_of_unchanged_event_types() {
+    let foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = UpdateWebhookSubscriptionUseCaseHarness::new(MockOutbox::new());
+    let mut subscription = harness
+        .create_subscription_in_dataset_with_event_types(
+            foo_id,
+            vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+        )
+        .await;
+    harness
+        .set_watermark(
+            subscription.id(),
+            &WebhookEventTypeCatalog::dataset_ref_updated(),
+            WebhookSubscriptionUseCaseHarness::stale_watermark(),
+        )
+        .await;
+
+    harness
+        .use_case
+        .execute(
+            &mut subscription,
+            url::Url::parse("https://example.com/updated").unwrap(),
+            vec![WebhookEventTypeCatalog::dataset_ref_updated()],
+            WebhookSubscriptionLabel::try_new("test_label_updated").unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        harness
+            .find_watermark(
+                subscription.id(),
+                &WebhookEventTypeCatalog::dataset_ref_updated()
+            )
+            .await,
+        Some(WebhookSubscriptionUseCaseHarness::stale_watermark())
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -260,6 +371,7 @@ impl UpdateWebhookSubscriptionUseCaseHarness {
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<UpdateWebhookSubscriptionUseCaseImpl>();
+        b.add_value(WebhooksConfig::default());
         b.add_value(mock_outbox);
         b.bind::<dyn Outbox, MockOutbox>();
 

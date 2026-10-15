@@ -1470,6 +1470,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert-json-diff"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47e4f2b81832e72834d7518d8487a0396a28cc408186a2e8854c0f98011faf12"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "assert_cmd"
 version = "2.0.16"
 source = "git+https://github.com/kamu-data/assert_cmd?branch=deactivate-output-truncation#c83b0859dcbce6f9bb941ea07b615cc90aebd003"
@@ -3898,7 +3908,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 3.0.8",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4676,6 +4686,24 @@ dependencies = [
  "byteorder",
  "time",
 ]
+
+[[package]]
+name = "deadpool"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0be2b1d1d6ec8d846f05e137292d0b89133caf95ef33695424c09568bdd39b1b"
+dependencies = [
+ "deadpool-runtime",
+ "lazy_static",
+ "num_cpus",
+ "tokio",
+]
+
+[[package]]
+name = "deadpool-runtime"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 
 [[package]]
 name = "decoded-char"
@@ -7697,6 +7725,7 @@ dependencies = [
  "messaging-outbox",
  "opendatafabric",
  "pretty_assertions",
+ "secrecy",
  "serde",
  "serde_json",
  "test-log",
@@ -8436,7 +8465,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.270.0"
 dependencies = [
  "async-graphql",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "database-common",
  "datafusion",
@@ -8456,13 +8485,16 @@ dependencies = [
  "random-strings",
  "regex",
  "reqwest",
+ "ring",
  "serde_json",
  "serde_yaml_ng",
+ "sha2 0.11.0",
  "tempfile",
  "test-utils",
  "tokio",
  "tokio-retry",
  "url",
+ "wiremock",
 ]
 
 [[package]]
@@ -8851,6 +8883,7 @@ dependencies = [
  "kamu-wakeup-listener-inmem",
  "messaging-outbox",
  "mockall",
+ "nonempty",
  "nutype",
  "oop",
  "opendatafabric",
@@ -9035,6 +9068,7 @@ dependencies = [
  "kamu-adapter-flow-dataset",
  "kamu-adapter-flow-webhook",
  "kamu-adapter-task-dataset",
+ "kamu-adapter-task-webhook",
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
@@ -9045,9 +9079,12 @@ dependencies = [
  "kamu-task-system-inmem",
  "kamu-task-system-services",
  "kamu-wakeup-listener-inmem",
+ "kamu-webhooks",
+ "kamu-webhooks-inmem",
  "messaging-outbox",
  "mockall",
  "observability",
+ "oop",
  "opendatafabric",
  "pretty_assertions",
  "prometheus",
@@ -9058,6 +9095,8 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "url",
+ "uuid",
  "wakeup-listener",
 ]
 
@@ -9999,6 +10038,7 @@ dependencies = [
  "futures",
  "http",
  "internal-error",
+ "kamu-datasets-postgres",
  "kamu-webhooks",
  "kamu-webhooks-repo-tests",
  "opendatafabric",
@@ -10019,6 +10059,7 @@ dependencies = [
  "dill",
  "futures",
  "http",
+ "kamu-datasets",
  "kamu-webhooks",
  "opendatafabric",
  "secrecy",
@@ -10077,6 +10118,7 @@ dependencies = [
  "dill",
  "futures",
  "internal-error",
+ "kamu-datasets-sqlite",
  "kamu-webhooks",
  "kamu-webhooks-repo-tests",
  "opendatafabric",
@@ -11037,9 +11079,9 @@ dependencies = [
 
 [[package]]
 name = "num-modular"
-version = "0.6.6"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26ac76200f74e658124f95fa63e1a82b2fd2181c5b2fdde80b3d89d2d3f905e7"
+checksum = "bd8e500409e6cd603b03e477c26a6caecdc27ac58979a53e881c75eafc079f44"
 
 [[package]]
 name = "num-order"
@@ -13506,9 +13548,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.45"
+version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d41d731c7d2f962d1ccc364cec258de3c0e93b38c2fb3ba97ac74513048d634"
+checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "aws-lc-rs",
  "log",
@@ -15008,7 +15050,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -16487,6 +16529,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "wiremock"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08db1edfb05d9b3c1542e521aea074442088292f00b5f28e435c714a98f85031"
+dependencies = [
+ "assert-json-diff",
+ "base64 0.22.1",
+ "deadpool",
+ "futures",
+ "http",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "log",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_webhooks::{WebhookEventType, WebhookSubscriptionID};
+use kamu_webhooks::{WebhookEventType, WebhookSubscriptionID, WebhookWatermark};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,6 +17,7 @@ kamu_task_system::logical_plan_struct! {
         pub webhook_subscription_id: WebhookSubscriptionID,
         pub webhook_event_type: WebhookEventType,
         pub webhook_payload: serde_json::Value,
+        pub webhook_watermark: Option<WebhookWatermark>,
     }
     => "DeliverWebhook"
 }

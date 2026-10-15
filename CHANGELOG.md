@@ -14,9 +14,30 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
+  a `blockHash` field
+- GraphQL: `DatasetMetadata.currentDownstreamDependenciesCount` returns the number of direct downstream
+  datasets. Accounts that can maintain the dataset also get the private ones they cannot read
+### Changed
+- SQL `to_table()` only reads datasets the query lists, like plain table references
+- `ChangelogStream` ingest requires `datafusion.execution.target_partitions` = 1 in the ingest configuration
+- Webhooks: `DATASET.REF.UPDATED` payloads go from the last head the receiver accepted (`old_hash`) to the
+  dataset's head when the delivery is sent (`new_hash`), so a delivery after a failed one covers the missed
+  range. After upgrading, a subscription may get one delivery covering changes since its last accepted one
 ### Fixed
+- Webhooks deliver dataset updates missed right after subscribing, while paused or unreachable, or while
+  the server was down, as one delivery once the subscription is active again
+- Deleting a dataset also removes the flows of its webhook subscriptions, which kept running before
 - The local disk cache of S3 metadata blocks writes entries atomically, so a failed or interrupted download
   no longer leaves a truncated block that breaks the node until the cache is cleared
+- `ChangelogStream` keeps the input order of records, so several changes to one key in a chunk produce the
+  correct state
+- Collection updates are committed as a single block
+- Collection entries are filtered by extra data and found by linked dataset using their current values
+- SQL `to_table()` reads datasets at the query's pinned blocks and includes them in the query state
+- SQL `to_table()` on a missing dataset is a bad query error instead of an internal error
+- Concurrent uploads to a versioned file fail with a conflict instead of creating duplicate versions
 
 ## [0.270.0] - 2026-10-12
 ### Added

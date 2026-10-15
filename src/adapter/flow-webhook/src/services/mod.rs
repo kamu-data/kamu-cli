@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_changes;
+pub(crate) use dataset_changes::*;
+
+mod dataset_ref_updated_watermark_provider;
+pub use dataset_ref_updated_watermark_provider::*;
+
 mod flow_webhooks_event_bridge;
 pub use flow_webhooks_event_bridge::*;
 

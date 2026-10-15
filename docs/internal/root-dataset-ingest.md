@@ -177,7 +177,13 @@ source that saw a new ETag but produced no new rows records that it is caught up
 Points worth knowing before changing this code:
 
 - **Offsets** are assigned with `row_number()` ordered by the merge strategy's `sort_order()`,
-  starting at `prev_offset + 1`, and the slice is sorted by offset.
+  or in the order of the merged records when `sort_order()` is empty, starting at
+  `prev_offset + 1`, and the slice is sorted by offset.
+- **Input order survives only in one partition.** A partitioned scan splits the input file into
+  ranges and interleaves them. The ingest session pins `target_partitions = 1`
+  (`EngineConfigDatafusionEmbeddedIngest`), and for a strategy with an empty `sort_order()` the
+  writer refuses to stage under any other setting. `UpsertStream` also numbers its input in
+  arrival order to drop intermediate updates, so it depends on the same setting.
 - **Event time** missing from the input is filled with `source_event_time` (polling: the time the
   fetch step reported, otherwise system time; push: the caller's event time, otherwise system
   time).
@@ -195,15 +201,19 @@ Points worth knowing before changing this code:
 The spec defines what each strategy means. The implementation
 (`merge_strategy_for` picks one per source) differs only in cost and ordering:
 
-| Strategy | Reads all previous slices | Implementation |
-| --- | --- | --- |
-| `Append` | no | [`append.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/append.rs) |
-| `Ledger` | yes — left anti-join on the primary key | [`ledger.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/ledger.rs) |
-| `Snapshot` | yes — projects history to latest-by-PK, then diffs | [`snapshot.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/snapshot.rs) |
-| `ChangelogStream` | no | [`changelog_stream.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/changelog_stream.rs) |
-| `UpsertStream` | yes — projects history to latest-by-PK | [`upsert_stream.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/upsert_stream.rs) |
+| Strategy | Reads all previous slices | Offset order within a slice | Implementation |
+| --- | --- | --- | --- |
+| `Append` | no | `event_time` | [`append.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/append.rs) |
+| `Ledger` | yes — left anti-join on the primary key | `event_time` | [`ledger.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/ledger.rs) |
+| `Snapshot` | yes — projects history to latest-by-PK, then diffs | primary key, then operation type | [`snapshot.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/snapshot.rs) |
+| `ChangelogStream` | no | input order | [`changelog_stream.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/changelog_stream.rs) |
+| `UpsertStream` | yes — projects history to latest-by-PK | primary key, then operation type | [`upsert_stream.rs`](../../src/infra/ingest-datafusion/src/merge_strategies/upsert_stream.rs) |
 
-Each strategy also supplies `sort_order()`, which decides how offsets are assigned within a slice.
+The order comes from each strategy's `sort_order()`. `Snapshot` and `UpsertStream` emit at most one
+change per key in a slice (a `-C`/`+C` pair sorts correctly by operation type), so sorting by key
+loses nothing. A changelog can retract and re-append a key, or correct it several times, within
+one chunk; projecting the state takes the last record per key by offset, so `ChangelogStream`
+keeps the records in the order they arrived.
 
 ---
 

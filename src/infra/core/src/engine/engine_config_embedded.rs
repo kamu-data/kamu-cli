@@ -53,7 +53,8 @@ impl EngineConfigDatafusionEmbeddedIngest {
     pub const DEFAULT_OVERRIDES: &[(&str, &str)] = &[
         // Note: We use single partition as ingest currently always reads one file at a
         // time and repartitioning of data likely to hurt performance rather than
-        // improve it
+        // improve it. Merge strategies that keep the input order of records (e.g.
+        // `ChangelogStream`) also depend on it: the writer refuses to run them otherwise.
         ("datafusion.execution.target_partitions", "1"),
     ];
 }

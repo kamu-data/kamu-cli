@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{GetChangelogProjectionOptions, GetDataOptions, GetDataResponse, QueryError};
+use crate::{GetDataOptions, GetDataResponse, QueryError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,16 +41,6 @@ pub trait QueryDatasetDataUseCase: Send + Sync {
         dataset_refs: &[odf::DatasetRef],
         skip_if_missing_or_inaccessible: bool,
     ) -> Result<Vec<GetDataResponse>, QueryError>;
-
-    // TODO: Consider replacing this function with a more sophisticated session
-    //       context builder that can be reused for multiple queries
-    /// Projects the CDC ledger into a state snapshot.
-    /// Uses [`odf::utils::data::changelog::project`] function internally.
-    async fn get_changelog_projection(
-        &self,
-        dataset_ref: &odf::DatasetRef,
-        options: GetChangelogProjectionOptions,
-    ) -> Result<GetDataResponse, QueryError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

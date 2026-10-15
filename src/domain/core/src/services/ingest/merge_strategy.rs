@@ -29,7 +29,7 @@ use odf::utils::data::DataFrameExt;
 ///   - must include operation type and event time columns
 ///   - event time column may still contain null values if input did not have this column
 /// - Sort order after [`MergeStrategy::merge`] is arbitrary and must be restored using
-///   [`MergeStrategy::sort_order`] at the end of processing
+///   [`MergeStrategy::sort_order`] at the end of processing, unless the sort order is empty
 pub trait MergeStrategy: Send + Sync {
     /// Reduces newly seen data `new` to a minimal update to previously
     /// ledgerized `prev` data.
@@ -41,6 +41,10 @@ pub trait MergeStrategy: Send + Sync {
 
     /// Returns the sort expression best suited for the output of this strategy
     /// to perform before writing the final result.
+    ///
+    /// An empty sort order means that the order of records produced by
+    /// [`MergeStrategy::merge`] is significant and must be preserved. In that case
+    /// `merge` must not reorder its input.
     fn sort_order(&self) -> Vec<SortExpr>;
 }
 

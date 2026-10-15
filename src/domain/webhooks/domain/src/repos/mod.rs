@@ -9,6 +9,8 @@
 
 mod webhook_delivery_repository;
 mod webhook_subscription_event_store;
+mod webhook_watermark_repository;
 
 pub use webhook_delivery_repository::*;
 pub use webhook_subscription_event_store::*;
+pub use webhook_watermark_repository::*;

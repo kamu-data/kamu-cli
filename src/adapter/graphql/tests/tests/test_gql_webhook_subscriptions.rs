@@ -15,7 +15,10 @@ use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_webhooks::*;
-use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_inmem::{
+    InMemoryWebhookSubscriptionEventStore,
+    InMemoryWebhookWatermarkRepository,
+};
 use kamu_webhooks_services::*;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
@@ -1303,10 +1306,12 @@ impl WebhookSubscriptionsHarness {
             b.add::<RemoveWebhookSubscriptionUseCaseImpl>();
             b.add::<RotateWebhookSubscriptionSecretUseCaseImpl>();
             b.add::<WebhookSubscriptionQueryServiceImpl>();
+            b.add::<WebhookWatermarkInitializer>();
             b.add_value(WebhooksConfig::sample());
             b.add_value(mock_secret_generator);
             b.bind::<dyn WebhookSecretGenerator, MockWebhookSecretGenerator>();
             b.add::<InMemoryWebhookSubscriptionEventStore>();
+            b.add::<InMemoryWebhookWatermarkRepository>();
 
             b.build()
         };

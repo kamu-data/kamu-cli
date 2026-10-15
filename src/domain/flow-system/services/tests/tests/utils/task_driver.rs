@@ -10,7 +10,9 @@
 use std::sync::Arc;
 
 use chrono::Duration;
+use kamu_adapter_task_webhook::LogicalPlanWebhookDeliver;
 use kamu_task_system::*;
+use kamu_webhooks::WebhookWatermarkRepository;
 use messaging_outbox::{Outbox, OutboxExt};
 use time_source::SystemTimeSource;
 use tokio::task::yield_now;
@@ -21,6 +23,7 @@ pub(crate) struct TaskDriver {
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
     task_event_store: Arc<dyn TaskEventStore>,
+    webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>,
     args: TaskDriverArgs,
 }
 
@@ -39,12 +42,14 @@ impl TaskDriver {
         time_source: Arc<dyn SystemTimeSource>,
         outbox: Arc<dyn Outbox>,
         task_event_store: Arc<dyn TaskEventStore>,
+        webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>,
         args: TaskDriverArgs,
     ) -> Self {
         Self {
             time_source,
             outbox,
             task_event_store,
+            webhook_watermark_repo,
             args,
         }
     }
@@ -76,6 +81,14 @@ impl TaskDriver {
         if let Some((finish_in, with_outcome)) = self.args.finish_in_with {
             self.time_source.sleep(finish_in).await;
 
+            if let TaskOutcome::Success(_) = &with_outcome {
+                Self::record_delivered_webhook_watermark(
+                    self.webhook_watermark_repo.as_ref(),
+                    &self.args.expected_logical_plan,
+                )
+                .await;
+            }
+
             // Note: We can omit transaction, since this is a test-only abstraction
             //       with assumed immediate delivery
             self.outbox
@@ -87,6 +100,29 @@ impl TaskDriver {
                         self.args.task_metadata,
                         with_outcome,
                     ),
+                )
+                .await
+                .unwrap();
+        }
+    }
+
+    /// Moves the watermark of a successful webhook delivery, as the delivery
+    /// worker does before the task finishes
+    async fn record_delivered_webhook_watermark(
+        webhook_watermark_repo: &dyn WebhookWatermarkRepository,
+        logical_plan: &LogicalPlan,
+    ) {
+        if logical_plan.plan_type != LogicalPlanWebhookDeliver::TYPE_ID {
+            return;
+        }
+
+        let plan = LogicalPlanWebhookDeliver::from_logical_plan(logical_plan).unwrap();
+        if let Some(watermark) = plan.webhook_watermark {
+            webhook_watermark_repo
+                .set_watermark(
+                    plan.webhook_subscription_id,
+                    &plan.webhook_event_type,
+                    watermark,
                 )
                 .await
                 .unwrap();

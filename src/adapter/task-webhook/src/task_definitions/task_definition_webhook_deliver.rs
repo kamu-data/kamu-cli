@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_task_system as ts;
-use kamu_webhooks::{WebhookEventType, WebhookSubscriptionID};
+use kamu_webhooks::{WebhookEventType, WebhookSubscriptionID, WebhookWatermark};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,6 +18,7 @@ ts::task_definition_struct! {
         pub webhook_subscription_id: WebhookSubscriptionID,
         pub webhook_event_type: WebhookEventType,
         pub webhook_payload: serde_json::Value,
+        pub webhook_watermark: Option<WebhookWatermark>,
     }
     => "dev.kamu.tasks.webhook.deliver"
 }

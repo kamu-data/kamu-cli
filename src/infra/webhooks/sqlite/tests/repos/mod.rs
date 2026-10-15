@@ -9,3 +9,5 @@
 
 mod test_sqlite_webhook_delivery_repository;
 mod test_sqlite_webhook_subscription_event_store;
+mod test_sqlite_webhook_watermark_repository;
+mod test_sqlite_webhook_watermarks_backfill;

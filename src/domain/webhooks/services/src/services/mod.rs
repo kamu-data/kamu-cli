@@ -14,6 +14,7 @@ mod webhook_secret_generator_impl;
 mod webhook_sender_impl;
 mod webhook_signer_impl;
 mod webhook_subscription_query_service_impl;
+mod webhook_watermark_initializer;
 
 pub use webhook_dataset_removal_handler::*;
 pub use webhook_delivery_worker_impl::*;
@@ -22,3 +23,4 @@ pub use webhook_secret_generator_impl::*;
 pub use webhook_sender_impl::*;
 pub use webhook_signer_impl::*;
 pub use webhook_subscription_query_service_impl::*;
+pub use webhook_watermark_initializer::*;

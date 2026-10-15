@@ -26,7 +26,11 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_TRANSFORM,
     FlowScopeDataset,
 };
-use kamu_adapter_flow_webhook::{FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION, FlowScopeSubscription};
+use kamu_adapter_flow_webhook::{
+    FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION,
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
+};
 use kamu_flow_system::*;
 use time_source::FakeSystemTimeSource;
 
@@ -211,6 +215,7 @@ impl FlowSystemTestListener {
             FLOW_TYPE_DATASET_RESET => "Reset",
             FLOW_TYPE_DATASET_RESET_TO_METADATA => "ResetToMetadata",
             FLOW_TYPE_SYSTEM_GC => "GC",
+            FLOW_TYPE_WEBHOOK_DELIVER => "WebhookDeliver",
             _ => "<unknown>",
         }
     }

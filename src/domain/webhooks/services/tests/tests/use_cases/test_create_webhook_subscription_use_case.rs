@@ -53,6 +53,60 @@ async fn test_create_in_dataset_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_create_starts_watermarks_of_event_types() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    for event_type in [
+        WebhookEventTypeCatalog::test(),
+        WebhookEventTypeCatalog::dataset_ref_updated(),
+    ] {
+        WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+            &mut mock_outbox,
+            &event_type,
+            Some(&dataset_id),
+            1,
+        );
+    }
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let res = harness
+        .use_case
+        .execute(
+            Some(dataset_id.clone()),
+            url::Url::parse("https://example.com").unwrap(),
+            vec![
+                WebhookEventTypeCatalog::test(),
+                WebhookEventTypeCatalog::dataset_ref_updated(),
+            ],
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        harness
+            .find_watermark(
+                res.subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated()
+            )
+            .await,
+        Some(WebhookSubscriptionUseCaseHarness::initial_watermark(
+            &dataset_id
+        ))
+    );
+    // No provider for this event type
+    assert_eq!(
+        harness
+            .find_watermark(res.subscription_id, &WebhookEventTypeCatalog::test())
+            .await,
+        None
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_invalid_target_url_rejected() {
     let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
@@ -72,6 +126,83 @@ async fn test_invalid_target_url_rejected() {
             .execute(
                 Some(dataset_id.clone()),
                 url::Url::parse(invalid_url).unwrap(),
+                vec![WebhookEventTypeCatalog::test()],
+                WebhookSubscriptionLabel::try_new("test_label").unwrap(),
+            )
+            .await;
+        assert_matches!(
+            res,
+            Err(kamu_webhooks::CreateWebhookSubscriptionError::InvalidTargetUrl(_))
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_loopback_target_url_accepted_when_loopback_only() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+        &mut mock_outbox,
+        &WebhookEventTypeCatalog::test(),
+        Some(&dataset_id),
+        2,
+    );
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::with_config(
+        mock_outbox,
+        WebhooksConfig {
+            loopback_targets_only: true,
+            ..WebhooksConfig::default()
+        },
+    );
+
+    for (label, loopback_url) in [
+        ("http_ip", "http://127.0.0.1:8080/hook"),
+        ("https_localhost", "https://localhost/hook"),
+    ] {
+        let res = harness
+            .use_case
+            .execute(
+                Some(dataset_id.clone()),
+                url::Url::parse(loopback_url).unwrap(),
+                vec![WebhookEventTypeCatalog::test()],
+                WebhookSubscriptionLabel::try_new(label).unwrap(),
+            )
+            .await;
+        assert!(res.is_ok(), "Failed to create subscription: {res:?}");
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_external_target_url_rejected_when_loopback_only() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::with_config(
+        MockOutbox::new(),
+        WebhooksConfig {
+            loopback_targets_only: true,
+            ..WebhooksConfig::default()
+        },
+    );
+
+    // Rejected whether or not the host resolves where the test runs, and on a
+    // scheme other than `http` or `https`
+    for rejected_url in [
+        "https://example.com/hook",
+        "http://192.0.2.1/hook",
+        "https://unresolvable.invalid/hook",
+        "ftp://127.0.0.1/hook",
+    ] {
+        let res = harness
+            .use_case
+            .execute(
+                Some(dataset_id.clone()),
+                url::Url::parse(rejected_url).unwrap(),
                 vec![WebhookEventTypeCatalog::test()],
                 WebhookSubscriptionLabel::try_new("test_label").unwrap(),
             )
@@ -227,12 +358,16 @@ struct CreateWebhookSubscriptionUseCaseHarness {
 
 impl CreateWebhookSubscriptionUseCaseHarness {
     fn new(mock_outbox: MockOutbox) -> Self {
+        Self::with_config(mock_outbox, WebhooksConfig::default())
+    }
+
+    fn with_config(mock_outbox: MockOutbox, webhooks_config: WebhooksConfig) -> Self {
         let base_harness = WebhookSubscriptionUseCaseHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<CreateWebhookSubscriptionUseCaseImpl>();
         b.add::<WebhookSecretGeneratorImpl>();
-        b.add_value(WebhooksConfig::default());
+        b.add_value(webhooks_config);
         b.add_value(mock_outbox);
         b.bind::<dyn Outbox, MockOutbox>();
 

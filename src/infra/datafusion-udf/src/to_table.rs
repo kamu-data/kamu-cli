@@ -19,7 +19,8 @@ use odf::utils::data::DataFrameExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const FUNCTION_NAME: &str = "to_table";
+/// Name under which the function is registered in a session
+pub const TO_TABLE_FUNCTION_NAME: &str = "to_table";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +38,7 @@ where
 {
     pub fn register(ctx: &SessionContext, on_resolve_dataset_callback: F) {
         ctx.register_udtf(
-            FUNCTION_NAME,
+            TO_TABLE_FUNCTION_NAME,
             Arc::new(Self::new(on_resolve_dataset_callback)),
         );
     }
@@ -51,15 +52,16 @@ where
     async fn main(&self, dataset_ref: odf::DatasetRef) -> DfResult<Arc<dyn TableProvider>> {
         let maybe_df = (self.on_resolve_dataset_callback)(dataset_ref.clone())
             .await
-            .map_err(|e| {
-                // Rewrite access error
-                if let QueryError::Access(_) = e {
-                    odf::DatasetNotFoundError::new(dataset_ref).into()
-                } else {
-                    e
-                }
-            })
-            .map_err(|e| DFError::External(Box::new(e)))?;
+            .map_err(|e| match e {
+                // Reported like a missing table, and the same for inaccessible datasets to
+                // not reveal their existence
+                QueryError::DatasetNotFound(_) | QueryError::Access(_) => DFError::Plan(format!(
+                    "{TO_TABLE_FUNCTION_NAME}(): dataset '{dataset_ref}' not found"
+                )),
+                QueryError::DatasetBlockNotFound(_)
+                | QueryError::BadQuery(_)
+                | QueryError::Internal(_) => DFError::External(Box::new(e)),
+            })?;
 
         if let Some(df) = maybe_df {
             Ok(df.into_view())
@@ -93,19 +95,21 @@ impl TryFrom<&[Expr]> for ToTableFunctionArgs {
 
     fn try_from(args: &[Expr]) -> Result<Self, Self::Error> {
         if args.len() != 1 {
-            return plan_err!("{FUNCTION_NAME}() accepts only one argument: dataset_ref");
+            return plan_err!("{TO_TABLE_FUNCTION_NAME}() accepts only one argument: dataset_ref");
         }
 
         let dataset_ref_as_str = match args.first() {
             Some(Expr::Column(c)) if c.relation.is_none() && !c.name.is_empty() => &c.name,
             _ => {
-                return plan_err!("{FUNCTION_NAME}(): dataset_ref must be a table reference");
+                return plan_err!(
+                    "{TO_TABLE_FUNCTION_NAME}(): dataset_ref must be a table reference"
+                );
             }
         };
 
         let Ok(dataset_ref) = dataset_ref_as_str.parse::<odf::DatasetRef>() else {
             return plan_err!(
-                "{FUNCTION_NAME}() requires correct dataset_ref format but got: \
+                "{TO_TABLE_FUNCTION_NAME}() requires correct dataset_ref format but got: \
                  \"{dataset_ref_as_str}\""
             );
         };

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO webhook_watermarks (subscription_id, event_type, watermark)\n                VALUES ($1, $2, $3)\n                ON CONFLICT (subscription_id, event_type)\n                DO UPDATE SET watermark = EXCLUDED.watermark\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "acf47d32c5ca55e99f8bdfdb3b69d3543a7bcb18ea926219b6c0fc2e58000960"
+}

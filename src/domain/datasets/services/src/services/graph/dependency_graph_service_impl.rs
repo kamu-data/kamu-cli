@@ -326,6 +326,20 @@ impl DependencyGraphService for DependencyGraphServiceImpl {
         Box::pin(tokio_stream::iter(downstream_node_datasets))
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    async fn get_downstream_dependencies_count(&self, dataset_id: &odf::DatasetID) -> usize {
+        let state = self.state.read().await;
+
+        let Ok(node_index) = state.get_dataset_node(dataset_id) else {
+            return 0;
+        };
+
+        state
+            .datasets_graph
+            .neighbors_directed(node_index, Direction::Outgoing)
+            .count()
+    }
+
     /// Iterates over 1st level of dataset's upstream dependencies
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_upstream_dependencies(

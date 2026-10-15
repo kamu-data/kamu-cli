@@ -47,6 +47,7 @@ impl DeliverWebhookTaskRunner {
                 webhook_subscription_id,
                 task_webhook.webhook_event_type,
                 task_webhook.webhook_payload,
+                task_webhook.webhook_watermark,
             )
             .await
         {

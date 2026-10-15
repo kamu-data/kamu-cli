@@ -18,10 +18,11 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME_STR, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::*;
+use kamu_adapter_flow_webhook::{DatasetRefUpdatedWatermarkProvider, FlowControllerWebhookDeliver};
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_datasets_services::testing::FakeDatasetEntryService;
+use kamu_datasets_services::testing::{FakeDatasetEntryService, FakeDatasetReferenceService};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -35,6 +36,7 @@ use kamu_task_system::{
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+use kamu_webhooks_inmem::InMemoryWebhookWatermarkRepository;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
@@ -83,6 +85,7 @@ pub(crate) struct FlowHarnessOverrides {
     pub flow_system_event_batch_size: Option<usize>,
     pub mock_dataset_changes: Option<MockDatasetIncrementQueryService>,
     pub mock_transform_flow_evaluator: Option<MockTransformFlowEvaluator>,
+    pub default_retry_policy_by_flow_type: HashMap<String, RetryPolicy>,
     /// Registers a projector that fails on every event
     pub with_failing_projector: bool,
     /// Registers a projector that fails on its first event only
@@ -136,7 +139,7 @@ impl FlowHarness {
             .add_value(FlowAgentConfig {
                 awaiting_step,
                 mandatory_throttling_period,
-                default_retry_policy_by_flow_type: HashMap::new(),
+                default_retry_policy_by_flow_type: overrides.default_retry_policy_by_flow_type,
             })
             .add_value(FlowAgentActivationConfig {
                 batch_size: NonZeroUsize::new(overrides.activation_batch_size.unwrap_or(20))
@@ -174,7 +177,11 @@ impl FlowHarness {
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryTaskQueueWakeupSource>()
             .add::<DatabaseTransactionRunner>()
-            .add::<FakeDatasetEntryService>();
+            .add::<FakeDatasetEntryService>()
+            .add::<FakeDatasetReferenceService>()
+            .add::<FlowControllerWebhookDeliver>()
+            .add::<DatasetRefUpdatedWatermarkProvider>()
+            .add::<InMemoryWebhookWatermarkRepository>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -716,6 +723,7 @@ impl FlowHarness {
 
     pub fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {
         TaskDriver::new(
+            self.catalog.get_one().unwrap(),
             self.catalog.get_one().unwrap(),
             self.catalog.get_one().unwrap(),
             self.catalog.get_one().unwrap(),

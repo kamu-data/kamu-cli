@@ -13,6 +13,8 @@ use dill::{component, interface};
 use kamu_webhooks::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
+use crate::WebhookWatermarkInitializer;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -20,7 +22,9 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub struct CreateWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
+    watermark_initializer: Arc<WebhookWatermarkInitializer>,
     outbox: Arc<dyn Outbox>,
+    webhooks_config: Arc<WebhooksConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,7 +54,7 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
             "Initiating creation of webhook subscription",
         );
 
-        validate_webhook_target_url(&target_url)?;
+        validate_webhook_target_url(&target_url, &self.webhooks_config)?;
         validate_webhook_event_types(&event_types)?;
         deduplicate_event_types(&mut event_types);
 
@@ -90,6 +94,10 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 .save(self.subscription_event_store.as_ref())
                 .await
                 .map_err(|e| CreateWebhookSubscriptionError::Internal(e.int_err()))?;
+
+            self.watermark_initializer
+                .initialize_watermarks(&subscription, subscription.event_types())
+                .await?;
 
             for event_type in subscription.event_types() {
                 self.outbox
