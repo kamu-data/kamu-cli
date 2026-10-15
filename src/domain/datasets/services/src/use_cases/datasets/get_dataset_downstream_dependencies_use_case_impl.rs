@@ -26,6 +26,23 @@ pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
+impl GetDatasetDownstreamDependenciesUseCaseImpl {
+    async fn can_maintain(&self, dataset_id: &odf::DatasetID) -> Result<bool, InternalError> {
+        match self
+            .dataset_action_authorizer
+            .check_action_allowed(dataset_id, DatasetAction::Maintain)
+            .await
+        {
+            Ok(()) => Ok(true),
+            Err(
+                DatasetActionUnauthorizedError::Access(_)
+                | DatasetActionUnauthorizedError::NotFound(_),
+            ) => Ok(false),
+            Err(DatasetActionUnauthorizedError::Internal(e)) => Err(e),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependenciesUseCaseImpl {
     #[tracing::instrument(
@@ -99,12 +116,40 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
         fields(%dataset_id)
     )]
     async fn count(&self, dataset_id: &odf::DatasetID) -> Result<usize, InternalError> {
-        // No authorization filter on purpose: the count reflects the dataset's total
-        // reach, so it includes downstreams the caller cannot read
-        Ok(self
+        use tokio_stream::StreamExt;
+
+        // Downstreams the caller cannot read are counted for maintainers only:
+        // to anyone else, the count would reveal that such datasets exist
+        if self.can_maintain(dataset_id).await? {
+            return Ok(self
+                .dependency_graph_service
+                .get_downstream_dependencies_count(dataset_id)
+                .await);
+        }
+
+        let downstream_dependency_ids = self
             .dependency_graph_service
-            .get_downstream_dependencies_count(dataset_id)
-            .await)
+            .get_downstream_dependencies(dataset_id)
+            .await
+            .collect::<Vec<_>>()
+            .await;
+        if downstream_dependency_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let downstream_dependency_ids = downstream_dependency_ids
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
+
+        let readable_count = self
+            .dataset_action_authorizer
+            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetAction::Read)
+            .await?
+            .authorized_ids
+            .len();
+
+        Ok(readable_count)
     }
 }
 

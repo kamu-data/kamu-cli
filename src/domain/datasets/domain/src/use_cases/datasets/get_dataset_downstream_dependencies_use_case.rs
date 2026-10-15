@@ -21,8 +21,9 @@ pub trait GetDatasetDownstreamDependenciesUseCase: Send + Sync {
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<DatasetDependency>, GetDatasetDownstreamDependenciesError>;
 
-    /// Counts direct downstream dependencies, including the ones the caller
-    /// cannot read
+    /// Counts direct downstream dependencies. A caller allowed to maintain the
+    /// dataset gets all of them, including the ones they cannot read; anyone
+    /// else gets only the readable ones
     async fn count(&self, dataset_id: &odf::DatasetID) -> Result<usize, InternalError>;
 }
 

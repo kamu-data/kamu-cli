@@ -598,7 +598,7 @@ async fn test_metadata_blocks_in_range() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_current_downstream_dependencies_count_includes_inaccessible() {
+async fn test_current_downstream_dependencies_count_hides_private_from_readers() {
     let harness = DatasetMetadataHarness::new().await;
 
     let create_root_result = harness
@@ -613,12 +613,12 @@ async fn test_current_downstream_dependencies_count_includes_inaccessible() {
 
     let root_id = &create_root_result.dataset_handle.id;
 
-    // The private downstream is hidden from the list, but still counted
+    // Another account sees neither the private downstream nor its count
     assert_eq!(
         harness
             .get_downstream_dependencies(&harness.catalog_other_account, root_id)
             .await,
-        (vec!["bar".to_string()], 2)
+        (vec!["bar".to_string()], 1)
     );
     assert_eq!(
         harness

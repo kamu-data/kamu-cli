@@ -18,7 +18,7 @@ Recommendation: for ease of reading, use the following format:
 - `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
   a `blockHash` field
 - GraphQL: `DatasetMetadata.currentDownstreamDependenciesCount` returns the number of direct downstream
-  datasets, including private ones the viewer cannot read
+  datasets. Accounts that can maintain the dataset also get the private ones they cannot read
 ### Changed
 - SQL `to_table()` only reads datasets the query lists, like plain table references
 - `ChangelogStream` ingest requires `datafusion.execution.target_partitions` = 1 in the ingest configuration

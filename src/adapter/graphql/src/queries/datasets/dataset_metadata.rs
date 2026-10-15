@@ -200,7 +200,8 @@ impl<'a> DatasetMetadata<'a> {
         Ok(downstream_dependencies)
     }
 
-    /// Number of direct downstream dependencies, including inaccessible ones
+    /// Number of direct downstream dependencies. Includes inaccessible ones only
+    /// for accounts that can maintain the dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_downstream_dependencies_count, skip_all)]
     async fn current_downstream_dependencies_count(&self, ctx: &Context<'_>) -> Result<usize> {
         let get_dataset_downstream_dependencies_use_case =

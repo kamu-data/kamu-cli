@@ -2791,7 +2791,8 @@ type DatasetMetadata {
 	"""
 	currentDownstreamDependencies: [DatasetAccessResult!]!
 	"""
-	Number of direct downstream dependencies, including inaccessible ones
+	Number of direct downstream dependencies. Includes inaccessible ones only
+	for accounts that can maintain the dataset
 	"""
 	currentDownstreamDependenciesCount: Int!
 	"""
