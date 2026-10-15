@@ -200,6 +200,19 @@ impl<'a> DatasetMetadata<'a> {
         Ok(downstream_dependencies)
     }
 
+    /// Number of direct downstream dependencies, including inaccessible ones
+    #[tracing::instrument(level = "info", name = DatasetMetadata_current_downstream_dependencies_count, skip_all)]
+    async fn current_downstream_dependencies_count(&self, ctx: &Context<'_>) -> Result<usize> {
+        let get_dataset_downstream_dependencies_use_case =
+            from_catalog_n!(ctx, dyn GetDatasetDownstreamDependenciesUseCase);
+
+        let count = get_dataset_downstream_dependencies_use_case
+            .count(self.readable_state.dataset_id())
+            .await?;
+
+        Ok(count)
+    }
+
     /// Current polling source used by the root dataset
     #[tracing::instrument(level = "info", name = DatasetMetadata_current_polling_source, skip_all)]
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {

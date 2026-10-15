@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 
@@ -90,6 +90,21 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
         }
 
         Ok(downstream_dependencies)
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = "GetDatasetDownstreamDependenciesUseCase::count",
+        skip_all,
+        fields(%dataset_id)
+    )]
+    async fn count(&self, dataset_id: &odf::DatasetID) -> Result<usize, InternalError> {
+        // No authorization filter on purpose: the count reflects the dataset's total
+        // reach, so it includes downstreams the caller cannot read
+        Ok(self
+            .dependency_graph_service
+            .get_downstream_dependencies_count(dataset_id)
+            .await)
     }
 }
 

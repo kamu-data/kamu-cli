@@ -2791,6 +2791,10 @@ type DatasetMetadata {
 	"""
 	currentDownstreamDependencies: [DatasetAccessResult!]!
 	"""
+	Number of direct downstream dependencies, including inaccessible ones
+	"""
+	currentDownstreamDependenciesCount: Int!
+	"""
 	Current polling source used by the root dataset
 	"""
 	currentPollingSource: SetPollingSource

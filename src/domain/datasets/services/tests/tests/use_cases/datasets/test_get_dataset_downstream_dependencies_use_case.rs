@@ -252,6 +252,14 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
         )],
         *actual_res,
     );
+
+    // The count includes the downstreams the caller cannot read
+    let count = harness
+        .use_case
+        .count(&alice_root_2_dataset_handle.id)
+        .await
+        .unwrap();
+    assert_eq!(count, 3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
