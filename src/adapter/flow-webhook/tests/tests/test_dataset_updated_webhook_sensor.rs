@@ -86,7 +86,7 @@ async fn test_sensor_activation_with_receiver_up_to_date_does_nothing() {
 
 #[test_log::test(tokio::test)]
 async fn test_sensor_activation_for_dataset_without_head_does_nothing() {
-    // A deleted dataset loses its head, while its subscription's trigger remains
+    // A deleted dataset loses its head before its subscription's trigger is removed
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
             delivered_head: Some(LinearDatasetHistory::head(1)),

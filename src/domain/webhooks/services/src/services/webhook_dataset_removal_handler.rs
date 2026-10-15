@@ -14,8 +14,10 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_webhooks::{
     MESSAGE_CONSUMER_KAMU_WEBHOOK_DATASET_REMOVAL_HANDLER,
+    MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
     WebhookSubscription,
     WebhookSubscriptionEventStore,
+    WebhookSubscriptionLifecycleMessage,
     WebhookWatermarkRepository,
 };
 use messaging_outbox::*;
@@ -36,6 +38,7 @@ use messaging_outbox::*;
 pub struct WebhookDatasetRemovalHandler {
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>,
+    outbox: Arc<dyn Outbox>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,6 +101,20 @@ impl MessageConsumerT<DatasetLifecycleMessage> for WebhookDatasetRemovalHandler 
                 for subscription_id in &subscription_ids {
                     self.webhook_watermark_repo
                         .remove_watermarks(*subscription_id)
+                        .await?;
+                }
+
+                // Same as a removal by the user: their triggers, flows and sensors go too
+                for subscription in &subscriptions {
+                    self.outbox
+                        .post_message(
+                            MESSAGE_PRODUCER_KAMU_WEBHOOK_SUBSCRIPTION_SERVICE,
+                            WebhookSubscriptionLifecycleMessage::deleted(
+                                subscription.id(),
+                                subscription.dataset_id().cloned(),
+                                subscription.event_types().to_vec(),
+                            ),
+                        )
                         .await?;
                 }
 

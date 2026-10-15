@@ -171,9 +171,9 @@ deliver to a local receiver and can never reach an external host. It has no conf
 accepts only the non-test types.
 
 **Dataset deletion.** `WebhookDatasetRemovalHandler` consumes `DatasetLifecycleMessage::Deleted`
-and records `Removed` on each of the dataset's subscriptions directly on the aggregate, not through
-`RemoveWebhookSubscriptionUseCase`, so no `Deleted` lifecycle message is posted for them
-([§8](#8-flow-integration)).
+and, in the same transaction, records `Removed` on each of the dataset's subscriptions, removes
+their watermarks and posts a `Deleted` lifecycle message for each, as
+`RemoveWebhookSubscriptionUseCase` does, so their flows are cleaned up ([§8](#8-flow-integration)).
 
 ---
 
@@ -408,9 +408,9 @@ transaction, and repairs triggers that do not match their subscription:
 
 Every other combination, and `Removed` subscriptions, are left alone.
 
-**After a dataset is deleted**, its subscriptions are `Removed` without a `Deleted` message
-([§4](#4-subscription-lifecycle)), and the dataset's own scope removal matches only the
-`Dataset` scope, so the subscriptions' triggers, sensors and process states are not removed.
+**After a dataset is deleted**, the dataset's own scope removal matches only the `Dataset` scope;
+the subscriptions' scopes are removed through the `Deleted` messages the removal handler posts
+([§4](#4-subscription-lifecycle)).
 
 ---
 

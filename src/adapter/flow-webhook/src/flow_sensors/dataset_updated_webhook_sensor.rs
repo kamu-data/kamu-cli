@@ -220,7 +220,7 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
             .await
         {
             Ok(head) => head,
-            // Triggers of a deleted dataset's subscriptions outlive it
+            // A deleted dataset's triggers stay until its subscriptions' removal is handled
             Err(GetDatasetReferenceError::NotFound(_)) => {
                 tracing::warn!(dataset_id = %self.dataset_id, "Dataset has no head, nothing to catch up");
                 return Ok(());
