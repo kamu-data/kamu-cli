@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 
@@ -24,6 +24,23 @@ pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
+}
+
+impl GetDatasetDownstreamDependenciesUseCaseImpl {
+    async fn can_maintain(&self, dataset_id: &odf::DatasetID) -> Result<bool, InternalError> {
+        match self
+            .dataset_action_authorizer
+            .check_action_allowed(dataset_id, DatasetAction::Maintain)
+            .await
+        {
+            Ok(()) => Ok(true),
+            Err(
+                DatasetActionUnauthorizedError::Access(_)
+                | DatasetActionUnauthorizedError::NotFound(_),
+            ) => Ok(false),
+            Err(DatasetActionUnauthorizedError::Internal(e)) => Err(e),
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -90,6 +107,49 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
         }
 
         Ok(downstream_dependencies)
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = "GetDatasetDownstreamDependenciesUseCase::count",
+        skip_all,
+        fields(%dataset_id)
+    )]
+    async fn count(&self, dataset_id: &odf::DatasetID) -> Result<usize, InternalError> {
+        use tokio_stream::StreamExt;
+
+        // Downstreams the caller cannot read are counted for maintainers only:
+        // to anyone else, the count would reveal that such datasets exist
+        if self.can_maintain(dataset_id).await? {
+            return Ok(self
+                .dependency_graph_service
+                .get_downstream_dependencies_count(dataset_id)
+                .await);
+        }
+
+        let downstream_dependency_ids = self
+            .dependency_graph_service
+            .get_downstream_dependencies(dataset_id)
+            .await
+            .collect::<Vec<_>>()
+            .await;
+        if downstream_dependency_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let downstream_dependency_ids = downstream_dependency_ids
+            .into_iter()
+            .map(Cow::Owned)
+            .collect::<Vec<_>>();
+
+        let readable_count = self
+            .dataset_action_authorizer
+            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetAction::Read)
+            .await?
+            .authorized_ids
+            .len();
+
+        Ok(readable_count)
     }
 }
 

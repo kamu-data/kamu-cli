@@ -132,6 +132,36 @@ async fn test_service_queries() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_get_downstream_dependencies_count() {
+    let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
+    harness.create_single_tenant_graph().await;
+
+    // Only direct downstreams are counted, not foo-bar-foo-baz
+    assert_eq!(harness.get_downstream_dependencies_count("foo").await, 2);
+    assert_eq!(harness.get_downstream_dependencies_count("bar").await, 1);
+    assert_eq!(
+        harness.get_downstream_dependencies_count("foo-bar").await,
+        1
+    );
+    assert_eq!(
+        harness
+            .get_downstream_dependencies_count("foo-bar-foo-baz")
+            .await,
+        0
+    );
+
+    let unknown_dataset_id = odf::DatasetID::new_seeded_ed25519(b"unknown");
+    assert_eq!(
+        harness
+            .get_downstream_dependencies_count_by_id(&unknown_dataset_id)
+            .await,
+        0
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_service_new_datasets() {
     let harness = DependencyGraphHarness::new(TenancyConfig::SingleTenant);
     harness.create_single_tenant_graph().await;
@@ -792,6 +822,18 @@ impl DependencyGraphHarness {
 
         res.sort();
         res
+    }
+
+    async fn get_downstream_dependencies_count(&self, dataset_name: &str) -> usize {
+        let dataset_id = self.dataset_id_by_name(dataset_name).await;
+        self.get_downstream_dependencies_count_by_id(&dataset_id)
+            .await
+    }
+
+    async fn get_downstream_dependencies_count_by_id(&self, dataset_id: &odf::DatasetID) -> usize {
+        self.dependency_graph_service
+            .get_downstream_dependencies_count(dataset_id)
+            .await
     }
 
     async fn get_recursive_downstream_dependencies(&self, dataset_names: Vec<&str>) -> Vec<String> {

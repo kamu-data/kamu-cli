@@ -190,20 +190,22 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
     //   │  bob/root-3  │
     //   └──────────────┘
     let harness = GetDatasetDownstreamDependenciesUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_dataset_ids_by_allowance(
-            DatasetAction::Read,
-            1,
-            [
-                alice_root_1_dataset_handle.id.clone(),
-                alice_root_2_dataset_handle.id.clone(),
-                bob_root_3_dataset_handle.id.clone(),
-                alice_public_derived_4_dataset_handle.id.clone(),
-                // Excluded:
-                // alice_private_derived_5_dataset_handle.id.clone(),
-                // bob_private_derived_6_dataset_handle.id.clone(),
-            ]
-            .into(),
-        ),
+        MockDatasetActionAuthorizer::new()
+            .make_expect_classify_dataset_ids_by_allowance(
+                DatasetAction::Read,
+                2,
+                [
+                    alice_root_1_dataset_handle.id.clone(),
+                    alice_root_2_dataset_handle.id.clone(),
+                    bob_root_3_dataset_handle.id.clone(),
+                    alice_public_derived_4_dataset_handle.id.clone(),
+                    // Excluded:
+                    // alice_private_derived_5_dataset_handle.id.clone(),
+                    // bob_private_derived_6_dataset_handle.id.clone(),
+                ]
+                .into(),
+            )
+            .expect_check_maintain_dataset(&alice_root_2_dataset_handle.id, 1, false),
         [alice.clone(), bob.clone()],
     )
     .await;
@@ -252,6 +254,64 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
         )],
         *actual_res,
     );
+
+    // Not a maintainer of the dataset: the count does not reveal the private
+    // downstreams either
+    let count = harness
+        .use_case
+        .count(&alice_root_2_dataset_handle.id)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_maintainer_counts_inaccessible_downstream_dependencies() {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    use odf::metadata::testing::handle;
+
+    let alice_root_dataset_handle = handle(&alice, &"root", odf::DatasetKind::Root);
+    let alice_derived_dataset_handle = handle(&alice, &"derived", odf::DatasetKind::Derivative);
+    let bob_private_derived_dataset_handle =
+        handle(&bob, &"private-derived", odf::DatasetKind::Derivative);
+
+    // No access check of the downstreams: a maintainer gets all of them
+    let harness = GetDatasetDownstreamDependenciesUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(
+            &alice_root_dataset_handle.id,
+            1,
+            true,
+        ),
+        [alice.clone(), bob.clone()],
+    )
+    .await;
+
+    harness
+        .create_root_dataset(alice_root_dataset_handle.clone())
+        .await;
+    harness
+        .create_derived_dataset(
+            alice_derived_dataset_handle,
+            vec![alice_root_dataset_handle.id.clone()],
+        )
+        .await;
+    harness
+        .create_derived_dataset(
+            bob_private_derived_dataset_handle,
+            vec![alice_root_dataset_handle.id.clone()],
+        )
+        .await;
+
+    let count = harness
+        .use_case
+        .count(&alice_root_dataset_handle.id)
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
