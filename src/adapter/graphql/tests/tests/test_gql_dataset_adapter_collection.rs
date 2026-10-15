@@ -388,7 +388,7 @@ async fn test_collection_extra_data() {
         }])
     );
 
-    assert_eq!(harness.get_metadata_chain_len(&did).await, 8);
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 6);
 
     // Redundant add does not produce a new event
     harness
@@ -406,7 +406,7 @@ async fn test_collection_extra_data() {
         )
         .await;
 
-    assert_eq!(harness.get_metadata_chain_len(&did).await, 8);
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 6);
 
     // Move without changing anything does not produce a new event
     harness
@@ -422,7 +422,7 @@ async fn test_collection_extra_data() {
         )
         .await;
 
-    assert_eq!(harness.get_metadata_chain_len(&did).await, 8);
+    assert_eq!(harness.get_metadata_chain_len(&did).await, 6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

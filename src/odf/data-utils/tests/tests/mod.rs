@@ -10,5 +10,6 @@
 #![cfg(feature = "datafusion")]
 
 mod test_assert_not_null;
+mod test_changelog;
 mod test_cmp;
 mod test_schema;

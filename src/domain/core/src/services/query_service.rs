@@ -345,6 +345,11 @@ impl From<datafusion::error::DataFusionError> for QueryError {
                 // errors
                 Self::BadQuery(BadQueryError::new(BadQueryErrorSource::Collection(errors)))
             }
+            // Errors raised by our table functions (e.g. `to_table()`) keep their meaning
+            DFError::External(inner) => match inner.downcast::<QueryError>() {
+                Ok(query_error) => *query_error,
+                Err(inner) => Self::Internal(DFError::External(inner).int_err()),
+            },
             // TODO: Handle Shared and Collection errors
             DFError::ArrowError(_, _)
             | DFError::Ffi(_)
@@ -357,7 +362,6 @@ impl From<datafusion::error::DataFusionError> for QueryError {
             | DFError::Execution(_)
             | DFError::ExecutionJoin(_)
             | DFError::ResourcesExhausted(_)
-            | DFError::External(_)
             | DFError::Substrait(_) => Self::Internal(value.int_err()),
         }
     }

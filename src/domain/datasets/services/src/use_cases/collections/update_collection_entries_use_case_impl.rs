@@ -156,25 +156,21 @@ impl UpdateCollectionEntriesUseCaseImpl {
         Ok(diff)
     }
 
-    fn build_data_batches(
+    /// Serializes the diff into NDJSON, keeping the order of operations: the changelog
+    /// stream assigns offsets in record order
+    fn build_data_batch(
         &self,
         entries: Vec<(Op, CollectionEntryRecord)>,
-    ) -> Result<Vec<bytes::Bytes>, UpdateCollectionEntriesUseCaseError> {
-        // TODO: PERF: FIXME: Writing each operation in a different block to work around
-        //       changelog sorting issue.
-        //       See: https://github.com/kamu-data/kamu-cli/issues/1228
+    ) -> Result<bytes::Bytes, UpdateCollectionEntriesUseCaseError> {
         use std::io::Write;
 
-        entries
-            .into_iter()
-            .map(|(op, entry)| {
-                let mut ndjson = Vec::<u8>::new();
-                let mut record = serde_json::to_value(entry).int_err()?;
-                record["op"] = u8::from(op).into();
-                writeln!(&mut ndjson, "{record}").int_err()?;
-                Ok(bytes::Bytes::from_owner(ndjson))
-            })
-            .collect()
+        let mut ndjson = Vec::<u8>::new();
+        for (op, entry) in entries {
+            let mut record = serde_json::to_value(entry).int_err()?;
+            record["op"] = u8::from(op).into();
+            writeln!(&mut ndjson, "{record}").int_err()?;
+        }
+        Ok(bytes::Bytes::from_owner(ndjson))
     }
 }
 
@@ -229,17 +225,13 @@ impl UpdateCollectionEntriesUseCase for UpdateCollectionEntriesUseCaseImpl {
 
             let expected_head_value = expected_head.clone().unwrap_or_else(|| chain_head.clone());
 
-            let data_sources: Vec<_> = self
-                .build_data_batches(diff.clone())?
-                .into_iter()
-                .map(kamu_core::DataSource::Buffer)
-                .collect();
+            let data_source = kamu_core::DataSource::Buffer(self.build_data_batch(diff.clone())?);
 
             match self
                 .push_ingest_data_use_case
-                .execute_multi(
+                .execute(
                     (*collection_dataset).clone(),
-                    data_sources,
+                    data_source,
                     kamu_core::PushIngestDataUseCaseOptions {
                         source_name: None,
                         source_event_time,

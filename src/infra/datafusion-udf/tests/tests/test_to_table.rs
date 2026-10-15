@@ -81,8 +81,8 @@ async fn test_dataset_not_found() {
             "
         ))
         .await,
-        Err(DFError::External(e))
-            if e.to_string() == "Dataset not found: kamu/unknown-table"
+        Err(DFError::Plan(e))
+            if e == "to_table(): dataset 'kamu/unknown-table' not found"
     );
     // ID
     let not_found_table_dataset_id = odf::DatasetID::new_generated_ed25519().1;
@@ -94,8 +94,8 @@ async fn test_dataset_not_found() {
             ",
         ))
         .await,
-        Err(DFError::External(e))
-            if e.to_string() == format!("Dataset not found: {not_found_table_dataset_id}")
+        Err(DFError::Plan(e))
+            if e == format!("to_table(): dataset '{not_found_table_dataset_id}' not found")
     );
 }
 
@@ -114,8 +114,8 @@ async fn test_dataset_unauthorized() {
             "
         ))
         .await,
-        Err(DFError::External(e))
-            if e.to_string() == "Dataset not found: kamu/unauthorized-table"
+        Err(DFError::Plan(e))
+            if e == "to_table(): dataset 'kamu/unauthorized-table' not found"
     );
 
     // ID
@@ -128,8 +128,8 @@ async fn test_dataset_unauthorized() {
             dataset_id = *UNAUTHORIZED_TABLE_DATASET_ID
         ))
         .await,
-        Err(DFError::External(e))
-            if e.to_string() == format!("Dataset not found: {}", *UNAUTHORIZED_TABLE_DATASET_ID)
+        Err(DFError::Plan(e))
+            if e == format!("to_table(): dataset '{}' not found", *UNAUTHORIZED_TABLE_DATASET_ID)
     );
 }
 

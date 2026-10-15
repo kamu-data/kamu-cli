@@ -1358,6 +1358,204 @@ async fn test_hard_compaction_with_schema_migration() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(ingest, datafusion, compact)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_dataset_compaction_snapshot_keeps_state_for_next_ingest() {
+    let harness = CompactTestHarness::new();
+
+    let target = harness
+        .create_root_dataset_with_merge(
+            odf::metadata::MergeStrategySnapshot {
+                primary_key: vec!["city".to_string()],
+                compare_columns: None,
+            }
+            .into(),
+            vec![
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ],
+        )
+        .await;
+
+    for snapshot in [
+        "city,population\nA,1000\nB,2000\nC,3000\n",
+        "city,population\nA,1000\nB,2100\nD,4000\n",
+        "city,population\nA,1000\nB,2200\nC,3100\nD,4000\n",
+    ] {
+        harness
+            .ingest_data(snapshot.to_string(), target.clone())
+            .await;
+    }
+
+    let ledger_before = harness.ledger().await;
+    let state_before = harness.state().await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(target.clone(), CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::Success {
+            new_num_blocks: 4,
+            old_num_blocks: 6,
+            ..
+        })
+    );
+    assert!(harness.verify_dataset(target.clone()).await);
+
+    pretty_assertions::assert_eq!(ledger_before, harness.ledger().await);
+    pretty_assertions::assert_eq!(state_before, harness.state().await);
+    pretty_assertions::assert_eq!(
+        harness.state().await,
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            | B    | 2200       |
+            | C    | 3100       |
+            | D    | 4000       |
+            +------+------------+
+            "#
+        )
+        .trim()
+    );
+
+    // The next snapshot is diffed against the state projected from the compacted history
+    harness
+        .ingest_data(
+            "city,population\nA,1000\nB,2300\nE,5000\n".to_string(),
+            target.clone(),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        harness
+            .records("SELECT op, city, population FROM foo WHERE offset > 9 ORDER BY city, op")
+            .await,
+        indoc!(
+            r#"
+            +----+------+------------+
+            | op | city | population |
+            +----+------+------------+
+            | 2  | B    | 2200       |
+            | 3  | B    | 2300       |
+            | 1  | C    | 3100       |
+            | 1  | D    | 4000       |
+            | 0  | E    | 5000       |
+            +----+------+------------+
+            "#
+        )
+        .trim()
+    );
+    pretty_assertions::assert_eq!(
+        harness.state().await,
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            | B    | 2300       |
+            | E    | 5000       |
+            +------+------------+
+            "#
+        )
+        .trim()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(ingest, datafusion, compact)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_dataset_compaction_changelog_stream_keeps_state() {
+    let harness = CompactTestHarness::new();
+
+    let target = harness
+        .create_root_dataset_with_merge(
+            odf::metadata::MergeStrategyChangelogStream {
+                primary_key: vec!["city".to_string()],
+            }
+            .into(),
+            vec![
+                odf::schema::DataField::i32("op"),
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ],
+        )
+        .await;
+
+    // Several changes per key within a block and across blocks
+    for changes in [
+        "op,city,population\n0,A,1000\n2,A,1000\n3,A,1100\n0,B,2000\n0,C,3000\n",
+        "op,city,population\n1,B,2000\n2,A,1100\n3,A,1200\n2,C,3000\n3,C,3100\n",
+        "op,city,population\n0,B,2100\n1,C,3100\n2,A,1200\n3,A,1300\n",
+    ] {
+        harness
+            .ingest_data(changes.to_string(), target.clone())
+            .await;
+    }
+
+    let ledger_before = harness.ledger().await;
+    let state_before = harness.state().await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(target.clone(), CompactionOptions::default())
+            .await,
+        Ok(CompactionResult::Success {
+            new_num_blocks: 4,
+            old_num_blocks: 6,
+            ..
+        })
+    );
+    assert!(harness.verify_dataset(target.clone()).await);
+
+    pretty_assertions::assert_eq!(ledger_before, harness.ledger().await);
+    pretty_assertions::assert_eq!(state_before, harness.state().await);
+    pretty_assertions::assert_eq!(
+        harness.state().await,
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1300       |
+            | B    | 2100       |
+            +------+------------+
+            "#
+        )
+        .trim()
+    );
+
+    // Changes after compaction apply on top of the compacted history
+    harness
+        .ingest_data(
+            "op,city,population\n2,B,2100\n3,B,2200\n0,C,3200\n".to_string(),
+            target.clone(),
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        harness.state().await,
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1300       |
+            | B    | 2200       |
+            | C    | 3200       |
+            +------+------------+
+            "#
+        )
+        .trim()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct CompactTestHarness {
     _temp_dir: tempfile::TempDir,
     did_generator: Arc<dyn DidGenerator>,
@@ -1366,6 +1564,7 @@ struct CompactTestHarness {
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
     ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
+    query_svc: Arc<dyn QueryService>,
     transform_helper: TransformTestHelper,
     verification_svc: Arc<dyn VerificationService>,
     current_date_time: DateTime<Utc>,
@@ -1404,6 +1603,9 @@ impl CompactTestHarness {
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()
+            .add::<QueryServiceImpl>()
+            .add::<SessionContextBuilder>()
+            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add_value(EngineConfigDatafusionEmbeddedIngest::default())
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
@@ -1439,6 +1641,7 @@ impl CompactTestHarness {
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
             ingest_data_use_case: catalog.get_one().unwrap(),
+            query_svc: catalog.get_one().unwrap(),
             verification_svc: catalog.get_one().unwrap(),
             transform_helper,
             current_date_time,
@@ -1495,6 +1698,9 @@ impl CompactTestHarness {
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
             .add::<CompactionPlannerImpl>()
             .add::<CompactionExecutorImpl>()
+            .add::<QueryServiceImpl>()
+            .add::<SessionContextBuilder>()
+            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
             .add_value(CurrentAccountSubject::new_test())
             .build();
 
@@ -1508,6 +1714,7 @@ impl CompactTestHarness {
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
             ingest_data_use_case: catalog.get_one().unwrap(),
+            query_svc: catalog.get_one().unwrap(),
             transform_helper,
             verification_svc: catalog.get_one().unwrap(),
             current_date_time,
@@ -1628,6 +1835,62 @@ impl CompactTestHarness {
             .await;
 
         ResolvedDataset::from_stored(&store_result, &dataset_alias)
+    }
+
+    async fn create_root_dataset_with_merge(
+        &self,
+        merge: odf::metadata::MergeStrategy,
+        fields: Vec<odf::schema::DataField>,
+    ) -> ResolvedDataset {
+        let dataset_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+        let store_result = self
+            .store_dataset(
+                MetadataFactory::dataset_snapshot()
+                    .name("foo")
+                    .kind(odf::DatasetKind::Root)
+                    .push_event(
+                        MetadataFactory::add_push_source()
+                            .read(odf::metadata::ReadStepCsv {
+                                header: Some(true),
+                                schema: Some(odf::schema::DataSchema::new(fields)),
+                                ..odf::metadata::ReadStepCsv::default()
+                            })
+                            .merge(merge)
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await;
+
+        ResolvedDataset::from_stored(&store_result, &dataset_alias)
+    }
+
+    /// Result of the query, formatted as a table
+    async fn records(&self, sql: &str) -> String {
+        let df = self
+            .query_svc
+            .sql_statement(sql, QueryOptions::default())
+            .await
+            .unwrap()
+            .df;
+
+        let batches = df.collect().await.unwrap();
+        datafusion::arrow::util::pretty::pretty_format_batches(&batches)
+            .unwrap()
+            .to_string()
+    }
+
+    /// Changelog of the `foo` dataset in offset order
+    async fn ledger(&self) -> String {
+        self.records("SELECT offset, op, city, population FROM foo ORDER BY offset")
+            .await
+    }
+
+    /// State projected from the changelog of the `foo` dataset
+    async fn state(&self) -> String {
+        self.records("SELECT city, population FROM to_table(foo) ORDER BY city")
+            .await
     }
 
     async fn dataset_data_helper(&self, dataset_ref: &odf::DatasetRef) -> DatasetDataHelper {

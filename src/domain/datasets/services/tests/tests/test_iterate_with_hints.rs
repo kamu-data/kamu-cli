@@ -15,7 +15,7 @@ use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use odf::metadata::testing::MetadataFactory;
 
-use super::use_cases::dataset_base_use_case_harness::{
+use super::use_cases::datasets::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
     DatasetBaseUseCaseHarnessOpts,
 };
