@@ -20,7 +20,12 @@ Recommendation: for ease of reading, use the following format:
 ### Changed
 - SQL `to_table()` only reads datasets the query lists, like plain table references
 - `ChangelogStream` ingest requires `datafusion.execution.target_partitions` = 1 in the ingest configuration
+- Webhooks: `old_hash` in `DATASET.REF.UPDATED` payloads is the last head the receiver accepted, so a
+  delivery after a failed one covers the missed range. After upgrading, a subscription may get one delivery
+  covering changes since its last accepted one
 ### Fixed
+- Webhooks deliver dataset updates missed right after subscribing, while paused or unreachable, or while
+  the server was down, as one delivery once the subscription is active again
 - The local disk cache of S3 metadata blocks writes entries atomically, so a failed or interrupted download
   no longer leaves a truncated block that breaks the node until the cache is cleared
 - `ChangelogStream` keeps the input order of records, so several changes to one key in a chunk produce the
