@@ -23,18 +23,22 @@ use kamu_datasets::{
     GetDatasetReferenceError,
 };
 use kamu_flow_system::{self as fs, FlowSensorSensitizationError};
+use kamu_webhooks::WebhookSubscriptionID;
 
 use crate::{
+    DatasetRefUpdatedWatermarkProvider,
     FLOW_TYPE_WEBHOOK_DELIVER,
     FlowScopeSubscription,
-    WebhookDeliveryBaseResolver,
+    HeadRelation,
     dataset_changes_between,
+    relation_between_heads,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetUpdatedWebhookSensor {
     webhook_flow_scope: fs::FlowScope,
+    subscription_id: WebhookSubscriptionID,
     dataset_id: odf::DatasetID,
     state: Arc<Mutex<State>>,
 }
@@ -59,10 +63,10 @@ impl State {
 
 impl DatasetUpdatedWebhookSensor {
     pub fn new(webhook_flow_scope: fs::FlowScope, reactive_rule: fs::ReactiveRule) -> Self {
+        let subscription_scope = FlowScopeSubscription::new(&webhook_flow_scope);
         Self {
-            dataset_id: FlowScopeSubscription::new(&webhook_flow_scope)
-                .maybe_dataset_id()
-                .unwrap(),
+            subscription_id: subscription_scope.subscription_id(),
+            dataset_id: subscription_scope.maybe_dataset_id().unwrap(),
             webhook_flow_scope,
             state: Arc::new(Mutex::new(State::new(reactive_rule))),
         }
@@ -109,24 +113,19 @@ impl DatasetUpdatedWebhookSensor {
         let Some(caught_up_head) = self.caught_up_head() else {
             return Ok(false);
         };
-        if *new_head == caught_up_head {
-            return Ok(true);
-        }
-
-        // The usual case, an update past the caught-up head, is checked first:
-        // its walk back through history is the short one
-        let covered = match self
-            .changes_between(catalog, &caught_up_head, new_head)
-            .await?
+        let dataset_increment_query_service = catalog
+            .get_one::<dyn DatasetIncrementQueryService>()
+            .unwrap();
+        let covered = match relation_between_heads(
+            dataset_increment_query_service.as_ref(),
+            &self.dataset_id,
+            &caught_up_head,
+            new_head,
+        )
+        .await?
         {
-            fs::ResourceChanges::NewData(_) => false,
-            fs::ResourceChanges::Breaking => match self
-                .changes_between(catalog, new_head, &caught_up_head)
-                .await?
-            {
-                fs::ResourceChanges::NewData(_) => true,
-                fs::ResourceChanges::Breaking => false,
-            },
+            HeadRelation::Same | HeadRelation::After => true,
+            HeadRelation::Before | HeadRelation::Diverged => false,
         };
         if !covered {
             self.set_caught_up_head(None);
@@ -201,9 +200,11 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
     ) -> Result<(), InternalError> {
         tracing::info!(?self.webhook_flow_scope, "DatasetUpdatedWebhookSensor activated");
 
-        let delivery_base_resolver = catalog.get_one::<WebhookDeliveryBaseResolver>().unwrap();
-        let Some(delivery_base) = delivery_base_resolver
-            .resolve(&self.webhook_flow_scope)
+        let watermark_provider = catalog
+            .get_one::<DatasetRefUpdatedWatermarkProvider>()
+            .unwrap();
+        let Some(delivered_head) = watermark_provider
+            .find_delivered_head(self.subscription_id)
             .await?
         else {
             tracing::info!("No delivered head known, nothing to catch up");
@@ -223,21 +224,23 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
             }
             Err(GetDatasetReferenceError::Internal(e)) => return Err(e),
         };
-        if head == delivery_base {
+        if head == delivered_head {
             tracing::info!("Receiver is up to date, nothing to catch up");
             return Ok(());
         }
 
-        tracing::info!(%delivery_base, %head, "Catching up on undelivered changes");
+        tracing::info!(%delivered_head, %head, "Catching up on undelivered changes");
         let update = fs::FlowActivationCauseResourceUpdate {
             activation_time,
-            changes: self.changes_between(catalog, &delivery_base, &head).await?,
+            changes: self
+                .changes_between(catalog, &delivered_head, &head)
+                .await?,
             resource_type: DATASET_RESOURCE_TYPE.to_string(),
             details: serde_json::to_value(DatasetResourceUpdateDetails {
                 dataset_id: self.dataset_id.clone(),
                 source: DatasetUpdateSource::ExternallyDetectedChange,
                 new_head: head.clone(),
-                old_head_maybe: Some(delivery_base),
+                old_head_maybe: Some(delivered_head),
             })
             .int_err()?,
         };

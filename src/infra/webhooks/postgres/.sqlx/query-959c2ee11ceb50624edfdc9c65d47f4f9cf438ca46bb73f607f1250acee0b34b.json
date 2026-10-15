@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT watermark as \"watermark!: serde_json::Value\"\n                FROM webhook_watermarks\n                WHERE subscription_id = $1 AND event_type = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "watermark!: serde_json::Value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "webhook_watermarks",
+            "name": "watermark"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "959c2ee11ceb50624edfdc9c65d47f4f9cf438ca46bb73f607f1250acee0b34b"
+}

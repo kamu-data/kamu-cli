@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT watermark as \"watermark!: serde_json::Value\"\n                FROM webhook_watermarks\n                WHERE subscription_id = $1 AND event_type = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "watermark!: serde_json::Value",
+        "ordinal": 0,
+        "type_info": "Null",
+        "origin": {
+          "Table": {
+            "table": "webhook_watermarks",
+            "name": "watermark"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "959c2ee11ceb50624edfdc9c65d47f4f9cf438ca46bb73f607f1250acee0b34b"
+}

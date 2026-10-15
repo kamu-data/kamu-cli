@@ -34,7 +34,6 @@ pub(crate) async fn new_webhook_subscription(catalog: &dill::Catalog) -> Webhook
         None,
         vec![WebhookEventTypeCatalog::test()],
         WebhookSubscriptionSecret::try_new(None, &SecretString::from("some-secret")).unwrap(),
-        None,
     );
 
     webhook_subscription

@@ -7,15 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -25,16 +16,23 @@ use kamu_adapter_task_webhook as atw;
 use kamu_datasets::{DatasetEntryService, DatasetIncrementQueryService};
 use kamu_flow_system as fs;
 use kamu_task_system as ts;
-use kamu_webhooks::{ResultIntoInternal, WebhookEventType, WebhookEventTypeCatalog};
+use kamu_webhooks::{
+    ResultIntoInternal,
+    WebhookEventType,
+    WebhookEventTypeCatalog,
+    WebhookWatermark,
+};
 
 use crate::{
+    DatasetRefUpdatedWatermark,
+    DatasetRefUpdatedWatermarkProvider,
     DatasetUpdatedWebhookSensor,
     FLOW_TYPE_WEBHOOK_DELIVER,
     FlowScopeSubscription,
+    HeadRelation,
     WEBHOOK_DATASET_REF_UPDATED_VERSION,
     WebhookDatasetRefUpdatedPayload,
-    WebhookDeliveryBaseResolver,
-    dataset_changes_between,
+    relation_between_heads,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +47,13 @@ pub struct FlowControllerWebhookDeliver {
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
     dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
-    delivery_base_resolver: Arc<WebhookDeliveryBaseResolver>,
+    watermark_provider: Arc<DatasetRefUpdatedWatermarkProvider>,
+}
+
+/// Webhook payload with the watermark to record once the receiver accepts it
+struct WebhookDeliveryContent {
+    payload: serde_json::Value,
+    watermark: Option<WebhookWatermark>,
 }
 
 impl FlowControllerWebhookDeliver {
@@ -58,7 +62,7 @@ impl FlowControllerWebhookDeliver {
         event_type: &WebhookEventType,
         maybe_dataset_id: Option<&odf::DatasetID>,
         flow: &fs::FlowState,
-    ) -> Result<serde_json::Value, InternalError> {
+    ) -> Result<WebhookDeliveryContent, InternalError> {
         if event_type.as_ref() == WebhookEventTypeCatalog::DATASET_REF_UPDATED {
             let input_dataset_id = maybe_dataset_id.ok_or_else(|| {
                 InternalError::new(format!(
@@ -79,7 +83,7 @@ impl FlowControllerWebhookDeliver {
         &self,
         flow: &fs::FlowState,
         input_dataset_id: &odf::DatasetID,
-    ) -> Result<serde_json::Value, InternalError> {
+    ) -> Result<WebhookDeliveryContent, InternalError> {
         // Find out who is the owner of the dataset
         let dataset_entry = self
             .dataset_entry_service
@@ -136,26 +140,31 @@ impl FlowControllerWebhookDeliver {
 
         // Start from the head the receiver already has, so that changes lost with a
         // failed delivery are covered by this one
-        if let Some(delivery_base) = self
-            .delivery_base_resolver
-            .resolve(&flow.flow_binding.scope)
+        let subscription_id =
+            FlowScopeSubscription::new(&flow.flow_binding.scope).subscription_id();
+        if let Some(delivered_head) = self
+            .watermark_provider
+            .find_delivered_head(subscription_id)
             .await?
-            && summary.old_head_maybe.as_ref() != Some(&delivery_base)
+            && summary.old_head_maybe.as_ref() != Some(&delivered_head)
         {
-            if delivery_base != summary.new_head {
-                match dataset_changes_between(
-                    self.dataset_increment_query_service.as_ref(),
-                    input_dataset_id,
-                    &delivery_base,
-                    &summary.new_head,
-                )
-                .await?
-                {
-                    fs::ResourceChanges::Breaking => summary.is_breaking_change = true,
-                    fs::ResourceChanges::NewData(_) => {}
+            match relation_between_heads(
+                self.dataset_increment_query_service.as_ref(),
+                input_dataset_id,
+                &delivered_head,
+                &summary.new_head,
+            )
+            .await?
+            {
+                HeadRelation::Before => summary.old_head_maybe = Some(delivered_head),
+                HeadRelation::Diverged => {
+                    summary.old_head_maybe = Some(delivered_head);
+                    summary.is_breaking_change = true;
                 }
+                // The receiver already has these changes: a watermark seeded from the
+                // current head may be past the deliveries queued before it
+                HeadRelation::Same | HeadRelation::After => {}
             }
-            summary.old_head_maybe = Some(delivery_base);
         }
 
         // Build webhook payload
@@ -170,7 +179,15 @@ impl FlowControllerWebhookDeliver {
         })
         .int_err()?;
 
-        Ok(webhook_payload)
+        Ok(WebhookDeliveryContent {
+            payload: webhook_payload,
+            watermark: Some(
+                DatasetRefUpdatedWatermark {
+                    head: summary.new_head,
+                }
+                .into(),
+            ),
+        })
     }
 }
 
@@ -238,14 +255,15 @@ impl fs::FlowController for FlowControllerWebhookDeliver {
         let event_type = subscription_scope.event_type();
         let maybe_dataset_id = subscription_scope.maybe_dataset_id();
 
-        let webhook_payload = self
+        let content = self
             .build_payload(&event_type, maybe_dataset_id.as_ref(), flow)
             .await?;
 
         Ok(atw::LogicalPlanWebhookDeliver {
             webhook_subscription_id: subscription_id,
             webhook_event_type: event_type,
-            webhook_payload,
+            webhook_payload: content.payload,
+            webhook_watermark: content.watermark,
         }
         .into_logical_plan())
     }

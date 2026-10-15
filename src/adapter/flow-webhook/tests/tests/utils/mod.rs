@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_webhook_watermarks;
 mod linear_dataset_history;
-mod webhook_delivery_history;
 
+pub(crate) use dataset_webhook_watermarks::*;
 pub(crate) use linear_dataset_history::*;
-pub(crate) use webhook_delivery_history::*;

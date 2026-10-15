@@ -83,7 +83,6 @@ kamu-task-system-services = { workspace = true }
 kamu-wakeup-listener-inmem = { workspace = true }
 kamu-webhooks = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
-kamu-webhooks-services = { workspace = true }
 messaging-outbox = { workspace = true, features = [
     "testing",
 ] }
@@ -96,7 +95,6 @@ indoc = "2"
 mockall = "0.15"
 oop = "0.0.2"
 pretty_assertions = "1"
-secrecy = "0.10"
 serde_json = { version = "1", default-features = false }
 test-log = { version = "0.2", features = [
     "trace",

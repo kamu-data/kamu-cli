@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM webhook_watermarks\n                WHERE subscription_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "f9a8d3a82d74d7fd20a5bb606b5092cdddf0324f17d2393eb65a56ef5afaf256"
+}

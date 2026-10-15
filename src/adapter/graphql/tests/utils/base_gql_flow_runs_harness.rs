@@ -29,7 +29,10 @@ use kamu_task_system::*;
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_webhooks::*;
-use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_inmem::{
+    InMemoryWebhookSubscriptionEventStore,
+    InMemoryWebhookWatermarkRepository,
+};
 use messaging_outbox::{Outbox, OutboxExt, register_message_dispatcher};
 use time_source::SystemTimeSource;
 use wakeup_listener::WakeupListenerConfig;
@@ -111,6 +114,7 @@ impl BaseGQLFlowRunsHarness {
             .add::<DeleteDatasetUseCaseImpl>();
 
         b.add::<InMemoryWebhookSubscriptionEventStore>()
+            .add::<InMemoryWebhookWatermarkRepository>()
             .add_value(WebhooksConfig::default());
 
         kamu_flow_system_services::register_dependencies(&mut b);

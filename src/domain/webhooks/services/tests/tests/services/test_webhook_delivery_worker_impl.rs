@@ -16,6 +16,7 @@ use kamu_webhooks::*;
 use kamu_webhooks_inmem::{
     InMemoryWebhookDeliveryRepository,
     InMemoryWebhookSubscriptionEventStore,
+    InMemoryWebhookWatermarkRepository,
 };
 use kamu_webhooks_services::*;
 use url::Url;
@@ -46,6 +47,7 @@ async fn test_deliver_webhook() {
             subscription_id,
             WebhookEventTypeCatalog::dataset_ref_updated(),
             serde_json::json!({"key": "value"}),
+            Some(TestWebhookDeliveryWorkerHarness::watermark()),
         )
         .await
         .unwrap();
@@ -76,6 +78,11 @@ async fn test_deliver_webhook() {
     );
 
     assert!(delivery.is_successful());
+
+    assert_eq!(
+        harness.find_watermark(subscription_id).await,
+        Some(TestWebhookDeliveryWorkerHarness::watermark())
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,6 +111,7 @@ async fn test_deliver_webhook_timeout_failure() {
             subscription_id,
             WebhookEventTypeCatalog::dataset_ref_updated(),
             serde_json::json!({"key": "value"}),
+            Some(TestWebhookDeliveryWorkerHarness::watermark()),
         )
         .await;
     assert_matches!(
@@ -137,6 +145,8 @@ async fn test_deliver_webhook_timeout_failure() {
     assert_eq!(delivery.response, None);
 
     assert!(!delivery.is_successful());
+
+    assert_eq!(harness.find_watermark(subscription_id).await, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,6 +175,7 @@ async fn test_deliver_webhook_connection_failure() {
             subscription_id,
             WebhookEventTypeCatalog::dataset_ref_updated(),
             serde_json::json!({"key": "value"}),
+            Some(TestWebhookDeliveryWorkerHarness::watermark()),
         )
         .await;
     assert_matches!(
@@ -194,6 +205,8 @@ async fn test_deliver_webhook_connection_failure() {
     assert_eq!(delivery.response, None);
 
     assert!(!delivery.is_successful());
+
+    assert_eq!(harness.find_watermark(subscription_id).await, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -224,6 +237,7 @@ async fn test_deliver_webhook_bad_status_failure() {
             subscription_id,
             WebhookEventTypeCatalog::dataset_ref_updated(),
             serde_json::json!({"key": "value"}),
+            Some(TestWebhookDeliveryWorkerHarness::watermark()),
         )
         .await;
     assert_matches!(
@@ -264,6 +278,8 @@ async fn test_deliver_webhook_bad_status_failure() {
     );
 
     assert!(!delivery.is_successful());
+
+    assert_eq!(harness.find_watermark(subscription_id).await, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -271,6 +287,7 @@ async fn test_deliver_webhook_bad_status_failure() {
 struct TestWebhookDeliveryWorkerHarness {
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
     webhook_delivery_repo: Arc<dyn WebhookDeliveryRepository>,
+    webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>,
     webhook_delivery_worker: Arc<dyn WebhookDeliveryWorker>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
 }
@@ -285,7 +302,8 @@ impl TestWebhookDeliveryWorkerHarness {
             .add_value(mock_sender)
             .bind::<dyn WebhookSender, MockWebhookSender>()
             .add::<InMemoryWebhookSubscriptionEventStore>()
-            .add::<InMemoryWebhookDeliveryRepository>();
+            .add::<InMemoryWebhookDeliveryRepository>()
+            .add::<InMemoryWebhookWatermarkRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -294,9 +312,27 @@ impl TestWebhookDeliveryWorkerHarness {
         Self {
             webhook_subscription_event_store: catalog.get_one().unwrap(),
             webhook_delivery_repo: catalog.get_one().unwrap(),
+            webhook_watermark_repo: catalog.get_one().unwrap(),
             webhook_delivery_worker: catalog.get_one().unwrap(),
             webhook_secret_generator: catalog.get_one().unwrap(),
         }
+    }
+
+    fn watermark() -> WebhookWatermark {
+        WebhookWatermark::from(serde_json::json!({"position": 1}))
+    }
+
+    async fn find_watermark(
+        &self,
+        subscription_id: WebhookSubscriptionID,
+    ) -> Option<WebhookWatermark> {
+        self.webhook_watermark_repo
+            .find_watermark(
+                subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated(),
+            )
+            .await
+            .unwrap()
     }
 
     async fn new_webhook_subscription(&self, subscription_id: WebhookSubscriptionID) {
@@ -307,7 +343,6 @@ impl TestWebhookDeliveryWorkerHarness {
             None,
             vec![WebhookEventTypeCatalog::test()],
             self.webhook_secret_generator.generate_secret().unwrap(),
-            None,
         );
 
         subscription

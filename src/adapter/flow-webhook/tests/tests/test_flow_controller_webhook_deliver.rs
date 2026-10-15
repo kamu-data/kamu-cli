@@ -17,14 +17,18 @@ use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, FLOW_TYPE_DATASET_INGEST}
 use kamu_adapter_flow_webhook::*;
 use kamu_adapter_task_webhook::LogicalPlanWebhookDeliver;
 use kamu_datasets::{DatasetEntry, DatasetIncrementQueryService, MockDatasetIncrementQueryService};
-use kamu_datasets_services::testing::FakeDatasetEntryService;
+use kamu_datasets_services::testing::{FakeDatasetEntryService, FakeDatasetReferenceService};
 use kamu_flow_system::*;
-use kamu_task_system::{LogicalPlan, TaskError, TaskOutcome, TaskResult};
+use kamu_flow_system_inmem::{InMemoryFlowEventStore, InMemoryFlowSystemEventBridge};
+use kamu_task_system::{LogicalPlan, TaskResult};
+use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
 use kamu_webhooks::{WebhookEventType, WebhookEventTypeCatalog, WebhookSubscriptionID};
 use serde_json::json;
+use time_source::SystemTimeSourceDefault;
 use uuid::Uuid;
+use wakeup_listener::WakeupListenerMetrics;
 
-use super::utils::{LinearDatasetHistory, WebhookDeliveryHistory};
+use super::utils::{DatasetWebhookWatermarks, LinearDatasetHistory};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -100,8 +104,8 @@ async fn test_delivery_logical_plan() {
                     "new_hash": new_head.to_string(),
                     "owner_account_id": TEST_ACCOUNT_ID.to_string(),
                     "version": 2,
-                }
-
+                },
+                "webhook_watermark": { "head": new_head.to_string() },
             }),
         }
     );
@@ -150,8 +154,8 @@ async fn test_delivery_logical_plan_multiple_updates() {
                     "new_hash": new_head_2.to_string(),
                     "owner_account_id": TEST_ACCOUNT_ID.to_string(),
                     "version": 2,
-                }
-
+                },
+                "webhook_watermark": { "head": new_head_2.to_string() },
             }),
         }
     );
@@ -199,8 +203,8 @@ async fn test_delivery_logical_plan_breaking() {
                     "old_hash": old_head.to_string(),
                     "owner_account_id": TEST_ACCOUNT_ID.to_string(),
                     "version": 2,
-                }
-
+                },
+                "webhook_watermark": { "head": new_head.to_string() },
             }),
         }
     );
@@ -220,20 +224,9 @@ async fn test_delivery_logical_plan_covers_changes_since_delivered_head() {
     let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
     let event_type = WebhookEventTypeCatalog::dataset_ref_updated();
 
-    // Subscribed at 1, then the delivery of 1 -> 2 failed, so the next one reports
+    // The receiver has 1, the delivery of 1 -> 2 was lost, so the next one reports
     // 1 -> 3
-    harness
-        .create_subscription(subscription_id, &event_type, &foo_dataset_id, &head_1)
-        .await;
-    harness
-        .fail_delivery(
-            subscription_id,
-            &event_type,
-            &foo_dataset_id,
-            &head_1,
-            &head_2,
-        )
-        .await;
+    harness.set_delivered_head(subscription_id, &head_1).await;
 
     let delivery_flow = harness
         .make_delivery_flow_new_data(
@@ -276,14 +269,9 @@ async fn test_delivery_logical_plan_breaking_when_delivered_head_rewritten() {
     let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
     let event_type = WebhookEventTypeCatalog::dataset_ref_updated();
 
-    // Subscribed at a head that is no longer in the history
+    // The receiver has a head that is no longer in the history
     harness
-        .create_subscription(
-            subscription_id,
-            &event_type,
-            &foo_dataset_id,
-            &diverged_head,
-        )
+        .set_delivered_head(subscription_id, &diverged_head)
         .await;
 
     let delivery_flow = harness
@@ -309,6 +297,53 @@ async fn test_delivery_logical_plan_breaking_when_delivered_head_rewritten() {
             "owner_account_id": TEST_ACCOUNT_ID.to_string(),
             "version": 2,
         }),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_delivery_logical_plan_ignores_delivered_head_past_the_update() {
+    let [head_1, head_2, head_3] = [1, 2, 3].map(LinearDatasetHistory::head);
+
+    let harness = FlowControllerWebhookDeliverHarness::new();
+
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    harness.register_dataset(&foo_dataset_id);
+
+    let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
+    let event_type = WebhookEventTypeCatalog::dataset_ref_updated();
+
+    // A watermark seeded at 3 while the delivery of 1 -> 2 was still queued
+    harness.set_delivered_head(subscription_id, &head_3).await;
+
+    let delivery_flow = harness
+        .make_delivery_flow_new_data(
+            FlowID::new(1),
+            subscription_id,
+            &event_type,
+            &foo_dataset_id,
+            Some(&head_1),
+            vec![&head_2],
+        )
+        .await;
+
+    let logical_plan = harness.build_task_logical_plan(&delivery_flow).await;
+    pretty_assertions::assert_eq!(
+        logical_plan.payload["webhook_payload"],
+        json!({
+            "block_ref": "head",
+            "dataset_id": foo_dataset_id.to_string(),
+            "is_breaking_change": false,
+            "new_hash": head_2.to_string(),
+            "old_hash": head_1.to_string(),
+            "owner_account_id": TEST_ACCOUNT_ID.to_string(),
+            "version": 2,
+        }),
+    );
+    pretty_assertions::assert_eq!(
+        logical_plan.payload["webhook_watermark"],
+        json!({ "head": head_2.to_string() }),
     );
 }
 
@@ -416,7 +451,7 @@ struct FlowControllerWebhookDeliverHarness {
     controller: Arc<FlowControllerWebhookDeliver>,
     fake_dataset_entry_service: Arc<FakeDatasetEntryService>,
     flow_event_store: Arc<dyn FlowEventStore>,
-    delivery_history: WebhookDeliveryHistory,
+    watermarks: DatasetWebhookWatermarks,
 }
 
 impl FlowControllerWebhookDeliverHarness {
@@ -427,54 +462,35 @@ impl FlowControllerWebhookDeliverHarness {
     fn with_overrides(mock_flow_sensor_dispatcher: MockFlowSensorDispatcher) -> Self {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerWebhookDeliver>()
+            .add::<InMemoryFlowEventStore>()
+            .add::<InMemoryFlowSystemEventBridge>()
+            .add::<InMemoryWakeupHub>()
+            .add::<WakeupListenerMetrics>()
+            .add::<SystemTimeSourceDefault>()
             .add::<FakeDatasetEntryService>()
+            .add::<FakeDatasetReferenceService>()
             .add_value(mock_flow_sensor_dispatcher)
             .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
             .add_value(LinearDatasetHistory::increments())
             .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>();
-        WebhookDeliveryHistory::register(&mut b);
+        DatasetWebhookWatermarks::register(&mut b);
 
         let catalog = b.build();
         Self {
             controller: catalog.get_one().unwrap(),
             fake_dataset_entry_service: catalog.get_one().unwrap(),
             flow_event_store: catalog.get_one().unwrap(),
-            delivery_history: WebhookDeliveryHistory::from_catalog(&catalog),
+            watermarks: DatasetWebhookWatermarks::from_catalog(&catalog),
         }
     }
 
-    /// Stores the subscription, created when the dataset's head was `dataset_head`
-    async fn create_subscription(
+    async fn set_delivered_head(
         &self,
         subscription_id: WebhookSubscriptionID,
-        event_type: &WebhookEventType,
-        dataset_id: &odf::DatasetID,
-        dataset_head: &odf::Multihash,
+        head: &odf::Multihash,
     ) {
-        self.delivery_history
-            .create_subscription(
-                &FlowScopeSubscription::make_scope(subscription_id, event_type, Some(dataset_id)),
-                Some(dataset_head),
-            )
-            .await;
-    }
-
-    /// Stores a delivery of `old_head` -> `new_head` that failed for good
-    async fn fail_delivery(
-        &self,
-        subscription_id: WebhookSubscriptionID,
-        event_type: &WebhookEventType,
-        dataset_id: &odf::DatasetID,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) {
-        self.delivery_history
-            .finish_delivery(
-                &FlowScopeSubscription::make_scope(subscription_id, event_type, Some(dataset_id)),
-                old_head,
-                new_head,
-                TaskOutcome::Failed(TaskError::empty_recoverable()),
-            )
+        self.watermarks
+            .set_delivered_head(subscription_id, head)
             .await;
     }
 

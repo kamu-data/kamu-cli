@@ -9,5 +9,9 @@
 
 pub mod webhook_delivery_repository_test_suite;
 pub mod webhook_subscription_event_store_test_suite;
+pub mod webhook_watermark_repository_test_suite;
+
+mod webhook_watermarks_backfill_scenario;
+pub use webhook_watermarks_backfill_scenario::*;
 
 pub(crate) mod helpers;

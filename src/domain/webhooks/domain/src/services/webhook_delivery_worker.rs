@@ -11,18 +11,27 @@ use internal_error::InternalError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{WebhookDeliveryID, WebhookEventType, WebhookSendError, WebhookSubscriptionID};
+use crate::{
+    WebhookDeliveryID,
+    WebhookEventType,
+    WebhookSendError,
+    WebhookSubscriptionID,
+    WebhookWatermark,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait WebhookDeliveryWorker: Send + Sync {
+    /// Sends the payload. A successful response moves the watermark of the
+    /// event type to `watermark`, when given
     async fn deliver_webhook(
         &self,
         webhook_delivery_id: WebhookDeliveryID,
         webhook_subscription_id: WebhookSubscriptionID,
         event_type: WebhookEventType,
         payload: serde_json::Value,
+        watermark: Option<WebhookWatermark>,
     ) -> Result<(), WebhookDeliveryError>;
 }
 

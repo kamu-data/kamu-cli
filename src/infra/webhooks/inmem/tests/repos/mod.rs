@@ -9,3 +9,4 @@
 
 mod test_inmem_webhook_delivery_repository;
 mod test_inmem_webhook_subscription_event_store;
+mod test_inmem_webhook_watermark_repository;

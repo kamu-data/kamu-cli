@@ -479,7 +479,7 @@ Sensors live only in memory. They are rebuilt at startup for every enabled react
 | Sensor | Output scope | Sensitive to | `on_activated` | `on_sensitized` |
 | --- | --- | --- | --- | --- |
 | `DerivedDatasetFlowSensor` (flow-dataset) | a derived dataset | its upstream datasets (`DependencyGraphService`) | `TransformFlowEvaluator`: if inputs have new data, runs the transform with one `NewData` cause per input | `NewData` → transform flow with the reactive rule; `Breaking` + `Recover` → reset-to-metadata flow; `Breaking` + `NoAction` → warning only |
-| `DatasetUpdatedWebhookSensor` (flow-webhook) | a webhook subscription | the subscription's dataset | if the head moved past the delivery base ([webhooks.md](webhooks.md#8-flow-integration)), runs the deliver flow with one `NewData` or `Breaking` cause | `NewData`, or `Breaking` + `Recover` → webhook deliver flow with the reactive rule; `Breaking` + `NoAction` → skipped; updates already covered by a catch-up → skipped |
+| `DatasetUpdatedWebhookSensor` (flow-webhook) | a webhook subscription | the subscription's dataset | if the head moved past the subscription's watermark ([webhooks.md](webhooks.md#8-flow-integration)), runs the deliver flow with one `NewData` or `Breaking` cause | `NewData`, or `Breaking` + `Recover` → webhook deliver flow with the reactive rule; `Breaking` + `NoAction` → skipped; updates already covered by a catch-up → skipped |
 
 `ReactiveRule { for_new_data: BatchingRule, for_breaking_change: BreakingChangeRule }` is set on the
 trigger; batching itself happens in scheduling ([§6](#reactive-batching)), not in the sensor.

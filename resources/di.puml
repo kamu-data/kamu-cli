@@ -190,6 +190,7 @@ interface "Web3AuthEip4361NonceRepository" <<i>>
 interface "Web3AuthEip4361NonceService" <<i>>
 interface "WebhookDeliveryRepository" <<i>>
 interface "WebhookSubscriptionEventStore" <<i>>
+interface "WebhookWatermarkRepository" <<i>>
 class "AccessTokenRegistryService" <<singleton>>
 class "AccessTokenServiceImpl"
 class "AccountAuthorizationHelperImpl"
@@ -453,6 +454,7 @@ class "SqliteVariableSetProjectionRepository"
 class "SqliteWeb3AuthEip4361NonceRepository"
 class "SqliteWebhookDeliveryRepository"
 class "SqliteWebhookSubscriptionEventStore"
+class "SqliteWebhookWatermarkRepository"
 class "StorageApplyResourceUseCaseImpl"
 class "StorageDeleteResourcesUseCaseImpl"
 class "StorageEventStoreBridge"
@@ -1241,6 +1243,8 @@ class "WsSmartTransferProtocolClient"
 "SqliteWebhookDeliveryRepository"  --> "TransactionRefT"
 "WebhookSubscriptionEventStore" <|-- "SqliteWebhookSubscriptionEventStore"
 "SqliteWebhookSubscriptionEventStore"  --> "TransactionRefT"
+"WebhookWatermarkRepository" <|-- "SqliteWebhookWatermarkRepository"
+"SqliteWebhookWatermarkRepository"  --> "TransactionRefT"
 "BackgroundAgent" <|-- "OutboxAgentImpl"
 "InitOnStartup" <|-- "OutboxAgentImpl"
 "OutboxAgent" <|-- "OutboxAgentImpl"

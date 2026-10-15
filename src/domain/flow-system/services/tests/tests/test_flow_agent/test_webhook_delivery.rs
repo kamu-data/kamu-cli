@@ -13,7 +13,11 @@ use std::sync::Arc;
 use chrono::Duration;
 use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_adapter_flow_dataset::{FlowConfigRuleIngest, ingest_dataset_binding};
-use kamu_adapter_flow_webhook::{FLOW_TYPE_WEBHOOK_DELIVER, webhook_deliver_binding};
+use kamu_adapter_flow_webhook::{
+    DatasetRefUpdatedWatermark,
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    webhook_deliver_binding,
+};
 use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
 use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, TaskErrorWebhookDelivery};
 use kamu_core::PullResult;
@@ -29,16 +33,12 @@ use kamu_webhooks::{
     WebhookEventTypeCatalog,
     WebhookSendConnectionTimeoutError,
     WebhookSendFailedToConnectError,
-    WebhookSubscription,
-    WebhookSubscriptionEventStore,
     WebhookSubscriptionID,
-    WebhookSubscriptionLabel,
-    WebhookSubscriptionSecret,
     WebhookUnsuccessfulResponseError,
+    WebhookWatermarkRepository,
 };
 use messaging_outbox::OutboxExt;
 use odf::dataset::MetadataChainIncrementInterval;
-use secrecy::SecretString;
 use time_source::SystemTimeSource;
 
 use crate::tests::{
@@ -1036,7 +1036,7 @@ impl WebhookFlowHarness {
         Self::dataset_references(&base).set_head(&foo_id, &Self::head(0));
 
         let subscription_id = WebhookSubscriptionID::new(uuid::Uuid::from_u128(1));
-        Self::create_subscription(&base, subscription_id, &foo_id).await;
+        Self::start_watermark(&base, subscription_id).await;
         let webhook_binding = webhook_deliver_binding(
             subscription_id,
             &WebhookEventTypeCatalog::dataset_ref_updated(),
@@ -1069,28 +1069,23 @@ impl WebhookFlowHarness {
         }
     }
 
-    /// The subscription to "foo", created when its head was `head(0)`
-    async fn create_subscription(
-        base: &FlowHarness,
-        subscription_id: WebhookSubscriptionID,
-        foo_id: &odf::DatasetID,
-    ) {
-        let mut subscription = WebhookSubscription::new(
-            subscription_id,
-            Self::target_url(),
-            WebhookSubscriptionLabel::try_new("test").unwrap(),
-            Some(foo_id.clone()),
-            vec![WebhookEventTypeCatalog::dataset_ref_updated()],
-            WebhookSubscriptionSecret::try_new(None, &SecretString::from("secret")).unwrap(),
-            Some(Self::head(0)),
-        );
-        subscription.enable().unwrap();
-
-        let event_store = base
+    /// The receiver of the subscription starts from `head(0)`
+    async fn start_watermark(base: &FlowHarness, subscription_id: WebhookSubscriptionID) {
+        let watermark_repo = base
             .catalog
-            .get_one::<dyn WebhookSubscriptionEventStore>()
+            .get_one::<dyn WebhookWatermarkRepository>()
             .unwrap();
-        subscription.save(event_store.as_ref()).await.unwrap();
+        watermark_repo
+            .set_watermark(
+                subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated(),
+                DatasetRefUpdatedWatermark {
+                    head: Self::head(0),
+                }
+                .into(),
+            )
+            .await
+            .unwrap();
     }
 
     fn dataset_references(base: &FlowHarness) -> Arc<FakeDatasetReferenceService> {
@@ -1313,6 +1308,12 @@ impl WebhookFlowHarness {
                 "old_hash": old_head.to_string(),
                 "is_breaking_change": is_breaking_change,
             }),
+            webhook_watermark: Some(
+                DatasetRefUpdatedWatermark {
+                    head: new_head.clone(),
+                }
+                .into(),
+            ),
         }
         .into_logical_plan()
     }

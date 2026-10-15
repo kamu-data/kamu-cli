@@ -16,6 +16,7 @@ use kamu_webhooks::{
     MESSAGE_CONSUMER_KAMU_WEBHOOK_DATASET_REMOVAL_HANDLER,
     WebhookSubscription,
     WebhookSubscriptionEventStore,
+    WebhookWatermarkRepository,
 };
 use messaging_outbox::*;
 
@@ -34,6 +35,7 @@ use messaging_outbox::*;
 })]
 pub struct WebhookDatasetRemovalHandler {
     webhook_subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    webhook_watermark_repo: Arc<dyn WebhookWatermarkRepository>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,6 +94,12 @@ impl MessageConsumerT<DatasetLifecycleMessage> for WebhookDatasetRemovalHandler 
                 )
                 .await
                 .int_err()?;
+
+                for subscription_id in &subscription_ids {
+                    self.webhook_watermark_repo
+                        .remove_watermarks(*subscription_id)
+                        .await?;
+                }
 
                 tracing::debug!(subscription_ids = ?subscription_ids, "Removed subscriptions");
 

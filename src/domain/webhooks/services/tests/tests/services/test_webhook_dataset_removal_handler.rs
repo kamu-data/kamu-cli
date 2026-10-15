@@ -13,7 +13,10 @@ use chrono::Utc;
 use dill::*;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
 use kamu_webhooks::*;
-use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_inmem::{
+    InMemoryWebhookSubscriptionEventStore,
+    InMemoryWebhookWatermarkRepository,
+};
 use kamu_webhooks_services::{WebhookDatasetRemovalHandler, WebhookSecretGeneratorImpl};
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 
@@ -26,7 +29,7 @@ async fn test_subscriptions_removed_with_dataset() {
     let dataset_id_1 = odf::DatasetID::new_seeded_ed25519(b"foo");
     let dataset_id_2 = odf::DatasetID::new_seeded_ed25519(b"bar");
 
-    {
+    let subscription_1_1 = {
         let mut subscription_id_1_1 = WebhookSubscription::new(
             WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
             url::Url::parse("https://example.com/webhook/1/1").unwrap(),
@@ -34,15 +37,15 @@ async fn test_subscriptions_removed_with_dataset() {
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             harness.webhook_secret_generator.generate_secret().unwrap(),
-            None,
         );
         subscription_id_1_1
             .save(harness.event_store.as_ref())
             .await
             .unwrap();
-    }
+        subscription_id_1_1.id()
+    };
 
-    {
+    let subscription_1_2 = {
         let mut subscription_id_1_2 = WebhookSubscription::new(
             WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
             url::Url::parse("https://example.com/webhook/1/2").unwrap(),
@@ -50,15 +53,15 @@ async fn test_subscriptions_removed_with_dataset() {
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             harness.webhook_secret_generator.generate_secret().unwrap(),
-            None,
         );
         subscription_id_1_2
             .save(harness.event_store.as_ref())
             .await
             .unwrap();
-    }
+        subscription_id_1_2.id()
+    };
 
-    {
+    let subscription_2 = {
         let mut subscription_id_2 = WebhookSubscription::new(
             WebhookSubscriptionID::new(uuid::Uuid::new_v4()),
             url::Url::parse("https://example.com/webhook/2").unwrap(),
@@ -66,13 +69,17 @@ async fn test_subscriptions_removed_with_dataset() {
             Some(dataset_id_2.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             harness.webhook_secret_generator.generate_secret().unwrap(),
-            None,
         );
         subscription_id_2
             .save(harness.event_store.as_ref())
             .await
             .unwrap();
+        subscription_id_2.id()
     };
+
+    for subscription_id in [subscription_1_1, subscription_1_2, subscription_2] {
+        harness.set_watermark(subscription_id).await;
+    }
 
     let res = harness
         .event_store
@@ -106,12 +113,17 @@ async fn test_subscriptions_removed_with_dataset() {
         .count_subscriptions_by_dataset(&dataset_id_2)
         .await;
     assert_eq!(res.unwrap(), 1);
+
+    assert!(!harness.has_watermark(subscription_1_1).await);
+    assert!(!harness.has_watermark(subscription_1_2).await);
+    assert!(harness.has_watermark(subscription_2).await);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TestWebhookDatasetRemovalHandlerHarness {
     event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    watermark_repo: Arc<dyn WebhookWatermarkRepository>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
     outbox: Arc<dyn Outbox>,
 }
@@ -126,7 +138,8 @@ impl TestWebhookDatasetRemovalHandlerHarness {
                 messaging_outbox::ConsumerFilter::AllConsumers,
             ))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
-            .add::<InMemoryWebhookSubscriptionEventStore>();
+            .add::<InMemoryWebhookSubscriptionEventStore>()
+            .add::<InMemoryWebhookWatermarkRepository>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(
             &mut b,
@@ -137,9 +150,32 @@ impl TestWebhookDatasetRemovalHandlerHarness {
 
         Self {
             event_store: catalog.get_one().unwrap(),
+            watermark_repo: catalog.get_one().unwrap(),
             webhook_secret_generator: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn set_watermark(&self, subscription_id: WebhookSubscriptionID) {
+        self.watermark_repo
+            .set_watermark(
+                subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated(),
+                WebhookWatermark::from(serde_json::json!({ "position": 1 })),
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn has_watermark(&self, subscription_id: WebhookSubscriptionID) -> bool {
+        self.watermark_repo
+            .find_watermark(
+                subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated(),
+            )
+            .await
+            .unwrap()
+            .is_some()
     }
 }
 

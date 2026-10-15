@@ -28,7 +28,6 @@ impl WebhookSubscription {
         dataset_id: Option<odf::DatasetID>,
         event_types: Vec<WebhookEventType>,
         secret: WebhookSubscriptionSecret,
-        dataset_head: Option<odf::Multihash>,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -41,7 +40,6 @@ impl WebhookSubscription {
                     event_types,
                     target_url,
                     secret,
-                    dataset_head,
                 },
             )
             .unwrap(),

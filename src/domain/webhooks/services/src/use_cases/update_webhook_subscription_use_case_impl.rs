@@ -13,12 +13,16 @@ use dill::{component, interface};
 use kamu_webhooks::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
+use crate::WebhookWatermarkInitializer;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn UpdateWebhookSubscriptionUseCase)]
 pub struct UpdateWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    watermark_initializer: Arc<WebhookWatermarkInitializer>,
+    watermark_repo: Arc<dyn WebhookWatermarkRepository>,
     outbox: Arc<dyn Outbox>,
     webhooks_config: Arc<WebhooksConfig>,
 }
@@ -41,6 +45,15 @@ impl UpdateWebhookSubscriptionUseCaseImpl {
             .filter(|et| !old_event_types.contains(et))
             .cloned()
             .collect::<Vec<_>>();
+
+        for disabled_event_type in &disabled_event_types {
+            self.watermark_repo
+                .remove_watermark(subscription.id(), disabled_event_type)
+                .await?;
+        }
+        self.watermark_initializer
+            .initialize_watermarks(subscription, &enabled_event_types)
+            .await?;
 
         for disabled_event_type in disabled_event_types {
             self.outbox

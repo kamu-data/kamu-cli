@@ -23,6 +23,7 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+kamu-datasets = { workspace = true }
 kamu-webhooks = { workspace = true }
 odf = { workspace = true }
 

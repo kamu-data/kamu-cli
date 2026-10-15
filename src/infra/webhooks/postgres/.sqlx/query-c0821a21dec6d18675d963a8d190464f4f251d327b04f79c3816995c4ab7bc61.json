@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM webhook_watermarks\n                WHERE subscription_id = $1 AND event_type = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c0821a21dec6d18675d963a8d190464f4f251d327b04f79c3816995c4ab7bc61"
+}

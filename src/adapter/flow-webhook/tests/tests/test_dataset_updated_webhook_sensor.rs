@@ -22,7 +22,7 @@ use kamu_flow_system::*;
 use kamu_webhooks::*;
 use uuid::Uuid;
 
-use super::utils::{LinearDatasetHistory, WebhookDeliveryHistory};
+use super::utils::{DatasetWebhookWatermarks, LinearDatasetHistory};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,10 +55,10 @@ async fn test_sensor_basic_crud() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_sensor_activation_without_delivery_base_does_nothing() {
+async fn test_sensor_activation_without_watermark_does_nothing() {
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
-            delivery_base: None,
+            delivered_head: None,
             ..Default::default()
         })
         .await;
@@ -73,7 +73,7 @@ async fn test_sensor_activation_with_receiver_up_to_date_does_nothing() {
     let head = LinearDatasetHistory::head(1);
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
-            delivery_base: Some(head.clone()),
+            delivered_head: Some(head.clone()),
             dataset_head: Some(head),
             ..Default::default()
         })
@@ -89,7 +89,7 @@ async fn test_sensor_activation_for_dataset_without_head_does_nothing() {
     // A deleted dataset loses its head, while its subscription's trigger remains
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
-            delivery_base: Some(LinearDatasetHistory::head(1)),
+            delivered_head: Some(LinearDatasetHistory::head(1)),
             dataset_head: None,
             ..Default::default()
         })
@@ -115,7 +115,7 @@ async fn test_sensor_activation_catches_up_new_data() {
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
             mock_flow_run_service: Some(mock_flow_run_service),
-            delivery_base: Some(head_1),
+            delivered_head: Some(head_1),
             dataset_head: Some(head_3),
             ..Default::default()
         })
@@ -142,7 +142,7 @@ async fn test_sensor_activation_catches_up_breaking_change() {
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
             mock_flow_run_service: Some(mock_flow_run_service),
-            delivery_base: Some(head_1),
+            delivered_head: Some(head_1),
             dataset_head: Some(diverged_head),
             ..Default::default()
         })
@@ -157,7 +157,7 @@ async fn test_sensor_activation_catches_up_breaking_change() {
 async fn test_sensor_activation_skips_breaking_change_without_recovery() {
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
-            delivery_base: Some(LinearDatasetHistory::head(1)),
+            delivered_head: Some(LinearDatasetHistory::head(1)),
             dataset_head: Some(LinearDatasetHistory::diverged_head()),
             for_breaking_change: Some(BreakingChangeRule::NoAction),
             ..Default::default()
@@ -190,7 +190,7 @@ async fn test_sensor_skips_updates_delivered_by_catch_up() {
     let harness =
         DatasetUpdatedWebhookSensorHarness::new(DatasetUpdatedWebhookSensorHarnessOverrides {
             mock_flow_run_service: Some(mock_flow_run_service),
-            delivery_base: Some(head_1.clone()),
+            delivered_head: Some(head_1.clone()),
             dataset_head: Some(head_3.clone()),
             ..Default::default()
         })
@@ -338,7 +338,7 @@ struct DatasetUpdatedWebhookSensorHarness {
 struct DatasetUpdatedWebhookSensorHarnessOverrides {
     mock_flow_run_service: Option<MockFlowRunService>,
     /// Head the receiver already knows
-    delivery_base: Option<odf::Multihash>,
+    delivered_head: Option<odf::Multihash>,
     /// Current head of the dataset
     dataset_head: Option<odf::Multihash>,
     /// Rule of the sensor, `Recover` by default
@@ -362,7 +362,7 @@ impl DatasetUpdatedWebhookSensorHarness {
         let mut b = dill::CatalogBuilder::new();
         b.add_value(mock_flow_run_service);
         b.bind::<dyn FlowRunService, MockFlowRunService>();
-        WebhookDeliveryHistory::register(&mut b);
+        DatasetWebhookWatermarks::register(&mut b);
         b.add_value(dataset_references);
         b.bind::<dyn DatasetReferenceService, FakeDatasetReferenceService>();
         b.add_value(LinearDatasetHistory::increments());
@@ -370,15 +370,17 @@ impl DatasetUpdatedWebhookSensorHarness {
 
         let catalog = b.build();
 
-        // With no successful deliveries, the receiver knows the head at creation
+        if let Some(delivered_head) = &overrides.delivered_head {
+            DatasetWebhookWatermarks::from_catalog(&catalog)
+                .set_delivered_head(Self::subscription_id(), delivered_head)
+                .await;
+        }
+
         let webhook_flow_scope = FlowScopeSubscription::make_scope(
             Self::subscription_id(),
             &WebhookEventTypeCatalog::dataset_ref_updated(),
             Some(&Self::dataset_id()),
         );
-        WebhookDeliveryHistory::from_catalog(&catalog)
-            .create_subscription(&webhook_flow_scope, overrides.delivery_base.as_ref())
-            .await;
 
         let sensor = DatasetUpdatedWebhookSensor::new(
             webhook_flow_scope,

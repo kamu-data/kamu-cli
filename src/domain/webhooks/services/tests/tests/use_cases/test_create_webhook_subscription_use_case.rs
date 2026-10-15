@@ -11,7 +11,6 @@ use std::assert_matches;
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
-use kamu_datasets_services::testing::FakeDatasetReferenceService;
 use kamu_webhooks::{
     CreateWebhookSubscriptionUseCase,
     WebhookEventTypeCatalog,
@@ -49,18 +48,59 @@ async fn test_create_in_dataset_success() {
         )
         .await;
     assert!(res.is_ok(), "Failed to create subscription: {res:?}");
+}
 
-    // Changes are delivered from the head the dataset had at creation
-    let subscription = harness
-        .find_subscription(
-            res.unwrap().subscription_id,
-            WebhookSubscriptionQueryMode::Active,
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_starts_watermarks_of_event_types() {
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_outbox = MockOutbox::new();
+    for event_type in [
+        WebhookEventTypeCatalog::test(),
+        WebhookEventTypeCatalog::dataset_ref_updated(),
+    ] {
+        WebhookSubscriptionUseCaseHarness::expect_webhook_event_enabled_message(
+            &mut mock_outbox,
+            &event_type,
+            Some(&dataset_id),
+            1,
+        );
+    }
+
+    let harness = CreateWebhookSubscriptionUseCaseHarness::new(mock_outbox);
+    let res = harness
+        .use_case
+        .execute(
+            Some(dataset_id.clone()),
+            url::Url::parse("https://example.com").unwrap(),
+            vec![
+                WebhookEventTypeCatalog::test(),
+                WebhookEventTypeCatalog::dataset_ref_updated(),
+            ],
+            WebhookSubscriptionLabel::try_new("test_label").unwrap(),
         )
         .await
         .unwrap();
+
     assert_eq!(
-        subscription.dataset_head_at_creation(),
-        Some(&CreateWebhookSubscriptionUseCaseHarness::dataset_head())
+        harness
+            .find_watermark(
+                res.subscription_id,
+                &WebhookEventTypeCatalog::dataset_ref_updated()
+            )
+            .await,
+        Some(WebhookSubscriptionUseCaseHarness::initial_watermark(
+            &dataset_id
+        ))
+    );
+    // No provider for this event type
+    assert_eq!(
+        harness
+            .find_watermark(res.subscription_id, &WebhookEventTypeCatalog::test())
+            .await,
+        None
     );
 }
 
@@ -327,30 +367,16 @@ impl CreateWebhookSubscriptionUseCaseHarness {
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<CreateWebhookSubscriptionUseCaseImpl>();
         b.add::<WebhookSecretGeneratorImpl>();
-        b.add::<FakeDatasetReferenceService>();
         b.add_value(webhooks_config);
         b.add_value(mock_outbox);
         b.bind::<dyn Outbox, MockOutbox>();
 
         let catalog = b.build();
 
-        // The datasets the tests subscribe to
-        let dataset_reference_service = catalog.get_one::<FakeDatasetReferenceService>().unwrap();
-        for dataset_name in [b"foo", b"bar"] {
-            dataset_reference_service.set_head(
-                &odf::DatasetID::new_seeded_ed25519(dataset_name),
-                &Self::dataset_head(),
-            );
-        }
-
         Self {
             base_harness,
             use_case: catalog.get_one().unwrap(),
         }
-    }
-
-    fn dataset_head() -> odf::Multihash {
-        odf::Multihash::from_digest_sha3_256(b"head")
     }
 }
 
