@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_query_service_impl;
+mod test_query_service_to_table;
 mod test_schema_service_impl;
 
 mod helpers;

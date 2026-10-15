@@ -872,6 +872,40 @@ async fn test_data_query_handler_error_dataset_does_not_exist() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_data_query_handler_error_to_table_dataset_does_not_exist() {
+    let harness = DataQueryHarness::new().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query_url = format!("{}query", harness.root_url);
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": "select * from to_table(\"does-not-exist\")"
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.json::<serde_json::Value>().await.unwrap();
+        pretty_assertions::assert_eq!(
+            (
+                http::StatusCode::BAD_REQUEST,
+                json!({"message": "to_table(): dataset 'does-not-exist' not found"})
+            ),
+            (status, body),
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_dataset_error_bad_alias() {
     let harness = DataQueryHarness::new().await;

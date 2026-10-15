@@ -127,6 +127,7 @@ arrow = { version = "59", default-features = false }
 bon = { version = "3", default-features = false }
 indoc = "2"
 mockall = "0.15"
+nonempty = { version = "0.12", default-features = false }
 oop = "0.0.2"
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [

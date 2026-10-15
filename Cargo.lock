@@ -8873,6 +8873,7 @@ dependencies = [
  "kamu-wakeup-listener-inmem",
  "messaging-outbox",
  "mockall",
+ "nonempty",
  "nutype",
  "oop",
  "opendatafabric",

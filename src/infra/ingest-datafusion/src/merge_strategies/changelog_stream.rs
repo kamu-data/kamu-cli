@@ -62,14 +62,8 @@ impl MergeStrategy for MergeStrategyChangelogStream {
     }
 
     fn sort_order(&self) -> Vec<SortExpr> {
-        // Main goal here is to establish correct order of -C / +C corrections, so we
-        // sort records by primary key and then by operation type
-        self.primary_key
-            .iter()
-            .map(|c| col(Column::from_name(c)).sort(true, true))
-            .chain(std::iter::once(
-                col(Column::from_name(self.vocab.operation_type_column())).sort(true, true),
-            ))
-            .collect()
+        // Changelog records are applied in the order they arrive: a key can be retracted and
+        // appended again, or corrected several times within one chunk
+        Vec::new()
     }
 }

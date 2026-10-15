@@ -78,22 +78,9 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
             return Ok(CollectionEntryListing::default());
         };
 
-        // Apply filters
         // Note: we are still working with a changelog here in the hope to narrow down
-        // the record set before projecting
-        let df = if let Some(extra_data_fields_filter) = filter {
-            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
-                .map_err(|e| -> ViewCollectionEntriesError {
-                    use DataFrameExtraDataFieldsFilterApplyError as E;
-                    match e {
-                        E::UnknownExtraDataFieldFilterNames(e) => e.into(),
-                        E::Internal(_) => e.int_err().into(),
-                    }
-                })?
-        } else {
-            df
-        };
-
+        // the record set before projecting. This is only safe for the primary key, as
+        // other columns can change between the `-C` and `+C` records of a correction.
         let df = if let Some(path_prefix) = path_prefix {
             df.filter(
                 datafusion::functions::string::starts_with()
@@ -111,6 +98,20 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
             &odf::metadata::DatasetVocabulary::default(),
         )
         .int_err()?;
+
+        // Extra data is filtered on the current state of entries
+        let df = if let Some(extra_data_fields_filter) = filter {
+            utils::DataFrameExtraDataFieldsFilterApplier::apply(df, extra_data_fields_filter)
+                .map_err(|e| -> ViewCollectionEntriesError {
+                    use DataFrameExtraDataFieldsFilterApplyError as E;
+                    match e {
+                        E::UnknownExtraDataFieldFilterNames(e) => e.into(),
+                        E::Internal(_) => e.int_err().into(),
+                    }
+                })?
+        } else {
+            df
+        };
 
         // Filter by max depth
         // TODO: PERF: This implementation is quite inefficient.
