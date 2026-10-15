@@ -307,6 +307,7 @@ impl TestWebhookDeliveryWorkerHarness {
             None,
             vec![WebhookEventTypeCatalog::test()],
             self.webhook_secret_generator.generate_secret().unwrap(),
+            None,
         );
 
         subscription

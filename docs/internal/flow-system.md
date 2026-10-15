@@ -479,7 +479,7 @@ Sensors live only in memory. They are rebuilt at startup for every enabled react
 | Sensor | Output scope | Sensitive to | `on_activated` | `on_sensitized` |
 | --- | --- | --- | --- | --- |
 | `DerivedDatasetFlowSensor` (flow-dataset) | a derived dataset | its upstream datasets (`DependencyGraphService`) | `TransformFlowEvaluator`: if inputs have new data, runs the transform with one `NewData` cause per input | `NewData` → transform flow with the reactive rule; `Breaking` + `Recover` → reset-to-metadata flow; `Breaking` + `NoAction` → warning only |
-| `DatasetUpdatedWebhookSensor` (flow-webhook) | a webhook subscription | the subscription's dataset | nothing | `NewData`, or `Breaking` + `Recover` → webhook deliver flow with the reactive rule; `Breaking` + `NoAction` → skipped |
+| `DatasetUpdatedWebhookSensor` (flow-webhook) | a webhook subscription | the subscription's dataset | if the head moved past the delivery base ([webhooks.md](webhooks.md#8-flow-integration)), runs the deliver flow with one `NewData` or `Breaking` cause | `NewData`, or `Breaking` + `Recover` → webhook deliver flow with the reactive rule; `Breaking` + `NoAction` → skipped; updates already covered by a catch-up → skipped |
 
 `ReactiveRule { for_new_data: BatchingRule, for_breaking_change: BreakingChangeRule }` is set on the
 trigger; batching itself happens in scheduling ([§6](#reactive-batching)), not in the sensor.
@@ -651,7 +651,8 @@ The webhook deliver flow is entirely driven by flow-system machinery:
   `WebhookTriggerStartupRecoveryJob` reconciles triggers with subscription statuses on startup
   ([webhooks.md](webhooks.md#8-flow-integration)).
 - **Payload.** Built by `build_task_logical_plan` from all the flow's `ResourceUpdate` causes, so a
-  batch of updates is one delivery; its shape is in [webhooks.md](webhooks.md#payload).
+  batch of updates is one delivery, starting from the head the receiver already knows; its shape is
+  in [webhooks.md](webhooks.md#payload).
 - **Failure.** Delivery errors are recoverable task errors
   ([task-system.md](task-system.md#74-webhook-delivery)), retried only under a default retry policy
   for the flow type (`flowSystem.defaultRetryPolicies`, empty unless configured), since webhook

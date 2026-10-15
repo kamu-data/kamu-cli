@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, interface};
+use kamu_datasets::DatasetReferenceService;
 use kamu_webhooks::*;
 use messaging_outbox::{Outbox, OutboxExt};
 
@@ -19,6 +20,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 #[interface(dyn CreateWebhookSubscriptionUseCase)]
 pub struct CreateWebhookSubscriptionUseCaseImpl {
     subscription_event_store: Arc<dyn WebhookSubscriptionEventStore>,
+    dataset_reference_service: Arc<dyn DatasetReferenceService>,
     webhook_secret_generator: Arc<dyn WebhookSecretGenerator>,
     outbox: Arc<dyn Outbox>,
     webhooks_config: Arc<WebhooksConfig>,
@@ -73,6 +75,14 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
 
             let secret = self.webhook_secret_generator.generate_secret().int_err()?;
 
+            // Changes after this head are delivered, including the ones made before
+            // the delivery flow starts listening
+            let dataset_head = self
+                .dataset_reference_service
+                .get_reference(dataset_id, &odf::BlockRef::Head)
+                .await
+                .int_err()?;
+
             let subscription_id = kamu_webhooks::WebhookSubscriptionID::new(uuid::Uuid::new_v4());
 
             let mut subscription = kamu_webhooks::WebhookSubscription::new(
@@ -82,6 +92,7 @@ impl CreateWebhookSubscriptionUseCase for CreateWebhookSubscriptionUseCaseImpl {
                 Some(dataset_id.clone()),
                 event_types,
                 secret.clone(),
+                Some(dataset_head),
             );
             subscription
                 .enable()

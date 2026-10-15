@@ -150,7 +150,7 @@ whatever the status.
 
 | Use case | Effect | Outbox message |
 | --- | --- | --- |
-| `CreateWebhookSubscriptionUseCase` | validates the URL and event types, deduplicates event types, checks label uniqueness, generates a secret, records `Created` + `Enabled`; returns the ID and the new secret, which the GraphQL layer decrypts for the response | `EventEnabled` per event type |
+| `CreateWebhookSubscriptionUseCase` | validates the URL and event types, deduplicates event types, checks label uniqueness, generates a secret, records `Created` (with the dataset's current head) + `Enabled`; returns the ID and the new secret, which the GraphQL layer decrypts for the response | `EventEnabled` per event type |
 | `UpdateWebhookSubscriptionUseCase` | same validation; label uniqueness only if the label changed; records `Modified` | `EventDisabled` per removed event type, then `EventEnabled` per added one |
 | `PauseWebhookSubscriptionUseCase` | `Paused` | `EventDisabled` per event type |
 | `ResumeWebhookSubscriptionUseCase` | `Resumed` | `EventEnabled` per event type |
@@ -297,10 +297,13 @@ against real deliveries.
 }
 ```
 
-One delivery may cover several updates batched into one flow: `old_hash` comes from the first
-update (omitted when the dataset had no previous head), `new_hash` from the last, and
-`is_breaking_change` is true if any of them was breaking. A breaking change (a history rewrite) is
-delivered like any other update.
+One delivery may cover several updates batched into one flow: `new_hash` comes from the last
+update, and `old_hash` is the **delivery base**, the head the receiver already knows
+([§8](#8-flow-integration)), so consecutive payloads form a contiguous range even after a failed
+delivery. Without a delivery base, `old_hash` comes from the first update (omitted when the dataset
+had no previous head). `is_breaking_change` is true if any update was breaking or the delivery base
+is no longer in the dataset's history. A breaking change (a history rewrite) is delivered like any
+other update.
 
 ---
 
@@ -345,6 +348,26 @@ one flow binding, trigger, sensor and process per (subscription, event type), wi
 The sensor and the worker do not look at the subscription's status; a subscription stops receiving
 deliveries only because its trigger is paused, stopped or removed; a task already running at that
 point still delivers ([flow-system.md](flow-system.md#11-scope-removal-and-external-events)).
+
+**Catching up.** Dataset updates reach the sensor only while it is registered, so updates made
+before it is (right after a subscription is created, while it is paused or unreachable, while the server is
+down)
+are caught up when the trigger is activated: `DatasetUpdatedWebhookSensor::on_activated` compares
+the dataset's head with the **delivery base** and, if they differ, runs one deliver flow covering
+the range, with an `ExternallyDetectedChange` cause (`Breaking` when the base is no longer in the
+history, so `BreakingChangeRule` applies). The delivery base comes from
+`WebhookDeliveryBaseResolver`:
+
+| Source | When |
+| --- | --- |
+| `new_head` of the last cause of the newest successful deliver flow of the binding | after the first successful delivery |
+| `dataset_head` recorded in the `Created` event by the create use case | before it |
+| none: nothing is caught up | subscriptions created before the head was recorded, until they deliver once |
+
+A dataset-update message can still reach the sensor after a catch-up already covered its update,
+since the messages and the trigger activation come from different outbox producers. The sensor
+remembers the head it caught up to and skips updates that are that head or its ancestors, until an
+update past it arrives.
 
 **Startup reconciliation.** `WebhookTriggerStartupRecoveryJob` runs on startup, inside a
 transaction, and repairs triggers that do not match their subscription:
@@ -417,8 +440,8 @@ The startup checks are in `src/app/cli/src/app.rs`; the full reference is genera
 | Use cases, with a shared harness | `src/domain/webhooks/services/tests/tests/use_cases/` (`webhook_subscription_use_case_harness.rs`) |
 | Delivery worker (mocked sender), signer test vector, dataset removal handler | `src/domain/webhooks/services/tests/tests/services/` |
 | Event store and delivery repository suites, run against every backend | `src/infra/webhooks/repo-tests/src/`, invoked from `src/infra/webhooks/{inmem,postgres,sqlite}/tests/` |
-| Sensor, deliver controller (payload shape), event bridge, recovery job | `src/adapter/flow-webhook/tests/tests/` |
-| Flow agent running delivery flows: activation by push and by an upstream ingest flow, batching, retries, stop policy, breaking changes | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
+| Sensor (including catch-up), delivery base resolver, deliver controller (payload shape), event bridge, recovery job | `src/adapter/flow-webhook/tests/tests/` |
+| Flow agent running delivery flows: activation by push and by an upstream ingest flow, batching, retries, stop policy, breaking changes, catch-up at startup and on resume | `src/domain/flow-system/services/tests/tests/test_flow_agent/test_webhook_delivery.rs` |
 | GraphQL subscription management | `src/adapter/graphql/tests/tests/test_gql_webhook_subscriptions.rs` |
 | GraphQL view of delivery flows: description, failure reasons, history, unreachable and reactivated subscriptions | `src/adapter/graphql/tests/tests/flows/test_gql_webhook_flow_runs.rs` |
 | End to end against a local `wiremock` receiver: signed delivery, tampering rejected, secret rotation, failure reasons, retry, unreachable and reactivated subscriptions, external targets rejected | `src/e2e/app/cli/repo-tests/src/test_webhooks.rs`, wired in `src/e2e/app/cli/{sqlite,postgres}/tests/tests/test_webhooks.rs` |

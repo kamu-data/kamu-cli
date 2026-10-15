@@ -24,6 +24,7 @@ pub struct WebhookSubscriptionState {
     event_types: Vec<WebhookEventType>,
     secret: WebhookSubscriptionSecret,
     created_at: DateTime<Utc>,
+    dataset_head_at_creation: Option<odf::Multihash>,
 }
 
 impl WebhookSubscriptionState {
@@ -58,6 +59,11 @@ impl WebhookSubscriptionState {
     pub fn secret(&self) -> &WebhookSubscriptionSecret {
         &self.secret
     }
+
+    /// Head of the dataset when the subscription was created, if recorded
+    pub fn dataset_head_at_creation(&self) -> Option<&odf::Multihash> {
+        self.dataset_head_at_creation.as_ref()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +85,7 @@ impl Projection for WebhookSubscriptionState {
                     label,
                     target_url,
                     secret,
-                    ..
+                    dataset_head,
                 }) => Ok(Self {
                     id: subscription_id,
                     dataset_id,
@@ -89,6 +95,7 @@ impl Projection for WebhookSubscriptionState {
                     status: WebhookSubscriptionStatus::Unverified,
                     created_at: event_time,
                     secret,
+                    dataset_head_at_creation: dataset_head,
                 }),
                 E::Enabled(_)
                 | E::Paused(_)

@@ -168,6 +168,7 @@ impl WebhookRecoveryJobHarness {
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             self.webhook_secret_generator.generate_secret().unwrap(),
+            None,
         );
 
         match status {

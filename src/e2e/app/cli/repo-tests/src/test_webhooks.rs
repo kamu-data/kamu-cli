@@ -279,17 +279,22 @@ pub async fn test_webhook_subscription_unreachable_until_reactivated(
     assert_eq!(scenario.received_requests().await.len(), 2);
     assert_eq!(scenario.list_flows(&subscription).await.len(), 2);
 
-    // Once reactivated, the next update is delivered
+    // Once reactivated, the updates never delivered are sent in one delivery
     scenario.reset_receiver().await;
     scenario.receiver_responds(ResponseTemplate::new(200)).await;
     scenario.reactivate(&subscription).await;
     assert_eq!(scenario.subscription_status(&subscription).await, "ENABLED");
 
-    scenario.ingest_match(4).await;
-
     let flows = scenario.wait_for_finished_flows(&subscription, 3).await;
     pretty_assertions::assert_eq!(flows[0], WebhookScenario::succeeded_flow(1));
     assert_eq!(scenario.received_requests().await.len(), 1);
+
+    // Then the next update is delivered as usual
+    scenario.ingest_match(4).await;
+
+    let flows = scenario.wait_for_finished_flows(&subscription, 4).await;
+    pretty_assertions::assert_eq!(flows[0], WebhookScenario::succeeded_flow(1));
+    assert_eq!(scenario.received_requests().await.len(), 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

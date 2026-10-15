@@ -34,6 +34,7 @@ async fn test_subscriptions_removed_with_dataset() {
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             harness.webhook_secret_generator.generate_secret().unwrap(),
+            None,
         );
         subscription_id_1_1
             .save(harness.event_store.as_ref())
@@ -49,6 +50,7 @@ async fn test_subscriptions_removed_with_dataset() {
             Some(dataset_id_1.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             harness.webhook_secret_generator.generate_secret().unwrap(),
+            None,
         );
         subscription_id_1_2
             .save(harness.event_store.as_ref())
@@ -64,6 +66,7 @@ async fn test_subscriptions_removed_with_dataset() {
             Some(dataset_id_2.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             harness.webhook_secret_generator.generate_secret().unwrap(),
+            None,
         );
         subscription_id_2
             .save(harness.event_store.as_ref())

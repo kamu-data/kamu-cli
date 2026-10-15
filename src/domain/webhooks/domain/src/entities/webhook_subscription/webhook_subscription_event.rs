@@ -39,6 +39,11 @@ pub struct WebhookSubscriptionEventCreated {
     pub target_url: url::Url,
     pub label: WebhookSubscriptionLabel,
     pub secret: WebhookSubscriptionSecret,
+    /// Head of the dataset when the subscription was created: the receiver is
+    /// notified of changes after it. Absent in subscriptions created before
+    /// it was recorded
+    #[serde(default)]
+    pub dataset_head: Option<odf::Multihash>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

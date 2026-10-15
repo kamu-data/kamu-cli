@@ -11,6 +11,7 @@ use std::assert_matches;
 use std::sync::Arc;
 
 use dill::CatalogBuilder;
+use kamu_datasets_services::testing::FakeDatasetReferenceService;
 use kamu_webhooks::{
     CreateWebhookSubscriptionUseCase,
     WebhookEventTypeCatalog,
@@ -48,6 +49,19 @@ async fn test_create_in_dataset_success() {
         )
         .await;
     assert!(res.is_ok(), "Failed to create subscription: {res:?}");
+
+    // Changes are delivered from the head the dataset had at creation
+    let subscription = harness
+        .find_subscription(
+            res.unwrap().subscription_id,
+            WebhookSubscriptionQueryMode::Active,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        subscription.dataset_head_at_creation(),
+        Some(&CreateWebhookSubscriptionUseCaseHarness::dataset_head())
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,16 +327,30 @@ impl CreateWebhookSubscriptionUseCaseHarness {
         let mut b = CatalogBuilder::new_chained(base_harness.catalog());
         b.add::<CreateWebhookSubscriptionUseCaseImpl>();
         b.add::<WebhookSecretGeneratorImpl>();
+        b.add::<FakeDatasetReferenceService>();
         b.add_value(webhooks_config);
         b.add_value(mock_outbox);
         b.bind::<dyn Outbox, MockOutbox>();
 
         let catalog = b.build();
 
+        // The datasets the tests subscribe to
+        let dataset_reference_service = catalog.get_one::<FakeDatasetReferenceService>().unwrap();
+        for dataset_name in [b"foo", b"bar"] {
+            dataset_reference_service.set_head(
+                &odf::DatasetID::new_seeded_ed25519(dataset_name),
+                &Self::dataset_head(),
+            );
+        }
+
         Self {
             base_harness,
             use_case: catalog.get_one().unwrap(),
         }
+    }
+
+    fn dataset_head() -> odf::Multihash {
+        odf::Multihash::from_digest_sha3_256(b"head")
     }
 }
 

@@ -22,7 +22,7 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, DatasetResourceUpdateDetails};
 use kamu_adapter_task_webhook as atw;
-use kamu_datasets::DatasetEntryService;
+use kamu_datasets::{DatasetEntryService, DatasetIncrementQueryService};
 use kamu_flow_system as fs;
 use kamu_task_system as ts;
 use kamu_webhooks::{ResultIntoInternal, WebhookEventType, WebhookEventTypeCatalog};
@@ -33,6 +33,8 @@ use crate::{
     FlowScopeSubscription,
     WEBHOOK_DATASET_REF_UPDATED_VERSION,
     WebhookDatasetRefUpdatedPayload,
+    WebhookDeliveryBaseResolver,
+    dataset_changes_between,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,6 +47,9 @@ use crate::{
 pub struct FlowControllerWebhookDeliver {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
+    dataset_entry_service: Arc<dyn DatasetEntryService>,
+    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
+    delivery_base_resolver: Arc<WebhookDeliveryBaseResolver>,
 }
 
 impl FlowControllerWebhookDeliver {
@@ -75,10 +80,9 @@ impl FlowControllerWebhookDeliver {
         flow: &fs::FlowState,
         input_dataset_id: &odf::DatasetID,
     ) -> Result<serde_json::Value, InternalError> {
-        let dataset_entry_service = self.catalog.get_one::<dyn DatasetEntryService>().unwrap();
-
         // Find out who is the owner of the dataset
-        let dataset_entry = dataset_entry_service
+        let dataset_entry = self
+            .dataset_entry_service
             .get_entry(input_dataset_id)
             .await
             .int_err()?;
@@ -126,9 +130,33 @@ impl FlowControllerWebhookDeliver {
                 }
             }
         }
-        let summary = summary.ok_or_else(|| {
+        let mut summary = summary.ok_or_else(|| {
             InternalError::new("No dataset updates found in the flow state for the input dataset")
         })?;
+
+        // Start from the head the receiver already has, so that changes lost with a
+        // failed delivery are covered by this one
+        if let Some(delivery_base) = self
+            .delivery_base_resolver
+            .resolve(&flow.flow_binding.scope)
+            .await?
+            && summary.old_head_maybe.as_ref() != Some(&delivery_base)
+        {
+            if delivery_base != summary.new_head {
+                match dataset_changes_between(
+                    self.dataset_increment_query_service.as_ref(),
+                    input_dataset_id,
+                    &delivery_base,
+                    &summary.new_head,
+                )
+                .await?
+                {
+                    fs::ResourceChanges::Breaking => summary.is_breaking_change = true,
+                    fs::ResourceChanges::NewData(_) => {}
+                }
+            }
+            summary.old_head_maybe = Some(delivery_base);
+        }
 
         // Build webhook payload
         let webhook_payload = serde_json::to_value(WebhookDatasetRefUpdatedPayload {

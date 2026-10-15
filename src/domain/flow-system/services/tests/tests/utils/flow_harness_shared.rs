@@ -18,11 +18,11 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_accounts::{DEFAULT_ACCOUNT_NAME_STR, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::*;
-use kamu_adapter_flow_webhook::FlowControllerWebhookDeliver;
+use kamu_adapter_flow_webhook::{FlowControllerWebhookDeliver, WebhookDeliveryBaseResolver};
 use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
-use kamu_datasets_services::testing::FakeDatasetEntryService;
+use kamu_datasets_services::testing::{FakeDatasetEntryService, FakeDatasetReferenceService};
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
 use kamu_flow_system_services::*;
@@ -36,6 +36,8 @@ use kamu_task_system::{
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
 use kamu_task_system_services::TaskSchedulerImpl;
 use kamu_wakeup_listener_inmem::InMemoryWakeupHub;
+use kamu_webhooks_inmem::InMemoryWebhookSubscriptionEventStore;
+use kamu_webhooks_services::WebhookSubscriptionQueryServiceImpl;
 use messaging_outbox::{Outbox, OutboxExt, OutboxImmediateImpl, register_message_dispatcher};
 use time_source::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::task::yield_now;
@@ -177,7 +179,11 @@ impl FlowHarness {
             .add::<InMemoryTaskQueueWakeupSource>()
             .add::<DatabaseTransactionRunner>()
             .add::<FakeDatasetEntryService>()
-            .add::<FlowControllerWebhookDeliver>();
+            .add::<FakeDatasetReferenceService>()
+            .add::<FlowControllerWebhookDeliver>()
+            .add::<WebhookDeliveryBaseResolver>()
+            .add::<InMemoryWebhookSubscriptionEventStore>()
+            .add::<WebhookSubscriptionQueryServiceImpl>();
 
             NoOpDatabasePlugin::init_database_components(&mut b);
 

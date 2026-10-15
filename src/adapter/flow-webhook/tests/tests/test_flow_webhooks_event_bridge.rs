@@ -196,6 +196,7 @@ async fn test_subscription_non_matching_event_type() {
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::test()],
             harness.webhook_secret_generator.generate_secret().unwrap(),
+            None,
         );
         subscription
             .save(harness.subscription_event_store.as_ref())
@@ -496,6 +497,7 @@ impl TestWebhooksEventBridgeHarness {
             Some(dataset_id.clone()),
             vec![WebhookEventTypeCatalog::dataset_ref_updated()],
             self.webhook_secret_generator.generate_secret().unwrap(),
+            None,
         );
         if enabled {
             subscription.enable().unwrap();

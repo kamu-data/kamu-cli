@@ -11,10 +11,25 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, FlowScopeDataset};
+use kamu_adapter_flow_dataset::{
+    DATASET_RESOURCE_TYPE,
+    DatasetResourceUpdateDetails,
+    DatasetUpdateSource,
+    FlowScopeDataset,
+};
+use kamu_datasets::{
+    DatasetIncrementQueryService,
+    DatasetReferenceService,
+    GetDatasetReferenceError,
+};
 use kamu_flow_system::{self as fs, FlowSensorSensitizationError};
 
-use crate::{FLOW_TYPE_WEBHOOK_DELIVER, FlowScopeSubscription};
+use crate::{
+    FLOW_TYPE_WEBHOOK_DELIVER,
+    FlowScopeSubscription,
+    WebhookDeliveryBaseResolver,
+    dataset_changes_between,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,11 +41,17 @@ pub struct DatasetUpdatedWebhookSensor {
 
 struct State {
     reactive_rule: fs::ReactiveRule,
+    /// Head delivered by the last catch-up, until an update past it arrives:
+    /// updates it already covers may still be dispatched afterwards
+    caught_up_head: Option<odf::Multihash>,
 }
 
 impl State {
     fn new(reactive_rule: fs::ReactiveRule) -> Self {
-        Self { reactive_rule }
+        Self {
+            reactive_rule,
+            caught_up_head: None,
+        }
     }
 }
 
@@ -51,6 +72,109 @@ impl DatasetUpdatedWebhookSensor {
     pub fn reactive_rule(&self) -> fs::ReactiveRule {
         self.state.lock().unwrap().reactive_rule
     }
+
+    fn caught_up_head(&self) -> Option<odf::Multihash> {
+        self.state.lock().unwrap().caught_up_head.clone()
+    }
+
+    fn set_caught_up_head(&self, head: Option<odf::Multihash>) {
+        self.state.lock().unwrap().caught_up_head = head;
+    }
+
+    async fn changes_between(
+        &self,
+        catalog: &dill::Catalog,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) -> Result<fs::ResourceChanges, InternalError> {
+        let dataset_increment_query_service = catalog
+            .get_one::<dyn DatasetIncrementQueryService>()
+            .unwrap();
+        dataset_changes_between(
+            dataset_increment_query_service.as_ref(),
+            &self.dataset_id,
+            old_head,
+            new_head,
+        )
+        .await
+    }
+
+    /// Whether an update to `new_head` was already delivered by the last
+    /// catch-up. Forgets the caught-up head once an update past it arrives
+    async fn is_covered_by_catch_up(
+        &self,
+        catalog: &dill::Catalog,
+        new_head: &odf::Multihash,
+    ) -> Result<bool, InternalError> {
+        let Some(caught_up_head) = self.caught_up_head() else {
+            return Ok(false);
+        };
+        if *new_head == caught_up_head {
+            return Ok(true);
+        }
+
+        // The usual case, an update past the caught-up head, is checked first:
+        // its walk back through history is the short one
+        let covered = match self
+            .changes_between(catalog, &caught_up_head, new_head)
+            .await?
+        {
+            fs::ResourceChanges::NewData(_) => false,
+            fs::ResourceChanges::Breaking => match self
+                .changes_between(catalog, new_head, &caught_up_head)
+                .await?
+            {
+                fs::ResourceChanges::NewData(_) => true,
+                fs::ResourceChanges::Breaking => false,
+            },
+        };
+        if !covered {
+            self.set_caught_up_head(None);
+        }
+        Ok(covered)
+    }
+
+    /// Runs a delivery flow for a dataset update, unless the rule skips
+    /// breaking changes
+    async fn run_delivery_flow(
+        &self,
+        catalog: &dill::Catalog,
+        update: &fs::FlowActivationCauseResourceUpdate,
+    ) -> Result<(), InternalError> {
+        let reactive_rule = self.reactive_rule();
+
+        match (update.changes, reactive_rule.for_breaking_change) {
+            (fs::ResourceChanges::Breaking, fs::BreakingChangeRule::NoAction) => {
+                tracing::warn!(
+                    dataset_id = %self.dataset_id,
+                    webhook_flow_scope = ?self.webhook_flow_scope,
+                    "Skipping breaking change",
+                );
+                return Ok(());
+            }
+            (fs::ResourceChanges::Breaking, fs::BreakingChangeRule::Recover)
+            | (
+                fs::ResourceChanges::NewData(_),
+                fs::BreakingChangeRule::NoAction | fs::BreakingChangeRule::Recover,
+            ) => { /* Allow webhook flow to run */ }
+        }
+
+        let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
+        let target_flow_binding =
+            fs::FlowBinding::new(FLOW_TYPE_WEBHOOK_DELIVER, self.webhook_flow_scope.clone());
+        flow_run_service
+            .run_flow_automatically(
+                update.activation_time,
+                &target_flow_binding,
+                vec![fs::FlowActivationCause::ResourceUpdate(update.clone())],
+                Some(fs::FlowTriggerRule::Reactive(reactive_rule)),
+                None,
+            )
+            .await
+            .int_err()?;
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -68,14 +192,58 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         state.reactive_rule = new_rule;
     }
 
+    /// Delivers the changes the receiver has not seen: updates made while the
+    /// trigger was inactive or before the sensor was registered
     async fn on_activated(
         &self,
-        _catalog: &dill::Catalog,
-        _activation_time: DateTime<Utc>,
+        catalog: &dill::Catalog,
+        activation_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         tracing::info!(?self.webhook_flow_scope, "DatasetUpdatedWebhookSensor activated");
-        // TODO
-        Ok(())
+
+        let delivery_base_resolver = catalog.get_one::<WebhookDeliveryBaseResolver>().unwrap();
+        let Some(delivery_base) = delivery_base_resolver
+            .resolve(&self.webhook_flow_scope)
+            .await?
+        else {
+            tracing::info!("No delivered head known, nothing to catch up");
+            return Ok(());
+        };
+
+        let dataset_reference_service = catalog.get_one::<dyn DatasetReferenceService>().unwrap();
+        let head = match dataset_reference_service
+            .get_reference(&self.dataset_id, &odf::BlockRef::Head)
+            .await
+        {
+            Ok(head) => head,
+            // Triggers of a deleted dataset's subscriptions outlive it
+            Err(GetDatasetReferenceError::NotFound(_)) => {
+                tracing::warn!(dataset_id = %self.dataset_id, "Dataset has no head, nothing to catch up");
+                return Ok(());
+            }
+            Err(GetDatasetReferenceError::Internal(e)) => return Err(e),
+        };
+        if head == delivery_base {
+            tracing::info!("Receiver is up to date, nothing to catch up");
+            return Ok(());
+        }
+
+        tracing::info!(%delivery_base, %head, "Catching up on undelivered changes");
+        let update = fs::FlowActivationCauseResourceUpdate {
+            activation_time,
+            changes: self.changes_between(catalog, &delivery_base, &head).await?,
+            resource_type: DATASET_RESOURCE_TYPE.to_string(),
+            details: serde_json::to_value(DatasetResourceUpdateDetails {
+                dataset_id: self.dataset_id.clone(),
+                source: DatasetUpdateSource::ExternallyDetectedChange,
+                new_head: head.clone(),
+                old_head_maybe: Some(delivery_base),
+            })
+            .int_err()?,
+        };
+
+        self.set_caught_up_head(Some(head));
+        self.run_delivery_flow(catalog, &update).await
     }
 
     async fn on_sensitized(
@@ -95,58 +263,33 @@ impl fs::FlowSensor for DatasetUpdatedWebhookSensor {
         }
 
         // React to dataset updates
-        if let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause {
-            // Decode dataset update
-            if update.resource_type != DATASET_RESOURCE_TYPE {
-                return Err(InternalError::new(format!(
-                    "Unexpected resource type: {}",
-                    update.resource_type
-                ))
-                .into());
-            }
-
-            // Extract reactive rule
-            let reactive_rule = self.reactive_rule();
-
-            // Skip if disabled for breaking changes
-            if matches!(update.changes, fs::ResourceChanges::Breaking) {
-                match reactive_rule.for_breaking_change {
-                    fs::BreakingChangeRule::NoAction => {
-                        tracing::warn!(
-                            "Skipping breaking change for dataset {} in flow {}",
-                            self.dataset_id,
-                            input_flow_binding.flow_type
-                        );
-                        return Ok(());
-                    }
-                    fs::BreakingChangeRule::Recover => { /* Allow webhook flow to run */ }
-                }
-            }
-
-            // Extract necessary services
-            let flow_run_service = catalog.get_one::<dyn fs::FlowRunService>().unwrap();
-
-            // Trigger webhook flow
-            let target_flow_binding =
-                fs::FlowBinding::new(FLOW_TYPE_WEBHOOK_DELIVER, self.webhook_flow_scope.clone());
-            flow_run_service
-                .run_flow_automatically(
-                    activation_cause.activation_time(),
-                    &target_flow_binding,
-                    vec![activation_cause.clone()],
-                    Some(fs::FlowTriggerRule::Reactive(reactive_rule)),
-                    None,
-                )
-                .await
-                .int_err()?;
-
-            Ok(())
-        } else {
-            Err(InternalError::new(format!(
+        let fs::FlowActivationCause::ResourceUpdate(update) = activation_cause else {
+            return Err(InternalError::new(format!(
                 "Invalid activation cause for DatasetUpdatedWebhookSensor: {activation_cause:?}",
             ))
-            .into())
+            .into());
+        };
+        if update.resource_type != DATASET_RESOURCE_TYPE {
+            return Err(InternalError::new(format!(
+                "Unexpected resource type: {}",
+                update.resource_type
+            ))
+            .into());
         }
+
+        let details =
+            serde_json::from_value::<DatasetResourceUpdateDetails>(update.details.clone())
+                .int_err()?;
+        if self
+            .is_covered_by_catch_up(catalog, &details.new_head)
+            .await?
+        {
+            tracing::info!(new_head = %details.new_head, "Update already delivered by catch-up");
+            return Ok(());
+        }
+
+        self.run_delivery_flow(catalog, update).await?;
+        Ok(())
     }
 }
 
