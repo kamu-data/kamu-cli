@@ -18,7 +18,7 @@ use datafusion::common::DFSchema;
 use datafusion::config::{CsvOptions, JsonOptions, TableParquetOptions};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::error::{DataFusionError, Result};
-use datafusion::execution::{SessionState, TaskContext};
+use datafusion::execution::SessionState;
 use datafusion::logical_expr::{LogicalPlan, SortExpr};
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
@@ -143,10 +143,6 @@ impl DataFrameExt {
 
     pub fn sort(self, expr: Vec<SortExpr>) -> Result<Self, DataFusionError> {
         self.0.sort(expr).map(Self)
-    }
-
-    pub fn task_ctx(&self) -> TaskContext {
-        self.0.task_ctx()
     }
 
     pub fn with_column(self, name: &str, expr: Expr) -> Result<Self, DataFusionError> {

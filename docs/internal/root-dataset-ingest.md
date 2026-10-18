@@ -180,10 +180,13 @@ Points worth knowing before changing this code:
   or in the order of the merged records when `sort_order()` is empty, starting at
   `prev_offset + 1`, and the slice is sorted by offset.
 - **Input order survives only in one partition.** A partitioned scan splits the input file into
-  ranges and interleaves them. The ingest session pins `target_partitions = 1`
-  (`EngineConfigDatafusionEmbeddedIngest`), and for a strategy with an empty `sort_order()` the
-  writer refuses to stage under any other setting. `UpsertStream` also numbers its input in
-  arrival order to drop intermediate updates, so it depends on the same setting.
+  ranges and interleaves them. The ingest session defaults to `target_partitions = 1`
+  (`EngineConfigDatafusionEmbeddedIngest`). For a strategy whose `requires_ordered_input()` is true
+  (`ChangelogStream`, which numbers records in input order, and `UpsertStream`, which keeps the
+  last upsert per key), the writer sets `target_partitions = 1` on the merged data frame whatever
+  the configuration says. DataFusion reads the setting when it plans the frame for execution, so
+  it applies to the whole plan, input scan included, as long as nothing executes the plan
+  before the writer sets it.
 - **Event time** missing from the input is filled with `source_event_time` (polling: the time the
   fetch step reported, otherwise system time; push: the caller's event time, otherwise system
   time).

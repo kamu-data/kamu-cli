@@ -1218,33 +1218,20 @@ async fn test_data_writer_changelog_stream_preserves_input_order() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test]
-fn test_data_writer_changelog_stream_rejects_partitioned_session() {
-    // Splitting the input into partitions would interleave records and lose their order
+fn test_data_writer_changelog_stream_preserves_input_order() {
+    // Setting multiple partitions here to ensure that the merge strategy will override this value
+    // to preserve input order
     let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
-
-    let res = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(4)
-        .build()
-        .unwrap()
-        .block_on(test_data_writer_changelog_stream_natural_order_impl(ctx));
-
-    assert_matches!(res, Err(WriteDataError::Internal(_)));
-}
-
-#[test_group::group(engine, ingest, datafusion)]
-#[test]
-fn test_data_writer_changelog_stream_preserves_input_order_serialized() {
-    let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
 
     // Ensure we run with multiple threads
     let plan = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(4)
         .build()
         .unwrap()
-        .block_on(test_data_writer_changelog_stream_natural_order_impl(ctx))
-        .unwrap();
+        .block_on(test_data_writer_changelog_stream_natural_order_impl(ctx));
 
-    // No sort may precede the window that assigns offsets
+    // No sort may precede the window that assigns offsets, and the input is scanned in a
+    // single partition whatever the session configures
     pretty_assertions::assert_eq!(
         indoc::indoc!(
             r#"
@@ -1261,9 +1248,7 @@ fn test_data_writer_changelog_stream_preserves_input_order_serialized() {
     );
 }
 
-async fn test_data_writer_changelog_stream_natural_order_impl(
-    ctx: SessionContext,
-) -> Result<String, WriteDataError> {
+async fn test_data_writer_changelog_stream_natural_order_impl(ctx: SessionContext) -> String {
     use std::io::Write;
 
     testing_logger::setup();
@@ -1322,7 +1307,7 @@ async fn test_data_writer_changelog_stream_natural_order_impl(
     .await
     .unwrap();
 
-    harness.write_df_with_ctx(ctx, df).await?;
+    harness.write_df_with_ctx(ctx, df).await.unwrap();
 
     let data_path = harness.get_last_data_file().await;
     odf::utils::testing::assert_parquet_offsets_are_in_order(&data_path);
@@ -1340,7 +1325,87 @@ async fn test_data_writer_changelog_stream_natural_order_impl(
         "Offsets must follow the input order"
     );
 
-    Ok(harness.captured_physical_plan())
+    harness.captured_physical_plan()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test]
+fn test_data_writer_upsert_stream_keeps_last_upsert_partitioned() {
+    // Splitting the input into partitions would let an earlier upsert of a key win
+    let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
+
+    // Ensure we run with multiple threads
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .build()
+        .unwrap()
+        .block_on(test_data_writer_upsert_stream_keeps_last_upsert_impl(ctx));
+}
+
+async fn test_data_writer_upsert_stream_keeps_last_upsert_impl(ctx: SessionContext) {
+    use std::io::Write;
+
+    let harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyUpsertStream {
+                primary_key: vec!["city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    let data_path = harness.temp_dir.path().join("data.ndjson");
+    let mut file = std::fs::File::create_new(&data_path).unwrap();
+
+    // Generate a lot of data to make the scan split into byte ranges when partitioned
+    for i in 0..50_000 {
+        for city in ["A", "B", "C"] {
+            writeln!(&mut file, "{{\"city\": \"{city}\", \"population\": {i}}}").unwrap();
+        }
+    }
+
+    let df = ReaderNdJson::new(
+        ctx.clone(),
+        odf::metadata::ReadStepNdJson {
+            schema: Some(odf::schema::DataSchema::new(vec![
+                odf::schema::DataField::string("city"),
+                odf::schema::DataField::i64("population"),
+            ])),
+            ..Default::default()
+        },
+        &odf::schema::ToArrowSettings::default(),
+    )
+    .unwrap()
+    .read(&data_path)
+    .await
+    .unwrap();
+
+    harness.write_df_with_ctx(ctx, df).await.unwrap();
+
+    assert_data_eq(
+        harness
+            .get_last_data()
+            .await
+            .select_columns(&["op", "city", "population"])
+            .unwrap()
+            .sort(vec![col("city").sort(true, true)])
+            .unwrap(),
+        indoc!(
+            r#"
+            +----+------+------------+
+            | op | city | population |
+            +----+------+------------+
+            | 0  | A    | 49999      |
+            | 0  | B    | 49999      |
+            | 0  | C    | 49999      |
+            +----+------+------------+
+            "#
+        ),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

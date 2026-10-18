@@ -380,4 +380,8 @@ impl MergeStrategy for MergeStrategySnapshot {
             ))
             .collect()
     }
+
+    fn requires_ordered_input(&self) -> bool {
+        false
+    }
 }
