@@ -715,7 +715,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         Ok(ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef {
+            account: Some(odf::metadata::auth::ResourceOwnerRef {
                 id: Some(account_resource_id),
                 did: Some(account_did),
                 name: Some(account_name),

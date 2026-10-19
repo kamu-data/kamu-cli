@@ -49,7 +49,7 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceID {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let variable_set_id = ResourceID::new(uuid::Uuid::new_v4());
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     repo.create_resource(&ResourceSnapshot {
         id: variable_set_id,

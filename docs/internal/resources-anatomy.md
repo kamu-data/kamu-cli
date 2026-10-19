@@ -21,7 +21,7 @@ pub struct ResourceManifest {
 pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,              // optional — NOT assignable; an exact pointer to an
                                              // existing resource for updates (e.g. when renaming)
-    pub account: Option<ResourceAccountRef>, // optional — id/did/name selector; defaults to caller
+    pub account: Option<ResourceOwnerRef>, // optional — id/did/name selector; defaults to caller
     pub name: ResourceName,                  // required
     pub labels: Vec<(TypeRef, serde_json::Value)>,
     pub annotations: Vec<(TypeRef, serde_json::Value)>,
@@ -59,7 +59,7 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 > downstream carries the plain `TypeUri`. Both serialize byte-identically, so there's no wire/storage
 > difference.
 
-> **`ResourceAccountRef`** is ODF's generated `auth::AccountRef` struct — `{ id: Option<ResourceID>,
+> **`ResourceOwnerRef`** is ODF's generated `auth::ResourceOwnerRef` struct — `{ id: Option<ResourceID>,
 > did: Option<AccountID>, name: Option<AccountName> }`, all fields optional — shared by the manifest
 > `account` field and every facade selector's `account`. See [§7](resources-framework.md#7-account-resolution--authorization)
 > for how a selector resolves to an account and how an empty one (`{}`) is rejected.
@@ -76,18 +76,20 @@ and `ResourceStatus` ([`state/resource_status.rs`](/src/domain/resources/domain/
 ```rust
 pub struct ResourceHeaders {
     pub id: ResourceID,                      // generated — stable identity, assigned once
-    pub account: auth::AccountHandle,        // resolved owning account: resource id (`id`) + DID (`did`) + name
+    pub account: auth::ResourceOwnerHandle,  // resolved owning account: resource id (`id`) + DID (`did`) + name
     pub name: ResourceName,                  // (authored)
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub generation: u64,                     // generated — bumps on spec/headers change
+    pub status_generation: u64,              // generated — not counted yet, always 1
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
+    pub deletion_requested_at: Option<DateTime<Utc>>, // generated — not set yet, always None
     pub deleted_at: Option<DateTime<Utc>>,   // generated (soft-delete tombstone)
 }
 
 pub struct ResourceStatus {                  // ODF-generated; entirely server-owned
-    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Failed
+    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Degraded|Failed (Deleting|Deleted not produced yet)
     pub observed_generation: Option<u64>,
     pub reconciled_at: Option<DateTime<Utc>>,
     pub conditions: Option<ResourceConditions>,
@@ -96,7 +98,7 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 
 > **Codegen-alias convention.** `ResourceHeaders`, `ResourceHeadersInput`, `ResourcePhase`,
 > `ResourceConditions`, `ResourceLabels`, `ResourceAnnotations`, `ResourceHandle` (and `ResourceID`/
-> `TypeUri`/`ResourceAccountRef` seen earlier) are all `pub type` aliases adopting ODF's generated types
+> `TypeUri`/`ResourceOwnerRef` seen earlier) are all `pub type` aliases adopting ODF's generated types
 > verbatim rather than hand-rolled structs. The generated DTOs have no direct `Serialize`/`Deserialize`
 > — serde goes through ODF's YAML "shadow proxy", so fields of these types carry a
 > `#[serde_as(as = "odf::metadata::serde::yaml::resource::…")]` annotation instead of deriving serde
@@ -112,7 +114,7 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > canonical per-instance DTO. Its identity/lookup counterpart, domain `ResourceHandle`
 > ([`values/resource_handle.rs`](/src/domain/resources/domain/src/values/resource_handle.rs)), is also a
 > `pub type` alias — of `odf::metadata::resource::ResourceHandle` (RFC-18 shape: `account:
-> auth::AccountHandle`, `r#type: TypeUri`, `id: ResourceID`, `did: Option<Did>`, `name: ResourceName`).
+> auth::ResourceOwnerHandle`, `r#type: TypeUri`, `id: ResourceID`, `did: Option<Did>`, `name: ResourceName`).
 > `did` is always `None` today — populating it needs DID-aware resource types, which don't exist yet
 > (see [`handle_support.rs`](/src/domain/resources/facade/src/facade/local/helpers/handle_support.rs)).
 > A short display name is derived on demand from `r#type` via `resource_type_name()` (see
@@ -148,7 +150,7 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 
 The behaviorally-significant consequences of adopting these shapes:
 
-- **`headers.account` is a mandatory `auth::AccountHandle`** carrying the RFC-18 shape — the account
+- **`headers.account` is a mandatory `auth::ResourceOwnerHandle`** carrying the RFC-18 shape — the account
   *resource* id (`id: ResourceID`, an artificial UUID stored on `accounts.resource_id`), the account
   DID (`did: AccountID`), and the account `name`. The `resources` table stores only `account_id` (the
   DID), so repositories resolve **both the name and the account resource id** on every read
@@ -163,9 +165,9 @@ The behaviorally-significant consequences of adopting these shapes:
   (`kamu_accounts::Account::resource_id`) in preparation for `Account` eventually becoming a
   projection of an account resource — no account-resource events/history exist today.
 - **Account is a precondition, not resolved, at the use-case boundary.**
-  `ResourceHeadersInput.account` is an `Option<auth::AccountRef>` selector — `{id, did, name}`, all
+  `ResourceHeadersInput.account` is an `Option<auth::ResourceOwnerRef>` selector — `{id, did, name}`, all
   optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must already be a
-  fully-resolved `AccountRef` (all three fields `Some`); `ResourceHeaders::from_input` panics
+  fully-resolved `ResourceOwnerRef` (all three fields `Some`); `ResourceHeaders::from_input` panics
   otherwise. Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
   authorizes), or by resolving the account directly when only a DID/name is in hand (e.g.
   `DatasetEnvVarMutationAdapterImpl` looks up the resource id via `AccountService` from

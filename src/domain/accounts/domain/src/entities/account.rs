@@ -16,6 +16,8 @@ use email_utils::Email;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+#[cfg(any(feature = "testing", test))]
+use crate::AccountHandle;
 use crate::Password;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,12 +47,11 @@ pub static TEST_ACCOUNT_ID: LazyLock<odf::AccountID> =
     LazyLock::new(|| odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR));
 
 #[cfg(any(feature = "testing", test))]
-pub static DEFAULT_ACCOUNT_HANDLE: LazyLock<odf::AccountHandle> =
-    LazyLock::new(|| odf::AccountHandle {
-        id: *DEFAULT_ACCOUNT_RESOURCE_ID,
-        did: TEST_ACCOUNT_ID.clone(),
-        name: DEFAULT_ACCOUNT_NAME.clone(),
-    });
+pub static DEFAULT_ACCOUNT_HANDLE: LazyLock<AccountHandle> = LazyLock::new(|| AccountHandle {
+    id: *DEFAULT_ACCOUNT_RESOURCE_ID,
+    did: TEST_ACCOUNT_ID.clone(),
+    name: DEFAULT_ACCOUNT_NAME.clone(),
+});
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -124,18 +125,6 @@ impl Account {
             &uuid::Uuid::NAMESPACE_URL,
             name.as_bytes(),
         ))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<&Account> for odf::AccountHandle {
-    fn from(account: &Account) -> Self {
-        odf::AccountHandle {
-            id: account.resource_id,
-            did: account.id.clone(),
-            name: account.account_name.clone(),
-        }
     }
 }
 

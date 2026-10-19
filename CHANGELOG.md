@@ -25,6 +25,12 @@ Recommendation: for ease of reading, use the following format:
   (e.g. `molecule` in `molecule.dev.*`); account names in these checks compare case-insensitively
 - Molecule: `createProject` rejects a symbol whose project account would name another org or its project
   (e.g. `dev`, `sandbox`, `sandbox.x` for `molecule`)
+- Updated to ODF spec v0.42.1
+- GraphQL (breaking): `AccountHandle` is renamed to `ResourceOwnerHandle` and `AccountRefInput` to
+  `ResourceOwnerRefInput`, following ODF. Remote resource commands need both the `kamu` CLI and the node on
+  this version or later
+- GraphQL: `ResourceHeaders` has `statusGeneration` and `deletionRequestedAt`, and `ResourcePhase` has
+  `DELETING` and `DELETED`, following ODF. They are not populated yet: `statusGeneration` is always `1`
 - SQL `to_table()` only reads datasets the query lists, like plain table references
 - Webhooks: `DATASET.REF.UPDATED` payloads go from the last head the receiver accepted (`old_hash`) to the
   dataset's head when the delivery is sent (`new_hash`), so a delivery after a failed one covers the missed

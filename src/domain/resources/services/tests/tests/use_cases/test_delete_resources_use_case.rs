@@ -27,7 +27,7 @@ use crate::tests::utils::make_id;
 #[test_log::test(tokio::test)]
 async fn test_delete_single_resource_success() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let (id, snapshot) = harness
         .apply_and_assert_snapshot(&account_handle, "res-a")
@@ -44,7 +44,7 @@ async fn test_delete_single_resource_success() {
 #[test_log::test(tokio::test)]
 async fn test_delete_multiple_resources_in_one_call() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let (id_a, snapshot_a) = harness
         .apply_and_assert_snapshot(&account_handle, "res-a")
@@ -77,7 +77,7 @@ async fn test_delete_multiple_resources_in_one_call() {
 #[test_log::test(tokio::test)]
 async fn test_delete_nonexistent_id_is_idempotent() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let random_id = make_id();
 
@@ -92,8 +92,8 @@ async fn test_delete_nonexistent_id_is_idempotent() {
 #[test_log::test(tokio::test)]
 async fn test_delete_resource_owned_by_other_account_fails() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
-    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
+    let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     let (id, snapshot) = harness
         .apply_and_assert_snapshot(&account_handle_a, "res-a")
@@ -128,7 +128,7 @@ async fn test_delete_emits_deleted_lifecycle_message() {
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
@@ -147,7 +147,7 @@ async fn test_delete_multiple_emits_single_message_with_all_resources() {
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 3);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
     let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
@@ -169,7 +169,7 @@ async fn test_delete_no_op_emits_no_message() {
     mock_outbox.expect_post_message_as_json().times(0);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
         .delete_resources(account_handle.did, vec![make_id()])
@@ -214,7 +214,7 @@ async fn test_deleted_message_carries_correct_snapshot_data() {
         .returning(|_, _, _| Ok(()));
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     *uid_cell.lock().unwrap() = Some(id);

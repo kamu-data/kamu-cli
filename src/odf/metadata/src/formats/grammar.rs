@@ -13,7 +13,7 @@ use super::did_odf::DID_ODF_PREFIX;
 
 pub struct Grammar;
 
-/// See: <https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity>
+/// See: <https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/datasets/identity.md#grammar>
 impl Grammar {
     fn match_non_eof(s: &str) -> Option<(&str, &str)> {
         if s.is_empty() { None } else { Some(("", s)) }

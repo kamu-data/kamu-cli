@@ -44,12 +44,12 @@ pub(crate) fn parse_manifest(
 
 pub(crate) fn make_headers_input(
     name: &str,
-    target_account: &odf::AccountHandle,
+    target_account: &odf::ResourceOwnerHandle,
     labels: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
     annotations: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
 ) -> Result<ResourceHeadersInput, ApplyManifestError> {
     ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::AccountRef {
+        Some(odf::metadata::auth::ResourceOwnerRef {
             id: Some(target_account.id),
             did: Some(target_account.did.clone()),
             name: Some(target_account.name.clone()),

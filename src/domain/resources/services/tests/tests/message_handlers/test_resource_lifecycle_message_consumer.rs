@@ -164,7 +164,7 @@ impl ResourceLifecycleConsumerHarness {
     }
 
     fn make_snapshot_with_schema(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
-        let account_handle = odf::AccountHandle::new_test("test-oowner");
+        let account_handle = odf::ResourceOwnerHandle::new_test("test-oowner");
 
         ResourceSnapshot {
             id,

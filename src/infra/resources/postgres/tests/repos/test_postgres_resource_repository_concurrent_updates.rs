@@ -64,7 +64,7 @@ impl ConcurrentResourceUpdatesHarness {
             headers: ResourceHeaders::simple(
                 Utc::now(),
                 id,
-                odf::AccountHandle::new_test("test-account"),
+                odf::ResourceOwnerHandle::new_test("test-account"),
                 "racing-resource",
             ),
             spec: serde_json::json!({}),

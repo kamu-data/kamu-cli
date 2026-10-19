@@ -457,7 +457,7 @@ through the API:
   `Cannot initialize ... from event ReconciliationSucceeded`. Emit the events from one ordered
   `INSERT ... ORDER BY` rather than from sibling data-modifying CTEs — Postgres does not define
   the execution order of those, so `nextval` may number them backwards.
-- **`headers.account` must be a full `AccountRef` object** (`{id, did, name}`), matching what the
+- **`headers.account` must be a full `ResourceOwnerRef` object** (`{id, did, name}`), matching what the
   runtime writes. A bare DID string deserializes into a partial ref, and the subsequent apply
   fails to load the resource. The `id` is the account *resource* UUID, so the migration adding
   `accounts.resource_id` has to run before any backfill that emits `Created` events.
@@ -479,7 +479,7 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   the calling subject's own account**. To target *another* account, the resolver requires the caller
   to be an **admin** (`rebac_service.is_account_admin`); otherwise it returns
   `AccessError::Unauthorized`. An **anonymous** subject cannot resolve any account (rejected).
-- **Account selector forms.** `account` (`ResourceAccountRef`) carries `id`/`did`/`name`, all
+- **Account selector forms.** `account` (`ResourceOwnerRef`) carries `id`/`did`/`name`, all
   optional. The account is looked up by `did` if given, else by `name`; any other selector field(s)
   present are then checked for agreement against the resolved account (a mismatch on `id`, `did`, or
   `name` → `SelectorMismatch`). An empty selector (`{}`) parses successfully (the struct derives
@@ -713,10 +713,10 @@ transaction per manifest — not to the facade.
 pub type ResourceRef      = odf::metadata::resource::ResourceRef;
 pub type ResourceSelector = odf::metadata::resource::ResourceSelector;
 
-pub struct ResourceRef      { pub account: Option<ResourceAccountRef>, pub id: Option<ResourceID>,
+pub struct ResourceRef      { pub account: Option<ResourceOwnerRef>, pub id: Option<ResourceID>,
                               pub did: Option<Did>, pub r#type: Option<TypeRef>,
                               pub name: Option<ResourceName> }
-pub struct ResourceSelector { pub account: Option<ResourceAccountRef>, pub id: Option<ResourceID>,
+pub struct ResourceSelector { pub account: Option<ResourceOwnerRef>, pub id: Option<ResourceID>,
                               pub did: Option<Did>, pub r#type: Option<TypeRef>,
                               pub name: Option<String> /* LIKE pattern */,
                               pub labels: Option<...> }

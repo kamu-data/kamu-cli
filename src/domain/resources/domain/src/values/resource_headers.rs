@@ -55,9 +55,20 @@ pub fn deleted_account_resource_id_sentinel() -> ResourceID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Value of `ResourceHeaders::status_generation` while status updates are not
+/// counted yet.
+// TODO: replace with the persisted counter once status updates bump it
+pub const UNTRACKED_STATUS_GENERATION: u64 = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub trait ResourceHeadersExt {
-    fn simple(now: DateTime<Utc>, id: ResourceID, account: auth::AccountHandle, name: &str)
-    -> Self;
+    fn simple(
+        now: DateTime<Utc>,
+        id: ResourceID,
+        account: auth::ResourceOwnerHandle,
+        name: &str,
+    ) -> Self;
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self;
     /// Inverse of [`Self::from_input`] for read-modify-write edits. Drops the
     /// server-owned fields and pins `id`, so the apply targets this resource
@@ -74,7 +85,7 @@ impl ResourceHeadersExt for ResourceHeaders {
     fn simple(
         now: DateTime<Utc>,
         id: ResourceID,
-        account: auth::AccountHandle,
+        account: auth::ResourceOwnerHandle,
         name: &str,
     ) -> Self {
         Self {
@@ -89,8 +100,10 @@ impl ResourceHeadersExt for ResourceHeaders {
             },
             owner_references: None,
             generation: 0,
+            status_generation: UNTRACKED_STATUS_GENERATION,
             created_at: now,
             updated_at: now,
+            deletion_requested_at: None,
             deleted_at: None,
         }
     }
@@ -119,8 +132,10 @@ impl ResourceHeadersExt for ResourceHeaders {
             }),
             owner_references: None,
             generation: 1,
+            status_generation: UNTRACKED_STATUS_GENERATION,
             created_at: now,
             updated_at: now,
+            deletion_requested_at: None,
             deleted_at: None,
         }
     }
@@ -128,7 +143,7 @@ impl ResourceHeadersExt for ResourceHeaders {
     fn into_input(self) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: Some(self.id),
-            account: Some(auth::AccountRef {
+            account: Some(auth::ResourceOwnerRef {
                 id: Some(self.account.id),
                 did: Some(self.account.did),
                 name: Some(self.account.name),
@@ -188,23 +203,23 @@ impl ResourceHeadersExt for ResourceHeaders {
 /// Account resolution (id + did + name lookup) happens upstream, as part of
 /// the apply process (see `ResourceAccountResolver`), before a
 /// [`ResourceHeadersInput`] is ever constructed — every production caller
-/// populates `account` with a fully-resolved [`auth::AccountRef`]. Panics if
+/// populates `account` with a fully-resolved [`auth::ResourceOwnerRef`]. Panics if
 /// handed a partially-resolved reference, which would indicate a caller
 /// bypassed account resolution.
-fn account_handle_from_input(input: Option<&auth::AccountRef>) -> auth::AccountHandle {
+fn account_handle_from_input(input: Option<&auth::ResourceOwnerRef>) -> auth::ResourceOwnerHandle {
     match input {
-        Some(auth::AccountRef {
+        Some(auth::ResourceOwnerRef {
             id: Some(id),
             did: Some(did),
             name: Some(name),
-        }) => auth::AccountHandle {
+        }) => auth::ResourceOwnerHandle {
             id: *id,
             did: did.clone(),
             name: name.clone(),
         },
         other => panic!(
-            "ResourceHeadersInput.account must be a fully resolved AccountRef (id, did, and name \
-             all present) by the time headers are constructed, got: {other:?}"
+            "ResourceHeadersInput.account must be a fully resolved ResourceOwnerRef (id, did, and \
+             name all present) by the time headers are constructed, got: {other:?}"
         ),
     }
 }

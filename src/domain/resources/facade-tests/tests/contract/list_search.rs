@@ -203,7 +203,7 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
     let facade = h.facade_for(TestAccount::Alice);
 
     let bobs_selector = ResourceSelector {
-        account: Some(kamu_resources::ResourceAccountRef {
+        account: Some(kamu_resources::ResourceOwnerRef {
             id: None,
             did: None,
             name: Some(h.account_name(TestAccount::Bob)),
@@ -292,7 +292,7 @@ pub async fn test_type_less_selector_may_name_an_account(h: &impl FacadeContract
     create_variable_set(h, TestAccount::Bob, "default-bob").await;
 
     let facade = h.facade_for(TestAccount::Alice);
-    let account_ref = |account| kamu_resources::ResourceAccountRef {
+    let account_ref = |account| kamu_resources::ResourceOwnerRef {
         id: None,
         did: None,
         name: Some(h.account_name(account)),
@@ -395,7 +395,7 @@ pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness)
     // denied before this limit is reached.
     let err = search(vec![
         ResourceSelector {
-            account: Some(kamu_resources::ResourceAccountRef {
+            account: Some(kamu_resources::ResourceOwnerRef {
                 id: None,
                 did: None,
                 name: Some(h.account_name(TestAccount::Alice)),

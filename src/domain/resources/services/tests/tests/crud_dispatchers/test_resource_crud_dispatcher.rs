@@ -263,7 +263,7 @@ impl ResourceCrudDispatcherHarness {
         ResourceCrudDispatcherApplyRequest {
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
-                odf::AccountHandle::new_test("test"),
+                odf::ResourceOwnerHandle::new_test("test"),
                 name,
             ),
             spec: serde_json::json!({ "value": value }),
@@ -277,7 +277,7 @@ impl ResourceCrudDispatcherHarness {
         ResourceCrudDispatcherApplyRequest {
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
-                odf::AccountHandle::new_test("test"),
+                odf::ResourceOwnerHandle::new_test("test"),
                 name,
             ),
             spec,

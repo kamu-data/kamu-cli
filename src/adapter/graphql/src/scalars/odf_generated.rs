@@ -26,31 +26,6 @@ use crate::queries::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Link to an account.
-///
-/// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
-#[derive(SimpleObject, Debug, Clone)]
-pub struct AccountHandle {
-    /// ID of the account resource.
-    pub id: ResourceID<'static>,
-    /// DID of the account.
-    pub did: AccountID<'static>,
-    /// Name of the account.
-    pub name: AccountName<'static>,
-}
-
-impl From<odf::metadata::auth::AccountHandle> for AccountHandle {
-    fn from(v: odf::metadata::auth::AccountHandle) -> Self {
-        Self {
-            id: v.id.into(),
-            did: v.did.into(),
-            name: v.name.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Indicates that data has been ingested into a root dataset.
 ///
 /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/AddData
@@ -789,7 +764,7 @@ impl From<odf::metadata::sources::MergeStrategyLedger> for MergeStrategyLedger {
 /// state of data against the reconstructed previous state and recording differences as retractions
 /// or corrections. The Operation Type "op" column will contain:
 ///   - append (`+A`) when a row appears for the first time
-///   - retraction (`-D`) when row disappears
+///   - retraction (`-R`) when row disappears
 ///   - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old value of
 ///     the row and `+C` carrying the new value.
 ///
@@ -1568,7 +1543,7 @@ impl From<odf::metadata::sources::RequestHeader> for RequestHeader {
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/Resource
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Resource {
-    /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset.json`.
+    /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset`.
     pub schema: TypeUri<'static>,
     /// Container for identity and ownership information of a resource.
     pub headers: ResourceHeaders,
@@ -1657,7 +1632,7 @@ impl async_graphql::ScalarType for ResourceConditions {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHandle {
     /// Account that owns the target resource.
-    pub account: AccountHandle,
+    pub account: ResourceOwnerHandle,
     /// Type URI of the target resource.
     pub r#type: TypeUri<'static>,
     /// ID of the resource within a node.
@@ -1693,7 +1668,7 @@ pub struct ResourceHeaders {
     /// Symbolic name of a resource that identifies it within a scope of an onwing account.
     pub name: ResourceName<'static>,
     /// Link to the account that owns the resource.
-    pub account: AccountHandle,
+    pub account: ResourceOwnerHandle,
     /// Map of string keys and values that can be used to organize, categorize, and query
     /// resources.
     pub labels: ResourceLabels,
@@ -1708,10 +1683,17 @@ pub struct ResourceHeaders {
     /// not increment on status changes, thus signifying changes to the desired state. Populated by
     /// the system. Starts with `1`.
     pub generation: UInt64,
+    /// A sequential number that changes every time the resource status is updated. Can be passed
+    /// back as a precondition of a status update to make sure the status was not modified since it
+    /// was read. Populated by the system. Starts with `1`.
+    pub status_generation: UInt64,
     /// Time when the resource was first applied and assigned an identity.
     pub created_at: DateTime<Utc>,
     /// Time when the resource was last updated, including header, spec, and status updates.
     pub updated_at: DateTime<Utc>,
+    /// Time when deletion of the resource was requested. The resource remains visible until its
+    /// controllers finish cleaning up and the deletion completes.
+    pub deletion_requested_at: Option<DateTime<Utc>>,
     /// Time when the resource was deleted.
     pub deleted_at: Option<DateTime<Utc>>,
 }
@@ -1728,8 +1710,10 @@ impl From<odf::metadata::resources::ResourceHeaders> for ResourceHeaders {
                 .owner_references
                 .map(|v| v.into_iter().map(Into::into).collect()),
             generation: v.generation.into(),
+            status_generation: v.status_generation.into(),
             created_at: v.created_at.into(),
             updated_at: v.updated_at.into(),
+            deletion_requested_at: v.deletion_requested_at.map(Into::into),
             deleted_at: v.deleted_at.map(Into::into),
         }
     }
@@ -1766,7 +1750,32 @@ impl async_graphql::ScalarType for ResourceLabels {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents the reconciliation phase of a resource.
+/// Link to a resolved account that can own resources: `User`, `Organization`, or `Node`.
+///
+/// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerHandle
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceOwnerHandle {
+    /// ID of the account resource.
+    pub id: ResourceID<'static>,
+    /// DID of the account.
+    pub did: AccountID<'static>,
+    /// Name of the account.
+    pub name: AccountName<'static>,
+}
+
+impl From<odf::metadata::auth::ResourceOwnerHandle> for ResourceOwnerHandle {
+    fn from(v: odf::metadata::auth::ResourceOwnerHandle) -> Self {
+        Self {
+            id: v.id.into(),
+            did: v.did.into(),
+            name: v.name.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the reconciliation or deletion phase of a resource.
 ///
 /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourcePhase
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
@@ -1777,6 +1786,8 @@ pub enum ResourcePhase {
     Ready,
     Degraded,
     Failed,
+    Deleting,
+    Deleted,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

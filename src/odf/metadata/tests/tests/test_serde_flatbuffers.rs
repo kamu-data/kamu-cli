@@ -107,62 +107,6 @@ fn test_flatbuffers_maps() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[test]
-fn test_flatbuffers_any_json_property() {
-    // String
-    let expected = auth::RelationInput {
-        subject: "X:x".parse().unwrap(),
-        object: "Y:y".parse().unwrap(),
-        relation: "my-rel".to_string(),
-        value: Some(json!("some-values")),
-    };
-
-    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
-    let offset = expected.serialize(&mut fb);
-    fb.finish(offset, None);
-    let data = fb.finished_data();
-
-    let actual =
-        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
-    pretty_assertions::assert_eq!(expected, actual);
-
-    // Int
-    let expected = auth::RelationInput {
-        subject: "X:x".parse().unwrap(),
-        object: "Y:y".parse().unwrap(),
-        relation: "my-rel".to_string(),
-        value: Some(json!(123)),
-    };
-
-    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
-    let offset = expected.serialize(&mut fb);
-    fb.finish(offset, None);
-    let data = fb.finished_data();
-
-    let actual =
-        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
-    pretty_assertions::assert_eq!(expected, actual);
-
-    // Nested
-    let expected = auth::RelationInput {
-        subject: "X:x".parse().unwrap(),
-        object: "Y:y".parse().unwrap(),
-        relation: "my-rel".to_string(),
-        value: Some(json!({"a": "x", "b": "y"})),
-    };
-
-    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
-    let offset = expected.serialize(&mut fb);
-    fb.finish(offset, None);
-    let data = fb.finished_data();
-
-    let actual =
-        auth::RelationInput::deserialize(::flatbuffers::root::<fb::RelationInput>(data).unwrap());
-    pretty_assertions::assert_eq!(expected, actual);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
     [
         (
@@ -556,8 +500,8 @@ fn serde_execute_transform_response() {
 // hand-written `ResourceID::as_bytes`/`from_bytes`.
 #[test]
 fn test_flatbuffers_resource_selectors() {
-    fn account_ref() -> opendatafabric_metadata::auth::AccountRef {
-        opendatafabric_metadata::auth::AccountRef {
+    fn account_ref() -> opendatafabric_metadata::auth::ResourceOwnerRef {
+        opendatafabric_metadata::auth::ResourceOwnerRef {
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),

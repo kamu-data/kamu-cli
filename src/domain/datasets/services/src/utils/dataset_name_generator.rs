@@ -27,7 +27,7 @@ impl DatasetNameGenerator {
         use std::fmt::Write;
 
         // Dataset name PEG grammar: [a-zA-Z0-9]+ ("-" [a-zA-Z0-9]+)*
-        // Based on: <https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity>
+        // Based on: <https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/datasets/identity.md#grammar>
         let mut s = String::with_capacity(odf::DatasetName::MAX_LEN);
 
         write!(&mut s, "{uuid}-").unwrap();

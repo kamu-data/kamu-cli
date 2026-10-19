@@ -46,7 +46,7 @@ static OTHER_SCHEMA: std::sync::LazyLock<TypeUri> =
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_success() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
     let state = harness
@@ -63,7 +63,7 @@ async fn test_get_state_by_id_success() {
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_not_found() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.allocate_id().await;
 
     let result = harness
@@ -83,8 +83,8 @@ async fn test_get_state_by_id_not_found() {
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_wrong_account() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
-    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
+    let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
     let id = harness.apply_and_get_id(&account_handle_a, "res-a").await;
 
     let result = harness
@@ -105,7 +105,7 @@ async fn test_get_state_by_id_wrong_account() {
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_type_mismatch() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.allocate_id().await;
 
     harness
@@ -133,8 +133,8 @@ async fn test_get_state_by_id_type_mismatch() {
 #[test_log::test(tokio::test)]
 async fn test_list_states_filters_by_account() {
     let harness: TypedResourceQueryServiceHarness = TypedResourceQueryServiceHarness::new();
-    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
-    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
+    let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     for name in ["res-a1", "res-a2", "res-a3"] {
         harness.apply_and_get_id(&account_handle_a, name).await;
@@ -176,7 +176,7 @@ async fn test_list_states_filters_by_account() {
 #[test_log::test(tokio::test)]
 async fn test_ensure_id_matches_type_success() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
     let result = harness
@@ -192,7 +192,7 @@ async fn test_ensure_id_matches_type_success() {
 #[test_log::test(tokio::test)]
 async fn test_ensure_id_matches_type_mismatch() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.allocate_id().await;
 
     harness
@@ -243,7 +243,11 @@ impl TypedResourceQueryServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    async fn apply_and_get_id(&self, owner_handle: &odf::AccountHandle, name: &str) -> ResourceID {
+    async fn apply_and_get_id(
+        &self,
+        owner_handle: &odf::ResourceOwnerHandle,
+        name: &str,
+    ) -> ResourceID {
         use kamu_resources::ApplyResourceApplicationDecision;
 
         let params = make_resource_params(owner_handle.clone(), name);
@@ -260,7 +264,7 @@ impl TypedResourceQueryServiceHarness {
     async fn insert_snapshot_with_schema(
         &self,
         id: ResourceID,
-        owner_handle: &odf::AccountHandle,
+        owner_handle: &odf::ResourceOwnerHandle,
         schema: &TypeUri,
         name: &str,
     ) {

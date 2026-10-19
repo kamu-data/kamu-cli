@@ -25,7 +25,7 @@ pub trait ResourceHeadersInputExt {
     fn remove_label(&mut self, key: &TypeRef);
 
     fn try_new(
-        account: Option<auth::AccountRef>,
+        account: Option<auth::ResourceOwnerRef>,
         name: &str,
         labels: Vec<(TypeRef, serde_json::Value)>,
         annotations: Vec<(TypeRef, serde_json::Value)>,
@@ -42,7 +42,7 @@ impl ResourceHeadersInputExt for ResourceHeadersInput {
     }
 
     fn try_new(
-        account: Option<auth::AccountRef>,
+        account: Option<auth::ResourceOwnerRef>,
         name: &str,
         labels: Vec<(TypeRef, serde_json::Value)>,
         annotations: Vec<(TypeRef, serde_json::Value)>,
@@ -185,8 +185,8 @@ mod tests {
 
     use super::*;
 
-    fn account() -> auth::AccountRef {
-        auth::AccountRef {
+    fn account() -> auth::ResourceOwnerRef {
+        auth::ResourceOwnerRef {
             id: None,
             did: Some(odf::AccountID::new_seeded_ed25519(b"test-account")),
             name: None,

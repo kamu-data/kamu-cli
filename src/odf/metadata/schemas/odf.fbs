@@ -17,192 +17,6 @@ struct Timestamp {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountRef
-// Reference to an account.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountRef
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AccountRef {
-  // UUID of the account resource.
-  id: [ubyte];
-  // DID of the account.
-  did: [ubyte];
-  // Name of the account.
-  name: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceLabels
-// Map of string keys and values that can be used to organize, categorize, and query resources.
-//
-// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceLabels
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceLabelsEntry {
-  key: string (key);
-  // JSON encoded
-  value: string (json);
-}
-table ResourceLabels {
-  // Key-value map
-  entries: [ResourceLabelsEntry];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceAnnotations
-// Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
-//
-// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceAnnotations
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceAnnotationsEntry {
-  key: string (key);
-  // JSON encoded
-  value: string (json);
-}
-table ResourceAnnotations {
-  // Key-value map
-  entries: [ResourceAnnotationsEntry];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceRef
-// Reference to another resource.
-//
-// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceRef
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceRef {
-  // Reference to an account that owns the target resource.
-  account: AccountRef;
-  // ID of the resource within a node.
-  id: [ubyte];
-  // DID of the resource.
-  did: [ubyte];
-  // Short type name or full type URI of the target resource.
-  //
-  // Examples:
-  // - "SecretSet"
-  // - "https://opendatafabric.org/config/v1/SecretSet"
-  type: string;
-  // Name of a resource.
-  name: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceHeadersInput
-// Container for identity and ownership information of a resource.
-//
-// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeadersInput
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceHeadersInput {
-  // Unique identifier of a resource within entire ODF node. Automatically assigned upon resource creation.
-  id: [ubyte];
-  // Symbolic name of a resource that identifies it within a scope of an onwing account.
-  name: string;
-  // Reference to the account that owns the resource.
-  account: AccountRef;
-  // Map of string keys and values that can be used to organize, categorize, and query resources.
-  labels: ResourceLabels;
-  // Annotations is a key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
-  annotations: ResourceAnnotations;
-  // References to resources that created this resource. Used for lineage tracking and cascading cleanup.
-  owner_references: [ResourceRef];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountType
-// Represents the type of an account.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountType
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-enum AccountType: int32 {
-  User,
-  Organization,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Secret
-// Individual secret in raw or encrypted form.
-//
-// Schema: https://opendatafabric.org/schemas/config/v1alpha1/Secret
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table Secret {
-  // A secret value in raw or encoded form.
-  value: string;
-  // Represents the encoding of the value. Typically will be `jwe` after a raw secret gets encrypted.
-  content_encoding: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountSpecInput
-// Predefined account specification.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountSpecInput
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AccountSpecInput {
-  // DID associated with the account by ODF or an external system
-  did: [ubyte];
-  // Type of the account.
-  //
-  // Defaults to: "User"
-  account_type: AccountType = null;
-  // Human-friendly display name.
-  display_name: string;
-  // Email address of the account.
-  email: string;
-  // URL of the account's avatar image.
-  avatar_url: string;
-  // Password for local authentication. Absent for SSO or DID-based accounts.
-  password: Secret;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountHandle
-// Link to an account.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AccountHandle {
-  // ID of the account resource.
-  id: [ubyte];
-  // DID of the account.
-  did: [ubyte];
-  // Name of the account.
-  name: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountSpec
-// Predefined account specification.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountSpec
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table AccountSpec {
-  // DID associated with the account by ODF or an external system
-  did: [ubyte];
-  // Type of the account.
-  //
-  // Defaults to: "User"
-  account_type: AccountType = null;
-  // Human-friendly display name.
-  display_name: string;
-  // Email address of the account.
-  email: string;
-  // URL of the account's avatar image.
-  avatar_url: string;
-  // Password for local authentication. Absent for SSO or DID-based accounts.
-  password: Secret;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval
 // Describes a range of data as a closed arithmetic interval of offsets
 //
@@ -952,7 +766,7 @@ table MergeStrategyLedger {
 // 
 // This strategy transforms snapshot data into an append-only event stream where data already added is immutable. It does so by performing Change Data Capture - essentially diffing the current state of data against the reconstructed previous state and recording differences as retractions or corrections. The Operation Type "op" column will contain:
 //   - append (`+A`) when a row appears for the first time
-//   - retraction (`-D`) when row disappears
+//   - retraction (`-R`) when row disappears
 //   - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old value of the row and `+C` carrying the new value.
 // 
 // To correctly associate rows between old and new snapshots this strategy relies on user-specified primary key columns.
@@ -1053,6 +867,22 @@ table AttachmentsEmbedded {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceOwnerHandle
+// Link to a resolved account that can own resources: `User`, `Organization`, or `Node`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceOwnerHandle {
+  // ID of the account resource.
+  id: [ubyte];
+  // DID of the account.
+  did: [ubyte];
+  // Name of the account.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ValueHandle
 // Reference to a value within a `VariableSet` or a `SecretSet`.
 //
@@ -1061,7 +891,7 @@ table AttachmentsEmbedded {
 
 table ValueHandle {
   // Account that owns the target resource.
-  account: AccountHandle;
+  account: ResourceOwnerHandle;
   // Type URI of the target resource.
   type: string;
   // ID of the resource within a node.
@@ -1091,6 +921,22 @@ table AwsCredentials {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceOwnerRef
+// Reference to an account that can own resources: `User`, `Organization`, or `Node`. Short form is the account name, as names of these accounts are unique within a node.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceOwnerRef {
+  // UUID of the account resource.
+  id: [ubyte];
+  // DID of the account.
+  did: [ubyte];
+  // Name of the account.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ValueRef
 // Reference to a value within a `VariableSet` or a `SecretSet`.
 //
@@ -1099,7 +945,7 @@ table AwsCredentials {
 
 table ValueRef {
   // Reference to an account that owns the `VariableSet` or the `SecretSet`.
-  account: AccountRef;
+  account: ResourceOwnerRef;
   // ID of a resource.
   id: [ubyte];
   // Short type name or full type URI of the target resource.
@@ -1107,7 +953,7 @@ table ValueRef {
   // Examples:
   // - "SecretSet"
   // - "VariableSet"
-  // - "https://opendatafabric.org/config/v1/SecretSet"
+  // - "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet"
   type: string;
   // Name of a resource.
   name: string;
@@ -1134,6 +980,70 @@ table AwsCredentialsInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectHandle
+// Resolved reference to a party a grant is given to.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union SubjectHandle {
+  SubjectHandleResource,
+  SubjectHandleAuthenticated,
+  SubjectHandleAnonymous,
+  SubjectHandleEveryone,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectHandleResource
+// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Resource
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectHandleResource {
+  // Type URI of the subject resource.
+  type: string;
+  // Account that owns the subject resource (for service accounts and groups).
+  account: ResourceOwnerHandle;
+  // ID of the subject resource.
+  id: [ubyte];
+  // DID of the subject resource, if applicable.
+  did: [ubyte];
+  // Name of the subject resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectHandleAuthenticated
+// Matches any authenticated principal.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Authenticated
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectHandleAuthenticated {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectHandleAnonymous
+// Matches any unauthenticated principal.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Anonymous
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectHandleAnonymous {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectHandleEveryone
+// Matches any principal, authenticated or not.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Everyone
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectHandleEveryone {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CompressionFormat
 // Defines a compression algorithm.
 //
@@ -1143,6 +1053,86 @@ table AwsCredentialsInput {
 enum CompressionFormat: int32 {
   Gzip,
   Zip,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceLabels
+// Map of string keys and values that can be used to organize, categorize, and query resources.
+//
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceLabels
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceLabelsEntry {
+  key: string (key);
+  // JSON encoded
+  value: string (json);
+}
+table ResourceLabels {
+  // Key-value map
+  entries: [ResourceLabelsEntry];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceAnnotations
+// Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
+//
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceAnnotations
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceAnnotationsEntry {
+  key: string (key);
+  // JSON encoded
+  value: string (json);
+}
+table ResourceAnnotations {
+  // Key-value map
+  entries: [ResourceAnnotationsEntry];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceRef
+// Reference to another resource.
+//
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceRef {
+  // Reference to an account that owns the target resource.
+  account: ResourceOwnerRef;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
+  // Short type name or full type URI of the target resource.
+  //
+  // Examples:
+  // - "SecretSet"
+  // - "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet"
+  type: string;
+  // Name of a resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceHeadersInput
+// Container for identity and ownership information of a resource.
+//
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourceHeadersInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceHeadersInput {
+  // Unique identifier of a resource within entire ODF node. Automatically assigned upon resource creation.
+  id: [ubyte];
+  // Symbolic name of a resource that identifies it within a scope of an onwing account.
+  name: string;
+  // Reference to the account that owns the resource.
+  account: ResourceOwnerRef;
+  // Map of string keys and values that can be used to organize, categorize, and query resources.
+  labels: ResourceLabels;
+  // Annotations is a key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
+  annotations: ResourceAnnotations;
+  // References to resources that created this resource. Used for lineage tracking and cascading cleanup.
+  owner_references: [ResourceRef];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1686,7 +1676,7 @@ table MetadataEventWrapper {
 
 table PersistentVolumeRef {
   // Reference to an account that owns the `PersistentVolume`.
-  account: AccountRef;
+  account: ResourceOwnerRef;
   // ID of the resource.
   id: [ubyte];
   // Name of the resource.
@@ -1705,7 +1695,7 @@ table DatasetSpecInput {
   did: [ubyte];
   // Type of the dataset.
   kind: DatasetKind;
-  // An array of metadata events that will be used to populate the chain. Here you can define polling and push sources, set licenses, add attachments etc.
+  // An array of metadata events that will be used to populate the chain, e.g. to set info, licenses, and attachments. As the dataset evolves, it maintains a snapshot of the key events that describe the dataset in its latest state, excluding intermediate transitions (e.g. previous schema changes) and events related to ingestions and transformations.
   metadata: [MetadataEventWrapper];
   // Reference to a storage volume where dataset data will be stored. If omitted, the node's default storage is used.
   volume: PersistentVolumeRef;
@@ -1720,7 +1710,7 @@ table DatasetSpecInput {
 
 table DatasetHandle {
   // Reference to an account that owns the dataset.
-  account: AccountHandle;
+  account: ResourceOwnerHandle;
   // ID of the dataset resource.
   id: [ubyte];
   // DID of the dataset.
@@ -1738,26 +1728,13 @@ table DatasetHandle {
 
 table DatasetRef {
   // Reference to an account that owns the dataset.
-  account: AccountRef;
+  account: ResourceOwnerRef;
   // UUID of the dataset resource.
   id: [ubyte];
   // DID of the dataset.
   did: [ubyte];
   // Name of the dataset.
   name: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetRole
-// Access role granted to a subject on a dataset. Note: in future this fixed enum schema will likely be replaced by a reference to a `DatasetRole` resources that defines granular permissions on different actions available on a dataset.
-//
-// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetRole
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-enum DatasetRole: int32 {
-  Reader,
-  Editor,
-  Maintainer,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1786,7 +1763,7 @@ table LabelFilter {
 
 table DatasetSelector {
   // Reference to an account that owns the target resources.
-  account: AccountRef;
+  account: ResourceOwnerRef;
   // ID of the singular resource.
   id: [ubyte];
   // Name pattern in SQL `LIKE` format.
@@ -1828,7 +1805,7 @@ table DatasetSnapshot {
 
 table ResourceHandle {
   // Account that owns the target resource.
-  account: AccountHandle;
+  account: ResourceOwnerHandle;
   // Type URI of the target resource.
   type: string;
   // ID of the resource within a node.
@@ -1851,7 +1828,7 @@ table DatasetSpec {
   did: [ubyte];
   // Type of the dataset.
   kind: DatasetKind;
-  // An array of metadata events that will be used to populate the chain. Here you can define polling and push sources, set licenses, add attachments etc.
+  // An array of metadata events that will be used to populate the chain, e.g. to set info, licenses, and attachments. As the dataset evolves, it maintains a snapshot of the key events that describe the dataset in its latest state, excluding intermediate transitions (e.g. previous schema changes) and events related to ingestions and transformations.
   metadata: [MetadataEventWrapper];
   // Reference to a storage volume where dataset data will be stored. If omitted, the node's default storage is used.
   volume: ResourceHandle;
@@ -1901,6 +1878,18 @@ table EventFilter {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FailureBehavior
+// Determines how a flow run proceeds when a task finishes with a `Failed` outcome.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/FailureBehavior
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum FailureBehavior: int32 {
+  Fail,
+  Continue,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceSelector
 // Matches zero or many resources using identity and label filters.
 //
@@ -1909,12 +1898,12 @@ table EventFilter {
 
 table ResourceSelector {
   // Reference to an account that owns the target resources.
-  account: AccountRef;
+  account: ResourceOwnerRef;
   // ID of the singular resource.
   id: [ubyte];
   // DID of the resource.
   did: [ubyte];
-  // Short type name of the target resource e.g. `SecretSet` or a full schema URI e.g. `https://opendatafabric.org/config/v1/SecretSet.json`.
+  // Short type name of the target resource e.g. `SecretSet` or a full schema URI e.g. `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet`.
   type: string;
   // Name pattern in SQL `LIKE` format.
   //
@@ -1928,6 +1917,26 @@ table ResourceSelector {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PrincipalRef
+// Reference to an identity that can act as a principal: `User`, `ServiceAccount`, or `Node`. Short form requires a type prefix, e.g. `ServiceAccount:acme/ingest-prod`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PrincipalRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PrincipalRef {
+  // Short type name or full type URI of the principal.
+  type: string;
+  // Reference to an account that owns the service account.
+  account: ResourceOwnerRef;
+  // ID of the principal resource.
+  id: [ubyte];
+  // DID of the principal.
+  did: [ubyte];
+  // Name of the principal resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FlowTriggerInput
 // Condition that causes a flow to be executed.
 //
@@ -1937,9 +1946,10 @@ table ResourceSelector {
 union FlowTriggerInput {
   FlowTriggerInputManual,
   FlowTriggerInputSchedule,
+  FlowTriggerInputInterval,
   FlowTriggerInputEvent,
   FlowTriggerInputSource,
-  FlowTriggerInputDataset,
+  FlowTriggerInputInputsUpdated,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1950,6 +1960,14 @@ union FlowTriggerInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputManual {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1960,8 +1978,36 @@ table FlowTriggerInputManual {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputSchedule {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
   // Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
   cron: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerInputInterval
+// Triggers the flow at regular intervals.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Interval
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerInputInterval {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
+  // Interval between activations e.g. `15m`.
+  interval: Duration;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1972,11 +2018,15 @@ table FlowTriggerInputSchedule {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputEvent {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
   // Filters the event by type and fields.
   events: EventFilter;
-  // The trigger will fire upon first observed event. If another event arrives withing the `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e. trigger is guaranteed to fire, but may batch multiple events together into one flow run.
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
   cooldown: Duration;
-  // If an event is observed a `cooldownMaxBatch` number of times during the `cooldown` interval it will fire the trigger without waiting for cooldown to finish.
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
   cooldown_max_batch: uint64 = null;
 }
 
@@ -1988,6 +2038,14 @@ table FlowTriggerInputEvent {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerInputSource {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
   // Reference to the source resource that drives this trigger.
   source: ResourceRef;
   // Minimum number of new records to accumulate before triggering.
@@ -1997,17 +2055,27 @@ table FlowTriggerInputSource {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FlowTriggerInputDataset
-// Triggers the flow when matching datasets are updated.
+// FlowTriggerInputInputsUpdated
+// Triggers the flow when inputs of a derivative dataset receive new data, with optional batching controls.
 //
-// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Dataset
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/InputsUpdated
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table FlowTriggerInputDataset {
-  // Selector that identifies which datasets can trigger this flow.
-  dataset: DatasetSelector;
-  // Set of event bus event IDs that this trigger will react to
-  events: [string];
+table FlowTriggerInputInputsUpdated {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
+  // Selector of derivative datasets whose inputs are watched. Defaults to the flow-level target when omitted.
+  target: DatasetSelector;
+  // Minimum number of new input records to accumulate before triggering.
+  min_records_to_await: uint64 = null;
+  // Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
+  max_await_interval: Duration;
 }
 
 table FlowTriggerInputWrapper {
@@ -2024,10 +2092,25 @@ table FlowTriggerInputWrapper {
 union TaskSpecInput {
   TaskSpecInputIngest,
   TaskSpecInputTransform,
+  TaskSpecInputSyncFrom,
+  TaskSpecInputSyncTo,
   TaskSpecInputCompaction,
+  TaskSpecInputReset,
   TaskSpecInputGarbageCollection,
   TaskSpecInputVerify,
   TaskSpecInputWebhookCall,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// NoOpBehavior
+// Determines how a flow run proceeds when a task finishes with a `NoOp` outcome.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/NoOpBehavior
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum NoOpBehavior: int32 {
+  Continue,
+  Break,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2042,6 +2125,16 @@ table TaskSpecInputIngest {
   name: string;
   // Reference to the dataset to ingest into. Defaults to the flow-level target when omitted.
   target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // Reference to the source resource that defines how to fetch data.
   source: ResourceRef;
   // Target number of records to ingest per data slice.
@@ -2060,6 +2153,163 @@ table TaskSpecInputTransform {
   name: string;
   // Reference to the derivative dataset that defines how to transform data.
   target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthInput
+// Credentials used to access a remote location during a sync.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union SyncAuthInput {
+  SyncAuthInputBearer,
+  SyncAuthInputAws,
+  SyncAuthInputHeaders,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthInputBearer
+// Authenticates with a bearer token, e.g. an access token of a remote ODF node.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput#/$defs/Bearer
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthInputBearer {
+  // Reference to a secret containing the token.
+  token: ValueRef;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthInputAws
+// Authenticates with AWS or an AWS-compatible object storage.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput#/$defs/Aws
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthInputAws {
+  // S3 endpoint URL. If omitted, defaults to AWS S3. Use for S3-compatible stores.
+  endpoint: string;
+  // AWS region where the bucket is located e.g. `us-west-2`.
+  region: string;
+  // Reference to a secret containing the AWS access key ID.
+  access_key: ValueRef;
+  // Reference to a secret containing the AWS secret access key.
+  secret_key: ValueRef;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthHeaderInput
+// A request header whose value is taken from a `VariableSet` or a `SecretSet`.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthHeaderInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthHeaderInput {
+  // Name of the header.
+  name: string;
+  // Reference to the value of the header.
+  value: ValueRef;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthInputHeaders
+// Authenticates by passing custom request headers.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput#/$defs/Headers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthInputHeaders {
+  // Headers to pass with every request.
+  headers: [SyncAuthHeaderInput];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncEndpointInput
+// A remote location a dataset is synced with.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncEndpointInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncEndpointInput {
+  // URL of the remote dataset. The scheme selects the transfer protocol e.g. `odf+https://`, `s3://`, `file://`.
+  url: string;
+  // Credentials used to access the remote location.
+  auth: SyncAuthInput;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputSyncFrom
+// Pulls new blocks from a remote dataset into a local dataset.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/SyncFrom
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputSyncFrom {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the local dataset to pull into. Defaults to the flow-level target when omitted.
+  target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+  // Remote dataset to pull from.
+  source: SyncEndpointInput;
+  // Overwrite the local dataset even if its history has diverged from the source.
+  //
+  // Defaults to: false
+  force: bool = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputSyncTo
+// Pushes new blocks of a local dataset to a remote dataset.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/SyncTo
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputSyncTo {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the local dataset to push. Defaults to the flow-level target when omitted.
+  target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+  // Remote dataset to push to.
+  destination: SyncEndpointInput;
+  // Overwrite the remote dataset even if its history has diverged from the local one.
+  //
+  // Defaults to: false
+  force: bool = null;
+  // Create the remote dataset if it does not exist.
+  //
+  // Defaults to: true
+  create_if_not_exists: bool = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2074,10 +2324,52 @@ table TaskSpecInputCompaction {
   name: string;
   // Reference to the dataset to compact. Defaults to the flow-level target when omitted.
   target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // Target maximum size of each compacted data slice e.g. `100MiB`.
   max_slice_size: uint64 = null;
   // Target maximum number of records per compacted data slice.
   max_slice_records: uint64 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputReset
+// Moves a block reference of a dataset to an earlier block, discarding the history that follows it.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Reset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputReset {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the dataset to reset. Defaults to the flow-level target when omitted.
+  target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+  // Name of the block reference to reset.
+  //
+  // Defaults to: "head"
+  ref: string;
+  // Hash of the block the reference will point to. Defaults to the `Seed` block when omitted.
+  new_block_hash: [ubyte];
+  // Expected hash of the block the reference currently points to. When specified, the task fails if the reference has moved, protecting against concurrent updates.
+  old_block_hash: [ubyte];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2092,6 +2384,16 @@ table TaskSpecInputGarbageCollection {
   name: string;
   // Reference to the dataset to collect garbage from. Defaults to the flow-level target when omitted.
   target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2106,6 +2408,16 @@ table TaskSpecInputVerify {
   name: string;
   // Reference to the dataset to verify. Defaults to the flow-level target when omitted.
   target: DatasetRef;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // If true, re-executes transformations on derivative datasets to verify reproducibility.
   replay_transform: bool = null;
 }
@@ -2134,7 +2446,7 @@ table RetryPolicy {
   max_attempts: uint32 = null;
   // How long to wait until the first retry.
   min_delay: Duration;
-  // Type of the backoff scaling.
+  // Type of the backoff scaling. When omitted, retries use a constant `minDelay`.
   backoff: RetryBackoff = null;
 }
 
@@ -2148,6 +2460,16 @@ table RetryPolicy {
 table TaskSpecInputWebhookCall {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalRef;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // Reference to the `WebhookEndpoint`.
   endpoint: ResourceRef;
   // The payload to send. May include templating.
@@ -2161,6 +2483,32 @@ table TaskSpecInputWrapper {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RecentBindingsRetention
+// Controls how many recent bindings are reported in `FlowStatus.recentBindings`.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/RecentBindingsRetention
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table RecentBindingsRetention {
+  // Maximum number of recent bindings to report.
+  max_bindings: uint32 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RecentRunsRetention
+// Controls how many recent runs are reported in `FlowStatus.recentRuns`. Implementations may additionally cap these values.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/RecentRunsRetention
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table RecentRunsRetention {
+  // Maximum number of recent runs to report.
+  max_runs: uint32 = null;
+  // Maximum age of a finished run to be reported e.g. `30d`.
+  max_age: Duration;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FlowSpecInput
 // Defines a sequence of tasks to be executed upon certain trigger conditions.
 //
@@ -2170,12 +2518,18 @@ table TaskSpecInputWrapper {
 table FlowSpecInput {
   // Defines resources for which this flow will be instantiated.
   target: ResourceSelector;
+  // Service account whose permissions the tasks of this flow execute with. Must be an account of service account type. Required for flows owned by an organization. When omitted, tasks execute with the permissions of the user account that owns the flow.
+  service_account: PrincipalRef;
   // Conditions that cause this flow to execute.
   triggers: [FlowTriggerInputWrapper];
   // List of tasks to run consecutively.
   tasks: [TaskSpecInputWrapper];
   // Defines how a flow should react to failures.
   retry_policy: RetryPolicy;
+  // Controls retention of `FlowStatus.recentBindings`.
+  recent_bindings_retention: RecentBindingsRetention;
+  // Controls retention of `FlowStatus.recentRuns`.
+  recent_runs_retention: RecentRunsRetention;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2188,8 +2542,30 @@ table FlowSpecInput {
 table FlowRunSpecInput {
   // Defines the default target resources on which tasks will be performed.
   target: ResourceRef;
+  // Service account whose permissions the tasks of this run execute with. Must be an account of service account type. A run created by the flow controller copies it from the `Flow`.
+  service_account: PrincipalRef;
   // List of tasks to run consecutively.
   tasks: [TaskSpecInputWrapper];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PrincipalHandle
+// Link to a resolved identity that can act as a principal: `User`, `ServiceAccount`, or `Node`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PrincipalHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PrincipalHandle {
+  // Type URI of the principal.
+  type: string;
+  // Account that owns the service account.
+  account: ResourceOwnerHandle;
+  // ID of the principal resource.
+  id: [ubyte];
+  // DID of the principal, if applicable.
+  did: [ubyte];
+  // Name of the principal resource.
+  name: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2202,9 +2578,10 @@ table FlowRunSpecInput {
 union FlowTrigger {
   FlowTriggerManual,
   FlowTriggerSchedule,
+  FlowTriggerInterval,
   FlowTriggerEvent,
   FlowTriggerSource,
-  FlowTriggerDataset,
+  FlowTriggerInputsUpdated,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2215,6 +2592,14 @@ union FlowTrigger {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerManual {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2225,8 +2610,36 @@ table FlowTriggerManual {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerSchedule {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
   // Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
   cron: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerInterval
+// Triggers the flow at regular intervals.
+//
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Interval
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerInterval {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
+  // Interval between activations e.g. `15m`.
+  interval: Duration;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2237,11 +2650,15 @@ table FlowTriggerSchedule {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerEvent {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
   // Filters the event by type and fields.
   events: EventFilter;
-  // The trigger will fire upon first observed event. If another event arrives withing the `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e. trigger is guaranteed to fire, but may batch multiple events together into one flow run.
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
   cooldown: Duration;
-  // If an event is observed a `cooldownMaxBatch` number of times during the `cooldown` interval it will fire the trigger without waiting for cooldown to finish.
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
   cooldown_max_batch: uint64 = null;
 }
 
@@ -2253,6 +2670,14 @@ table FlowTriggerEvent {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table FlowTriggerSource {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
   // Reference to the source resource that drives this trigger.
   source: ResourceHandle;
   // Minimum number of new records to accumulate before triggering.
@@ -2262,17 +2687,27 @@ table FlowTriggerSource {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FlowTriggerDataset
-// Triggers the flow when matching datasets are updated.
+// FlowTriggerInputsUpdated
+// Triggers the flow when inputs of a derivative dataset receive new data, with optional batching controls.
 //
-// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Dataset
+// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/InputsUpdated
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table FlowTriggerDataset {
-  // Selector that identifies which datasets can trigger this flow.
-  dataset: DatasetSelector;
-  // Set of event bus event IDs that this trigger will react to
-  events: [string];
+table FlowTriggerInputsUpdated {
+  // Allows to pause an individual trigger.
+  //
+  // Defaults to: true
+  enabled: bool = null;
+  // Minimum interval between activations of the trigger. If the trigger fires again within the interval, the activation is postponed until the interval ends, batching multiple activations into one flow run.
+  cooldown: Duration;
+  // If the trigger is activated this many times during the `cooldown` interval, it fires without waiting for the interval to end.
+  cooldown_max_batch: uint64 = null;
+  // Selector of derivative datasets whose inputs are watched. Defaults to the flow-level target when omitted.
+  target: DatasetSelector;
+  // Minimum number of new input records to accumulate before triggering.
+  min_records_to_await: uint64 = null;
+  // Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
+  max_await_interval: Duration;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2285,8 +2720,8 @@ table FlowTriggerDataset {
 table FlowRunActivationCause {
   // Time at which the trigger fired.
   activation_time: Timestamp;
-  // Account that initiated the run, if applicable.
-  initiator: AccountHandle;
+  // Principal that initiated the run, if applicable.
+  initiator: PrincipalHandle;
   // Copy of the trigger configuration from the parent Flow that fired.
   trigger: FlowTrigger;
 }
@@ -2329,7 +2764,10 @@ table FlowRunRetry {
 union TaskSpec {
   TaskSpecIngest,
   TaskSpecTransform,
+  TaskSpecSyncFrom,
+  TaskSpecSyncTo,
   TaskSpecCompaction,
+  TaskSpecReset,
   TaskSpecGarbageCollection,
   TaskSpecVerify,
   TaskSpecWebhookCall,
@@ -2347,6 +2785,16 @@ table TaskSpecIngest {
   name: string;
   // Reference to the dataset to ingest into. Defaults to the flow-level target when omitted.
   target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // Reference to the source resource that defines how to fetch data.
   source: ResourceHandle;
   // Target number of records to ingest per data slice.
@@ -2365,6 +2813,163 @@ table TaskSpecTransform {
   name: string;
   // Reference to the derivative dataset that defines how to transform data.
   target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuth
+// Credentials used to access a remote location during a sync.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union SyncAuth {
+  SyncAuthBearer,
+  SyncAuthAws,
+  SyncAuthHeaders,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthBearer
+// Authenticates with a bearer token, e.g. an access token of a remote ODF node.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth#/$defs/Bearer
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthBearer {
+  // Reference to a secret containing the token.
+  token: ValueHandle;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthAws
+// Authenticates with AWS or an AWS-compatible object storage.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth#/$defs/Aws
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthAws {
+  // S3 endpoint URL. If omitted, defaults to AWS S3. Use for S3-compatible stores.
+  endpoint: string;
+  // AWS region where the bucket is located e.g. `us-west-2`.
+  region: string;
+  // Reference to a secret containing the AWS access key ID.
+  access_key: ValueHandle;
+  // Reference to a secret containing the AWS secret access key.
+  secret_key: ValueHandle;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthHeader
+// A request header whose value is taken from a `VariableSet` or a `SecretSet`.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthHeader
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthHeader {
+  // Name of the header.
+  name: string;
+  // Reference to the value of the header.
+  value: ValueHandle;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncAuthHeaders
+// Authenticates by passing custom request headers.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth#/$defs/Headers
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncAuthHeaders {
+  // Headers to pass with every request.
+  headers: [SyncAuthHeader];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SyncEndpoint
+// A remote location a dataset is synced with.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncEndpoint
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SyncEndpoint {
+  // URL of the remote dataset. The scheme selects the transfer protocol e.g. `odf+https://`, `s3://`, `file://`.
+  url: string;
+  // Credentials used to access the remote location.
+  auth: SyncAuth;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecSyncFrom
+// Pulls new blocks from a remote dataset into a local dataset.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/SyncFrom
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecSyncFrom {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the local dataset to pull into. Defaults to the flow-level target when omitted.
+  target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+  // Remote dataset to pull from.
+  source: SyncEndpoint;
+  // Overwrite the local dataset even if its history has diverged from the source.
+  //
+  // Defaults to: false
+  force: bool = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecSyncTo
+// Pushes new blocks of a local dataset to a remote dataset.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/SyncTo
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecSyncTo {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the local dataset to push. Defaults to the flow-level target when omitted.
+  target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+  // Remote dataset to push to.
+  destination: SyncEndpoint;
+  // Overwrite the remote dataset even if its history has diverged from the local one.
+  //
+  // Defaults to: false
+  force: bool = null;
+  // Create the remote dataset if it does not exist.
+  //
+  // Defaults to: true
+  create_if_not_exists: bool = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2379,10 +2984,52 @@ table TaskSpecCompaction {
   name: string;
   // Reference to the dataset to compact. Defaults to the flow-level target when omitted.
   target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // Target maximum size of each compacted data slice e.g. `100MiB`.
   max_slice_size: uint64 = null;
   // Target maximum number of records per compacted data slice.
   max_slice_records: uint64 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecReset
+// Moves a block reference of a dataset to an earlier block, discarding the history that follows it.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Reset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecReset {
+  // An alias for the task used to refer to it in flows and access the results
+  name: string;
+  // Reference to the dataset to reset. Defaults to the flow-level target when omitted.
+  target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
+  // Name of the block reference to reset.
+  //
+  // Defaults to: "head"
+  ref: string;
+  // Hash of the block the reference will point to. Defaults to the `Seed` block when omitted.
+  new_block_hash: [ubyte];
+  // Expected hash of the block the reference currently points to. When specified, the task fails if the reference has moved, protecting against concurrent updates.
+  old_block_hash: [ubyte];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2397,6 +3044,16 @@ table TaskSpecGarbageCollection {
   name: string;
   // Reference to the dataset to collect garbage from. Defaults to the flow-level target when omitted.
   target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2411,6 +3068,16 @@ table TaskSpecVerify {
   name: string;
   // Reference to the dataset to verify. Defaults to the flow-level target when omitted.
   target: DatasetHandle;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // If true, re-executes transformations on derivative datasets to verify reproducibility.
   replay_transform: bool = null;
 }
@@ -2425,10 +3092,22 @@ table TaskSpecVerify {
 table TaskSpecWebhookCall {
   // An alias for the task used to refer to it in flows and access the results
   name: string;
+  // Service account whose permissions the task executes with. Must be an account of service account type. Defaults to the service account of the run when omitted.
+  service_account: PrincipalHandle;
+  // How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue` executes the next task, while `Break` finishes the flow run early without an error.
+  //
+  // Defaults to: "Continue"
+  on_no_op: NoOpBehavior = null;
+  // How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail` finishes the flow run with an error, while `Continue` executes the next task.
+  //
+  // Defaults to: "Fail"
+  on_failure: FailureBehavior = null;
   // Reference to the `WebhookEndpoint`.
   endpoint: ResourceHandle;
   // The payload to send. May include templating.
   payload: string;
+  // Defines how a webhook should react to failures.
+  retry_policy: RetryPolicy;
 }
 
 table TaskSpecWrapper {
@@ -2445,6 +3124,8 @@ table TaskSpecWrapper {
 table FlowRunSpec {
   // Defines the default target resources on which tasks will be performed.
   target: ResourceHandle;
+  // Service account whose permissions the tasks of this run execute with. Must be an account of service account type. A run created by the flow controller copies it from the `Flow`.
+  service_account: PrincipalHandle;
   // List of tasks to run consecutively.
   tasks: [TaskSpecWrapper];
 }
@@ -2471,10 +3152,8 @@ enum FlowRunStatusValue: int32 {
 
 enum TaskStatus: int32 {
   Pending,
-  Planning,
-  Ready,
+  Queued,
   Running,
-  Committing,
   Finished,
 }
 
@@ -2510,6 +3189,23 @@ table TaskOutcomeSuccess {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskError
+// Type-specific details of a task failure. The `kind` property identifies the error, e.g. `InputDatasetCompacted`, and the remaining properties depend on it.
+//
+// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskError
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskErrorEntry {
+  key: string (key);
+  // JSON encoded
+  value: string (json);
+}
+table TaskError {
+  // Key-value map
+  entries: [TaskErrorEntry];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TaskOutcomeFailed
 // Task failed.
 //
@@ -2519,6 +3215,10 @@ table TaskOutcomeSuccess {
 table TaskOutcomeFailed {
   // Human-readable description of the failure.
   message: string;
+  // Whether retrying the task could succeed, e.g. after a network error. An unrecoverable failure, such as an invalid query, would fail the same way again.
+  recoverable: bool;
+  // Type-specific details of the failure.
+  error: TaskError;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2589,12 +3289,18 @@ table FlowTriggerWrapper {
 table FlowSpec {
   // Defines resources for which this flow will be instantiated.
   target: ResourceSelector;
+  // Service account whose permissions the tasks of this flow execute with. Must be an account of service account type. Required for flows owned by an organization. When omitted, tasks execute with the permissions of the user account that owns the flow.
+  service_account: PrincipalHandle;
   // Conditions that cause this flow to execute.
   triggers: [FlowTriggerWrapper];
   // List of tasks to run consecutively.
   tasks: [TaskSpecWrapper];
   // Defines how a flow should react to failures.
   retry_policy: RetryPolicy;
+  // Controls retention of `FlowStatus.recentBindings`.
+  recent_bindings_retention: RecentBindingsRetention;
+  // Controls retention of `FlowStatus.recentRuns`.
+  recent_runs_retention: RecentRunsRetention;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2664,23 +3370,99 @@ table FlowStatus {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectRef
+// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many principals at once. Short form is either a well-known subject name (e.g. `Authenticated`) or a resource reference with a type prefix, DID, or ID (e.g. `Group:acme/engineering`).
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union SubjectRef {
+  SubjectRefResource,
+  SubjectRefAuthenticated,
+  SubjectRefAnonymous,
+  SubjectRefEveryone,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectRefResource
+// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Resource
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectRefResource {
+  // Short type name or full type URI of the subject resource.
+  type: string;
+  // Reference to an account that owns the subject resource (for service accounts and groups).
+  account: ResourceOwnerRef;
+  // ID of the subject resource.
+  id: [ubyte];
+  // DID of the subject resource.
+  did: [ubyte];
+  // Name of the subject resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectRefAuthenticated
+// Matches any authenticated principal.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Authenticated
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectRefAuthenticated {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectRefAnonymous
+// Matches any unauthenticated principal.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Anonymous
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectRefAnonymous {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SubjectRefEveryone
+// Matches any principal, authenticated or not.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Everyone
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SubjectRefEveryone {
+}
+
+table SubjectRefWrapper {
+  value: SubjectRef;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // GroupSpecInput
-// Group specification. Groups have no intrinsic properties — membership and permissions are expressed entirely through relations.
+// Group specification.
 //
 // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table GroupSpecInput {
+  // Members of the group. Only the `Resource` subject kind is allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
+  members: [SubjectRefWrapper];
+}
+
+table SubjectHandleWrapper {
+  value: SubjectHandle;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // GroupSpec
-// Group specification. Groups have no intrinsic properties — membership and permissions are expressed entirely through relations.
+// Group specification.
 //
 // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table GroupSpec {
+  // Members of the group. Only the `Resource` subject kind is allowed, so that well-known subjects like `Everyone` cannot be nested into a group.
+  members: [SubjectHandleWrapper];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2868,6 +3650,34 @@ table MetadataBlock {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// NodeSpecInput
+// Node account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/NodeSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table NodeSpecInput {
+  // DID associated with the account by ODF or an external system.
+  did: [ubyte];
+  // Human-friendly display name.
+  display_name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// NodeSpec
+// Node account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/NodeSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table NodeSpec {
+  // DID associated with the account by ODF or an external system.
+  did: [ubyte];
+  // Human-friendly display name.
+  display_name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // OperationType
 // Defines an operation in a changelog stream.
 //
@@ -2879,6 +3689,42 @@ enum OperationType: ubyte {
   Retract,
   CorrectFrom,
   CorrectTo,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// OrganizationSpecInput
+// Organization account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/OrganizationSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table OrganizationSpecInput {
+  // Human-friendly display name.
+  display_name: string;
+  // URL of the account's avatar image.
+  avatar_url: string;
+  // Suspends the account. Effects of suspension are implementation-specific.
+  //
+  // Defaults to: false
+  disabled: bool = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// OrganizationSpec
+// Organization account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/OrganizationSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table OrganizationSpec {
+  // Human-friendly display name.
+  display_name: string;
+  // URL of the account's avatar image.
+  avatar_url: string;
+  // Suspends the account. Effects of suspension are implementation-specific.
+  //
+  // Defaults to: false
+  disabled: bool = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2963,6 +3809,129 @@ table PersistentVolumeSpecRoot {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicySpecInput
+// Policy specification. The `kind` selects the policy language.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union PolicySpecInput {
+  PolicySpecInputGeneric,
+  PolicySpecInputCedar,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicySpecInputGeneric
+// Engine-agnostic policy that grants a set of actions. Subject and object are always supplied by a `PolicyBinding`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpecInput#/$defs/Generic
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicySpecInputGeneric {
+  // Schema URIs of actions granted by the policy.
+  actions: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicySpecInputCedar
+// Policy expressed in the Cedar policy language. Policies that declare `?principal` and `?resource` slots are templates instantiated via `PolicyBinding`, otherwise they take effect on their own. Only supported by nodes that use Cedar.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpecInput#/$defs/Cedar
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicySpecInputCedar {
+  // Cedar policy source.
+  body: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicyRef
+// Reference to a `Policy`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicyRef {
+  // Reference to an account that owns the `Policy`.
+  account: ResourceOwnerRef;
+  // ID of the resource.
+  id: [ubyte];
+  // Name of the resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicyBindingSpecInput
+// Policy binding specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBindingSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicyBindingSpecInput {
+  // Policy template to instantiate.
+  policy: PolicyRef;
+  // Party the permissions are granted to.
+  subject: SubjectRef;
+  // Resource the permissions are granted on. Refers to both the resource and the entity materialized from it.
+  object: ResourceRef;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicyBindingSpec
+// Policy binding specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBindingSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicyBindingSpec {
+  // Policy template to instantiate.
+  policy: ResourceHandle;
+  // Party the permissions are granted to.
+  subject: SubjectHandle;
+  // Resource the permissions are granted on. Refers to both the resource and the entity materialized from it.
+  object: ResourceHandle;
+}
+
+union PolicySpec {
+  PolicySpecGeneric,
+  PolicySpecCedar,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicySpecGeneric
+// Engine-agnostic policy that grants a set of actions. Subject and object are always supplied by a `PolicyBinding`.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpec#/$defs/Generic
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicySpecGeneric {
+  // Schema URIs of actions granted by the policy.
+  actions: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicySpecCedar
+// Policy expressed in the Cedar policy language. Policies that declare `?principal` and `?resource` slots are templates instantiated via `PolicyBinding`, otherwise they take effect on their own. Only supported by nodes that use Cedar.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpec#/$defs/Cedar
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicySpecCedar {
+  // Cedar policy source.
+  body: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicySpecRoot
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpecRoot
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PolicySpecRoot {
+  value: PolicySpec;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ProjectionSpecInput
 // Represents a projection of a dataaset history into a state for fast lookups.
 //
@@ -3004,6 +3973,10 @@ table RawQueryRequest {
   transform: Transform;
   // Path where query result will be written.
   output_data_path: string;
+  // Requires the engine to keep the order of records read from the input in the query result, or fail the request if it cannot.
+  //
+  // Defaults to: false
+  preserve_order: bool = null;
 }
 
 union RawQueryResponse {
@@ -3072,63 +4045,20 @@ table RawQueryResponseRoot {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Relation
-// A directed relationship between two resources, optionally carrying a typed value.
+// ReconciliationError
+// Condition describing why the controller failed to reconcile the latest generation of a resource. Set by the controller; never written by users.
 //
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relation
+// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ReconciliationError
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table Relation {
-  // The resource that holds the relation.
-  subject: ResourceHandle;
-  // Name of the relation e.g. `role`, `member`, `owner`.
-  relation: string;
-  // Optional value associated with the relation e.g. `maintainer` for a `role` relation.
-  value: string (json);
-  // The resource that is the target of the relation.
-  object: ResourceHandle;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// RelationInput
-// A directed relationship between two resources, optionally carrying a typed value.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationInput
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table RelationInput {
-  // The resource that holds the relation.
-  subject: ResourceRef;
-  // Name of the relation e.g. `role`, `member`, `owner`.
-  relation: string;
-  // Optional value associated with the relation e.g. `maintainer` for a `role` relation.
-  value: string (json);
-  // The resource that is the target of the relation.
-  object: ResourceRef;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// RelationsSpecInput
-// Specifies relations between resources on which auth policies act upon.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpecInput
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table RelationsSpecInput {
-  // Relations between resources.
-  relations: [RelationInput];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// RelationsSpec
-// Specifies relations between resources on which auth policies act upon.
-//
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpec
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table RelationsSpec {
-  // Relations between resources.
-  relations: [Relation];
+table ReconciliationError {
+  // Machine-readable code identifying the type of the error.
+  //
+  // Examples:
+  // - "unresolved-reference"
+  code: string;
+  // Human-readable description of the error.
+  message: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3144,7 +4074,7 @@ table ResourceHeaders {
   // Symbolic name of a resource that identifies it within a scope of an onwing account.
   name: string;
   // Link to the account that owns the resource.
-  account: AccountHandle;
+  account: ResourceOwnerHandle;
   // Map of string keys and values that can be used to organize, categorize, and query resources.
   labels: ResourceLabels;
   // Annotations is a key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
@@ -3153,17 +4083,21 @@ table ResourceHeaders {
   owner_references: [ResourceHandle];
   // A sequential number that changes every time the resource header and spec are updated. Does not increment on status changes, thus signifying changes to the desired state. Populated by the system. Starts with `1`.
   generation: uint64;
+  // A sequential number that changes every time the resource status is updated. Can be passed back as a precondition of a status update to make sure the status was not modified since it was read. Populated by the system. Starts with `1`.
+  status_generation: uint64;
   // Time when the resource was first applied and assigned an identity.
   created_at: Timestamp;
   // Time when the resource was last updated, including header, spec, and status updates.
   updated_at: Timestamp;
+  // Time when deletion of the resource was requested. The resource remains visible until its controllers finish cleaning up and the deletion completes.
+  deletion_requested_at: Timestamp;
   // Time when the resource was deleted.
   deleted_at: Timestamp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourcePhase
-// Represents the reconciliation phase of a resource.
+// Represents the reconciliation or deletion phase of a resource.
 //
 // Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourcePhase
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3174,6 +4108,8 @@ enum ResourcePhase: int32 {
   Ready,
   Degraded,
   Failed,
+  Deleting,
+  Deleted,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3223,7 +4159,7 @@ table ResourceStatus {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table Resource {
-  // Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset.json`.
+  // Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset`.
   schema: string;
   // Container for identity and ownership information of a resource.
   headers: ResourceHeaders;
@@ -3247,6 +4183,20 @@ table ResourceInput {
   headers: ResourceHeadersInput;
   // Specifies the desired state of a resource.
   spec: [ubyte];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Secret
+// Individual secret in raw or encrypted form.
+//
+// Schema: https://opendatafabric.org/schemas/config/v1alpha1/Secret
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table Secret {
+  // A secret value in raw or encoded form.
+  value: string;
+  // Represents the encoding of the value. Typically will be `jwe` after a raw secret gets encrypted.
+  content_encoding: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3287,6 +4237,38 @@ table SecretSetSpecInput {
 table SecretSetSpec {
   // Key value pairs of secrets.
   secrets: Secrets;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ServiceAccountSpecInput
+// Service account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ServiceAccountSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ServiceAccountSpecInput {
+  // Human-friendly display name.
+  display_name: string;
+  // Suspends the account. Effects of suspension are implementation-specific.
+  //
+  // Defaults to: false
+  disabled: bool = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ServiceAccountSpec
+// Service account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ServiceAccountSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ServiceAccountSpec {
+  // Human-friendly display name.
+  display_name: string;
+  // Suspends the account. Effects of suspension are implementation-specific.
+  //
+  // Defaults to: false
+  disabled: bool = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3505,6 +4487,54 @@ table TransformResponseInternalError {
 
 table TransformResponseRoot {
   value: TransformResponse;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// UserSpecInput
+// User account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/UserSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table UserSpecInput {
+  // DID associated with the account by ODF or an external system.
+  did: [ubyte];
+  // Human-friendly display name.
+  display_name: string;
+  // Email address of the user.
+  email: string;
+  // URL of the account's avatar image.
+  avatar_url: string;
+  // Password for local authentication, stored as a hash upon apply. Absent for SSO or DID-based accounts.
+  password: Secret;
+  // Suspends the account. Effects of suspension are implementation-specific.
+  //
+  // Defaults to: false
+  disabled: bool = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// UserSpec
+// User account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/UserSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table UserSpec {
+  // DID associated with the account by ODF or an external system.
+  did: [ubyte];
+  // Human-friendly display name.
+  display_name: string;
+  // Email address of the user.
+  email: string;
+  // URL of the account's avatar image.
+  avatar_url: string;
+  // Password for local authentication, stored as a hash upon apply. Absent for SSO or DID-based accounts.
+  password: Secret;
+  // Suspends the account. Effects of suspension are implementation-specific.
+  //
+  // Defaults to: false
+  disabled: bool = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

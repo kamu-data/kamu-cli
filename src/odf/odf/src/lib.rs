@@ -20,7 +20,7 @@ pub use odf_dataset::{
     IterBlocksError,
     MetadataChain,
 };
-pub use odf_metadata::auth::AccountHandle;
+pub use odf_metadata::auth::ResourceOwnerHandle;
 pub use odf_metadata::resources::ResourceID;
 pub use odf_metadata::{
     AccessError,

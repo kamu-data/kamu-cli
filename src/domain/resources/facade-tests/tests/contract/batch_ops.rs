@@ -947,7 +947,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
     // one account spelled two ways into two groups.
     let spelled_out = vec![
         ResourceRef {
-            account: Some(kamu_resources::ResourceAccountRef {
+            account: Some(kamu_resources::ResourceOwnerRef {
                 id: None,
                 did: None,
                 name: Some(h.account_name(TestAccount::Alice)),

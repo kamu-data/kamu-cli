@@ -5,7 +5,7 @@ content:
   kind: Root
   metadata:
     # Specifies the source of data that can be periodically polled to refresh the dataset
-    # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+    # See: https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/reference.md#setpollingsource
     - kind: SetPollingSource
       # Where to fetch the data from.
       fetch:

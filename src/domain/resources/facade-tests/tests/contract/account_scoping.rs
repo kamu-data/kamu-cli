@@ -10,8 +10,8 @@
 use database_common::PaginationOpts;
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
-    ResourceAccountRef,
     ResourceID,
+    ResourceOwnerRef,
     ResourceRef,
     ResourceSchemaProvider,
     ResourceSelector,
@@ -49,7 +49,7 @@ async fn create_with_account_selector(
     h: &impl FacadeContractHarness,
     facade_account: TestAccount,
     name: &str,
-    selector: ResourceAccountRef,
+    selector: ResourceOwnerRef,
 ) -> ResourceID {
     apply_manifest_and_get_id(
         h,
@@ -59,7 +59,7 @@ async fn create_with_account_selector(
     .await
 }
 
-fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccountRef) -> String {
+fn variable_set_manifest_json_with_account(name: &str, account: &ResourceOwnerRef) -> String {
     let mut account_fields = Vec::new();
     if let Some(n) = &account.name {
         account_fields.push(format!(r#""name": "{n}""#));
@@ -85,32 +85,32 @@ fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccount
     )
 }
 
-fn account_by_name(name: &odf::AccountName) -> ResourceAccountRef {
-    ResourceAccountRef {
+fn account_by_name(name: &odf::AccountName) -> ResourceOwnerRef {
+    ResourceOwnerRef {
         id: None,
         did: None,
         name: Some(name.clone()),
     }
 }
 
-fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef {
+fn account_by_id(id: odf::AccountID) -> ResourceOwnerRef {
+    ResourceOwnerRef {
         id: None,
         did: Some(id),
         name: None,
     }
 }
 
-fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef {
+fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceOwnerRef {
+    ResourceOwnerRef {
         id: None,
         did: Some(id),
         name: Some(name.clone()),
     }
 }
 
-fn unknown_account_by_name() -> ResourceAccountRef {
-    ResourceAccountRef {
+fn unknown_account_by_name() -> ResourceOwnerRef {
+    ResourceOwnerRef {
         id: None,
         did: None,
         name: Some(odf::AccountName::new_unchecked(
@@ -119,15 +119,15 @@ fn unknown_account_by_name() -> ResourceAccountRef {
     }
 }
 
-fn unknown_account_by_id() -> ResourceAccountRef {
-    ResourceAccountRef {
+fn unknown_account_by_id() -> ResourceOwnerRef {
+    ResourceOwnerRef {
         id: None,
         did: Some(odf::AccountID::new_generated_ed25519().1),
         name: None,
     }
 }
 
-fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceRef {
+fn selector_by_name(name: &str, account: Option<ResourceOwnerRef>) -> ResourceRef {
     ResourceRef {
         account,
         r#type: Some(
@@ -142,7 +142,7 @@ fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> Resource
     }
 }
 
-fn batch_selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> Vec<ResourceRef> {
+fn batch_selector_by_name(name: &str, account: Option<ResourceOwnerRef>) -> Vec<ResourceRef> {
     vec![selector_by_name(name, account)]
 }
 
@@ -555,7 +555,7 @@ contract_test!(
 
 /// An explicit `"account": {}` in the manifest — distinct from omitting the
 /// `account` key entirely (which defaults to the caller's own account, see
-/// RF-120). `ResourceAccountRef` is a struct with all-optional fields, so
+/// RF-120). `ResourceOwnerRef` is a struct with all-optional fields, so
 /// `{}` parses fine (all `None`); it is instead rejected by account
 /// resolution (`ResourceAccountResolverImpl`), which looks the account up by
 /// `did` or `name` and requires one of them.

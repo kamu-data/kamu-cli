@@ -162,7 +162,7 @@ impl BaseResourceServiceHarness {
     /// (e.g. `InMemoryResourceRepository`'s per-read account-name resolution)
     /// find a match instead of falling back to the deleted-account sentinel.
     /// Idempotent: registering the same handle twice is a no-op.
-    pub async fn register_test_account(&self, account: &odf::AccountHandle) {
+    pub async fn register_test_account(&self, account: &odf::ResourceOwnerHandle) {
         let account_repository = self.catalog.get_one::<dyn AccountRepository>().unwrap();
 
         if account_repository
@@ -193,8 +193,8 @@ impl BaseResourceServiceHarness {
 
     /// Convenience: derives a handle from `account_name` (see
     /// [`test_account_handle`]) and registers it in one step.
-    pub async fn ensure_test_account(&self, account_name: &str) -> odf::AccountHandle {
-        let handle = odf::AccountHandle::new_test(account_name);
+    pub async fn ensure_test_account(&self, account_name: &str) -> odf::ResourceOwnerHandle {
+        let handle = odf::ResourceOwnerHandle::new_test(account_name);
         self.register_test_account(&handle).await;
         handle
     }
@@ -203,10 +203,13 @@ impl BaseResourceServiceHarness {
     /// [`Self::ensure_test_account`]). `account_id`/`account_name` must
     /// belong together — they are not independently derivable from one
     /// another.
-    pub fn make_headers_input(account: odf::AccountHandle, name: &str) -> ResourceHeadersInput {
+    pub fn make_headers_input(
+        account: odf::ResourceOwnerHandle,
+        name: &str,
+    ) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef {
+            account: Some(odf::metadata::auth::ResourceOwnerRef {
                 id: Some(account.id),
                 did: Some(account.did),
                 name: Some(account.name),
