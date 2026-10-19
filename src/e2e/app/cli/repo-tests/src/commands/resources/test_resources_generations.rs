@@ -18,7 +18,7 @@ use crate::resources::{ResourceCtx, ResourceView, fixtures};
 // status updates. Each reconciliation updates the status twice: when it starts
 // and with its outcome.
 //
-// apply → spec update → labels-only update → unchanged re-apply
+// apply → spec update → labels and annotations update → unchanged re-apply
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_resources_generations(ctx: ResourceCtx) {

@@ -180,9 +180,9 @@ The behaviorally-significant consequences of adopting these shapes:
   `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Ready,Reconciling}`; each value
   carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
   meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
-  New resources have no conditions. Only a status update replaces them: a spec or header update
-  leaves them in place while the phase shows `Pending`. The schema docs under `src/domain/resources/schemas/…/conditions/` are embedded
-  from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
+  New resources have no conditions; only a status update replaces them
+  ([state machine](resources-framework.md#lifecycle-state-machine)). The schema docs under
+  `src/domain/resources/schemas/…/conditions/` are embedded from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
   dispatchers; value validation is strict serde over `ResourceConditionValue` (unknown fields are
   rejected).
 - **Manifest labels/annotations reject duplicate keys.** The ODF proxy deserializes into a `BTreeMap`

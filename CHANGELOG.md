@@ -24,10 +24,10 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL (breaking): `AccountHandle` is renamed to `ResourceOwnerHandle` and `AccountRefInput` to
   `ResourceOwnerRefInput`, following ODF. Remote resource commands need both the `kamu` CLI and the node on
   this version or later
-- GraphQL: `ResourceHeaders` has `statusGeneration` and `deletionRequestedAt`, and `ResourcePhase` has
-  `DELETING` and `DELETED`, following ODF. `deletionRequestedAt`, `DELETING` and `DELETED` are not
-  populated yet
-- Resources: `statusGeneration` counts status updates, and `updatedAt` also moves when the status changes
+- GraphQL: `ResourceHeaders` has `statusGeneration`, counting status updates, and `deletionRequestedAt`,
+  and `ResourcePhase` has `DELETING` and `DELETED`, following ODF. `deletionRequestedAt`, `DELETING` and
+  `DELETED` are not populated yet
+- Resources: `updatedAt` also moves when the status changes
 - Resources: changing only the labels or annotations of a resource bumps its `generation` and reconciles
   it again
 - Resources: after an update, the conditions of the previous reconciliation stay visible until the
@@ -39,6 +39,8 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 - Resources: an update applied while the resource was being reconciled no longer fails the reconciliation
   with an internal error; the updated resource is reconciled instead
+- Resources: deleting a resource before its reconciliation finished no longer fails the reconciliation
+  with an internal error
 - Webhooks deliver dataset updates missed right after subscribing, while paused or unreachable, or while
   the server was down, as one delivery once the subscription is active again
 - Deleting a dataset also removes the flows of its webhook subscriptions, which kept running before

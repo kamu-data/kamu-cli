@@ -104,8 +104,8 @@ The framework provides a uniform way to **declaratively manage** typed resources
   maintains the remaining headers — including `generation` (the desired-state revision, bumped on
   each spec/headers change) and `statusGeneration` (bumped on each status update) — and the
   generated ODF `status` with `phase`, optional `observedGeneration`/`observedAt`, optional
-  `reconciledGeneration`/`reconciledAt`, and `conditions`. Reconciliation is needed when
-  `observedGeneration` is absent or lower than `generation`.
+  `reconciledGeneration`/`reconciledAt`, and `conditions`. Reconciliation is needed until
+  `reconciledGeneration` reaches `generation`.
 - **Pluggable types** — the generic machinery is type-parameterized over a resource type `R`;
   concrete types plug in via traits + registered dispatchers keyed by canonical schema URL.
 - **Local & remote symmetry** — the same operations run in-process or against a remote server behind
@@ -137,7 +137,7 @@ long-term goal. This page documents what exists now.
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed` (ODF `ResourcePhase`; `Deleting`/`Deleted` are not produced yet). `Pending` is derived: it shows whenever `observedGeneration` is absent or lower than `generation`. See [§13 state machine](#lifecycle-state-machine). |
 | **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
-| **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last one reconciliation processed. Absent or lower → reconcile. |
+| **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
 | **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated` event. A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by UID or by exact name **plus type** — a name alone is not unique across types — optionally account-scoped. A batch is `Vec<ResourceRef>`. |
@@ -172,13 +172,13 @@ not break; most are enforced in code and exercised by tests — pointers given w
   bumped by the aggregate only when an apply produces a real headers/spec change (`Update`), once
   per apply even when both change; an unchanged apply is `Untouched` and does not bump it.
 - **Status is written only through `StatusUpdated`, by controllers.** Header and spec updates never
-  write status; the phase shows `Pending` by derivation until the new generation is observed, and
-  conditions stay until the controller replaces them. Each `StatusUpdated` bumps
+  write status ([`Pending` is derived](#lifecycle-state-machine)). Each `StatusUpdated` bumps
   `headers.statusGeneration`, and every status write is conditional on the `statusGeneration` its
   writer read.
 - **`status.observedGeneration <= headers.generation`** when present. A new resource has no
-  observed generation. Reconciliation sets `observedGeneration` to the generation it just processed;
-  `needs_reconciliation()` is true when `observedGeneration` is absent or lower than `generation`.
+  observed generation. Reconciliation sets `observedGeneration` to the generation it starts on;
+  `needs_reconciliation()` is true until that generation is also reconciled, so a `Failed` resource
+  or one left in `Reconciling` still needs it.
 - **`status` is never accepted from manifests.** It is server-owned end to end; manifests use
   `deny_unknown_fields`, so a `status` key is rejected ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
 - **`SecretSet` plaintext never crosses a durable boundary.** It is encrypted by the spec sanitizer
@@ -303,7 +303,7 @@ pub trait ManagedResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
     type LifecycleError;
 
-    fn needs_reconciliation(&self) -> bool { /* observed_generation vs generation */ }
+    fn needs_reconciliation(&self) -> bool { /* generation not yet observed or not reconciled */ }
 
     fn try_create(now, id, headers: ResourceHeadersInput, spec: Self::SpecInput) -> Result<Self, LifecycleError>;
     // One apply passes the same `new_generation` to both
@@ -343,14 +343,13 @@ and an aggregate. This is the bound that all generic use cases require.
 `Created`, `HeadersUpdated`, `SpecUpdated`, `StatusUpdated`, `Deleted`.
 
 - `HeadersUpdated` and `SpecUpdated` carry the new `generation`. `HeadersUpdated.new_generation` is
-  optional: events stored before header updates bumped the generation lack it and leave it as is.
+  optional; an event without it leaves the generation as is.
 - `StatusUpdated` carries the whole new status, written by a controller. It bumps
   `statusGeneration` and `updatedAt`.
-- After every event the projector shows the phase as `Pending` while `observedGeneration` is absent
-  or lower than `generation`. That derivation is not a status update.
+- The projector derives the `Pending` phase after each of them
+  ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
 
-`Created.spec` and `SpecUpdated.new_spec` are
-instantiated with `R::SpecInput`, not `R::Spec` — the event log stores what was submitted, same as
+`Created.spec` and `SpecUpdated.new_spec` are instantiated with `R::SpecInput`, not `R::Spec` — the event log stores what was submitted, same as
 `Created.headers`/`HeadersUpdated.new_headers` store `ResourceHeadersInput`. The `ResourceState`
 projection folds these into current state, converting `SpecInput` -> `Spec` (and `HeadersInput` ->
 `Headers`) at fold time — see `Spec` vs `SpecInput` above.
@@ -468,11 +467,11 @@ backfill, never rewriting the event log in place).
 
 **The one rewrite of the event log in place**, `20261015072340_resource_status_events.sql`, replaced
 the events `ReconciliationStarted`/`Succeeded`/`Failed` with `StatusUpdated`. It is the exception, not
-a pattern: the old events no longer had a Rust type to decode into, and keeping them readable would
-have meant keeping their whole status logic. It folds each resource's events in SQL into the status
-each of them produced, aborts unless the folded final status matches `resources.status` (timestamps
-aside, as their text form varies), and derives the snapshot rows again the way the rewritten events
-replay. Do not take it as precedent for routine changes: add an event and keep old ones readable.
+a pattern for routine changes, which add an event and keep old ones readable: these events have no
+Rust type to decode into, and keeping them readable would mean keeping their whole status logic. It
+folds each resource's events in SQL into the status each of them produced, aborts unless the folded
+final status matches `resources.status` (timestamps aside, as their text form varies), and derives
+the snapshot rows again the way the rewritten events replay.
 
 A backfill that synthesizes an event log must satisfy two invariants that are easy to miss in SQL,
 because both produce resources that load fine at the SQL level yet are unreadable and unwritable
@@ -1265,11 +1264,11 @@ sequenceDiagram
     participant ST as Event store + repo
     participant OB as Outbox
 
-    UC->>L: load(id)  %% needs_reconciliation()? observed_generation < generation
-    UC->>ST: try_mark_reconciliation_started(statusGeneration) → StatusUpdated (status gen. N)
+    UC->>L: load(id)  %% needs_reconciliation()? generation not yet reconciled
+    UC->>ST: try_mark_reconciliation_started(statusGeneration) → StatusUpdated unless already Reconciling (status gen. N)
     UC->>Rec: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
     UC->>L: load(id) again
-    alt generation moved
+    alt deleted or generation moved
         UC->>UC: discard the outcome
     else success
         UC->>ST: try_mark_reconciliation_succeeded(generation, N) → StatusUpdated
@@ -1282,10 +1281,11 @@ sequenceDiagram
 
 Reconciliation runs as **two separately-committed phases**
 ([`use_cases/reconcile.rs`](/src/domain/resources/services/src/use_cases/reconcile.rs)), each writing
-the status once:
+the status at most once:
 
 - **Phase 1** commits the `Reconciling` status, a stable hand-off point, which brings
-  `statusGeneration` to some N.
+  `statusGeneration` to some N. A resource already `Reconciling` keeps its status, and N is its
+  current `statusGeneration`.
 - **Phase 2** runs the `Reconciler<R>` on that resource, reloads it, and commits the outcome
   (`Ready`, `Failed` or `Degraded`) in a separate transaction, conditional on `statusGeneration`
   still being N.
@@ -1293,8 +1293,14 @@ the status once:
   saving or posting anything: it was computed for a superseded generation, and the newer `Applied`
   message reconciles again. A `ReconciliationSucceeded` message for it would also make the
   configuration consumer drop projection entries the new generation still needs.
+- **A resource deleted before or between the phases** is not reconciled, or its outcome is
+  discarded: a deleted resource never needs reconciliation.
 - **Another status writer between the phases** makes phase 2 fail with
   `ReconcileResourceUseCaseError::StatusConflict`, which the lifecycle dispatcher logs and skips.
+- **Any other write racing a phase's save** is detected by the repository and surfaces as
+  `ReconcileResourceUseCaseError::ConcurrentModification`, which the dispatcher logs and skips too:
+  the other writer is an apply, which posts its own `Applied` message, a delete, or another
+  reconciliation.
 - **A resource left in `Reconciling`** (phase 2 never completed) is picked up by a later reconcile.
 
 ### Outbox connections
@@ -1373,6 +1379,7 @@ stateDiagram-v2
     Reconciling --> Ready: reconciliation succeeded
     Reconciling --> Failed: failed, nothing reconciled before
     Reconciling --> Degraded: failed, an earlier generation reconciled
+    Reconciling --> Pending: spec/headers changed<br/>(outcome discarded)
     Ready --> Pending: spec/headers changed<br/>(generation bumps)
     Failed --> Pending: re-apply (generation bumps)
     Degraded --> Pending: re-apply (generation bumps)
@@ -1550,8 +1557,8 @@ resource contract working as intended. Behaviourally it is a headers-only change
 short-circuits on an unchanged spec. Like any header change it bumps `generation` once, so the
 resource is reconciled again. A `SecretSet` whose stored spec is still the backfill migration's
 read-only `aes256gcm` form also changes its spec, as `SecretSetSpecSanitizer` upgrades it to `jwe`
-on the way through; that still bumps the generation only once. It cannot
-reach the auto-managed sets (those are deleted, not stripped), and a normally-authored set is always
+on the way through; that still bumps the generation only once. The `aes256gcm` form cannot reach
+the auto-managed sets (those are deleted, not stripped), and a normally-authored set is always
 already `jwe`.
 
 *Projection GC is inherited, not repeated.* Deleting posts `ResourceLifecycleMessage::Deleted`,

@@ -18,9 +18,9 @@
  *
  * The folded final status must match `resources.status`, otherwise the
  * migration aborts. The snapshot rows are then derived again the way the
- * rewritten events replay: spec and header updates no longer clear
- * conditions, the phase is `Pending` while the generation is not observed,
- * and every event moves `updated_at`.
+ * rewritten events replay: spec updates keep conditions, the phase is
+ * `Pending` while the generation is not observed, and every event moves
+ * `updated_at`.
  *
  * Mirrors the Postgres migration of the same name, which reads more easily:
  * SQLite has no functions, so the condition update is spelled out per use.
@@ -162,7 +162,8 @@ SELECT * FROM fold;
 
 /*
  * Guard: the final folded status of each resource must match the stored one.
- * Timestamps are left out, as their text form varies. A mismatch fails the
+ * Timestamps are left out, as their text form varies. Condition fields are
+ * picked out by name, since SQLite compares JSON as text and key order varies. A mismatch fails the
  * CHECK constraint below, which aborts the migration.
  */
 CREATE TEMP TABLE resource_status_check AS
@@ -251,7 +252,13 @@ FROM (
     SELECT
         e.resource_id,
         SUM(e.event_type = 'StatusUpdated') AS status_updates,
-        MAX(e.event_time)                   AS last_event_time,
+        (
+            SELECT t.event_time
+            FROM resource_events t
+            WHERE t.resource_id = e.resource_id
+            ORDER BY t.event_id DESC
+            LIMIT 1
+        )                                   AS last_event_time,
         (
             SELECT json_extract(s.event_payload, '$.StatusUpdated.new_status')
             FROM resource_events s

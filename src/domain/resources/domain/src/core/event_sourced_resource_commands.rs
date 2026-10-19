@@ -177,14 +177,7 @@ where
     R: EventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState> + StatusConflictOf,
 {
-    let actual_status_generation = resource.headers().status_generation;
-    if actual_status_generation != expected_status_generation {
-        return Err(ResourceStatusConflictError {
-            expected: expected_status_generation,
-            actual: actual_status_generation,
-        }
-        .into());
-    }
+    ensure_status_generation(resource, expected_status_generation)?;
 
     if resource.status() == &new_status {
         return Ok(());
@@ -192,6 +185,27 @@ where
 
     let event = resource.make_status_updated_event(now, new_status);
     resource.apply_event(event)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Checked before a new status is derived from the current one, since a
+/// transition derived from another writer's status may be invalid.
+fn ensure_status_generation<R>(
+    resource: &R,
+    expected_status_generation: u64,
+) -> Result<(), ResourceStatusConflictError>
+where
+    R: EventSourcedResource,
+{
+    let actual_status_generation = resource.headers().status_generation;
+    if actual_status_generation != expected_status_generation {
+        return Err(ResourceStatusConflictError {
+            expected: expected_status_generation,
+            actual: actual_status_generation,
+        });
+    }
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -212,6 +226,8 @@ where
     if resource.status().phase == ResourcePhase::Reconciling {
         return Ok(());
     }
+
+    ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
     new_status.mark_reconciling(resource.headers().generation, now);
@@ -240,6 +256,8 @@ where
         return Ok(());
     }
 
+    ensure_status_generation(resource, expected_status_generation)?;
+
     let mut new_status = resource.status().clone();
     new_status.mark_ready(expected_generation, now);
 
@@ -267,6 +285,8 @@ where
         );
         return Ok(());
     }
+
+    ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
     new_status.mark_failed_or_degraded(error.reason_code(), error.user_message(), now);

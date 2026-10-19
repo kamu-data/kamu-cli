@@ -29,8 +29,13 @@ pub trait ManagedResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
     type LifecycleError: StatusConflictOf;
 
+    /// A deleted resource never needs reconciliation.
     fn needs_reconciliation(&self) -> bool {
         use crate::ResourceStatusExt;
+
+        if self.headers().deleted_at.is_some() {
+            return false;
+        }
 
         let generation = self.headers().generation;
 
@@ -46,8 +51,8 @@ pub trait ManagedResource: DeclarativeResource {
     where
         Self: Sized;
 
-    /// One apply passes the same `new_generation` to this and to
-    /// [`Self::try_update_spec`], so it bumps the generation once.
+    /// Sets the generation to `new_generation`, unless the headers are
+    /// unchanged, in which case nothing is recorded.
     fn try_update_headers(
         &mut self,
         now: DateTime<Utc>,

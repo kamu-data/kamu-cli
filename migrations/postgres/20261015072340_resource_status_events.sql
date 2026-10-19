@@ -18,9 +18,9 @@
  *
  * The folded final status must match `resources.status`, otherwise the
  * migration aborts. The snapshot rows are then derived again the way the
- * rewritten events replay: spec and header updates no longer clear
- * conditions, the phase is `Pending` while the generation is not observed,
- * and every event moves `updated_at`.
+ * rewritten events replay: spec updates keep conditions, the phase is
+ * `Pending` while the generation is not observed, and every event moves
+ * `updated_at`.
  */
 
 ALTER TABLE resources ADD COLUMN status_generation BIGINT NOT NULL DEFAULT 1;
@@ -37,6 +37,13 @@ SELECT
 FROM resource_events;
 
 CREATE UNIQUE INDEX ON resource_events_ordered (resource_id, seq);
+
+/*
+ * Temp tables are not analyzed automatically. Without statistics the planner
+ * may join the recursive fold below to this table with a full scan per step,
+ * which is quadratic in the length of the longest event history.
+ */
+ANALYZE resource_events_ordered;
 
 /* ------------------------------ */
 
@@ -231,7 +238,7 @@ FROM (
     SELECT
         resource_id,
         COUNT(*) FILTER (WHERE event_type = 'StatusUpdated') AS status_updates,
-        MAX(event_time)                                      AS last_event_time,
+        (ARRAY_AGG(event_time ORDER BY event_id DESC))[1]    AS last_event_time,
         (
             ARRAY_AGG(event_payload -> 'StatusUpdated' -> 'new_status' ORDER BY event_id DESC)
             FILTER (WHERE event_type = 'StatusUpdated')

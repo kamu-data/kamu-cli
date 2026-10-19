@@ -9,6 +9,7 @@
 
 use chrono::Utc;
 use dill::CatalogBuilder;
+use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
@@ -63,6 +64,28 @@ async fn test_applied_message_skips_reconciliation_status_conflict() {
 
     let harness = ResourceLifecycleConsumerHarness::new(
         ResourceLifecycleConsumerHarness::expect_execute_once_with_status_conflict(id),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::applied(
+            Utc::now(),
+            ResourceLifecycleMessageOutcome::Created,
+            ResourceLifecycleConsumerHarness::make_snapshot(id),
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_applied_message_skips_reconciliation_concurrent_modification() {
+    // The writer the repository detected reconciles the resource itself or
+    // makes the reconciliation unnecessary
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new(
+        ResourceLifecycleConsumerHarness::expect_execute_once_with_concurrent_modification(id),
     );
 
     harness
@@ -156,6 +179,21 @@ impl ResourceLifecycleConsumerHarness {
                         expected: 2,
                         actual: 3,
                     },
+                ))
+            });
+        mock
+    }
+
+    fn expect_execute_once_with_concurrent_modification(
+        id: ResourceID,
+    ) -> MockReconcileResourceUseCase<TestResource> {
+        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
+        mock.expect_execute()
+            .once()
+            .withf(move |id_| *id_ == id)
+            .returning(|_| {
+                Err(ReconcileResourceUseCaseError::ConcurrentModification(
+                    ConcurrentModificationError {},
                 ))
             });
         mock
