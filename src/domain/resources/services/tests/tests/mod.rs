@@ -15,4 +15,5 @@ mod message_handlers;
 mod services;
 mod test_resource_extension_schema_registry;
 mod test_resource_extension_schema_resolver;
+mod test_resource_generations;
 mod use_cases;

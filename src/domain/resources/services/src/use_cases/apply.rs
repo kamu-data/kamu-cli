@@ -138,7 +138,7 @@ macro_rules! declare_apply_resource_use_case {
         #[async_trait::async_trait]
         impl kamu_resources::ApplyResourceUseCase<$resource> for $use_case
         where
-            $resource: kamu_resources::ReconcilableEventSourcedResource
+            $resource: kamu_resources::EventSourcedResource
                 + kamu_resources::ResourceSchemaProvider,
             <$resource as kamu_resources::DeclarativeResource>::Spec:
                 serde::Serialize + PartialEq + Clone + kamu_resources::ResourceSpecFromInput<
@@ -146,7 +146,7 @@ macro_rules! declare_apply_resource_use_case {
                 >,
             <$resource as kamu_resources::DeclarativeResource>::SpecInput:
                 serde::Serialize + Clone + kamu_resources::ResourceValidateSpec + kamu_resources::ResourceLinterSpec,
-            <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
+            <$resource as kamu_resources::ManagedResource>::LifecycleError:
                 kamu_resources::IntoApplyResourceRejection
                     + kamu_resources::InvariantViolationOf<
                         <$resource as kamu_resources::DeclarativeResource>::ResourceState,

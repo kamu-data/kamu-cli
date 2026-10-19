@@ -128,7 +128,7 @@ pub enum UnsupportedResourceSelectorError {
 
 impl<R> From<ApplyResourceUseCaseError<R>> for ApplyResourceCrudDispatcherError
 where
-    R: crate::ReconcilableEventSourcedResource,
+    R: crate::EventSourcedResource,
 {
     fn from(err: ApplyResourceUseCaseError<R>) -> Self {
         match err {

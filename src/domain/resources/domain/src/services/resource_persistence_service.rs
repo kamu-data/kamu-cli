@@ -11,16 +11,12 @@ use chrono::{DateTime, Utc};
 use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 
-use crate::{
-    ReconcilableEventSourcedResource,
-    ResourceDuplicateError,
-    ResourceDurableStateValidationError,
-};
+use crate::{EventSourcedResource, ResourceDuplicateError, ResourceDurableStateValidationError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourcePersistenceService<R: ReconcilableEventSourcedResource>: Send + Sync {
+pub trait ResourcePersistenceService<R: EventSourcedResource>: Send + Sync {
     async fn create(&self, resource: &mut R) -> Result<(), ResourcePersistenceError>;
 
     async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError>;

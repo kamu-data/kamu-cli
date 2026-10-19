@@ -1,12 +1,12 @@
 {
-  "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                -- LEFT JOIN: a.resource_id is NULL only when the owning account\n                -- row is gone (deletion racing async cleanup), same case the\n                -- account_name sentinel covers. Substitute the nil resource id.\n                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $3) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels,\n                r.annotations,\n                r.spec,\n                r.status,\n                r.generation,\n                r.created_at,\n                r.updated_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.account_id = $1\n              AND r.resource_id = ANY($2)\n              AND r.deleted_at IS NULL\n            -- Request order, matching the in-memory backend: callers pair the\n            -- result back to the IDs they asked for. Without this the row order\n            -- is whatever the scan happens to produce.\n            ORDER BY array_position($2, r.resource_id)\n            ",
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                COALESCE(a.resource_id, X'00000000000000000000000000000000') as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $2) as \"account_name!: String\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels as \"labels: serde_json::Value\",\n                r.annotations as \"annotations: serde_json::Value\",\n                r.spec as \"spec: serde_json::Value\",\n                r.status as \"status: serde_json::Value\",\n                r.generation,\n                r.status_generation,\n                r.created_at as \"created_at: DateTime<Utc>\",\n                r.updated_at as \"updated_at: DateTime<Utc>\",\n                r.deleted_at as \"deleted_at: DateTime<Utc>\",\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
-        "ordinal": 0,
         "name": "id: uuid::Uuid",
-        "type_info": "Uuid",
+        "ordinal": 0,
+        "type_info": "Text",
         "origin": {
           "Table": {
             "table": "resources",
@@ -15,9 +15,9 @@
         }
       },
       {
-        "ordinal": 1,
         "name": "account_id: odf::AccountID",
-        "type_info": "Varchar",
+        "ordinal": 1,
+        "type_info": "Text",
         "origin": {
           "Table": {
             "table": "resources",
@@ -26,20 +26,20 @@
         }
       },
       {
-        "ordinal": 2,
         "name": "account_resource_id!: uuid::Uuid",
-        "type_info": "Uuid",
+        "ordinal": 2,
+        "type_info": "Text",
         "origin": "Expression"
       },
       {
+        "name": "account_name!: String",
         "ordinal": 3,
-        "name": "account_name!",
-        "type_info": "Varchar",
+        "type_info": "Text",
         "origin": "Expression"
       },
       {
-        "ordinal": 4,
         "name": "resource_schema",
+        "ordinal": 4,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -49,9 +49,9 @@
         }
       },
       {
-        "ordinal": 5,
         "name": "resource_name",
-        "type_info": "Varchar",
+        "ordinal": 5,
+        "type_info": "Text",
         "origin": {
           "Table": {
             "table": "resources",
@@ -60,9 +60,9 @@
         }
       },
       {
+        "name": "labels: serde_json::Value",
         "ordinal": 6,
-        "name": "labels",
-        "type_info": "Jsonb",
+        "type_info": "Null",
         "origin": {
           "Table": {
             "table": "resources",
@@ -71,9 +71,9 @@
         }
       },
       {
+        "name": "annotations: serde_json::Value",
         "ordinal": 7,
-        "name": "annotations",
-        "type_info": "Jsonb",
+        "type_info": "Null",
         "origin": {
           "Table": {
             "table": "resources",
@@ -82,9 +82,9 @@
         }
       },
       {
+        "name": "spec: serde_json::Value",
         "ordinal": 8,
-        "name": "spec",
-        "type_info": "Jsonb",
+        "type_info": "Null",
         "origin": {
           "Table": {
             "table": "resources",
@@ -93,9 +93,9 @@
         }
       },
       {
+        "name": "status: serde_json::Value",
         "ordinal": 9,
-        "name": "status",
-        "type_info": "Jsonb",
+        "type_info": "Null",
         "origin": {
           "Table": {
             "table": "resources",
@@ -104,9 +104,9 @@
         }
       },
       {
-        "ordinal": 10,
         "name": "generation",
-        "type_info": "Int8",
+        "ordinal": 10,
+        "type_info": "Integer",
         "origin": {
           "Table": {
             "table": "resources",
@@ -115,9 +115,20 @@
         }
       },
       {
+        "name": "status_generation",
         "ordinal": 11,
-        "name": "created_at",
-        "type_info": "Timestamptz",
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "status_generation"
+          }
+        }
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 12,
+        "type_info": "Null",
         "origin": {
           "Table": {
             "table": "resources",
@@ -126,9 +137,9 @@
         }
       },
       {
-        "ordinal": 12,
-        "name": "updated_at",
-        "type_info": "Timestamptz",
+        "name": "updated_at: DateTime<Utc>",
+        "ordinal": 13,
+        "type_info": "Null",
         "origin": {
           "Table": {
             "table": "resources",
@@ -137,9 +148,9 @@
         }
       },
       {
-        "ordinal": 13,
-        "name": "deleted_at",
-        "type_info": "Timestamptz",
+        "name": "deleted_at: DateTime<Utc>",
+        "ordinal": 14,
+        "type_info": "Null",
         "origin": {
           "Table": {
             "table": "resources",
@@ -148,9 +159,9 @@
         }
       },
       {
-        "ordinal": 14,
         "name": "last_event_id",
-        "type_info": "Int8",
+        "ordinal": 15,
+        "type_info": "Integer",
         "origin": {
           "Table": {
             "table": "resources",
@@ -160,23 +171,20 @@
       }
     ],
     "parameters": {
-      "Left": [
-        "Text",
-        "UuidArray",
-        "Varchar"
-      ]
+      "Right": 2
     },
     "nullable": [
       false,
       false,
-      null,
-      null,
+      false,
+      true,
       false,
       false,
       false,
       false,
       false,
       true,
+      false,
       false,
       false,
       false,
@@ -184,5 +192,5 @@
       true
     ]
   },
-  "hash": "d5e20bf4df84b62a06ba32f00fb541c58cbb2915793b51966f069092ec786130"
+  "hash": "661d7bf454d6ccd99c0f5f17b0ac4d2f9ce62e1cb6f28a7884bed38763e725e9"
 }

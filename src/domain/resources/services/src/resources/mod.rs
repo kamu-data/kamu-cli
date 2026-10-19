@@ -22,8 +22,8 @@ macro_rules! declare_resource_service_layer {
                 bridge = [<$name EventStoreBridge>],
                 store = $domain::[<$name EventStore>],
                 resource = $resource,
-                state = <$state_model as kamu_resources::ReconcilableStateModel>::State,
-                event = <<$state_model as kamu_resources::ReconcilableStateModel>::State as event_sourcing::Projection>::Event
+                state = <$state_model as kamu_resources::ResourceStateModel>::State,
+                event = <<$state_model as kamu_resources::ResourceStateModel>::State as event_sourcing::Projection>::Event
             );
 
             $crate::declare_resource_aggregate_loader!(

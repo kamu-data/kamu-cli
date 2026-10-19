@@ -14,8 +14,8 @@ use internal_error::ErrorIntoInternal;
 use crate::domain::{
     CreateResourceError,
     DeclarativeResource,
+    EventSourcedResource,
     InvariantViolationOf,
-    ReconcilableEventSourcedResource,
     ResourceLabelProjectionRepository,
     ResourcePersistenceError,
     ResourceRepository,
@@ -31,7 +31,7 @@ use crate::{ResourceDurableStateValidator, ResourceExtensionSchemaRegistry};
 
 pub struct ResourcePersistenceServiceHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
 {
     resource_repository: &'a dyn ResourceRepository,
     label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
@@ -41,7 +41,7 @@ where
 
 impl<'a, R> ResourcePersistenceServiceHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: serde::Serialize,
 {
@@ -116,7 +116,7 @@ where
 
 impl<R> ResourcePersistenceServiceHelper<'_, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
     R::Spec: serde::Serialize,
@@ -173,7 +173,7 @@ where
 
 impl<R> ResourcePersistenceServiceHelper<'_, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: serde::Serialize,
 {

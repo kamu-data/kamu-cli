@@ -19,6 +19,7 @@ mod test_resources_dataset_deletion_cleanup;
 mod test_resources_delete;
 mod test_resources_dry_run;
 mod test_resources_extension_schemas;
+mod test_resources_generations;
 mod test_resources_get_selectors;
 mod test_resources_golden_view;
 mod test_resources_id_lookup;

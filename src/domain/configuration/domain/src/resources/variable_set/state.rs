@@ -7,28 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResourceState, ReconcilableStateModel};
+use kamu_resources::{EventSourcedResourceState, ResourceStateModel};
 
-use crate::{
-    VariableSetFailureDetails,
-    VariableSetReconcileSuccess,
-    VariableSetSpec,
-    VariableSetSpecInput,
-};
+use crate::{VariableSetSpec, VariableSetSpecInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type VariableSetState = ReconcilableResourceState<VariableSetStateModel>;
+pub type VariableSetState = EventSourcedResourceState<VariableSetStateModel>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct VariableSetStateModel {}
 
-impl ReconcilableStateModel for VariableSetStateModel {
+impl ResourceStateModel for VariableSetStateModel {
     type Spec = VariableSetSpec;
     type SpecInput = VariableSetSpecInput;
-    type Success = VariableSetReconcileSuccess;
-    type FailureDetails = VariableSetFailureDetails;
     type State = VariableSetState;
 }
 

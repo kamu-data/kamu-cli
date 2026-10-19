@@ -11,29 +11,34 @@ use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
-    ReconcilableEventSourcedResource,
+    EventSourcedResource,
     ResourceID,
     ResourceLoadError,
     ResourcePersistenceError,
+    ResourceStatusConflictError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
-pub trait ReconcileResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
+pub trait ReconcileResourceUseCase<R: EventSourcedResource>: Send + Sync {
     async fn execute(&self, id: &ResourceID) -> Result<(), ReconcileResourceUseCaseError<R>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum ReconcileResourceUseCaseError<R: ReconcilableEventSourcedResource> {
+pub enum ReconcileResourceUseCaseError<R: EventSourcedResource> {
     #[error(transparent)]
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
+
+    /// Another writer updated the status after reconciliation started.
+    #[error(transparent)]
+    StatusConflict(ResourceStatusConflictError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -46,7 +51,7 @@ pub enum ReconcileResourceUseCaseError<R: ReconcilableEventSourcedResource> {
 
 impl<R> From<ResourcePersistenceError> for ReconcileResourceUseCaseError<R>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
 {
     fn from(err: ResourcePersistenceError) -> Self {
         match err {

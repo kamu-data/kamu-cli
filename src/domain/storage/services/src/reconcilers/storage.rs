@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResource, Reconciler};
-use kamu_storage::{StorageReconcileSuccess, StorageResource};
+use kamu_resources::{ManagedResource, Reconciler};
+use kamu_storage::StorageResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,13 +23,10 @@ impl Reconciler<StorageResource> for StorageReconcilerImpl {
     async fn reconcile(
         &self,
         _resource: &StorageResource,
-    ) -> Result<
-        <StorageResource as ReconcilableResource>::ReconcileSuccess,
-        <StorageResource as ReconcilableResource>::ReconcileError,
-    > {
+    ) -> Result<(), <StorageResource as ManagedResource>::ReconcileError> {
         // TODO: actually synchronize storage and resolve references
 
-        Ok(StorageReconcileSuccess {})
+        Ok(())
     }
 }
 

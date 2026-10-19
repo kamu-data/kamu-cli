@@ -14,7 +14,7 @@ use chrono::Utc;
 use dill::CatalogBuilder;
 use kamu_resources::{
     DeclarativeResource,
-    ReconcilableResource,
+    ManagedResource,
     ResourceAggregateLoader,
     ResourceID,
     ResourceLabelProjectionRepository,
@@ -127,7 +127,10 @@ async fn test_save_resource_resyncs_label_projection() {
         vec![],
     )
     .unwrap();
-    loaded.try_update_headers(Utc::now(), new_headers).unwrap();
+    let new_generation = loaded.headers().generation + 1;
+    loaded
+        .try_update_headers(Utc::now(), new_headers, new_generation)
+        .unwrap();
     harness.persistence_svc().save(&mut loaded).await.unwrap();
 
     assert_eq!(
@@ -158,7 +161,10 @@ async fn test_delete_resource_clears_label_projection() {
         vec![],
     )
     .unwrap();
-    loaded.try_update_headers(Utc::now(), new_headers).unwrap();
+    let new_generation = loaded.headers().generation + 1;
+    loaded
+        .try_update_headers(Utc::now(), new_headers, new_generation)
+        .unwrap();
     harness.persistence_svc().save(&mut loaded).await.unwrap();
 
     assert_eq!(
@@ -207,12 +213,14 @@ async fn test_save_resource_updates_snapshot() {
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    let new_generation = loaded.headers().generation + 1;
     loaded
         .try_update_spec(
             Utc::now(),
             TestResourceSpec {
                 value: "updated".to_string(),
             },
+            new_generation,
         )
         .unwrap();
     harness.persistence_svc().save(&mut loaded).await.unwrap();
@@ -309,23 +317,27 @@ async fn test_concurrent_modification_detected() {
     let now = Utc::now();
 
     // Save agg_1 first — this advances the event cursor in the store
+    let new_generation = agg_1.headers().generation + 1;
     agg_1
         .try_update_spec(
             now,
             TestResourceSpec {
                 value: "from-agg-1".to_string(),
             },
+            new_generation,
         )
         .unwrap();
     harness.persistence_svc().save(&mut agg_1).await.unwrap();
 
     // agg_2 still carries the old last_stored_event_id — save must fail
+    let new_generation = agg_2.headers().generation + 1;
     agg_2
         .try_update_spec(
             now,
             TestResourceSpec {
                 value: "from-agg-2".to_string(),
             },
+            new_generation,
         )
         .unwrap();
     let result = harness.persistence_svc().save(&mut agg_2).await;

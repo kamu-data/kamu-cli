@@ -25,9 +25,8 @@ use crate::resources::{ResourceCtx, fixtures};
 // its brittleness at every call site.
 //
 // Volatile fields are stripped from the actual document before comparison:
-//   - headers.id / account / generation / statusGeneration / createdAt / updatedAt — per-run /
-//     per-context
-//   - status.reconciledAt — reconciler timestamp
+//   - headers.id / account / generation / createdAt / updatedAt — per-run / per-context
+//   - status.observedAt / reconciledAt — reconciler timestamps
 //   - status.conditions.*.lastTransitionTime — reconciler timestamps
 // Everything else is asserted verbatim against an expected document built from
 // the fixture constants.
@@ -96,6 +95,9 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
             "annotations": {
                 (fixtures::DESCRIPTION_ANNOTATION_SCHEMA): fixtures::DEFAULT_DESCRIPTION
             },
+            // Created, then one status update when reconciliation started
+            // and one with its outcome
+            "statusGeneration": 3,
             "deletedAt": null,
         },
         "spec": { "variables": { "MESSAGE": { "value": message_value } } },
@@ -121,6 +123,7 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
                 (fixtures::DESCRIPTION_ANNOTATION_SCHEMA): fixtures::DEFAULT_DESCRIPTION,
                 "owner": "https://github.com/open-data-fabric"
             },
+            "statusGeneration": 3,
             "deletedAt": null,
         },
         "spec": { "variables": { "MESSAGE": { "value": message_value } } },
@@ -142,6 +145,7 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
             "annotations": {
                 (fixtures::DESCRIPTION_ANNOTATION_SCHEMA): fixtures::DEFAULT_DESCRIPTION
             },
+            "statusGeneration": 3,
             "deletedAt": null,
         },
         // `spec` is asserted separately: `take_secret_keys_encrypted` removes
@@ -179,14 +183,7 @@ fn successful_conditions() -> serde_json::Value {
 /// deterministic and can be asserted verbatim.
 fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
     if let Some(headers) = doc.get_mut("headers").and_then(|m| m.as_object_mut()) {
-        for k in [
-            "id",
-            "account",
-            "generation",
-            "statusGeneration",
-            "createdAt",
-            "updatedAt",
-        ] {
+        for k in ["id", "account", "generation", "createdAt", "updatedAt"] {
             headers.remove(k).unwrap();
         }
     }

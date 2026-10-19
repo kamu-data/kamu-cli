@@ -33,7 +33,6 @@ use kamu_resources::{
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
     TypeUri,
-    UNTRACKED_STATUS_GENERATION,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -67,6 +66,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let annotations =
             kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
+        let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let resource_id: &uuid::Uuid = resource_snapshot.id.as_ref();
         let status = resource_snapshot
@@ -89,9 +89,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_event_id
+                last_event_id,
+                status_generation
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             resource_id,
             account_id_str,
@@ -106,6 +107,7 @@ impl ResourceRepository for PostgresResourceRepository {
             resource_snapshot.headers.updated_at,
             resource_snapshot.headers.deleted_at,
             last_event_id,
+            status_generation,
         )
         .execute(connection_mut)
         .await
@@ -163,6 +165,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 spec,
                 status,
                 generation,
+                status_generation,
                 updated_at,
                 deleted_at,
                 last_event_id,
@@ -199,6 +202,7 @@ impl ResourceRepository for PostgresResourceRepository {
                         .map(kamu_resources::resource_status_to_json),
                 )
                 .push_bind(i64::try_from(resource_snapshot.headers.generation).unwrap())
+                .push_bind(i64::try_from(resource_snapshot.headers.status_generation).unwrap())
                 .push_bind(resource_snapshot.headers.updated_at)
                 .push_bind(resource_snapshot.headers.deleted_at)
                 .push_bind(resource_snapshot.last_event_id.map(EventID::into_inner))
@@ -232,6 +236,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 spec = u.spec,
                 status = u.status,
                 generation = u.generation,
+                status_generation = u.status_generation,
                 updated_at = u.updated_at,
                 deleted_at = u.deleted_at,
                 last_event_id = u.last_event_id
@@ -589,6 +594,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.spec,
                 r.status,
                 r.generation,
+                r.status_generation,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at,
@@ -622,7 +628,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
-                status_generation: UNTRACKED_STATUS_GENERATION,
+                status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
                 deletion_requested_at: None,
@@ -740,6 +746,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.spec,
                 r.status,
                 r.generation,
+                r.status_generation,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at,
@@ -795,6 +802,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.spec,
                 r.status,
                 r.generation,
+                r.status_generation,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at,
@@ -826,7 +834,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
-                status_generation: UNTRACKED_STATUS_GENERATION,
+                status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
                 deletion_requested_at: None,
@@ -872,6 +880,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.spec,
                 r.status,
                 r.generation,
+                r.status_generation,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at,
@@ -911,7 +920,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                     owner_references: None, // TODO
                     generation: u64::try_from(row.generation).unwrap(),
-                    status_generation: UNTRACKED_STATUS_GENERATION,
+                    status_generation: u64::try_from(row.status_generation).unwrap(),
                     created_at: row.created_at,
                     updated_at: row.updated_at,
                     deletion_requested_at: None,
@@ -965,6 +974,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     r.spec,
                     r.status,
                     r.generation,
+                    r.status_generation,
                     r.created_at,
                     r.updated_at,
                     r.deleted_at,
@@ -1039,7 +1049,7 @@ impl ResourceRepository for PostgresResourceRepository {
                         annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                         owner_references: None, // TODO
                         generation: u64::try_from(row.generation).unwrap(),
-                        status_generation: UNTRACKED_STATUS_GENERATION,
+                        status_generation: u64::try_from(row.status_generation).unwrap(),
                         created_at: row.created_at,
                         updated_at: row.updated_at,
                         deletion_requested_at: None,

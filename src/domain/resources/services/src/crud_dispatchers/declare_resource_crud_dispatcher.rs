@@ -35,13 +35,13 @@ macro_rules! declare_resource_crud_dispatcher {
         #[async_trait::async_trait]
         impl $crate::ResourceCrudDispatcher for $dispatcher
         where
-            $resource: kamu_resources::ReconcilableEventSourcedResource
+            $resource: kamu_resources::EventSourcedResource
                 + kamu_resources::ResourceSchemaProvider
                 + kamu_resources::ResourcePresentation,
             <$resource as kamu_resources::DeclarativeResource>::Spec: serde::Serialize,
             <$resource as kamu_resources::DeclarativeResource>::SpecInput:
                 serde::de::DeserializeOwned,
-            <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
+            <$resource as kamu_resources::ManagedResource>::LifecycleError:
                 std::error::Error + Send + Sync + 'static,
         {
             fn schema(&self) -> &'static kamu_resources::TypeUri {

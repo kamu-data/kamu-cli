@@ -80,19 +80,21 @@ pub struct ResourceHeaders {
     pub name: ResourceName,                  // (authored)
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
-    pub generation: u64,                     // generated — bumps on spec/headers change
-    pub status_generation: u64,              // generated — not counted yet, always 1
+    pub generation: u64,                     // generated — bumps once per apply that changes headers or spec
+    pub status_generation: u64,              // generated — bumps on every status update
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
     pub deletion_requested_at: Option<DateTime<Utc>>, // generated — not set yet, always None
     pub deleted_at: Option<DateTime<Utc>>,   // generated (soft-delete tombstone)
 }
 
-pub struct ResourceStatus {                  // ODF-generated; entirely server-owned
+pub struct ResourceStatus {                  // ODF-generated; written only by controllers
     pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Degraded|Failed (Deleting|Deleted not produced yet)
-    pub observed_generation: Option<u64>,
+    pub observed_generation: Option<u64>,    // generation the controller last started reconciling
+    pub observed_at: Option<DateTime<Utc>>,
+    pub reconciled_generation: Option<u64>,  // generation the controller last reconciled successfully
     pub reconciled_at: Option<DateTime<Utc>>,
-    pub conditions: Option<ResourceConditions>,
+    pub conditions: ResourceConditions,      // empty for a new resource
 }
 ```
 
@@ -178,9 +180,9 @@ The behaviorally-significant consequences of adopting these shapes:
   `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Ready,Reconciling}`; each value
   carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
   meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
-  `conditions` is optional (absent → `None`, not empty map): new resources have none, and a spec
-  update clears them. The schema docs under `src/domain/resources/schemas/…/conditions/` are embedded
-  from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
+  New resources have no conditions; only a status update replaces them
+  ([state machine](resources-framework.md#lifecycle-state-machine)). The schema docs under
+  `src/domain/resources/schemas/…/conditions/` are embedded from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
   dispatchers; value validation is strict serde over `ResourceConditionValue` (unknown fields are
   rejected).
 - **Manifest labels/annotations reject duplicate keys.** The ODF proxy deserializes into a `BTreeMap`
@@ -241,7 +243,7 @@ pub struct ResourceSnapshot {
 flowchart LR
     M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
-    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, reconciledAt, conditions}"]
+    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, statusGeneration, created/updated/deleted_at,<br/>status{phase, observed/reconciled generation and time, conditions}"]
     M --> A --> S
 ```
 
