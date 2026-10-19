@@ -83,4 +83,8 @@ impl MergeStrategy for MergeStrategyLedger {
     fn sort_order(&self) -> Vec<SortExpr> {
         vec![col(Column::from_name(self.vocab.event_time_column())).sort(true, true)]
     }
+
+    fn requires_ordered_input(&self) -> bool {
+        false
+    }
 }

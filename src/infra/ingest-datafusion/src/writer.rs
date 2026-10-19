@@ -346,7 +346,6 @@ impl DataWriterDataFusion {
         // latter.
         let sort_order = self.merge_strategy.sort_order();
         let row_number = if sort_order.is_empty() {
-            Self::ensure_order_preserving_session(&df)?;
             datafusion::functions_window::row_number::row_number()
         } else {
             datafusion::functions_window::row_number::row_number()
@@ -394,18 +393,26 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
-    /// Natural record order survives only in a single partition: a partitioned scan
-    /// splits the input into ranges that are later interleaved
-    fn ensure_order_preserving_session(df: &DataFrameExt) -> Result<(), InternalError> {
-        let target_partitions = df.task_ctx().session_config().target_partitions();
-        if target_partitions != 1 {
-            return InternalError::bail(format!(
-                "Merge strategy requires the input order of records to be preserved, which needs \
-                 `datafusion.execution.target_partitions` = 1 in the ingest configuration, but it \
-                 is {target_partitions}"
-            ));
+    /// Makes the whole plan of `df` execute in a single partition, regardless of the
+    /// ingest configuration. The input order of records survives only there: a
+    /// partitioned scan splits the input into ranges that are later interleaved.
+    ///
+    /// The setting is taken from the session of the data frame when it is planned
+    /// for execution, so it must be applied before anything executes the plan.
+    fn with_order_preserving_session(df: DataFrameExt) -> DataFrameExt {
+        let (mut state, plan) = df.into_parts();
+
+        let execution = &mut state.config_mut().options_mut().execution;
+        if execution.target_partitions != 1 {
+            tracing::debug!(
+                target_partitions = execution.target_partitions,
+                "Merge strategy requires the input order of records, ingesting in a single \
+                 partition",
+            );
+            execution.target_partitions = 1;
         }
-        Ok(())
+
+        DataFrame::new(state, plan).into()
     }
 
     fn coerce_schema(
@@ -1033,6 +1040,13 @@ impl DataWriter for DataWriterDataFusion {
             let df = self.ensure_event_time_column(df, prev.as_ref().map(DataFrameExt::schema))?;
 
             let df = self.merge_strategy.merge(prev, df)?;
+
+            // Must precede anything that executes the plan, so it also applies to the input scan
+            let df = if self.merge_strategy.requires_ordered_input() {
+                Self::with_order_preserving_session(df)
+            } else {
+                df
+            };
 
             tracing::debug!(
                 schema = ?df.schema(),

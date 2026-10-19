@@ -44,8 +44,14 @@ pub trait MergeStrategy: Send + Sync {
     ///
     /// An empty sort order means that the order of records produced by
     /// [`MergeStrategy::merge`] is significant and must be preserved. In that case
-    /// `merge` must not reorder its input.
+    /// `merge` must not reorder its input, and [`MergeStrategy::requires_ordered_input`]
+    /// must return `true`.
     fn sort_order(&self) -> Vec<SortExpr>;
+
+    /// Whether the result depends on the order in which new records arrive, e.g.
+    /// because several changes to one key must be applied in sequence. The caller
+    /// then executes the merge in a way that preserves the input order.
+    fn requires_ordered_input(&self) -> bool;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

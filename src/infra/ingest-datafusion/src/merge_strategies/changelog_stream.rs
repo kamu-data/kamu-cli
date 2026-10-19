@@ -66,4 +66,8 @@ impl MergeStrategy for MergeStrategyChangelogStream {
         // appended again, or corrected several times within one chunk
         Vec::new()
     }
+
+    fn requires_ordered_input(&self) -> bool {
+        true
+    }
 }
