@@ -95,12 +95,12 @@ pub enum TestResourceLifecycleError {
 
     #[error("resource invariant violation: {0}")]
     InvariantViolation(Box<ProjectionError<TestResourceState>>),
+
+    #[error(transparent)]
+    StatusConflict(#[from] ResourceStatusConflictError),
 }
 
-kamu_resources::impl_invariant_violation_lifecycle_error!(
-    TestResourceLifecycleError,
-    TestResourceState
-);
+kamu_resources::impl_resource_lifecycle_error!(TestResourceLifecycleError, TestResourceState);
 
 impl IntoApplyResourceRejection for TestResourceLifecycleError {
     fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
@@ -118,6 +118,10 @@ impl IntoApplyResourceRejection for TestResourceLifecycleError {
                 })
             }
             Self::InvariantViolation(err) => {
+                use internal_error::ErrorIntoInternal;
+                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
+            }
+            Self::StatusConflict(err) => {
                 use internal_error::ErrorIntoInternal;
                 ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
             }

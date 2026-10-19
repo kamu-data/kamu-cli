@@ -12,7 +12,7 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeadersInput, ResourceID, ResourceName};
+use crate::{ResourceHeadersInput, ResourceID, ResourceName, ResourceStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,10 +21,8 @@ pub enum ResourceEvent<TSpec> {
     Created(ResourceEventCreated<TSpec>),
     HeadersUpdated(ResourceEventHeadersUpdated),
     SpecUpdated(ResourceEventSpecUpdated<TSpec>),
+    StatusUpdated(ResourceEventStatusUpdated),
     Deleted(ResourceEventDeleted),
-    ReconciliationStarted(ResourceEventReconciliationStarted),
-    ReconciliationSucceeded(ResourceEventReconciliationSucceeded),
-    ReconciliationFailed(ResourceEventReconciliationFailed),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +44,10 @@ pub struct ResourceEventHeadersUpdated {
     pub id: ResourceID,
     #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceHeadersInput")]
     pub new_headers: ResourceHeadersInput,
+    /// Absent in events stored before header updates bumped the generation;
+    /// such events leave it unchanged.
+    #[serde(default)]
+    pub new_generation: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,34 +58,21 @@ pub struct ResourceEventSpecUpdated<TSpec> {
     pub new_generation: u64,
 }
 
+/// A controller replaced the status of the resource.
+#[serde_with::serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceEventStatusUpdated {
+    pub event_time: DateTime<Utc>,
+    pub id: ResourceID,
+    #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceStatus")]
+    pub new_status: ResourceStatus,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventDeleted {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
     pub tombstone_name: ResourceName,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceEventReconciliationStarted {
-    pub event_time: DateTime<Utc>,
-    pub id: ResourceID,
-    pub generation: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceEventReconciliationSucceeded {
-    pub event_time: DateTime<Utc>,
-    pub id: ResourceID,
-    pub generation: u64,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceEventReconciliationFailed {
-    pub event_time: DateTime<Utc>,
-    pub id: ResourceID,
-    pub generation: u64,
-    pub reason: String,
-    pub message: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,10 +87,8 @@ impl<TSpec> ResourceEvent<TSpec> {
             ResourceEvent::Created(e) => &e.id,
             ResourceEvent::HeadersUpdated(e) => &e.id,
             ResourceEvent::SpecUpdated(e) => &e.id,
+            ResourceEvent::StatusUpdated(e) => &e.id,
             ResourceEvent::Deleted(e) => &e.id,
-            ResourceEvent::ReconciliationStarted(e) => &e.id,
-            ResourceEvent::ReconciliationSucceeded(e) => &e.id,
-            ResourceEvent::ReconciliationFailed(e) => &e.id,
         }
     }
 
@@ -110,10 +97,8 @@ impl<TSpec> ResourceEvent<TSpec> {
             ResourceEvent::Created(e) => e.event_time,
             ResourceEvent::HeadersUpdated(e) => e.event_time,
             ResourceEvent::SpecUpdated(e) => e.event_time,
+            ResourceEvent::StatusUpdated(e) => e.event_time,
             ResourceEvent::Deleted(e) => e.event_time,
-            ResourceEvent::ReconciliationStarted(e) => e.event_time,
-            ResourceEvent::ReconciliationSucceeded(e) => e.event_time,
-            ResourceEvent::ReconciliationFailed(e) => e.event_time,
         }
     }
 }
@@ -135,11 +120,7 @@ impl_enum_with_variants!(ResourceEvent<TSpec>);
 impl_enum_variant!(ResourceEvent<TSpec>::Created(ResourceEventCreated<TSpec>));
 impl_enum_variant!(ResourceEvent<TSpec>::HeadersUpdated(ResourceEventHeadersUpdated));
 impl_enum_variant!(ResourceEvent<TSpec>::SpecUpdated(ResourceEventSpecUpdated<TSpec>));
+impl_enum_variant!(ResourceEvent<TSpec>::StatusUpdated(ResourceEventStatusUpdated));
 impl_enum_variant!(ResourceEvent<TSpec>::Deleted(ResourceEventDeleted));
-impl_enum_variant!(ResourceEvent<TSpec>::ReconciliationStarted(ResourceEventReconciliationStarted));
-impl_enum_variant!(
-    ResourceEvent<TSpec>::ReconciliationSucceeded(ResourceEventReconciliationSucceeded)
-);
-impl_enum_variant!(ResourceEvent<TSpec>::ReconciliationFailed(ResourceEventReconciliationFailed));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,13 +9,25 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{DeclarativeResource, ResourceName, ResourceReconcileError};
+use crate::{
+    DeclarativeResource,
+    ResourceName,
+    ResourceReconcileError,
+    ResourceStatus,
+    StatusConflictOf,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A resource whose desired state is reconciled by its main controller.
+///
+/// `generation` counts changes to headers and spec, and `status_generation`
+/// counts status updates. Status updates take the `status_generation` the
+/// caller read as a precondition and fail with a status conflict when it is
+/// stale.
 pub trait ManagedResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
-    type LifecycleError;
+    type LifecycleError: StatusConflictOf;
 
     fn needs_reconciliation(&self) -> bool {
         use crate::ResourceStatusExt;
@@ -34,16 +46,20 @@ pub trait ManagedResource: DeclarativeResource {
     where
         Self: Sized;
 
+    /// One apply passes the same `new_generation` to this and to
+    /// [`Self::try_update_spec`], so it bumps the generation once.
     fn try_update_headers(
         &mut self,
         now: DateTime<Utc>,
         new_headers: crate::ResourceHeadersInput,
+        new_generation: u64,
     ) -> Result<(), Self::LifecycleError>;
 
     fn try_update_spec(
         &mut self,
         now: DateTime<Utc>,
         new_spec: Self::SpecInput,
+        new_generation: u64,
     ) -> Result<(), Self::LifecycleError>;
 
     fn try_delete(
@@ -54,25 +70,39 @@ pub trait ManagedResource: DeclarativeResource {
     where
         Self: Sized;
 
-    fn try_mark_reconciliation_started(
+    fn try_update_status(
         &mut self,
         now: DateTime<Utc>,
+        expected_status_generation: u64,
+        new_status: ResourceStatus,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;
 
+    fn try_mark_reconciliation_started(
+        &mut self,
+        now: DateTime<Utc>,
+        expected_status_generation: u64,
+    ) -> Result<(), Self::LifecycleError>
+    where
+        Self: Sized;
+
+    /// Skipped when `expected_generation` is no longer the current generation.
     fn try_mark_reconciliation_succeeded(
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
+        expected_status_generation: u64,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;
 
+    /// Skipped when `expected_generation` is no longer the current generation.
     fn try_mark_reconciliation_failed(
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
+        expected_status_generation: u64,
         error: &Self::ReconcileError,
     ) -> Result<(), Self::LifecycleError>
     where

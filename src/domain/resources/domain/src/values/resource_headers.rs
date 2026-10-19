@@ -55,6 +55,10 @@ pub fn deleted_account_resource_id_sentinel() -> ResourceID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// `ResourceHeaders::status_generation` of a new resource. Every status update
+/// increments it.
+pub const INITIAL_STATUS_GENERATION: u64 = 1;
+
 /// Value of `ResourceHeaders::status_generation` while status updates are not
 /// counted yet.
 // TODO: replace with the persisted counter once status updates bump it
@@ -100,7 +104,7 @@ impl ResourceHeadersExt for ResourceHeaders {
             },
             owner_references: None,
             generation: 0,
-            status_generation: UNTRACKED_STATUS_GENERATION,
+            status_generation: INITIAL_STATUS_GENERATION,
             created_at: now,
             updated_at: now,
             deletion_requested_at: None,
@@ -132,7 +136,7 @@ impl ResourceHeadersExt for ResourceHeaders {
             }),
             owner_references: None,
             generation: 1,
-            status_generation: UNTRACKED_STATUS_GENERATION,
+            status_generation: INITIAL_STATUS_GENERATION,
             created_at: now,
             updated_at: now,
             deletion_requested_at: None,

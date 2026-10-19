@@ -109,8 +109,9 @@ async fn test_deleted_dataset_strips_label_from_user_authored_variable_set() {
         "the spec must be preserved byte-for-byte"
     );
     assert_eq!(
-        after.headers.generation, before.headers.generation,
-        "a headers-only change must not bump the generation, i.e. must not schedule reconciliation"
+        after.headers.generation,
+        before.headers.generation + 1,
+        "a headers-only change bumps the generation once"
     );
     assert!(
         after
@@ -163,8 +164,9 @@ async fn test_deleted_dataset_strips_label_from_user_authored_secret_set() {
         "an already-`jwe` secret must not be re-encrypted, so the ciphertext is unchanged"
     );
     assert_eq!(
-        after.headers.generation, before.headers.generation,
-        "no generation bump for an already-sanitized secret set"
+        after.headers.generation,
+        before.headers.generation + 1,
+        "only the label changes for an already-sanitized secret set, bumping the generation once"
     );
 }
 

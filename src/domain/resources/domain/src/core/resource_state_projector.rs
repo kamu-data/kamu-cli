@@ -50,6 +50,10 @@ where
             assert_eq!(s.id(), &e.id);
 
             s.headers_mut().apply_update(e.event_time, e.new_headers);
+            if let Some(new_generation) = e.new_generation {
+                s.headers_mut().generation = new_generation;
+            }
+            align_phase(&mut s);
 
             Ok(s)
         }
@@ -60,8 +64,18 @@ where
             *s.spec_mut() = TModel::Spec::from_input(e.new_spec);
             s.headers_mut().generation = e.new_generation;
             s.headers_mut().updated_at = e.event_time;
+            align_phase(&mut s);
 
-            s.status_mut().mark_pending();
+            Ok(s)
+        }
+
+        (Some(mut s), E::StatusUpdated(e)) => {
+            assert_eq!(s.id(), &e.id);
+
+            *s.status_mut() = e.new_status;
+            s.headers_mut().status_generation += 1;
+            s.headers_mut().updated_at = e.event_time;
+            align_phase(&mut s);
 
             Ok(s)
         }
@@ -76,33 +90,15 @@ where
             Ok(s)
         }
 
-        (Some(mut s), E::ReconciliationStarted(e)) => {
-            assert_eq!(s.id(), &e.id);
-
-            s.status_mut().mark_reconciling(e.generation, e.event_time);
-
-            Ok(s)
-        }
-
-        (Some(mut s), E::ReconciliationSucceeded(e)) => {
-            assert_eq!(s.id(), &e.id);
-
-            s.status_mut().mark_ready(e.generation, e.event_time);
-
-            Ok(s)
-        }
-
-        (Some(mut s), E::ReconciliationFailed(e)) => {
-            assert_eq!(s.id(), &e.id);
-
-            s.status_mut()
-                .mark_failed_or_degraded(e.reason, e.message, e.event_time);
-
-            Ok(s)
-        }
-
         (state, event) => Err(ProjectionError::new(state, event)),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn align_phase<TState: DeclarativeResourceState>(state: &mut TState) {
+    let generation = state.headers().generation;
+    state.status_mut().align_phase_with_generation(generation);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -197,9 +197,15 @@ where
         // already loaded, so nothing has to be re-read from storage.
         let previous_state = resource.as_ref().clone();
 
-        if let Err(err) =
-            <R as ManagedResource>::try_update_headers(&mut resource, now, params.headers)
-        {
+        // Headers and spec changes of one apply bump the generation once
+        let new_generation = resource.headers().generation + 1;
+
+        if let Err(err) = <R as ManagedResource>::try_update_headers(
+            &mut resource,
+            now,
+            params.headers,
+            new_generation,
+        ) {
             return Ok(PlannedApplyResourceDecision::Rejected(
                 Self::map_lifecycle_error(err)?,
             ));
@@ -207,7 +213,9 @@ where
 
         let warnings = params.spec.lint_warnings();
 
-        if let Err(err) = <R as ManagedResource>::try_update_spec(&mut resource, now, params.spec) {
+        if let Err(err) =
+            <R as ManagedResource>::try_update_spec(&mut resource, now, params.spec, new_generation)
+        {
             return Ok(PlannedApplyResourceDecision::Rejected(
                 Self::map_lifecycle_error(err)?,
             ));

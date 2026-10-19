@@ -290,7 +290,7 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
 
     let helper = harness.make_reconcile_helper();
 
-    // Phase 1: commit ReconciliationStarted; capture the aggregate at that version
+    // Phase 1: commit the Reconciling status; capture the aggregate at that version
     let resource_before_concurrent_update = helper
         .start_reconciliation_phase(id)
         .await
@@ -338,7 +338,7 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
 async fn test_reconcile_after_delete_returns_ok_but_snapshot_is_gone() {
     // Documents current behavior: the aggregate loader still finds the
     // soft-deleted resource in the event store, but the aggregate projection
-    // rejects the ReconciliationStarted event on a deleted resource with an
+    // rejects the status update on a deleted resource with an
     // InvariantViolation lifecycle error.
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 

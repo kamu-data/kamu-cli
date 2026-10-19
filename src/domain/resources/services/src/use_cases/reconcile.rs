@@ -79,8 +79,9 @@ where
         // Phase 1 commits the "started" transition before the actual reconciliation
         // work, giving the second phase a stable persisted hand-off point.
         let mut resource = resource;
+        let status_generation = resource.headers().status_generation;
         resource
-            .try_mark_reconciliation_started(self.time_source.now())
+            .try_mark_reconciliation_started(self.time_source.now(), status_generation)
             .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
 
         self.persist_resource_state(&mut resource).await?;
@@ -109,10 +110,12 @@ where
     ) -> Result<ResourceLifecycleMessage, ReconcileResourceUseCaseError<R>> {
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so concurrent changes between the two phases are expected.
+        let generation = resource.headers().generation;
+        let status_generation = resource.headers().status_generation;
         match self.reconciler.reconcile(&*resource).await {
             Ok(()) => {
                 resource
-                    .try_mark_reconciliation_succeeded(now, resource.headers().generation)
+                    .try_mark_reconciliation_succeeded(now, generation, status_generation)
                     .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
 
                 Ok(ResourceLifecycleMessage::reconciliation_succeeded(
@@ -124,7 +127,7 @@ where
             }
             Err(err) => {
                 resource
-                    .try_mark_reconciliation_failed(now, resource.headers().generation, &err)
+                    .try_mark_reconciliation_failed(now, generation, status_generation, &err)
                     .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
 
                 Ok(ResourceLifecycleMessage::reconciliation_failed(

@@ -339,7 +339,8 @@ impl ResourceDurableStateValidatorHarness {
         name: &str,
     ) -> Result<(), ResourcePersistenceError> {
         let mut agg = self.create_and_load(name).await;
-        agg.try_mark_reconciliation_started(Utc::now()).unwrap();
+        agg.try_mark_reconciliation_started(Utc::now(), agg.headers().status_generation)
+            .unwrap();
         self.persistence_svc().save(&mut agg).await
     }
 
@@ -348,9 +349,14 @@ impl ResourceDurableStateValidatorHarness {
         name: &str,
     ) -> Result<(), ResourcePersistenceError> {
         let mut agg = self.create_and_load(name).await;
-        agg.try_mark_reconciliation_started(Utc::now()).unwrap();
-        agg.try_mark_reconciliation_succeeded(Utc::now(), agg.headers().generation)
+        agg.try_mark_reconciliation_started(Utc::now(), agg.headers().status_generation)
             .unwrap();
+        agg.try_mark_reconciliation_succeeded(
+            Utc::now(),
+            agg.headers().generation,
+            agg.headers().status_generation,
+        )
+        .unwrap();
         self.persistence_svc().save(&mut agg).await
     }
 
@@ -359,10 +365,16 @@ impl ResourceDurableStateValidatorHarness {
         name: &str,
     ) -> Result<(), ResourcePersistenceError> {
         let mut agg = self.create_and_load(name).await;
-        agg.try_mark_reconciliation_started(Utc::now()).unwrap();
-        let err = TestResourceReconcileError::Internal(InternalError::new("test failure"));
-        agg.try_mark_reconciliation_failed(Utc::now(), agg.headers().generation, &err)
+        agg.try_mark_reconciliation_started(Utc::now(), agg.headers().status_generation)
             .unwrap();
+        let err = TestResourceReconcileError::Internal(InternalError::new("test failure"));
+        agg.try_mark_reconciliation_failed(
+            Utc::now(),
+            agg.headers().generation,
+            agg.headers().status_generation,
+            &err,
+        )
+        .unwrap();
         self.persistence_svc().save(&mut agg).await
     }
 

@@ -163,12 +163,13 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
     }
 
     /// Get-modify-apply, which stays headers-only in practice: an unchanged
-    /// spec short-circuits, and `HeadersUpdated` schedules no reconciliation.
+    /// spec short-circuits. Like any header change, it bumps the generation
+    /// once and so reconciles the resource again.
     ///
     /// The exception is a `SecretSet` still in the migration's `aes256gcm`
-    /// form, which the sanitizer upgrades to `jwe` -- a real spec change. Only
-    /// reachable here, since auto-managed sets are deleted rather than
-    /// stripped.
+    /// form, which the sanitizer upgrades to `jwe` -- a real spec change in the
+    /// same apply. Only reachable here, since auto-managed sets are deleted
+    /// rather than stripped.
     async fn strip_dangling_label(
         dispatcher: &Arc<dyn ResourceCrudDispatcher>,
         snapshots: Vec<ResourceSnapshot>,

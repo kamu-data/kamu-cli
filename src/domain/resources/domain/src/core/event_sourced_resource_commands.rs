@@ -18,7 +18,11 @@ use crate::{
     ResourceHeadersValidationError,
     ResourceName,
     ResourcePhase,
+    ResourceReconcileError,
     ResourceSpecFromInput,
+    ResourceStatus,
+    ResourceStatusConflictError,
+    ResourceStatusExt,
     ResourceValidateHeaders,
     ResourceValidateSpec,
 };
@@ -31,12 +35,32 @@ pub trait InvariantViolationOf<TState: Projection> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Lifecycle errors of every resource type can carry a status conflict, so
+/// generic code can tell it apart from other failures.
+pub trait StatusConflictOf: From<ResourceStatusConflictError> {
+    fn as_status_conflict(&self) -> Option<&ResourceStatusConflictError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Implements [`InvariantViolationOf`] and [`StatusConflictOf`] for a lifecycle
+/// error enum with `InvariantViolation` and `StatusConflict` variants.
 #[macro_export]
-macro_rules! impl_invariant_violation_lifecycle_error {
+macro_rules! impl_resource_lifecycle_error {
     ($lifecycle_error:ty, $state:ty) => {
         impl $crate::InvariantViolationOf<$state> for $lifecycle_error {
             fn invariant_violation(error: ::event_sourcing::ProjectionError<$state>) -> Self {
                 Self::InvariantViolation(::std::boxed::Box::new(error))
+            }
+        }
+
+        impl $crate::StatusConflictOf for $lifecycle_error {
+            fn as_status_conflict(&self) -> Option<&$crate::ResourceStatusConflictError> {
+                if let Self::StatusConflict(err) = self {
+                    Some(err)
+                } else {
+                    None
+                }
             }
         }
     };
@@ -76,6 +100,7 @@ pub fn try_update_resource_headers<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     new_headers: ResourceHeadersInput,
+    new_generation: u64,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
@@ -88,7 +113,7 @@ where
         return Ok(());
     }
 
-    let event = resource.make_headers_updated_event(now, new_headers);
+    let event = resource.make_headers_updated_event(now, new_headers, new_generation);
     resource.apply_event(event)
 }
 
@@ -98,6 +123,7 @@ pub fn try_update_resource_spec<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     new_spec: R::SpecInput,
+    new_generation: u64,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
@@ -114,7 +140,7 @@ where
         return Ok(());
     }
 
-    let event = resource.make_spec_updated_event(now, new_spec, resource.headers().generation + 1);
+    let event = resource.make_spec_updated_event(now, new_spec, new_generation);
     resource.apply_event(event)
 }
 
@@ -139,13 +165,45 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn try_mark_resource_reconciliation_started<R>(
+/// Replaces the status, provided it is still at `expected_status_generation`.
+/// A status equal to the current one is not an update.
+pub fn try_update_resource_status<R>(
     resource: &mut R,
     now: DateTime<Utc>,
+    expected_status_generation: u64,
+    new_status: ResourceStatus,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
-    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState> + StatusConflictOf,
+{
+    let actual_status_generation = resource.headers().status_generation;
+    if actual_status_generation != expected_status_generation {
+        return Err(ResourceStatusConflictError {
+            expected: expected_status_generation,
+            actual: actual_status_generation,
+        }
+        .into());
+    }
+
+    if resource.status() == &new_status {
+        return Ok(());
+    }
+
+    let event = resource.make_status_updated_event(now, new_status);
+    resource.apply_event(event)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn try_mark_resource_reconciliation_started<R>(
+    resource: &mut R,
+    now: DateTime<Utc>,
+    expected_status_generation: u64,
+) -> Result<(), R::LifecycleError>
+where
+    R: EventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState> + StatusConflictOf,
 {
     if !resource.needs_reconciliation() {
         return Ok(());
@@ -155,8 +213,10 @@ where
         return Ok(());
     }
 
-    let event = resource.make_reconciliation_started_event(now);
-    resource.apply_event(event)
+    let mut new_status = resource.status().clone();
+    new_status.mark_reconciling(resource.headers().generation, now);
+
+    try_update_resource_status(resource, now, expected_status_generation, new_status)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,10 +225,11 @@ pub fn try_mark_resource_reconciliation_succeeded<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     expected_generation: u64,
+    expected_status_generation: u64,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
-    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState> + StatusConflictOf,
 {
     if resource.headers().generation != expected_generation {
         tracing::warn!(
@@ -179,8 +240,10 @@ where
         return Ok(());
     }
 
-    let event = resource.make_reconciliation_succeeded_event(now, expected_generation);
-    resource.apply_event(event)
+    let mut new_status = resource.status().clone();
+    new_status.mark_ready(expected_generation, now);
+
+    try_update_resource_status(resource, now, expected_status_generation, new_status)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,11 +252,12 @@ pub fn try_mark_resource_reconciliation_failed<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     expected_generation: u64,
+    expected_status_generation: u64,
     error: &R::ReconcileError,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
-    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState> + StatusConflictOf,
 {
     if resource.headers().generation != expected_generation {
         tracing::warn!(
@@ -204,8 +268,10 @@ where
         return Ok(());
     }
 
-    let event = resource.make_reconciliation_failed_event(now, expected_generation, error);
-    resource.apply_event(event)
+    let mut new_status = resource.status().clone();
+    new_status.mark_failed_or_degraded(error.reason_code(), error.user_message(), now);
+
+    try_update_resource_status(resource, now, expected_status_generation, new_status)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
