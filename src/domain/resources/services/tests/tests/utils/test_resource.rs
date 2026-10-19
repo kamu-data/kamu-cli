@@ -62,11 +62,9 @@ impl ResourceLinterSpec for TestResourceSpec {
 
 pub struct TestResourceStateModel;
 
-impl ReconcilableStateModel for TestResourceStateModel {
+impl ResourceStateModel for TestResourceStateModel {
     type Spec = TestResourceSpec;
     type SpecInput = TestResourceSpec;
-    type Success = ();
-    type FailureDetails = String;
     type State = TestResourceState;
 }
 
@@ -74,7 +72,7 @@ impl ReconcilableStateModel for TestResourceStateModel {
 // TestResourceState
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type TestResourceState = ReconcilableResourceState<TestResourceStateModel>;
+pub type TestResourceState = EventSourcedResourceState<TestResourceStateModel>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceEventStore
@@ -218,13 +216,10 @@ impl ResourcePresentation for TestResource {
     }
 }
 
-kamu_resources::impl_reconcilable_event_sourced_resource!(
+kamu_resources::impl_event_sourced_resource!(
     resource = TestResource,
-    reconcile_success = (),
     reconcile_error = TestResourceReconcileError,
-    reconcile_failure_details = String,
     lifecycle_error = TestResourceLifecycleError,
-    reconcile_failure_details_fn = |error| { error.to_string() }
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

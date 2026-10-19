@@ -19,9 +19,9 @@ use time_source::SystemTimeSource;
 use crate::domain::{
     DeclarativeResource,
     DeleteResourcesError,
+    EventSourcedResource,
     GenericResourceQueryService,
     InvariantViolationOf,
-    ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceID,
     ResourceNotOwnedByAccountError,
@@ -34,7 +34,7 @@ use crate::domain::{
 
 pub struct DeleteResourcesUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
 {
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
@@ -45,7 +45,7 @@ where
 
 impl<'a, R> DeleteResourcesUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
     R::Spec: Serialize,

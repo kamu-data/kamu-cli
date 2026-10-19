@@ -11,8 +11,8 @@ use chrono::{DateTime, Utc};
 use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
-    ReconcilableEventSourcedResource,
-    ReconcilableResourceEvent,
+    EventSourcedResource,
+    ResourceEvent,
     ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceHeadersValidationError,
@@ -44,7 +44,7 @@ macro_rules! impl_invariant_violation_lifecycle_error {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn try_create_reconcilable_resource<R, TCreated, TCreate>(
+pub fn try_create_resource<R, TCreated, TCreate>(
     now: DateTime<Utc>,
     id: crate::ResourceID,
     headers: ResourceHeadersInput,
@@ -52,14 +52,14 @@ pub fn try_create_reconcilable_resource<R, TCreated, TCreate>(
     create: TCreate,
 ) -> Result<TCreated, R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::SpecInput: ResourceValidateSpec,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>
         + From<ResourceHeadersValidationError>
         + From<<R::SpecInput as ResourceValidateSpec>::ValidationError>,
     TCreate: FnOnce(
         crate::ResourceID,
-        ReconcilableResourceEvent<R::SpecInput, R::ReconcileSuccess, R::ReconcileFailureDetails>,
+        ResourceEvent<R::SpecInput>,
     ) -> Result<TCreated, ProjectionError<R::ResourceState>>,
 {
     headers.validate()?;
@@ -78,7 +78,7 @@ pub fn try_update_resource_headers<R>(
     new_headers: ResourceHeadersInput,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::LifecycleError:
         From<ResourceHeadersValidationError> + InvariantViolationOf<R::ResourceState>,
 {
@@ -100,7 +100,7 @@ pub fn try_update_resource_spec<R>(
     new_spec: R::SpecInput,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::SpecInput: ResourceValidateSpec + Clone,
     R::Spec: ResourceSpecFromInput<R::SpecInput> + PartialEq,
     R::LifecycleError: From<<R::SpecInput as ResourceValidateSpec>::ValidationError>
@@ -126,7 +126,7 @@ pub fn try_delete_resource<R>(
     tombstone_name: ResourceName,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if resource.headers().deleted_at.is_some() {
@@ -144,7 +144,7 @@ pub fn try_mark_resource_reconciliation_started<R>(
     now: DateTime<Utc>,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if !resource.needs_reconciliation() {
@@ -165,10 +165,9 @@ pub fn try_mark_resource_reconciliation_succeeded<R>(
     resource: &mut R,
     now: DateTime<Utc>,
     expected_generation: u64,
-    success: R::ReconcileSuccess,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if resource.headers().generation != expected_generation {
@@ -180,7 +179,7 @@ where
         return Ok(());
     }
 
-    let event = resource.make_reconciliation_succeeded_event(now, expected_generation, success);
+    let event = resource.make_reconciliation_succeeded_event(now, expected_generation);
     resource.apply_event(event)
 }
 
@@ -193,7 +192,7 @@ pub fn try_mark_resource_reconciliation_failed<R>(
     error: &R::ReconcileError,
 ) -> Result<(), R::LifecycleError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
     if resource.headers().generation != expected_generation {

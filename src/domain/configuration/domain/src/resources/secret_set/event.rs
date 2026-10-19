@@ -7,22 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ReconcilableResourceEvent;
-use serde::{Deserialize, Serialize};
+use kamu_resources::ResourceEvent;
 
-use crate::{SecretSetReconcileSuccess, SecretSetSpecInput};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub type SecretSetEvent = ReconcilableResourceEvent<
-    SecretSetSpecInput,
-    SecretSetReconcileSuccess,
-    SecretSetFailureDetails,
->;
+use crate::SecretSetSpecInput;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SecretSetFailureDetails {}
+pub type SecretSetEvent = ResourceEvent<SecretSetSpecInput>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

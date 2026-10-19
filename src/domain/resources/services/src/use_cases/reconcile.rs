@@ -14,9 +14,9 @@ use time_source::SystemTimeSource;
 
 use crate::domain::{
     DeclarativeResource,
+    EventSourcedResource,
     InvariantViolationOf,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ReconcilableEventSourcedResource,
     ReconcileResourceUseCaseError,
     Reconciler,
     ResourceAggregateLoader,
@@ -31,7 +31,7 @@ use crate::domain::{
 
 pub struct ReconcileResourceUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
 {
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
@@ -42,7 +42,7 @@ where
 
 impl<'a, R> ReconcileResourceUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: Serialize,
 {
@@ -110,9 +110,9 @@ where
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so concurrent changes between the two phases are expected.
         match self.reconciler.reconcile(&*resource).await {
-            Ok(success) => {
+            Ok(()) => {
                 resource
-                    .try_mark_reconciliation_succeeded(now, resource.headers().generation, success)
+                    .try_mark_reconciliation_succeeded(now, resource.headers().generation)
                     .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
 
                 Ok(ResourceLifecycleMessage::reconciliation_succeeded(

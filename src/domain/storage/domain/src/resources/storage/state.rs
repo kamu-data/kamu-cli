@@ -7,23 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResourceState, ReconcilableStateModel};
+use kamu_resources::{EventSourcedResourceState, ResourceStateModel};
 
-use crate::{StorageFailureDetails, StorageReconcileSuccess, StorageSpec};
+use crate::StorageSpec;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type StorageState = ReconcilableResourceState<StorageStateModel>;
+pub type StorageState = EventSourcedResourceState<StorageStateModel>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct StorageStateModel {}
 
-impl ReconcilableStateModel for StorageStateModel {
+impl ResourceStateModel for StorageStateModel {
     type Spec = StorageSpec;
     type SpecInput = StorageSpec;
-    type Success = StorageReconcileSuccess;
-    type FailureDetails = StorageFailureDetails;
     type State = StorageState;
 }
 

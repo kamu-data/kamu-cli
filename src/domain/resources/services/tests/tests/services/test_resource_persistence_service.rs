@@ -14,7 +14,7 @@ use chrono::Utc;
 use dill::CatalogBuilder;
 use kamu_resources::{
     DeclarativeResource,
-    ReconcilableResource,
+    ManagedResource,
     ResourceAggregateLoader,
     ResourceID,
     ResourceLabelProjectionRepository,

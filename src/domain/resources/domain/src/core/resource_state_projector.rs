@@ -11,27 +11,27 @@ use event_sourcing::ProjectionError;
 
 use crate::{
     DeclarativeResourceState,
-    ReconcilableResourceEvent,
-    ReconcilableStateModel,
+    ResourceEvent,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceSpecFromInput,
     ResourceState,
+    ResourceStateModel,
     ResourceStatusExt,
     new_pending_resource_status,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn project_reconcilable_resource_state<TModel>(
+pub fn project_resource_state<TModel>(
     state: Option<TModel::State>,
-    event: ReconcilableResourceEvent<TModel::SpecInput, TModel::Success, TModel::FailureDetails>,
+    event: ResourceEvent<TModel::SpecInput>,
 ) -> Result<TModel::State, ProjectionError<TModel::State>>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
     TModel::Spec: ResourceSpecFromInput<TModel::SpecInput>,
 {
-    use ReconcilableResourceEvent as E;
+    use ResourceEvent as E;
 
     match (state, event) {
         (None, E::Created(e)) => Ok(ResourceState::new(

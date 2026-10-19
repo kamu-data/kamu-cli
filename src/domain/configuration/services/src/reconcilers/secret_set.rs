@@ -19,11 +19,10 @@ use kamu_configuration::{
     SecretSetEntry,
     SecretSetProjectionRepository,
     SecretSetReconcileError,
-    SecretSetReconcileSuccess,
     SecretSetResource,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceID};
+use kamu_resources::{DeclarativeResource, ManagedResource, Reconciler, ResourceID};
 use odf::AccountID;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
@@ -47,10 +46,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
     async fn reconcile(
         &self,
         resource: &SecretSetResource,
-    ) -> Result<
-        <SecretSetResource as ReconcilableResource>::ReconcileSuccess,
-        <SecretSetResource as ReconcilableResource>::ReconcileError,
-    > {
+    ) -> Result<(), <SecretSetResource as ManagedResource>::ReconcileError> {
         let now = self.time_source.now();
         let resource_id = *resource.id();
         let resource_generation = resource.headers().generation;
@@ -82,7 +78,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
                 }
             })?;
 
-        Ok(SecretSetReconcileSuccess {})
+        Ok(())
     }
 }
 

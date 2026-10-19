@@ -9,21 +9,17 @@
 
 use event_sourcing::Projection;
 
-use crate::{DeclarativeResourceState, ReconcilableResourceEvent, ResourceState};
+use crate::{DeclarativeResourceState, ResourceEvent, ResourceState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableStateModel {
+pub trait ResourceStateModel {
     /// Mirrors `DeclarativeResource::Spec`/`SpecInput`.
     type Spec: std::fmt::Debug + Clone + Send + Sync;
     type SpecInput: std::fmt::Debug + Clone + Send + Sync;
-    type Success: std::fmt::Debug + Clone + Send + Sync + 'static;
-    type FailureDetails: std::fmt::Debug + Clone + Send + Sync + 'static;
     type State: DeclarativeResourceState<Spec = Self::Spec>
         + From<ResourceState<Self::Spec>>
-        + Projection<
-            Event = ReconcilableResourceEvent<Self::SpecInput, Self::Success, Self::FailureDetails>,
-        >;
+        + Projection<Event = ResourceEvent<Self::SpecInput>>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,10 +13,8 @@ use crate::{DeclarativeResource, ResourceName, ResourceReconcileError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableResource: DeclarativeResource {
-    type ReconcileSuccess;
+pub trait ManagedResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
-    type ReconcileFailureDetails;
     type LifecycleError;
 
     fn needs_reconciliation(&self) -> bool {
@@ -26,8 +24,6 @@ pub trait ReconcilableResource: DeclarativeResource {
 
         !self.status().was_observed(generation) || !self.status().was_reconciled(generation)
     }
-
-    fn reconcile_failure_details(error: &Self::ReconcileError) -> Self::ReconcileFailureDetails;
 
     fn try_create(
         now: DateTime<Utc>,
@@ -69,7 +65,6 @@ pub trait ReconcilableResource: DeclarativeResource {
         &mut self,
         now: DateTime<Utc>,
         expected_generation: u64,
-        success: Self::ReconcileSuccess,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;

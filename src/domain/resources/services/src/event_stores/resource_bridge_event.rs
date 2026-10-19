@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::domain::{ReconcilableResourceEvent, ResourceID};
+use crate::domain::{ResourceEvent, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,9 +21,7 @@ pub trait ResourceBridgeEvent {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TSuccess, TFailureDetails> ResourceBridgeEvent
-    for ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>
-{
+impl<TSpec> ResourceBridgeEvent for ResourceEvent<TSpec> {
     fn id(&self) -> &ResourceID {
         Self::id(self)
     }

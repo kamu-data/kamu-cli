@@ -279,23 +279,21 @@ pub trait DeclarativeResource:
 request; it is validated and linted (`ResourceValidateSpec`/`ResourceLinterSpec` run against
 `SpecInput`, not `Spec`), carried unconverted through `ApplyResourceParams` and into the
 `Created`/`SpecUpdated` events, and converted to `Spec` exactly once — lazily, at projection/replay
-time (`ResourceSpecFromInput::from_input`, called from `project_reconcilable_resource_state` in
-`core/reconcilable_status_projector.rs`) — mirroring how `ResourceHeadersInput` is threaded through
+time (`ResourceSpecFromInput::from_input`, called from `project_resource_state` in
+`core/resource_state_projector.rs`) — mirroring how `ResourceHeadersInput` is threaded through
 events and converted to `ResourceHeaders` via `ResourceHeaders::from_input` at the same projection
 step (see below). For a resource kind with no server-side defaulting, `Spec` and `SpecInput` are the
 same type and `from_input` is the identity — `VariableSetResource` and `SecretSetResource` are both
 such cases today; `StorageResource` (WIP) is expected to be the first case where they genuinely
 diverge, once reference resolution (`ValueRef` -> concrete value) is implemented.
 
-**`ReconcilableResource`** adds the lifecycle + reconciliation transitions
-([`core/reconcilable_resource.rs`](/src/domain/resources/domain/src/core/reconcilable_resource.rs)).
+**`ManagedResource`** adds the lifecycle + reconciliation transitions
+([`core/managed_resource.rs`](/src/domain/resources/domain/src/core/managed_resource.rs)).
 Note that `needs_reconciliation()` is derived from `generation` vs the status:
 
 ```rust
-pub trait ReconcilableResource: DeclarativeResource {
-    type ReconcileSuccess;
+pub trait ManagedResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
-    type ReconcileFailureDetails;
     type LifecycleError;
 
     fn needs_reconciliation(&self) -> bool { /* observed_generation vs generation */ }
@@ -305,13 +303,13 @@ pub trait ReconcilableResource: DeclarativeResource {
     fn try_update_spec(&mut self, now, new_spec: Self::SpecInput) -> ...;
     fn try_delete(&mut self, now, tombstone_name: String) -> ...;
     fn try_mark_reconciliation_started(&mut self, now) -> ...;
-    fn try_mark_reconciliation_succeeded(&mut self, now, expected_generation, success) -> ...;
+    fn try_mark_reconciliation_succeeded(&mut self, now, expected_generation) -> ...;
     fn try_mark_reconciliation_failed(&mut self, now, expected_generation, error) -> ...;
 }
 ```
 
-**`ReconcilableEventSourcedResource`** binds the resource to the `event-sourcing` crate — its
-`ResourceState` is an event `Projection` over `ReconcilableResourceEvent<Spec, Success, FailureDetails>`
+**`EventSourcedResource`** binds the resource to the `event-sourcing` crate — its
+`ResourceState` is an event `Projection` over `ResourceEvent<SpecInput>`
 and an aggregate. This is the bound that all generic use cases require.
 
 **Presentation & descriptor traits:**
@@ -329,7 +327,7 @@ and an aggregate. This is the bound that all generic use cases require.
 
 ### Events
 
-`ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>` is the event-sourcing alphabet:
+`ResourceEvent<TSpec>` is the event-sourcing alphabet:
 `Created`, `HeadersUpdated`, `SpecUpdated`, `Deleted`, `ReconciliationStarted`,
 `ReconciliationSucceeded`, `ReconciliationFailed`. `Created.spec` and `SpecUpdated.new_spec` are
 instantiated with `R::SpecInput`, not `R::Spec` — the event log stores what was submitted, same as
@@ -550,7 +548,7 @@ create/update/untouched, without writing) from *application* (persist + publish)
 ([`use_cases/apply_resource_use_case.rs`](/src/domain/resources/domain/src/use_cases/apply_resource_use_case.rs)):
 
 ```rust
-pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
+pub trait ApplyResourceUseCase<R: EventSourcedResource>: Send + Sync {
     async fn plan(&self, params: ApplyResourceParams<R>)
         -> Result<ApplyResourcePlanningDecision<R>, ApplyResourceUseCaseError<R>>;
     async fn apply(&self, params: ApplyResourceParams<R>)
@@ -1610,7 +1608,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 1. **Define the domain types** under `configuration/domain/src/resources/<type>/`: `spec.rs`
    (`#[serde(deny_unknown_fields)]`, with validation + lint), `state.rs`, `event.rs`,
    and `resource.rs` implementing `ResourceSchemaProvider`, `DeclarativeResource`,
-   `ReconcilableResource`/`ReconcilableEventSourcedResource`, and `ResourcePresentation`
+   `ManagedResource`/`EventSourcedResource`, and `ResourcePresentation`
    (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR` plus the selector consts via
    `kamu_resources::declare_resource_selector_constants!("TypeName", ["alias1", "alias2", ...])` —
    canonical should be the schema `TypeName`; include at least the singular and plural lowercase

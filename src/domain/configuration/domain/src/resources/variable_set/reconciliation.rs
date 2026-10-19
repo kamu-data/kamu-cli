@@ -9,25 +9,16 @@
 
 use event_sourcing::ConcurrentModificationError;
 use kamu_resources::ResourceReconcileError;
-use serde::{Deserialize, Serialize};
 
-use crate::{VariableSetFailureDetails, VariableSetLifecycleError, VariableSetResource};
+use crate::{VariableSetLifecycleError, VariableSetResource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_resources::impl_reconcilable_event_sourced_resource!(
+kamu_resources::impl_event_sourced_resource!(
     resource = VariableSetResource,
-    reconcile_success = VariableSetReconcileSuccess,
     reconcile_error = VariableSetReconcileError,
-    reconcile_failure_details = VariableSetFailureDetails,
     lifecycle_error = VariableSetLifecycleError,
-    reconcile_failure_details_fn = |_error| { VariableSetFailureDetails {} }
 );
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct VariableSetReconcileSuccess {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

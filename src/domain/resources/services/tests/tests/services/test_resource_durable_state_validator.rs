@@ -15,9 +15,9 @@ use event_sourcing::Aggregate;
 use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
+    ManagedResource,
     RESOURCE_CONDITION_READY_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
-    ReconcilableResource,
     ResourceAggregateLoader,
     ResourceAnnotations,
     ResourceConditionValue,
@@ -349,7 +349,7 @@ impl ResourceDurableStateValidatorHarness {
     ) -> Result<(), ResourcePersistenceError> {
         let mut agg = self.create_and_load(name).await;
         agg.try_mark_reconciliation_started(Utc::now()).unwrap();
-        agg.try_mark_reconciliation_succeeded(Utc::now(), agg.headers().generation, ())
+        agg.try_mark_reconciliation_succeeded(Utc::now(), agg.headers().generation)
             .unwrap();
         self.persistence_svc().save(&mut agg).await
     }
@@ -374,10 +374,8 @@ impl ResourceDurableStateValidatorHarness {
     ) -> Result<(), ResourcePersistenceError> {
         let agg = self.create_and_load(name).await;
         let mut snapshot =
-            <TestResource as kamu_resources::ReconcilableEventSourcedResource>::make_resource_snapshot(
-                &agg,
-            )
-            .unwrap();
+            <TestResource as kamu_resources::EventSourcedResource>::make_resource_snapshot(&agg)
+                .unwrap();
         snapshot
             .status
             .as_mut()
@@ -408,7 +406,7 @@ impl ResourceDurableStateValidatorHarness {
     ) -> Result<(), ResourcePersistenceError> {
         let result = self.persistence_svc().create(agg).await;
         if result.is_err() {
-            kamu_resources::ReconcilableEventSourcedResource::revert(agg);
+            kamu_resources::EventSourcedResource::revert(agg);
         }
         result
     }

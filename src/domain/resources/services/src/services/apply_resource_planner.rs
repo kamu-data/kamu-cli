@@ -21,11 +21,11 @@ use crate::domain::{
     ApplyResourceRejection,
     ApplyResourceUseCaseError,
     DeclarativeResource,
+    EventSourcedResource,
     GenericResourceQueryService,
     IntoApplyResourceRejection,
     InvariantViolationOf,
-    ReconcilableEventSourcedResource,
-    ReconcilableResource,
+    ManagedResource,
     ResourceAggregateLoader,
     ResourceHeadersInput,
     ResourceHeadersValidationError,
@@ -42,7 +42,7 @@ use crate::domain::{
 
 pub struct ApplyResourcePlanner<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
 {
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
@@ -52,7 +52,7 @@ where
 
 impl<'a, R> ApplyResourcePlanner<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::Spec: Serialize + PartialEq + Clone + ResourceSpecFromInput<R::SpecInput>,
     R::SpecInput: ResourceValidateSpec + ResourceLinterSpec + Clone,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
@@ -164,7 +164,7 @@ where
         let warnings = params.spec.lint_warnings();
 
         let resource =
-            match <R as ReconcilableResource>::try_create(now, id, params.headers, params.spec) {
+            match <R as ManagedResource>::try_create(now, id, params.headers, params.spec) {
                 Ok(resource) => resource,
                 Err(err) => {
                     return Ok(PlannedApplyResourceDecision::Rejected(
@@ -198,7 +198,7 @@ where
         let previous_state = resource.as_ref().clone();
 
         if let Err(err) =
-            <R as ReconcilableResource>::try_update_headers(&mut resource, now, params.headers)
+            <R as ManagedResource>::try_update_headers(&mut resource, now, params.headers)
         {
             return Ok(PlannedApplyResourceDecision::Rejected(
                 Self::map_lifecycle_error(err)?,
@@ -207,9 +207,7 @@ where
 
         let warnings = params.spec.lint_warnings();
 
-        if let Err(err) =
-            <R as ReconcilableResource>::try_update_spec(&mut resource, now, params.spec)
-        {
+        if let Err(err) = <R as ManagedResource>::try_update_spec(&mut resource, now, params.spec) {
             return Ok(PlannedApplyResourceDecision::Rejected(
                 Self::map_lifecycle_error(err)?,
             ));
@@ -248,7 +246,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum PlannedApplyResourceDecision<R: ReconcilableEventSourcedResource> {
+pub enum PlannedApplyResourceDecision<R: EventSourcedResource> {
     Planned(PlannedApplyResource<R>),
     Rejected(ApplyResourceRejection),
 }
@@ -256,7 +254,7 @@ pub enum PlannedApplyResourceDecision<R: ReconcilableEventSourcedResource> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct PlannedApplyResource<R: ReconcilableEventSourcedResource> {
+pub struct PlannedApplyResource<R: EventSourcedResource> {
     pub(crate) resource: R,
     pub(crate) action: ApplyResourceAction,
     pub(crate) reconciliation_required: bool,
@@ -272,7 +270,7 @@ pub struct PlannedApplyResource<R: ReconcilableEventSourcedResource> {
 
 impl<R> PlannedApplyResource<R>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
 {
     fn into_public_plan(mut self) -> ApplyResourcePlan<R> {
         let id = *self.resource.id();

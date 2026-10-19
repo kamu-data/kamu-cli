@@ -17,14 +17,14 @@ use crate::{ResourceHeadersInput, ResourceID, ResourceName};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::IntoStaticStr)]
-pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
+pub enum ResourceEvent<TSpec> {
     Created(ResourceEventCreated<TSpec>),
     HeadersUpdated(ResourceEventHeadersUpdated),
     SpecUpdated(ResourceEventSpecUpdated<TSpec>),
     Deleted(ResourceEventDeleted),
     ReconciliationStarted(ResourceEventReconciliationStarted),
-    ReconciliationSucceeded(ResourceEventReconciliationSucceeded<TSuccess>),
-    ReconciliationFailed(ResourceEventReconciliationFailed<TFailureDetails>),
+    ReconciliationSucceeded(ResourceEventReconciliationSucceeded),
+    ReconciliationFailed(ResourceEventReconciliationFailed),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,63 +71,58 @@ pub struct ResourceEventReconciliationStarted {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceEventReconciliationSucceeded<TSuccess> {
+pub struct ResourceEventReconciliationSucceeded {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
     pub generation: u64,
-    pub success: TSuccess,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceEventReconciliationFailed<TFailureDetails> {
+pub struct ResourceEventReconciliationFailed {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
     pub generation: u64,
     pub reason: String,
     pub message: String,
-    pub details: TFailureDetails,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
+impl<TSpec> ResourceEvent<TSpec> {
     pub fn typename(&self) -> &'static str {
         self.into()
     }
 
     pub fn id(&self) -> &ResourceID {
         match self {
-            ReconcilableResourceEvent::Created(e) => &e.id,
-            ReconcilableResourceEvent::HeadersUpdated(e) => &e.id,
-            ReconcilableResourceEvent::SpecUpdated(e) => &e.id,
-            ReconcilableResourceEvent::Deleted(e) => &e.id,
-            ReconcilableResourceEvent::ReconciliationStarted(e) => &e.id,
-            ReconcilableResourceEvent::ReconciliationSucceeded(e) => &e.id,
-            ReconcilableResourceEvent::ReconciliationFailed(e) => &e.id,
+            ResourceEvent::Created(e) => &e.id,
+            ResourceEvent::HeadersUpdated(e) => &e.id,
+            ResourceEvent::SpecUpdated(e) => &e.id,
+            ResourceEvent::Deleted(e) => &e.id,
+            ResourceEvent::ReconciliationStarted(e) => &e.id,
+            ResourceEvent::ReconciliationSucceeded(e) => &e.id,
+            ResourceEvent::ReconciliationFailed(e) => &e.id,
         }
     }
 
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
-            ReconcilableResourceEvent::Created(e) => e.event_time,
-            ReconcilableResourceEvent::HeadersUpdated(e) => e.event_time,
-            ReconcilableResourceEvent::SpecUpdated(e) => e.event_time,
-            ReconcilableResourceEvent::Deleted(e) => e.event_time,
-            ReconcilableResourceEvent::ReconciliationStarted(e) => e.event_time,
-            ReconcilableResourceEvent::ReconciliationSucceeded(e) => e.event_time,
-            ReconcilableResourceEvent::ReconciliationFailed(e) => e.event_time,
+            ResourceEvent::Created(e) => e.event_time,
+            ResourceEvent::HeadersUpdated(e) => e.event_time,
+            ResourceEvent::SpecUpdated(e) => e.event_time,
+            ResourceEvent::Deleted(e) => e.event_time,
+            ResourceEvent::ReconciliationStarted(e) => e.event_time,
+            ResourceEvent::ReconciliationSucceeded(e) => e.event_time,
+            ResourceEvent::ReconciliationFailed(e) => e.event_time,
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TSuccess, TFailureDetails> ProjectionEvent<ResourceID>
-    for ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>
+impl<TSpec> ProjectionEvent<ResourceID> for ResourceEvent<TSpec>
 where
     TSpec: std::fmt::Debug + Clone + Send + Sync + 'static,
-    TSuccess: std::fmt::Debug + Clone + Send + Sync + 'static,
-    TFailureDetails: std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     fn matches_query(&self, query: &ResourceID) -> bool {
         self.id() == query
@@ -136,41 +131,15 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl_enum_with_variants!(ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>);
+impl_enum_with_variants!(ResourceEvent<TSpec>);
+impl_enum_variant!(ResourceEvent<TSpec>::Created(ResourceEventCreated<TSpec>));
+impl_enum_variant!(ResourceEvent<TSpec>::HeadersUpdated(ResourceEventHeadersUpdated));
+impl_enum_variant!(ResourceEvent<TSpec>::SpecUpdated(ResourceEventSpecUpdated<TSpec>));
+impl_enum_variant!(ResourceEvent<TSpec>::Deleted(ResourceEventDeleted));
+impl_enum_variant!(ResourceEvent<TSpec>::ReconciliationStarted(ResourceEventReconciliationStarted));
 impl_enum_variant!(
-    ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>::Created(
-        ResourceEventCreated<TSpec>
-    )
+    ResourceEvent<TSpec>::ReconciliationSucceeded(ResourceEventReconciliationSucceeded)
 );
-impl_enum_variant!(
-    ReconcilableResourceEvent < TSpec,
-    TSuccess,
-    TFailureDetails > ::HeadersUpdated(ResourceEventHeadersUpdated)
-);
-impl_enum_variant!(
-    ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>::SpecUpdated(
-        ResourceEventSpecUpdated<TSpec>
-    )
-);
-impl_enum_variant!(
-    ReconcilableResourceEvent < TSpec,
-    TSuccess,
-    TFailureDetails > ::Deleted(ResourceEventDeleted)
-);
-impl_enum_variant!(
-    ReconcilableResourceEvent < TSpec,
-    TSuccess,
-    TFailureDetails > ::ReconciliationStarted(ResourceEventReconciliationStarted)
-);
-impl_enum_variant!(
-    ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>::ReconciliationSucceeded(
-        ResourceEventReconciliationSucceeded<TSuccess>
-    )
-);
-impl_enum_variant!(
-    ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>::ReconciliationFailed(
-        ResourceEventReconciliationFailed<TFailureDetails>
-    )
-);
+impl_enum_variant!(ResourceEvent<TSpec>::ReconciliationFailed(ResourceEventReconciliationFailed));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

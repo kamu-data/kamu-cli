@@ -12,29 +12,29 @@ use internal_error::InternalError;
 
 use crate::{
     DeclarativeResourceState,
-    ReconcilableResourceEvent,
-    ReconcilableStateModel,
+    ResourceEvent,
     ResourceID,
     ResourceSnapshot,
     ResourceState,
+    ResourceStateModel,
     ResourceStatus,
-    project_reconcilable_resource_state,
+    project_resource_state,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ReconcilableResourceState<TModel>
+pub struct EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     inner: ResourceState<TModel::Spec>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> ReconcilableResourceState<TModel>
+impl<TModel> EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     pub fn into_inner(self) -> ResourceState<TModel::Spec> {
         self.inner
@@ -43,18 +43,18 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> std::fmt::Debug for ReconcilableResourceState<TModel>
+impl<TModel> std::fmt::Debug for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.inner.fmt(f)
     }
 }
 
-impl<TModel> Clone for ReconcilableResourceState<TModel>
+impl<TModel> Clone for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     fn clone(&self) -> Self {
         Self {
@@ -65,9 +65,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> std::ops::Deref for ReconcilableResourceState<TModel>
+impl<TModel> std::ops::Deref for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     type Target = ResourceState<TModel::Spec>;
 
@@ -76,9 +76,9 @@ where
     }
 }
 
-impl<TModel> std::ops::DerefMut for ReconcilableResourceState<TModel>
+impl<TModel> std::ops::DerefMut for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
@@ -87,9 +87,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> From<ResourceState<TModel::Spec>> for ReconcilableResourceState<TModel>
+impl<TModel> From<ResourceState<TModel::Spec>> for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     fn from(value: ResourceState<TModel::Spec>) -> Self {
         Self { inner: value }
@@ -98,9 +98,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> DeclarativeResourceState for ReconcilableResourceState<TModel>
+impl<TModel> DeclarativeResourceState for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
 {
     type Spec = TModel::Spec;
 
@@ -146,25 +146,24 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> Projection for ReconcilableResourceState<TModel>
+impl<TModel> Projection for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel<State = Self> + 'static,
+    TModel: ResourceStateModel<State = Self> + 'static,
     TModel::Spec: crate::ResourceSpecFromInput<TModel::SpecInput>,
 {
     type Query = ResourceID;
-    type Event =
-        ReconcilableResourceEvent<TModel::SpecInput, TModel::Success, TModel::FailureDetails>;
+    type Event = ResourceEvent<TModel::SpecInput>;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        project_reconcilable_resource_state::<TModel>(state, event)
+        project_resource_state::<TModel>(state, event)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> TryFrom<ResourceSnapshot> for ReconcilableResourceState<TModel>
+impl<TModel> TryFrom<ResourceSnapshot> for EventSourcedResourceState<TModel>
 where
-    TModel: ReconcilableStateModel,
+    TModel: ResourceStateModel,
     ResourceState<TModel::Spec>: TryFrom<ResourceSnapshot, Error = InternalError>,
 {
     type Error = InternalError;
