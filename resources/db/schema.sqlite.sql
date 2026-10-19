@@ -577,7 +577,7 @@ CREATE TABLE resources (
     updated_at             TIMESTAMPTZ NOT NULL,
     deleted_at             TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL
-);
+, status_generation BIGINT NOT NULL DEFAULT 1);
 
 CREATE TABLE sqlite_sequence(name,seq);
 

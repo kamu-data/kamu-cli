@@ -183,6 +183,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_status_generation_round_trips,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_update_resource_wrong_event_id_fails,
     harness = PostgresResourceRepositoryHarness
 );

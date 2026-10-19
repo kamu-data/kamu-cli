@@ -859,7 +859,8 @@ CREATE TABLE public.resources (
     created_at timestamp with time zone NOT NULL,
     updated_at timestamp with time zone NOT NULL,
     deleted_at timestamp with time zone,
-    last_event_id bigint
+    last_event_id bigint,
+    status_generation bigint DEFAULT 1 NOT NULL
 );
 
 
