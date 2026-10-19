@@ -14,6 +14,7 @@ pub mod batch_ops;
 pub mod cross_impl;
 pub mod delete;
 pub mod error_taxonomy;
+pub mod generations;
 pub mod get_handle;
 pub mod list_search;
 pub mod render_manifest;

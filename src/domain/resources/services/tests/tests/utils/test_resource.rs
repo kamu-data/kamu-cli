@@ -62,11 +62,9 @@ impl ResourceLinterSpec for TestResourceSpec {
 
 pub struct TestResourceStateModel;
 
-impl ReconcilableStateModel for TestResourceStateModel {
+impl ResourceStateModel for TestResourceStateModel {
     type Spec = TestResourceSpec;
     type SpecInput = TestResourceSpec;
-    type Success = ();
-    type FailureDetails = String;
     type State = TestResourceState;
 }
 
@@ -74,7 +72,7 @@ impl ReconcilableStateModel for TestResourceStateModel {
 // TestResourceState
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type TestResourceState = ReconcilableResourceState<TestResourceStateModel>;
+pub type TestResourceState = EventSourcedResourceState<TestResourceStateModel>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceEventStore
@@ -97,12 +95,12 @@ pub enum TestResourceLifecycleError {
 
     #[error("resource invariant violation: {0}")]
     InvariantViolation(Box<ProjectionError<TestResourceState>>),
+
+    #[error(transparent)]
+    StatusConflict(#[from] ResourceStatusConflictError),
 }
 
-kamu_resources::impl_invariant_violation_lifecycle_error!(
-    TestResourceLifecycleError,
-    TestResourceState
-);
+kamu_resources::impl_resource_lifecycle_error!(TestResourceLifecycleError, TestResourceState);
 
 impl IntoApplyResourceRejection for TestResourceLifecycleError {
     fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
@@ -120,6 +118,10 @@ impl IntoApplyResourceRejection for TestResourceLifecycleError {
                 })
             }
             Self::InvariantViolation(err) => {
+                use internal_error::ErrorIntoInternal;
+                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
+            }
+            Self::StatusConflict(err) => {
                 use internal_error::ErrorIntoInternal;
                 ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
             }
@@ -218,13 +220,10 @@ impl ResourcePresentation for TestResource {
     }
 }
 
-kamu_resources::impl_reconcilable_event_sourced_resource!(
+kamu_resources::impl_event_sourced_resource!(
     resource = TestResource,
-    reconcile_success = (),
     reconcile_error = TestResourceReconcileError,
-    reconcile_failure_details = String,
     lifecycle_error = TestResourceLifecycleError,
-    reconcile_failure_details_fn = |error| { error.to_string() }
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,14 +9,8 @@
 
 use internal_error::InternalError;
 use kamu_resources::ResourceReconcileError;
-use serde::{Deserialize, Serialize};
 
-use crate::{StorageFailureDetails, StorageLifecycleError, StorageResource};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StorageReconcileSuccess {}
+use crate::{StorageLifecycleError, StorageResource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,13 +56,10 @@ impl ResourceReconcileError for StorageReconcileError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_resources::impl_reconcilable_event_sourced_resource!(
+kamu_resources::impl_event_sourced_resource!(
     resource = StorageResource,
-    reconcile_success = StorageReconcileSuccess,
     reconcile_error = StorageReconcileError,
-    reconcile_failure_details = StorageFailureDetails,
     lifecycle_error = StorageLifecycleError,
-    reconcile_failure_details_fn = |_error| { StorageFailureDetails {} }
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

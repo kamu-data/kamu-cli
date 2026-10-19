@@ -1763,6 +1763,80 @@ pub async fn test_update_resource(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_status_generation_round_trips(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "status-counted");
+    snapshot.id = repo.new_resource_id().await.unwrap();
+    snapshot.headers.status_generation = 4;
+    let id = snapshot.id;
+    repo.create_resource(&snapshot).await.unwrap();
+
+    let read_status_generations = async || {
+        let by_id = repo
+            .find_resource_snapshot_by_id(&id)
+            .await
+            .unwrap()
+            .unwrap();
+        let by_query = repo
+            .find_resource_snapshot(&ResourceRawEventQuery {
+                schema: TEST_KIND.clone(),
+                id,
+            })
+            .await
+            .unwrap()
+            .unwrap();
+        let by_ids = repo
+            .find_resource_snapshots_by_ids(&account_handle.did, &[id])
+            .await
+            .unwrap();
+        let by_schema_and_ids = repo
+            .find_resource_snapshots_by_schema_and_ids(&TEST_KIND, &[id])
+            .await
+            .unwrap();
+        let listed: Vec<_> = repo
+            .list_resource_snapshots(
+                &account_handle.did,
+                &ResourceScope::default(),
+                PaginationOpts::from_max_results(100),
+            )
+            .try_collect()
+            .await
+            .unwrap();
+
+        [by_id, by_query]
+            .into_iter()
+            .chain(by_ids)
+            .chain(by_schema_and_ids)
+            .chain(listed)
+            .map(|s| s.headers.status_generation)
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(read_status_generations().await, [4; 5]);
+
+    let updated = ResourceSnapshot {
+        headers: ResourceHeaders {
+            status_generation: 7,
+            ..snapshot.headers.clone()
+        },
+        last_event_id: Some(EventID::new(1)),
+        ..snapshot.clone()
+    };
+    repo.update_resources(&[ResourceSnapshotUpdate {
+        snapshot: updated,
+        expected_last_event_id: None,
+    }])
+    .await
+    .unwrap();
+
+    assert_eq!(read_status_generations().await, [7; 5]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 

@@ -40,7 +40,6 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSummaryRow,
     TypeUri,
-    UNTRACKED_STATUS_GENERATION,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -77,6 +76,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let annotations =
             kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
+        let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let resource_id: &uuid::Uuid = resource_snapshot.id.as_ref();
         let status = resource_snapshot
@@ -99,9 +99,10 @@ impl ResourceRepository for SqliteResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_event_id
+                last_event_id,
+                status_generation
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             resource_id,
             account_id_str,
@@ -116,6 +117,7 @@ impl ResourceRepository for SqliteResourceRepository {
             resource_snapshot.headers.updated_at,
             resource_snapshot.headers.deleted_at,
             last_event_id,
+            status_generation,
         )
         .execute(connection_mut)
         .await
@@ -152,6 +154,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let annotations =
             kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
+        let status_generation = i64::try_from(resource_snapshot.headers.status_generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let expected_last_event_id = expected_last_event_id.map(EventID::into_inner);
         let resource_id: &uuid::Uuid = resource_snapshot.id.as_ref();
@@ -174,7 +177,8 @@ impl ResourceRepository for SqliteResourceRepository {
                 generation = $9,
                 updated_at = $10,
                 deleted_at = $11,
-                last_event_id = $12
+                last_event_id = $12,
+                status_generation = $14
             WHERE resource_id = $1
               AND (
                     last_event_id IS NULL AND CAST($13 as INT8) IS NULL OR
@@ -194,6 +198,7 @@ impl ResourceRepository for SqliteResourceRepository {
             resource_snapshot.headers.deleted_at,
             last_event_id,
             expected_last_event_id,
+            status_generation,
         )
         .execute(connection_mut)
         .await
@@ -457,6 +462,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.spec as "spec: serde_json::Value",
                 r.status as "status: serde_json::Value",
                 r.generation,
+                r.status_generation,
                 r.created_at as "created_at: DateTime<Utc>",
                 r.updated_at as "updated_at: DateTime<Utc>",
                 r.deleted_at as "deleted_at: DateTime<Utc>",
@@ -490,7 +496,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
-                status_generation: UNTRACKED_STATUS_GENERATION,
+                status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
                 deletion_requested_at: None,
@@ -612,6 +618,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.spec,
                 r.status,
                 r.generation,
+                r.status_generation,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at,
@@ -666,6 +673,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.spec as "spec: serde_json::Value",
                 r.status as "status: serde_json::Value",
                 r.generation,
+                r.status_generation,
                 r.created_at as "created_at: DateTime<Utc>",
                 r.updated_at as "updated_at: DateTime<Utc>",
                 r.deleted_at as "deleted_at: DateTime<Utc>",
@@ -697,7 +705,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
-                status_generation: UNTRACKED_STATUS_GENERATION,
+                status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
                 deletion_requested_at: None,
@@ -744,6 +752,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.spec,
                 r.status,
                 r.generation,
+                r.status_generation,
                 r.created_at,
                 r.updated_at,
                 r.deleted_at,
@@ -805,6 +814,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     r.spec,
                     r.status,
                     r.generation,
+                    r.status_generation,
                     r.created_at,
                     r.updated_at,
                     r.deleted_at,

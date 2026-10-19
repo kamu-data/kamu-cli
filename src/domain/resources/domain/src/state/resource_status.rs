@@ -46,8 +46,9 @@ pub trait ResourceStatusExt {
 
     fn was_reconciled(&self, generation: u64) -> bool;
 
-    /// Acknowledges the new spec generation before starting to reconcile
-    fn mark_pending(&mut self);
+    /// Shows `Pending` while the main controller has not observed `generation`.
+    /// The phase is derived, so this runs after every change of the resource.
+    fn align_phase_with_generation(&mut self, generation: u64);
 
     /// Updates observed generation and indicates that reconcilation had started
     fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>);
@@ -75,19 +76,19 @@ impl ResourceStatusExt for ResourceStatus {
             .is_some_and(|reconciled_generation| reconciled_generation >= generation)
     }
 
-    fn mark_pending(&mut self) {
-        self.phase = ResourcePhase::Pending;
-
-        // TODO: Should only clear main controller's conditions, not all of them?
-        self.conditions = empty_resource_conditions();
+    fn align_phase_with_generation(&mut self, generation: u64) {
+        if !self.was_observed(generation) {
+            self.phase = ResourcePhase::Pending;
+        }
     }
 
     fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>) {
+        // Equal when retrying a generation that failed to reconcile
         assert!(
             self.observed_generation.is_none()
-                || self.observed_generation.unwrap() < observed_generation,
-            "Previous observed generation {:?} >= {observed_generation}",
-            self.reconciled_generation,
+                || self.observed_generation.unwrap() <= observed_generation,
+            "Previous observed generation {:?} > {observed_generation}",
+            self.observed_generation,
         );
         self.phase = ResourcePhase::Reconciling;
         self.observed_generation = Some(observed_generation);

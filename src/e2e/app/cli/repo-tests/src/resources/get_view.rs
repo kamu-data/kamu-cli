@@ -41,6 +41,7 @@
 //! get a `Vec<ResourceView>` and never branch on cardinality.
 //! [`ResourceCtx::get_one`] is the sugar for the "exactly one" case.
 
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use super::ResourceCtx;
@@ -135,6 +136,31 @@ impl ResourceView {
         self.0.pointer(&format!("/spec/secrets/{key}")).is_some()
     }
 
+    /// `headers.generation`: counts changes to the headers and spec.
+    pub fn generation(&self) -> u64 {
+        self.u64_at("/headers/generation", "headers.generation")
+    }
+
+    /// `headers.statusGeneration`: counts status updates.
+    pub fn status_generation(&self) -> u64 {
+        self.u64_at("/headers/statusGeneration", "headers.statusGeneration")
+    }
+
+    /// `status.phase`, e.g. `Ready`.
+    pub fn phase(&self) -> &str {
+        self.str_at("/status/phase", "status.phase")
+    }
+
+    /// `headers.updatedAt`, which status updates move too.
+    pub fn updated_at(&self) -> DateTime<Utc> {
+        self.timestamp_at("/headers/updatedAt", "headers.updatedAt")
+    }
+
+    /// `status.reconciledAt`.
+    pub fn reconciled_at(&self) -> DateTime<Utc> {
+        self.timestamp_at("/status/reconciledAt", "status.reconciledAt")
+    }
+
     /// The underlying JSON document — escape hatch for the golden test and any
     /// assertion not yet covered by a typed accessor.
     pub fn into_json(self) -> Value {
@@ -144,6 +170,19 @@ impl ResourceView {
     /// The underlying JSON document by reference.
     pub fn as_json(&self) -> &Value {
         &self.0
+    }
+
+    fn u64_at(&self, pointer: &str, label: &str) -> u64 {
+        self.0
+            .pointer(pointer)
+            .and_then(Value::as_u64)
+            .unwrap_or_else(|| panic!("resource view has no number `{label}`:\n{}", self.0))
+    }
+
+    fn timestamp_at(&self, pointer: &str, label: &str) -> DateTime<Utc> {
+        self.str_at(pointer, label)
+            .parse()
+            .unwrap_or_else(|e| panic!("resource view `{label}` is not a timestamp: {e}"))
     }
 
     fn str_at(&self, pointer: &str, label: &str) -> &str {

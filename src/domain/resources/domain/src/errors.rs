@@ -53,6 +53,19 @@ pub struct ResourceInvalidSpecError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A status update was based on a status that has changed since it was read.
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
+#[error(
+    "Resource status was updated concurrently: expected status generation {expected}, found \
+     {actual}"
+)]
+pub struct ResourceStatusConflictError {
+    pub expected: u64,
+    pub actual: u64,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
 #[error("Resource '{id}' of type '{resource_type}' is not owned by the specified account")]
 pub struct ResourceNotOwnedByAccountError {

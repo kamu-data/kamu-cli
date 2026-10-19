@@ -19,7 +19,7 @@ use kamu_resources::{
     ApplyResourcePlanningDecision,
     DeclarativeResource,
     DeclarativeResourceState,
-    ReconcilableEventSourcedResource,
+    EventSourcedResource,
     Resource,
     ResourceSchemaProvider,
     TypeUri,
@@ -34,7 +34,7 @@ pub fn decode_resource_spec<R>(
     spec: serde_json::Value,
 ) -> Result<R::SpecInput, ApplyResourceCrudDispatcherError>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
     R::SpecInput: DeserializeOwned,
 {
     serde_json::from_value(spec).map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {

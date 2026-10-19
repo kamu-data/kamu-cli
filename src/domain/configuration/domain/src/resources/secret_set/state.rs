@@ -7,28 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ReconcilableResourceState, ReconcilableStateModel};
+use kamu_resources::{EventSourcedResourceState, ResourceStateModel};
 
-use crate::{
-    SecretSetFailureDetails,
-    SecretSetReconcileSuccess,
-    SecretSetSpec,
-    SecretSetSpecInput,
-};
+use crate::{SecretSetSpec, SecretSetSpecInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type SecretSetState = ReconcilableResourceState<SecretSetStateModel>;
+pub type SecretSetState = EventSourcedResourceState<SecretSetStateModel>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SecretSetStateModel {}
 
-impl ReconcilableStateModel for SecretSetStateModel {
+impl ResourceStateModel for SecretSetStateModel {
     type Spec = SecretSetSpec;
     type SpecInput = SecretSetSpecInput;
-    type Success = SecretSetReconcileSuccess;
-    type FailureDetails = SecretSetFailureDetails;
     type State = SecretSetState;
 }
 

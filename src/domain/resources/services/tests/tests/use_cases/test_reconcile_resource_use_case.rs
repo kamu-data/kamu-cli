@@ -13,12 +13,16 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use kamu_resources::{
     ApplyResourceParams,
+    DeclarativeResource,
+    ManagedResource,
     ReconcileResourceUseCaseError,
     Reconciler,
     ResourceAggregateLoader,
     ResourceConditionStatus,
+    ResourceID,
     ResourcePersistenceService,
     ResourcePhase,
+    ResourceStatusConflictError,
     ready_condition_type_ref,
     reconciling_condition_type_ref,
 };
@@ -279,10 +283,10 @@ async fn test_reconcile_failure_posts_reconciliation_failed_message() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
-    // Simulates a concurrent apply happening between the two reconcile phases.
-    // The event store detects the out-of-date prev_stored_event_id and returns
-    // ConcurrentModificationError from finish_reconciliation_phase.
+async fn test_finish_phase_discards_outcome_of_superseded_generation() {
+    // A concurrent apply between the two reconcile phases bumps the generation.
+    // The outcome computed for the old generation is dropped, and the
+    // `Applied` message of the new generation reconciles it again.
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -290,14 +294,12 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
 
     let helper = harness.make_reconcile_helper();
 
-    // Phase 1: commit ReconciliationStarted; capture the aggregate at that version
-    let resource_before_concurrent_update = helper
+    let started = helper
         .start_reconciliation_phase(id)
         .await
         .unwrap()
         .expect("resource should need reconciliation");
 
-    // Concurrent apply: adds a SpecUpdated event and bumps generation to 2
     let update_params = ApplyResourceParams {
         id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account_handle, "res-a"),
@@ -312,22 +314,112 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
         .unwrap()
         .expect_applied();
 
-    // Phase 2 with the stale aggregate: must fail
-    let result = helper
-        .finish_reconciliation_phase(resource_before_concurrent_update)
-        .await;
+    helper.finish_reconciliation_phase(started).await.unwrap();
 
-    assert_matches!(
-        result,
-        Err(ReconcileResourceUseCaseError::ConcurrentModification(_)),
-        "expected ConcurrentModification error, got: {result:?}"
-    );
-
-    // The concurrent apply wins: generation=2, phase=Pending
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
     assert_eq!(snapshot.headers.generation, 2);
     assert_eq!(status.phase, ResourcePhase::Pending);
+    assert_eq!(status.reconciled_generation, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_finish_phase_after_concurrent_status_update_returns_status_conflict() {
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    let helper = harness.make_reconcile_helper();
+
+    let started = helper
+        .start_reconciliation_phase(id)
+        .await
+        .unwrap()
+        .expect("resource should need reconciliation");
+
+    harness.update_status_concurrently(&id).await;
+
+    let result = helper.finish_reconciliation_phase(started).await;
+
+    assert_matches!(
+        result,
+        Err(ReconcileResourceUseCaseError::StatusConflict(
+            ResourceStatusConflictError {
+                expected: 2,
+                actual: 3,
+            }
+        )),
+        "expected StatusConflict, got: {result:?}"
+    );
+    assert_eq!(
+        harness.load(&id).await.status().phase,
+        ResourcePhase::Reconciling
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_overlapping_reconciliations_of_one_generation_record_one_outcome() {
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    let helper = harness.make_reconcile_helper();
+
+    let first = helper
+        .start_reconciliation_phase(id)
+        .await
+        .unwrap()
+        .expect("resource should need reconciliation");
+    // Already `Reconciling`, so the second start writes no status
+    let second = helper
+        .start_reconciliation_phase(id)
+        .await
+        .unwrap()
+        .expect("resource should still need reconciliation");
+
+    helper.finish_reconciliation_phase(first).await.unwrap();
+    let result = helper.finish_reconciliation_phase(second).await;
+
+    assert_matches!(
+        result,
+        Err(ReconcileResourceUseCaseError::StatusConflict(
+            ResourceStatusConflictError {
+                expected: 2,
+                actual: 3,
+            }
+        )),
+        "expected StatusConflict, got: {result:?}"
+    );
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.status().phase, ResourcePhase::Ready);
+    assert_eq!(resource.headers().status_generation, 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_reconcile_counts_status_updates() {
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    assert_eq!(harness.load(&id).await.headers().status_generation, 1);
+
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
+
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.headers().generation, 1);
+    assert_eq!(
+        resource.headers().status_generation,
+        3,
+        "one status update when reconciliation starts, one with its outcome"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -335,11 +427,7 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_after_delete_returns_ok_but_snapshot_is_gone() {
-    // Documents current behavior: the aggregate loader still finds the
-    // soft-deleted resource in the event store, but the aggregate projection
-    // rejects the ReconciliationStarted event on a deleted resource with an
-    // InvariantViolation lifecycle error.
+async fn test_reconcile_after_delete_is_no_op() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -347,17 +435,38 @@ async fn test_reconcile_after_delete_returns_ok_but_snapshot_is_gone() {
 
     harness.delete_resources(account_handle.did, vec![id]).await;
 
-    assert!(
-        harness.get_snapshot_by_id(&id).await.is_none(),
-        "snapshot must be absent immediately after delete"
-    );
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
 
-    let result = harness.reconcile_test_uc().execute(&id).await;
-    assert_matches!(
-        result,
-        Err(ReconcileResourceUseCaseError::Lifecycle(_)),
-        "expected Lifecycle(InvariantViolation) for a deleted resource, got: {result:?}"
-    );
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.status().phase, ResourcePhase::Pending);
+    assert_eq!(resource.headers().status_generation, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_finish_phase_discards_outcome_of_deleted_resource() {
+    let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
+
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    let helper = harness.make_reconcile_helper();
+
+    let started = helper
+        .start_reconciliation_phase(id)
+        .await
+        .unwrap()
+        .expect("resource should need reconciliation");
+
+    harness.delete_resources(account_handle.did, vec![id]).await;
+
+    helper.finish_reconciliation_phase(started).await.unwrap();
+
+    let resource = harness.load(&id).await;
+    assert!(resource.headers().deleted_at.is_some());
+    assert_eq!(resource.status().phase, ResourcePhase::Reconciling);
+    assert_eq!(resource.headers().status_generation, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -390,6 +499,22 @@ impl ReconcileTestHarness {
             reconciler: catalog.get_one().unwrap(),
             base,
         }
+    }
+
+    async fn load(&self, id: &ResourceID) -> TestResource {
+        self.loader.load(id).await.unwrap()
+    }
+
+    /// Another status writer updates the status of the resource.
+    async fn update_status_concurrently(&self, id: &ResourceID) {
+        let mut resource = self.load(id).await;
+        let mut new_status = resource.status().clone();
+        new_status.observed_at = Some(self.time_source().now() + chrono::Duration::seconds(1));
+        let status_generation = resource.headers().status_generation;
+        resource
+            .try_update_status(self.time_source().now(), status_generation, new_status)
+            .unwrap();
+        self.persistence.save(&mut resource).await.unwrap();
     }
 
     fn make_reconcile_helper(&self) -> ReconcileResourceUseCaseHelper<'_, TestResource> {

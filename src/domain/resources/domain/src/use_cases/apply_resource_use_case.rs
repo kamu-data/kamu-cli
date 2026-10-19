@@ -12,7 +12,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 
 use crate::{
     DeclarativeResource,
-    ReconcilableEventSourcedResource,
+    EventSourcedResource,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceLoadError,
@@ -31,7 +31,7 @@ use crate::{
 /// themselves. Resolution is the caller's responsibility (via the facade's
 /// `ResourceAccountResolver`, or by threading an already-known handle).
 #[async_trait::async_trait]
-pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
+pub trait ApplyResourceUseCase<R: EventSourcedResource>: Send + Sync {
     async fn plan(
         &self,
         params: ApplyResourceParams<R>,
@@ -208,7 +208,7 @@ pub trait IntoApplyResourceRejection {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
+pub enum ApplyResourceUseCaseError<R: EventSourcedResource> {
     #[error(transparent)]
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
@@ -229,7 +229,7 @@ pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
 
 impl<R> ApplyResourceUseCaseError<R>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
 {
     pub fn type_mismatch(id: ResourceID, expected: &TypeUri, actual: &ResourceSnapshot) -> Self {
         Self::ResourceTypeMismatch(ResourceTypeMismatchError::from_expected_and_actual(
@@ -242,7 +242,7 @@ where
 
 impl<R> From<ResourcePersistenceError> for ApplyResourceUseCaseError<R>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
 {
     fn from(err: ResourcePersistenceError) -> Self {
         match err {
@@ -260,7 +260,7 @@ where
 
 impl<R> From<TypedResourceQueryError> for ApplyResourceUseCaseError<R>
 where
-    R: ReconcilableEventSourcedResource,
+    R: EventSourcedResource,
 {
     fn from(err: TypedResourceQueryError) -> Self {
         match err {

@@ -29,13 +29,23 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL (breaking): `AccountHandle` is renamed to `ResourceOwnerHandle` and `AccountRefInput` to
   `ResourceOwnerRefInput`, following ODF. Remote resource commands need both the `kamu` CLI and the node on
   this version or later
-- GraphQL: `ResourceHeaders` has `statusGeneration` and `deletionRequestedAt`, and `ResourcePhase` has
-  `DELETING` and `DELETED`, following ODF. They are not populated yet: `statusGeneration` is always `1`
+- GraphQL: `ResourceHeaders` has `statusGeneration`, counting status updates, and `deletionRequestedAt`,
+  and `ResourcePhase` has `DELETING` and `DELETED`, following ODF. `deletionRequestedAt`, `DELETING` and
+  `DELETED` are not populated yet
+- Resources: `updatedAt` also moves when the status changes
+- Resources: changing only the labels or annotations of a resource bumps its `generation` and reconciles
+  it again
+- Resources: after an update, the conditions of the previous reconciliation stay visible until the
+  resource is reconciled again; the phase shows `Pending` meanwhile
 - SQL `to_table()` only reads datasets the query lists, like plain table references
 - Webhooks: `DATASET.REF.UPDATED` payloads go from the last head the receiver accepted (`old_hash`) to the
   dataset's head when the delivery is sent (`new_hash`), so a delivery after a failed one covers the missed
   range. After upgrading, a subscription may get one delivery covering changes since its last accepted one
 ### Fixed
+- Resources: an update applied while the resource was being reconciled no longer fails the reconciliation
+  with an internal error; the updated resource is reconciled instead
+- Resources: deleting a resource before its reconciliation finished no longer fails the reconciliation
+  with an internal error
 - Webhooks deliver dataset updates missed right after subscribing, while paused or unreachable, or while
   the server was down, as one delivery once the subscription is active again
 - Deleting a dataset also removes the flows of its webhook subscriptions, which kept running before

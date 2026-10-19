@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::ReconcilableResource;
+use crate::ManagedResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait Reconciler<R: ReconcilableResource>: Send + Sync {
-    async fn reconcile(&self, resource: &R) -> Result<R::ReconcileSuccess, R::ReconcileError>;
+pub trait Reconciler<R: ManagedResource>: Send + Sync {
+    async fn reconcile(&self, resource: &R) -> Result<(), R::ReconcileError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

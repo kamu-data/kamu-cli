@@ -15,6 +15,7 @@ use kamu_resources::{
     ApplyResourceRejectionCategory,
     IntoApplyResourceRejection,
     ResourceHeadersValidationError,
+    ResourceStatusConflictError,
 };
 use thiserror::Error;
 
@@ -32,14 +33,14 @@ pub enum VariableSetLifecycleError {
 
     #[error("resource invariant violation: {0}")]
     InvariantViolation(Box<ProjectionError<VariableSetState>>),
+
+    #[error(transparent)]
+    StatusConflict(#[from] ResourceStatusConflictError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-kamu_resources::impl_invariant_violation_lifecycle_error!(
-    VariableSetLifecycleError,
-    VariableSetState
-);
+kamu_resources::impl_resource_lifecycle_error!(VariableSetLifecycleError, VariableSetState);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,6 +60,9 @@ impl IntoApplyResourceRejection for VariableSetLifecycleError {
                 })
             }
             Self::InvariantViolation(err) => {
+                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
+            }
+            Self::StatusConflict(err) => {
                 ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
             }
         }

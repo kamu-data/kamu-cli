@@ -15,46 +15,33 @@ use serde::Serialize;
 use crate::{
     DeclarativeResource,
     InvariantViolationOf,
-    ReconcilableResource,
-    ReconcilableResourceEvent,
+    ManagedResource,
+    ResourceEvent,
     ResourceEventCreated,
     ResourceEventDeleted,
     ResourceEventHeadersUpdated,
-    ResourceEventReconciliationFailed,
-    ResourceEventReconciliationStarted,
-    ResourceEventReconciliationSucceeded,
     ResourceEventSpecUpdated,
+    ResourceEventStatusUpdated,
     ResourceHeadersInput,
     ResourceID,
     ResourceName,
-    ResourceReconcileError,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    ResourceStatus,
     make_typed_resource_snapshot,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ReconcilableEventSourcedResource:
-    ReconcilableResource
+pub trait EventSourcedResource:
+    ManagedResource
     + DeclarativeResource<
-        ResourceState: Projection<
-            Query = ResourceID,
-            Event = ReconcilableResourceEvent<
-                Self::SpecInput,
-                Self::ReconcileSuccess,
-                Self::ReconcileFailureDetails,
-            >,
-        >,
+        ResourceState: Projection<Query = ResourceID, Event = ResourceEvent<Self::SpecInput>>,
     > + AggregateAccess<Projection = Self::ResourceState>
 {
     fn apply_event(
         &mut self,
-        event: ReconcilableResourceEvent<
-            Self::SpecInput,
-            Self::ReconcileSuccess,
-            Self::ReconcileFailureDetails,
-        >,
+        event: ResourceEvent<Self::SpecInput>,
     ) -> Result<(), Self::LifecycleError>
     where
         Self::LifecycleError: InvariantViolationOf<Self::ResourceState>,
@@ -73,12 +60,8 @@ pub trait ReconcilableEventSourcedResource:
         id: ResourceID,
         headers: ResourceHeadersInput,
         spec: Self::SpecInput,
-    ) -> ReconcilableResourceEvent<
-        Self::SpecInput,
-        Self::ReconcileSuccess,
-        Self::ReconcileFailureDetails,
-    > {
-        ReconcilableResourceEvent::Created(ResourceEventCreated {
+    ) -> ResourceEvent<Self::SpecInput> {
+        ResourceEvent::Created(ResourceEventCreated {
             event_time: now,
             id,
             headers,
@@ -90,15 +73,13 @@ pub trait ReconcilableEventSourcedResource:
         &self,
         now: DateTime<Utc>,
         new_headers: ResourceHeadersInput,
-    ) -> ReconcilableResourceEvent<
-        Self::SpecInput,
-        Self::ReconcileSuccess,
-        Self::ReconcileFailureDetails,
-    > {
-        ReconcilableResourceEvent::HeadersUpdated(ResourceEventHeadersUpdated {
+        new_generation: u64,
+    ) -> ResourceEvent<Self::SpecInput> {
+        ResourceEvent::HeadersUpdated(ResourceEventHeadersUpdated {
             event_time: now,
             id: *self.id(),
             new_headers,
+            new_generation: Some(new_generation),
         })
     }
 
@@ -107,12 +88,8 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         new_spec: Self::SpecInput,
         new_generation: u64,
-    ) -> ReconcilableResourceEvent<
-        Self::SpecInput,
-        Self::ReconcileSuccess,
-        Self::ReconcileFailureDetails,
-    > {
-        ReconcilableResourceEvent::SpecUpdated(ResourceEventSpecUpdated {
+    ) -> ResourceEvent<Self::SpecInput> {
+        ResourceEvent::SpecUpdated(ResourceEventSpecUpdated {
             event_time: now,
             id: *self.id(),
             new_spec,
@@ -124,12 +101,8 @@ pub trait ReconcilableEventSourcedResource:
         &self,
         now: DateTime<Utc>,
         tombstone_name: ResourceName,
-    ) -> ReconcilableResourceEvent<
-        Self::SpecInput,
-        Self::ReconcileSuccess,
-        Self::ReconcileFailureDetails,
-    > {
-        ReconcilableResourceEvent::Deleted(ResourceEventDeleted {
+    ) -> ResourceEvent<Self::SpecInput> {
+        ResourceEvent::Deleted(ResourceEventDeleted {
             event_time: now,
             id: *self.id(),
             tombstone_name,
@@ -151,56 +124,15 @@ pub trait ReconcilableEventSourcedResource:
         )
     }
 
-    fn make_reconciliation_started_event(
+    fn make_status_updated_event(
         &self,
         now: DateTime<Utc>,
-    ) -> ReconcilableResourceEvent<
-        Self::SpecInput,
-        Self::ReconcileSuccess,
-        Self::ReconcileFailureDetails,
-    > {
-        ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
+        new_status: ResourceStatus,
+    ) -> ResourceEvent<Self::SpecInput> {
+        ResourceEvent::StatusUpdated(ResourceEventStatusUpdated {
             event_time: now,
             id: *self.id(),
-            generation: self.headers().generation,
-        })
-    }
-
-    fn make_reconciliation_succeeded_event(
-        &self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        success: Self::ReconcileSuccess,
-    ) -> ReconcilableResourceEvent<
-        Self::SpecInput,
-        Self::ReconcileSuccess,
-        Self::ReconcileFailureDetails,
-    > {
-        ReconcilableResourceEvent::ReconciliationSucceeded(ResourceEventReconciliationSucceeded {
-            event_time: now,
-            id: *self.id(),
-            generation: expected_generation,
-            success,
-        })
-    }
-
-    fn make_reconciliation_failed_event(
-        &self,
-        now: DateTime<Utc>,
-        expected_generation: u64,
-        error: &Self::ReconcileError,
-    ) -> ReconcilableResourceEvent<
-        Self::SpecInput,
-        Self::ReconcileSuccess,
-        Self::ReconcileFailureDetails,
-    > {
-        ReconcilableResourceEvent::ReconciliationFailed(ResourceEventReconciliationFailed {
-            event_time: now,
-            id: *self.id(),
-            generation: expected_generation,
-            reason: error.reason_code().to_string(),
-            message: error.user_message(),
-            details: Self::reconcile_failure_details(error),
+            new_status,
         })
     }
 
@@ -217,33 +149,29 @@ pub trait ReconcilableEventSourcedResource:
             + From<crate::ResourceHeadersValidationError>
             + From<<Self::SpecInput as crate::ResourceValidateSpec>::ValidationError>,
     {
-        crate::try_create_reconcilable_resource::<Self, _, _>(
-            now,
-            id,
-            headers,
-            spec,
-            Aggregate::new,
-        )
-        .map(Self::from_aggregate)
+        crate::try_create_resource::<Self, _, _>(now, id, headers, spec, Aggregate::new)
+            .map(Self::from_aggregate)
     }
 
     fn try_update_headers(
         &mut self,
         now: DateTime<Utc>,
         new_headers: ResourceHeadersInput,
+        new_generation: u64,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized,
         Self::LifecycleError:
             From<crate::ResourceHeadersValidationError> + InvariantViolationOf<Self::ResourceState>,
     {
-        crate::try_update_resource_headers(self, now, new_headers)
+        crate::try_update_resource_headers(self, now, new_headers, new_generation)
     }
 
     fn try_update_spec(
         &mut self,
         now: DateTime<Utc>,
         new_spec: Self::SpecInput,
+        new_generation: u64,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized,
@@ -252,7 +180,7 @@ pub trait ReconcilableEventSourcedResource:
         Self::LifecycleError: From<<Self::SpecInput as crate::ResourceValidateSpec>::ValidationError>
             + InvariantViolationOf<Self::ResourceState>,
     {
-        crate::try_update_resource_spec(self, now, new_spec)
+        crate::try_update_resource_spec(self, now, new_spec, new_generation)
     }
 
     fn from_aggregate(aggregate: Aggregate<Self::ResourceState, Self::Store>) -> Self
@@ -263,19 +191,14 @@ pub trait ReconcilableEventSourcedResource:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
-macro_rules! impl_reconcilable_event_sourced_resource {
+macro_rules! impl_event_sourced_resource {
     (
         resource = $resource:ty,
-        reconcile_success = $reconcile_success:ty,
         reconcile_error = $reconcile_error:ty,
-        reconcile_failure_details = $reconcile_failure_details:ty,
-        lifecycle_error = $lifecycle_error:ty,
-        reconcile_failure_details_fn = |$error:ident| $body:block
+        lifecycle_error = $lifecycle_error:ty $(,)?
     ) => {
-        impl $crate::ReconcilableResource for $resource {
-            type ReconcileSuccess = $reconcile_success;
+        impl $crate::ManagedResource for $resource {
             type ReconcileError = $reconcile_error;
-            type ReconcileFailureDetails = $reconcile_failure_details;
             type LifecycleError = $lifecycle_error;
 
             fn try_create(
@@ -284,23 +207,20 @@ macro_rules! impl_reconcilable_event_sourced_resource {
                 headers: $crate::ResourceHeadersInput,
                 spec: Self::SpecInput,
             ) -> Result<Self, Self::LifecycleError> {
-                <$resource as $crate::ReconcilableEventSourcedResource>::try_create(
-                    now,
-                    id,
-                    headers,
-                    spec,
-                )
+                <$resource as $crate::EventSourcedResource>::try_create(now, id, headers, spec)
             }
 
             fn try_update_headers(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
                 new_headers: $crate::ResourceHeadersInput,
+                new_generation: u64,
             ) -> Result<(), Self::LifecycleError> {
-                <$resource as $crate::ReconcilableEventSourcedResource>::try_update_headers(
+                <$resource as $crate::EventSourcedResource>::try_update_headers(
                     self,
                     now,
                     new_headers,
+                    new_generation,
                 )
             }
 
@@ -308,11 +228,13 @@ macro_rules! impl_reconcilable_event_sourced_resource {
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
                 new_spec: Self::SpecInput,
+                new_generation: u64,
             ) -> Result<(), Self::LifecycleError> {
-                <$resource as $crate::ReconcilableEventSourcedResource>::try_update_spec(
+                <$resource as $crate::EventSourcedResource>::try_update_spec(
                     self,
                     now,
                     new_spec,
+                    new_generation,
                 )
             }
 
@@ -324,24 +246,43 @@ macro_rules! impl_reconcilable_event_sourced_resource {
                 $crate::try_delete_resource(self, now, tombstone_name)
             }
 
+            fn try_update_status(
+                &mut self,
+                now: ::chrono::DateTime<::chrono::Utc>,
+                expected_status_generation: u64,
+                new_status: $crate::ResourceStatus,
+            ) -> Result<(), Self::LifecycleError> {
+                $crate::try_update_resource_status(
+                    self,
+                    now,
+                    expected_status_generation,
+                    new_status,
+                )
+            }
+
             fn try_mark_reconciliation_started(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
+                expected_status_generation: u64,
             ) -> Result<(), Self::LifecycleError> {
-                $crate::try_mark_resource_reconciliation_started(self, now)
+                $crate::try_mark_resource_reconciliation_started(
+                    self,
+                    now,
+                    expected_status_generation,
+                )
             }
 
             fn try_mark_reconciliation_succeeded(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
                 expected_generation: u64,
-                success: Self::ReconcileSuccess,
+                expected_status_generation: u64,
             ) -> Result<(), Self::LifecycleError> {
                 $crate::try_mark_resource_reconciliation_succeeded(
                     self,
                     now,
                     expected_generation,
-                    success,
+                    expected_status_generation,
                 )
             }
 
@@ -349,20 +290,20 @@ macro_rules! impl_reconcilable_event_sourced_resource {
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
                 expected_generation: u64,
+                expected_status_generation: u64,
                 error: &Self::ReconcileError,
             ) -> Result<(), Self::LifecycleError> {
                 $crate::try_mark_resource_reconciliation_failed(
                     self,
                     now,
                     expected_generation,
+                    expected_status_generation,
                     error,
                 )
             }
-
-            fn reconcile_failure_details($error: &Self::ReconcileError) -> Self::ReconcileFailureDetails $body
         }
 
-        impl $crate::ReconcilableEventSourcedResource for $resource {
+        impl $crate::EventSourcedResource for $resource {
             fn from_aggregate(
                 aggregate: ::event_sourcing::Aggregate<Self::ResourceState, Self::Store>,
             ) -> Self {

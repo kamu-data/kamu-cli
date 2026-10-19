@@ -20,11 +20,11 @@ use crate::domain::{
     ApplyResourceResult,
     ApplyResourceUseCaseError,
     DeclarativeResource,
+    EventSourcedResource,
     GenericResourceQueryService,
     IntoApplyResourceRejection,
     InvariantViolationOf,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceHeadersExt,
     ResourceHeadersValidationError,
@@ -45,7 +45,7 @@ use crate::{ApplyResourcePlanner, PlannedApplyResource, PlannedApplyResourceDeci
 
 pub struct ApplyResourcePlanExecutor<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
 {
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
@@ -57,7 +57,7 @@ where
 
 impl<'a, R> ApplyResourcePlanExecutor<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
+    R: EventSourcedResource + ResourceSchemaProvider,
     R::Spec: Serialize + PartialEq + Clone + ResourceSpecFromInput<R::SpecInput>,
     R::SpecInput: ResourceValidateSpec + ResourceLinterSpec + Clone,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>

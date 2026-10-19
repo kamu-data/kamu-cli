@@ -22,7 +22,6 @@ use crate::{
     ResourceSnapshotStream,
     TypeRef,
     TypeUri,
-    UNTRACKED_STATUS_GENERATION,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,6 +425,7 @@ pub struct ResourceSnapshotRow {
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
     pub generation: i64,
+    pub status_generation: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -450,7 +450,7 @@ impl ResourceSnapshotRow {
                 labels: crate::resource_labels_from_json(self.labels),
                 annotations: crate::resource_annotations_from_json(self.annotations),
                 generation: u64::try_from(self.generation).unwrap(),
-                status_generation: UNTRACKED_STATUS_GENERATION,
+                status_generation: u64::try_from(self.status_generation).unwrap(),
                 created_at: self.created_at,
                 updated_at: self.updated_at,
                 deletion_requested_at: None,

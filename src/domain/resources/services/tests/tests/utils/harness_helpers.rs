@@ -10,8 +10,8 @@
 use chrono::Utc;
 use kamu_resources::{
     ApplyResourceParams,
-    ReconcilableResource,
-    ReconcilableResourceEvent,
+    ManagedResource,
+    ResourceEvent,
     ResourceEventCreated,
     ResourceEventSpecUpdated,
     ResourceID,
@@ -59,7 +59,7 @@ pub fn make_fresh_aggregate(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type TestEvent = ReconcilableResourceEvent<TestResourceSpec, (), String>;
+pub type TestEvent = ResourceEvent<TestResourceSpec>;
 
 pub fn make_created_event(id: ResourceID, name: &str, value: &str) -> TestEvent {
     TestEvent::Created(ResourceEventCreated {
