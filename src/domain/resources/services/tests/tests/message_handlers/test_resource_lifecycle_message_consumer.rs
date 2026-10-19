@@ -14,6 +14,7 @@ use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     MockReconcileResourceUseCase,
     ReconcileResourceUseCase,
+    ReconcileResourceUseCaseError,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
@@ -21,6 +22,7 @@ use kamu_resources::{
     ResourceLifecycleMessageOutcome,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    ResourceStatusConflictError,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use odf::metadata::resources::TypeUri;
@@ -39,6 +41,28 @@ async fn test_applied_message_triggers_reconciliation() {
 
     let harness = ResourceLifecycleConsumerHarness::new(
         ResourceLifecycleConsumerHarness::expect_execute_once(id),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::applied(
+            Utc::now(),
+            ResourceLifecycleMessageOutcome::Created,
+            ResourceLifecycleConsumerHarness::make_snapshot(id),
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_applied_message_skips_reconciliation_status_conflict() {
+    // A concurrent reconciliation of the same resource already recorded its
+    // outcome, so the conflict is not an error of the message.
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new(
+        ResourceLifecycleConsumerHarness::expect_execute_once_with_status_conflict(id),
     );
 
     harness
@@ -116,6 +140,24 @@ impl ResourceLifecycleConsumerHarness {
             .once()
             .withf(move |id_| *id_ == id)
             .returning(|_| Ok(()));
+        mock
+    }
+
+    fn expect_execute_once_with_status_conflict(
+        id: ResourceID,
+    ) -> MockReconcileResourceUseCase<TestResource> {
+        let mut mock = MockReconcileResourceUseCase::<TestResource>::new();
+        mock.expect_execute()
+            .once()
+            .withf(move |id_| *id_ == id)
+            .returning(|_| {
+                Err(ReconcileResourceUseCaseError::StatusConflict(
+                    ResourceStatusConflictError {
+                        expected: 2,
+                        actual: 3,
+                    },
+                ))
+            });
         mock
     }
 

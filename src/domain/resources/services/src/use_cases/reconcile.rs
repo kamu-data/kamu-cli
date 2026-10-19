@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use messaging_outbox::{Outbox, OutboxExt};
 use serde::Serialize;
 use time_source::SystemTimeSource;
@@ -25,6 +24,7 @@ use crate::domain::{
     ResourceLoadError,
     ResourcePersistenceService,
     ResourceSchemaProvider,
+    StatusConflictOf,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,77 +66,97 @@ where
         &self,
         id: ResourceID,
     ) -> Result<Option<R>, ReconcileResourceUseCaseError<R>> {
-        let resource = self
-            .resource_aggregate_loader
-            .load(&id)
-            .await
-            .map_err(ResourceLoadError)
-            .map_err(ReconcileResourceUseCaseError::LoadFailed)?;
+        let mut resource = self.load(&id).await?;
         if !resource.needs_reconciliation() {
             return Ok(None);
         }
 
         // Phase 1 commits the "started" transition before the actual reconciliation
         // work, giving the second phase a stable persisted hand-off point.
-        let mut resource = resource;
         let status_generation = resource.headers().status_generation;
         resource
             .try_mark_reconciliation_started(self.time_source.now(), status_generation)
-            .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
+            .map_err(Self::lifecycle_error)?;
 
         self.persist_resource_state(&mut resource).await?;
 
         Ok(Some(resource))
     }
 
+    /// Records the outcome of reconciling `started`, the resource as phase 1
+    /// left it. The outcome is written to the current state of the resource,
+    /// provided its generation is still the reconciled one and no other writer
+    /// updated the status since phase 1.
     pub async fn finish_reconciliation_phase(
         &self,
-        mut resource: R,
+        started: R,
     ) -> Result<(), ReconcileResourceUseCaseError<R>> {
-        let now = self.time_source.now();
-        let lifecycle_message = self
-            .apply_reconciliation_outcome(&mut resource, now)
-            .await?;
+        let generation = started.headers().generation;
+        let status_generation = started.headers().status_generation;
 
-        self.persist_resource_state(&mut resource).await?;
-        self.notify_reconciliation_finished(&resource, lifecycle_message)
-            .await
-    }
+        let outcome = self.reconciler.reconcile(&started).await;
 
-    async fn apply_reconciliation_outcome(
-        &self,
-        resource: &mut R,
-        now: DateTime<Utc>,
-    ) -> Result<ResourceLifecycleMessage, ReconcileResourceUseCaseError<R>> {
         // Phase 2 runs in a separate transaction after the started state was
-        // committed, so concurrent changes between the two phases are expected.
-        let generation = resource.headers().generation;
-        let status_generation = resource.headers().status_generation;
-        match self.reconciler.reconcile(&*resource).await {
+        // committed, so the resource may have changed in between.
+        let mut resource = self.load(started.id()).await?;
+        if resource.headers().generation != generation {
+            tracing::info!(
+                resource_id = %resource.id(),
+                reconciled_generation = generation,
+                current_generation = resource.headers().generation,
+                "Discarding reconciliation outcome of a superseded generation"
+            );
+            return Ok(());
+        }
+
+        let now = self.time_source.now();
+        let lifecycle_message = match outcome {
             Ok(()) => {
                 resource
                     .try_mark_reconciliation_succeeded(now, generation, status_generation)
-                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
+                    .map_err(Self::lifecycle_error)?;
+                self.persist_resource_state(&mut resource).await?;
 
-                Ok(ResourceLifecycleMessage::reconciliation_succeeded(
+                ResourceLifecycleMessage::reconciliation_succeeded(
                     now,
                     resource
                         .make_resource_snapshot()
                         .map_err(ReconcileResourceUseCaseError::Internal)?,
-                ))
+                )
             }
             Err(err) => {
                 resource
                     .try_mark_reconciliation_failed(now, generation, status_generation, &err)
-                    .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
+                    .map_err(Self::lifecycle_error)?;
+                self.persist_resource_state(&mut resource).await?;
 
-                Ok(ResourceLifecycleMessage::reconciliation_failed(
+                ResourceLifecycleMessage::reconciliation_failed(
                     now,
                     resource
                         .make_resource_snapshot()
                         .map_err(ReconcileResourceUseCaseError::Internal)?,
-                ))
+                )
             }
+        };
+
+        self.outbox
+            .post_message(MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, lifecycle_message)
+            .await
+            .map_err(ReconcileResourceUseCaseError::Internal)
+    }
+
+    async fn load(&self, id: &ResourceID) -> Result<R, ReconcileResourceUseCaseError<R>> {
+        self.resource_aggregate_loader
+            .load(id)
+            .await
+            .map_err(ResourceLoadError)
+            .map_err(ReconcileResourceUseCaseError::LoadFailed)
+    }
+
+    fn lifecycle_error(err: R::LifecycleError) -> ReconcileResourceUseCaseError<R> {
+        match err.as_status_conflict() {
+            Some(conflict) => ReconcileResourceUseCaseError::StatusConflict(*conflict),
+            None => ReconcileResourceUseCaseError::Lifecycle(err),
         }
     }
 
@@ -148,35 +168,6 @@ where
             .save(resource)
             .await
             .map_err(ReconcileResourceUseCaseError::from)
-    }
-
-    async fn notify_reconciliation_finished(
-        &self,
-        resource: &R,
-        lifecycle_message: ResourceLifecycleMessage,
-    ) -> Result<(), ReconcileResourceUseCaseError<R>> {
-        let snapshot = resource
-            .make_resource_snapshot()
-            .map_err(ReconcileResourceUseCaseError::Internal)?;
-        let lifecycle_message = match lifecycle_message {
-            ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
-                ResourceLifecycleMessage::reconciliation_succeeded(
-                    succeeded_message.event_time,
-                    snapshot,
-                )
-            }
-            ResourceLifecycleMessage::ReconciliationFailed(failed_message) => {
-                ResourceLifecycleMessage::reconciliation_failed(failed_message.event_time, snapshot)
-            }
-            ResourceLifecycleMessage::Applied(_) | ResourceLifecycleMessage::Deleted(_) => {
-                unreachable!("reconcile use case must only emit reconciliation outcome messages")
-            }
-        };
-
-        self.outbox
-            .post_message(MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, lifecycle_message)
-            .await
-            .map_err(ReconcileResourceUseCaseError::Internal)
     }
 }
 
@@ -236,8 +227,8 @@ macro_rules! declare_reconcile_resource_use_case {
                 &self,
                 resource: $resource,
             ) -> Result<(), kamu_resources::ReconcileResourceUseCaseError<$resource>> {
-                // Resume from the aggregate returned by phase 1 and record the
-                // reconciler outcome in a new transaction.
+                // Reconcile the aggregate returned by phase 1 and record the
+                // outcome in a new transaction.
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
                     resource_aggregate_loader.as_ref(),
                     resource_persistence_service.as_ref(),

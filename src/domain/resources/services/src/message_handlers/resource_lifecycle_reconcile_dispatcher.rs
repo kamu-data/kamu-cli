@@ -37,10 +37,22 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
                 &self,
                 resource: &kamu_resources::ResourceSnapshot,
             ) -> Result<(), internal_error::InternalError> {
-                self.reconcile_resource_use_case
-                    .execute(&resource.id)
-                    .await
-                    .map_err(internal_error::ErrorIntoInternal::int_err)
+                let result = self.reconcile_resource_use_case.execute(&resource.id).await;
+
+                // The other status writer is a concurrent reconciliation of the
+                // same resource, which records its own outcome.
+                if let Err(kamu_resources::ReconcileResourceUseCaseError::StatusConflict(err)) =
+                    &result
+                {
+                    tracing::info!(
+                        resource_id = %resource.id,
+                        error = %err,
+                        "Skipping reconciliation outcome: status was updated concurrently"
+                    );
+                    return Ok(());
+                }
+
+                result.map_err(internal_error::ErrorIntoInternal::int_err)
             }
 
             async fn handle_reconciliation_succeeded(

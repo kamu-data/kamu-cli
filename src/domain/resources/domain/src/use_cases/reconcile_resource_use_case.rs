@@ -10,7 +10,13 @@
 use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
-use crate::{EventSourcedResource, ResourceID, ResourceLoadError, ResourcePersistenceError};
+use crate::{
+    EventSourcedResource,
+    ResourceID,
+    ResourceLoadError,
+    ResourcePersistenceError,
+    ResourceStatusConflictError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,6 +35,10 @@ pub enum ReconcileResourceUseCaseError<R: EventSourcedResource> {
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
+
+    /// Another writer updated the status after reconciliation started.
+    #[error(transparent)]
+    StatusConflict(ResourceStatusConflictError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
