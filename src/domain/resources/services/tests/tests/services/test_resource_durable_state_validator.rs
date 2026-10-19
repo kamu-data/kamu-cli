@@ -261,7 +261,7 @@ async fn test_malformed_condition_value_fails_durable_state_guard() {
 struct ResourceDurableStateValidatorHarness {
     base: BaseResourceServiceHarness,
     catalog: dill::Catalog,
-    account_handle: odf::AccountHandle,
+    account_handle: odf::ResourceOwnerHandle,
 }
 
 impl ResourceDurableStateValidatorHarness {
@@ -275,7 +275,7 @@ impl ResourceDurableStateValidatorHarness {
         Self {
             base,
             catalog: b.build(),
-            account_handle: odf::AccountHandle::new_test("test"),
+            account_handle: odf::ResourceOwnerHandle::new_test("test"),
         }
     }
 

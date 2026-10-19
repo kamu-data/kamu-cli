@@ -36,163 +36,19 @@ pub mod auth {
     #[allow(unused_imports)]
     use super::*;
 
-    /// Registers an account in an predefined account provider.
+    /// Create `PolicyBinding` resources that reference this resource as `object`.
     ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Account
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/actions/BindPolicy
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct Account {
-        /// Container for identity and ownership information of a resource.
-        pub headers: resources::ResourceHeadersInput,
-        /// Specifies the desired state of the resource.
-        pub spec: auth::AccountSpecInput,
+    pub struct BindPolicy {
+        /// Subject of the binding being created, allowing policies to restrict granting access to
+        /// e.g. `Everyone`.
+        pub subject: auth::SubjectHandle,
     }
 
-    impl Account {
-        pub fn schema() -> &'static TypeUri {
-            &ACCOUNT_SCHEMA
-        }
-        pub const fn schema_str() -> &'static str {
-            ACCOUNT_SCHEMA_STR
-        }
-    }
-
-    static ACCOUNT_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/auth/v1alpha1/Account";
-
-    static ACCOUNT_SCHEMA: std::sync::LazyLock<TypeUri> =
-        std::sync::LazyLock::new(|| TypeUri::new_unchecked(ACCOUNT_SCHEMA_STR));
-
-    /// Link to an account.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct AccountHandle {
-        /// ID of the account resource.
-        pub id: ResourceID,
-        /// DID of the account.
-        pub did: AccountID,
-        /// Name of the account.
-        pub name: AccountName,
-    }
-    impl IntoResourceRef for AccountHandle {}
-
-    /// Reference to an account.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountRef
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct AccountRef {
-        /// UUID of the account resource.
-        pub id: Option<ResourceID>,
-        /// DID of the account.
-        pub did: Option<AccountID>,
-        /// Name of the account.
-        pub name: Option<AccountName>,
-    }
-    impl IntoResourceRef for AccountRef {}
-
-    /// Predefined account specification.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountSpec
-    #[derive(Clone, Debug, Eq)]
-    pub struct AccountSpec {
-        /// DID associated with the account by ODF or an external system
-        pub did: Option<AccountID>,
-        /// Type of the account.
-        ///
-        /// Defaults to: "User"
-        pub account_type: Option<auth::AccountType>,
-        /// Human-friendly display name.
-        pub display_name: Option<String>,
-        /// Email address of the account.
-        pub email: String,
-        /// URL of the account's avatar image.
-        pub avatar_url: Option<String>,
-        /// Password for local authentication. Absent for SSO or DID-based accounts.
-        pub password: Option<config::Secret>,
-    }
-
-    impl AccountSpec {
-        pub fn default_account_type() -> auth::AccountType {
-            auth::AccountType::User
-        }
-        pub fn account_type(&self) -> auth::AccountType {
-            self.account_type.unwrap_or(Self::default_account_type())
-        }
-    }
-
-    impl PartialEq for AccountSpec {
-        fn eq(&self, other: &Self) -> bool {
-            self.did == other.did
-                && self
-                    .account_type
-                    .or_else(|| Some(Self::default_account_type()))
-                    == other
-                        .account_type
-                        .or_else(|| Some(Self::default_account_type()))
-                && self.display_name == other.display_name
-                && self.email == other.email
-                && self.avatar_url == other.avatar_url
-                && self.password == other.password
-        }
-    }
-
-    /// Predefined account specification.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountSpecInput
-    #[derive(Clone, Debug, Eq)]
-    pub struct AccountSpecInput {
-        /// DID associated with the account by ODF or an external system
-        pub did: Option<AccountID>,
-        /// Type of the account.
-        ///
-        /// Defaults to: "User"
-        pub account_type: Option<auth::AccountType>,
-        /// Human-friendly display name.
-        pub display_name: Option<String>,
-        /// Email address of the account.
-        pub email: String,
-        /// URL of the account's avatar image.
-        pub avatar_url: Option<String>,
-        /// Password for local authentication. Absent for SSO or DID-based accounts.
-        pub password: Option<config::Secret>,
-    }
-
-    impl AccountSpecInput {
-        pub fn default_account_type() -> auth::AccountType {
-            auth::AccountType::User
-        }
-        pub fn account_type(&self) -> auth::AccountType {
-            self.account_type.unwrap_or(Self::default_account_type())
-        }
-    }
-
-    impl PartialEq for AccountSpecInput {
-        fn eq(&self, other: &Self) -> bool {
-            self.did == other.did
-                && self
-                    .account_type
-                    .or_else(|| Some(Self::default_account_type()))
-                    == other
-                        .account_type
-                        .or_else(|| Some(Self::default_account_type()))
-                && self.display_name == other.display_name
-                && self.email == other.email
-                && self.avatar_url == other.avatar_url
-                && self.password == other.password
-        }
-    }
-
-    /// Represents the type of an account.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountType
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-    pub enum AccountType {
-        User,
-        Organization,
-    }
-
-    /// A named group of accounts. Members are assigned via the `Member` relation. Groups can be
-    /// granted roles on resources, allowing permissions to be managed at the group level rather
-    /// than per-account.
+    /// A named, possibly nested set of principals. Policies can be bound to groups so that
+    /// permissions are granted to all members at once. Some group names are reserved, e.g.
+    /// `{org}/admins` and `{org}/members` are created together with an organization.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Group
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -217,92 +73,704 @@ pub mod auth {
     static GROUP_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(GROUP_SCHEMA_STR));
 
-    /// Group specification. Groups have no intrinsic properties — membership and permissions are
-    /// expressed entirely through relations.
+    /// Group specification.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpec
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct GroupSpec {}
+    pub struct GroupSpec {
+        /// Members of the group. Only the `Resource` subject kind is allowed, so that well-known
+        /// subjects like `Everyone` cannot be nested into a group.
+        pub members: Option<Vec<auth::SubjectHandle>>,
+    }
 
-    /// Group specification. Groups have no intrinsic properties — membership and permissions are
-    /// expressed entirely through relations.
+    /// Group specification.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/GroupSpecInput
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct GroupSpecInput {}
-
-    /// A directed relationship between two resources, optionally carrying a typed value.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relation
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct Relation {
-        /// The resource that holds the relation.
-        pub subject: resources::ResourceHandle,
-        /// Name of the relation e.g. `role`, `member`, `owner`.
-        pub relation: String,
-        /// Optional value associated with the relation e.g. `maintainer` for a `role` relation.
-        pub value: Option<serde_json::Value>,
-        /// The resource that is the target of the relation.
-        pub object: resources::ResourceHandle,
+    pub struct GroupSpecInput {
+        /// Members of the group. Only the `Resource` subject kind is allowed, so that well-known
+        /// subjects like `Everyone` cannot be nested into a group.
+        pub members: Option<Vec<auth::SubjectRef>>,
     }
 
-    /// A directed relationship between two resources, optionally carrying a typed value.
+    /// An entire ODF deployment acting under a single identity. The node acts as a principal in
+    /// system tasks and node-to-node communications and owns node-wide resources like the reserved
+    /// `{node}/admins` group.
     ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationInput
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Node
     #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct RelationInput {
-        /// The resource that holds the relation.
-        pub subject: resources::ResourceRef,
-        /// Name of the relation e.g. `role`, `member`, `owner`.
-        pub relation: String,
-        /// Optional value associated with the relation e.g. `maintainer` for a `role` relation.
-        pub value: Option<serde_json::Value>,
-        /// The resource that is the target of the relation.
-        pub object: resources::ResourceRef,
-    }
-
-    /// Specified relations between resources on which auth policies act upon.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct Relations {
+    pub struct Node {
         /// Container for identity and ownership information of a resource.
         pub headers: resources::ResourceHeadersInput,
         /// Specifies the desired state of the resource.
-        pub spec: auth::RelationsSpecInput,
+        pub spec: auth::NodeSpecInput,
     }
 
-    impl Relations {
+    impl Node {
         pub fn schema() -> &'static TypeUri {
-            &RELATIONS_SCHEMA
+            &NODE_SCHEMA
         }
         pub const fn schema_str() -> &'static str {
-            RELATIONS_SCHEMA_STR
+            NODE_SCHEMA_STR
         }
     }
 
-    static RELATIONS_SCHEMA_STR: &str =
-        "https://opendatafabric.org/schemas/auth/v1alpha1/Relations";
+    static NODE_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/auth/v1alpha1/Node";
 
-    static RELATIONS_SCHEMA: std::sync::LazyLock<TypeUri> =
-        std::sync::LazyLock::new(|| TypeUri::new_unchecked(RELATIONS_SCHEMA_STR));
+    static NODE_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(NODE_SCHEMA_STR));
 
-    /// Specifies relations between resources on which auth policies act upon.
+    /// Node account specification.
     ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpec
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct RelationsSpec {
-        /// Relations between resources.
-        pub relations: Vec<auth::Relation>,
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/NodeSpec
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct NodeSpec {
+        /// DID associated with the account by ODF or an external system.
+        pub did: Option<AccountID>,
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
     }
 
-    /// Specifies relations between resources on which auth policies act upon.
+    /// Node account specification.
     ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpecInput
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/NodeSpecInput
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct RelationsSpecInput {
-        /// Relations between resources.
-        pub relations: Option<Vec<auth::RelationInput>>,
+    pub struct NodeSpecInput {
+        /// DID associated with the account by ODF or an external system.
+        pub did: Option<AccountID>,
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
+    }
+
+    /// An account that owns resources on behalf of a group of users but cannot authenticate or act
+    /// itself. Upon creation the node creates reserved groups `{org}/admins`, whose members have
+    /// owner rights over all resources of the organization, and `{org}/members`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Organization
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct Organization {
+        /// Container for identity and ownership information of a resource.
+        pub headers: resources::ResourceHeadersInput,
+        /// Specifies the desired state of the resource.
+        pub spec: auth::OrganizationSpecInput,
+    }
+
+    impl Organization {
+        pub fn schema() -> &'static TypeUri {
+            &ORGANIZATION_SCHEMA
+        }
+        pub const fn schema_str() -> &'static str {
+            ORGANIZATION_SCHEMA_STR
+        }
+    }
+
+    static ORGANIZATION_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/auth/v1alpha1/Organization";
+
+    static ORGANIZATION_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(ORGANIZATION_SCHEMA_STR));
+
+    /// Organization account specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/OrganizationSpec
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct OrganizationSpec {
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
+        /// URL of the account's avatar image.
+        pub avatar_url: Option<String>,
+        /// Suspends the account. Effects of suspension are implementation-specific.
+        ///
+        /// Defaults to: false
+        pub disabled: Option<bool>,
+    }
+
+    impl OrganizationSpec {
+        pub fn default_disabled() -> bool {
+            false
+        }
+        pub fn disabled(&self) -> bool {
+            self.disabled.unwrap_or(Self::default_disabled())
+        }
+    }
+
+    impl PartialEq for OrganizationSpec {
+        fn eq(&self, other: &Self) -> bool {
+            self.display_name == other.display_name
+                && self.avatar_url == other.avatar_url
+                && self.disabled.or_else(|| Some(Self::default_disabled()))
+                    == other.disabled.or_else(|| Some(Self::default_disabled()))
+        }
+    }
+
+    /// Organization account specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/OrganizationSpecInput
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct OrganizationSpecInput {
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
+        /// URL of the account's avatar image.
+        pub avatar_url: Option<String>,
+        /// Suspends the account. Effects of suspension are implementation-specific.
+        ///
+        /// Defaults to: false
+        pub disabled: Option<bool>,
+    }
+
+    impl OrganizationSpecInput {
+        pub fn default_disabled() -> bool {
+            false
+        }
+        pub fn disabled(&self) -> bool {
+            self.disabled.unwrap_or(Self::default_disabled())
+        }
+    }
+
+    impl PartialEq for OrganizationSpecInput {
+        fn eq(&self, other: &Self) -> bool {
+            self.display_name == other.display_name
+                && self.avatar_url == other.avatar_url
+                && self.disabled.or_else(|| Some(Self::default_disabled()))
+                    == other.disabled.or_else(|| Some(Self::default_disabled()))
+        }
+    }
+
+    /// A reusable grant of permissions. Policies with subject and object slots are templates
+    /// instantiated via `PolicyBinding`, while policies without slots take effect on their own.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Policy
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct Policy {
+        /// Container for identity and ownership information of a resource.
+        pub headers: resources::ResourceHeadersInput,
+        /// Specifies the desired state of the resource.
+        pub spec: auth::PolicySpecInput,
+    }
+
+    impl Policy {
+        pub fn schema() -> &'static TypeUri {
+            &POLICY_SCHEMA
+        }
+        pub const fn schema_str() -> &'static str {
+            POLICY_SCHEMA_STR
+        }
+    }
+
+    static POLICY_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/auth/v1alpha1/Policy";
+
+    static POLICY_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(POLICY_SCHEMA_STR));
+
+    /// Instantiates a `Policy` template for a concrete subject and object.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBinding
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PolicyBinding {
+        /// Container for identity and ownership information of a resource.
+        pub headers: resources::ResourceHeadersInput,
+        /// Specifies the desired state of the resource.
+        pub spec: auth::PolicyBindingSpecInput,
+    }
+
+    impl PolicyBinding {
+        pub fn schema() -> &'static TypeUri {
+            &POLICY_BINDING_SCHEMA
+        }
+        pub const fn schema_str() -> &'static str {
+            POLICY_BINDING_SCHEMA_STR
+        }
+    }
+
+    static POLICY_BINDING_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBinding";
+
+    static POLICY_BINDING_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(POLICY_BINDING_SCHEMA_STR));
+
+    /// Policy binding specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBindingSpec
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PolicyBindingSpec {
+        /// Policy template to instantiate.
+        pub policy: resources::ResourceHandle,
+        /// Party the permissions are granted to.
+        pub subject: auth::SubjectHandle,
+        /// Resource the permissions are granted on. Refers to both the resource and the entity
+        /// materialized from it.
+        pub object: resources::ResourceHandle,
+    }
+
+    /// Policy binding specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBindingSpecInput
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PolicyBindingSpecInput {
+        /// Policy template to instantiate.
+        pub policy: auth::PolicyRef,
+        /// Party the permissions are granted to.
+        pub subject: auth::SubjectRef,
+        /// Resource the permissions are granted on. Refers to both the resource and the entity
+        /// materialized from it.
+        pub object: resources::ResourceRef,
+    }
+
+    /// Reference to a `Policy`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyRef
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct PolicyRef {
+        /// Reference to an account that owns the `Policy`.
+        pub account: Option<auth::ResourceOwnerRef>,
+        /// ID of the resource.
+        pub id: Option<ResourceID>,
+        /// Name of the resource.
+        pub name: Option<ResourceName>,
+    }
+    impl IntoResourceRef for PolicyRef {}
+
+    /// Policy specification. The `kind` selects the policy language.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpec
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum PolicySpec {
+        Generic(auth::PolicySpecGeneric),
+        Cedar(auth::PolicySpecCedar),
+    }
+
+    impl_enum_with_variants!(PolicySpec);
+    impl_enum_variant!(PolicySpec::Generic(auth::PolicySpecGeneric));
+    impl_enum_variant!(PolicySpec::Cedar(auth::PolicySpecCedar));
+
+    /// Policy expressed in the Cedar policy language. Policies that declare `?principal` and
+    /// `?resource` slots are templates instantiated via `PolicyBinding`, otherwise they take effect
+    /// on their own. Only supported by nodes that use Cedar.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpec#/$defs/Cedar
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PolicySpecCedar {
+        /// Cedar policy source.
+        pub body: String,
+    }
+
+    /// Engine-agnostic policy that grants a set of actions. Subject and object are always supplied
+    /// by a `PolicyBinding`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpec#/$defs/Generic
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PolicySpecGeneric {
+        /// Schema URIs of actions granted by the policy.
+        pub actions: Vec<TypeUri>,
+    }
+
+    /// Policy specification. The `kind` selects the policy language.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpecInput
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum PolicySpecInput {
+        Generic(auth::PolicySpecInputGeneric),
+        Cedar(auth::PolicySpecInputCedar),
+    }
+
+    impl_enum_with_variants!(PolicySpecInput);
+    impl_enum_variant!(PolicySpecInput::Generic(auth::PolicySpecInputGeneric));
+    impl_enum_variant!(PolicySpecInput::Cedar(auth::PolicySpecInputCedar));
+
+    /// Policy expressed in the Cedar policy language. Policies that declare `?principal` and
+    /// `?resource` slots are templates instantiated via `PolicyBinding`, otherwise they take effect
+    /// on their own. Only supported by nodes that use Cedar.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpecInput#/$defs/Cedar
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PolicySpecInputCedar {
+        /// Cedar policy source.
+        pub body: String,
+    }
+
+    /// Engine-agnostic policy that grants a set of actions. Subject and object are always supplied
+    /// by a `PolicyBinding`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicySpecInput#/$defs/Generic
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PolicySpecInputGeneric {
+        /// Schema URIs of actions granted by the policy.
+        pub actions: Vec<TypeUri>,
+    }
+
+    /// Link to a resolved identity that can act as a principal: `User`, `ServiceAccount`, or
+    /// `Node`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PrincipalHandle
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct PrincipalHandle {
+        /// Type URI of the principal.
+        pub r#type: TypeUri,
+        /// Account that owns the service account.
+        pub account: Option<auth::ResourceOwnerHandle>,
+        /// ID of the principal resource.
+        pub id: ResourceID,
+        /// DID of the principal, if applicable.
+        pub did: Option<Did>,
+        /// Name of the principal resource.
+        pub name: ResourceName,
+    }
+    impl IntoResourceRef for PrincipalHandle {}
+
+    /// Reference to an identity that can act as a principal: `User`, `ServiceAccount`, or `Node`.
+    /// Short form requires a type prefix, e.g. `ServiceAccount:acme/ingest-prod`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/PrincipalRef
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct PrincipalRef {
+        /// Short type name or full type URI of the principal.
+        pub r#type: Option<TypeRef>,
+        /// Reference to an account that owns the service account.
+        pub account: Option<auth::ResourceOwnerRef>,
+        /// ID of the principal resource.
+        pub id: Option<ResourceID>,
+        /// DID of the principal.
+        pub did: Option<Did>,
+        /// Name of the principal resource.
+        pub name: Option<ResourceName>,
+    }
+    impl IntoResourceRef for PrincipalRef {}
+
+    /// Link to a resolved account that can own resources: `User`, `Organization`, or `Node`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerHandle
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ResourceOwnerHandle {
+        /// ID of the account resource.
+        pub id: ResourceID,
+        /// DID of the account.
+        pub did: AccountID,
+        /// Name of the account.
+        pub name: AccountName,
+    }
+    impl IntoResourceRef for ResourceOwnerHandle {}
+
+    /// Reference to an account that can own resources: `User`, `Organization`, or `Node`. Short
+    /// form is the account name, as names of these accounts are unique within a node.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerRef
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct ResourceOwnerRef {
+        /// UUID of the account resource.
+        pub id: Option<ResourceID>,
+        /// DID of the account.
+        pub did: Option<AccountID>,
+        /// Name of the account.
+        pub name: Option<AccountName>,
+    }
+    impl IntoResourceRef for ResourceOwnerRef {}
+
+    /// A non-human identity used by automation (scheduled flows, CI, installed applications).
+    /// Service accounts are scoped under an owning account and can act as principals, but cannot
+    /// own resources.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ServiceAccount
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ServiceAccount {
+        /// Container for identity and ownership information of a resource.
+        pub headers: resources::ResourceHeadersInput,
+        /// Specifies the desired state of the resource.
+        pub spec: auth::ServiceAccountSpecInput,
+    }
+
+    impl ServiceAccount {
+        pub fn schema() -> &'static TypeUri {
+            &SERVICE_ACCOUNT_SCHEMA
+        }
+        pub const fn schema_str() -> &'static str {
+            SERVICE_ACCOUNT_SCHEMA_STR
+        }
+    }
+
+    static SERVICE_ACCOUNT_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/auth/v1alpha1/ServiceAccount";
+
+    static SERVICE_ACCOUNT_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(SERVICE_ACCOUNT_SCHEMA_STR));
+
+    /// Service account specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ServiceAccountSpec
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct ServiceAccountSpec {
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
+        /// Suspends the account. Effects of suspension are implementation-specific.
+        ///
+        /// Defaults to: false
+        pub disabled: Option<bool>,
+    }
+
+    impl ServiceAccountSpec {
+        pub fn default_disabled() -> bool {
+            false
+        }
+        pub fn disabled(&self) -> bool {
+            self.disabled.unwrap_or(Self::default_disabled())
+        }
+    }
+
+    impl PartialEq for ServiceAccountSpec {
+        fn eq(&self, other: &Self) -> bool {
+            self.display_name == other.display_name
+                && self.disabled.or_else(|| Some(Self::default_disabled()))
+                    == other.disabled.or_else(|| Some(Self::default_disabled()))
+        }
+    }
+
+    /// Service account specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ServiceAccountSpecInput
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct ServiceAccountSpecInput {
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
+        /// Suspends the account. Effects of suspension are implementation-specific.
+        ///
+        /// Defaults to: false
+        pub disabled: Option<bool>,
+    }
+
+    impl ServiceAccountSpecInput {
+        pub fn default_disabled() -> bool {
+            false
+        }
+        pub fn disabled(&self) -> bool {
+            self.disabled.unwrap_or(Self::default_disabled())
+        }
+    }
+
+    impl PartialEq for ServiceAccountSpecInput {
+        fn eq(&self, other: &Self) -> bool {
+            self.display_name == other.display_name
+                && self.disabled.or_else(|| Some(Self::default_disabled()))
+                    == other.disabled.or_else(|| Some(Self::default_disabled()))
+        }
+    }
+
+    /// Resolved reference to a party a grant is given to.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum SubjectHandle {
+        Resource(auth::SubjectHandleResource),
+        Authenticated(auth::SubjectHandleAuthenticated),
+        Anonymous(auth::SubjectHandleAnonymous),
+        Everyone(auth::SubjectHandleEveryone),
+    }
+
+    impl_enum_with_variants!(SubjectHandle);
+    impl_enum_variant!(SubjectHandle::Resource(auth::SubjectHandleResource));
+    impl_enum_variant!(SubjectHandle::Authenticated(
+        auth::SubjectHandleAuthenticated
+    ));
+    impl_enum_variant!(SubjectHandle::Anonymous(auth::SubjectHandleAnonymous));
+    impl_enum_variant!(SubjectHandle::Everyone(auth::SubjectHandleEveryone));
+
+    /// Matches any unauthenticated principal.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Anonymous
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectHandleAnonymous {}
+
+    /// Matches any authenticated principal.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Authenticated
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectHandleAuthenticated {}
+
+    /// Matches any principal, authenticated or not.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Everyone
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectHandleEveryone {}
+
+    /// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectHandle#/$defs/Resource
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SubjectHandleResource {
+        /// Type URI of the subject resource.
+        pub r#type: TypeUri,
+        /// Account that owns the subject resource (for service accounts and groups).
+        pub account: Option<auth::ResourceOwnerHandle>,
+        /// ID of the subject resource.
+        pub id: ResourceID,
+        /// DID of the subject resource, if applicable.
+        pub did: Option<Did>,
+        /// Name of the subject resource.
+        pub name: ResourceName,
+    }
+
+    /// Reference to a party a grant is given to. Unlike a principal, a subject may stand for many
+    /// principals at once. Short form is either a well-known subject name (e.g. `Authenticated`) or
+    /// a resource reference with a type prefix, DID, or ID (e.g. `Group:acme/engineering`).
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum SubjectRef {
+        Resource(auth::SubjectRefResource),
+        Authenticated(auth::SubjectRefAuthenticated),
+        Anonymous(auth::SubjectRefAnonymous),
+        Everyone(auth::SubjectRefEveryone),
+    }
+
+    impl_enum_with_variants!(SubjectRef);
+    impl_enum_variant!(SubjectRef::Resource(auth::SubjectRefResource));
+    impl_enum_variant!(SubjectRef::Authenticated(auth::SubjectRefAuthenticated));
+    impl_enum_variant!(SubjectRef::Anonymous(auth::SubjectRefAnonymous));
+    impl_enum_variant!(SubjectRef::Everyone(auth::SubjectRefEveryone));
+
+    /// Matches any unauthenticated principal.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Anonymous
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectRefAnonymous {}
+
+    /// Matches any authenticated principal.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Authenticated
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectRefAuthenticated {}
+
+    /// Matches any principal, authenticated or not.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Everyone
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectRefEveryone {}
+
+    /// A specific `User`, `ServiceAccount`, `Node`, or members of a `Group`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/SubjectRef#/$defs/Resource
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SubjectRefResource {
+        /// Short type name or full type URI of the subject resource.
+        pub r#type: Option<TypeRef>,
+        /// Reference to an account that owns the subject resource (for service accounts and
+        /// groups).
+        pub account: Option<auth::ResourceOwnerRef>,
+        /// ID of the subject resource.
+        pub id: Option<ResourceID>,
+        /// DID of the subject resource.
+        pub did: Option<Did>,
+        /// Name of the subject resource.
+        pub name: Option<ResourceName>,
+    }
+
+    /// An individual person who can authenticate and act as a principal.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/User
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct User {
+        /// Container for identity and ownership information of a resource.
+        pub headers: resources::ResourceHeadersInput,
+        /// Specifies the desired state of the resource.
+        pub spec: auth::UserSpecInput,
+    }
+
+    impl User {
+        pub fn schema() -> &'static TypeUri {
+            &USER_SCHEMA
+        }
+        pub const fn schema_str() -> &'static str {
+            USER_SCHEMA_STR
+        }
+    }
+
+    static USER_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/auth/v1alpha1/User";
+
+    static USER_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(USER_SCHEMA_STR));
+
+    /// User account specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/UserSpec
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct UserSpec {
+        /// DID associated with the account by ODF or an external system.
+        pub did: Option<AccountID>,
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
+        /// Email address of the user.
+        pub email: Option<String>,
+        /// URL of the account's avatar image.
+        pub avatar_url: Option<String>,
+        /// Password for local authentication, stored as a hash upon apply. Absent for SSO or
+        /// DID-based accounts.
+        pub password: Option<config::Secret>,
+        /// Suspends the account. Effects of suspension are implementation-specific.
+        ///
+        /// Defaults to: false
+        pub disabled: Option<bool>,
+    }
+
+    impl UserSpec {
+        pub fn default_disabled() -> bool {
+            false
+        }
+        pub fn disabled(&self) -> bool {
+            self.disabled.unwrap_or(Self::default_disabled())
+        }
+    }
+
+    impl PartialEq for UserSpec {
+        fn eq(&self, other: &Self) -> bool {
+            self.did == other.did
+                && self.display_name == other.display_name
+                && self.email == other.email
+                && self.avatar_url == other.avatar_url
+                && self.password == other.password
+                && self.disabled.or_else(|| Some(Self::default_disabled()))
+                    == other.disabled.or_else(|| Some(Self::default_disabled()))
+        }
+    }
+
+    /// User account specification.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/UserSpecInput
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct UserSpecInput {
+        /// DID associated with the account by ODF or an external system.
+        pub did: Option<AccountID>,
+        /// Human-friendly display name.
+        pub display_name: Option<String>,
+        /// Email address of the user.
+        pub email: Option<String>,
+        /// URL of the account's avatar image.
+        pub avatar_url: Option<String>,
+        /// Password for local authentication, stored as a hash upon apply. Absent for SSO or
+        /// DID-based accounts.
+        pub password: Option<config::Secret>,
+        /// Suspends the account. Effects of suspension are implementation-specific.
+        ///
+        /// Defaults to: false
+        pub disabled: Option<bool>,
+    }
+
+    impl UserSpecInput {
+        pub fn default_disabled() -> bool {
+            false
+        }
+        pub fn disabled(&self) -> bool {
+            self.disabled.unwrap_or(Self::default_disabled())
+        }
+    }
+
+    impl PartialEq for UserSpecInput {
+        fn eq(&self, other: &Self) -> bool {
+            self.did == other.did
+                && self.display_name == other.display_name
+                && self.email == other.email
+                && self.avatar_url == other.avatar_url
+                && self.password == other.password
+                && self.disabled.or_else(|| Some(Self::default_disabled()))
+                    == other.disabled.or_else(|| Some(Self::default_disabled()))
+        }
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -312,6 +780,12 @@ pub mod auth {
 pub mod config {
     #[allow(unused_imports)]
     use super::*;
+
+    /// Decrypt a secret from a `SecretSet`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/actions/Decrypt
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct Decrypt {}
 
     /// Individual secret in raw or encrypted form.
     ///
@@ -386,7 +860,7 @@ pub mod config {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ValueHandle {
         /// Account that owns the target resource.
-        pub account: auth::AccountHandle,
+        pub account: auth::ResourceOwnerHandle,
         /// Type URI of the target resource.
         pub r#type: TypeUri,
         /// ID of the resource within a node.
@@ -408,7 +882,7 @@ pub mod config {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ValueRef {
         /// Reference to an account that owns the `VariableSet` or the `SecretSet`.
-        pub account: Option<auth::AccountRef>,
+        pub account: Option<auth::ResourceOwnerRef>,
         /// ID of a resource.
         pub id: Option<ResourceID>,
         /// Short type name or full type URI of the target resource.
@@ -416,7 +890,7 @@ pub mod config {
         /// Examples:
         /// - "SecretSet"
         /// - "VariableSet"
-        /// - "https://opendatafabric.org/config/v1/SecretSet"
+        /// - "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet"
         pub r#type: Option<TypeRef>,
         /// Name of a resource.
         pub name: Option<ResourceName>,
@@ -917,6 +1391,12 @@ pub mod datasets {
         pub extra: Option<data::ExtraAttributes>,
     }
 
+    /// Rewrite or truncate dataset history.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/actions/AlterHistory
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct AlterHistory {}
+
     /// Embedded attachment item.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/AttachmentEmbedded
@@ -1006,7 +1486,7 @@ pub mod datasets {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct DatasetHandle {
         /// Reference to an account that owns the dataset.
-        pub account: Option<auth::AccountHandle>,
+        pub account: Option<auth::ResourceOwnerHandle>,
         /// ID of the dataset resource.
         pub id: ResourceID,
         /// DID of the dataset.
@@ -1031,7 +1511,7 @@ pub mod datasets {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct DatasetRef {
         /// Reference to an account that owns the dataset.
-        pub account: Option<auth::AccountRef>,
+        pub account: Option<auth::ResourceOwnerRef>,
         /// UUID of the dataset resource.
         pub id: Option<ResourceID>,
         /// DID of the dataset.
@@ -1040,18 +1520,6 @@ pub mod datasets {
         pub name: Option<ResourceName>,
     }
     impl IntoResourceRef for DatasetRef {}
-
-    /// Access role granted to a subject on a dataset. Note: in future this fixed enum schema will
-    /// likely be replaced by a reference to a `DatasetRole` resources that defines granular
-    /// permissions on different actions available on a dataset.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/DatasetRole
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-    pub enum DatasetRole {
-        Reader,
-        Editor,
-        Maintainer,
-    }
 
     pub use crate::datasets::DatasetSelector;
 
@@ -1064,8 +1532,11 @@ pub mod datasets {
         pub did: DatasetID,
         /// Type of the dataset.
         pub kind: datasets::DatasetKind,
-        /// An array of metadata events that will be used to populate the chain. Here you can
-        /// define polling and push sources, set licenses, add attachments etc.
+        /// An array of metadata events that will be used to populate the chain, e.g. to set info,
+        /// licenses, and attachments. As the dataset evolves, it maintains a snapshot of the key
+        /// events that describe the dataset in its latest state, excluding intermediate
+        /// transitions (e.g. previous schema changes) and events related to ingestions and
+        /// transformations.
         pub metadata: Vec<datasets::MetadataEvent>,
         /// Reference to a storage volume where dataset data will be stored. If omitted, the node's
         /// default storage is used.
@@ -1081,8 +1552,11 @@ pub mod datasets {
         pub did: Option<DatasetID>,
         /// Type of the dataset.
         pub kind: datasets::DatasetKind,
-        /// An array of metadata events that will be used to populate the chain. Here you can
-        /// define polling and push sources, set licenses, add attachments etc.
+        /// An array of metadata events that will be used to populate the chain, e.g. to set info,
+        /// licenses, and attachments. As the dataset evolves, it maintains a snapshot of the key
+        /// events that describe the dataset in its latest state, excluding intermediate
+        /// transitions (e.g. previous schema changes) and events related to ingestions and
+        /// transformations.
         pub metadata: Vec<datasets::MetadataEvent>,
         /// Reference to a storage volume where dataset data will be stored. If omitted, the node's
         /// default storage is used.
@@ -1387,6 +1861,12 @@ pub mod datasets {
         pub project: datasets::Transform,
     }
 
+    /// Read dataset data (query, download).
+    ///
+    /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/actions/Read
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct Read {}
+
     /// Establishes the identity of the dataset. Always the first metadata event in the chain.
     ///
     /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/Seed
@@ -1549,6 +2029,12 @@ pub mod datasets {
         /// Moment in event time which watermark has reached.
         pub event_time: DateTime<Utc>,
     }
+
+    /// Append new data to the dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/datasets/v1alpha1/actions/Write
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct Write {}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // engines
@@ -1562,7 +2048,7 @@ pub mod engines {
     /// ingest preprocessing step
     ///
     /// Schema: https://opendatafabric.org/schemas/engines/v1alpha1/RawQueryRequest
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct RawQueryRequest {
         /// Paths to input data files to perform query over. Must all have identical schema.
         pub input_data_paths: Vec<PathBuf>,
@@ -1570,6 +2056,35 @@ pub mod engines {
         pub transform: datasets::Transform,
         /// Path where query result will be written.
         pub output_data_path: PathBuf,
+        /// Requires the engine to keep the order of records read from the input in the query
+        /// result, or fail the request if it cannot.
+        ///
+        /// Defaults to: false
+        pub preserve_order: Option<bool>,
+    }
+
+    impl RawQueryRequest {
+        pub fn default_preserve_order() -> bool {
+            false
+        }
+        pub fn preserve_order(&self) -> bool {
+            self.preserve_order
+                .unwrap_or(Self::default_preserve_order())
+        }
+    }
+
+    impl PartialEq for RawQueryRequest {
+        fn eq(&self, other: &Self) -> bool {
+            self.input_data_paths == other.input_data_paths
+                && self.transform == other.transform
+                && self.output_data_path == other.output_data_path
+                && self
+                    .preserve_order
+                    .or_else(|| Some(Self::default_preserve_order()))
+                    == other
+                        .preserve_order
+                        .or_else(|| Some(Self::default_preserve_order()))
+        }
     }
 
     /// Sent by an engine to coordinator when performing the raw query operation
@@ -1828,8 +2343,8 @@ pub mod flows {
     pub struct FlowRunActivationCause {
         /// Time at which the trigger fired.
         pub activation_time: DateTime<Utc>,
-        /// Account that initiated the run, if applicable.
-        pub initiator: Option<auth::AccountHandle>,
+        /// Principal that initiated the run, if applicable.
+        pub initiator: Option<auth::PrincipalHandle>,
         /// Copy of the trigger configuration from the parent Flow that fired.
         pub trigger: flows::FlowTrigger,
     }
@@ -1866,6 +2381,10 @@ pub mod flows {
     pub struct FlowRunSpec {
         /// Defines the default target resources on which tasks will be performed.
         pub target: Option<resources::ResourceHandle>,
+        /// Service account whose permissions the tasks of this run execute with. Must be an
+        /// account of service account type. A run created by the flow controller copies it from
+        /// the `Flow`.
+        pub service_account: Option<auth::PrincipalHandle>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<tasks::TaskSpec>,
     }
@@ -1877,6 +2396,10 @@ pub mod flows {
     pub struct FlowRunSpecInput {
         /// Defines the default target resources on which tasks will be performed.
         pub target: Option<resources::ResourceRef>,
+        /// Service account whose permissions the tasks of this run execute with. Must be an
+        /// account of service account type. A run created by the flow controller copies it from
+        /// the `Flow`.
+        pub service_account: Option<auth::PrincipalRef>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<tasks::TaskSpecInput>,
     }
@@ -1926,12 +2449,20 @@ pub mod flows {
     pub struct FlowSpec {
         /// Defines resources for which this flow will be instantiated.
         pub target: resources::ResourceSelector,
+        /// Service account whose permissions the tasks of this flow execute with. Must be an
+        /// account of service account type. Required for flows owned by an organization. When
+        /// omitted, tasks execute with the permissions of the user account that owns the flow.
+        pub service_account: Option<auth::PrincipalHandle>,
         /// Conditions that cause this flow to execute.
         pub triggers: Vec<flows::FlowTrigger>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<tasks::TaskSpec>,
         /// Defines how a flow should react to failures.
         pub retry_policy: Option<flows::RetryPolicy>,
+        /// Controls retention of `FlowStatus.recentBindings`.
+        pub recent_bindings_retention: Option<flows::RecentBindingsRetention>,
+        /// Controls retention of `FlowStatus.recentRuns`.
+        pub recent_runs_retention: Option<flows::RecentRunsRetention>,
     }
 
     /// Defines a sequence of tasks to be executed upon certain trigger conditions.
@@ -1941,12 +2472,20 @@ pub mod flows {
     pub struct FlowSpecInput {
         /// Defines resources for which this flow will be instantiated.
         pub target: resources::ResourceSelector,
+        /// Service account whose permissions the tasks of this flow execute with. Must be an
+        /// account of service account type. Required for flows owned by an organization. When
+        /// omitted, tasks execute with the permissions of the user account that owns the flow.
+        pub service_account: Option<auth::PrincipalRef>,
         /// Conditions that cause this flow to execute.
         pub triggers: Vec<flows::FlowTriggerInput>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<tasks::TaskSpecInput>,
         /// Defines how a flow should react to failures.
         pub retry_policy: Option<flows::RetryPolicy>,
+        /// Controls retention of `FlowStatus.recentBindings`.
+        pub recent_bindings_retention: Option<flows::RecentBindingsRetention>,
+        /// Controls retention of `FlowStatus.recentRuns`.
+        pub recent_runs_retention: Option<flows::RecentRunsRetention>,
     }
 
     /// Condition tracking the overall status of a Flow and a summary of recent runs.
@@ -2011,44 +2550,57 @@ pub mod flows {
     pub enum FlowTrigger {
         Manual(flows::FlowTriggerManual),
         Schedule(flows::FlowTriggerSchedule),
+        Interval(flows::FlowTriggerInterval),
         Event(flows::FlowTriggerEvent),
         Source(flows::FlowTriggerSource),
-        Dataset(flows::FlowTriggerDataset),
+        InputsUpdated(flows::FlowTriggerInputsUpdated),
     }
 
     impl_enum_with_variants!(FlowTrigger);
     impl_enum_variant!(FlowTrigger::Manual(flows::FlowTriggerManual));
     impl_enum_variant!(FlowTrigger::Schedule(flows::FlowTriggerSchedule));
+    impl_enum_variant!(FlowTrigger::Interval(flows::FlowTriggerInterval));
     impl_enum_variant!(FlowTrigger::Event(flows::FlowTriggerEvent));
     impl_enum_variant!(FlowTrigger::Source(flows::FlowTriggerSource));
-    impl_enum_variant!(FlowTrigger::Dataset(flows::FlowTriggerDataset));
-
-    /// Triggers the flow when matching datasets are updated.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Dataset
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct FlowTriggerDataset {
-        /// Selector that identifies which datasets can trigger this flow.
-        pub dataset: datasets::DatasetSelector,
-        /// Set of event bus event IDs that this trigger will react to
-        pub events: Option<Vec<String>>,
-    }
+    impl_enum_variant!(FlowTrigger::InputsUpdated(flows::FlowTriggerInputsUpdated));
 
     /// Triggers the flow when an event bus event matching one of the filters is observed.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Event
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct FlowTriggerEvent {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
         /// Filters the event by type and fields.
         pub events: events::EventFilter,
-        /// The trigger will fire upon first observed event. If another event arrives withing the
-        /// `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e.
-        /// trigger is guaranteed to fire, but may batch multiple events together into one flow
-        /// run.
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
         pub cooldown: Option<DurationString>,
-        /// If an event is observed a `cooldownMaxBatch` number of times during the `cooldown`
-        /// interval it will fire the trigger without waiting for cooldown to finish.
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
         pub cooldown_max_batch: Option<u64>,
+    }
+
+    impl FlowTriggerEvent {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerEvent {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.events == other.events
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+        }
     }
 
     /// Condition that causes a flow to be executed.
@@ -2058,66 +2610,238 @@ pub mod flows {
     pub enum FlowTriggerInput {
         Manual(flows::FlowTriggerInputManual),
         Schedule(flows::FlowTriggerInputSchedule),
+        Interval(flows::FlowTriggerInputInterval),
         Event(flows::FlowTriggerInputEvent),
         Source(flows::FlowTriggerInputSource),
-        Dataset(flows::FlowTriggerInputDataset),
+        InputsUpdated(flows::FlowTriggerInputInputsUpdated),
     }
 
     impl_enum_with_variants!(FlowTriggerInput);
     impl_enum_variant!(FlowTriggerInput::Manual(flows::FlowTriggerInputManual));
     impl_enum_variant!(FlowTriggerInput::Schedule(flows::FlowTriggerInputSchedule));
+    impl_enum_variant!(FlowTriggerInput::Interval(flows::FlowTriggerInputInterval));
     impl_enum_variant!(FlowTriggerInput::Event(flows::FlowTriggerInputEvent));
     impl_enum_variant!(FlowTriggerInput::Source(flows::FlowTriggerInputSource));
-    impl_enum_variant!(FlowTriggerInput::Dataset(flows::FlowTriggerInputDataset));
-
-    /// Triggers the flow when matching datasets are updated.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Dataset
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct FlowTriggerInputDataset {
-        /// Selector that identifies which datasets can trigger this flow.
-        pub dataset: datasets::DatasetSelector,
-        /// Set of event bus event IDs that this trigger will react to
-        pub events: Option<Vec<String>>,
-    }
+    impl_enum_variant!(FlowTriggerInput::InputsUpdated(
+        flows::FlowTriggerInputInputsUpdated
+    ));
 
     /// Triggers the flow when an event bus event matching one of the filters is observed.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Event
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct FlowTriggerInputEvent {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
         /// Filters the event by type and fields.
         pub events: events::EventFilter,
-        /// The trigger will fire upon first observed event. If another event arrives withing the
-        /// `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e.
-        /// trigger is guaranteed to fire, but may batch multiple events together into one flow
-        /// run.
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
         pub cooldown: Option<DurationString>,
-        /// If an event is observed a `cooldownMaxBatch` number of times during the `cooldown`
-        /// interval it will fire the trigger without waiting for cooldown to finish.
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
         pub cooldown_max_batch: Option<u64>,
+    }
+
+    impl FlowTriggerInputEvent {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInputEvent {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.events == other.events
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+        }
+    }
+
+    /// Triggers the flow when inputs of a derivative dataset receive new data, with optional
+    /// batching controls.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/InputsUpdated
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct FlowTriggerInputInputsUpdated {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
+        /// Selector of derivative datasets whose inputs are watched. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetSelector>,
+        /// Minimum number of new input records to accumulate before triggering.
+        pub min_records_to_await: Option<u64>,
+        /// Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
+        pub max_await_interval: Option<DurationString>,
+    }
+
+    impl FlowTriggerInputInputsUpdated {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInputInputsUpdated {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.target == other.target
+                && self.min_records_to_await == other.min_records_to_await
+                && self.max_await_interval == other.max_await_interval
+        }
+    }
+
+    /// Triggers the flow at regular intervals.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Interval
+    #[derive(Clone, Debug, Eq)]
+    pub struct FlowTriggerInputInterval {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
+        /// Interval between activations e.g. `15m`.
+        pub interval: DurationString,
+    }
+
+    impl FlowTriggerInputInterval {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInputInterval {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.interval == other.interval
+        }
     }
 
     /// Triggers the flow via an API call or UI action.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Manual
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct FlowTriggerInputManual {}
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct FlowTriggerInputManual {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
+    }
+
+    impl FlowTriggerInputManual {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInputManual {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+        }
+    }
 
     /// Triggers the flow on a cron schedule.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Schedule
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct FlowTriggerInputSchedule {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
         /// Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
         pub cron: String,
+    }
+
+    impl FlowTriggerInputSchedule {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInputSchedule {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.cron == other.cron
+        }
     }
 
     /// Triggers the flow when a source receives new data, with optional batching controls.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTriggerInput#/$defs/Source
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct FlowTriggerInputSource {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
         /// Reference to the source resource that drives this trigger.
         pub source: resources::ResourceRef,
         /// Minimum number of new records to accumulate before triggering.
@@ -2126,32 +2850,252 @@ pub mod flows {
         pub max_await_interval: Option<DurationString>,
     }
 
+    impl FlowTriggerInputSource {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInputSource {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.source == other.source
+                && self.min_records_to_await == other.min_records_to_await
+                && self.max_await_interval == other.max_await_interval
+        }
+    }
+
+    /// Triggers the flow when inputs of a derivative dataset receive new data, with optional
+    /// batching controls.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/InputsUpdated
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct FlowTriggerInputsUpdated {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
+        /// Selector of derivative datasets whose inputs are watched. Defaults to the flow-level
+        /// target when omitted.
+        pub target: Option<datasets::DatasetSelector>,
+        /// Minimum number of new input records to accumulate before triggering.
+        pub min_records_to_await: Option<u64>,
+        /// Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
+        pub max_await_interval: Option<DurationString>,
+    }
+
+    impl FlowTriggerInputsUpdated {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInputsUpdated {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.target == other.target
+                && self.min_records_to_await == other.min_records_to_await
+                && self.max_await_interval == other.max_await_interval
+        }
+    }
+
+    /// Triggers the flow at regular intervals.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Interval
+    #[derive(Clone, Debug, Eq)]
+    pub struct FlowTriggerInterval {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
+        /// Interval between activations e.g. `15m`.
+        pub interval: DurationString,
+    }
+
+    impl FlowTriggerInterval {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerInterval {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.interval == other.interval
+        }
+    }
+
     /// Triggers the flow via an API call or UI action.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Manual
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct FlowTriggerManual {}
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct FlowTriggerManual {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
+    }
+
+    impl FlowTriggerManual {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerManual {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+        }
+    }
 
     /// Triggers the flow on a cron schedule.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Schedule
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct FlowTriggerSchedule {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
         /// Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
         pub cron: String,
+    }
+
+    impl FlowTriggerSchedule {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerSchedule {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.cron == other.cron
+        }
     }
 
     /// Triggers the flow when a source receives new data, with optional batching controls.
     ///
     /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/FlowTrigger#/$defs/Source
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct FlowTriggerSource {
+        /// Allows to pause an individual trigger.
+        ///
+        /// Defaults to: true
+        pub enabled: Option<bool>,
+        /// Minimum interval between activations of the trigger. If the trigger fires again within
+        /// the interval, the activation is postponed until the interval ends, batching multiple
+        /// activations into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If the trigger is activated this many times during the `cooldown` interval, it fires
+        /// without waiting for the interval to end.
+        pub cooldown_max_batch: Option<u64>,
         /// Reference to the source resource that drives this trigger.
         pub source: resources::ResourceHandle,
         /// Minimum number of new records to accumulate before triggering.
         pub min_records_to_await: Option<u64>,
         /// Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
         pub max_await_interval: Option<DurationString>,
+    }
+
+    impl FlowTriggerSource {
+        pub fn default_enabled() -> bool {
+            true
+        }
+        pub fn enabled(&self) -> bool {
+            self.enabled.unwrap_or(Self::default_enabled())
+        }
+    }
+
+    impl PartialEq for FlowTriggerSource {
+        fn eq(&self, other: &Self) -> bool {
+            self.enabled.or_else(|| Some(Self::default_enabled()))
+                == other.enabled.or_else(|| Some(Self::default_enabled()))
+                && self.cooldown == other.cooldown
+                && self.cooldown_max_batch == other.cooldown_max_batch
+                && self.source == other.source
+                && self.min_records_to_await == other.min_records_to_await
+                && self.max_await_interval == other.max_await_interval
+        }
+    }
+
+    /// Controls how many recent bindings are reported in `FlowStatus.recentBindings`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/RecentBindingsRetention
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct RecentBindingsRetention {
+        /// Maximum number of recent bindings to report.
+        pub max_bindings: Option<u32>,
+    }
+
+    /// Controls how many recent runs are reported in `FlowStatus.recentRuns`. Implementations may
+    /// additionally cap these values.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flows/v1alpha1/RecentRunsRetention
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct RecentRunsRetention {
+        /// Maximum number of recent runs to report.
+        pub max_runs: Option<u32>,
+        /// Maximum age of a finished run to be reported e.g. `30d`.
+        pub max_age: Option<DurationString>,
     }
 
     /// Type of the backoff scaling.
@@ -2172,7 +3116,7 @@ pub mod flows {
         pub max_attempts: Option<u32>,
         /// How long to wait until the first retry.
         pub min_delay: Option<DurationString>,
-        /// Type of the backoff scaling.
+        /// Type of the backoff scaling. When omitted, retries use a constant `minDelay`.
         pub backoff: Option<flows::RetryBackoff>,
     }
 }
@@ -2375,6 +3319,38 @@ pub mod resources {
     #[allow(unused_imports)]
     use super::*;
 
+    /// Apply a specific label to the resource.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/actions/AddLabel
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct AddLabel {
+        /// Schema URI of the label being added.
+        pub label_type: TypeUri,
+        /// Value of the label being added.
+        pub label_value: serde_json::Value,
+    }
+
+    /// Create a new resource instance of a type (object is a type URI) under an account.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/actions/Create
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct Create {
+        /// Account under which the resource is being created.
+        pub target_owner: auth::ResourceOwnerHandle,
+    }
+
+    /// Delete the resource instance.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/actions/Delete
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct Delete {}
+
+    /// Modify the resource manifest.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/actions/Edit
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct Edit {}
+
     /// Filters that work on resource labels and identity headers.
     ///
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/LabelFilter
@@ -2383,13 +3359,48 @@ pub mod resources {
         pub entries: std::collections::BTreeMap<String, serde_json::Value>,
     }
 
+    /// List resource instances of a type (object is a type URI) under an account.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/actions/List
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct List {
+        /// Account under which resources are being listed.
+        pub target_owner: auth::ResourceOwnerHandle,
+    }
+
+    /// Condition describing why the controller failed to reconcile the latest generation of a
+    /// resource. Set by the controller; never written by users.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ReconciliationError
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ReconciliationError {
+        /// Machine-readable code identifying the type of the error.
+        ///
+        /// Examples:
+        /// - "unresolved-reference"
+        pub code: String,
+        /// Human-readable description of the error.
+        pub message: String,
+    }
+
+    /// Remove a specific label from the resource.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/actions/RemoveLabel
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct RemoveLabel {
+        /// Schema URI of the label being removed.
+        pub label_type: TypeUri,
+        /// Existing value of the label being removed.
+        pub label_value: serde_json::Value,
+    }
+
     /// Top-level container for canonical representation of a resource that specifies the type and
     /// version of the resource, carries identity, ownership, and status information.
     ///
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/Resource
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Resource<SpecT> {
-        /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset.json`.
+        /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset`.
         pub schema: TypeUri,
         /// Container for identity and ownership information of a resource.
         pub headers: resources::ResourceHeaders,
@@ -2423,7 +3434,7 @@ pub mod resources {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ResourceHandle {
         /// Account that owns the target resource.
-        pub account: auth::AccountHandle,
+        pub account: auth::ResourceOwnerHandle,
         /// Type URI of the target resource.
         pub r#type: TypeUri,
         /// ID of the resource within a node.
@@ -2446,7 +3457,7 @@ pub mod resources {
         /// Symbolic name of a resource that identifies it within a scope of an onwing account.
         pub name: ResourceName,
         /// Link to the account that owns the resource.
-        pub account: auth::AccountHandle,
+        pub account: auth::ResourceOwnerHandle,
         /// Map of string keys and values that can be used to organize, categorize, and query
         /// resources.
         pub labels: resources::ResourceLabels,
@@ -2461,10 +3472,17 @@ pub mod resources {
         /// Does not increment on status changes, thus signifying changes to the desired state.
         /// Populated by the system. Starts with `1`.
         pub generation: u64,
+        /// A sequential number that changes every time the resource status is updated. Can be
+        /// passed back as a precondition of a status update to make sure the status was not
+        /// modified since it was read. Populated by the system. Starts with `1`.
+        pub status_generation: u64,
         /// Time when the resource was first applied and assigned an identity.
         pub created_at: DateTime<Utc>,
         /// Time when the resource was last updated, including header, spec, and status updates.
         pub updated_at: DateTime<Utc>,
+        /// Time when deletion of the resource was requested. The resource remains visible until
+        /// its controllers finish cleaning up and the deletion completes.
+        pub deletion_requested_at: Option<DateTime<Utc>>,
         /// Time when the resource was deleted.
         pub deleted_at: Option<DateTime<Utc>>,
     }
@@ -2480,7 +3498,7 @@ pub mod resources {
         /// Symbolic name of a resource that identifies it within a scope of an onwing account.
         pub name: ResourceName,
         /// Reference to the account that owns the resource.
-        pub account: Option<auth::AccountRef>,
+        pub account: Option<auth::ResourceOwnerRef>,
         /// Map of string keys and values that can be used to organize, categorize, and query
         /// resources.
         pub labels: Option<resources::ResourceLabels>,
@@ -2515,7 +3533,7 @@ pub mod resources {
         pub entries: std::collections::BTreeMap<TypeRef, serde_json::Value>,
     }
 
-    /// Represents the reconciliation phase of a resource.
+    /// Represents the reconciliation or deletion phase of a resource.
     ///
     /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourcePhase
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -2525,6 +3543,8 @@ pub mod resources {
         Ready,
         Degraded,
         Failed,
+        Deleting,
+        Deleted,
     }
 
     /// Reference to another resource.
@@ -2533,7 +3553,7 @@ pub mod resources {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ResourceRef {
         /// Reference to an account that owns the target resource.
-        pub account: Option<auth::AccountRef>,
+        pub account: Option<auth::ResourceOwnerRef>,
         /// ID of the resource within a node.
         pub id: Option<ResourceID>,
         /// DID of the resource.
@@ -2542,7 +3562,7 @@ pub mod resources {
         ///
         /// Examples:
         /// - "SecretSet"
-        /// - "https://opendatafabric.org/config/v1/SecretSet"
+        /// - "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet"
         pub r#type: Option<TypeRef>,
         /// Name of a resource.
         pub name: Option<ResourceName>,
@@ -2572,6 +3592,12 @@ pub mod resources {
         /// Detailed conditions describing the state of the resource that are added by controllers.
         pub conditions: resources::ResourceConditions,
     }
+
+    /// Read the resource manifest.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resources/v1alpha1/actions/View
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct View {}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // sinks
@@ -2909,7 +3935,7 @@ pub mod sources {
     /// current state of data against the reconstructed previous state and recording differences as
     /// retractions or corrections. The Operation Type "op" column will contain:
     ///   - append (`+A`) when a row appears for the first time
-    ///   - retraction (`-D`) when row disappears
+    ///   - retraction (`-R`) when row disappears
     ///   - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old
     ///     value of the row and `+C` carrying the new value.
     ///
@@ -3636,7 +4662,7 @@ pub mod storage {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct PersistentVolumeRef {
         /// Reference to an account that owns the `PersistentVolume`.
-        pub account: Option<auth::AccountRef>,
+        pub account: Option<auth::ResourceOwnerRef>,
         /// ID of the resource.
         pub id: Option<ResourceID>,
         /// Name of the resource.
@@ -3723,6 +4749,164 @@ pub mod tasks {
     #[allow(unused_imports)]
     use super::*;
 
+    /// Determines how a flow run proceeds when a task finishes with a `Failed` outcome.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/FailureBehavior
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum FailureBehavior {
+        Fail,
+        Continue,
+    }
+
+    /// Determines how a flow run proceeds when a task finishes with a `NoOp` outcome.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/NoOpBehavior
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    pub enum NoOpBehavior {
+        Continue,
+        Break,
+    }
+
+    /// Credentials used to access a remote location during a sync.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum SyncAuth {
+        Bearer(tasks::SyncAuthBearer),
+        Aws(tasks::SyncAuthAws),
+        Headers(tasks::SyncAuthHeaders),
+    }
+
+    impl_enum_with_variants!(SyncAuth);
+    impl_enum_variant!(SyncAuth::Bearer(tasks::SyncAuthBearer));
+    impl_enum_variant!(SyncAuth::Aws(tasks::SyncAuthAws));
+    impl_enum_variant!(SyncAuth::Headers(tasks::SyncAuthHeaders));
+
+    /// Authenticates with AWS or an AWS-compatible object storage.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth#/$defs/Aws
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SyncAuthAws {
+        /// S3 endpoint URL. If omitted, defaults to AWS S3. Use for S3-compatible stores.
+        pub endpoint: Option<String>,
+        /// AWS region where the bucket is located e.g. `us-west-2`.
+        pub region: Option<String>,
+        /// Reference to a secret containing the AWS access key ID.
+        pub access_key: Option<config::ValueHandle>,
+        /// Reference to a secret containing the AWS secret access key.
+        pub secret_key: Option<config::ValueHandle>,
+    }
+
+    /// Authenticates with a bearer token, e.g. an access token of a remote ODF node.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth#/$defs/Bearer
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncAuthBearer {
+        /// Reference to a secret containing the token.
+        pub token: config::ValueHandle,
+    }
+
+    /// A request header whose value is taken from a `VariableSet` or a `SecretSet`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthHeader
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncAuthHeader {
+        /// Name of the header.
+        pub name: String,
+        /// Reference to the value of the header.
+        pub value: config::ValueHandle,
+    }
+
+    /// A request header whose value is taken from a `VariableSet` or a `SecretSet`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthHeaderInput
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncAuthHeaderInput {
+        /// Name of the header.
+        pub name: String,
+        /// Reference to the value of the header.
+        pub value: config::ValueRef,
+    }
+
+    /// Authenticates by passing custom request headers.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuth#/$defs/Headers
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncAuthHeaders {
+        /// Headers to pass with every request.
+        pub headers: Vec<tasks::SyncAuthHeader>,
+    }
+
+    /// Credentials used to access a remote location during a sync.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum SyncAuthInput {
+        Bearer(tasks::SyncAuthInputBearer),
+        Aws(tasks::SyncAuthInputAws),
+        Headers(tasks::SyncAuthInputHeaders),
+    }
+
+    impl_enum_with_variants!(SyncAuthInput);
+    impl_enum_variant!(SyncAuthInput::Bearer(tasks::SyncAuthInputBearer));
+    impl_enum_variant!(SyncAuthInput::Aws(tasks::SyncAuthInputAws));
+    impl_enum_variant!(SyncAuthInput::Headers(tasks::SyncAuthInputHeaders));
+
+    /// Authenticates with AWS or an AWS-compatible object storage.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput#/$defs/Aws
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct SyncAuthInputAws {
+        /// S3 endpoint URL. If omitted, defaults to AWS S3. Use for S3-compatible stores.
+        pub endpoint: Option<String>,
+        /// AWS region where the bucket is located e.g. `us-west-2`.
+        pub region: Option<String>,
+        /// Reference to a secret containing the AWS access key ID.
+        pub access_key: Option<config::ValueRef>,
+        /// Reference to a secret containing the AWS secret access key.
+        pub secret_key: Option<config::ValueRef>,
+    }
+
+    /// Authenticates with a bearer token, e.g. an access token of a remote ODF node.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput#/$defs/Bearer
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncAuthInputBearer {
+        /// Reference to a secret containing the token.
+        pub token: config::ValueRef,
+    }
+
+    /// Authenticates by passing custom request headers.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncAuthInput#/$defs/Headers
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncAuthInputHeaders {
+        /// Headers to pass with every request.
+        pub headers: Vec<tasks::SyncAuthHeaderInput>,
+    }
+
+    /// A remote location a dataset is synced with.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncEndpoint
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncEndpoint {
+        /// URL of the remote dataset. The scheme selects the transfer protocol e.g. `odf+https://`, `s3://`, `file://`.
+        pub url: String,
+        /// Credentials used to access the remote location.
+        pub auth: Option<tasks::SyncAuth>,
+    }
+
+    /// A remote location a dataset is synced with.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/SyncEndpointInput
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct SyncEndpointInput {
+        /// URL of the remote dataset. The scheme selects the transfer protocol e.g. `odf+https://`, `s3://`, `file://`.
+        pub url: String,
+        /// Credentials used to access the remote location.
+        pub auth: Option<tasks::SyncAuthInput>,
+    }
+
     /// An individual work item to be executed.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/Task
@@ -3747,6 +4931,15 @@ pub mod tasks {
 
     static TASK_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(TASK_SCHEMA_STR));
+
+    /// Type-specific details of a task failure. The `kind` property identifies the error, e.g.
+    /// `InputDatasetCompacted`, and the remaining properties depend on it.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskError
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub struct TaskError {
+        pub entries: std::collections::BTreeMap<String, serde_json::Value>,
+    }
 
     /// Result of the execution of a task.
     ///
@@ -3778,6 +4971,11 @@ pub mod tasks {
     pub struct TaskOutcomeFailed {
         /// Human-readable description of the failure.
         pub message: String,
+        /// Whether retrying the task could succeed, e.g. after a network error. An unrecoverable
+        /// failure, such as an invalid query, would fail the same way again.
+        pub recoverable: bool,
+        /// Type-specific details of the failure.
+        pub error: Option<tasks::TaskError>,
     }
 
     /// Task completed with no work done (e.g. no new data to process).
@@ -3809,7 +5007,10 @@ pub mod tasks {
     pub enum TaskSpec {
         Ingest(tasks::TaskSpecIngest),
         Transform(tasks::TaskSpecTransform),
+        SyncFrom(tasks::TaskSpecSyncFrom),
+        SyncTo(tasks::TaskSpecSyncTo),
         Compaction(tasks::TaskSpecCompaction),
+        Reset(tasks::TaskSpecReset),
         GarbageCollection(tasks::TaskSpecGarbageCollection),
         Verify(tasks::TaskSpecVerify),
         WebhookCall(tasks::TaskSpecWebhookCall),
@@ -3818,7 +5019,10 @@ pub mod tasks {
     impl_enum_with_variants!(TaskSpec);
     impl_enum_variant!(TaskSpec::Ingest(tasks::TaskSpecIngest));
     impl_enum_variant!(TaskSpec::Transform(tasks::TaskSpecTransform));
+    impl_enum_variant!(TaskSpec::SyncFrom(tasks::TaskSpecSyncFrom));
+    impl_enum_variant!(TaskSpec::SyncTo(tasks::TaskSpecSyncTo));
     impl_enum_variant!(TaskSpec::Compaction(tasks::TaskSpecCompaction));
+    impl_enum_variant!(TaskSpec::Reset(tasks::TaskSpecReset));
     impl_enum_variant!(TaskSpec::GarbageCollection(
         tasks::TaskSpecGarbageCollection
     ));
@@ -3828,44 +5032,174 @@ pub mod tasks {
     /// Compacts data files in matching datasets to improve query performance.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Compaction
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecCompaction {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to compact. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// Target maximum size of each compacted data slice e.g. `100MiB`.
         pub max_slice_size: Option<ByteSize>,
         /// Target maximum number of records per compacted data slice.
         pub max_slice_records: Option<u64>,
     }
 
+    impl TaskSpecCompaction {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecCompaction {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.max_slice_size == other.max_slice_size
+                && self.max_slice_records == other.max_slice_records
+        }
+    }
+
     /// Removes unreferenced data files from matching datasets.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/GarbageCollection
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecGarbageCollection {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to collect garbage from. Defaults to the flow-level target
         /// when omitted.
         pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+    }
+
+    impl TaskSpecGarbageCollection {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecGarbageCollection {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+        }
     }
 
     /// Fetches data from a source and appends it to a dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Ingest
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct TaskSpecIngest {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to ingest into. Defaults to the flow-level target when
         /// omitted.
         pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// Reference to the source resource that defines how to fetch data.
         pub source: resources::ResourceHandle,
         /// Target number of records to ingest per data slice.
         pub target_records_per_slice: Option<u64>,
+    }
+
+    impl TaskSpecIngest {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecIngest {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.source == other.source
+                && self.target_records_per_slice == other.target_records_per_slice
+        }
     }
 
     /// An individual work item to be executed as part of a flow.
@@ -3875,7 +5209,10 @@ pub mod tasks {
     pub enum TaskSpecInput {
         Ingest(tasks::TaskSpecInputIngest),
         Transform(tasks::TaskSpecInputTransform),
+        SyncFrom(tasks::TaskSpecInputSyncFrom),
+        SyncTo(tasks::TaskSpecInputSyncTo),
         Compaction(tasks::TaskSpecInputCompaction),
+        Reset(tasks::TaskSpecInputReset),
         GarbageCollection(tasks::TaskSpecInputGarbageCollection),
         Verify(tasks::TaskSpecInputVerify),
         WebhookCall(tasks::TaskSpecInputWebhookCall),
@@ -3884,7 +5221,10 @@ pub mod tasks {
     impl_enum_with_variants!(TaskSpecInput);
     impl_enum_variant!(TaskSpecInput::Ingest(tasks::TaskSpecInputIngest));
     impl_enum_variant!(TaskSpecInput::Transform(tasks::TaskSpecInputTransform));
+    impl_enum_variant!(TaskSpecInput::SyncFrom(tasks::TaskSpecInputSyncFrom));
+    impl_enum_variant!(TaskSpecInput::SyncTo(tasks::TaskSpecInputSyncTo));
     impl_enum_variant!(TaskSpecInput::Compaction(tasks::TaskSpecInputCompaction));
+    impl_enum_variant!(TaskSpecInput::Reset(tasks::TaskSpecInputReset));
     impl_enum_variant!(TaskSpecInput::GarbageCollection(
         tasks::TaskSpecInputGarbageCollection
     ));
@@ -3894,77 +5234,533 @@ pub mod tasks {
     /// Compacts data files in matching datasets to improve query performance.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Compaction
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecInputCompaction {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to compact. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// Target maximum size of each compacted data slice e.g. `100MiB`.
         pub max_slice_size: Option<ByteSize>,
         /// Target maximum number of records per compacted data slice.
         pub max_slice_records: Option<u64>,
     }
 
+    impl TaskSpecInputCompaction {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputCompaction {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.max_slice_size == other.max_slice_size
+                && self.max_slice_records == other.max_slice_records
+        }
+    }
+
     /// Removes unreferenced data files from matching datasets.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecInputGarbageCollection {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to collect garbage from. Defaults to the flow-level target
         /// when omitted.
         pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+    }
+
+    impl TaskSpecInputGarbageCollection {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputGarbageCollection {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+        }
     }
 
     /// Fetches data from a source and appends it to a dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Ingest
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct TaskSpecInputIngest {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to ingest into. Defaults to the flow-level target when
         /// omitted.
         pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// Reference to the source resource that defines how to fetch data.
         pub source: resources::ResourceRef,
         /// Target number of records to ingest per data slice.
         pub target_records_per_slice: Option<u64>,
     }
 
+    impl TaskSpecInputIngest {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputIngest {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.source == other.source
+                && self.target_records_per_slice == other.target_records_per_slice
+        }
+    }
+
+    /// Moves a block reference of a dataset to an earlier block, discarding the history that
+    /// follows it.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Reset
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct TaskSpecInputReset {
+        /// An alias for the task used to refer to it in flows and access the results
+        pub name: Option<String>,
+        /// Reference to the dataset to reset. Defaults to the flow-level target when omitted.
+        pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+        /// Name of the block reference to reset.
+        ///
+        /// Defaults to: "head"
+        pub r#ref: Option<String>,
+        /// Hash of the block the reference will point to. Defaults to the `Seed` block when
+        /// omitted.
+        pub new_block_hash: Option<Multihash>,
+        /// Expected hash of the block the reference currently points to. When specified, the task
+        /// fails if the reference has moved, protecting against concurrent updates.
+        pub old_block_hash: Option<Multihash>,
+    }
+
+    impl TaskSpecInputReset {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+        pub fn default_ref() -> &'static str {
+            "head"
+        }
+        pub fn r#ref(&self) -> &str {
+            self.r#ref.as_deref().unwrap_or(Self::default_ref())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputReset {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.r#ref.as_deref().or_else(|| Some(Self::default_ref()))
+                    == other.r#ref.as_deref().or_else(|| Some(Self::default_ref()))
+                && self.new_block_hash == other.new_block_hash
+                && self.old_block_hash == other.old_block_hash
+        }
+    }
+
+    /// Pulls new blocks from a remote dataset into a local dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/SyncFrom
+    #[derive(Clone, Debug, Eq)]
+    pub struct TaskSpecInputSyncFrom {
+        /// An alias for the task used to refer to it in flows and access the results
+        pub name: Option<String>,
+        /// Reference to the local dataset to pull into. Defaults to the flow-level target when
+        /// omitted.
+        pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+        /// Remote dataset to pull from.
+        pub source: tasks::SyncEndpointInput,
+        /// Overwrite the local dataset even if its history has diverged from the source.
+        ///
+        /// Defaults to: false
+        pub force: Option<bool>,
+    }
+
+    impl TaskSpecInputSyncFrom {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+        pub fn default_force() -> bool {
+            false
+        }
+        pub fn force(&self) -> bool {
+            self.force.unwrap_or(Self::default_force())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputSyncFrom {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.source == other.source
+                && self.force.or_else(|| Some(Self::default_force()))
+                    == other.force.or_else(|| Some(Self::default_force()))
+        }
+    }
+
+    /// Pushes new blocks of a local dataset to a remote dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/SyncTo
+    #[derive(Clone, Debug, Eq)]
+    pub struct TaskSpecInputSyncTo {
+        /// An alias for the task used to refer to it in flows and access the results
+        pub name: Option<String>,
+        /// Reference to the local dataset to push. Defaults to the flow-level target when omitted.
+        pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+        /// Remote dataset to push to.
+        pub destination: tasks::SyncEndpointInput,
+        /// Overwrite the remote dataset even if its history has diverged from the local one.
+        ///
+        /// Defaults to: false
+        pub force: Option<bool>,
+        /// Create the remote dataset if it does not exist.
+        ///
+        /// Defaults to: true
+        pub create_if_not_exists: Option<bool>,
+    }
+
+    impl TaskSpecInputSyncTo {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+        pub fn default_force() -> bool {
+            false
+        }
+        pub fn force(&self) -> bool {
+            self.force.unwrap_or(Self::default_force())
+        }
+        pub fn default_create_if_not_exists() -> bool {
+            true
+        }
+        pub fn create_if_not_exists(&self) -> bool {
+            self.create_if_not_exists
+                .unwrap_or(Self::default_create_if_not_exists())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputSyncTo {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.destination == other.destination
+                && self.force.or_else(|| Some(Self::default_force()))
+                    == other.force.or_else(|| Some(Self::default_force()))
+                && self
+                    .create_if_not_exists
+                    .or_else(|| Some(Self::default_create_if_not_exists()))
+                    == other
+                        .create_if_not_exists
+                        .or_else(|| Some(Self::default_create_if_not_exists()))
+        }
+    }
+
     /// Executes transformation of data defined in a derivative dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Transform
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecInputTransform {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the derivative dataset that defines how to transform data.
         pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+    }
+
+    impl TaskSpecInputTransform {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputTransform {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+        }
     }
 
     /// Checks dataset metadata for integrity.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/Verify
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecInputVerify {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to verify. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetRef>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// If true, re-executes transformations on derivative datasets to verify reproducibility.
         pub replay_transform: Option<bool>,
+    }
+
+    impl TaskSpecInputVerify {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputVerify {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.replay_transform == other.replay_transform
+        }
     }
 
     /// Dispatches a certain payload to a specific `WebhookEndpoint`.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpecInput#/$defs/WebhookCall
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct TaskSpecInputWebhookCall {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalRef>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// Reference to the `WebhookEndpoint`.
         pub endpoint: resources::ResourceRef,
         /// The payload to send. May include templating.
@@ -3973,41 +5769,431 @@ pub mod tasks {
         pub retry_policy: Option<flows::RetryPolicy>,
     }
 
+    impl TaskSpecInputWebhookCall {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecInputWebhookCall {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.endpoint == other.endpoint
+                && self.payload == other.payload
+                && self.retry_policy == other.retry_policy
+        }
+    }
+
+    /// Moves a block reference of a dataset to an earlier block, discarding the history that
+    /// follows it.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Reset
+    #[derive(Clone, Debug, Eq, Default)]
+    pub struct TaskSpecReset {
+        /// An alias for the task used to refer to it in flows and access the results
+        pub name: Option<String>,
+        /// Reference to the dataset to reset. Defaults to the flow-level target when omitted.
+        pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+        /// Name of the block reference to reset.
+        ///
+        /// Defaults to: "head"
+        pub r#ref: Option<String>,
+        /// Hash of the block the reference will point to. Defaults to the `Seed` block when
+        /// omitted.
+        pub new_block_hash: Option<Multihash>,
+        /// Expected hash of the block the reference currently points to. When specified, the task
+        /// fails if the reference has moved, protecting against concurrent updates.
+        pub old_block_hash: Option<Multihash>,
+    }
+
+    impl TaskSpecReset {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+        pub fn default_ref() -> &'static str {
+            "head"
+        }
+        pub fn r#ref(&self) -> &str {
+            self.r#ref.as_deref().unwrap_or(Self::default_ref())
+        }
+    }
+
+    impl PartialEq for TaskSpecReset {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.r#ref.as_deref().or_else(|| Some(Self::default_ref()))
+                    == other.r#ref.as_deref().or_else(|| Some(Self::default_ref()))
+                && self.new_block_hash == other.new_block_hash
+                && self.old_block_hash == other.old_block_hash
+        }
+    }
+
+    /// Pulls new blocks from a remote dataset into a local dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/SyncFrom
+    #[derive(Clone, Debug, Eq)]
+    pub struct TaskSpecSyncFrom {
+        /// An alias for the task used to refer to it in flows and access the results
+        pub name: Option<String>,
+        /// Reference to the local dataset to pull into. Defaults to the flow-level target when
+        /// omitted.
+        pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+        /// Remote dataset to pull from.
+        pub source: tasks::SyncEndpoint,
+        /// Overwrite the local dataset even if its history has diverged from the source.
+        ///
+        /// Defaults to: false
+        pub force: Option<bool>,
+    }
+
+    impl TaskSpecSyncFrom {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+        pub fn default_force() -> bool {
+            false
+        }
+        pub fn force(&self) -> bool {
+            self.force.unwrap_or(Self::default_force())
+        }
+    }
+
+    impl PartialEq for TaskSpecSyncFrom {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.source == other.source
+                && self.force.or_else(|| Some(Self::default_force()))
+                    == other.force.or_else(|| Some(Self::default_force()))
+        }
+    }
+
+    /// Pushes new blocks of a local dataset to a remote dataset.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/SyncTo
+    #[derive(Clone, Debug, Eq)]
+    pub struct TaskSpecSyncTo {
+        /// An alias for the task used to refer to it in flows and access the results
+        pub name: Option<String>,
+        /// Reference to the local dataset to push. Defaults to the flow-level target when omitted.
+        pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+        /// Remote dataset to push to.
+        pub destination: tasks::SyncEndpoint,
+        /// Overwrite the remote dataset even if its history has diverged from the local one.
+        ///
+        /// Defaults to: false
+        pub force: Option<bool>,
+        /// Create the remote dataset if it does not exist.
+        ///
+        /// Defaults to: true
+        pub create_if_not_exists: Option<bool>,
+    }
+
+    impl TaskSpecSyncTo {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+        pub fn default_force() -> bool {
+            false
+        }
+        pub fn force(&self) -> bool {
+            self.force.unwrap_or(Self::default_force())
+        }
+        pub fn default_create_if_not_exists() -> bool {
+            true
+        }
+        pub fn create_if_not_exists(&self) -> bool {
+            self.create_if_not_exists
+                .unwrap_or(Self::default_create_if_not_exists())
+        }
+    }
+
+    impl PartialEq for TaskSpecSyncTo {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.destination == other.destination
+                && self.force.or_else(|| Some(Self::default_force()))
+                    == other.force.or_else(|| Some(Self::default_force()))
+                && self
+                    .create_if_not_exists
+                    .or_else(|| Some(Self::default_create_if_not_exists()))
+                    == other
+                        .create_if_not_exists
+                        .or_else(|| Some(Self::default_create_if_not_exists()))
+        }
+    }
+
     /// Executes transformation of data defined in a derivative dataset.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Transform
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecTransform {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the derivative dataset that defines how to transform data.
         pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
+    }
+
+    impl TaskSpecTransform {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecTransform {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+        }
     }
 
     /// Checks dataset metadata for integrity.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/Verify
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Clone, Debug, Eq, Default)]
     pub struct TaskSpecVerify {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
         /// Reference to the dataset to verify. Defaults to the flow-level target when omitted.
         pub target: Option<datasets::DatasetHandle>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// If true, re-executes transformations on derivative datasets to verify reproducibility.
         pub replay_transform: Option<bool>,
+    }
+
+    impl TaskSpecVerify {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecVerify {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.target == other.target
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.replay_transform == other.replay_transform
+        }
     }
 
     /// Dispatches a certain payload to a specific `WebhookEndpoint`.
     ///
     /// Schema: https://opendatafabric.org/schemas/tasks/v1alpha1/TaskSpec#/$defs/WebhookCall
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq)]
     pub struct TaskSpecWebhookCall {
         /// An alias for the task used to refer to it in flows and access the results
         pub name: Option<String>,
+        /// Service account whose permissions the task executes with. Must be an account of service
+        /// account type. Defaults to the service account of the run when omitted.
+        pub service_account: Option<auth::PrincipalHandle>,
+        /// How the flow run proceeds when this task finishes with a `NoOp` outcome: `Continue`
+        /// executes the next task, while `Break` finishes the flow run early without an error.
+        ///
+        /// Defaults to: "Continue"
+        pub on_no_op: Option<tasks::NoOpBehavior>,
+        /// How the flow run proceeds when this task finishes with a `Failed` outcome: `Fail`
+        /// finishes the flow run with an error, while `Continue` executes the next task.
+        ///
+        /// Defaults to: "Fail"
+        pub on_failure: Option<tasks::FailureBehavior>,
         /// Reference to the `WebhookEndpoint`.
         pub endpoint: resources::ResourceHandle,
         /// The payload to send. May include templating.
         pub payload: Option<String>,
+        /// Defines how a webhook should react to failures.
+        pub retry_policy: Option<flows::RetryPolicy>,
+    }
+
+    impl TaskSpecWebhookCall {
+        pub fn default_on_no_op() -> tasks::NoOpBehavior {
+            tasks::NoOpBehavior::Continue
+        }
+        pub fn on_no_op(&self) -> tasks::NoOpBehavior {
+            self.on_no_op.unwrap_or(Self::default_on_no_op())
+        }
+        pub fn default_on_failure() -> tasks::FailureBehavior {
+            tasks::FailureBehavior::Fail
+        }
+        pub fn on_failure(&self) -> tasks::FailureBehavior {
+            self.on_failure.unwrap_or(Self::default_on_failure())
+        }
+    }
+
+    impl PartialEq for TaskSpecWebhookCall {
+        fn eq(&self, other: &Self) -> bool {
+            self.name == other.name
+                && self.service_account == other.service_account
+                && self.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                    == other.on_no_op.or_else(|| Some(Self::default_on_no_op()))
+                && self.on_failure.or_else(|| Some(Self::default_on_failure()))
+                    == other
+                        .on_failure
+                        .or_else(|| Some(Self::default_on_failure()))
+                && self.endpoint == other.endpoint
+                && self.payload == other.payload
+                && self.retry_policy == other.retry_policy
+        }
     }
 
     /// Execution phase of a task.
@@ -4016,10 +6202,8 @@ pub mod tasks {
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub enum TaskStatus {
         Pending,
-        Planning,
-        Ready,
+        Queued,
         Running,
-        Committing,
         Finished,
     }
 }

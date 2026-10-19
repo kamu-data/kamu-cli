@@ -306,6 +306,7 @@ impl Engine for ODFEngine {
             input_data_paths: vec![container_input_data_path],
             transform: request.transform,
             output_data_path: container_output_data_path.clone(),
+            preserve_order: None,
         };
 
         let engine_container = EngineContainer::new(

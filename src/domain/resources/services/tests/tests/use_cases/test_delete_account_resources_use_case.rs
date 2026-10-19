@@ -24,7 +24,7 @@ use crate::tests::use_cases::resource_use_case_base_harness::ResourceUseCaseBase
 #[test_log::test(tokio::test)]
 async fn test_delete_account_no_resources_succeeds() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness.delete_account_resources(account_handle.did).await;
 }
@@ -34,7 +34,7 @@ async fn test_delete_account_no_resources_succeeds() {
 #[test_log::test(tokio::test)]
 async fn test_delete_account_deletes_all_owned_resources() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let (id_a, snapshot_a) = harness
         .apply_and_assert_snapshot(&account_handle, "res-a")
@@ -63,8 +63,8 @@ async fn test_delete_account_deletes_all_owned_resources() {
 #[test_log::test(tokio::test)]
 async fn test_delete_account_leaves_other_accounts_intact() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
-    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
+    let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     harness.apply_and_get_id(&account_handle_a, "res-a").await;
 
@@ -88,7 +88,7 @@ async fn test_delete_account_leaves_other_accounts_intact() {
 async fn test_delete_account_handles_pagination() {
     // PAGE_SIZE in delete_account_resources.rs is 100; create 101 to exceed it
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let mut ids = Vec::new();
     for i in 0..=100 {
@@ -115,7 +115,7 @@ async fn test_delete_account_emits_deleted_lifecycle_message() {
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness.apply_and_get_id(&account_handle, "res-a").await;
 
@@ -132,7 +132,7 @@ async fn test_delete_account_multiple_resources_emits_single_message() {
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 3);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness.apply_and_get_id(&account_handle, "res-a").await;
     harness.apply_and_get_id(&account_handle, "res-b").await;
@@ -150,7 +150,7 @@ async fn test_delete_account_no_resources_emits_no_message() {
     mock_outbox.expect_post_message_as_json().times(0);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness.delete_account_resources(account_handle.did).await;
 }
@@ -189,7 +189,7 @@ async fn test_delete_account_message_carries_correct_snapshot_data() {
         .returning(|_, _, _| Ok(()));
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     *uid_cell.lock().unwrap() = Some(id);

@@ -193,7 +193,7 @@ struct ApplyResourcePlannerHarness {
     typed_query_svc: Arc<dyn TypedResourceQueryService<TestResource>>,
     aggregate_loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
     apply_svc: Arc<dyn ApplyResourceUseCase<TestResource>>,
-    account_handle: odf::AccountHandle,
+    account_handle: odf::ResourceOwnerHandle,
 }
 
 impl ApplyResourcePlannerHarness {
@@ -216,7 +216,7 @@ impl ApplyResourcePlannerHarness {
             typed_query_svc,
             aggregate_loader,
             apply_svc,
-            account_handle: odf::AccountHandle::new_test("test"),
+            account_handle: odf::ResourceOwnerHandle::new_test("test"),
         }
     }
 

@@ -22,6 +22,7 @@ use crate::{
     ResourceSnapshotStream,
     TypeRef,
     TypeUri,
+    UNTRACKED_STATUS_GENERATION,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,8 +401,8 @@ pub struct ResourceHandleRow {
 }
 
 impl ResourceHandleRow {
-    pub fn account_handle(&self) -> odf::AccountHandle {
-        odf::AccountHandle {
+    pub fn account_handle(&self) -> odf::ResourceOwnerHandle {
+        odf::ResourceOwnerHandle {
             id: ResourceID::new(self.account_resource_id),
             did: self.account_id.clone(),
             name: odf::AccountName::new_unchecked(&self.account_name),
@@ -440,7 +441,7 @@ impl ResourceSnapshotRow {
             schema: TypeUri::new_unchecked(self.resource_schema),
             headers: crate::ResourceHeaders {
                 id,
-                account: odf::AccountHandle {
+                account: odf::ResourceOwnerHandle {
                     id: ResourceID::new(self.account_resource_id),
                     did: self.account_id,
                     name: odf::AccountName::new_unchecked(&self.account_name),
@@ -449,8 +450,10 @@ impl ResourceSnapshotRow {
                 labels: crate::resource_labels_from_json(self.labels),
                 annotations: crate::resource_annotations_from_json(self.annotations),
                 generation: u64::try_from(self.generation).unwrap(),
+                status_generation: UNTRACKED_STATUS_GENERATION,
                 created_at: self.created_at,
                 updated_at: self.updated_at,
+                deletion_requested_at: None,
                 deleted_at: self.deleted_at,
                 owner_references: None,
             },

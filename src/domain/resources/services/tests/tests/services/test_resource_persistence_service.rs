@@ -68,7 +68,7 @@ async fn test_create_resource_populates_label_projection() {
     let harness = ResourcePersistenceServiceHarness::new();
 
     let headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::AccountRef {
+        Some(odf::metadata::auth::ResourceOwnerRef {
             id: Some(harness.account_handle.id),
             did: Some(harness.account_handle.did.clone()),
             name: Some(harness.account_handle.name.clone()),
@@ -117,7 +117,7 @@ async fn test_save_resource_resyncs_label_projection() {
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::AccountRef {
+        Some(odf::metadata::auth::ResourceOwnerRef {
             id: Some(harness.account_handle.id),
             did: Some(harness.account_handle.did.clone()),
             name: Some(harness.account_handle.name.clone()),
@@ -148,7 +148,7 @@ async fn test_delete_resource_clears_label_projection() {
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
-        Some(odf::metadata::auth::AccountRef {
+        Some(odf::metadata::auth::ResourceOwnerRef {
             id: Some(harness.account_handle.id),
             did: Some(harness.account_handle.did.clone()),
             name: Some(harness.account_handle.name.clone()),
@@ -343,7 +343,7 @@ async fn test_concurrent_modification_detected() {
 struct ResourcePersistenceServiceHarness {
     base: BaseResourceServiceHarness,
     catalog: dill::Catalog,
-    account_handle: odf::AccountHandle,
+    account_handle: odf::ResourceOwnerHandle,
 }
 
 impl ResourcePersistenceServiceHarness {
@@ -357,7 +357,7 @@ impl ResourcePersistenceServiceHarness {
         Self {
             base,
             catalog: b.build(),
-            account_handle: odf::AccountHandle::new_test("test"),
+            account_handle: odf::ResourceOwnerHandle::new_test("test"),
         }
     }
 

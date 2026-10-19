@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::DEFAULT_ACCOUNT_NAME;
 #[cfg(any(feature = "testing", test))]
 use crate::TEST_ACCOUNT_ID;
+use crate::{AccountHandle, DEFAULT_ACCOUNT_NAME};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ pub enum CurrentAccountSubject {
 
 #[derive(Debug, Clone)]
 pub struct LoggedAccount {
-    pub account_handle: odf::AccountHandle,
+    pub account_handle: AccountHandle,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -53,7 +53,7 @@ impl CurrentAccountSubject {
         account_name: odf::AccountName,
     ) -> Self {
         Self::Logged(LoggedAccount {
-            account_handle: odf::AccountHandle {
+            account_handle: AccountHandle {
                 id: resource_id,
                 did: account_id,
                 name: account_name,
@@ -132,7 +132,7 @@ impl CurrentAccountSubject {
         }
     }
 
-    pub fn account_handle(&self) -> &odf::AccountHandle {
+    pub fn account_handle(&self) -> &AccountHandle {
         match self {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account misused");

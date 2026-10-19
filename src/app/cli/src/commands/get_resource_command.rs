@@ -118,8 +118,8 @@ impl GetResourceCommand {
         #[serde(rename_all = "camelCase")]
         struct RenderedResourceHeaders<'a> {
             id: &'a kamu_resources::ResourceID,
-            #[serde_as(as = "odf::metadata::serde::yaml::auth::AccountHandle")]
-            account: &'a odf::AccountHandle,
+            #[serde_as(as = "odf::metadata::serde::yaml::auth::ResourceOwnerHandle")]
+            account: &'a odf::ResourceOwnerHandle,
             name: &'a str,
             #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceLabels")]
             labels: &'a kamu_resources::ResourceLabels,

@@ -12,9 +12,9 @@ use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     Resource,
-    ResourceAccountRef,
     ResourceHandle,
     ResourceID,
+    ResourceOwnerRef,
     ResourceRef,
     ResourceSelector,
     ResourceSummaryView,
@@ -238,7 +238,7 @@ pub struct SearchResourceHandlesResponse {
 
 #[derive(Debug, Clone, Default)]
 pub struct ResourcesSummaryRequest {
-    pub account: Option<ResourceAccountRef>,
+    pub account: Option<ResourceOwnerRef>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

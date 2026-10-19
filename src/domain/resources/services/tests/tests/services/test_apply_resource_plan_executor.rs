@@ -52,7 +52,7 @@ async fn test_execute_create_returns_applied_created() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test");
 
     let plan = harness
         .make_plan(
@@ -88,7 +88,7 @@ async fn test_execute_update_returns_applied_updated() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test");
 
     // Create first
     let create_plan = harness
@@ -133,7 +133,7 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test");
 
     // Create the resource first (sends one outbox message)
     let create_plan = harness
@@ -185,7 +185,7 @@ async fn test_execute_create_duplicate_retries_as_update() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_handle = odf::AccountHandle::new_test("test");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test");
 
     // Persist the resource directly so it already exists in the store —
     // bypassing the outbox path so no message is expected for this step.
@@ -278,7 +278,7 @@ impl ApplyResourcePlanExecutorHarness {
 
     async fn make_plan(
         &self,
-        account: odf::AccountHandle,
+        account: odf::ResourceOwnerHandle,
         name: &str,
         spec: TestResourceSpec,
     ) -> PlannedApplyResource<TestResource> {

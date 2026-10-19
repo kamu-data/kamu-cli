@@ -44,7 +44,7 @@ macro_rules! declare_apply_resource_use_case {
                 params: &kamu_resources::ApplyResourceParams<$resource>,
             ) -> Result<(), kamu_resources::ApplyResourceUseCaseError<$resource>> {
                 match &params.headers.account {
-                    Some(odf::metadata::auth::AccountRef {
+                    Some(odf::metadata::auth::ResourceOwnerRef {
                         id: Some(_),
                         did: Some(_),
                         name: Some(_),

@@ -53,7 +53,7 @@ static KIND_C: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("Kind
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn make_test_snapshot(
-    account: &odf::AccountHandle,
+    account: &odf::ResourceOwnerHandle,
     schema: &TypeUri,
     name: &str,
 ) -> ResourceSnapshot {
@@ -100,7 +100,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
 pub async fn test_create_and_find_resource(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "my-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
@@ -151,7 +151,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 pub async fn test_create_find_update_resource_with_populated_labels_annotations(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "labeled-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
@@ -228,8 +228,8 @@ pub async fn test_create_find_update_resource_with_populated_labels_annotations(
 pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
-    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
 
     let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "first");
     first.id = repo.new_resource_id().await.unwrap();
@@ -280,8 +280,8 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
 pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
-    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
 
     let found = repo
         .find_resource_handles_by_ids(&account_handle.did, &[])
@@ -364,8 +364,8 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
 pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
-    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
 
     let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "first");
     first.id = repo.new_resource_id().await.unwrap();
@@ -415,7 +415,7 @@ pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
 pub async fn test_search_resource_handles(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
@@ -556,7 +556,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
 pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     let ids = seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
     let rows = repo
@@ -685,7 +685,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
 pub async fn test_search_resource_handles_partially_vacuous_scope(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
     for empty_query in [
@@ -737,7 +737,7 @@ pub async fn test_search_resource_handles_partially_vacuous_scope(catalog: &Cata
 pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     let ids = seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
     // `AnyType` finds a match regardless of which seeded schema it carries,
@@ -817,7 +817,7 @@ pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
 pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     let ids = seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
     let count = repo
@@ -861,7 +861,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
 pub async fn test_search_resource_handles_pattern_special_characters(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     // "a-b" and "a_b" differ only in whether the middle character is a
     // literal underscore or a hyphen — an unescaped `_` in a LIKE pattern
@@ -919,7 +919,7 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
 pub async fn test_count_search_resource_handles(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
@@ -999,7 +999,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
 pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     // Stored names are always lowercase (as produced by try_new).
     let mut alpha = make_test_snapshot(&account_handle, &TEST_KIND, "my-resource");
@@ -1104,7 +1104,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
 async fn seed_label_filtered_resources(
     repo: &dyn ResourceRepository,
     projection_repo: &dyn ResourceLabelProjectionRepository,
-    account_handle: &odf::AccountHandle,
+    account_handle: &odf::ResourceOwnerHandle,
 ) {
     for (name, labels) in [
         ("prod-data", vec![("environment", "prod"), ("team", "data")]),
@@ -1141,7 +1141,7 @@ async fn seed_label_filtered_resources(
 async fn seed_labelled_resource(
     repo: &dyn ResourceRepository,
     projection_repo: &dyn ResourceLabelProjectionRepository,
-    account_handle: &odf::AccountHandle,
+    account_handle: &odf::ResourceOwnerHandle,
     schema: &TypeUri,
     name: &str,
     labels: &[(&str, &str)],
@@ -1180,7 +1180,7 @@ pub async fn test_search_resource_handles_per_row_labels(catalog: &Catalog) {
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     for (schema, name, labels) in [
         (&*KIND_A, "a-prod", vec![("environment", "prod")]),
@@ -1297,7 +1297,7 @@ pub async fn test_search_resource_handles_any_type_labels(catalog: &Catalog) {
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     for (schema, name, labels) in [
         (&*KIND_A, "any-a-prod", vec![("environment", "prod")]),
@@ -1366,7 +1366,7 @@ fn one_type_scope_with_labels(label_pairs: Vec<ResourceLabelPair>) -> ResourceSc
 
 async fn filtered_list_names(
     repo: &dyn ResourceRepository,
-    account_handle: &odf::AccountHandle,
+    account_handle: &odf::ResourceOwnerHandle,
     label_pairs: Vec<ResourceLabelPair>,
 ) -> Vec<String> {
     let snapshots = repo
@@ -1393,7 +1393,7 @@ pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     seed_label_filtered_resources(repo.as_ref(), projection_repo.as_ref(), &account_handle).await;
 
     let names = filtered_list_names(repo.as_ref(), &account_handle, Vec::new()).await;
@@ -1446,7 +1446,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     seed_label_filtered_resources(repo.as_ref(), projection_repo.as_ref(), &account_handle).await;
 
     let scope_with_pattern = |pattern: &str| {
@@ -1506,8 +1506,8 @@ struct SeededSearchHandleIds {
 pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
-    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
     seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
     let search = async |scope: ResourceScope| {
@@ -1636,9 +1636,9 @@ pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
 
 async fn seed_search_resource_handles(
     repo: &dyn ResourceRepository,
-    account_handle: &odf::AccountHandle,
+    account_handle: &odf::ResourceOwnerHandle,
 ) -> SeededSearchHandleIds {
-    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
 
     let mut ids = std::collections::HashMap::new();
     // Results are ordered `updated_at DESC, resource_id DESC`. Seeding with a
@@ -1682,7 +1682,7 @@ async fn seed_search_resource_handles(
 pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "duplicate-resource");
     first.id = repo.new_resource_id().await.unwrap();
@@ -1701,7 +1701,7 @@ pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
 pub async fn test_create_resource_duplicate_ignore_case_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "duplicate-resource");
     first.id = repo.new_resource_id().await.unwrap();
@@ -1720,7 +1720,7 @@ pub async fn test_create_resource_duplicate_ignore_case_fails(catalog: &Catalog)
 pub async fn test_update_resource(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "update-me");
     snapshot.id = repo.new_resource_id().await.unwrap();
@@ -1766,7 +1766,7 @@ pub async fn test_update_resource(catalog: &Catalog) {
 pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "concurrent-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
@@ -1784,7 +1784,7 @@ pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
 pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "locked-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
@@ -1824,7 +1824,7 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
 pub async fn test_update_resources(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "bulk-first");
     first.id = repo.new_resource_id().await.unwrap();
@@ -1917,7 +1917,7 @@ pub async fn test_update_resources(catalog: &Catalog) {
 pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "bulk-concurrent-first");
     first.id = repo.new_resource_id().await.unwrap();
@@ -1981,7 +1981,7 @@ pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
 pub async fn test_list_resource_snapshots_by_scope(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     for i in 1..=3_u32 {
         let mut snapshot = make_test_snapshot(&account_handle, &KIND_A, &format!("resource-a-{i}"));
@@ -2035,7 +2035,7 @@ pub async fn test_list_resource_snapshots_by_scope(catalog: &Catalog) {
 pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut app_a = make_test_snapshot(&account_handle, &KIND_A, "app-alpha");
     app_a.id = repo.new_resource_id().await.unwrap();
@@ -2289,8 +2289,8 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
 pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
-    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
 
     for i in 1..=2_u32 {
         let mut snapshot = make_test_snapshot(&account_handle, &KIND_A, &format!("resource-a-{i}"));
@@ -2325,8 +2325,8 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
 pub async fn test_summarize_resources(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
-    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
+    let other_account_handle = odf::ResourceOwnerHandle::new_test("other-account");
 
     let mut pending = make_test_snapshot(&account_handle, &KIND_A, "pending");
     pending.id = repo.new_resource_id().await.unwrap();
@@ -2419,7 +2419,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
 pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "to-delete");
     snapshot.id = repo.new_resource_id().await.unwrap();
@@ -2461,7 +2461,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_test_account(handle: &odf::AccountHandle) -> Account {
+fn make_test_account(handle: &odf::ResourceOwnerHandle) -> Account {
     let name = handle.name.as_str();
     Account {
         id: handle.did.clone(),
@@ -2487,7 +2487,7 @@ pub async fn test_account_rename_reflected_immediately_in_headers(catalog: &Cata
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    let original_handle = odf::AccountHandle::new_test("rename-me");
+    let original_handle = odf::ResourceOwnerHandle::new_test("rename-me");
     let original_account = make_test_account(&original_handle);
     account_repo.save_account(&original_account).await.unwrap();
 
@@ -2536,7 +2536,7 @@ pub async fn test_deleted_account_falls_back_to_sentinel_name(catalog: &Catalog)
     // Deliberately do NOT seed an `accounts` row for this id — simulates the
     // account having been deleted (or never synced) while its resources
     // still exist.
-    let account_handle = odf::AccountHandle::new_test("no-such-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("no-such-account");
 
     let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "orphaned-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
@@ -2564,7 +2564,7 @@ pub async fn test_deleted_account_falls_back_to_sentinel_name(catalog: &Catalog)
 async fn seed_labelled_resource_created_at(
     repo: &dyn ResourceRepository,
     projection_repo: &dyn ResourceLabelProjectionRepository,
-    account_handle: &odf::AccountHandle,
+    account_handle: &odf::ResourceOwnerHandle,
     schema: &TypeUri,
     name: &str,
     created_at: chrono::DateTime<Utc>,
@@ -2603,7 +2603,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_returns_nothing_initiall
 
     let ids = repo
         .find_resource_ids_by_schema_and_label(
-            &odf::AccountHandle::new_test("test-account").did,
+            &odf::ResourceOwnerHandle::new_test("test-account").did,
             &TEST_KIND,
             "environment",
             "prod",
@@ -2625,7 +2625,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_orders_by_created_at(cat
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     let base = Utc::now() - chrono::Duration::days(3);
 
     let middle = seed_labelled_resource_created_at(
@@ -2688,7 +2688,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_discriminates_schema_and
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     let now = Utc::now();
 
     let wanted = seed_labelled_resource_created_at(
@@ -2753,7 +2753,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_deleted(catalog
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
     let now = Utc::now();
 
     let live = seed_labelled_resource_created_at(
@@ -2816,7 +2816,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_other_accounts(
     let first = seed_labelled_resource_created_at(
         repo.as_ref(),
         projection_repo.as_ref(),
-        &odf::AccountHandle::new_test("account-one"),
+        &odf::ResourceOwnerHandle::new_test("account-one"),
         &TEST_KIND,
         "owned-by-one",
         now,
@@ -2826,7 +2826,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_other_accounts(
     let second = seed_labelled_resource_created_at(
         repo.as_ref(),
         projection_repo.as_ref(),
-        &odf::AccountHandle::new_test("account-two"),
+        &odf::ResourceOwnerHandle::new_test("account-two"),
         &TEST_KIND,
         "owned-by-two",
         now + chrono::Duration::hours(1),
@@ -2836,7 +2836,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_other_accounts(
 
     let ids = repo
         .find_resource_ids_by_schema_and_label(
-            &odf::AccountHandle::new_test("account-one").did,
+            &odf::ResourceOwnerHandle::new_test("account-one").did,
             &TEST_KIND,
             "environment",
             "prod",
@@ -2855,7 +2855,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_other_accounts(
     // a blanket restriction to one privileged account.
     let ids = repo
         .find_resource_ids_by_schema_and_label(
-            &odf::AccountHandle::new_test("account-two").did,
+            &odf::ResourceOwnerHandle::new_test("account-two").did,
             &TEST_KIND,
             "environment",
             "prod",
@@ -2883,7 +2883,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_any_account_spans_accoun
     let first = seed_labelled_resource_created_at(
         repo.as_ref(),
         projection_repo.as_ref(),
-        &odf::AccountHandle::new_test("account-one"),
+        &odf::ResourceOwnerHandle::new_test("account-one"),
         &TEST_KIND,
         "owned-by-one",
         now,
@@ -2893,7 +2893,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_any_account_spans_accoun
     let second = seed_labelled_resource_created_at(
         repo.as_ref(),
         projection_repo.as_ref(),
-        &odf::AccountHandle::new_test("account-two"),
+        &odf::ResourceOwnerHandle::new_test("account-two"),
         &TEST_KIND,
         "owned-by-two",
         now + chrono::Duration::hours(1),
@@ -2915,7 +2915,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_any_account_spans_accoun
     // The scoped variant must be unaffected by the new one's existence.
     let scoped = repo
         .find_resource_ids_by_schema_and_label(
-            &odf::AccountHandle::new_test("account-one").did,
+            &odf::ResourceOwnerHandle::new_test("account-one").did,
             &TEST_KIND,
             "environment",
             "prod",
@@ -2942,8 +2942,8 @@ pub async fn test_find_resource_ids_by_schema_and_label_any_account_discriminate
         .get_one::<dyn ResourceLabelProjectionRepository>()
         .unwrap();
 
-    let account_one = odf::AccountHandle::new_test("account-one");
-    let account_two = odf::AccountHandle::new_test("account-two");
+    let account_one = odf::ResourceOwnerHandle::new_test("account-one");
+    let account_two = odf::ResourceOwnerHandle::new_test("account-two");
     let now = Utc::now();
 
     let wanted = seed_labelled_resource_created_at(

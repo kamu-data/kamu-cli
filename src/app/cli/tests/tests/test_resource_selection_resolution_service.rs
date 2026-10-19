@@ -136,7 +136,7 @@ async fn resolves_exact_type_name_patterns_via_search() {
             did: None,
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
         }],
         Arc::clone(&search_requests),
     );
@@ -268,7 +268,7 @@ async fn exact_any_type_searches_across_every_supported_type() {
             did: None,
             id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
         }],
         Arc::clone(&search_requests),
     );
@@ -358,14 +358,14 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
                 did: None,
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
             ResourceHandle {
                 r#type: STORAGE_TYPE_URI.clone(),
                 did: None,
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
         ],
         Arc::clone(&search_requests),
@@ -465,14 +465,14 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
                 did: None,
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "app-alpha".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
             ResourceHandle {
                 r#type: secretset_type_uri().clone(),
                 did: None,
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "app-beta".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
         ],
         Arc::clone(&search_requests),
@@ -643,7 +643,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
             did: None,
             id: shared_id,
             name: "app-alpha".parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
         }],
         Arc::clone(&search_requests),
     );
@@ -700,14 +700,14 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
                 did: None,
                 id: shared_id,
                 name: "app-alpha".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
             ResourceHandle {
                 r#type: variableset_type_uri().clone(),
                 did: None,
                 id: second_id,
                 name: "app-beta".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
             },
         ],
         Arc::clone(&search_requests),
@@ -764,7 +764,7 @@ async fn passes_the_label_filter_to_pattern_expansion() {
             did: None,
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
         }],
         Arc::clone(&search_requests),
     );
@@ -812,7 +812,7 @@ async fn passes_the_label_filter_to_the_all_selector() {
             did: None,
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
         }],
         Arc::clone(&search_requests),
     );
@@ -852,7 +852,7 @@ async fn narrows_exact_selectors_by_the_label_filter() {
         did: None,
         id: matching_id,
         name: "vars-a".parse().unwrap(),
-        account: DEFAULT_ACCOUNT_HANDLE.clone(),
+        account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
     };
 
     let mut harness = ResourceSelectionResolutionHarness::new();
@@ -904,7 +904,7 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
         did: None,
         id: ResourceID::new(uuid::Uuid::new_v4()),
         name: "vars-a".parse().unwrap(),
-        account: DEFAULT_ACCOUNT_HANDLE.clone(),
+        account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
     };
 
     let mut harness = ResourceSelectionResolutionHarness::new();

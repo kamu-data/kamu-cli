@@ -1175,7 +1175,7 @@ struct PreparedApplyManifest {
     id: Option<ResourceID>,
     header: ResourceHeadersInput,
     header_warnings: Vec<ResourceWarning>,
-    target_account: odf::AccountHandle,
+    target_account: odf::ResourceOwnerHandle,
     spec: serde_json::Value,
 }
 

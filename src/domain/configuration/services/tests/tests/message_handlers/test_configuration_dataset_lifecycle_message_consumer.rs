@@ -438,7 +438,7 @@ fn has_target_label(snapshot: &ResourceSnapshot) -> bool {
 #[oop::extend(BaseConfigurationServiceHarness, base)]
 struct ConsumerHarness {
     base: BaseConfigurationServiceHarness,
-    owner: odf::AccountHandle,
+    owner: odf::ResourceOwnerHandle,
 }
 
 impl ConsumerHarness {

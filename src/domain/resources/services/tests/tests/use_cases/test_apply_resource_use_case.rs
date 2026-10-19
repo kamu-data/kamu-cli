@@ -47,7 +47,7 @@ async fn test_apply_end_to_end_create_and_retrieve() {
     // Smoke test: verifies planner → executor → persistence wiring is correct.
     // No sanitizer; just confirms the resource is created and retrievable.
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
@@ -94,7 +94,7 @@ async fn test_sanitizer_modifies_spec_on_create() {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
@@ -121,7 +121,7 @@ async fn test_sanitizer_receives_current_spec_on_update() {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let (id, initial_snapshot) = harness
         .apply_and_assert_snapshot(&account_handle, "res-a")
@@ -161,7 +161,7 @@ async fn test_sanitizer_modifies_spec_in_plan() {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
@@ -182,7 +182,7 @@ async fn test_sanitizer_modifies_spec_in_plan() {
 #[test_log::test(tokio::test)]
 async fn test_no_sanitizer_passes_spec_unchanged() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
@@ -207,7 +207,7 @@ async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
         ..Default::default()
     });
 
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
@@ -233,7 +233,7 @@ async fn test_apply_create_initial_status_is_pending() {
         },
         ..Default::default()
     });
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let result = harness
         .apply_test_uc()
@@ -267,7 +267,7 @@ async fn test_apply_update_resets_status_to_pending() {
         },
         ..Default::default()
     });
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     // Create + reconcile → gen=1, observed_gen=1, phase=Ready
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -317,7 +317,7 @@ async fn test_apply_update_resets_status_to_pending() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_params(
-    account_handle: &odf::AccountHandle,
+    account_handle: &odf::ResourceOwnerHandle,
     name: &str,
     value: &str,
 ) -> ApplyResourceParams<crate::tests::utils::TestResource> {

@@ -35,15 +35,15 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "AccountRefInput")]
-pub(crate) struct AccountRefInput {
+#[cynic(graphql_type = "ResourceOwnerRefInput")]
+pub(crate) struct ResourceOwnerRefInput {
     pub id: Option<kamu_resources::ResourceID>,
     pub did: Option<odf::AccountID>,
     pub name: Option<AccountName>,
 }
 
-impl From<&domain::ResourceAccountRef> for AccountRefInput {
-    fn from(value: &domain::ResourceAccountRef) -> Self {
+impl From<&domain::ResourceOwnerRef> for ResourceOwnerRefInput {
+    fn from(value: &domain::ResourceOwnerRef) -> Self {
         Self {
             id: value.id,
             did: value.did.clone(),
@@ -63,7 +63,7 @@ impl From<&domain::ResourceAccountRef> for AccountRefInput {
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceRefInput")]
 pub(crate) struct ResourceRefInput {
-    pub account: Option<AccountRefInput>,
+    pub account: Option<ResourceOwnerRefInput>,
 
     /// `None` spans every type — the server resolves which one holds the named
     /// resource, and reports an ambiguity if several do.
@@ -144,7 +144,7 @@ pub(crate) struct ApplyManifestInput {
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceSelectorInput")]
 pub(crate) struct ResourceSelectorInput {
-    pub account: Option<AccountRefInput>,
+    pub account: Option<ResourceOwnerRefInput>,
 
     #[cynic(rename = "type")]
     pub type_: Option<ResourceTypeSelectorInput>,

@@ -39,7 +39,7 @@ fn make_variable_set_spec(
 #[test_log::test(tokio::test)]
 async fn test_reconcile_variable_set_populates_projection_entries() {
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let spec = make_variable_set_spec([("DB_HOST", "localhost"), ("DB_PORT", "5432")]);
 
@@ -82,7 +82,7 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
 #[test_log::test(tokio::test)]
 async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations() {
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let spec = make_variable_set_spec([("KEY_A", "value-a"), ("KEY_B", "value-b")]);
 

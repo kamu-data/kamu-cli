@@ -10,9 +10,9 @@
 use std::sync::Arc;
 
 use internal_error::ResultIntoInternal;
-use kamu_accounts::{AccountService, CurrentAccountSubject};
+use kamu_accounts::{AccountHandle, AccountService, CurrentAccountSubject};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
-use kamu_resources::ResourceAccountRef;
+use kamu_resources::ResourceOwnerRef;
 
 use crate::{ResolveManifestAccountError, ResourceAccountAccessError, ResourceAccountResolver};
 
@@ -32,8 +32,8 @@ pub(crate) struct ResourceAccountResolverImpl {
 impl ResourceAccountResolver for ResourceAccountResolverImpl {
     async fn resolve_target_account(
         &self,
-        selector: Option<&ResourceAccountRef>,
-    ) -> Result<odf::AccountHandle, ResolveManifestAccountError> {
+        selector: Option<&ResourceOwnerRef>,
+    ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
         let target_account = self.resolve_account(selector).await?;
         self.ensure_can_use_account_resources(&target_account)
             .await?;
@@ -46,8 +46,8 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
 impl ResourceAccountResolverImpl {
     async fn resolve_account(
         &self,
-        selector: Option<&ResourceAccountRef>,
-    ) -> Result<odf::AccountHandle, ResolveManifestAccountError> {
+        selector: Option<&ResourceOwnerRef>,
+    ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
         let Some(selector) = selector else {
             return self.resolve_current_subject_account();
         };
@@ -86,14 +86,14 @@ impl ResourceAccountResolverImpl {
             ));
         }
 
-        Ok((&account).into())
+        Ok(AccountHandle::from(&account).into())
     }
 
     fn resolve_current_subject_account(
         &self,
-    ) -> Result<odf::AccountHandle, ResolveManifestAccountError> {
+    ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError> {
         match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(account) => Ok(account.account_handle.clone()),
+            CurrentAccountSubject::Logged(account) => Ok((&account.account_handle).into()),
             CurrentAccountSubject::Anonymous(_) => {
                 Err(ResourceAccountAccessError::AnonymousSubject.into())
             }
@@ -102,7 +102,7 @@ impl ResourceAccountResolverImpl {
 
     async fn ensure_can_use_account_resources(
         &self,
-        target_account: &odf::AccountHandle,
+        target_account: &odf::ResourceOwnerHandle,
     ) -> Result<(), ResolveManifestAccountError> {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(current)

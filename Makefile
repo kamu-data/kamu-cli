@@ -1,6 +1,6 @@
 ODF_SPEC_DIR=../open-data-fabric
 # Version of the ODF spec used by codegen; CI checks out this ref via `make print-odf-spec-ref`
-ODF_SPEC_REF=v0.40.0
+ODF_SPEC_REF=v0.42.1
 ODF_METADATA_CRATE_DIR=./src/odf/metadata
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug

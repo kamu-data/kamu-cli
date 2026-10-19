@@ -51,7 +51,7 @@ static NEWER_SCHEMA: std::sync::LazyLock<kamu_resources::TypeUri> =
 async fn test_find_owned_snapshot_success() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
         .insert_snapshot(id, &account_handle, TestResource::schema(), "res-a")
@@ -73,7 +73,7 @@ async fn test_find_owned_snapshot_success() {
 async fn test_find_owned_snapshot_not_found() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let result = harness
         .find_owned_snapshot(&account_handle.did, TestResource::schema(), id)
@@ -89,8 +89,8 @@ async fn test_find_owned_snapshot_access_denied() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
 
-    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
-    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
+    let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     harness
         .insert_snapshot(id, &account_handle_a, TestResource::schema(), "res-a")
@@ -117,7 +117,7 @@ async fn test_find_owned_snapshot_schema_mismatch_by_query() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
 
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
         .insert_snapshot(id, &account_handle, TestResource::schema(), "res-a")
@@ -142,7 +142,7 @@ async fn test_find_owned_snapshot_schema_mismatch_by_type() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
 
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
         .insert_snapshot(id, &account_handle, TestResource::schema(), "res-a")
@@ -162,7 +162,7 @@ async fn test_find_owned_snapshot_schema_mismatch_by_type() {
 #[test_log::test(tokio::test)]
 async fn test_find_owned_snapshots_all_found() {
     let harness = GenericResourceQueryServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let uid_1 = harness.allocate_id().await;
     let uid_2 = harness.allocate_id().await;
@@ -194,7 +194,7 @@ async fn test_find_owned_snapshots_all_found() {
 #[test_log::test(tokio::test)]
 async fn test_find_owned_snapshots_not_found() {
     let harness = GenericResourceQueryServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let uid_1 = harness.allocate_id().await;
     let uid_2 = harness.allocate_id().await;
@@ -215,8 +215,8 @@ async fn test_find_owned_snapshots_access_denied() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
 
-    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
-    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
+    let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     harness
         .insert_snapshot(id, &account_handle_a, TestResource::schema(), "res-a")
@@ -236,7 +236,7 @@ async fn test_find_owned_snapshots_access_denied() {
 async fn test_find_owned_snapshots_schema_mismatch_by_type() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
         .insert_snapshot(id, &account_handle, &OTHER_SCHEMA, "res-a")
@@ -258,7 +258,7 @@ async fn test_find_owned_snapshots_schema_mismatch_by_type() {
 async fn test_find_owned_snapshots_schema_mismatch_by_version() {
     let harness = GenericResourceQueryServiceHarness::new();
     let id = harness.allocate_id().await;
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     harness
         .insert_snapshot(id, &account_handle, &LEGACY_SCHEMA, "res-a")
@@ -280,8 +280,8 @@ async fn test_find_owned_snapshots_schema_mismatch_by_version() {
 async fn test_find_owned_snapshots_mixed_outcomes() {
     let harness = GenericResourceQueryServiceHarness::new();
 
-    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
-    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
+    let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
 
     // uid_found: correct owner and schema
     let uid_found = harness.allocate_id().await;
@@ -361,7 +361,7 @@ impl GenericResourceQueryServiceHarness {
     async fn insert_snapshot(
         &self,
         id: ResourceID,
-        account_handle: &odf::AccountHandle,
+        account_handle: &odf::ResourceOwnerHandle,
         schema: &TypeUri,
         name: &str,
     ) {

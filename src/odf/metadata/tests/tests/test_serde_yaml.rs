@@ -1224,25 +1224,25 @@ fn test_serde_resource_input_short_forms() {
 fn test_serde_resource_input_refs() {
     let data = indoc!(
         r#"
-        $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
+        $schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBinding
         headers:
           name: alice-bob
         spec:
-          relations:
-            - subject:
-                type: Account
-                name: alice
-              relation: role
-              value: maintainer
-              object:
-                type: Dataset
-                account: bob
-                name: bobs-dataset
+          policy:
+            name: dataset-maintainer
+          subject:
+            kind: Resource
+            type: User
+            name: alice
+          object:
+            type: Dataset
+            account: bob
+            name: bobs-dataset
         "#
     );
 
     let val = serde_yaml::from_str::<
-        serde::resources::ResourceInput<serde::auth::RelationsSpecInput>,
+        serde::resources::ResourceInput<serde::auth::PolicyBindingSpecInput>,
     >(data)
     .unwrap()
     .into_dto()
@@ -1251,7 +1251,7 @@ fn test_serde_resource_input_refs() {
     pretty_assertions::assert_eq!(
         val,
         ResourceInput {
-            schema: Relations::schema().clone(),
+            schema: PolicyBinding::schema().clone(),
             headers: ResourceHeadersInput {
                 id: None,
                 name: "alice-bob".parse().unwrap(),
@@ -1260,55 +1260,56 @@ fn test_serde_resource_input_refs() {
                 annotations: None,
                 owner_references: None,
             },
-            spec: RelationsSpecInput {
-                relations: Some(vec![RelationInput {
-                    subject: ResourceRef {
-                        account: None,
-                        r#type: Some(TypeRef::Name("Account".parse().unwrap())),
+            spec: PolicyBindingSpecInput {
+                policy: PolicyRef {
+                    account: None,
+                    id: None,
+                    name: Some("dataset-maintainer".parse().unwrap()),
+                },
+                subject: SubjectRef::Resource(SubjectRefResource {
+                    r#type: Some(TypeRef::Name("User".parse().unwrap())),
+                    account: None,
+                    id: None,
+                    did: None,
+                    name: Some("alice".parse().unwrap()),
+                }),
+                object: ResourceRef {
+                    account: Some(ResourceOwnerRef {
                         id: None,
                         did: None,
-                        name: Some("alice".parse().unwrap()),
-                    },
-                    relation: "role".to_string(),
-                    value: Some(json!("maintainer")),
-                    object: ResourceRef {
-                        account: Some(AccountRef {
-                            id: None,
-                            did: None,
-                            name: Some("bob".parse().unwrap()),
-                        }),
-                        r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
-                        id: None,
-                        did: None,
-                        name: Some("bobs-dataset".parse().unwrap()),
-                    },
-                }]),
+                        name: Some("bob".parse().unwrap()),
+                    }),
+                    r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
+                    id: None,
+                    did: None,
+                    name: Some("bobs-dataset".parse().unwrap()),
+                },
             },
         }
     );
 
     pretty_assertions::assert_eq!(
         serde_yaml::to_string(&serde::resources::ResourceInput::<
-            serde::auth::RelationsSpecInput,
+            serde::auth::PolicyBindingSpecInput,
         >::from(val))
         .unwrap(),
         indoc!(
             r#"
-            $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
+            $schema: https://opendatafabric.org/schemas/auth/v1alpha1/PolicyBinding
             headers:
               name: alice-bob
             spec:
-              relations:
-              - subject:
-                  type: Account
-                  name: alice
-                relation: role
-                value: maintainer
-                object:
-                  account:
-                    name: bob
-                  type: Dataset
-                  name: bobs-dataset
+              policy:
+                name: dataset-maintainer
+              subject:
+                kind: Resource
+                type: User
+                name: alice
+              object:
+                account:
+                  name: bob
+                type: Dataset
+                name: bobs-dataset
             "#
         )
     );
@@ -1340,8 +1341,10 @@ fn test_serde_resource_canonical() {
               b: y
             string: foo
           generation: 1
+          statusGeneration: 3
           createdAt: 2026-01-01T00:00:00Z
           updatedAt: 2026-01-01T00:00:00Z
+          deletionRequestedAt: 2026-01-01T00:00:00Z
           deletedAt: 2026-01-01T00:00:00Z
         spec:
           secrets:
@@ -1380,7 +1383,7 @@ fn test_serde_resource_canonical() {
             headers: ResourceHeaders {
                 id: "7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
-                account: AccountHandle {
+                account: ResourceOwnerHandle {
                     id: "c27331ce-ce88-4ff9-8c5a-4ce8107cc03f".parse().unwrap(),
                     did: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
                     name: "sergiimk".parse().unwrap(),
@@ -1399,8 +1402,10 @@ fn test_serde_resource_canonical() {
                 },
                 owner_references: None,
                 generation: 1,
+                status_generation: 3,
                 created_at: "2026-01-01T00:00:00Z".parse().unwrap(),
                 updated_at: "2026-01-01T00:00:00Z".parse().unwrap(),
+                deletion_requested_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
                 deleted_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
             },
             spec: SecretSetSpec {
@@ -1492,16 +1497,16 @@ fn test_serde_resource_canonical() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_serde_account_ref() {
+fn test_serde_resource_owner_ref() {
     let resource_id = ResourceID::new(uuid::Uuid::new_v4());
     let did = AccountID::new_generated_ed25519().1;
 
     assert_eq!(
-        serde_json::from_value::<serde::auth::AccountRef>(json!({ "did": did.to_string() }))
+        serde_json::from_value::<serde::auth::ResourceOwnerRef>(json!({ "did": did.to_string() }))
             .unwrap()
             .into_dto()
             .unwrap(),
-        AccountRef {
+        ResourceOwnerRef {
             id: None,
             did: Some(did.clone()),
             name: None,
@@ -1509,11 +1514,11 @@ fn test_serde_account_ref() {
     );
 
     assert_eq!(
-        serde_json::from_value::<serde::auth::AccountRef>(json!({ "name": "alice" }))
+        serde_json::from_value::<serde::auth::ResourceOwnerRef>(json!({ "name": "alice" }))
             .unwrap()
             .into_dto()
             .unwrap(),
-        AccountRef {
+        ResourceOwnerRef {
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),
@@ -1521,13 +1526,13 @@ fn test_serde_account_ref() {
     );
 
     assert_eq!(
-        serde_json::from_value::<serde::auth::AccountRef>(
+        serde_json::from_value::<serde::auth::ResourceOwnerRef>(
             json!({ "id": resource_id.to_string(), "did": did.to_string(), "name": "alice" })
         )
         .unwrap()
         .into_dto()
         .unwrap(),
-        AccountRef {
+        ResourceOwnerRef {
             id: Some(resource_id),
             did: Some(did.clone()),
             name: Some("alice".parse().unwrap()),
@@ -1537,25 +1542,25 @@ fn test_serde_account_ref() {
     // All fields are optional: an empty object is valid and resolves to an
     // unspecified reference (resolution failure, if any, happens downstream).
     assert_eq!(
-        serde_json::from_value::<serde::auth::AccountRef>(json!({}))
+        serde_json::from_value::<serde::auth::ResourceOwnerRef>(json!({}))
             .unwrap()
             .into_dto()
             .unwrap(),
-        AccountRef {
+        ResourceOwnerRef {
             id: None,
             did: None,
             name: None,
         }
     );
 
-    let both = AccountRef {
+    let both = ResourceOwnerRef {
         id: Some(resource_id),
         did: Some(did),
         name: Some("alice".parse().unwrap()),
     };
-    let round_tripped: AccountRef =
-        serde_json::to_value(serde::auth::AccountRef::from(both.clone()))
-            .and_then(serde_json::from_value::<serde::auth::AccountRef>)
+    let round_tripped: ResourceOwnerRef =
+        serde_json::to_value(serde::auth::ResourceOwnerRef::from(both.clone()))
+            .and_then(serde_json::from_value::<serde::auth::ResourceOwnerRef>)
             .unwrap()
             .into_dto()
             .unwrap();
@@ -1584,7 +1589,7 @@ fn test_serde_resource_selector_short_form() {
     assert_eq!(selector.name.as_deref(), Some("app-%"));
     assert_matches!(
         selector.account,
-        Some(AccountRef { name: Some(ref n), .. }) if n.as_str() == "alice"
+        Some(ResourceOwnerRef { name: Some(ref n), .. }) if n.as_str() == "alice"
     );
 
     // A malformed short form must be a deserialization error, never a panic.
@@ -1604,7 +1609,7 @@ fn test_serde_resource_selector_short_form() {
 #[test]
 fn test_serde_resource_selector() {
     let selector = ResourceSelector {
-        account: Some(AccountRef {
+        account: Some(ResourceOwnerRef {
             id: None,
             did: None,
             name: Some("alice".parse().unwrap()),

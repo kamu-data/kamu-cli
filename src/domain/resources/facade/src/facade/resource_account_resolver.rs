@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_resources::ResourceAccountRef;
+use kamu_resources::ResourceOwnerRef;
 use thiserror::Error;
 
 use crate::{ResourceAccountResolutionError, ResourceAccountResolutionProblemCode};
@@ -19,8 +19,8 @@ use crate::{ResourceAccountResolutionError, ResourceAccountResolutionProblemCode
 pub trait ResourceAccountResolver: Send + Sync {
     async fn resolve_target_account(
         &self,
-        selector: Option<&ResourceAccountRef>,
-    ) -> Result<odf::AccountHandle, ResolveManifestAccountError>;
+        selector: Option<&ResourceOwnerRef>,
+    ) -> Result<odf::ResourceOwnerHandle, ResolveManifestAccountError>;
 
     /// Resolves several account refs at once, for calls whose selectors each
     /// name their own account.
@@ -34,9 +34,9 @@ pub trait ResourceAccountResolver: Send + Sync {
     /// which costs a lookup but cannot produce a wrong answer.
     async fn resolve_target_accounts(
         &self,
-        selectors: &[Option<ResourceAccountRef>],
-    ) -> Result<Vec<odf::AccountHandle>, ResolveManifestAccountError> {
-        let mut resolved: Vec<(Option<ResourceAccountRef>, odf::AccountHandle)> = Vec::new();
+        selectors: &[Option<ResourceOwnerRef>],
+    ) -> Result<Vec<odf::ResourceOwnerHandle>, ResolveManifestAccountError> {
+        let mut resolved: Vec<(Option<ResourceOwnerRef>, odf::ResourceOwnerHandle)> = Vec::new();
         let mut out = Vec::with_capacity(selectors.len());
 
         for selector in selectors {

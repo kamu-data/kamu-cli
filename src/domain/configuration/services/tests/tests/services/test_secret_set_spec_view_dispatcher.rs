@@ -22,7 +22,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 #[test_log::test(tokio::test)]
 async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
         secrets: odf::metadata::config::Secrets {

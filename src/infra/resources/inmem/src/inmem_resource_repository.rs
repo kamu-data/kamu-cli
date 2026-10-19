@@ -624,6 +624,8 @@ impl ResourceRepository for InMemoryResourceRepository {
                 Some(ResourcePhase::Ready) => row.phase_counts.increment_ready(),
                 Some(ResourcePhase::Degraded) => row.phase_counts.increment_degraded(),
                 Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),
+                // No bucket for these yet: counted in the total only, as the SQL storages do
+                Some(ResourcePhase::Deleting | ResourcePhase::Deleted) => {}
             }
         }
 

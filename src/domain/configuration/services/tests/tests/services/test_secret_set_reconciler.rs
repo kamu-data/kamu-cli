@@ -18,7 +18,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 #[test_log::test(tokio::test)]
 async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("secret-set-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("secret-set-owner");
 
     let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
         secrets: odf::metadata::config::Secrets {

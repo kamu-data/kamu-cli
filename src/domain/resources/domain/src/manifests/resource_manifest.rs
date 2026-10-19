@@ -14,7 +14,7 @@ use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{Resource, ResourceAccountRef, ResourceID, ResourceSchemaId, TypeRef};
+use crate::{Resource, ResourceID, ResourceOwnerRef, ResourceSchemaId, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,7 +57,7 @@ impl ResourceManifest {
         // store-integrity bug.
         let schema = ResourceSchemaId::parse(schema.as_str()).int_err()?;
 
-        let account = Some(ResourceAccountRef {
+        let account = Some(ResourceOwnerRef {
             id: Some(headers.account.id),
             did: Some(headers.account.did.clone()),
             name: Some(headers.account.name.clone()),
@@ -111,8 +111,8 @@ pub struct ResourceManifestHeaders {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<ResourceID>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[serde_as(as = "Option<odf::metadata::serde::yaml::auth::AccountRef>")]
-    pub account: Option<ResourceAccountRef>,
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::auth::ResourceOwnerRef>")]
+    pub account: Option<ResourceOwnerRef>,
     pub name: String,
     #[serde(
         default,
@@ -233,7 +233,7 @@ mod tests {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // `AccountRef`'s own serde contract (id/name/both, empty rejection) is
+    // `ResourceOwnerRef`'s own serde contract (id/name/both, empty rejection) is
     // covered in ODF's `test_serde_account_ref`; this just confirms the field
     // is wired through `ResourceManifestHeaders`.
     #[test]
@@ -246,7 +246,7 @@ mod tests {
         let headers: ResourceManifestHeaders = serde_json::from_str(&json).unwrap();
         assert_matches!(
             &headers.account,
-            Some(ResourceAccountRef { did: Some(actual), .. }) if *actual == did
+            Some(ResourceOwnerRef { did: Some(actual), .. }) if *actual == did
         );
 
         let serialized = serde_json::to_string(&headers).unwrap();
@@ -258,7 +258,7 @@ mod tests {
         let round_tripped: ResourceManifestHeaders = serde_json::from_str(&serialized).unwrap();
         assert_matches!(
             round_tripped.account,
-            Some(ResourceAccountRef { did: Some(actual), .. }) if actual == did
+            Some(ResourceOwnerRef { did: Some(actual), .. }) if actual == did
         );
     }
 

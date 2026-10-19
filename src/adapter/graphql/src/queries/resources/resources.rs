@@ -12,7 +12,6 @@ use database_common::PaginationOpts;
 use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::{
-    AccountRefInput,
     BatchResourceHandlesOutcome,
     BatchResourceManifestsOutcome,
     BatchResourcesOutcome,
@@ -21,6 +20,7 @@ use crate::queries::{
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
     ResourceManifestFormat,
+    ResourceOwnerRefInput,
     ResourceRefInput,
     ResourceSummary,
     ResourceTypeDescriptor,
@@ -77,13 +77,13 @@ impl Resources {
     async fn summary(
         &self,
         ctx: &Context<'_>,
-        account: Option<AccountRefInput>,
+        account: Option<ResourceOwnerRefInput>,
     ) -> Result<ResourcesSummaryOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade
             .summary(kamu_resources_facade::ResourcesSummaryRequest {
-                account: account.map(AccountRefInput::into_manifest_account),
+                account: account.map(ResourceOwnerRefInput::into_manifest_account),
             })
             .await
         {

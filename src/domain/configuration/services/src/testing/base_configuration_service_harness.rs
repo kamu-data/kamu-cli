@@ -94,7 +94,7 @@ impl BaseConfigurationServiceHarness {
     /// `dataset_id`, oldest first — exactly what the resolver sees.
     pub async fn variable_sets_targeting(
         &self,
-        owner: &odf::AccountHandle,
+        owner: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
     ) -> Vec<ResourceID> {
         self.resources_targeting(owner, VariableSetResource::schema(), dataset_id)
@@ -105,7 +105,7 @@ impl BaseConfigurationServiceHarness {
     /// `dataset_id`.
     pub async fn secret_sets_targeting(
         &self,
-        owner: &odf::AccountHandle,
+        owner: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
     ) -> Vec<ResourceID> {
         self.resources_targeting(owner, SecretSetResource::schema(), dataset_id)
@@ -114,7 +114,7 @@ impl BaseConfigurationServiceHarness {
 
     async fn resources_targeting(
         &self,
-        owner: &odf::AccountHandle,
+        owner: &odf::ResourceOwnerHandle,
         schema: &TypeUri,
         dataset_id: &odf::DatasetID,
     ) -> Vec<ResourceID> {
@@ -132,7 +132,7 @@ impl BaseConfigurationServiceHarness {
     /// Creates a `VariableSet` resource labelled as targeting `dataset_id`.
     pub async fn seed_variable_set_targeting(
         &self,
-        account: &odf::AccountHandle,
+        account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,
         created_at: DateTime<Utc>,
@@ -150,7 +150,7 @@ impl BaseConfigurationServiceHarness {
     /// Creates a `SecretSet` resource labelled as targeting `dataset_id`.
     pub async fn seed_secret_set_targeting(
         &self,
-        account: &odf::AccountHandle,
+        account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,
         created_at: DateTime<Utc>,
@@ -170,7 +170,7 @@ impl BaseConfigurationServiceHarness {
     /// [`Self::seed_variable_set_targeting`] only writes a snapshot.
     pub async fn apply_variable_set_targeting(
         &self,
-        account: &odf::AccountHandle,
+        account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,
         variables: impl IntoIterator<Item = (&'static str, &'static str)>,
@@ -216,7 +216,7 @@ impl BaseConfigurationServiceHarness {
     /// plaintext and are sanitized to `jwe` like any normally-authored set.
     pub async fn apply_secret_set_targeting(
         &self,
-        account: &odf::AccountHandle,
+        account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,
         secrets: impl IntoIterator<Item = (&'static str, &'static str)>,
@@ -260,7 +260,7 @@ impl BaseConfigurationServiceHarness {
     }
 
     fn make_targeting_headers_input(
-        account: &odf::AccountHandle,
+        account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,
         extra_labels: impl IntoIterator<Item = (&'static str, &'static str)>,
@@ -295,7 +295,7 @@ impl BaseConfigurationServiceHarness {
     async fn seed_resource_targeting(
         &self,
         schema: &TypeUri,
-        account: &odf::AccountHandle,
+        account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,
         created_at: DateTime<Utc>,

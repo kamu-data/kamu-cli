@@ -11,7 +11,7 @@ use cynic::QueryBuilder;
 use kamu_resources_facade::ResourcesSummaryRequest;
 
 use crate::cynic_api::fragments::{ResourceAccountResolutionProblem, ResourcesSummary};
-use crate::cynic_api::inputs::AccountRefInput;
+use crate::cynic_api::inputs::ResourceOwnerRefInput;
 use crate::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +43,7 @@ pub(crate) enum ResourcesSummaryOutcome {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct SummaryVariables {
-    pub account: Option<AccountRefInput>,
+    pub account: Option<ResourceOwnerRefInput>,
 }
 
 impl SummaryVariables {

@@ -47,6 +47,8 @@ impl Display for resources::ResourcePhase {
             Self::Ready => "Ready",
             Self::Degraded => "Degraded",
             Self::Failed => "Failed",
+            Self::Deleting => "Deleting",
+            Self::Deleted => "Deleted",
         })
     }
 }
@@ -65,18 +67,16 @@ impl From<resources::ResourceHeaders> for resources::ResourceHeadersInput {
             annotations,
             owner_references,
             generation: _,
+            status_generation: _,
             created_at: _,
             updated_at: _,
+            deletion_requested_at: _,
             deleted_at: _,
         } = value;
         Self {
             id: Some(id),
             name,
-            account: Some(auth::AccountRef {
-                id: Some(account.id),
-                did: Some(account.did),
-                name: Some(account.name),
-            }),
+            account: Some(account.into()),
             labels: Some(labels),
             annotations: Some(annotations),
             owner_references: owner_references.map(|v| v.into_iter().map(Into::into).collect()),
@@ -133,10 +133,10 @@ impl From<resources::ResourceHandle> for resources::ResourceRef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountRef
+// ResourceOwnerRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::str::FromStr for auth::AccountRef {
+impl std::str::FromStr for auth::ResourceOwnerRef {
     type Err = ::multiformats::ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -152,10 +152,10 @@ impl std::str::FromStr for auth::AccountRef {
     }
 }
 
-impl_parse_error!(auth::AccountRef);
-impl_try_from_str!(auth::AccountRef);
+impl_parse_error!(auth::ResourceOwnerRef);
+impl_try_from_str!(auth::ResourceOwnerRef);
 
-impl From<auth::AccountID> for auth::AccountRef {
+impl From<auth::AccountID> for auth::ResourceOwnerRef {
     fn from(value: AccountID) -> Self {
         Self {
             id: None,
@@ -165,7 +165,7 @@ impl From<auth::AccountID> for auth::AccountRef {
     }
 }
 
-impl From<auth::AccountName> for auth::AccountRef {
+impl From<auth::AccountName> for auth::ResourceOwnerRef {
     fn from(value: AccountName) -> Self {
         Self {
             id: None,
@@ -175,9 +175,9 @@ impl From<auth::AccountName> for auth::AccountRef {
     }
 }
 
-impl From<auth::AccountHandle> for auth::AccountRef {
-    fn from(value: auth::AccountHandle) -> Self {
-        let auth::AccountHandle { id, did, name } = value;
+impl From<auth::ResourceOwnerHandle> for auth::ResourceOwnerRef {
+    fn from(value: auth::ResourceOwnerHandle) -> Self {
+        let auth::ResourceOwnerHandle { id, did, name } = value;
         Self {
             id: Some(id),
             did: Some(did),
@@ -186,12 +186,13 @@ impl From<auth::AccountHandle> for auth::AccountRef {
     }
 }
 
-impl From<auth::AccountRef> for resources::ResourceRef {
-    fn from(value: auth::AccountRef) -> Self {
-        let auth::AccountRef { id, did, name } = value;
+// The owner can be a `User`, an `Organization` or a `Node`, so the type is left unresolved
+impl From<auth::ResourceOwnerRef> for resources::ResourceRef {
+    fn from(value: auth::ResourceOwnerRef) -> Self {
+        let auth::ResourceOwnerRef { id, did, name } = value;
         Self {
             account: None,
-            r#type: Some(auth::Account::schema().clone().into()),
+            r#type: None,
             id,
             did: did.map(Into::into),
             name: name.map(Into::into),
@@ -200,16 +201,16 @@ impl From<auth::AccountRef> for resources::ResourceRef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AccountHandle
+// ResourceOwnerHandle
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<auth::AccountHandle> for resources::ResourceRef {
-    fn from(value: auth::AccountHandle) -> Self {
-        auth::AccountRef::from(value).into()
+impl From<auth::ResourceOwnerHandle> for resources::ResourceRef {
+    fn from(value: auth::ResourceOwnerHandle) -> Self {
+        auth::ResourceOwnerRef::from(value).into()
     }
 }
 
-impl auth::AccountHandle {
+impl auth::ResourceOwnerHandle {
     pub fn new_test(account_name_str: &str) -> Self {
         Self {
             id: crate::resources::ResourceID::new(uuid::Uuid::new_v5(
@@ -218,6 +219,91 @@ impl auth::AccountHandle {
             )),
             did: AccountID::new_seeded_ed25519(account_name_str.as_bytes()),
             name: AccountName::new_unchecked(account_name_str),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PolicyRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for auth::PolicyRef {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+impl_parse_error!(auth::PolicyRef);
+impl_try_from_str!(auth::PolicyRef);
+
+impl From<auth::PolicyRef> for resources::ResourceRef {
+    fn from(value: auth::PolicyRef) -> Self {
+        let auth::PolicyRef { account, id, name } = value;
+        Self {
+            account,
+            r#type: Some(auth::Policy::schema().clone().into()),
+            id,
+            did: None,
+            name,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PrincipalRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for auth::PrincipalRef {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+impl_parse_error!(auth::PrincipalRef);
+impl_try_from_str!(auth::PrincipalRef);
+
+impl From<auth::PrincipalRef> for resources::ResourceRef {
+    fn from(value: auth::PrincipalRef) -> Self {
+        let auth::PrincipalRef {
+            r#type,
+            account,
+            id,
+            did,
+            name,
+        } = value;
+        Self {
+            account,
+            r#type,
+            id,
+            did,
+            name,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PrincipalHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<auth::PrincipalHandle> for resources::ResourceRef {
+    fn from(value: auth::PrincipalHandle) -> Self {
+        let auth::PrincipalHandle {
+            r#type,
+            account,
+            id,
+            did,
+            name,
+        } = value;
+        Self {
+            account: account.map(Into::into),
+            r#type: Some(r#type.into()),
+            id: Some(id),
+            did,
+            name: Some(name),
         }
     }
 }
