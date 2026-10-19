@@ -69,7 +69,7 @@ Out of scope, each with its own owner:
 | How the update task runs a sync job on the server | [task-system.md](task-system.md) |
 | How the server reacts to a dataset changed by a push: flows, sensors | [flow-system.md](flow-system.md) |
 | How `HEAD` updates post `DatasetReferenceMessage` | [root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency) |
-| The wire format of the Smart Transfer Protocol messages | the ODF [OpenAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/protocols/smart-transfer-protocol.openapi.yaml) and [AsyncAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/protocols/smart-transfer-protocol.asyncapi.yaml) specs |
+| The wire format of the Smart Transfer Protocol messages | the ODF [OpenAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/contracts/transfer/smart-transfer-protocol.openapi.yaml) and [AsyncAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/contracts/transfer/smart-transfer-protocol.asyncapi.yaml) specs |
 
 ---
 
@@ -80,10 +80,10 @@ the repository model and both protocols. This page does not restate them; read t
 
 | Topic | Spec / RFC |
 | --- | --- |
-| Repositories, aliases and references | [Repository](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#repository), [Aliases and References](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#aliases-and-references) |
+| Repositories, aliases and references | [Repository](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/glossary.md#repository), [Aliases and References](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/datasets/identity.md#aliases-and-references) |
 | Content addressability of blocks and objects | [RFC-003](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/003-content-addressability.md), [RFC-006](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/006-checkpoints-as-files.md) |
-| Simple Transfer Protocol | [Simple Transfer Protocol](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#simple-transfer-protocol), [RFC-007](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/007-simple-transfer-protocol.md) |
-| Smart Transfer Protocol | [Smart Transfer Protocol](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#smart-transfer-protocol), [RFC-008](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/008-smart-transfer-protocol.md), [OpenAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/protocols/smart-transfer-protocol.openapi.yaml), [AsyncAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/protocols/smart-transfer-protocol.asyncapi.yaml) |
+| Simple Transfer Protocol | [Simple Transfer Protocol](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/exchange/transfer-protocols.md#simple-transfer-protocol), [RFC-007](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/007-simple-transfer-protocol.md) |
+| Smart Transfer Protocol | [Smart Transfer Protocol](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/exchange/transfer-protocols.md#smart-transfer-protocol), [RFC-008](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/008-smart-transfer-protocol.md), [OpenAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/contracts/transfer/smart-transfer-protocol.openapi.yaml), [AsyncAPI](https://github.com/open-data-fabric/open-data-fabric/blob/master/contracts/transfer/smart-transfer-protocol.asyncapi.yaml) |
 
 ---
 

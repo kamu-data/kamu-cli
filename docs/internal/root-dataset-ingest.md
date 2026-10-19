@@ -71,7 +71,7 @@ Out of scope, each with its own owner:
 | How `kamu pull` plans, orders and authorizes ingest jobs among others | [dataset-pull.md](dataset-pull.md) |
 | How the update task is queued, planned and run | [task-system.md](task-system.md) |
 | How `DatasetReferenceMessage` and other outbox messages are delivered | [outbox.md](outbox.md) |
-| The ODF metadata model itself | [ODF spec](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md) |
+| The ODF metadata model itself | [ODF spec](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/overview.md) |
 | Derivative datasets (`SetTransform`, `ExecuteTransform`) | [derived-dataset-transform.md](derived-dataset-transform.md) |
 
 ---
@@ -84,16 +84,16 @@ restate them; read these first:
 
 | Topic | Spec / RFC |
 | --- | --- |
-| Root datasets and ingestion | [Root Dataset](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#root-dataset), [Data Ingestion](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#data-ingestion) |
-| `SetPollingSource` | [Polling Sources](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#polling-sources) |
+| Root datasets and ingestion | [Root Dataset](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/glossary.md#root-dataset), [Data Ingestion](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/datasets/ingestion.md) |
+| `SetPollingSource` | [Polling Sources](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/datasets/ingestion.md#push-and-polling-sources) |
 | `AddPushSource`, `DisablePushSource`, `DisablePollingSource` | [RFC-011](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/011-push-ingest-sources.md) |
 | `AddData.newSourceState` | [RFC-009](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/009-ingest-source-state.md) |
 | `SetDataSchema` | [RFC-010](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/010-data-schema-in-metadata.md), [RFC-016](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/016-odf-schema.md) |
 | Offsets in `AddData` | [RFC-001](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/001-record-offsets.md), [RFC-014](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/014-minimize-offset-scanning.md) |
-| Merge strategies | [Merge Strategies](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#merge-strategies) |
+| Merge strategies | [Merge Strategies](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/datasets/ingestion.md#merge-strategies) |
 | The `op` column, retractions and corrections | [RFC-015](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/015-unified-changelog-stream-schema.md) |
 | Linked objects | [RFC-017](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/017-large-files-linking.md) |
-| Watermarks | [Watermark](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#watermark) |
+| Watermarks | [Watermark](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/glossary.md#watermark) |
 
 ---
 

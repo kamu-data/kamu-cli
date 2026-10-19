@@ -78,10 +78,10 @@ latest block. The ideas reset relies on:
 
 | Topic | Spec |
 | --- | --- |
-| The chain, its references and the `Seed` | [Metadata Chain](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#metadata-chain), [Seed](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#seed) |
-| Why history is kept, and the sanctioned alternative to rewriting it | [Requirements](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#requirements), [Retractions and Corrections](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#retractions-and-corrections) |
-| Why a derivative can be rebuilt from its inputs, which is what reset to metadata relies on | [Derivative Data Transience](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#derivative-data-transience) |
-| What a derivative records about consumed inputs | [ExecuteTransform](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#executetransform) |
+| The chain, its references and the `Seed` | [Metadata Chain](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/glossary.md#metadata-chain), [Seed](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/reference.md#seed) |
+| Why history is kept, and the sanctioned alternative to rewriting it | [Requirements](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/overview.md#requirements), [Retractions and Corrections](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/transformations/processing-model.md#retractions-and-corrections) |
+| Why a derivative can be rebuilt from its inputs, which is what reset to metadata relies on | [Derivative Data Transience](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/transformations/processing-model.md#derivative-data-transience) |
+| What a derivative records about consumed inputs | [ExecuteTransform](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/reference.md#executetransform) |
 
 ---
 

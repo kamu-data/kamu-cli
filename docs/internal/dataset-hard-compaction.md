@@ -77,10 +77,10 @@ history and treats the metadata chain as append-only. The pieces compaction work
 
 | Topic | Spec / RFC |
 | --- | --- |
-| Data slices and the metadata chain | [Data Slice](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#data-slice), [Metadata Chain](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#metadata-chain) |
-| `AddData`: offsets, checkpoint, watermark, source state | [AddData](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#adddata), [RFC-001](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/001-record-offsets.md) |
-| Why history is kept, and the sanctioned alternative to rewriting it | [Requirements](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#requirements), [Retractions and Corrections](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#retractions-and-corrections) |
-| Compaction as a declared task | [CompactionParams](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#compactionparams), [TaskSpec::Compaction](https://github.com/open-data-fabric/open-data-fabric/blob/master/open-data-fabric.md#taskspeccompaction), [RFC-019 Task Types](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/019-iac-task-flow-system.md#task-types) |
+| Data slices and the metadata chain | [Data Slice](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/glossary.md#data-slice), [Metadata Chain](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/glossary.md#metadata-chain) |
+| `AddData`: offsets, checkpoint, watermark, source state | [AddData](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/reference.md#adddata), [RFC-001](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/001-record-offsets.md) |
+| Why history is kept, and the sanctioned alternative to rewriting it | [Requirements](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/overview.md#requirements), [Retractions and Corrections](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/transformations/processing-model.md#retractions-and-corrections) |
+| Compaction as a declared task | [TaskSpec::Compaction](https://github.com/open-data-fabric/open-data-fabric/blob/master/specs/reference.md#taskspeccompaction), [RFC-019 Task Types](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/019-iac-task-flow-system.md#task-types) |
 | Linked-object summaries, which compaction adds up | [RFC-017](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/017-large-files-linking.md#impact-on-existing-functionality) |
 
 ---
