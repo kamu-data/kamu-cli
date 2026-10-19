@@ -33,6 +33,7 @@ use kamu_resources::{
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
     TypeUri,
+    UNTRACKED_STATUS_GENERATION,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -611,7 +612,7 @@ impl ResourceRepository for PostgresResourceRepository {
             schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
-                account: odf::AccountHandle {
+                account: odf::ResourceOwnerHandle {
                     id: ResourceID::new(row.account_resource_id),
                     did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),
@@ -621,8 +622,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
+                status_generation: UNTRACKED_STATUS_GENERATION,
                 created_at: row.created_at,
                 updated_at: row.updated_at,
+                deletion_requested_at: None,
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
@@ -813,7 +816,7 @@ impl ResourceRepository for PostgresResourceRepository {
             schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
-                account: odf::AccountHandle {
+                account: odf::ResourceOwnerHandle {
                     id: ResourceID::new(row.account_resource_id),
                     did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),
@@ -823,8 +826,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 owner_references: None, // TODO
                 generation: u64::try_from(row.generation).unwrap(),
+                status_generation: UNTRACKED_STATUS_GENERATION,
                 created_at: row.created_at,
                 updated_at: row.updated_at,
+                deletion_requested_at: None,
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
@@ -896,7 +901,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 schema: TypeUri::new_unchecked(row.resource_schema),
                 headers: ResourceHeaders {
                     id: ResourceID::new(row.id),
-                    account: odf::AccountHandle {
+                    account: odf::ResourceOwnerHandle {
                         id: ResourceID::new(row.account_resource_id),
                         did: row.account_id,
                         name: odf::AccountName::new_unchecked(&row.account_name),
@@ -906,8 +911,10 @@ impl ResourceRepository for PostgresResourceRepository {
                     annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                     owner_references: None, // TODO
                     generation: u64::try_from(row.generation).unwrap(),
+                    status_generation: UNTRACKED_STATUS_GENERATION,
                     created_at: row.created_at,
                     updated_at: row.updated_at,
+                    deletion_requested_at: None,
                     deleted_at: row.deleted_at,
                 },
                 spec: row.spec,
@@ -1022,7 +1029,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     schema: TypeUri::new_unchecked(row.resource_schema),
                     headers: ResourceHeaders {
                         id: ResourceID::new(row.id),
-                        account: odf::AccountHandle {
+                        account: odf::ResourceOwnerHandle {
                             id: ResourceID::new(row.account_resource_id),
                             did: row.account_id,
                             name: odf::AccountName::new_unchecked(&row.account_name),
@@ -1032,8 +1039,10 @@ impl ResourceRepository for PostgresResourceRepository {
                         annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                         owner_references: None, // TODO
                         generation: u64::try_from(row.generation).unwrap(),
+                        status_generation: UNTRACKED_STATUS_GENERATION,
                         created_at: row.created_at,
                         updated_at: row.updated_at,
+                        deletion_requested_at: None,
                         deleted_at: row.deleted_at,
                     },
                     spec: row.spec,

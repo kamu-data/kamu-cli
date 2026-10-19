@@ -23,7 +23,7 @@ use crate::tests::utils::{TestResource, TestResourceSpec};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn make_resource_params(
-    account: odf::AccountHandle,
+    account: odf::ResourceOwnerHandle,
     name: &str,
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
@@ -44,7 +44,7 @@ pub fn make_id() -> ResourceID {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn make_fresh_aggregate(
-    account: odf::AccountHandle,
+    account: odf::ResourceOwnerHandle,
     name: &str,
 ) -> (ResourceID, crate::tests::utils::TestResource) {
     use crate::tests::utils::TestResourceSpec;
@@ -66,7 +66,7 @@ pub fn make_created_event(id: ResourceID, name: &str, value: &str) -> TestEvent 
         event_time: Utc::now(),
         id,
         headers: BaseResourceServiceHarness::make_headers_input(
-            odf::AccountHandle::new_test("test"),
+            odf::ResourceOwnerHandle::new_test("test"),
             name,
         ),
         spec: TestResourceSpec {

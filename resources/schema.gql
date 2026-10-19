@@ -363,26 +363,6 @@ type AccountFlowsMut {
 }
 
 """
-Link to an account.
-
-Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
-"""
-type AccountHandle {
-	"""
-	ID of the account resource.
-	"""
-	id: ResourceID!
-	"""
-	DID of the account.
-	"""
-	did: AccountID!
-	"""
-	Name of the account.
-	"""
-	name: AccountName!
-}
-
-"""
 Unique and stable identifier of an account (`did:...`)
 """
 scalar AccountID
@@ -514,27 +494,6 @@ type AccountQuotasUsageStorage {
 	account is unlimited.
 	"""
 	limitTotalBytes: Int
-}
-
-"""
-Reference to an account, mirroring the ODF `auth/v1alpha1/AccountRef`.
-
-Resolves by `did` if given, else by `name`; any other field present is then
-checked for agreement, so a mismatch is reported rather than ignored.
-"""
-input AccountRefInput {
-	"""
-	Resource ID of the account, only checked for agreement
-	"""
-	id: ResourceID
-	"""
-	Account DID, used for lookup when given
-	"""
-	did: AccountID
-	"""
-	Account name, used for lookup when `did` is absent
-	"""
-	name: AccountName
 }
 
 """
@@ -5613,7 +5572,7 @@ is immutable. It does so by performing Change Data Capture - essentially diffing
 state of data against the reconstructed previous state and recording differences as retractions
 or corrections. The Operation Type "op" column will contain:
 - append (`+A`) when a row appears for the first time
-- retraction (`-D`) when row disappears
+- retraction (`-R`) when row disappears
 - correction (`-C`, `+C`) when row data has changed, with `-C` event carrying the old value of
 the row and `+C` carrying the new value.
 
@@ -6688,7 +6647,7 @@ Schema: https://opendatafabric.org/schemas/resources/v1alpha1/Resource
 """
 type Resource {
 	"""
-	Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset.json`.
+	Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}` e.g. `https://opendatafabric.org/schemas/datasets/v1/Dataset`.
 	"""
 	schema: TypeUri!
 	"""
@@ -6973,7 +6932,7 @@ type ResourceHandle {
 	"""
 	Account that owns the target resource.
 	"""
-	account: AccountHandle!
+	account: ResourceOwnerHandle!
 	"""
 	Type URI of the target resource.
 	"""
@@ -7086,7 +7045,7 @@ type ResourceHeaders {
 	"""
 	Link to the account that owns the resource.
 	"""
-	account: AccountHandle!
+	account: ResourceOwnerHandle!
 	"""
 	Map of string keys and values that can be used to organize, categorize, and query
 	resources.
@@ -7110,6 +7069,12 @@ type ResourceHeaders {
 	"""
 	generation: Uint64!
 	"""
+	A sequential number that changes every time the resource status is updated. Can be passed
+	back as a precondition of a status update to make sure the status was not modified since it
+	was read. Populated by the system. Starts with `1`.
+	"""
+	statusGeneration: Uint64!
+	"""
 	Time when the resource was first applied and assigned an identity.
 	"""
 	createdAt: DateTime!
@@ -7117,6 +7082,11 @@ type ResourceHeaders {
 	Time when the resource was last updated, including header, spec, and status updates.
 	"""
 	updatedAt: DateTime!
+	"""
+	Time when deletion of the resource was requested. The resource remains visible until its
+	controllers finish cleaning up and the deletion completes.
+	"""
+	deletionRequestedAt: DateTime
 	"""
 	Time when the resource was deleted.
 	"""
@@ -7386,7 +7356,48 @@ type ResourceNameNotFoundProblem {
 }
 
 """
-Represents the reconciliation phase of a resource.
+Link to a resolved account that can own resources: `User`, `Organization`, or `Node`.
+
+Schema: https://opendatafabric.org/schemas/auth/v1alpha1/ResourceOwnerHandle
+"""
+type ResourceOwnerHandle {
+	"""
+	ID of the account resource.
+	"""
+	id: ResourceID!
+	"""
+	DID of the account.
+	"""
+	did: AccountID!
+	"""
+	Name of the account.
+	"""
+	name: AccountName!
+}
+
+"""
+Reference to an account, mirroring the ODF `auth/v1alpha1/ResourceOwnerRef`.
+
+Resolves by `did` if given, else by `name`; any other field present is then
+checked for agreement, so a mismatch is reported rather than ignored.
+"""
+input ResourceOwnerRefInput {
+	"""
+	Resource ID of the account, only checked for agreement
+	"""
+	id: ResourceID
+	"""
+	Account DID, used for lookup when given
+	"""
+	did: AccountID
+	"""
+	Account name, used for lookup when `did` is absent
+	"""
+	name: AccountName
+}
+
+"""
+Represents the reconciliation or deletion phase of a resource.
 
 Schema: https://opendatafabric.org/schemas/resources/v1alpha1/ResourcePhase
 """
@@ -7396,6 +7407,8 @@ enum ResourcePhase {
 	READY
 	DEGRADED
 	FAILED
+	DELETING
+	DELETED
 }
 
 """
@@ -7444,7 +7457,7 @@ input ResourceRefInput {
 	"""
 	Account owning the resource, defaults to the calling account
 	"""
-	account: AccountRefInput
+	account: ResourceOwnerRefInput
 	"""
 	Canonical selector (`variablesets`), alias (`vs`), ODF type name
 	(`VariableSet`), or full schema URI — all resolve to the same type.
@@ -7517,7 +7530,7 @@ input ResourceSelectorInput {
 	§ Selectors), which have no call to inherit an account from; using it as
 	a per-selector override within a query extends beyond that.
 	"""
-	account: AccountRefInput
+	account: ResourceOwnerRefInput
 	"""
 	Canonical selector (`variablesets`), alias (`vs`), ODF type name
 	(`VariableSet`), or full schema URI. `null` spans every type.
@@ -7766,7 +7779,7 @@ type Resources {
 	Returns a summary-oriented dashboard for the current or specified
 	subject
 	"""
-	summary(account: AccountRefInput): ResourcesSummaryOutcome!
+	summary(account: ResourceOwnerRefInput): ResourcesSummaryOutcome!
 	"""
 	Returns resources by refs
 	"""

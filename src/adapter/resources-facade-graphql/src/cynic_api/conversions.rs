@@ -58,8 +58,10 @@ impl TryFrom<fragments::Resource> for domain::Resource {
                     .owner_references
                     .map(|v| v.into_iter().map(Into::into).collect()),
                 generation: value.headers.generation.into(),
+                status_generation: value.headers.status_generation.into(),
                 created_at: value.headers.created_at,
                 updated_at: value.headers.updated_at,
+                deletion_requested_at: value.headers.deletion_requested_at,
                 deleted_at: value.headers.deleted_at,
             },
             spec: value.spec,

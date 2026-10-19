@@ -21,7 +21,7 @@ use messaging_outbox::{OutboxProvider, register_message_dispatcher};
 
 #[test_log::test(tokio::test)]
 async fn test_deleted_message_triggers_cascade_delete() {
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let harness = AccountLifecycleConsumerHarness::new(
         AccountLifecycleConsumerHarness::expect_execute_once(account_handle.did.clone()),
@@ -45,7 +45,7 @@ async fn test_created_message_is_no_op() {
     let harness =
         AccountLifecycleConsumerHarness::new(AccountLifecycleConsumerHarness::expect_no_execute());
 
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let message = AccountLifecycleMessage::created(
         Utc::now(),
@@ -65,7 +65,7 @@ async fn test_updated_message_is_no_op() {
     let harness =
         AccountLifecycleConsumerHarness::new(AccountLifecycleConsumerHarness::expect_no_execute());
 
-    let account_handle = odf::AccountHandle::new_test("oldname");
+    let account_handle = odf::ResourceOwnerHandle::new_test("oldname");
 
     let message = AccountLifecycleMessage::updated(
         Utc::now(),

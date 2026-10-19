@@ -20,7 +20,7 @@ async fn test_oldest_labelled_variable_set_wins() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
 
     let now = Utc::now();
 
@@ -119,7 +119,7 @@ async fn test_secret_overrides_variable_on_same_key() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     let now = Utc::now();
 
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
@@ -212,7 +212,7 @@ async fn test_single_key_lookup_prefers_the_secret_like_the_merged_map() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     let now = Utc::now();
 
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
@@ -318,7 +318,7 @@ async fn test_variable_sets_labelled_for_other_datasets_are_ignored() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let (_, other_dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
 
     let now = Utc::now();
 
@@ -383,8 +383,8 @@ async fn test_sets_owned_by_another_account_are_ignored() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
 
-    let owner = odf::AccountHandle::new_test("dataset-owner");
-    let attacker = odf::AccountHandle::new_test("attacker");
+    let owner = odf::ResourceOwnerHandle::new_test("dataset-owner");
+    let attacker = odf::ResourceOwnerHandle::new_test("attacker");
 
     let now = Utc::now();
 

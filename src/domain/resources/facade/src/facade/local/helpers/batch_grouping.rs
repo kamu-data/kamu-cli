@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceAccountRef, ResourceRef, TypeUri};
+use kamu_resources::{ResourceOwnerRef, ResourceRef, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -16,7 +16,7 @@ use kamu_resources::{ResourceAccountRef, ResourceRef, TypeUri};
 pub(crate) struct BatchTargetGroup {
     /// The resolved account, carried whole rather than as a bare id: the
     /// resource-view path stamps it into `ResourceHeaders.account`.
-    pub account: odf::AccountHandle,
+    pub account: odf::ResourceOwnerHandle,
     pub schema: TypeUri,
     /// `(request_index, ref)` pairs, so results can be merged back into the
     /// caller's ordering after every group has run.
@@ -43,7 +43,7 @@ pub(crate) struct BatchTargetGroup {
 /// order stable for a given input — worth having when reading logs, and it
 /// makes the write path deterministic.
 pub(crate) fn group_by_account_and_schema(
-    entries: Vec<(usize, ResourceRef, odf::AccountHandle, TypeUri)>,
+    entries: Vec<(usize, ResourceRef, odf::ResourceOwnerHandle, TypeUri)>,
 ) -> Vec<BatchTargetGroup> {
     let mut groups: Vec<BatchTargetGroup> = Vec::new();
 
@@ -74,8 +74,8 @@ pub(crate) fn group_by_account_and_schema(
 /// answer, since the resolved ids are what the grouping compares.
 pub(crate) fn distinct_account_refs(
     resource_refs: &[ResourceRef],
-) -> Vec<Option<ResourceAccountRef>> {
-    let mut seen: Vec<Option<ResourceAccountRef>> = Vec::new();
+) -> Vec<Option<ResourceOwnerRef>> {
+    let mut seen: Vec<Option<ResourceOwnerRef>> = Vec::new();
 
     for resource_ref in resource_refs {
         if !seen.iter().any(|account| account == &resource_ref.account) {

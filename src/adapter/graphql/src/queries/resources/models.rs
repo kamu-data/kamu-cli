@@ -98,12 +98,12 @@ impl ResourceLabelFilterInput {
     }
 }
 
-/// Reference to an account, mirroring the ODF `auth/v1alpha1/AccountRef`.
+/// Reference to an account, mirroring the ODF `auth/v1alpha1/ResourceOwnerRef`.
 ///
 /// Resolves by `did` if given, else by `name`; any other field present is then
 /// checked for agreement, so a mismatch is reported rather than ignored.
 #[derive(InputObject, Debug, Clone, Default)]
-pub struct AccountRefInput {
+pub struct ResourceOwnerRefInput {
     /// Resource ID of the account, only checked for agreement
     pub id: Option<ResourceID<'static>>,
     /// Account DID, used for lookup when given
@@ -112,9 +112,9 @@ pub struct AccountRefInput {
     pub name: Option<AccountName<'static>>,
 }
 
-impl AccountRefInput {
-    pub fn into_manifest_account(self) -> kamu_resources::ResourceAccountRef {
-        kamu_resources::ResourceAccountRef {
+impl ResourceOwnerRefInput {
+    pub fn into_manifest_account(self) -> kamu_resources::ResourceOwnerRef {
+        kamu_resources::ResourceOwnerRef {
             id: self.id.map(Into::into),
             did: self.did.map(Into::into),
             name: self.name.map(Into::into),
@@ -170,7 +170,7 @@ pub struct ResourceSelectorInput {
     /// ODF specifies this field for selectors embedded in a manifest (RFC-018
     /// § Selectors), which have no call to inherit an account from; using it as
     /// a per-selector override within a query extends beyond that.
-    pub account: Option<AccountRefInput>,
+    pub account: Option<ResourceOwnerRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI. `null` spans every type.
     pub r#type: Option<ResourceTypeSelectorInput>,
@@ -191,7 +191,9 @@ impl TryFrom<ResourceSelectorInput> for kamu_resources::ResourceSelector {
 
     fn try_from(value: ResourceSelectorInput) -> Result<Self, GqlError> {
         let selector = Self {
-            account: value.account.map(AccountRefInput::into_manifest_account),
+            account: value
+                .account
+                .map(ResourceOwnerRefInput::into_manifest_account),
             r#type: value.r#type.map(ResourceTypeSelectorInput::into_type_ref),
             id: value.id.map(Into::into),
             // Reserved in ODF for when datasets and accounts become resources;
@@ -274,7 +276,7 @@ impl SearchResourcesInput {
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceRefInput {
     /// Account owning the resource, defaults to the calling account
-    pub account: Option<AccountRefInput>,
+    pub account: Option<ResourceOwnerRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI — all resolve to the same type.
     ///
@@ -293,7 +295,9 @@ impl TryFrom<ResourceRefInput> for kamu_resources::ResourceRef {
 
     fn try_from(value: ResourceRefInput) -> Result<Self, GqlError> {
         let resource_ref = Self {
-            account: value.account.map(AccountRefInput::into_manifest_account),
+            account: value
+                .account
+                .map(ResourceOwnerRefInput::into_manifest_account),
             r#type: value.r#type.map(ResourceTypeSelectorInput::into_type_ref),
             id: value.id.map(Into::into),
             // Reserved in ODF for when datasets and accounts become resources;

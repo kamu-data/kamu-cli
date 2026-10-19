@@ -72,6 +72,8 @@ pub(crate) enum ResourcePhase {
     Ready,
     Degraded,
     Failed,
+    Deleting,
+    Deleted,
 }
 
 impl From<ResourcePhase> for kamu_resources::ResourcePhase {
@@ -82,6 +84,8 @@ impl From<ResourcePhase> for kamu_resources::ResourcePhase {
             ResourcePhase::Ready => Self::Ready,
             ResourcePhase::Degraded => Self::Degraded,
             ResourcePhase::Failed => Self::Failed,
+            ResourcePhase::Deleting => Self::Deleting,
+            ResourcePhase::Deleted => Self::Deleted,
         }
     }
 }
@@ -278,28 +282,30 @@ pub(crate) struct ResourceStatus {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceHeaders {
     pub id: kamu_resources::ResourceID,
-    pub account: AccountHandle,
+    pub account: ResourceOwnerHandle,
     pub name: kamu_resources::ResourceName,
     pub labels: ResourceLabels,
     pub annotations: ResourceAnnotations,
     pub owner_references: Option<Vec<ResourceHandle>>,
     pub generation: Uint64,
+    pub status_generation: Uint64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub deletion_requested_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct AccountHandle {
+pub(crate) struct ResourceOwnerHandle {
     pub id: kamu_resources::ResourceID,
     pub did: odf::AccountID,
     pub name: AccountName,
 }
 
-impl From<AccountHandle> for odf::AccountHandle {
-    fn from(value: AccountHandle) -> Self {
+impl From<ResourceOwnerHandle> for odf::ResourceOwnerHandle {
+    fn from(value: ResourceOwnerHandle) -> Self {
         Self {
             id: value.id,
             did: value.did,
@@ -317,7 +323,7 @@ pub(crate) struct ResourceHandle {
     pub r#type: kamu_resources::TypeUri,
     pub did: Option<odf::metadata::formats::Did>,
     pub name: kamu_resources::ResourceName,
-    pub account: AccountHandle,
+    pub account: ResourceOwnerHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

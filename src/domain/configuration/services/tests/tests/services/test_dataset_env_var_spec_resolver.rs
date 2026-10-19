@@ -27,7 +27,7 @@ async fn test_reads_a_variable_set_from_its_spec() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
 
     harness
@@ -50,7 +50,7 @@ async fn test_multiple_labelled_variable_sets_merge_with_one_consistent_winner()
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
 
     // Applied oldest-first, which is also the order the label index returns.
@@ -105,7 +105,7 @@ async fn test_secret_overrides_variable_on_same_key() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
 
     harness
@@ -143,7 +143,7 @@ async fn test_single_key_lookup_prefers_the_secret_like_the_merged_map() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
 
     harness
@@ -175,7 +175,7 @@ async fn test_single_key_lookup_reports_missing_key() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
 
     harness
@@ -202,8 +202,8 @@ async fn test_sets_owned_by_another_account_are_ignored() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let owner = odf::AccountHandle::new_test("owner-account");
-    let stranger = odf::AccountHandle::new_test("stranger-account");
+    let owner = odf::ResourceOwnerHandle::new_test("owner-account");
+    let stranger = odf::ResourceOwnerHandle::new_test("stranger-account");
     harness.seed_dataset_entry(&dataset_id, &owner.did).await;
 
     harness
@@ -236,7 +236,7 @@ async fn test_unlabelled_dataset_resolves_to_nothing() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     harness.seed_dataset_entry(&dataset_id, &account.did).await;
 
     let resolved = harness

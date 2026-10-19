@@ -16,7 +16,7 @@
 //! account-accepting API (not demoted to internal errors).
 
 use database_common::PaginationOpts;
-use kamu_resources::{ResourceAccountRef, ResourceRef, ResourceSelector, TypeName};
+use kamu_resources::{ResourceOwnerRef, ResourceRef, ResourceSelector, TypeName};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -78,7 +78,7 @@ fn batch_by_name(name: &str) -> Vec<ResourceRef> {
 }
 
 /// A one-element batch naming `account`, for the bad-account paths.
-fn batch_by_name_for_account(name: &str, account: ResourceAccountRef) -> Vec<ResourceRef> {
+fn batch_by_name_for_account(name: &str, account: ResourceOwnerRef) -> Vec<ResourceRef> {
     vec![ResourceRef {
         account: Some(account),
         ..by_name(name)
@@ -420,7 +420,7 @@ contract_test!(
 pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let unknown_account = ResourceAccountRef {
+    let unknown_account = ResourceOwnerRef {
         id: None,
         did: None,
         name: Some(odf::AccountName::new_unchecked(

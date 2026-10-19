@@ -25,7 +25,8 @@ use crate::resources::{ResourceCtx, fixtures};
 // its brittleness at every call site.
 //
 // Volatile fields are stripped from the actual document before comparison:
-//   - headers.id / account / generation / createdAt / updatedAt — per-run / per-context
+//   - headers.id / account / generation / statusGeneration / createdAt / updatedAt — per-run /
+//     per-context
 //   - status.reconciledAt — reconciler timestamp
 //   - status.conditions.*.lastTransitionTime — reconciler timestamps
 // Everything else is asserted verbatim against an expected document built from
@@ -178,7 +179,14 @@ fn successful_conditions() -> serde_json::Value {
 /// deterministic and can be asserted verbatim.
 fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
     if let Some(headers) = doc.get_mut("headers").and_then(|m| m.as_object_mut()) {
-        for k in ["id", "account", "generation", "createdAt", "updatedAt"] {
+        for k in [
+            "id",
+            "account",
+            "generation",
+            "statusGeneration",
+            "createdAt",
+            "updatedAt",
+        ] {
             headers.remove(k).unwrap();
         }
     }

@@ -21,7 +21,7 @@
 /// crate wants to attach). This macro generates the newtype plus
 /// `new`/`into_dto`/`Deref`/`DerefMut`/`TryFrom`/`From` boilerplate via
 /// `#[serde(try_from = "…", into = "…")]`, matching the pattern
-/// `odf::metadata::auth::AccountRef` uses for types codegen defines
+/// `odf::metadata::auth::ResourceOwnerRef` uses for types codegen defines
 /// natively — the difference here is this type is one layer removed from
 /// codegen, so the proxy conversion has to be written by hand once, here.
 #[macro_export]

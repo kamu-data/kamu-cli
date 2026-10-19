@@ -25,7 +25,7 @@ static TEST_KIND: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("T
 async fn create_test_resource(catalog: &Catalog, name: &str) -> ResourceID {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
-    let account = odf::AccountHandle::new_test("test-account");
+    let account = odf::ResourceOwnerHandle::new_test("test-account");
     let snapshot =
         crate::resource_repository_test_suite::make_test_snapshot(&account, &TEST_KIND, name);
     let id = snapshot.id;

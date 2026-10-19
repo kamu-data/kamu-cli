@@ -30,7 +30,7 @@ use kamu_resources::{
 async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let id = ResourceID::new(uuid::Uuid::new_v4());
-    let account_handle = odf::AccountHandle::new_test("test-account");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-account");
 
     let snapshot = ResourceSnapshot {
         id,

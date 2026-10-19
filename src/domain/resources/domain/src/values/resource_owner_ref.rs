@@ -13,6 +13,6 @@
 /// manifest headers and facade account selectors. Resolution to a concrete
 /// account happens downstream (see `ResourceAccountResolver` in the facade
 /// crate); this type only carries what the caller supplied.
-pub type ResourceAccountRef = odf::metadata::auth::AccountRef;
+pub type ResourceOwnerRef = odf::metadata::auth::ResourceOwnerRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

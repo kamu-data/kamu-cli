@@ -500,7 +500,7 @@ async fn test_applied_message_is_no_op() {
 fn make_snapshot(
     id: ResourceID,
     schema: &'static TypeUri,
-    account: &odf::AccountHandle,
+    account: &odf::ResourceOwnerHandle,
     generation: u64,
 ) -> ResourceSnapshot {
     let now = Utc::now();
@@ -522,7 +522,7 @@ fn make_snapshot(
 
 struct ConfigurationResourceLifecycleConsumerHarness {
     catalog: dill::Catalog,
-    account_handle: odf::AccountHandle,
+    account_handle: odf::ResourceOwnerHandle,
 }
 
 impl ConfigurationResourceLifecycleConsumerHarness {
@@ -545,7 +545,7 @@ impl ConfigurationResourceLifecycleConsumerHarness {
 
         Self {
             catalog: b.build(),
-            account_handle: odf::AccountHandle::new_test("test-owner"),
+            account_handle: odf::ResourceOwnerHandle::new_test("test-owner"),
         }
     }
 

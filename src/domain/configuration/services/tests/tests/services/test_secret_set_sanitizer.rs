@@ -65,7 +65,7 @@ fn make_spec_input(
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_encrypts_literal_values() {
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let spec = make_spec_input([
         ("API_TOKEN", plaintext_secret("my-secret-token")),
@@ -125,7 +125,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     // First apply with a plaintext value to produce an encrypted snapshot
     let spec = make_spec_input([("API_TOKEN", plaintext_secret("original-value"))]);
@@ -218,7 +218,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_same_plaintext_is_untouched() {
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let spec = make_spec_input([("API_TOKEN", plaintext_secret("original-value"))]);
 
@@ -294,7 +294,7 @@ async fn test_apply_secret_set_rejects_jwe_that_does_not_decrypt_under_current_k
     use crypto_utils::SecretCryptor;
 
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let wrong_key = "ffffffffffffffffffffffffffffffff";
     let wrong_key_cryptor = SecretCryptor::try_new(wrong_key).unwrap();
@@ -341,7 +341,7 @@ async fn test_apply_secret_set_upgrades_legacy_aes256gcm_to_jwe() {
     // not the canonical write-path encoding, so applying the resource as-is must
     // decrypt and re-encrypt it into `jwe` rather than leaving it untouched.
     let harness = BaseConfigurationServiceHarness::new();
-    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
     let legacy_spec = make_spec_input([(
         "API_TOKEN",

@@ -9,7 +9,7 @@
 
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
 
-use crate::auth::AccountRef;
+use crate::auth::ResourceOwnerRef;
 use crate::formats::*;
 use crate::resources::{LabelFilter, ResourceID, TypeRef};
 use crate::serde::flatbuffers::{
@@ -32,7 +32,7 @@ use crate::serde::flatbuffers::{
 /// included.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ResourceSelector {
-    pub account: Option<AccountRef>,
+    pub account: Option<ResourceOwnerRef>,
     pub id: Option<ResourceID>,
     pub did: Option<Did>,
     /// Short type name (`SecretSet`) or full schema URI. `None` spans every
@@ -46,7 +46,7 @@ pub struct ResourceSelector {
 }
 
 impl ResourceSelector {
-    pub fn account(&self) -> Option<&AccountRef> {
+    pub fn account(&self) -> Option<&ResourceOwnerRef> {
         self.account.as_ref()
     }
 
@@ -178,7 +178,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for ResourceSelector {
 impl<'fb> FlatbuffersDeserializable<fb::ResourceSelector<'fb>> for ResourceSelector {
     fn deserialize(proxy: fb::ResourceSelector<'fb>) -> Self {
         Self {
-            account: proxy.account().map(AccountRef::deserialize),
+            account: proxy.account().map(ResourceOwnerRef::deserialize),
             id: proxy
                 .id()
                 .map(|v| ResourceID::from_bytes(v.bytes()).unwrap()),
@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(sel.name.as_deref(), Some("app-%"));
         assert_matches!(
             sel.account,
-            Some(AccountRef { name: Some(ref n), .. }) if n.as_str() == "alice"
+            Some(ResourceOwnerRef { name: Some(ref n), .. }) if n.as_str() == "alice"
         );
     }
 

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod resource;
-mod resource_account_ref;
 mod resource_annotation;
 mod resource_condition;
 mod resource_conditions;
@@ -20,6 +19,7 @@ mod resource_label_filter;
 mod resource_label_filter_parser;
 mod resource_label_filter_predicate;
 mod resource_labels_annotations;
+mod resource_owner_ref;
 mod resource_phase;
 mod resource_ref;
 mod resource_schema_id;
@@ -30,7 +30,6 @@ mod resource_warning;
 mod rfc_spec_newtype;
 
 pub use resource::*;
-pub use resource_account_ref::*;
 pub use resource_annotation::*;
 pub use resource_condition::*;
 pub use resource_conditions::*;
@@ -42,6 +41,7 @@ pub use resource_label_filter::*;
 pub use resource_label_filter_parser::*;
 pub use resource_label_filter_predicate::*;
 pub use resource_labels_annotations::*;
+pub use resource_owner_ref::*;
 pub use resource_phase::*;
 pub use resource_ref::*;
 pub use resource_schema_id::*;
