@@ -227,11 +227,12 @@ impl auth::ResourceOwnerHandle {
 // PolicyRef
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// The spec defines no short form, so only the structured form is accepted
 impl std::str::FromStr for auth::PolicyRef {
     type Err = ::multiformats::ParseError<Self>;
 
-    fn from_str(_s: &str) -> Result<Self, Self::Err> {
-        todo!()
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Err(::multiformats::ParseError::<Self>::new(s))
     }
 }
 
@@ -258,8 +259,18 @@ impl From<auth::PolicyRef> for resources::ResourceRef {
 impl std::str::FromStr for auth::PrincipalRef {
     type Err = ::multiformats::ParseError<Self>;
 
-    fn from_str(_s: &str) -> Result<Self, Self::Err> {
-        todo!()
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((typ, account, name)) = Grammar::match_resource_ref(s) else {
+            return Err(::multiformats::ParseError::<Self>::new(s));
+        };
+
+        Ok(Self {
+            r#type: Some(resources::TypeName::new_unchecked(typ).into()),
+            account: account.map(|s| AccountName::new_unchecked(s).into()),
+            id: None,
+            did: None,
+            name: Some(resources::ResourceName::new_unchecked(name)),
+        })
     }
 }
 

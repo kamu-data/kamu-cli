@@ -1603,6 +1603,53 @@ fn test_serde_resource_selector_short_form() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test]
+fn test_serde_principal_ref_short_form() {
+    let principal: PrincipalRef = serde_yaml::from_str::<
+        serde::StructOrString<serde::auth::PrincipalRef>,
+    >("ServiceAccount:acme/ingest-prod")
+    .unwrap()
+    .0
+    .into_dto()
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        principal,
+        PrincipalRef {
+            r#type: Some(TypeRef::Name("ServiceAccount".parse().unwrap())),
+            account: Some(ResourceOwnerRef {
+                id: None,
+                did: None,
+                name: Some("acme".parse().unwrap()),
+            }),
+            id: None,
+            did: None,
+            name: Some("ingest-prod".parse().unwrap()),
+        }
+    );
+
+    // The type prefix is required
+    assert_matches!(
+        serde_yaml::from_str::<serde::StructOrString<serde::auth::PrincipalRef>>(
+            "acme/ingest-prod"
+        ),
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `PolicyRef` has no short form: a string must be a deserialization error, never a panic
+#[test]
+fn test_serde_policy_ref_rejects_short_form() {
+    assert_matches!(
+        serde_yaml::from_str::<serde::StructOrString<serde::auth::PolicyRef>>("dataset-maintainer"),
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Proxy conversions are hand-written (`rust.dtoType`) rather than generated, so
 // every field is asserted individually: a dropped one is silently discarded
 // instead of failing to compile.
