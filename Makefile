@@ -625,7 +625,7 @@ define add_license_header
 endef
 
 define insert_text_into_beginning
-	echo -e $(1) | cat - $(2) > tmp
+	printf '%b\n' $(1) | cat - $(2) > tmp
 	mv tmp $(2)
 endef
 
