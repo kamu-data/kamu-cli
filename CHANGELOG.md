@@ -26,7 +26,6 @@ Recommendation: for ease of reading, use the following format:
 - Molecule: `createProject` rejects a symbol whose project account would name another org or its project
   (e.g. `dev`, `sandbox`, `sandbox.x` for `molecule`)
 - SQL `to_table()` only reads datasets the query lists, like plain table references
-- `ChangelogStream` ingest requires `datafusion.execution.target_partitions` = 1 in the ingest configuration
 - Webhooks: `DATASET.REF.UPDATED` payloads go from the last head the receiver accepted (`old_hash`) to the
   dataset's head when the delivery is sent (`new_hash`), so a delivery after a failed one covers the missed
   range. After upgrading, a subscription may get one delivery covering changes since its last accepted one
@@ -38,6 +37,9 @@ Recommendation: for ease of reading, use the following format:
   no longer leaves a truncated block that breaks the node until the cache is cleared
 - `ChangelogStream` keeps the input order of records, so several changes to one key in a chunk produce the
   correct state
+- `UpsertStream` keeps the last upsert of a key in a chunk when the ingest configuration sets
+  `datafusion.execution.target_partitions` above 1. `ChangelogStream` and `UpsertStream` sources ingest in a
+  single partition regardless of that setting
 - Collection updates are committed as a single block
 - Collection entries are filtered by extra data and found by linked dataset using their current values
 - SQL `to_table()` reads datasets at the query's pinned blocks and includes them in the query state

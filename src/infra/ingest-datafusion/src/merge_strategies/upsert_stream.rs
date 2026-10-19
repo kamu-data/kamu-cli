@@ -86,6 +86,7 @@ impl MergeStrategyUpsertStream {
     ) -> Result<DataFrameExt, DataFusionErrorWrapped> {
         let rank_col = "__rank";
 
+        // Numbers upserts in arrival order, which holds as `requires_ordered_input()` is true
         let with_offsets = upserts.with_column(
             self.vocab.offset_column(),
             datafusion::functions_window::row_number::row_number(),
@@ -521,5 +522,9 @@ impl MergeStrategy for MergeStrategyUpsertStream {
                 col(Column::from_name(self.vocab.operation_type_column())).sort(true, true),
             ))
             .collect()
+    }
+
+    fn requires_ordered_input(&self) -> bool {
+        true
     }
 }
