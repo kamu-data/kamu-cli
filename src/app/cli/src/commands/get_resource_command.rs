@@ -126,8 +126,11 @@ impl GetResourceCommand {
             #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceAnnotations")]
             annotations: &'a kamu_resources::ResourceAnnotations,
             generation: u64,
+            status_generation: u64,
             created_at: &'a DateTime<Utc>,
             updated_at: &'a DateTime<Utc>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            deletion_requested_at: &'a Option<DateTime<Utc>>,
             deleted_at: &'a Option<DateTime<Utc>>,
         }
 
@@ -140,8 +143,10 @@ impl GetResourceCommand {
                     labels: &resource.headers.labels,
                     annotations: &resource.headers.annotations,
                     generation: resource.headers.generation,
+                    status_generation: resource.headers.status_generation,
                     created_at: &resource.headers.created_at,
                     updated_at: &resource.headers.updated_at,
+                    deletion_requested_at: &resource.headers.deletion_requested_at,
                     deleted_at: &resource.headers.deleted_at,
                 }
             }
