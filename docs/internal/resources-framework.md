@@ -1360,8 +1360,11 @@ sequenceDiagram
     RQ->>ST: try_request_deletion → DeletionRequested (Deleting)
     RQ->>OB: produce ResourceLifecycleMessage::DeletionRequested (one per batch)
     OB->>CD: execute(ids), through the lifecycle dispatcher
-    loop each resource that needs cleanup
+    loop each resource that needs cleanup, in a transaction of its own
         CD->>Ctl: cleanup(resource)  %% e.g. VariableSet drops its projection entries
+        Note over CD,Ctl: a failed cleanup rolls its transaction back
+    end
+    loop each cleanup outcome, all in one transaction
         alt cleaned up
             CD->>CD: try_complete_deletion → Deleted (tombstone name)
         else cleanup failed
@@ -1383,13 +1386,18 @@ Deletion runs in two steps, as the ODF resource framework defines them
 - **Completing the deletion** runs the main controller's `cleanup`, then appends `Deleted`, which
   renames the resource to its tombstone. Resources that do not wait for cleanup are skipped, so a
   message delivered twice completes a deletion once.
-- **A batch completes in one transaction**, so one `Deleted` message covers it. A concurrent
-  modification of any resource in it rolls the batch back; the deletions are then completed one by
-  one, and a conflict there is logged and skipped: the other writer completes the deletion or
-  requests it again.
+- **Each cleanup runs in a transaction of its own**, so a failing one, a database error included,
+  holds back only its resource and discards whatever the controller wrote before failing. The
+  outcomes are then recorded in one transaction, so one `Deleted` message covers the batch. A
+  concurrent modification of any resource in it rolls that transaction back; the outcomes are then
+  recorded one by one, and a conflict there is logged and skipped: the other writer completes the
+  deletion or requests it again. The orchestration lives in `CompleteResourceDeletionPhases`, which
+  each generated use case implements with its two transactional phases.
 - **A failed cleanup is an outcome, not an error.** The resource stays `Deleting` with a
-  `Ready=False` condition, reason `CleanupFailed`. Nothing retries it automatically; deleting the
-  resource again by its id does.
+  `Ready=False` condition, reason `CleanupFailed`, unless another writer updated its status since
+  the cleanup started; that status then stands. Nothing retries it automatically; deleting the
+  resource again by its id does. Since the failure never reaches the outbox consumer, it cannot
+  stall the processing of other resource messages.
 - **The phase a delete reports** is the one at the time of the response: `Deleted` only if the
   controllers cleaned up within the request. A local workspace processes a command's messages once
   its transaction has committed, so `kamu delete` there reports afterwards, through a

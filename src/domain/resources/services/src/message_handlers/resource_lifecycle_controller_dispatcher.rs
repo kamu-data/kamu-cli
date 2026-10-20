@@ -93,16 +93,6 @@ macro_rules! declare_resource_lifecycle_controller_dispatcher {
 
                 match self.complete_resource_deletion_use_case.execute(&ids).await {
                     Ok(()) => Ok(()),
-                    // Another completion of the same deletion records its own
-                    // outcome
-                    Err(E::StatusConflict(err)) => {
-                        tracing::info!(
-                            ?ids,
-                            error = %err,
-                            "Skipping cleanup outcome: status was updated concurrently"
-                        );
-                        Ok(())
-                    }
                     Err(E::ConcurrentModification(err)) => {
                         tracing::info!(
                             ?ids,

@@ -10,20 +10,15 @@
 use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 
-use crate::{
-    EventSourcedResource,
-    ResourceID,
-    ResourceLoadError,
-    ResourcePersistenceError,
-    ResourceStatusConflictError,
-};
+use crate::{EventSourcedResource, ResourceID, ResourceLoadError, ResourcePersistenceError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Runs the cleanup of the main controller for resources whose deletion was
-/// requested, then completes their deletion. A failed cleanup is recorded in
-/// the status and leaves that deletion in progress; it is not an error of the
-/// use case. Resources that do not wait for a cleanup are skipped.
+/// requested, each in a transaction of its own, then completes their deletion.
+/// A failed cleanup, a database error included, is recorded in the status and
+/// leaves that deletion in progress; it is not an error of the use case.
+/// Resources that do not wait for a cleanup are skipped.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait CompleteResourceDeletionUseCase<R: EventSourcedResource>: Send + Sync {
@@ -42,10 +37,6 @@ pub enum CompleteResourceDeletionUseCaseError<R: EventSourcedResource> {
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
-
-    /// Another writer updated the status while the cleanup ran.
-    #[error(transparent)]
-    StatusConflict(ResourceStatusConflictError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

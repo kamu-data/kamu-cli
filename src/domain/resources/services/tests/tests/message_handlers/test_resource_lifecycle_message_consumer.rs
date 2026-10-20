@@ -128,34 +128,6 @@ async fn test_deletion_requested_message_completes_deletions_in_one_batch() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deletion_requested_message_skips_status_conflict() {
-    // Another completion of the same deletion records its own outcome
-    let id = make_id();
-
-    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
-        ResourceLifecycleConsumerHarness::expect_no_execute(),
-        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id], || {
-            Err(CompleteResourceDeletionUseCaseError::StatusConflict(
-                ResourceStatusConflictError {
-                    expected: 3,
-                    actual: 4,
-                },
-            ))
-        }),
-    );
-
-    harness
-        .consume_message(&ResourceLifecycleMessage::deletion_requested(
-            Utc::now(),
-            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
-        ))
-        .await
-        .unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn test_deletion_requested_message_skips_concurrent_modification() {
     let id = make_id();
 
