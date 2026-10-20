@@ -98,3 +98,63 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cleanup_secret_set_removes_its_projection_entries() {
+    let harness = BaseConfigurationServiceHarness::new();
+    let account_handle = odf::ResourceOwnerHandle::new_test("secret-set-owner");
+
+    let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
+        secrets: odf::metadata::config::Secrets {
+            entries: [(
+                "API_TOKEN".to_string(),
+                odf::metadata::config::Secret {
+                    value: "my-secret-token".to_string(),
+                    content_encoding: None,
+                },
+            )]
+            .into_iter()
+            .collect(),
+        },
+    });
+
+    let decision = harness
+        .apply_secret_use_case()
+        .apply(ApplyResourceParams {
+            id: None,
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            spec,
+        })
+        .await
+        .unwrap();
+    let id = decision.expect_applied().id;
+    assert_eq!(
+        harness
+            .secret_set_projection_repo()
+            .get_latest_entries(&id)
+            .await
+            .unwrap()
+            .len(),
+        1,
+        "precondition: the secret is projected"
+    );
+
+    let resource = harness.load_secret_set(&id).await;
+    harness
+        .secret_set_controller()
+        .cleanup(&resource)
+        .await
+        .unwrap();
+
+    assert!(
+        harness
+            .secret_set_projection_repo()
+            .get_latest_entries(&id)
+            .await
+            .unwrap()
+            .is_empty(),
+        "cleanup must remove the projection entries of the resource"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

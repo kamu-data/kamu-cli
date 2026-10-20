@@ -85,7 +85,7 @@ where
 
     /// Records the outcome of reconciling `started`, the resource as phase 1
     /// left it. The outcome is written to the current state of the resource,
-    /// provided it is not deleted, its generation is still the reconciled one
+    /// provided its deletion was not requested, its generation is still the reconciled one
     /// and no other writer updated the status since phase 1.
     pub async fn finish_reconciliation_phase(
         &self,
@@ -99,10 +99,10 @@ where
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so the resource may have changed in between.
         let mut resource = self.load(started.id()).await?;
-        if resource.headers().deleted_at.is_some() {
+        if resource.headers().deletion_requested_at.is_some() {
             tracing::info!(
                 resource_id = %resource.id(),
-                "Discarding reconciliation outcome of a deleted resource"
+                "Discarding reconciliation outcome of a resource being deleted"
             );
             return Ok(());
         }

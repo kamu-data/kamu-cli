@@ -8,10 +8,12 @@
 // by the Apache License, Version 2.0.
 
 mod apply;
+mod complete_deletion;
 mod reconcile;
 mod request_account_resources_deletion;
 mod request_deletion;
 
+pub use complete_deletion::*;
 pub use reconcile::*;
 pub use request_account_resources_deletion::*;
 pub use request_deletion::*;

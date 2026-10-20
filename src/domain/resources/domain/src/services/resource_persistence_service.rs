@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 
@@ -21,17 +20,9 @@ pub trait ResourcePersistenceService<R: EventSourcedResource>: Send + Sync {
 
     async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError>;
 
-    async fn delete(
-        &self,
-        resource: &mut R,
-        now: DateTime<Utc>,
-    ) -> Result<(), ResourcePersistenceError>;
-
-    async fn delete_many(
-        &self,
-        resources: &mut [R],
-        now: DateTime<Utc>,
-    ) -> Result<(), ResourcePersistenceError>;
+    /// Saves the resources in one batch; fails with a concurrent modification
+    /// when any of them changed since it was loaded.
+    async fn save_many(&self, resources: &mut [R]) -> Result<(), ResourcePersistenceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

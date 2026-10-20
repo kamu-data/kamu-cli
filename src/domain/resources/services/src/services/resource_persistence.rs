@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use event_sourcing::{EventID, SaveError};
 use internal_error::ErrorIntoInternal;
 
@@ -104,38 +103,9 @@ where
         self.sync_snapshot(resource, expected_last_event_id).await
     }
 
-    fn validate_snapshot(
-        &self,
-        snapshot: &ResourceSnapshot,
-    ) -> Result<(), ResourcePersistenceError> {
-        ResourceDurableStateValidator::new(self.extension_schema_registry)
-            .validate_snapshot(snapshot)
-            .map_err(ResourcePersistenceError::InvalidDurableState)
-    }
-}
-
-impl<R> ResourcePersistenceServiceHelper<'_, R>
-where
-    R: EventSourcedResource + ResourceSchemaProvider,
-    R::LifecycleError:
-        InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
-    R::Spec: serde::Serialize,
-{
-    pub async fn delete(
-        &self,
-        resource: &mut R,
-        now: DateTime<Utc>,
-    ) -> Result<(), ResourcePersistenceError> {
-        self.delete_many(std::slice::from_mut(resource), now).await
-    }
-
-    pub async fn delete_many(
-        &self,
-        resources: &mut [R],
-        now: DateTime<Utc>,
-    ) -> Result<(), ResourcePersistenceError> {
-        for resource in resources.iter_mut() {
-            Self::mark_deleted(resource, now)?;
+    pub async fn save_many(&self, resources: &mut [R]) -> Result<(), ResourcePersistenceError> {
+        for resource in resources.iter() {
+            self.validate_snapshot(&resource.make_resource_snapshot()?)?;
         }
 
         let expected_last_event_ids = resources
@@ -157,19 +127,13 @@ where
             .await
     }
 
-    fn mark_deleted(resource: &mut R, now: DateTime<Utc>) -> Result<(), ResourcePersistenceError> {
-        let tombstone_name =
-            kamu_resources::ResourceName::new_unchecked(&format!("deleted-{}", resource.id()));
-
-        resource
-            .try_complete_deletion(now, tombstone_name)
-            .map_err(|err| {
-                ResourcePersistenceError::Internal(
-                    format!("{err}")
-                        .int_err()
-                        .with_context(format!("Failed to delete resource {}", resource.id())),
-                )
-            })
+    fn validate_snapshot(
+        &self,
+        snapshot: &ResourceSnapshot,
+    ) -> Result<(), ResourcePersistenceError> {
+        ResourceDurableStateValidator::new(self.extension_schema_registry)
+            .validate_snapshot(snapshot)
+            .map_err(ResourcePersistenceError::InvalidDurableState)
     }
 }
 
@@ -287,25 +251,9 @@ macro_rules! declare_resource_persistence_service {
                 helper.save(resource).await
             }
 
-            async fn delete(
-                &self,
-                resource: &mut $resource,
-                now: chrono::DateTime<chrono::Utc>,
-            ) -> Result<(), kamu_resources::ResourcePersistenceError> {
-                let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
-                    self.resource_repository.as_ref(),
-                    self.label_projection_repository.as_ref(),
-                    self.event_store.as_ref(),
-                    self.extension_schema_registry.as_ref(),
-                );
-
-                helper.delete(resource, now).await
-            }
-
-            async fn delete_many(
+            async fn save_many(
                 &self,
                 resources: &mut [$resource],
-                now: chrono::DateTime<chrono::Utc>,
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
@@ -314,7 +262,7 @@ macro_rules! declare_resource_persistence_service {
                     self.extension_schema_registry.as_ref(),
                 );
 
-                helper.delete_many(resources, now).await
+                helper.save_many(resources).await
             }
         }
     };

@@ -109,10 +109,10 @@ async fn test_delete_account_handles_pagination() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_emits_deleted_lifecycle_message() {
+async fn test_delete_account_emits_deletion_requested_lifecycle_message() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
-    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -129,7 +129,7 @@ async fn test_delete_account_emits_deleted_lifecycle_message() {
 async fn test_delete_account_multiple_resources_emits_single_message() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 3, None);
-    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 3);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 3);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -139,7 +139,7 @@ async fn test_delete_account_multiple_resources_emits_single_message() {
     harness.apply_and_get_id(&account_handle, "res-c").await;
 
     harness.delete_account_resources(account_handle.did).await;
-    // MockOutbox verifies exactly one Deleted message with 3 resources on drop
+    // MockOutbox verifies exactly one DeletionRequested message with 3 resources on drop
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -177,7 +177,7 @@ async fn test_delete_account_message_carries_correct_snapshot_data() {
             if producer != MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE {
                 return false;
             }
-            let ResourceLifecycleMessage::Deleted(m) =
+            let ResourceLifecycleMessage::DeletionRequested(m) =
                 serde_json::from_value(message.clone()).unwrap()
             else {
                 return false;

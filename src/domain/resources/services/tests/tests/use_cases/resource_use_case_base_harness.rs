@@ -14,6 +14,7 @@ use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourceUseCase,
+    CompleteResourceDeletionUseCase,
     ReconcileResourceUseCase,
     RequestAccountResourcesDeletionUseCase,
     RequestResourcesDeletionUseCase,
@@ -138,13 +139,21 @@ impl ResourceUseCaseBaseHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn delete_test_uc(&self) -> Arc<dyn RequestResourcesDeletionUseCase<TestResource>> {
+    pub fn request_deletion_test_uc(
+        &self,
+    ) -> Arc<dyn RequestResourcesDeletionUseCase<TestResource>> {
         self.catalog.get_one().unwrap()
     }
 
     pub fn request_account_resources_deletion_uc(
         &self,
     ) -> Arc<dyn RequestAccountResourcesDeletionUseCase> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn complete_deletion_test_uc(
+        &self,
+    ) -> Arc<dyn CompleteResourceDeletionUseCase<TestResource>> {
         self.catalog.get_one().unwrap()
     }
 
@@ -164,7 +173,7 @@ impl ResourceUseCaseBaseHarness {
     }
 
     pub async fn delete_resources(&self, account_id: odf::AccountID, ids: Vec<ResourceID>) {
-        self.delete_test_uc()
+        self.request_deletion_test_uc()
             .execute(account_id, ids)
             .await
             .unwrap();

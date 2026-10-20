@@ -170,13 +170,12 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Completes the deletion and renames the resource to `tombstone_name`,
+/// Completes the deletion and renames the resource to its tombstone name,
 /// requesting the deletion first if that has not happened yet. Completing it
 /// again is not an update.
 pub fn try_complete_resource_deletion<R>(
     resource: &mut R,
     now: DateTime<Utc>,
-    tombstone_name: ResourceName,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
@@ -188,6 +187,7 @@ where
 
     try_request_resource_deletion(resource, now)?;
 
+    let tombstone_name = ResourceName::new_unchecked(&format!("deleted-{}", resource.id()));
     let event = resource.make_deleted_event(now, tombstone_name);
     resource.apply_event(event)
 }

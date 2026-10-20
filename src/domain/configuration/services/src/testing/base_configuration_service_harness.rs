@@ -24,6 +24,8 @@ use kamu_configuration_inmem::{
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
     ApplyResourceUseCase,
+    ResourceAggregateLoader,
+    ResourceController,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
@@ -80,6 +82,26 @@ impl BaseConfigurationServiceHarness {
 
     pub fn apply_secret_use_case(&self) -> Arc<dyn ApplyResourceUseCase<SecretSetResource>> {
         self.catalog.get_one().unwrap()
+    }
+
+    pub fn variable_set_controller(&self) -> Arc<dyn ResourceController<VariableSetResource>> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn secret_set_controller(&self) -> Arc<dyn ResourceController<SecretSetResource>> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub async fn load_variable_set(&self, id: &ResourceID) -> VariableSetResource {
+        let loader: Arc<dyn ResourceAggregateLoader<VariableSetResource>> =
+            self.catalog.get_one().unwrap();
+        loader.load(id).await.unwrap()
+    }
+
+    pub async fn load_secret_set(&self, id: &ResourceID) -> SecretSetResource {
+        let loader: Arc<dyn ResourceAggregateLoader<SecretSetResource>> =
+            self.catalog.get_one().unwrap();
+        loader.load(id).await.unwrap()
     }
 
     pub fn resource_repo(&self) -> Arc<dyn ResourceRepository> {
