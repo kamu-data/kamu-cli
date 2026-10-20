@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::resources::{ResourceCtx, assert_output_contains_all};
+use crate::resources::{ResourceCtx, assert_output_contains_all, fixtures};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: resource delete semantics (QA scenario 10)
@@ -257,6 +257,50 @@ pub async fn test_resources_bare_id_selector(ctx: ResourceCtx) {
 
     ctx.assert_resource_absent("vs", vars_name).await;
     ctx.assert_resource_absent("ss", secrets_name).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scenario: `--include-deleting` on `get`, `list` and `delete`
+//
+// The flag also shows resources whose deletion waits for their controllers.
+// The controllers clean up once the delete command has finished, so a deleted
+// resource is gone with or without the flag.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_resources_include_deleting(ctx: ResourceCtx) {
+    let kept = "kept-vars";
+    let gone = "gone-vars";
+    let vs_schema = fixtures::VARIABLE_SET_SCHEMA.to_string();
+
+    ctx.apply_variable_set(kept, "one").await;
+    ctx.apply_variable_set(gone, "two").await;
+
+    assert_eq!(
+        ctx.get_idents(["get", "vs/%", "--include-deleting"]).await,
+        vec![
+            (vs_schema.clone(), gone.to_string()),
+            (vs_schema.clone(), kept.to_string()),
+        ]
+    );
+
+    ctx.assert_success(
+        ["delete", "vs", gone, "--include-deleting", "--force"],
+        Some(&[r#"Deleting: VariableSet/gone-vars"#]),
+    )
+    .await;
+
+    ctx.assert_failure(["get", "vs", gone, "--include-deleting"], None)
+        .await;
+    assert_eq!(
+        ctx.get_idents(["get", "vs/%", "--include-deleting"]).await,
+        vec![(vs_schema, kept.to_string())]
+    );
+
+    let listed = ctx.stdout(["list", "vs", "--include-deleting"]).await;
+    assert!(
+        listed.contains(kept) && !listed.contains(gone),
+        "`list vs --include-deleting` should show only {kept}, got:\n{listed}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

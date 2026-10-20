@@ -84,12 +84,12 @@ pub struct ResourceHeaders {
     pub status_generation: u64,              // generated — bumps on every status update
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
-    pub deletion_requested_at: Option<DateTime<Utc>>, // generated — not set yet, always None
-    pub deleted_at: Option<DateTime<Utc>>,   // generated (soft-delete tombstone)
+    pub deletion_requested_at: Option<DateTime<Utc>>, // generated — deletion requested
+    pub deleted_at: Option<DateTime<Utc>>,   // generated — deletion completed (tombstone)
 }
 
 pub struct ResourceStatus {                  // ODF-generated; written only by controllers
-    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Degraded|Failed (Deleting|Deleted not produced yet)
+    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Degraded|Failed|Deleting|Deleted
     pub observed_generation: Option<u64>,    // generation the controller last started reconciling
     pub observed_at: Option<DateTime<Utc>>,
     pub reconciled_generation: Option<u64>,  // generation the controller last reconciled successfully
@@ -243,7 +243,7 @@ pub struct ResourceSnapshot {
 flowchart LR
     M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
-    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, statusGeneration, created/updated/deleted_at,<br/>status{phase, observed/reconciled generation and time, conditions}"]
+    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, statusGeneration, created/updated/<br/>deletionRequested/deleted_at,<br/>status{phase, observed/reconciled generation and time, conditions}"]
     M --> A --> S
 ```
 

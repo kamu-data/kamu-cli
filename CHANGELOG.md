@@ -15,6 +15,9 @@ Recommendation: for ease of reading, use the following format:
 
 ## [Unreleased]
 ### Added
+- Resources: `--include-deleting` on `kamu list`, `kamu get` and `kamu delete`, and `includeDeleting` in
+  the GraphQL resource queries and `delete`, also show resources being deleted. Deleting such a resource
+  again retries its cleanup
 - `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
   a `blockHash` field
 - GraphQL: `DatasetMetadata.currentDownstreamDependenciesCount` returns the number of direct downstream
@@ -25,8 +28,11 @@ Recommendation: for ease of reading, use the following format:
   `ResourceOwnerRefInput`, following ODF. Remote resource commands need both the `kamu` CLI and the node on
   this version or later
 - GraphQL: `ResourceHeaders` has `statusGeneration`, counting status updates, and `deletionRequestedAt`,
-  and `ResourcePhase` has `DELETING` and `DELETED`, following ODF. `deletionRequestedAt`, `DELETING` and
-  `DELETED` are not populated yet
+  and `ResourcePhase` has `DELETING` and `DELETED`, following ODF
+- Resources: deleting a resource takes two steps. It shows `Deleting` until its controller has cleaned up,
+  then `Deleted`; a failed cleanup keeps it `Deleting`, and deleting it again retries. Its name is free at
+  once: applying a manifest with that name creates a new resource and warns about the one being deleted.
+  `kamu delete` prints `Deleting` or `Deleted`, and GraphQL `ResourceDeleteSuccess.phase` reports it
 - Resources: `updatedAt` also moves when the status changes
 - Resources: changing only the labels or annotations of a resource bumps its `generation` and reconciles
   it again

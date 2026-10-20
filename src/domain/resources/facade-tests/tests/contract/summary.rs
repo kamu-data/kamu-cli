@@ -11,7 +11,9 @@ use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ApplyResourceOutcome,
     ResourcePhaseCounts,
+    ResourceRef,
     ResourceSchemaProvider,
+    ResourceVisibility,
     ResourcesSummary,
 };
 use kamu_resources_facade::{
@@ -23,9 +25,12 @@ use pretty_assertions::assert_eq;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::{assert_applied_outcome, create_variable_set, variable_set_manifest_json};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+use crate::helpers::{
+    assert_applied_outcome,
+    create_variable_set,
+    total_schema_count,
+    variable_set_manifest_json,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -165,6 +170,51 @@ fn vs_phase_counts(summary: &ResourcesSummary) -> ResourcePhaseCounts {
         .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.phase_counts.clone())
         .unwrap_or_default()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-114
+contract_test!(
+    summary_counts_resources_being_deleted,
+    super::test_summary_counts_resources_being_deleted,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContractHarness) {
+    let id = create_variable_set(h, TestAccount::Alice, "phase-deleting").await;
+    let facade = h.facade_for(TestAccount::Alice);
+    facade
+        .delete(
+            vec![ResourceRef {
+                account: None,
+                r#type: None,
+                id: Some(id),
+                did: None,
+                name: None,
+            }],
+            ResourceVisibility::Active,
+        )
+        .await
+        .unwrap();
+
+    let summary = facade
+        .summary(ResourcesSummaryRequest { account: None })
+        .await
+        .unwrap();
+    assert_eq!(vs_phase_counts(&summary).deleting, 1);
+
+    h.flush_outbox().await;
+
+    let summary = facade
+        .summary(ResourcesSummaryRequest { account: None })
+        .await
+        .unwrap();
+    assert_eq!(vs_phase_counts(&summary).deleting, 0);
+    assert_eq!(
+        total_schema_count(summary, VariableSetResource::schema()),
+        0
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
