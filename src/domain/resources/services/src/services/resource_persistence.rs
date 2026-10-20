@@ -140,14 +140,7 @@ where
             .validate_snapshot(snapshot)
             .map_err(ResourcePersistenceError::InvalidDurableState)
     }
-}
 
-impl<R> ResourcePersistenceServiceHelper<'_, R>
-where
-    R: EventSourcedResource + ResourceSchemaProvider,
-    R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: serde::Serialize,
-{
     async fn sync_snapshot(
         &self,
         resource: &R,
@@ -190,7 +183,7 @@ where
 
         for update in &updates {
             // Tombstones keep no live projection rows. Keyed off the snapshot,
-            // not the call site, since create / save / delete share this path.
+            // not the call site, since every save shares this path.
             let entries = if update.snapshot.headers.deleted_at.is_some() {
                 Vec::new()
             } else {

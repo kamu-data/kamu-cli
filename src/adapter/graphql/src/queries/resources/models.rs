@@ -661,7 +661,8 @@ pub enum BatchResourcesOutcome {
 /// Resources found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourcesResult {
-    /// Resources found, one per resolved reference
+    /// Resources found, one per resolved reference; with `includeDeleting` a
+    /// name may match several, which share its `requestIndex`
     pub resources: Vec<BatchResourceSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -707,7 +708,8 @@ pub enum BatchResourceManifestsOutcome {
 /// Rendered manifests and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestsResult {
-    /// Manifests rendered, one per resolved reference
+    /// Manifests rendered, one per resolved reference; with `includeDeleting`
+    /// a name may match several, which share its `requestIndex`
     pub manifests: Vec<BatchResourceManifestSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -756,7 +758,8 @@ pub enum BatchResourceHandlesOutcome {
 /// Resource handles found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceHandlesResult {
-    /// Handles found, one per resolved reference
+    /// Handles found, one per resolved reference; with `includeDeleting` a
+    /// name may match several, which share its `requestIndex`
     pub handles: Vec<BatchResourceHandleSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,

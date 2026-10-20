@@ -433,7 +433,9 @@ async fn test_reconcile_of_resource_being_deleted_is_no_op() {
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.delete_resources(account_handle.did, vec![id]).await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
 
     harness.reconcile_test_uc().execute(&id).await.unwrap();
 
@@ -459,7 +461,9 @@ async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
         .unwrap()
         .expect("resource should need reconciliation");
 
-    harness.delete_resources(account_handle.did, vec![id]).await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
 
     helper.finish_reconciliation_phase(started).await.unwrap();
 

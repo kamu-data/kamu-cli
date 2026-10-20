@@ -107,7 +107,7 @@ pub(crate) async fn resolve_batch_ids(
             .resolve_resource_ids_by_names(account_id, schema, &names, visibility)
             .await?
         {
-            // A name repeated in the request comes back once per occurrence
+            // A name repeated in the request may come back once per occurrence
             let ids = ids_by_name.entry(name).or_default();
             if !ids.contains(&id) {
                 ids.push(id);

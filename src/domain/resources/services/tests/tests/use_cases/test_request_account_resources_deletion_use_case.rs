@@ -26,7 +26,9 @@ async fn test_delete_account_no_resources_succeeds() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
-    harness.delete_account_resources(account_handle.did).await;
+    harness
+        .request_account_resources_deletion(account_handle.did)
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,7 +52,9 @@ async fn test_delete_account_deletes_all_owned_resources() {
     pretty_assertions::assert_eq!(snapshot_b.spec, serde_json::json!({ "value": "res-b" }));
     pretty_assertions::assert_eq!(snapshot_c.spec, serde_json::json!({ "value": "res-c" }));
 
-    harness.delete_account_resources(account_handle.did).await;
+    harness
+        .request_account_resources_deletion(account_handle.did)
+        .await;
 
     for id in [&id_a, &id_b, &id_c] {
         let snapshot = harness.get_snapshot_by_id(id).await;
@@ -73,7 +77,9 @@ async fn test_delete_account_leaves_other_accounts_intact() {
         .await;
     pretty_assertions::assert_eq!(snapshot_b.spec, serde_json::json!({ "value": "res-b" }));
 
-    harness.delete_account_resources(account_handle_a.did).await;
+    harness
+        .request_account_resources_deletion(account_handle_a.did)
+        .await;
 
     let snapshot = harness.get_snapshot_by_id(&id_b).await;
     assert!(
@@ -86,7 +92,7 @@ async fn test_delete_account_leaves_other_accounts_intact() {
 
 #[test_log::test(tokio::test)]
 async fn test_delete_account_handles_pagination() {
-    // PAGE_SIZE in request_account_resources_deletion.rs is 100; create 101 to exceed it
+    // 101 resources span more than one page of the account listing (100 per page)
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -98,7 +104,9 @@ async fn test_delete_account_handles_pagination() {
         ids.push(id);
     }
 
-    harness.delete_account_resources(account_handle.did).await;
+    harness
+        .request_account_resources_deletion(account_handle.did)
+        .await;
 
     for id in &ids {
         let snapshot = harness.get_snapshot_by_id(id).await;
@@ -119,7 +127,9 @@ async fn test_delete_account_emits_deletion_requested_lifecycle_message() {
 
     harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.delete_account_resources(account_handle.did).await;
+    harness
+        .request_account_resources_deletion(account_handle.did)
+        .await;
     // MockOutbox verifies expectations on drop
 }
 
@@ -138,7 +148,9 @@ async fn test_delete_account_multiple_resources_emits_single_message() {
     harness.apply_and_get_id(&account_handle, "res-b").await;
     harness.apply_and_get_id(&account_handle, "res-c").await;
 
-    harness.delete_account_resources(account_handle.did).await;
+    harness
+        .request_account_resources_deletion(account_handle.did)
+        .await;
     // MockOutbox verifies exactly one DeletionRequested message with 3 resources on drop
 }
 
@@ -152,7 +164,9 @@ async fn test_delete_account_no_resources_emits_no_message() {
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
-    harness.delete_account_resources(account_handle.did).await;
+    harness
+        .request_account_resources_deletion(account_handle.did)
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,7 +208,9 @@ async fn test_delete_account_message_carries_correct_snapshot_data() {
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     *uid_cell.lock().unwrap() = Some(id);
 
-    harness.delete_account_resources(account_handle.did).await;
+    harness
+        .request_account_resources_deletion(account_handle.did)
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

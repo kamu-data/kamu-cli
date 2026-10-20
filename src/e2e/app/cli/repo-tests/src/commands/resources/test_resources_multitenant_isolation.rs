@@ -85,12 +85,9 @@ pub async fn test_resources_multitenant_isolation(kamu: KamuCliPuppet) {
     assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 3);
 
     ctx.set_account(Some(alice.clone()));
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "vs", "shared", "--force"],
-        Some(&[
-            r#"Deleted: VariableSet/shared"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
-        ]),
+        &["VariableSet/shared"],
     )
     .await;
 

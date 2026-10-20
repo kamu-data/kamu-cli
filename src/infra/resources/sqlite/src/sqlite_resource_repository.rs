@@ -328,7 +328,14 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
 
         let names_placeholders =
-            sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(4).unwrap());
+            sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(3).unwrap());
+
+        // Spelled out rather than bound, so that for live resources the
+        // planner can use the partial unique index on names
+        let visibility_predicate = match visibility {
+            ResourceVisibility::Active => "AND r.deletion_requested_at IS NULL",
+            ResourceVisibility::IncludeDeleting => "",
+        };
 
         // Within a name the live resource comes first, then those being
         // deleted, oldest first; the stable sort below keeps that order.
@@ -340,7 +347,7 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources r
             WHERE r.account_id = $1
               AND r.resource_schema = $2
-              AND (r.deletion_requested_at IS NULL OR $3)
+              {visibility_predicate}
               AND r.resource_name COLLATE NOCASE IN ({names_placeholders})
               AND r.deleted_at IS NULL
             ORDER BY
@@ -352,8 +359,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let mut query = sqlx::query_as::<_, (uuid::Uuid, String)>(AssertSqlSafe(query_str))
             .bind(account_id_str)
-            .bind(schema.as_str())
-            .bind(visibility.includes_deleting());
+            .bind(schema.as_str());
 
         for name in names {
             query = query.bind(name.to_string());

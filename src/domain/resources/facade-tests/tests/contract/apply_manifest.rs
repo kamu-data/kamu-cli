@@ -1185,9 +1185,9 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-143: ImmutableFieldChanged, ReferencedObjectMissing and
-// LifecycleRuleConflict are not triggerable by VariableSet/SecretSet, so they
-// stay deferred until a resource type can trigger them.
+// RF-143: ImmutableFieldChanged and ReferencedObjectMissing are not triggerable
+// by VariableSet/SecretSet, so they stay deferred until a resource type can
+// trigger them. LifecycleRuleConflict is covered by RF-182 in delete.rs.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

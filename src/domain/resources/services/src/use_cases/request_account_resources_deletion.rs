@@ -17,7 +17,9 @@ use kamu_resources::{
     RequestAccountResourcesDeletionUseCase,
     ResourceCrudDispatcherDeletionRequest,
     ResourceID,
+    ResourceScope,
     ResourceSnapshot,
+    ResourceVisibility,
 };
 
 use crate::ResourceDispatcherFactory;
@@ -47,8 +49,8 @@ impl RequestAccountResourcesDeletionUseCaseImpl {
                 // retries its cleanup.
                 .list_snapshots(
                     account_id,
-                    &kamu_resources::ResourceScope::default(),
-                    kamu_resources::ResourceVisibility::IncludeDeleting,
+                    &ResourceScope::default(),
+                    ResourceVisibility::IncludeDeleting,
                     pagination,
                 )
                 .await

@@ -45,6 +45,8 @@ pub struct ResourceSelectionResolutionOptions {
     /// counts only resources that actually match.
     pub label_filter: Option<ResourceLabelFilterInput>,
 
+    /// Which resources names and patterns find; ids always find resources
+    /// being deleted
     pub visibility: ResourceVisibility,
 }
 

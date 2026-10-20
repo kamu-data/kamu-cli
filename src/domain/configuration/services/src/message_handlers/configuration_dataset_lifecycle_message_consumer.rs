@@ -124,8 +124,8 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
     /// Grouped by owner because `account_id` here is an ownership scope, not an
     /// actor claim -- the use case rejects ids owned by anyone else.
     ///
-    /// Projection GC is inherited: the resulting `Deleted` message is already
-    /// handled by `ConfigurationResourceLifecycleMessageConsumer`.
+    /// Projection cleanup is inherited: the controllers' `cleanup` runs when
+    /// the deletion completes.
     async fn delete_auto_managed(
         dispatcher: &Arc<dyn ResourceCrudDispatcher>,
         snapshots: Vec<ResourceSnapshot>,

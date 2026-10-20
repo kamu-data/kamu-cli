@@ -397,8 +397,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         // runs inside a single database transaction — opened by the
         // `#[transactional_handler]` GraphQL handler, or by the CLI's
         // `DatabaseTransactionRunner` — so a failure in a later group rolls back
-        // the deletes an earlier one performed. Fanning out therefore does not
-        // introduce partial-delete semantics.
+        // the deletion requests an earlier one made. Fanning out therefore does
+        // not introduce partial-delete semantics.
         for group in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
@@ -473,18 +473,20 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 }
             }
 
-            if !ids_to_delete.is_empty() {
-                // Registered selector schemas must have a dispatcher.
-                let dispatcher = self
-                    .dispatcher_factory
-                    .crud_dispatcher_for_trusted_schema(group.schema.as_str())?;
-                dispatcher
-                    .request_deletion(ResourceCrudDispatcherDeletionRequest {
-                        account_id: group.account.did.clone(),
-                        ids: ids_to_delete.clone(),
-                    })
-                    .await?;
+            if ids_to_delete.is_empty() {
+                continue;
             }
+
+            // Registered selector schemas must have a dispatcher.
+            let dispatcher = self
+                .dispatcher_factory
+                .crud_dispatcher_for_trusted_schema(group.schema.as_str())?;
+            dispatcher
+                .request_deletion(ResourceCrudDispatcherDeletionRequest {
+                    account_id: group.account.did.clone(),
+                    ids: ids_to_delete.clone(),
+                })
+                .await?;
 
             // Controllers may complete a deletion within the request, which
             // removes the resource from the lookup by id

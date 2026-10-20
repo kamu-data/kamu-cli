@@ -929,7 +929,8 @@ Resource handles found and references that could not be resolved
 """
 type BatchResourceHandlesResult {
 	"""
-	Handles found, one per resolved reference
+	Handles found, one per resolved reference; with `includeDeleting` a
+	name may match several, which share its `requestIndex`
 	"""
 	handles: [BatchResourceHandleSuccess!]!
 	"""
@@ -962,7 +963,8 @@ Rendered manifests and references that could not be resolved
 """
 type BatchResourceManifestsResult {
 	"""
-	Manifests rendered, one per resolved reference
+	Manifests rendered, one per resolved reference; with `includeDeleting`
+	a name may match several, which share its `requestIndex`
 	"""
 	manifests: [BatchResourceManifestSuccess!]!
 	"""
@@ -1009,7 +1011,8 @@ Resources found and references that could not be resolved
 """
 type BatchResourcesResult {
 	"""
-	Resources found, one per resolved reference
+	Resources found, one per resolved reference; with `includeDeleting` a
+	name may match several, which share its `requestIndex`
 	"""
 	resources: [BatchResourceSuccess!]!
 	"""
@@ -7842,7 +7845,9 @@ type ResourcesMut {
 	"""
 	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
 	"""
-	Requests deletion of the resources identified by the given references
+	Requests deletion of the resources identified by the given references.
+	Names match live resources only; an id also matches a resource being
+	deleted, which retries its cleanup
 	"""
 	delete(resourceRefs: [ResourceRefInput!]!): ResourceDeleteOutcome!
 }

@@ -118,8 +118,8 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-134 | delete.rs | Active | Delete wrong schema returns mismatch problem |  |
 | RF-135 | delete.rs | Active | Delete is account-scoped |  |
 | RF-136 | delete.rs | Active | Repeated delete of a deleted resource returns not found |  |
-| RF-137 | delete.rs | Active | Delete reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and searches unless `IncludeDeleting`; once cleaned up: not found even with it |
-| RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; a name lookup with `IncludeDeleting` returns both, live first |
+| RF-137 | delete.rs | Active | Delete reports `Deleting` until controllers clean up | While deleting: found by id, hidden from names and from both `search` and `search_handles` unless `IncludeDeleting` (a `search` summary then reports `Deleting`); once cleaned up: not found even with it |
+| RF-138 | delete.rs | Active | A resource being deleted gives up its name | Re-apply creates a new resource with a `replaces_resource_being_deleted` warning; with `IncludeDeleting`, `get_handles`, `get` and `render_manifests` by name return both under one request index, live first |
 | RF-139 | delete.rs | Active | Repeated delete of a resource being deleted retries its cleanup | By id only: `delete` resolves names to live resources |
 | RF-140 | error_taxonomy.rs | Active | One-element-batch lookup taxonomy is consistent across get/get_handles/render_manifests/delete | Full 3x4 matrix (NameNotFound/IDNotFound/SchemaMismatch x 4 methods); RF-141 covers only a subset, so this was converted to batch form rather than retired |
 | RF-141 | error_taxonomy.rs | Active | Multi-ref batch lookup problem taxonomy mirrors the one-element case |  |
@@ -153,3 +153,4 @@ Each `RF-*` contract scenario is listed with its status. Test code and comments 
 | RF-179 | error_taxonomy.rs | Active | A name-without-type ref is refused, and distinguishably from `EmptyRef` | RF-171 pins the refusal; this pins its taxonomy, distinguishing it from `EmptyRef` and `NameNotFound` |
 | RF-180 | list_search.rs | Active | A type-less selector may name an account, spanning every type under it | The only spelling for an all-types listing scoped to one account, there being no call-level `account`. RF-105 covers a typed selector's account |
 | RF-181 | generations.rs | Active | `generation` counts header and spec changes, `statusGeneration` counts status updates | Walks apply → reconcile → spec update → labels-only update → unchanged re-apply. Between an update and its reconciliation the phase is derived as `Pending` without a status update |
+| RF-182 | delete.rs | Active | Applying a manifest whose `headers.id` names a resource being deleted is rejected | Plan and apply both reject with `LifecycleRuleConflict`; the resource stays `Deleting` with its spec unchanged |

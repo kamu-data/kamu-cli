@@ -20,6 +20,7 @@ use kamu_resources::{
     ResourceDeletionInProgressError,
     ResourceEvent,
     ResourceEventDeleted,
+    ResourceEventHeadersUpdated,
     ResourceHeadersInput,
     ResourceName,
     ResourcePhase,
@@ -127,6 +128,10 @@ fn test_stored_deletion_without_request_replays_as_deleted() {
     harness.apply_stored_deletion();
 
     let headers = harness.resource.headers();
+    assert_eq!(
+        headers.name.as_str(),
+        format!("deleted-{}", harness.resource.id())
+    );
     assert_eq!(headers.deletion_requested_at, Some(harness.now));
     assert_eq!(headers.deleted_at, Some(harness.now));
     assert_eq!(harness.phase(), ResourcePhase::Deleted);
@@ -151,6 +156,21 @@ fn test_headers_and_spec_of_resource_being_deleted_cannot_change() {
         Err(TestResourceLifecycleError::DeletionInProgress(_))
     );
     assert_eq!(harness.generations(), (1, 3));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_stored_headers_update_after_deletion_request_is_an_invariant_violation() {
+    let mut harness = ResourceDeletionHarness::reconciled();
+    harness.request_deletion();
+
+    assert_matches!(
+        harness.try_apply_stored_headers_update(Some("prod")),
+        Err(TestResourceLifecycleError::InvariantViolation(_))
+    );
+    assert_eq!(harness.generations(), (1, 3));
+    assert_eq!(harness.phase(), ResourcePhase::Deleting);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,18 +319,30 @@ impl ResourceDeletionHarness {
 
     /// Applies a deletion as stored before it was preceded by a request.
     fn apply_stored_deletion(&mut self) {
+        let id = *self.resource.id();
         let event = ResourceEventDeleted {
             event_time: self.tick(),
-            id: *self.resource.id(),
-            tombstone_name: Self::tombstone_name(),
+            id,
+            tombstone_name: ResourceName::new_unchecked(&format!("deleted-{id}")),
         };
         self.resource
             .apply_event(ResourceEvent::Deleted(event))
             .unwrap();
     }
 
-    fn tombstone_name() -> ResourceName {
-        ResourceName::new_unchecked("deleted-res")
+    /// Applies a stored headers update directly, bypassing the command checks.
+    fn try_apply_stored_headers_update(
+        &mut self,
+        env_label: Option<&str>,
+    ) -> Result<(), TestResourceLifecycleError> {
+        let event = ResourceEventHeadersUpdated {
+            event_time: self.tick(),
+            id: *self.resource.id(),
+            new_headers: Self::headers_input(env_label),
+            new_generation: Some(self.resource.headers().generation + 1),
+        };
+        self.resource
+            .apply_event(ResourceEvent::HeadersUpdated(event))
     }
 
     fn mark_started(&mut self) {

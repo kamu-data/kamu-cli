@@ -191,8 +191,8 @@ where
         ))
     }
 
-    /// Resources being deleted keep their name, though a new resource may take
-    /// it.
+    /// Warns about each resource being deleted whose name the created resource
+    /// takes.
     async fn replaced_resources_warnings(
         &self,
         headers: &ResourceHeadersInput,

@@ -9,7 +9,7 @@
 
 use kamu_configuration::{Variable, VariableSetSpecInput};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
-use kamu_resources::ApplyResourceParams;
+use kamu_resources::{ApplyResourceParams, ResourcePhase};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,53 +169,67 @@ async fn test_cleanup_variable_set_removes_only_its_projection_entries() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
-    let mut ids = Vec::new();
-    for name in ["vars-deleted", "vars-other"] {
-        let decision = harness
-            .apply_variable_use_case()
-            .apply(ApplyResourceParams {
-                id: None,
-                headers: BaseResourceServiceHarness::make_headers_input(
-                    account_handle.clone(),
-                    name,
-                ),
-                spec: make_variable_set_spec([("KEY", "value")]),
-            })
-            .await
-            .unwrap();
-        ids.push(decision.expect_applied().id);
-    }
-    let [id_deleted, id_other] = ids[..] else {
-        unreachable!()
-    };
+    let id_deleted = harness
+        .apply_variable_set(&account_handle, "vars-deleted", [("KEY", "value")])
+        .await;
+    let id_other = harness
+        .apply_variable_set(&account_handle, "vars-other", [("KEY", "value")])
+        .await;
 
-    let resource = harness.load_variable_set(&id_deleted).await;
-    harness
-        .variable_set_controller()
-        .cleanup(&resource)
-        .await
-        .unwrap();
+    harness.cleanup_variable_set(&id_deleted).await;
 
-    let repo = harness.variable_set_projection_repo();
-    assert!(
-        repo.get_latest_entries(&id_deleted)
-            .await
-            .unwrap()
-            .is_empty(),
+    assert_eq!(
+        harness
+            .variable_set_projection_entry_count(&id_deleted)
+            .await,
+        0,
         "cleanup must remove the projection entries of the resource"
     );
     assert_eq!(
-        repo.get_latest_entries(&id_other).await.unwrap().len(),
+        harness.variable_set_projection_entry_count(&id_other).await,
         1,
         "entries of other resources must be untouched"
     );
 
     // Cleanup may run again after a failure
+    harness.cleanup_variable_set(&id_deleted).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_requested_deletion_of_variable_set_removes_its_projection_entries() {
+    let harness = BaseConfigurationServiceHarness::new();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+
+    let id_deleted = harness
+        .apply_variable_set(&account_handle, "vars-deleted", [("KEY", "value")])
+        .await;
+    let id_other = harness
+        .apply_variable_set(&account_handle, "vars-other", [("KEY", "value")])
+        .await;
+
     harness
-        .variable_set_controller()
-        .cleanup(&resource)
-        .await
-        .unwrap();
+        .request_variable_sets_deletion(&account_handle.did, vec![id_deleted])
+        .await;
+
+    assert_eq!(
+        harness.variable_set_phase(&id_deleted).await,
+        ResourcePhase::Deleted
+    );
+    assert!(harness.get_snapshot_by_id(&id_deleted).await.is_none());
+    assert_eq!(
+        harness
+            .variable_set_projection_entry_count(&id_deleted)
+            .await,
+        0,
+        "completing the deletion must remove the projection entries of the resource"
+    );
+    assert_eq!(
+        harness.variable_set_projection_entry_count(&id_other).await,
+        1,
+        "entries of other resources must be untouched"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,11 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError, ResultIntoInternal};
-use kamu_resources::{ResourceID, ResourcePhase, ResourceVisibility, TypeUri};
+use kamu_resources::{
+    ResourceID,
+    ResourceLabelFilterInput,
+    ResourcePhase,
+    ResourceRef,
+    ResourceSelectorName,
+    ResourceVisibility,
+    TypeUri,
+};
 use kamu_resources_facade::{
     BatchResourceError,
     ResourceDeletion,
@@ -42,7 +50,7 @@ pub struct DeleteResourcesCommand {
 
     resolved_context: ResolvedResourceContext,
     syntax: ResourceSelectionSyntax,
-    label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<ResourceLabelFilterInput>,
     force: bool,
     ignore_not_found: bool,
     dry_run: bool,
@@ -60,7 +68,7 @@ impl DeleteResourcesCommand {
         post_command_actions: Arc<PostCommandActions>,
         resolved_context: ResolvedResourceContext,
         syntax: ResourceSelectionSyntax,
-        label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+        label_filter: Option<ResourceLabelFilterInput>,
         force: bool,
         ignore_not_found: bool,
         dry_run: bool,
@@ -180,7 +188,7 @@ impl DeleteResourcesCommand {
 
         if errors.is_empty() && !deletions.is_empty() && self.phases_known_after_command() {
             self.post_command_actions.add(ReportDeletionPhases {
-                targets: deletions.into_iter().map(|(target, _)| target).collect(),
+                deletions,
                 summary,
                 output_config: self.output_config.clone(),
             });
@@ -289,9 +297,7 @@ impl DeleteResourcesCommand {
 
     /// Builds one ref per already-resolved target, naming the type by its
     /// resolved schema rather than by the selector the user typed.
-    fn entry_resource_refs(
-        entries: &[(usize, DeleteResourceTarget)],
-    ) -> Vec<kamu_resources::ResourceRef> {
+    fn entry_resource_refs(entries: &[(usize, DeleteResourceTarget)]) -> Vec<ResourceRef> {
         entries
             .iter()
             .map(|(_, target)| target.resource_ref())
@@ -403,43 +409,72 @@ impl Command for DeleteResourcesCommand {
 /// Reports the phase each resource reached once its controllers had the chance
 /// to clean up: still found by its id means `Deleting`, gone means `Deleted`
 struct ReportDeletionPhases {
-    targets: Vec<DeleteResourceTarget>,
+    deletions: Vec<(DeleteResourceTarget, ResourcePhase)>,
     summary: DeleteResourcesSummary,
     output_config: Arc<OutputConfig>,
+}
+
+impl ReportDeletionPhases {
+    /// A resource that cannot be read again keeps the phase its deletion
+    /// request returned: the deletion has already committed.
+    async fn reached_phases(&self, resource_facade: &dyn ResourceFacade) -> Vec<ResourcePhase> {
+        let requested_phases = self.deletions.iter().map(|(_, phase)| *phase);
+        let resource_refs = self
+            .deletions
+            .iter()
+            .map(|(target, _)| target.resource_ref())
+            .collect();
+
+        let response = match resource_facade
+            .get_handles(resource_refs, ResourceVisibility::Active)
+            .await
+        {
+            Ok(response) => response,
+            Err(err) => {
+                tracing::warn!(error = ?err, "Failed to read deleted resources again");
+                return requested_phases.collect();
+            }
+        };
+
+        let mut reached_phases = requested_phases.collect::<Vec<_>>();
+        for success in response.successes {
+            reached_phases[success.request_index] = ResourcePhase::Deleting;
+        }
+        for problem in response.problems {
+            if let Some(phase) = phase_when_not_found(&problem.error) {
+                reached_phases[problem.request_index] = phase;
+            }
+        }
+        reached_phases
+    }
 }
 
 #[async_trait::async_trait]
 impl PostCommandAction for ReportDeletionPhases {
     async fn run(self: Box<Self>, catalog: dill::Catalog) -> Result<(), CLIError> {
         let resource_facade = catalog.get_one::<dyn ResourceFacade>().int_err()?;
-        let resource_refs = self
-            .targets
-            .iter()
-            .map(DeleteResourceTarget::resource_ref)
-            .collect();
-
-        let being_deleted = resource_facade
-            .get_handles(resource_refs, ResourceVisibility::Active)
-            .await
-            .map_err(CLIError::critical)?
-            .successes
-            .into_iter()
-            .map(|success| success.item.id)
-            .collect::<HashSet<_>>();
+        let reached_phases = self.reached_phases(resource_facade.as_ref()).await;
 
         let mut summary = self.summary;
-        for target in &self.targets {
-            let phase = if being_deleted.contains(&target.id) {
-                ResourcePhase::Deleting
-            } else {
-                ResourcePhase::Deleted
-            };
+        for ((target, _), phase) in self.deletions.iter().zip(reached_phases) {
             summary.record_success(phase);
             DeleteResourcesPrinter::print_success(target, phase, self.output_config.as_ref());
         }
         DeleteResourcesPrinter::print_summary(&summary, false);
 
         Ok(())
+    }
+}
+
+/// Only a resource its id no longer finds has completed its deletion
+fn phase_when_not_found(problem: &ResourceLookupProblem) -> Option<ResourcePhase> {
+    match problem {
+        ResourceLookupProblem::IDNotFound(_) => Some(ResourcePhase::Deleted),
+        ResourceLookupProblem::NameNotFound(_)
+        | ResourceLookupProblem::SchemaMismatch(_)
+        | ResourceLookupProblem::NameMismatch(_)
+        | ResourceLookupProblem::EmptyRef
+        | ResourceLookupProblem::UntypedName => None,
     }
 }
 
@@ -455,7 +490,7 @@ pub(super) struct PreparedDeleteTargets {
 
 #[derive(Debug, Clone)]
 struct DeleteResourceTarget {
-    canonical_selector: kamu_resources::ResourceSelectorName,
+    canonical_selector: ResourceSelectorName,
     schema: TypeUri,
     id: ResourceID,
     name: String,
@@ -475,8 +510,8 @@ impl DeleteResourceTarget {
         format!("{}/{}", self.canonical_selector, self.name)
     }
 
-    fn resource_ref(&self) -> kamu_resources::ResourceRef {
-        kamu_resources::ResourceRef {
+    fn resource_ref(&self) -> ResourceRef {
+        ResourceRef {
             account: None,
             r#type: Some(self.schema.clone().into()),
             id: Some(self.id),
