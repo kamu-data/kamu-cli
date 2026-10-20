@@ -170,9 +170,9 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Completes the deletion and renames the resource to its tombstone name,
-/// requesting the deletion first if that has not happened yet. Completing it
-/// again is not an update.
+/// Completes a requested deletion and renames the resource to its tombstone
+/// name. Completing it again is not an update; completing a deletion that was
+/// never requested is an invariant violation, since it would skip the cleanup.
 pub fn try_complete_resource_deletion<R>(
     resource: &mut R,
     now: DateTime<Utc>,
@@ -185,10 +185,15 @@ where
         return Ok(());
     }
 
-    try_request_resource_deletion(resource, now)?;
-
     let tombstone_name = ResourceName::new_unchecked(&format!("deleted-{}", resource.id()));
     let event = resource.make_deleted_event(now, tombstone_name);
+
+    if resource.headers().deletion_requested_at.is_none() {
+        return Err(R::LifecycleError::invariant_violation(
+            ProjectionError::new(Some(resource.aggregate().as_state().clone()), event),
+        ));
+    }
+
     resource.apply_event(event)
 }
 

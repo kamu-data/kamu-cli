@@ -263,7 +263,9 @@ impl SearchResourcesInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Reference to exactly one resource, mirroring the ODF `ResourceRef`.
+/// Reference to one resource, mirroring the ODF `ResourceRef`. A name matches
+/// the live resource holding it; with `includeDeleting` it also matches
+/// resources being deleted, so it may resolve to several.
 ///
 /// A resource is addressed either by `id`, or by `type` **and** `name` — ODF's
 /// uniqueness key is `(account, type, name)`, and resources of different types
@@ -276,7 +278,7 @@ impl SearchResourcesInput {
 ///
 /// To match resources *without* knowing their type, use a selector
 /// (`bySelectors`): selectors ask which resources match and may span every
-/// type, while a ref names exactly one.
+/// type, while a ref names one resource.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceRefInput {
     /// Account owning the resource, defaults to the calling account

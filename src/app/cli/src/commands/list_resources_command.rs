@@ -74,6 +74,7 @@ impl ListResourcesCommand {
         label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
         visibility: ResourceVisibility,
     ) -> Self {
+        let visibility = scope.effective_visibility(visibility);
         Self {
             resource_facade,
             resource_context_reporter,
@@ -590,6 +591,30 @@ impl ListResourcesScope {
     /// columns).
     pub(crate) fn is_generic(&self) -> bool {
         !matches!(self, Self::ByType(..))
+    }
+
+    /// Ids always find resources being deleted, so a scope of ids alone
+    /// includes them; any other scope follows the requested visibility.
+    pub(crate) fn effective_visibility(&self, requested: ResourceVisibility) -> ResourceVisibility {
+        let only_ids = match self {
+            Self::ByType(_, query) | Self::All(query) => Self::is_id_query(query.as_ref()),
+            Self::Types(type_queries) => type_queries
+                .iter()
+                .all(|(_, query)| Self::is_id_query(query.as_ref())),
+        };
+
+        if only_ids {
+            ResourceVisibility::IncludeDeleting
+        } else {
+            requested
+        }
+    }
+
+    fn is_id_query(query: Option<&ResourceQuery>) -> bool {
+        match query {
+            Some(ResourceQuery::ExactIds(_)) => true,
+            Some(ResourceQuery::ExactNames(_) | ResourceQuery::NamePattern(_)) | None => false,
+        }
     }
 }
 
