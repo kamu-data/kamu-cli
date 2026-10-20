@@ -463,7 +463,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                     .dispatcher_factory
                     .crud_dispatcher_for_trusted_schema(group.schema.as_str())?;
                 dispatcher
-                    .delete(ResourceCrudDispatcherDeleteRequest {
+                    .request_deletion(ResourceCrudDispatcherDeletionRequest {
                         account_id: group.account.did.clone(),
                         ids: ids_to_delete,
                     })

@@ -16,18 +16,18 @@ use crate::{DeclarativeResource, FindOwnedResourceError, ResourceID};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DeleteResourcesUseCase<R: DeclarativeResource>: Send + Sync {
+pub trait RequestResourcesDeletionUseCase<R: DeclarativeResource>: Send + Sync {
     async fn execute(
         &self,
         account_id: odf::AccountID,
         ids: Vec<ResourceID>,
-    ) -> Result<(), DeleteResourcesError>;
+    ) -> Result<(), RequestResourcesDeletionError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DeleteResourcesError {
+pub enum RequestResourcesDeletionError {
     #[error(transparent)]
     Access(
         #[from]
@@ -44,7 +44,7 @@ pub enum DeleteResourcesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<FindOwnedResourceError> for DeleteResourcesError {
+impl From<FindOwnedResourceError> for RequestResourcesDeletionError {
     fn from(err: FindOwnedResourceError) -> Self {
         match err {
             FindOwnedResourceError::Access(err) => Self::Access(err),

@@ -29,7 +29,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::utils::{
     TestResource,
-    TestResourceReconciler,
+    TestResourceController,
     make_resource_params,
     register_test_resource_resource_service_layer,
 };
@@ -227,7 +227,7 @@ impl TypedResourceQueryServiceHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
+        b.add::<TestResourceController>();
 
         Self {
             base,

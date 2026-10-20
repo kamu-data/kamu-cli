@@ -33,8 +33,8 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::utils::{
     TestResource,
+    TestResourceController,
     TestResourceReconcileError,
-    TestResourceReconciler,
     TestResourceSpec,
     TestResourceState,
     make_fresh_aggregate,
@@ -270,7 +270,7 @@ impl ResourceDurableStateValidatorHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
+        b.add::<TestResourceController>();
 
         Self {
             base,

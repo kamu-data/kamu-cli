@@ -13,7 +13,7 @@ use internal_error::InternalError;
 
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
-pub trait DeleteAccountResourcesUseCase: Send + Sync {
+pub trait RequestAccountResourcesDeletionUseCase: Send + Sync {
     async fn execute(&self, account_id: odf::AccountID) -> Result<(), InternalError>;
 }
 

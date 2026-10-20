@@ -14,7 +14,7 @@ use crate::resources::{ResourceCtx, fixtures};
 //
 // This is the *one* place that pins the entire `get -o json` document shape:
 // the `RenderedResourceViewJson` envelope, the headers block, and the
-// reconciler `status` block. Its job is to fail loudly when the render struct
+// controller `status` block. Its job is to fail loudly when the render struct
 // in `get_resource_command.rs` changes shape, so a human decides whether the
 // change was intended.
 //
@@ -26,8 +26,8 @@ use crate::resources::{ResourceCtx, fixtures};
 //
 // Volatile fields are stripped from the actual document before comparison:
 //   - headers.id / account / generation / createdAt / updatedAt — per-run / per-context
-//   - status.observedAt / reconciledAt — reconciler timestamps
-//   - status.conditions.*.lastTransitionTime — reconciler timestamps
+//   - status.observedAt / reconciledAt — controller timestamps
+//   - status.conditions.*.lastTransitionTime — controller timestamps
 // Everything else is asserted verbatim against an expected document built from
 // the fixture constants.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

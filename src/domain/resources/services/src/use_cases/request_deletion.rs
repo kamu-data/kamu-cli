@@ -18,10 +18,10 @@ use time_source::SystemTimeSource;
 
 use crate::domain::{
     DeclarativeResource,
-    DeleteResourcesError,
     EventSourcedResource,
     GenericResourceQueryService,
     InvariantViolationOf,
+    RequestResourcesDeletionError,
     ResourceAggregateLoader,
     ResourceID,
     ResourceNotOwnedByAccountError,
@@ -32,7 +32,7 @@ use crate::domain::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DeleteResourcesUseCaseHelper<'a, R>
+pub struct RequestResourcesDeletionUseCaseHelper<'a, R>
 where
     R: EventSourcedResource + ResourceSchemaProvider,
 {
@@ -43,7 +43,7 @@ where
     time_source: &'a dyn SystemTimeSource,
 }
 
-impl<'a, R> DeleteResourcesUseCaseHelper<'a, R>
+impl<'a, R> RequestResourcesDeletionUseCaseHelper<'a, R>
 where
     R: EventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError:
@@ -70,7 +70,7 @@ where
         &self,
         account_id: odf::AccountID,
         ids: Vec<ResourceID>,
-    ) -> Result<(), DeleteResourcesError> {
+    ) -> Result<(), RequestResourcesDeletionError> {
         let now = self.time_source.now();
 
         let unique_ids = ids
@@ -83,10 +83,10 @@ where
             .generic_resource_query_service
             .find_owned_snapshots(&account_id, R::schema(), &unique_ids)
             .await
-            .map_err(DeleteResourcesError::Internal)?;
+            .map_err(RequestResourcesDeletionError::Internal)?;
 
         if let Some(&id) = outcome.access_denied.first() {
-            return Err(DeleteResourcesError::Access(
+            return Err(RequestResourcesDeletionError::Access(
                 odf::AccessError::Unauthorized(
                     ResourceNotOwnedByAccountError {
                         id,
@@ -115,17 +115,19 @@ where
                 unreachable!("delete_many() must not expose duplicate persistence errors")
             }
             Err(ResourcePersistenceError::ConcurrentModification(err)) => {
-                Err(DeleteResourcesError::ConcurrentModification(err))
+                Err(RequestResourcesDeletionError::ConcurrentModification(err))
             }
             Err(ResourcePersistenceError::InvalidDurableState(err)) => {
-                Err(DeleteResourcesError::Internal(
+                Err(RequestResourcesDeletionError::Internal(
                     err.int_err()
                         .with_context("Failed to persist deleted resources"),
                 ))
             }
-            Err(ResourcePersistenceError::Internal(err)) => Err(DeleteResourcesError::Internal(
-                err.with_context("Failed to persist deleted resources"),
-            )),
+            Err(ResourcePersistenceError::Internal(err)) => {
+                Err(RequestResourcesDeletionError::Internal(
+                    err.with_context("Failed to persist deleted resources"),
+                ))
+            }
         }?;
 
         if !resources.is_empty() {
@@ -135,12 +137,15 @@ where
         Ok(())
     }
 
-    async fn load_resources(&self, ids: &[ResourceID]) -> Result<Vec<R>, DeleteResourcesError> {
+    async fn load_resources(
+        &self,
+        ids: &[ResourceID],
+    ) -> Result<Vec<R>, RequestResourcesDeletionError> {
         self.resource_aggregate_loader
             .load_many(ids)
             .await
             .map_err(|err| {
-                DeleteResourcesError::Internal(
+                RequestResourcesDeletionError::Internal(
                     format!("{err}")
                         .int_err()
                         .with_context("Failed to load resources"),
@@ -150,7 +155,7 @@ where
             .zip(ids)
             .map(|(resource_result, id)| {
                 resource_result.map_err(|err| {
-                    DeleteResourcesError::Internal(
+                    RequestResourcesDeletionError::Internal(
                         format!("{err}")
                             .int_err()
                             .with_context(format!("Failed to load resource {id}")),
@@ -164,13 +169,13 @@ where
         &self,
         now: DateTime<Utc>,
         resources: Vec<R>,
-    ) -> Result<(), DeleteResourcesError> {
+    ) -> Result<(), RequestResourcesDeletionError> {
         let resource_snashots = resources
             .into_iter()
             .map(|resource| {
                 resource
                     .make_resource_snapshot()
-                    .map_err(DeleteResourcesError::Internal)
+                    .map_err(RequestResourcesDeletionError::Internal)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -180,7 +185,7 @@ where
                 ResourceLifecycleMessage::deleted(now, resource_snashots),
             )
             .await
-            .map_err(DeleteResourcesError::Internal)?;
+            .map_err(RequestResourcesDeletionError::Internal)?;
 
         Ok(())
     }
@@ -189,13 +194,13 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
-macro_rules! declare_delete_resources_use_case {
+macro_rules! declare_request_resources_deletion_use_case {
     (
         use_case = $use_case:ident,
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn kamu_resources::DeleteResourcesUseCase<$resource>)]
+        #[dill::interface(dyn kamu_resources::RequestResourcesDeletionUseCase<$resource>)]
         pub struct $use_case {
             generic_resource_query_service:
                 std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
@@ -208,13 +213,13 @@ macro_rules! declare_delete_resources_use_case {
         }
 
         #[async_trait::async_trait]
-        impl kamu_resources::DeleteResourcesUseCase<$resource> for $use_case {
+        impl kamu_resources::RequestResourcesDeletionUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
                 ids: Vec<kamu_resources::ResourceID>,
-            ) -> Result<(), kamu_resources::DeleteResourcesError> {
-                let helper = $crate::DeleteResourcesUseCaseHelper::<$resource>::new(
+            ) -> Result<(), kamu_resources::RequestResourcesDeletionError> {
+                let helper = $crate::RequestResourcesDeletionUseCaseHelper::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),
                     self.resource_aggregate_loader.as_ref(),
                     self.resource_persistence_service.as_ref(),

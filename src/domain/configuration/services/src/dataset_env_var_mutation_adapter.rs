@@ -44,7 +44,7 @@ use kamu_resources::{
     GenericResourceQueryService,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
-    ResourceCrudDispatcherDeleteRequest,
+    ResourceCrudDispatcherDeletionRequest,
     ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceID,
@@ -370,7 +370,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         if spec.variables.entries.is_empty() {
             dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest {
+                .request_deletion(ResourceCrudDispatcherDeletionRequest {
                     account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })
@@ -420,7 +420,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         if decrypted.is_empty() {
             dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest {
+                .request_deletion(ResourceCrudDispatcherDeletionRequest {
                     account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })

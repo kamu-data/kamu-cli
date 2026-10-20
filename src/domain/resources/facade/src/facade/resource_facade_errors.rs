@@ -12,7 +12,7 @@ use graphql_http::GraphqlHttpRequestError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
     ApplyResourceCrudDispatcherError,
-    DeleteResourcesCrudDispatcherError,
+    RequestResourcesDeletionCrudDispatcherError,
     ResourceExtensionResolutionError,
     ResourceHeadersValidationError,
     ResourceID,
@@ -355,9 +355,9 @@ pub enum ResourcesSummaryError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DeleteResourcesCrudDispatcherError> for BatchResourceError {
-    fn from(err: DeleteResourcesCrudDispatcherError) -> Self {
-        use DeleteResourcesCrudDispatcherError as E;
+impl From<RequestResourcesDeletionCrudDispatcherError> for BatchResourceError {
+    fn from(err: RequestResourcesDeletionCrudDispatcherError) -> Self {
+        use RequestResourcesDeletionCrudDispatcherError as E;
         match err {
             E::Access(err) => Self::Internal(err.int_err()),
             E::ConcurrentModification(err) => Self::Internal(err.int_err()),

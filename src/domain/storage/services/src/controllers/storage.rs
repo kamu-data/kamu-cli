@@ -7,19 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ManagedResource, Reconciler};
+use kamu_resources::{ManagedResource, ResourceController};
 use kamu_storage::StorageResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn Reconciler<StorageResource>)]
-pub struct StorageReconcilerImpl {}
+#[dill::interface(dyn ResourceController<StorageResource>)]
+pub struct StorageControllerImpl {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reconciler<StorageResource> for StorageReconcilerImpl {
+impl ResourceController<StorageResource> for StorageControllerImpl {
     async fn reconcile(
         &self,
         _resource: &StorageResource,

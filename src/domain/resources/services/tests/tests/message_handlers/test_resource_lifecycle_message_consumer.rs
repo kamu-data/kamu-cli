@@ -101,7 +101,7 @@ async fn test_applied_message_skips_reconciliation_concurrent_modification() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deleted_message_is_no_op_for_reconciler() {
+async fn test_deleted_message_is_no_op_for_controller() {
     // Deleted message → handle_deleted, which is a no-op in the generated
     // reconcile dispatcher.  Verified: reconcile use case is never called.
     let id = make_id();

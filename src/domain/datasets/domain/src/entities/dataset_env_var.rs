@@ -157,7 +157,7 @@ impl SecretsEncryptionConfig {
 
     /// Build a [`SecretCryptor`] from the configured encryption key.
     ///
-    /// Used by `SecretSet` secret handling (sanitizer, reveal, reconciler) to
+    /// Used by `SecretSet` secret handling (sanitizer, reveal, controller) to
     /// produce/consume `contentEncoding: "jwe"` values and to decrypt the
     /// legacy `contentEncoding: "aes256gcm"` form emitted by the env-var
     /// backfill migrations, and to encrypt/decrypt the read-side projection's

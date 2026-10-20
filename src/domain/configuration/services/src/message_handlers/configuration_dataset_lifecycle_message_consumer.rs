@@ -22,7 +22,7 @@ use kamu_resources::{
     ApplyManifestApplicationDecision,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
-    ResourceCrudDispatcherDeleteRequest,
+    ResourceCrudDispatcherDeletionRequest,
     ResourceHeadersExt,
     ResourceHeadersInputExt,
     ResourceID,
@@ -152,7 +152,7 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
 
         for (account_id, ids) in ids_by_owner {
             dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest { account_id, ids })
+                .request_deletion(ResourceCrudDispatcherDeletionRequest { account_id, ids })
                 .await
                 // A foreign-owner rejection would mean a snapshot disagrees
                 // about its own owner: integrity bug, not a user denial.

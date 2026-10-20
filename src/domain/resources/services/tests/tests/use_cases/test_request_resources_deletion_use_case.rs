@@ -10,8 +10,8 @@
 use std::assert_matches;
 
 use kamu_resources::{
-    DeleteResourcesError,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    RequestResourcesDeletionError,
     ResourceLifecycleMessage,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
@@ -107,7 +107,7 @@ async fn test_delete_resource_owned_by_other_account_fails() {
 
     assert_matches!(
         result,
-        Err(DeleteResourcesError::Access(_)),
+        Err(RequestResourcesDeletionError::Access(_)),
         "expected Access error, got: {result:?}"
     );
 

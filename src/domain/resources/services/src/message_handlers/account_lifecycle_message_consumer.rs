@@ -13,8 +13,8 @@ use dill::{Catalog, component, interface, meta};
 use internal_error::InternalError;
 use kamu_accounts::{AccountLifecycleMessage, MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE};
 use kamu_resources::{
-    DeleteAccountResourcesUseCase,
     MESSAGE_CONSUMER_KAMU_RESOURCE_ACCOUNT_LIFECYCLE_HANDLER,
+    RequestAccountResourcesDeletionUseCase,
 };
 use messaging_outbox::{
     InitialConsumerBoundary,
@@ -38,7 +38,7 @@ use messaging_outbox::{
     initial_consumer_boundary: InitialConsumerBoundary::Latest,
 })]
 pub struct AccountLifecycleMessageConsumer {
-    delete_account_resources_use_case: Arc<dyn DeleteAccountResourcesUseCase>,
+    request_account_resources_deletion_use_case: Arc<dyn RequestAccountResourcesDeletionUseCase>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +63,7 @@ impl MessageConsumerT<AccountLifecycleMessage> for AccountLifecycleMessageConsum
 
         match message {
             AccountLifecycleMessage::Deleted(message) => {
-                self.delete_account_resources_use_case
+                self.request_account_resources_deletion_use_case
                     .execute(message.account_id.clone())
                     .await
             }
