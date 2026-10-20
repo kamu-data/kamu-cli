@@ -21,7 +21,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // This is a *selector* test: each case asserts which resources a selector
 // resolves to (the sorted `(schema, name)` identity set) and — where it adds
 // signal — the one spec field the form is about. It deliberately does NOT
-// compare whole `get -o json` documents: the reconciler status block, volatile
+// compare whole `get -o json` documents: the controller status block, volatile
 // headers (id/account/timestamps), and encrypted secret blobs are not what
 // the selector grammar is about, and re-asserting them here would break these
 // tests on unrelated changes. The full document shape is pinned once, per type,

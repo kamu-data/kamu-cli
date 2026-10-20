@@ -22,7 +22,7 @@ use kamu_configuration::{
     SecretSetResource,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{DeclarativeResource, ManagedResource, Reconciler, ResourceID};
+use kamu_resources::{DeclarativeResource, ManagedResource, ResourceController, ResourceID};
 use odf::AccountID;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
@@ -32,8 +32,8 @@ use crate::PreviousConfigurationEntry;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn Reconciler<SecretSetResource>)]
-pub struct SecretSetReconcilerImpl {
+#[dill::interface(dyn ResourceController<SecretSetResource>)]
+pub struct SecretSetControllerImpl {
     secret_set_projection_repository: Arc<dyn SecretSetProjectionRepository>,
     time_source: Arc<dyn SystemTimeSource>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
@@ -42,7 +42,7 @@ pub struct SecretSetReconcilerImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
+impl ResourceController<SecretSetResource> for SecretSetControllerImpl {
     async fn reconcile(
         &self,
         resource: &SecretSetResource,
@@ -84,7 +84,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SecretSetReconcilerImpl {
+impl SecretSetControllerImpl {
     async fn load_previous_entries_by_key(
         &self,
         resource_id: &ResourceID,

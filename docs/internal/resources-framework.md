@@ -387,8 +387,8 @@ schema plus presentation metadata as `dill` metadata for registry lookup
 ### Use-case traits
 
 Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` (two-phase, below),
-`ReconcileResourceUseCase<R>`, `DeleteResourcesUseCase<R>`, plus the non-generic
-`ListAllResourcesUseCase` and `DeleteAccountResourcesUseCase`.
+`ReconcileResourceUseCase<R>`, `RequestResourcesDeletionUseCase<R>`, plus the non-generic
+`ListAllResourcesUseCase` and `RequestAccountResourcesDeletionUseCase`.
 
 Reads are deliberately absent from this list. Typed per-type read use cases would each run their own
 paginated query, which cannot paginate correctly across types — page 2 of a merged result is not
@@ -521,7 +521,7 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
   accounts. A UID of the wrong schema yields `ResourceTypeMismatchError` in the domain and
   `ResourceLookupProblem::SchemaMismatch` at the facade boundary.
-- **Account-deletion cascade.** When an account is deleted, `DeleteAccountResourcesUseCase` deletes
+- **Account-deletion cascade.** When an account is deleted, `RequestAccountResourcesDeletionUseCase` deletes
   that account's resources (see [§13](#13-data-flow-walkthroughs)). It operates on live resources;
   already-tombstoned resources are simply skipped (they are already `deleted_at`-marked), so the
   cascade is idempotent with respect to prior deletions.
@@ -569,7 +569,7 @@ This crate turns the domain traits into running code. Module layout: `services/`
 - **`GenericResourceQueryService`** (impl `GenericResourceQueryServiceImpl`) — descriptor-agnostic
   queries (allocate UID, find by name, search identities) delegating to `ResourceRepository`.
 - **`TypedResourceQueryService<R>`** — type-safe queries for a single type.
-- **`Reconciler<R>`** — the per-type reconcile engine (implemented in the type's crate).
+- **`ResourceController<R>`** — the per-type main controller, which reconciles the resource (implemented in the type's crate).
 
 **Two-phase apply.** `ApplyResourceUseCase<R>` separates *planning* (validate, diff, decide
 create/update/untouched, without writing) from *application* (persist + publish)
@@ -1260,13 +1260,13 @@ lines rather than two whole-object dumps — the property that motivated this de
 sequenceDiagram
     participant UC as ReconcileResourceUseCase<R>
     participant L as AggregateLoader<R>
-    participant Rec as Reconciler<R>
+    participant Ctl as ResourceController<R>
     participant ST as Event store + repo
     participant OB as Outbox
 
     UC->>L: load(id)  %% needs_reconciliation()? generation not yet reconciled
     UC->>ST: try_mark_reconciliation_started(statusGeneration) → StatusUpdated unless already Reconciling (status gen. N)
-    UC->>Rec: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
+    UC->>Ctl: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
     UC->>L: load(id) again
     alt deleted or generation moved
         UC->>UC: discard the outcome
@@ -1286,7 +1286,7 @@ the status at most once:
 - **Phase 1** commits the `Reconciling` status, a stable hand-off point, which brings
   `statusGeneration` to some N. A resource already `Reconciling` keeps its status, and N is its
   current `statusGeneration`.
-- **Phase 2** runs the `Reconciler<R>` on that resource, reloads it, and commits the outcome
+- **Phase 2** runs the `ResourceController<R>` on that resource, reloads it, and commits the outcome
   (`Ready`, `Failed` or `Degraded`) in a separate transaction, conditional on `statusGeneration`
   still being N.
 - **A changed generation between the phases** (any apply between them) discards the outcome without
@@ -1320,20 +1320,20 @@ flowchart LR
     OB --> CFG["configuration crate:<br/>ConfigurationResourceLifecycleMessageConsumer"]
 
     ACC[["AccountLifecycleMessage::Deleted"]] --> OB2[("Outbox")]
-    OB2 --> ACCH["AccountLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_ACCOUNT_LIFECYCLE_HANDLER)<br/>→ DeleteAccountResourcesUseCase (cascade delete)"]
+    OB2 --> ACCH["AccountLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_ACCOUNT_LIFECYCLE_HANDLER)<br/>→ RequestAccountResourcesDeletionUseCase (cascade delete)"]
 
     DS[["DatasetLifecycleMessage::Deleted"]] --> OB3[("Outbox")]
     OB3 --> DSH["configuration crate:<br/>ConfigurationDatasetLifecycleMessageConsumer<br/>→ retracts legacy-config-target-dataset"]
 ```
 
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `ReconciliationSucceeded` /
-  `ReconciliationFailed` (`use_cases/reconcile.rs`), `Deleted` (`use_cases/delete.rs`). Consumed by
+  `ReconciliationFailed` (`use_cases/reconcile.rs`), `Deleted` (`use_cases/request_deletion.rs`). Consumed by
   the **event bridge** (routes to the per-type `ResourceLifecycleEventDispatcher` — this is what
   schedules reconciliation) and by the configuration crate's projection-maintenance consumer. See
   [How reconciliation is scheduled](#how-reconciliation-is-scheduled) for the split of duties.
 - **Account cascade** — when an account is deleted, `AccountLifecycleMessage::Deleted` is consumed by
   `AccountLifecycleMessageConsumer` (`MESSAGE_CONSUMER_KAMU_RESOURCE_ACCOUNT_LIFECYCLE_HANDLER`),
-  which invokes `DeleteAccountResourcesUseCase` to remove all of that account's resources.
+  which invokes `RequestAccountResourcesDeletionUseCase` to remove all of that account's resources.
 - **Dataset cleanup** — when a dataset is deleted, `DatasetLifecycleMessage::Deleted` is consumed by
   the configuration crate's `ConfigurationDatasetLifecycleMessageConsumer`, which deletes the
   auto-managed `legacy-vars-*` / `legacy-secrets-*` sets and strips the now-dangling
@@ -1350,7 +1350,7 @@ above). `apply` produces `Applied`; the generic **event bridge**
 [`resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
 consumes it, looks up the per-type `ResourceLifecycleEventDispatcher` by descriptor, and its
 `handle_applied` calls `ReconcileResourceUseCase::execute(id)` (which loads the aggregate, marks
-reconciliation started, runs the type's `Reconciler<R>`, records the outcome in the status, and
+reconciliation started, runs the type's `ResourceController<R>`, records the outcome in the status, and
 posts `ReconciliationSucceeded`/`Failed`). Only `handle_applied` triggers work today; the other
 `handle_*` are no-ops. The dispatcher + reconcile use case are generated together by the
 `declare_resource_service_layer!` macro and registered from the type's crate.
@@ -1547,7 +1547,7 @@ someone else's namespace.
 *Authority.* The consumer runs below the facade, which is where authorization lives, so it resolves
 dispatchers from the message-scoped catalog and never touches `CurrentAccountSubject` — there is no
 system principal in this codebase and none is needed. The `account_id` it passes to
-`ResourceCrudDispatcherDeleteRequest` is an ownership **scope**, read back off each selected
+`ResourceCrudDispatcherDeletionRequest` is an ownership **scope**, read back off each selected
 resource's own snapshot, not an actor claim: the use case feeds it to `find_owned_snapshots`, which
 hard-errors on ids owned by anyone else. Nothing in `ResourceEventDeleted` or
 `ResourceLifecycleMessageDeleted` records an actor, so there is no attribution to distort.
@@ -1575,7 +1575,7 @@ orphaned binding rows.
 > read-side projection, logs, GraphQL responses, CLI output, diffs, or outbox payloads. `SecretSet`
 > input is converted to an encrypted canonical representation **before the first durable write.**
 
-Encryption happens in **two places — not (primarily) in the reconciler**, which is the easy wrong
+Encryption happens in **two places — not (primarily) in the controller**, which is the easy wrong
 assumption:
 
 1. **Spec sanitizer — the pre-persistence boundary** ([`sanitizers/secret_set.rs`](/src/domain/configuration/services/src/sanitizers/secret_set.rs)).
@@ -1605,8 +1605,8 @@ assumption:
    `ResourceSpecSanitizer::sanitize_new_spec` returns `SanitizeSpecOutcome<R>` so sanitizers can
    report key-dependent business rejections without adding resource-specific `LifecycleError`
    variants; technical failures still return `InternalError`.
-2. **Reconciler — encrypted read-side projection** ([`reconcilers/secret_set.rs`](/src/domain/configuration/services/src/reconcilers/secret_set.rs)).
-   `SecretSetReconcilerImpl` re-encrypts into a *separate* projection (`SecretSetEntry` rows in
+2. **Controller — encrypted read-side projection** ([`controllers/secret_set.rs`](/src/domain/configuration/services/src/controllers/secret_set.rs)).
+   `SecretSetControllerImpl` re-encrypts into a *separate* projection (`SecretSetEntry` rows in
    `SecretSetProjectionRepository`) that downstream consumers read; ciphertext-only, and it does not
    rewrite the resource `spec`.
 
@@ -1668,7 +1668,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically
    via the shared `ResourceStatus`/`ResourceStatusExt`, written through the generic
    `StatusUpdated` event by the reconcile use case.
-2. **Implement a `Reconciler<R>`** in `configuration/services/src/reconcilers/` (no-op projection is
+2. **Implement a `ResourceController<R>`** in `configuration/services/src/controllers/` (no-op projection is
    fine if there's nothing to do; transform the spec here if needed — see `SecretSet`).
 3. **Declare dispatchers** with `declare_resource_crud_dispatcher!` /
    `declare_resource_presentation_dispatcher!` (and a spec-view dispatcher if the type has sensitive
@@ -1677,8 +1677,8 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    persistence, typed query, all use cases, and the lifecycle reconcile dispatcher) with the
    `declare_resource_service_layer!` umbrella macro, then call its
    `register_<type>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
-   `register_*` from the crate's `dependencies.rs`, and `add` the `Reconciler<R>` impl.
-5. **Test all three tiers** (see [§15](#15-tests)): a reconciler/service unit test, a facade contract
+   `register_*` from the crate's `dependencies.rs`, and `add` the `ResourceController<R>` impl.
+5. **Test all three tiers** (see [§15](#15-tests)): a controller/service unit test, a facade contract
    case, and an E2E lifecycle test (apply → list → get → update → delete) plus a golden-view test.
 
 `ResourceDispatcherFactory` then resolves your resource by schema metadata, so the generic CRUD
@@ -1699,7 +1699,7 @@ Three tiers, all exercising the real `VariableSet` / `SecretSet` types:
 apply planner/executor, reconcile transitions, CRUD dispatch, persistence, the event-store bridge,
 and the message consumers. A `TestResource` mock and `BaseResourceServiceHarness`
 (`services/src/testing/`) provide a type-agnostic harness; configuration tests cover the real
-reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
+controllers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
 
 **Facade contract tests** —
 [`src/domain/resources/facade-tests`](/src/domain/resources/facade-tests). The key idea: a
@@ -1756,7 +1756,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |
 | CLI services | (app/cli) | `src/app/cli/src/services/resources` | `resource_facade_factory.rs`, `resource_manifest_{discovery,execution}_service.rs`, `resource_type_lookup_service.rs`, `resource_selection_*_service.rs`, `resource_summary_service.rs`, `impl/` |
-| Concrete types | `kamu-configuration` / `-services` | `src/domain/configuration/{domain,services}/src` | `resources/{variable_set,secret_set}/`, `reconcilers/`, `resource_crud_dispatchers/`, `dependencies.rs` |
+| Concrete types | `kamu-configuration` / `-services` | `src/domain/configuration/{domain,services}/src` | `resources/{variable_set,secret_set}/`, `controllers/`, `resource_crud_dispatchers/`, `dependencies.rs` |
 | Concrete type (WIP) | `kamu-storage` / `-services` | `src/domain/storage/{domain,services}/src` | `Storage` type (`st`/`storage`) — registered in the CLI catalog but incomplete; same machinery as above |
 | Tests | several | see [§15](#15-tests) | `resources/services/tests`, `resources/facade-tests`, `e2e/app/cli/repo-tests/src/commands/resources` |
 
@@ -1798,7 +1798,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   preserves the accepted string (stored as the inner `TypeUri`) and allows non-`opendatafabric.org`
   hosts for future custom schema namespaces.
 - **Secrets are encrypted before the first durable write** (by the spec sanitizer, not the
-  reconciler) and only decrypted on read with `SpecViewMode::Revealed` (CLI `--revealed`, GraphQL
+  controller) and only decrypted on read with `SpecViewMode::Revealed` (CLI `--revealed`, GraphQL
   `revealed: true`); the default `Encrypted` returns the stored ciphertext envelope. See
   [Secret handling](#secret-handling-invariant) — never assume plaintext is safe to log or emit.
 - **Two-phase apply** — `--dry-run` / `plan_apply_manifest` never writes; only `apply_manifest`

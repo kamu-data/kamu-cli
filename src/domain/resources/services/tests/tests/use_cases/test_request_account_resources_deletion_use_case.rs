@@ -86,7 +86,7 @@ async fn test_delete_account_leaves_other_accounts_intact() {
 
 #[test_log::test(tokio::test)]
 async fn test_delete_account_handles_pagination() {
-    // PAGE_SIZE in delete_account_resources.rs is 100; create 101 to exceed it
+    // PAGE_SIZE in request_account_resources_deletion.rs is 100; create 101 to exceed it
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 

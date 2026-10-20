@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod apply_resource_use_case;
-mod delete_account_resources_use_case;
-mod delete_resources_use_case;
 mod reconcile_resource_use_case;
+mod request_account_resources_deletion_use_case;
+mod request_resources_deletion_use_case;
 mod resource_spec_sanitizer;
 
 pub use apply_resource_use_case::*;
-pub use delete_account_resources_use_case::*;
-pub use delete_resources_use_case::*;
 pub use reconcile_resource_use_case::*;
+pub use request_account_resources_deletion_use_case::*;
+pub use request_resources_deletion_use_case::*;
 pub use resource_spec_sanitizer::*;

@@ -10,35 +10,35 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use kamu_resources::Reconciler;
+use kamu_resources::ResourceController;
 
 use crate::tests::utils::{TestResource, TestResourceReconcileError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceReconciler
+// TestResourceController
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn Reconciler<TestResource>)]
-pub struct TestResourceReconciler;
+#[dill::interface(dyn ResourceController<TestResource>)]
+pub struct TestResourceController;
 
 #[async_trait::async_trait]
-impl Reconciler<TestResource> for TestResourceReconciler {
+impl ResourceController<TestResource> for TestResourceController {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         Ok(())
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceFailingReconciler
+// TestResourceFailingController
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn Reconciler<TestResource>)]
-pub struct TestResourceFailingReconciler;
+#[dill::interface(dyn ResourceController<TestResource>)]
+pub struct TestResourceFailingController;
 
 #[async_trait::async_trait]
-impl Reconciler<TestResource> for TestResourceFailingReconciler {
+impl ResourceController<TestResource> for TestResourceFailingController {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         use internal_error::ErrorIntoInternal;
         Err(TestResourceReconcileError::Internal(
@@ -48,17 +48,17 @@ impl Reconciler<TestResource> for TestResourceFailingReconciler {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceCountingReconciler
+// TestResourceCountingController
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Not a #[dill::component] — always registered via add_value() so that the
 // Arc<AtomicU32> owned by the test is shared across all catalog resolutions.
-pub struct TestResourceCountingReconciler {
+pub struct TestResourceCountingController {
     pub call_count: Arc<AtomicU32>,
 }
 
 #[async_trait::async_trait]
-impl Reconciler<TestResource> for TestResourceCountingReconciler {
+impl ResourceController<TestResource> for TestResourceCountingController {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
         Ok(())
@@ -68,27 +68,27 @@ impl Reconciler<TestResource> for TestResourceCountingReconciler {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
-pub enum TestResourceReconcilerProvider {
+pub enum TestResourceControllerProvider {
     #[default]
     Stub,
     Failing,
     Counting(Arc<AtomicU32>),
 }
 
-impl TestResourceReconcilerProvider {
+impl TestResourceControllerProvider {
     pub fn embed_into_catalog(self, b: &mut dill::CatalogBuilder) {
         match self {
-            TestResourceReconcilerProvider::Stub => {
-                b.add::<TestResourceReconciler>();
+            TestResourceControllerProvider::Stub => {
+                b.add::<TestResourceController>();
             }
-            TestResourceReconcilerProvider::Failing => {
-                b.add::<TestResourceFailingReconciler>();
+            TestResourceControllerProvider::Failing => {
+                b.add::<TestResourceFailingController>();
             }
-            TestResourceReconcilerProvider::Counting(counter) => {
-                b.add_value(TestResourceCountingReconciler {
+            TestResourceControllerProvider::Counting(counter) => {
+                b.add_value(TestResourceCountingController {
                     call_count: counter,
                 })
-                .bind::<dyn Reconciler<TestResource>, TestResourceCountingReconciler>();
+                .bind::<dyn ResourceController<TestResource>, TestResourceCountingController>();
             }
         }
     }

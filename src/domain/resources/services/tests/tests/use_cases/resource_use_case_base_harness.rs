@@ -14,9 +14,9 @@ use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
     ApplyResourceUseCase,
-    DeleteAccountResourcesUseCase,
-    DeleteResourcesUseCase,
     ReconcileResourceUseCase,
+    RequestAccountResourcesDeletionUseCase,
+    RequestResourcesDeletionUseCase,
     ResourceID,
     ResourceSpecSanitizer,
 };
@@ -28,7 +28,7 @@ use messaging_outbox::{MockOutbox, OutboxAgent, OutboxProvider};
 
 use crate::tests::utils::{
     TestResource,
-    TestResourceReconcilerProvider,
+    TestResourceControllerProvider,
     TestResourceSpec,
     TestResourceSpecClearingSanitizer,
     TestResourceSpecSanitizer,
@@ -50,7 +50,7 @@ pub enum SanitizerKind {
 
 pub struct ResourceUseCaseBaseHarnessOpts {
     pub base_opts: BaseResourceServiceHarnessOpts,
-    pub reconciler_provider: TestResourceReconcilerProvider,
+    pub controller_provider: TestResourceControllerProvider,
     pub sanitizer: SanitizerKind,
 }
 
@@ -62,7 +62,7 @@ impl Default for ResourceUseCaseBaseHarnessOpts {
                     force_immediate: true,
                 },
             },
-            reconciler_provider: TestResourceReconcilerProvider::default(),
+            controller_provider: TestResourceControllerProvider::default(),
             sanitizer: SanitizerKind::None,
         }
     }
@@ -90,15 +90,15 @@ impl ResourceUseCaseBaseHarness {
         })
     }
 
-    pub fn new_with_mock_outbox_and_reconciler(
+    pub fn new_with_mock_outbox_and_controller(
         mock_outbox: MockOutbox,
-        reconciler_provider: TestResourceReconcilerProvider,
+        controller_provider: TestResourceControllerProvider,
     ) -> Self {
         Self::new_with_opts(ResourceUseCaseBaseHarnessOpts {
             base_opts: BaseResourceServiceHarnessOpts {
                 outbox_provider: OutboxProvider::Mock(mock_outbox),
             },
-            reconciler_provider,
+            controller_provider,
             sanitizer: SanitizerKind::None,
         })
     }
@@ -109,7 +109,7 @@ impl ResourceUseCaseBaseHarness {
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
         register_test_resource_crud_dispatcher(&mut b);
-        opts.reconciler_provider.embed_into_catalog(&mut b);
+        opts.controller_provider.embed_into_catalog(&mut b);
 
         match opts.sanitizer {
             SanitizerKind::None => {}
@@ -138,11 +138,13 @@ impl ResourceUseCaseBaseHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn delete_test_uc(&self) -> Arc<dyn DeleteResourcesUseCase<TestResource>> {
+    pub fn delete_test_uc(&self) -> Arc<dyn RequestResourcesDeletionUseCase<TestResource>> {
         self.catalog.get_one().unwrap()
     }
 
-    pub fn delete_account_resources_uc(&self) -> Arc<dyn DeleteAccountResourcesUseCase> {
+    pub fn request_account_resources_deletion_uc(
+        &self,
+    ) -> Arc<dyn RequestAccountResourcesDeletionUseCase> {
         self.catalog.get_one().unwrap()
     }
 
@@ -169,7 +171,7 @@ impl ResourceUseCaseBaseHarness {
     }
 
     pub async fn delete_account_resources(&self, account_id: odf::AccountID) {
-        self.delete_account_resources_uc()
+        self.request_account_resources_deletion_uc()
             .execute(account_id)
             .await
             .unwrap();

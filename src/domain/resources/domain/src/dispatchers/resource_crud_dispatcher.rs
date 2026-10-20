@@ -16,7 +16,7 @@ use crate::{
     ApplyManifestPlanningDecision,
     ApplyManifestRejection,
     ApplyResourceUseCaseError,
-    DeleteResourcesError,
+    RequestResourcesDeletionError,
     ResourceHeadersInput,
     ResourceID,
     ResourceIDNotFoundError,
@@ -41,10 +41,10 @@ pub trait ResourceCrudDispatcher: Send + Sync {
         request: ResourceCrudDispatcherApplyRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyResourceCrudDispatcherError>;
 
-    async fn delete(
+    async fn request_deletion(
         &self,
-        request: ResourceCrudDispatcherDeleteRequest,
-    ) -> Result<(), DeleteResourcesCrudDispatcherError>;
+        request: ResourceCrudDispatcherDeletionRequest,
+    ) -> Result<(), RequestResourcesDeletionCrudDispatcherError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +59,7 @@ pub struct ResourceCrudDispatcherApplyRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ResourceCrudDispatcherDeleteRequest {
+pub struct ResourceCrudDispatcherDeletionRequest {
     pub account_id: odf::AccountID,
     pub ids: Vec<ResourceID>,
 }
@@ -87,7 +87,7 @@ pub enum ApplyResourceCrudDispatcherError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum DeleteResourcesCrudDispatcherError {
+pub enum RequestResourcesDeletionCrudDispatcherError {
     #[error(transparent)]
     Access(#[from] odf::AccessError),
 
@@ -158,12 +158,14 @@ impl From<crate::ApplyResourceRejection> for ApplyManifestRejection {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DeleteResourcesError> for DeleteResourcesCrudDispatcherError {
-    fn from(err: DeleteResourcesError) -> Self {
+impl From<RequestResourcesDeletionError> for RequestResourcesDeletionCrudDispatcherError {
+    fn from(err: RequestResourcesDeletionError) -> Self {
         match err {
-            DeleteResourcesError::Access(err) => Self::Access(err),
-            DeleteResourcesError::ConcurrentModification(err) => Self::ConcurrentModification(err),
-            DeleteResourcesError::Internal(err) => Self::Internal(err),
+            RequestResourcesDeletionError::Access(err) => Self::Access(err),
+            RequestResourcesDeletionError::ConcurrentModification(err) => {
+                Self::ConcurrentModification(err)
+            }
+            RequestResourcesDeletionError::Internal(err) => Self::Internal(err),
         }
     }
 }

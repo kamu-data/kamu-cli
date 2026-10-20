@@ -136,7 +136,7 @@ pub async fn test_summary_phase_counts(h: &impl FacadeContractHarness) {
         "no resources must be Ready before reconciliation"
     );
 
-    // Flush outbox: Applied message is consumed, reconciler runs, resource
+    // Flush outbox: Applied message is consumed, controller runs, resource
     // transitions Pending → Reconciling → Ready within the same iteration.
     // The Reconciling phase is a very short-lived internal transient that is
     // not observable between two flush calls at facade granularity.

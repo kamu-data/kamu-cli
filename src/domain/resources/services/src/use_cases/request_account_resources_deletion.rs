@@ -13,9 +13,9 @@ use std::sync::Arc;
 use database_common::collect_all_pages;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
-    DeleteAccountResourcesUseCase,
     GenericResourceQueryService,
-    ResourceCrudDispatcherDeleteRequest,
+    RequestAccountResourcesDeletionUseCase,
+    ResourceCrudDispatcherDeletionRequest,
     ResourceID,
     ResourceSnapshot,
 };
@@ -29,13 +29,13 @@ const PAGE_SIZE: usize = 100;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn DeleteAccountResourcesUseCase)]
-pub struct DeleteAccountResourcesUsecaseImpl {
+#[dill::interface(dyn RequestAccountResourcesDeletionUseCase)]
+pub struct RequestAccountResourcesDeletionUseCaseImpl {
     dispatcher_factory: Arc<ResourceDispatcherFactory>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
 }
 
-impl DeleteAccountResourcesUsecaseImpl {
+impl RequestAccountResourcesDeletionUseCaseImpl {
     async fn list_owned_resource_snapshots(
         &self,
         account_id: &odf::AccountID,
@@ -78,7 +78,7 @@ impl DeleteAccountResourcesUsecaseImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
+impl RequestAccountResourcesDeletionUseCase for RequestAccountResourcesDeletionUseCaseImpl {
     async fn execute(&self, account_id: odf::AccountID) -> Result<(), InternalError> {
         let resource_snapshots = self.list_owned_resource_snapshots(&account_id).await?;
 
@@ -90,7 +90,7 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
                 .crud_dispatcher_for_trusted_schema(resource_snapshot.schema.as_str())?;
 
             dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest {
+                .request_deletion(ResourceCrudDispatcherDeletionRequest {
                     account_id: account_id.clone(),
                     ids,
                 })

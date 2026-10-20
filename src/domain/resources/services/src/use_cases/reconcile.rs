@@ -17,8 +17,8 @@ use crate::domain::{
     InvariantViolationOf,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcileResourceUseCaseError,
-    Reconciler,
     ResourceAggregateLoader,
+    ResourceController,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLoadError,
@@ -36,7 +36,7 @@ where
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
     outbox: &'a dyn Outbox,
-    reconciler: &'a dyn Reconciler<R>,
+    controller: &'a dyn ResourceController<R>,
     time_source: &'a dyn SystemTimeSource,
 }
 
@@ -50,14 +50,14 @@ where
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
         resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
         outbox: &'a dyn Outbox,
-        reconciler: &'a dyn Reconciler<R>,
+        controller: &'a dyn ResourceController<R>,
         time_source: &'a dyn SystemTimeSource,
     ) -> Self {
         Self {
             resource_aggregate_loader,
             resource_persistence_service,
             outbox,
-            reconciler,
+            controller,
             time_source,
         }
     }
@@ -94,7 +94,7 @@ where
         let generation = started.headers().generation;
         let status_generation = started.headers().status_generation;
 
-        let outcome = self.reconciler.reconcile(&started).await;
+        let outcome = self.controller.reconcile(&started).await;
 
         // Phase 2 runs in a separate transaction after the started state was
         // committed, so the resource may have changed in between.
@@ -199,8 +199,8 @@ macro_rules! declare_reconcile_resource_use_case {
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
                         resource_persistence_service:
                             std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
-                        reconciler:
-                            std::sync::Arc<dyn kamu_resources::Reconciler<$resource>>,
+                        controller:
+                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>,
                         outbox:
                             std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
                     )]
@@ -213,7 +213,7 @@ macro_rules! declare_reconcile_resource_use_case {
                     resource_aggregate_loader.as_ref(),
                     resource_persistence_service.as_ref(),
                     outbox.as_ref(),
-                    reconciler.as_ref(),
+                    controller.as_ref(),
                     self.time_source.as_ref(),
                 );
 
@@ -225,8 +225,8 @@ macro_rules! declare_reconcile_resource_use_case {
                             std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
                         resource_persistence_service:
                             std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
-                        reconciler:
-                            std::sync::Arc<dyn kamu_resources::Reconciler<$resource>>,
+                        controller:
+                            std::sync::Arc<dyn kamu_resources::ResourceController<$resource>>,
                         outbox:
                             std::sync::Arc<dyn $crate::messaging_outbox::Outbox>
                     )]
@@ -240,7 +240,7 @@ macro_rules! declare_reconcile_resource_use_case {
                     resource_aggregate_loader.as_ref(),
                     resource_persistence_service.as_ref(),
                     outbox.as_ref(),
-                    reconciler.as_ref(),
+                    controller.as_ref(),
                     self.time_source.as_ref(),
                 );
 

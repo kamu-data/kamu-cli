@@ -9,8 +9,8 @@
 
 mod harness_helpers;
 mod test_resource;
-mod test_resource_reconciler;
+mod test_resource_controller;
 
 pub use harness_helpers::*;
 pub use test_resource::*;
-pub use test_resource_reconciler::*;
+pub use test_resource_controller::*;

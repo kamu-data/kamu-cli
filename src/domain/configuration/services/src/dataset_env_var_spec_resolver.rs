@@ -125,7 +125,7 @@ impl DatasetEnvVarSpecResolverImpl {
 
     /// Specs hold `jwe` (or legacy `aes256gcm`) ciphertext while
     /// [`DatasetEnvVar`] expects raw-AES `(value, nonce)`, so this re-encodes
-    /// between them the same way `SecretSetReconcilerImpl` does.
+    /// between them the same way `SecretSetControllerImpl` does.
     fn secret_to_env_var(
         cryptor: &SecretCryptor,
         key: &str,

@@ -12,7 +12,7 @@ use crate::ManagedResource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait Reconciler<R: ManagedResource>: Send + Sync {
+pub trait ResourceController<R: ManagedResource>: Send + Sync {
     async fn reconcile(&self, resource: &R) -> Result<(), R::ReconcileError>;
 }
 
