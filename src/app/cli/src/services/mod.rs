@@ -21,4 +21,7 @@ pub mod resources;
 mod confirm_delete_service;
 pub use confirm_delete_service::*;
 
+mod post_command_actions;
+pub use post_command_actions::*;
+
 pub mod odf_server;

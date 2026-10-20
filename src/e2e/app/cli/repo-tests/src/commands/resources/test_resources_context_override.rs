@@ -78,12 +78,10 @@ pub async fn test_resources_context_override_isolation(mut client: KamuApiServer
     }
 
     // Deleting via `--context prod` removes only the remote copy.
-    ctx.assert_success(
-        ctx.args_with_context(["delete", "vs", resource_name, "--force"], prod_context),
-        Some(&[
-            r#"Deleted: VariableSet/shared-name"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
-        ]),
+    ctx.assert_deleted_in_context(
+        ["delete", "vs", resource_name, "--force"],
+        prod_context,
+        &[&format!("VariableSet/{resource_name}")],
     )
     .await;
 

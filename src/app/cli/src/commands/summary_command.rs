@@ -58,6 +58,7 @@ impl SummaryCommand {
             Field::new("Ready", DataType::UInt64, false),
             Field::new("Degraded", DataType::UInt64, false),
             Field::new("Failed", DataType::UInt64, false),
+            Field::new("Deleting", DataType::UInt64, false),
         ]));
 
         let record_batch = RecordBatch::try_new(
@@ -112,6 +113,13 @@ impl SummaryCommand {
                         .map(|item| item.phase_counts.failed)
                         .collect::<Vec<_>>(),
                 )),
+                Arc::new(UInt64Array::from(
+                    summary
+                        .resource_counts
+                        .iter()
+                        .map(|item| item.phase_counts.deleting)
+                        .collect::<Vec<_>>(),
+                )),
             ],
         )
         .map_err(CLIError::critical)?;
@@ -125,6 +133,7 @@ impl SummaryCommand {
             .with_column_formats(vec![
                 ColumnFormat::new().with_style_spec("l"),
                 ColumnFormat::new().with_style_spec("l"),
+                ColumnFormat::new().with_style_spec("r"),
                 ColumnFormat::new().with_style_spec("r"),
                 ColumnFormat::new().with_style_spec("r"),
                 ColumnFormat::new().with_style_spec("r"),

@@ -39,6 +39,7 @@ use kamu_resources::{
     ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSummaryRow,
+    ResourceVisibility,
     TypeUri,
     UpdateResourceError,
 };
@@ -100,9 +101,10 @@ impl ResourceRepository for SqliteResourceRepository {
                 updated_at,
                 deleted_at,
                 last_event_id,
-                status_generation
+                status_generation,
+                deletion_requested_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
             resource_id,
             account_id_str,
@@ -118,6 +120,7 @@ impl ResourceRepository for SqliteResourceRepository {
             resource_snapshot.headers.deleted_at,
             last_event_id,
             status_generation,
+            resource_snapshot.headers.deletion_requested_at,
         )
         .execute(connection_mut)
         .await
@@ -178,7 +181,8 @@ impl ResourceRepository for SqliteResourceRepository {
                 updated_at = $10,
                 deleted_at = $11,
                 last_event_id = $12,
-                status_generation = $14
+                status_generation = $14,
+                deletion_requested_at = $15
             WHERE resource_id = $1
               AND (
                     last_event_id IS NULL AND CAST($13 as INT8) IS NULL OR
@@ -199,6 +203,7 @@ impl ResourceRepository for SqliteResourceRepository {
             last_event_id,
             expected_last_event_id,
             status_generation,
+            resource_snapshot.headers.deletion_requested_at,
         )
         .execute(connection_mut)
         .await
@@ -244,7 +249,7 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE account_id = $1
               AND resource_schema = $2
               AND resource_name COLLATE NOCASE = $3
-              AND deleted_at IS NULL
+              AND deletion_requested_at IS NULL
             "#,
             account_id_str,
             schema,
@@ -310,6 +315,7 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
+        visibility: ResourceVisibility,
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         if names.is_empty() {
             return Ok(Vec::new());
@@ -324,6 +330,15 @@ impl ResourceRepository for SqliteResourceRepository {
         let names_placeholders =
             sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(3).unwrap());
 
+        // Spelled out rather than bound, so that for live resources the
+        // planner can use the partial unique index on names
+        let visibility_predicate = match visibility {
+            ResourceVisibility::Active => "AND r.deletion_requested_at IS NULL",
+            ResourceVisibility::IncludeDeleting => "",
+        };
+
+        // Within a name the live resource comes first, then those being
+        // deleted, oldest first; the stable sort below keeps that order.
         let query_str = format!(
             r#"
             SELECT
@@ -332,8 +347,13 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources r
             WHERE r.account_id = $1
               AND r.resource_schema = $2
+              {visibility_predicate}
               AND r.resource_name COLLATE NOCASE IN ({names_placeholders})
               AND r.deleted_at IS NULL
+            ORDER BY
+                r.deletion_requested_at IS NOT NULL,
+                r.deletion_requested_at,
+                r.resource_id
             "#,
         );
 
@@ -364,6 +384,7 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
@@ -394,6 +415,7 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE r.deleted_at IS NULL"#,
         );
 
+        push_visibility_predicate(&mut query_builder, visibility);
         push_scope_predicate(&mut query_builder, scope, account_id);
 
         query_builder
@@ -413,6 +435,7 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
@@ -428,6 +451,7 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE r.deleted_at IS NULL"#,
         );
 
+        push_visibility_predicate(&mut query_builder, visibility);
         push_scope_predicate(&mut query_builder, scope, account_id);
 
         let row = query_builder
@@ -465,6 +489,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.status_generation,
                 r.created_at as "created_at: DateTime<Utc>",
                 r.updated_at as "updated_at: DateTime<Utc>",
+                r.deletion_requested_at as "deletion_requested_at: DateTime<Utc>",
                 r.deleted_at as "deleted_at: DateTime<Utc>",
                 r.last_event_id
             FROM resources r
@@ -499,7 +524,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
-                deletion_requested_at: None,
+                deletion_requested_at: row.deletion_requested_at,
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
@@ -534,7 +559,7 @@ impl ResourceRepository for SqliteResourceRepository {
               AND r.resource_schema = $2
               AND rl.label_key = $3
               AND rl.label_value = $4
-              AND r.deleted_at IS NULL
+              AND r.deletion_requested_at IS NULL
             ORDER BY r.created_at ASC, r.resource_id ASC
             "#,
             account_id_str,
@@ -571,7 +596,7 @@ impl ResourceRepository for SqliteResourceRepository {
             WHERE r.resource_schema = $1
               AND rl.label_key = $2
               AND rl.label_value = $3
-              AND r.deleted_at IS NULL
+              AND r.deletion_requested_at IS NULL
             ORDER BY r.created_at ASC, r.resource_id ASC
             "#,
             resource_schema,
@@ -621,6 +646,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.status_generation,
                 r.created_at,
                 r.updated_at,
+                r.deletion_requested_at,
                 r.deleted_at,
                 r.last_event_id
             FROM resources r
@@ -676,6 +702,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.status_generation,
                 r.created_at as "created_at: DateTime<Utc>",
                 r.updated_at as "updated_at: DateTime<Utc>",
+                r.deletion_requested_at as "deletion_requested_at: DateTime<Utc>",
                 r.deleted_at as "deleted_at: DateTime<Utc>",
                 r.last_event_id
             FROM resources r
@@ -708,7 +735,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
-                deletion_requested_at: None,
+                deletion_requested_at: row.deletion_requested_at,
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
@@ -755,6 +782,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.status_generation,
                 r.created_at,
                 r.updated_at,
+                r.deletion_requested_at,
                 r.deleted_at,
                 r.last_event_id
             FROM resources r
@@ -784,6 +812,7 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
@@ -817,6 +846,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     r.status_generation,
                     r.created_at,
                     r.updated_at,
+                    r.deletion_requested_at,
                     r.deleted_at,
                     r.last_event_id
                 FROM resources r
@@ -824,6 +854,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 WHERE r.deleted_at IS NULL"#,
             );
 
+            push_visibility_predicate(&mut query_builder, visibility);
             push_scope_predicate(&mut query_builder, &scope, &account_id);
 
             query_builder
@@ -871,6 +902,9 @@ impl ResourceRepository for SqliteResourceRepository {
                     CASE WHEN json_extract(status, '$.phase') = 'Failed' THEN 1 ELSE 0 END
                 ) as "failed_count!: i64",
                 SUM(
+                    CASE WHEN json_extract(status, '$.phase') = 'Deleting' THEN 1 ELSE 0 END
+                ) as "deleting_count!: i64",
+                SUM(
                     CASE
                         WHEN COALESCE(json_extract(status, '$.phase'), 'Pending') = 'Pending'
                         THEN 1
@@ -900,6 +934,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     ready: u64::try_from(row.ready_count).unwrap(),
                     degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
+                    deleting: u64::try_from(row.deleting_count).unwrap(),
                 },
             })
             .collect())
@@ -931,6 +966,22 @@ fn sort_into_requested_order<Row, Key: std::hash::Hash + Eq>(
         .collect();
 
     rows.sort_by_key(|row| position.get(&key_of(row)).copied().unwrap_or(usize::MAX));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends the condition excluding resources being deleted, unless
+/// `visibility` includes them.
+fn push_visibility_predicate(
+    query_builder: &mut sqlx::QueryBuilder<sqlx::Sqlite>,
+    visibility: ResourceVisibility,
+) {
+    match visibility {
+        ResourceVisibility::Active => {
+            query_builder.push(" AND r.deletion_requested_at IS NULL");
+        }
+        ResourceVisibility::IncludeDeleting => {}
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

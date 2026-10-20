@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
+use kamu_resources::ResourceVisibility;
 
 use crate::LoggedInGuard;
 use crate::prelude::*;
@@ -109,6 +110,12 @@ impl Resources {
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
         #[graphql(default)] opts: SpecViewOptsInput,
+        #[graphql(
+            default,
+            desc = "Also find resources whose deletion is in progress; a name may then match \
+                    several resources, the live one first"
+        )]
+        include_deleting: bool,
     ) -> Result<BatchResourcesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -116,6 +123,7 @@ impl Resources {
             .get(
                 into_resource_refs(resource_refs)?,
                 opts.into_spec_view_opts(),
+                ResourceVisibility::with_deleting(include_deleting),
             )
             .await
         {
@@ -137,11 +145,20 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
+        #[graphql(
+            default,
+            desc = "Also find resources whose deletion is in progress; a name may then match \
+                    several resources, the live one first"
+        )]
+        include_deleting: bool,
     ) -> Result<BatchResourceHandlesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade
-            .get_handles(into_resource_refs(resource_refs)?)
+            .get_handles(
+                into_resource_refs(resource_refs)?,
+                ResourceVisibility::with_deleting(include_deleting),
+            )
             .await
         {
             Ok(response) => Ok(BatchResourceHandlesOutcome::Success(response.into())),
@@ -256,6 +273,12 @@ impl Resources {
         resource_refs: Vec<ResourceRefInput>,
         format: ResourceManifestFormat,
         #[graphql(default)] opts: SpecViewOptsInput,
+        #[graphql(
+            default,
+            desc = "Also find resources whose deletion is in progress; a name may then match \
+                    several resources, the live one first"
+        )]
+        include_deleting: bool,
     ) -> Result<BatchResourceManifestsOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -264,6 +287,7 @@ impl Resources {
                 into_resource_refs(resource_refs)?,
                 format.into(),
                 opts.into_spec_view_opts(),
+                ResourceVisibility::with_deleting(include_deleting),
             )
             .await
         {

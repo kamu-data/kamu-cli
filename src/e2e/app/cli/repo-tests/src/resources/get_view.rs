@@ -21,7 +21,7 @@
 //!
 //! Neither question is served by comparing the *whole* `get -o json` document.
 //! A full-document comparison forces every test to (re-)assert volatile fields
-//! (`id`, `account`, timestamps) and incidental server state (the reconciler
+//! (`id`, `account`, timestamps) and incidental server state (the controller
 //! status block, `stats`, condition timestamps) that the test does not care
 //! about — so an unrelated status change breaks selector tests with a diff that
 //! points at the wrong feature.

@@ -43,6 +43,7 @@ use crate::output::*;
 use crate::{
     ConfirmDeleteService,
     GcService,
+    PostCommandActions,
     WorkspaceFutureVersionError,
     WorkspaceLayout,
     WorkspaceService,
@@ -185,6 +186,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
             base_catalog_builder.add_value(output_config.clone());
             base_catalog_builder.add_value(Interact::new(args.yes, output_config.is_tty));
+            base_catalog_builder.add_value(PostCommandActions::default());
 
             register_config_in_catalog(
                 &cli_config,
@@ -350,6 +352,13 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 .instrument(tracing::debug_span!(
                     "Consume accumulated the Outbox messages"
                 ))
+                .await?;
+        }
+
+        let post_command_actions = cli_catalog.get_one::<PostCommandActions>().int_err()?;
+        for action in post_command_actions.take() {
+            tx_runner
+                .maybe_transactional(is_transactional, |catalog| action.run(catalog))
                 .await?;
         }
 

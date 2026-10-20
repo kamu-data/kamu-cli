@@ -119,12 +119,9 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     .await;
 
     // ── 9. Delete the resource ───────────────────────────────────────────────
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "ss", resource_name, "--force"],
-        Some(&[
-            r#"Deleted: SecretSet/app-secrets"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
-        ]),
+        &["SecretSet/app-secrets"],
     )
     .await;
 

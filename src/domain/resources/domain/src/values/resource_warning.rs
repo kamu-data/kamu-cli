@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{ResourceExtensionKind, TypeRef};
+use crate::{ResourceExtensionKind, ResourceID, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -15,6 +15,7 @@ pub const WARNING_CODE_MISSING_DESCRIPTION: &str = "missing_description";
 pub const WARNING_CODE_RESOURCE_LABEL_NOT_INDEXED: &str = "resource_label_not_indexed";
 pub const WARNING_CODE_RESOURCE_FREEFORM_LABELS: &str = "resource_freeform_labels";
 pub const WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS: &str = "resource_freeform_annotations";
+pub const WARNING_CODE_REPLACES_RESOURCE_BEING_DELETED: &str = "replaces_resource_being_deleted";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,6 +41,16 @@ pub fn resource_label_not_indexed_warning(key: &TypeRef) -> ResourceWarning {
         code: WARNING_CODE_RESOURCE_LABEL_NOT_INDEXED.to_string(),
         path: Some(format!("headers.labels.{key}")),
         message: format!("Resource label '{key}' is not indexed because its value is not a string"),
+    }
+}
+
+/// The created resource takes the name of a resource whose deletion is still
+/// in progress.
+pub fn resource_replaces_resource_being_deleted_warning(id: &ResourceID) -> ResourceWarning {
+    ResourceWarning {
+        code: WARNING_CODE_REPLACES_RESOURCE_BEING_DELETED.to_string(),
+        path: Some("headers.name".to_string()),
+        message: format!("Resource replaces a resource that is still being deleted ({id})"),
     }
 }
 

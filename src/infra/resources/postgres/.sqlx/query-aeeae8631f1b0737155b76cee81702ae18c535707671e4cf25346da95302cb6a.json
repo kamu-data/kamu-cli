@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT resource_id as \"id: uuid::Uuid\"\n            FROM resources\n            WHERE account_id = $1\n              AND resource_schema = $2\n              AND LOWER(resource_name) = LOWER($3)\n              AND deletion_requested_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: uuid::Uuid",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "resource_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "aeeae8631f1b0737155b76cee81702ae18c535707671e4cf25346da95302cb6a"
+}

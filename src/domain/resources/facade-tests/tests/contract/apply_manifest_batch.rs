@@ -16,6 +16,7 @@ use kamu_resources::{
     ApplyResourceRejectionCategory,
     ResourceRef,
     ResourceSchemaProvider,
+    ResourceVisibility,
     TypeName,
 };
 use kamu_resources_facade::{
@@ -132,7 +133,11 @@ fn by_name(name: &str) -> ResourceRef {
 async fn assert_absent(h: &impl FacadeContractHarness, name: &str) {
     let result = h
         .facade_for(TestAccount::Alice)
-        .get(vec![by_name(name)], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![by_name(name)],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
 
@@ -295,7 +300,11 @@ pub async fn test_batch_apply_all_successes_preserves_order(h: &impl FacadeContr
 
     let fetched = assert_single_batch_success(
         facade
-            .get(vec![by_name("batch-contract-b")], SpecViewOpts::ENCRYPTED)
+            .get(
+                vec![by_name("batch-contract-b")],
+                SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
+            )
             .await
             .unwrap(),
     );

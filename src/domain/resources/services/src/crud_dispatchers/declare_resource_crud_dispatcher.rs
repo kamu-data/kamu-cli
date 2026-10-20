@@ -28,8 +28,8 @@ macro_rules! declare_resource_crud_dispatcher {
                 std::sync::Arc<dyn kamu_resources::ApplyResourceUseCase<$resource>>,
             generic_resource_query_service:
                 std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
-            delete_resources_use_case:
-                std::sync::Arc<dyn kamu_resources::DeleteResourcesUseCase<$resource>>,
+            request_resources_deletion_use_case:
+                std::sync::Arc<dyn kamu_resources::RequestResourcesDeletionUseCase<$resource>>,
         }
 
         #[async_trait::async_trait]
@@ -96,14 +96,14 @@ macro_rules! declare_resource_crud_dispatcher {
                     .map_err(Into::into)
             }
 
-            async fn delete(
+            async fn request_deletion(
                 &self,
-                request: $crate::ResourceCrudDispatcherDeleteRequest,
-            ) -> Result<(), $crate::DeleteResourcesCrudDispatcherError> {
-                self.delete_resources_use_case
+                request: $crate::ResourceCrudDispatcherDeletionRequest,
+            ) -> Result<(), $crate::RequestResourcesDeletionCrudDispatcherError> {
+                self.request_resources_deletion_use_case
                     .execute(request.account_id, request.ids)
                     .await
-                    .map_err(kamu_resources::DeleteResourcesCrudDispatcherError::from)
+                    .map_err(kamu_resources::RequestResourcesDeletionCrudDispatcherError::from)
             }
         }
     };

@@ -14,8 +14,11 @@ use kamu_configuration::{
     RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetProjectionRepository,
     SecretSetResource,
+    SecretSetSpecInput,
+    Variable,
     VariableSetProjectionRepository,
     VariableSetResource,
+    VariableSetSpecInput,
 };
 use kamu_configuration_inmem::{
     InMemorySecretSetProjectionRepository,
@@ -23,11 +26,18 @@ use kamu_configuration_inmem::{
 };
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
+    ApplyResourceParams,
     ApplyResourceUseCase,
+    DeclarativeResource,
+    RequestResourcesDeletionUseCase,
+    ResourceAggregateLoader,
+    ResourceController,
     ResourceHeaders,
     ResourceHeadersExt,
+    ResourceHeadersInput,
     ResourceID,
     ResourceLabelProjectionRepository,
+    ResourcePhase,
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshot,
@@ -80,6 +90,26 @@ impl BaseConfigurationServiceHarness {
 
     pub fn apply_secret_use_case(&self) -> Arc<dyn ApplyResourceUseCase<SecretSetResource>> {
         self.catalog.get_one().unwrap()
+    }
+
+    pub fn variable_set_controller(&self) -> Arc<dyn ResourceController<VariableSetResource>> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn secret_set_controller(&self) -> Arc<dyn ResourceController<SecretSetResource>> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub async fn load_variable_set(&self, id: &ResourceID) -> VariableSetResource {
+        let loader: Arc<dyn ResourceAggregateLoader<VariableSetResource>> =
+            self.catalog.get_one().unwrap();
+        loader.load(id).await.unwrap()
+    }
+
+    pub async fn load_secret_set(&self, id: &ResourceID) -> SecretSetResource {
+        let loader: Arc<dyn ResourceAggregateLoader<SecretSetResource>> =
+            self.catalog.get_one().unwrap();
+        loader.load(id).await.unwrap()
     }
 
     pub fn resource_repo(&self) -> Arc<dyn ResourceRepository> {
@@ -165,6 +195,36 @@ impl BaseConfigurationServiceHarness {
         .await
     }
 
+    /// Creates a `VariableSet` through the real apply path; reconciliation
+    /// populates its projection entries before this returns.
+    pub async fn apply_variable_set(
+        &self,
+        account: &odf::ResourceOwnerHandle,
+        name: &str,
+        variables: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> ResourceID {
+        self.apply_variable_set_with_headers(
+            BaseResourceServiceHarness::make_headers_input(account.clone(), name),
+            variables,
+        )
+        .await
+    }
+
+    /// [`Self::apply_variable_set`] for secrets, which arrive as plaintext
+    /// and are sanitized to `jwe` like any normally-authored set.
+    pub async fn apply_secret_set(
+        &self,
+        account: &odf::ResourceOwnerHandle,
+        name: &str,
+        secrets: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> ResourceID {
+        self.apply_secret_set_with_headers(
+            BaseResourceServiceHarness::make_headers_input(account.clone(), name),
+            secrets,
+        )
+        .await
+    }
+
     /// Seeds a labelled `VariableSet` through the real apply path, so it gets
     /// an event-sourced aggregate. Required by tests that mutate the result;
     /// [`Self::seed_variable_set_targeting`] only writes a snapshot.
@@ -176,44 +236,14 @@ impl BaseConfigurationServiceHarness {
         variables: impl IntoIterator<Item = (&'static str, &'static str)>,
         extra_labels: impl IntoIterator<Item = (&'static str, &'static str)>,
     ) -> ResourceID {
-        let spec = kamu_configuration::VariableSetSpecInput::new(
-            odf::metadata::config::VariableSetSpecInput {
-                variables: odf::metadata::config::Variables {
-                    entries: variables
-                        .into_iter()
-                        .map(|(name, value)| {
-                            (
-                                name.to_string(),
-                                kamu_configuration::Variable {
-                                    value: value.to_string(),
-                                },
-                            )
-                        })
-                        .collect(),
-                },
-            },
-        );
-
-        let decision = self
-            .apply_variable_use_case()
-            .apply(kamu_resources::ApplyResourceParams {
-                id: None,
-                headers: Self::make_targeting_headers_input(
-                    account,
-                    dataset_id,
-                    name,
-                    extra_labels,
-                ),
-                spec,
-            })
-            .await
-            .unwrap();
-
-        decision.expect_applied().id
+        self.apply_variable_set_with_headers(
+            Self::make_targeting_headers_input(account, dataset_id, name, extra_labels),
+            variables,
+        )
+        .await
     }
 
-    /// [`Self::apply_variable_set_targeting`] for secrets, which arrive as
-    /// plaintext and are sanitized to `jwe` like any normally-authored set.
+    /// [`Self::apply_variable_set_targeting`] for secrets.
     pub async fn apply_secret_set_targeting(
         &self,
         account: &odf::ResourceOwnerHandle,
@@ -222,35 +252,39 @@ impl BaseConfigurationServiceHarness {
         secrets: impl IntoIterator<Item = (&'static str, &'static str)>,
         extra_labels: impl IntoIterator<Item = (&'static str, &'static str)>,
     ) -> ResourceID {
-        let spec = kamu_configuration::SecretSetSpecInput::new(
-            odf::metadata::config::SecretSetSpecInput {
-                secrets: odf::metadata::config::Secrets {
-                    entries: secrets
-                        .into_iter()
-                        .map(|(name, value)| {
-                            (
-                                name.to_string(),
-                                odf::metadata::config::Secret {
-                                    value: value.to_string(),
-                                    content_encoding: None,
-                                },
-                            )
-                        })
-                        .collect(),
-                },
+        self.apply_secret_set_with_headers(
+            Self::make_targeting_headers_input(account, dataset_id, name, extra_labels),
+            secrets,
+        )
+        .await
+    }
+
+    async fn apply_variable_set_with_headers(
+        &self,
+        headers: ResourceHeadersInput,
+        variables: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> ResourceID {
+        let spec = VariableSetSpecInput::new(odf::metadata::config::VariableSetSpecInput {
+            variables: odf::metadata::config::Variables {
+                entries: variables
+                    .into_iter()
+                    .map(|(name, value)| {
+                        (
+                            name.to_string(),
+                            Variable {
+                                value: value.to_string(),
+                            },
+                        )
+                    })
+                    .collect(),
             },
-        );
+        });
 
         let decision = self
-            .apply_secret_use_case()
-            .apply(kamu_resources::ApplyResourceParams {
+            .apply_variable_use_case()
+            .apply(ApplyResourceParams {
                 id: None,
-                headers: Self::make_targeting_headers_input(
-                    account,
-                    dataset_id,
-                    name,
-                    extra_labels,
-                ),
+                headers,
                 spec,
             })
             .await
@@ -259,12 +293,115 @@ impl BaseConfigurationServiceHarness {
         decision.expect_applied().id
     }
 
+    async fn apply_secret_set_with_headers(
+        &self,
+        headers: ResourceHeadersInput,
+        secrets: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> ResourceID {
+        let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
+            secrets: odf::metadata::config::Secrets {
+                entries: secrets
+                    .into_iter()
+                    .map(|(name, value)| {
+                        (
+                            name.to_string(),
+                            odf::metadata::config::Secret {
+                                value: value.to_string(),
+                                content_encoding: None,
+                            },
+                        )
+                    })
+                    .collect(),
+            },
+        });
+
+        let decision = self
+            .apply_secret_use_case()
+            .apply(ApplyResourceParams {
+                id: None,
+                headers,
+                spec,
+            })
+            .await
+            .unwrap();
+
+        decision.expect_applied().id
+    }
+
+    /// Requests deletion of `account_id`'s `VariableSet`s. The immediate
+    /// outbox delivers `DeletionRequested` right away, so the deletion is
+    /// completed, cleanup included, before this returns.
+    pub async fn request_variable_sets_deletion(
+        &self,
+        account_id: &odf::AccountID,
+        ids: Vec<ResourceID>,
+    ) {
+        let use_case: Arc<dyn RequestResourcesDeletionUseCase<VariableSetResource>> =
+            self.catalog.get_one().unwrap();
+        use_case.execute(account_id.clone(), ids).await.unwrap();
+    }
+
+    /// [`Self::request_variable_sets_deletion`] for `SecretSet`s.
+    pub async fn request_secret_sets_deletion(
+        &self,
+        account_id: &odf::AccountID,
+        ids: Vec<ResourceID>,
+    ) {
+        let use_case: Arc<dyn RequestResourcesDeletionUseCase<SecretSetResource>> =
+            self.catalog.get_one().unwrap();
+        use_case.execute(account_id.clone(), ids).await.unwrap();
+    }
+
+    /// Runs the `VariableSet` controller's cleanup directly, outside the
+    /// deletion flow.
+    pub async fn cleanup_variable_set(&self, id: &ResourceID) {
+        let resource = self.load_variable_set(id).await;
+        self.variable_set_controller()
+            .cleanup(&resource)
+            .await
+            .unwrap();
+    }
+
+    /// Runs the `SecretSet` controller's cleanup directly, outside the
+    /// deletion flow.
+    pub async fn cleanup_secret_set(&self, id: &ResourceID) {
+        let resource = self.load_secret_set(id).await;
+        self.secret_set_controller()
+            .cleanup(&resource)
+            .await
+            .unwrap();
+    }
+
+    pub async fn variable_set_phase(&self, id: &ResourceID) -> ResourcePhase {
+        self.load_variable_set(id).await.status().phase
+    }
+
+    pub async fn secret_set_phase(&self, id: &ResourceID) -> ResourcePhase {
+        self.load_secret_set(id).await.status().phase
+    }
+
+    pub async fn variable_set_projection_entry_count(&self, id: &ResourceID) -> usize {
+        self.variable_set_projection_repo()
+            .get_latest_entries(id)
+            .await
+            .unwrap()
+            .len()
+    }
+
+    pub async fn secret_set_projection_entry_count(&self, id: &ResourceID) -> usize {
+        self.secret_set_projection_repo()
+            .get_latest_entries(id)
+            .await
+            .unwrap()
+            .len()
+    }
+
     fn make_targeting_headers_input(
         account: &odf::ResourceOwnerHandle,
         dataset_id: &odf::DatasetID,
         name: &str,
         extra_labels: impl IntoIterator<Item = (&'static str, &'static str)>,
-    ) -> kamu_resources::ResourceHeadersInput {
+    ) -> ResourceHeadersInput {
         let mut headers = BaseResourceServiceHarness::make_headers_input(account.clone(), name);
 
         let mut entries: std::collections::BTreeMap<_, _> = [(

@@ -11,7 +11,7 @@ use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
-use super::{fixtures, summary_count};
+use super::{assert_output_contains_all, fixtures, summary_count};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -197,6 +197,104 @@ impl ResourceCtx {
         self.kamu()
             .assert_failure_command_execution(full, None, expected.map(<[&str]>::to_vec))
             .await;
+    }
+
+    /// Lines `kamu delete` prints in this context when it deleted `deleted`,
+    /// given as `Type/name`.
+    fn delete_report(&self, deleted: &[&str]) -> Vec<String> {
+        match self {
+            Self::Local(_) => Self::local_delete_report(deleted),
+            Self::Remote { .. } => Self::remote_delete_report(deleted),
+        }
+    }
+
+    /// A local workspace reports the deletion once controllers have cleaned up.
+    fn local_delete_report(deleted: &[&str]) -> Vec<String> {
+        let count = deleted.len();
+        Self::delete_report_lines(
+            "Deleted",
+            deleted,
+            format!("Summary {count} item(s): {count} deleted, 0 ignored, 0 failed"),
+        )
+    }
+
+    /// A server reports the deletion at the time of its response, before it
+    /// processes the deletion's messages.
+    fn remote_delete_report(deleted: &[&str]) -> Vec<String> {
+        let count = deleted.len();
+        Self::delete_report_lines(
+            "Deleting",
+            deleted,
+            format!("Summary {count} item(s): 0 deleted, {count} deleting, 0 ignored, 0 failed"),
+        )
+    }
+
+    fn delete_report_lines(label: &str, deleted: &[&str], summary: String) -> Vec<String> {
+        deleted
+            .iter()
+            .map(|name| format!("{label}: {name}"))
+            .chain([summary])
+            .collect()
+    }
+
+    /// Run a `kamu delete` and assert it deleted exactly `deleted`, given as
+    /// `Type/name`, reported in that order.
+    pub async fn assert_deleted<I, S>(&self, args: I, deleted: &[&str])
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.assert_delete_report(self.args(args), self.delete_report(deleted))
+            .await;
+    }
+
+    /// Run a `kamu delete` with `--context <context_name>`, naming a remote
+    /// context, and assert it deleted exactly `deleted`, given as `Type/name`,
+    /// reported in that order.
+    pub async fn assert_deleted_in_context<I, S>(
+        &self,
+        args: I,
+        context_name: &str,
+        deleted: &[&str],
+    ) where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.assert_delete_report(
+            self.args_with_context(args, context_name),
+            Self::remote_delete_report(deleted),
+        )
+        .await;
+    }
+
+    /// Run a `kamu delete` and assert it deleted exactly `deleted`, given as
+    /// `Type/name`, reported in any order.
+    pub async fn assert_deleted_in_any_order<I, S>(&self, args: I, deleted: &[&str])
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let command_name = full.join(" ");
+        let output = self.stderr(full).await;
+        let report = self.delete_report(deleted);
+        assert_output_contains_all(
+            &output,
+            &report.iter().map(String::as_str).collect::<Vec<_>>(),
+            &command_name,
+        );
+    }
+
+    async fn assert_delete_report(&self, args: Vec<String>, report: Vec<String>) {
+        let expected = report
+            .iter()
+            .map(|line| regex::escape(line))
+            .collect::<Vec<_>>();
+        self.assert_success(
+            args,
+            Some(&expected.iter().map(String::as_str).collect::<Vec<_>>()),
+        )
+        .await;
     }
 
     /// Write `content` to `<workspace>/<rel_path>`, creating parent directories

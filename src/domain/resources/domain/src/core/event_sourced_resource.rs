@@ -19,6 +19,7 @@ use crate::{
     ResourceEvent,
     ResourceEventCreated,
     ResourceEventDeleted,
+    ResourceEventDeletionRequested,
     ResourceEventHeadersUpdated,
     ResourceEventSpecUpdated,
     ResourceEventStatusUpdated,
@@ -94,6 +95,13 @@ pub trait EventSourcedResource:
             id: *self.id(),
             new_spec,
             new_generation,
+        })
+    }
+
+    fn make_deletion_requested_event(&self, now: DateTime<Utc>) -> ResourceEvent<Self::SpecInput> {
+        ResourceEvent::DeletionRequested(ResourceEventDeletionRequested {
+            event_time: now,
+            id: *self.id(),
         })
     }
 
@@ -238,12 +246,18 @@ macro_rules! impl_event_sourced_resource {
                 )
             }
 
-            fn try_delete(
+            fn try_request_deletion(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
-                tombstone_name: $crate::ResourceName,
             ) -> Result<(), Self::LifecycleError> {
-                $crate::try_delete_resource(self, now, tombstone_name)
+                $crate::try_request_resource_deletion(self, now)
+            }
+
+            fn try_complete_deletion(
+                &mut self,
+                now: ::chrono::DateTime<::chrono::Utc>,
+            ) -> Result<(), Self::LifecycleError> {
+                $crate::try_complete_resource_deletion(self, now)
             }
 
             fn try_update_status(
@@ -297,6 +311,20 @@ macro_rules! impl_event_sourced_resource {
                     self,
                     now,
                     expected_generation,
+                    expected_status_generation,
+                    error,
+                )
+            }
+
+            fn try_mark_cleanup_failed(
+                &mut self,
+                now: ::chrono::DateTime<::chrono::Utc>,
+                expected_status_generation: u64,
+                error: &$crate::ResourceCleanupError,
+            ) -> Result<(), Self::LifecycleError> {
+                $crate::try_mark_resource_cleanup_failed(
+                    self,
+                    now,
                     expected_status_generation,
                     error,
                 )

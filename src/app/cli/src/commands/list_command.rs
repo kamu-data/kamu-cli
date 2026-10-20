@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 use kamu_datasets::DatasetRegistry;
-use kamu_resources::ResourceQuery;
+use kamu_resources::{ResourceQuery, ResourceVisibility};
 
 use super::{CLIError, Command, ListDatasetsCommand, ListResourcesCommand, ListResourcesScope};
 use crate::accounts;
@@ -72,6 +72,9 @@ pub struct ListCommand {
 
     #[dill::component(explicit)]
     label_selectors: Vec<String>,
+
+    #[dill::component(explicit)]
+    include_deleting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,6 +255,7 @@ impl ListCommand {
                 self.max_results
             },
             ResourceLabelSelectorParser::parse(&self.label_selectors)?,
+            ResourceVisibility::with_deleting(self.include_deleting),
         ))
     }
 
@@ -286,6 +290,12 @@ impl Command for ListCommand {
                 if !self.label_selectors.is_empty() {
                     return Err(CLIError::usage_error(
                         "Label selectors are not supported when listing datasets",
+                    ));
+                }
+
+                if self.include_deleting {
+                    return Err(CLIError::usage_error(
+                        "--include-deleting is supported only when listing resources",
                     ));
                 }
 
@@ -408,6 +418,52 @@ mod tests {
         )];
         let scope = ListCommand::scope_for_resolved_types(with_query);
         assert!(!scope.is_generic(), "a pattern must not change the columns");
+    }
+
+    fn id_query() -> ResourceQuery {
+        ResourceQuery::ExactIds(vec![kamu_resources::ResourceID::new(uuid::Uuid::new_v4())])
+    }
+
+    // Ids always find resources being deleted, as `get` and `delete` do
+    #[test]
+    fn test_scope_of_ids_alone_includes_resources_being_deleted() {
+        let by_type = ListResourcesScope::ByType(descriptor("variablesets"), Some(id_query()));
+        let types = ListResourcesScope::Types(vec![
+            (descriptor("variablesets"), Some(id_query())),
+            (descriptor("secretsets"), Some(id_query())),
+        ]);
+        let all = ListResourcesScope::All(Some(id_query()));
+
+        for scope in [by_type, types, all] {
+            assert_eq!(
+                scope.effective_visibility(ResourceVisibility::Active),
+                ResourceVisibility::IncludeDeleting
+            );
+        }
+    }
+
+    // Visibility applies to the whole search, so ids mixed with patterns
+    // follow the requested one
+    #[test]
+    fn test_scope_mixing_ids_with_patterns_follows_requested_visibility() {
+        let scope = ListResourcesScope::Types(vec![
+            (descriptor("variablesets"), Some(id_query())),
+            (
+                descriptor("secretsets"),
+                Some(ResourceQuery::NamePattern("my-%".to_string())),
+            ),
+        ]);
+
+        for requested in [
+            ResourceVisibility::Active,
+            ResourceVisibility::IncludeDeleting,
+        ] {
+            assert_eq!(scope.effective_visibility(requested), requested);
+        }
+        assert_eq!(
+            ListResourcesScope::All(None).effective_visibility(ResourceVisibility::Active),
+            ResourceVisibility::Active
+        );
     }
 
     #[test]

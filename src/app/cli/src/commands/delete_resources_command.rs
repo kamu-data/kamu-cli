@@ -10,12 +10,24 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use internal_error::{BoxedError, InternalError};
-use kamu_resources::{ResourceID, TypeUri};
-use kamu_resources_facade::{BatchResourceError, ResourceFacade, ResourceLookupProblem};
+use internal_error::{BoxedError, InternalError, ResultIntoInternal};
+use kamu_resources::{
+    ResourceID,
+    ResourceLabelFilterInput,
+    ResourcePhase,
+    ResourceRef,
+    ResourceSelectorName,
+    ResourceVisibility,
+    TypeUri,
+};
+use kamu_resources_facade::{
+    BatchResourceError,
+    ResourceDeletion,
+    ResourceFacade,
+    ResourceLookupProblem,
+};
 
 use super::{BatchError, CLIError, Command};
-use crate::Interact;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResolvedResourceContext, ResourceContextReporter};
 use crate::resources::{
@@ -24,6 +36,7 @@ use crate::resources::{
     ResourceSelectionSyntax,
     ResourceTarget,
 };
+use crate::{Interact, PostCommandAction, PostCommandActions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,10 +46,11 @@ pub struct DeleteResourcesCommand {
     resource_context_reporter: Arc<ResourceContextReporter>,
     interact: Arc<Interact>,
     output_config: Arc<OutputConfig>,
+    post_command_actions: Arc<PostCommandActions>,
 
     resolved_context: ResolvedResourceContext,
     syntax: ResourceSelectionSyntax,
-    label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+    label_filter: Option<ResourceLabelFilterInput>,
     force: bool,
     ignore_not_found: bool,
     dry_run: bool,
@@ -51,9 +65,10 @@ impl DeleteResourcesCommand {
         resource_context_reporter: Arc<ResourceContextReporter>,
         interact: Arc<Interact>,
         output_config: Arc<OutputConfig>,
+        post_command_actions: Arc<PostCommandActions>,
         resolved_context: ResolvedResourceContext,
         syntax: ResourceSelectionSyntax,
-        label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+        label_filter: Option<ResourceLabelFilterInput>,
         force: bool,
         ignore_not_found: bool,
         dry_run: bool,
@@ -64,6 +79,7 @@ impl DeleteResourcesCommand {
             resource_context_reporter,
             interact,
             output_config,
+            post_command_actions,
             resolved_context,
             syntax,
             label_filter,
@@ -85,6 +101,8 @@ impl DeleteResourcesCommand {
                     ignore_not_found: self.ignore_not_found,
                     max_expanded_results: None,
                     label_filter: self.label_filter.clone(),
+                    // A resource being deleted is selected by its id only
+                    visibility: ResourceVisibility::Active,
                 },
             )
             .await?;
@@ -164,9 +182,29 @@ impl DeleteResourcesCommand {
             self.confirm_delete(&targets)?;
         }
 
-        self.execute_delete_phase(targets, &mut summary, &mut errors)
+        let deletions = self
+            .execute_delete_phase(targets, &mut summary, &mut errors)
             .await;
 
+        if errors.is_empty() && !deletions.is_empty() && self.phases_known_after_command() {
+            self.post_command_actions.add(ReportDeletionPhases {
+                deletions,
+                summary,
+                output_config: self.output_config.clone(),
+            });
+            return Ok(());
+        }
+
+        let rolled_back = !errors.is_empty() && self.errors_roll_back_deletions();
+        for (target, phase) in &deletions {
+            if rolled_back {
+                summary.record_rolled_back();
+                DeleteResourcesPrinter::print_rolled_back(target, self.output_config.as_ref());
+            } else {
+                summary.record_success(*phase);
+                DeleteResourcesPrinter::print_success(target, *phase, self.output_config.as_ref());
+            }
+        }
         DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
 
         if errors.is_empty() {
@@ -177,6 +215,26 @@ impl DeleteResourcesCommand {
                 errors_with_context: errors,
             }
             .into())
+        }
+    }
+
+    /// A local workspace processes the messages of a command once its
+    /// transaction has committed, so controllers clean up only then. A server
+    /// reports the phase at the time of its response.
+    fn phases_known_after_command(&self) -> bool {
+        match self.resolved_context {
+            ResolvedResourceContext::LocalWorkspace => true,
+            ResolvedResourceContext::RemoteWorkspace { .. } => false,
+        }
+    }
+
+    /// A local workspace runs the whole command in one transaction, which an
+    /// error rolls back together with the deletions requested before it. A
+    /// server commits each request on its own.
+    fn errors_roll_back_deletions(&self) -> bool {
+        match self.resolved_context {
+            ResolvedResourceContext::LocalWorkspace => true,
+            ResolvedResourceContext::RemoteWorkspace { .. } => false,
         }
     }
 
@@ -199,18 +257,21 @@ impl DeleteResourcesCommand {
         ))
     }
 
+    /// Returns the deleted targets with the phase each one reached
     async fn execute_delete_phase(
         &self,
         targets: Vec<DeleteResourceTarget>,
         summary: &mut DeleteResourcesSummary,
         errors: &mut Vec<(BoxedError, String)>,
-    ) {
+    ) -> Vec<(DeleteResourceTarget, ResourcePhase)> {
+        let mut deletions = Vec::new();
+
         if self.dry_run {
             for target in targets {
                 summary.record_deleted();
-                DeleteResourcesPrinter::print_success(&target, true, self.output_config.as_ref());
+                DeleteResourcesPrinter::print_dry_run_success(&target, self.output_config.as_ref());
             }
-            return;
+            return deletions;
         }
 
         // The facade batches by descriptor, so cross-type selections are split into one
@@ -225,6 +286,7 @@ impl DeleteResourcesCommand {
                     self.handle_delete_result(
                         &entries,
                         response,
+                        &mut deletions,
                         summary,
                         errors,
                         self.output_config.as_ref(),
@@ -245,22 +307,16 @@ impl DeleteResourcesCommand {
                 break;
             }
         }
+
+        deletions
     }
 
     /// Builds one ref per already-resolved target, naming the type by its
     /// resolved schema rather than by the selector the user typed.
-    fn entry_resource_refs(
-        entries: &[(usize, DeleteResourceTarget)],
-    ) -> Vec<kamu_resources::ResourceRef> {
+    fn entry_resource_refs(entries: &[(usize, DeleteResourceTarget)]) -> Vec<ResourceRef> {
         entries
             .iter()
-            .map(|(_, target)| kamu_resources::ResourceRef {
-                account: None,
-                r#type: Some(target.schema.clone().into()),
-                id: Some(target.id),
-                did: None,
-                name: None,
-            })
+            .map(|(_, target)| target.resource_ref())
             .collect()
     }
 
@@ -282,7 +338,11 @@ impl DeleteResourcesCommand {
     fn handle_delete_result(
         &self,
         entries: &[(usize, DeleteResourceTarget)],
-        response: kamu_resources_facade::BatchResourceResponse<ResourceID, ResourceLookupProblem>,
+        response: kamu_resources_facade::BatchResourceResponse<
+            ResourceDeletion,
+            ResourceLookupProblem,
+        >,
+        deletions: &mut Vec<(DeleteResourceTarget, ResourcePhase)>,
         summary: &mut DeleteResourcesSummary,
         errors: &mut Vec<(BoxedError, String)>,
         output_config: &OutputConfig,
@@ -292,8 +352,7 @@ impl DeleteResourcesCommand {
         // descriptor group.
         for success in response.successes {
             let (_, target) = &entries[success.request_index];
-            summary.record_deleted();
-            DeleteResourcesPrinter::print_success(target, false, output_config);
+            deletions.push((target.clone(), success.item.phase));
         }
 
         for problem in response.problems {
@@ -363,6 +422,85 @@ impl Command for DeleteResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reports the phase each resource reached once its controllers had the chance
+/// to clean up: still found by its id means `Deleting`, gone means `Deleted`
+struct ReportDeletionPhases {
+    deletions: Vec<(DeleteResourceTarget, ResourcePhase)>,
+    summary: DeleteResourcesSummary,
+    output_config: Arc<OutputConfig>,
+}
+
+impl ReportDeletionPhases {
+    /// A resource that cannot be read again keeps the phase its deletion
+    /// request returned: the deletion has already committed.
+    async fn reached_phases(&self, resource_facade: &dyn ResourceFacade) -> Vec<ResourcePhase> {
+        let requested_phases = self.deletions.iter().map(|(_, phase)| *phase);
+        let resource_refs = self
+            .deletions
+            .iter()
+            .map(|(target, _)| target.resource_ref())
+            .collect();
+
+        let response = match resource_facade
+            .get_handles(resource_refs, ResourceVisibility::Active)
+            .await
+        {
+            Ok(response) => response,
+            Err(err) => {
+                tracing::warn!(error = ?err, "Failed to read deleted resources again");
+                return requested_phases.collect();
+            }
+        };
+
+        let mut reached_phases = requested_phases.collect::<Vec<_>>();
+        for success in response.successes {
+            reached_phases[success.request_index] = ResourcePhase::Deleting;
+        }
+        for problem in response.problems {
+            if let Some(phase) = phase_when_not_found(&problem.error) {
+                reached_phases[problem.request_index] = phase;
+            }
+        }
+        reached_phases
+    }
+}
+
+#[async_trait::async_trait]
+impl PostCommandAction for ReportDeletionPhases {
+    async fn run(self: Box<Self>, catalog: dill::Catalog) -> Result<(), CLIError> {
+        let resource_facade = catalog.get_one::<dyn ResourceFacade>().int_err()?;
+        let reached_phases = self.reached_phases(resource_facade.as_ref()).await;
+
+        let mut summary = self.summary;
+        for ((target, _), phase) in self.deletions.iter().zip(reached_phases) {
+            summary.record_success(phase);
+            DeleteResourcesPrinter::print_success(target, phase, self.output_config.as_ref());
+            // Controllers had their chance to clean up, so a resource still
+            // being deleted is waiting for a retry
+            if phase == ResourcePhase::Deleting {
+                DeleteResourcesPrinter::print_retry_hint(target, self.output_config.as_ref());
+            }
+        }
+        DeleteResourcesPrinter::print_summary(&summary, false);
+
+        Ok(())
+    }
+}
+
+/// Only a resource its id no longer finds has completed its deletion
+fn phase_when_not_found(problem: &ResourceLookupProblem) -> Option<ResourcePhase> {
+    match problem {
+        ResourceLookupProblem::IDNotFound(_) => Some(ResourcePhase::Deleted),
+        ResourceLookupProblem::NameNotFound(_)
+        | ResourceLookupProblem::SchemaMismatch(_)
+        | ResourceLookupProblem::NameMismatch(_)
+        | ResourceLookupProblem::EmptyRef
+        | ResourceLookupProblem::UntypedName => None,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub(super) struct PreparedDeleteTargets {
     targets: Vec<DeleteResourceTarget>,
@@ -373,7 +511,7 @@ pub(super) struct PreparedDeleteTargets {
 
 #[derive(Debug, Clone)]
 struct DeleteResourceTarget {
-    canonical_selector: kamu_resources::ResourceSelectorName,
+    canonical_selector: ResourceSelectorName,
     schema: TypeUri,
     id: ResourceID,
     name: String,
@@ -392,6 +530,16 @@ impl DeleteResourceTarget {
     fn display_name(&self) -> String {
         format!("{}/{}", self.canonical_selector, self.name)
     }
+
+    fn resource_ref(&self) -> ResourceRef {
+        ResourceRef {
+            account: None,
+            r#type: Some(self.schema.clone().into()),
+            id: Some(self.id),
+            did: None,
+            name: None,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -400,14 +548,32 @@ impl DeleteResourceTarget {
 struct DeleteResourcesSummary {
     total_items: usize,
     deleted: usize,
+    deleting: usize,
     ignored: usize,
     failed: usize,
+    rolled_back: usize,
 }
 
 impl DeleteResourcesSummary {
     fn record_deleted(&mut self) {
         self.total_items += 1;
         self.deleted += 1;
+    }
+
+    /// Controllers may still be cleaning up after the deletion was requested.
+    fn record_success(&mut self, phase: ResourcePhase) {
+        match phase {
+            ResourcePhase::Deleting => {
+                self.total_items += 1;
+                self.deleting += 1;
+            }
+            ResourcePhase::Pending
+            | ResourcePhase::Reconciling
+            | ResourcePhase::Ready
+            | ResourcePhase::Degraded
+            | ResourcePhase::Failed
+            | ResourcePhase::Deleted => self.record_deleted(),
+        }
     }
 
     fn record_ignored(&mut self) {
@@ -419,6 +585,11 @@ impl DeleteResourcesSummary {
         self.total_items += 1;
         self.failed += 1;
     }
+
+    fn record_rolled_back(&mut self) {
+        self.total_items += 1;
+        self.rolled_back += 1;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -426,18 +597,62 @@ impl DeleteResourcesSummary {
 struct DeleteResourcesPrinter;
 
 impl DeleteResourcesPrinter {
-    fn print_success(target: &DeleteResourceTarget, dry_run: bool, output_config: &OutputConfig) {
+    fn print_success(
+        target: &DeleteResourceTarget,
+        phase: ResourcePhase,
+        output_config: &OutputConfig,
+    ) {
         if output_config.quiet {
             return;
         }
 
-        let label = if dry_run {
-            console::style("Deleted (dry-run)").cyan().bold()
-        } else {
-            console::style("Deleted").green().bold()
+        let label = match phase {
+            ResourcePhase::Deleting => console::style("Deleting").yellow().bold(),
+            ResourcePhase::Pending
+            | ResourcePhase::Reconciling
+            | ResourcePhase::Ready
+            | ResourcePhase::Degraded
+            | ResourcePhase::Failed
+            | ResourcePhase::Deleted => console::style("Deleted").green().bold(),
         };
 
         eprintln!("{label}: {}", target.display_name());
+    }
+
+    fn print_retry_hint(target: &DeleteResourceTarget, output_config: &OutputConfig) {
+        if output_config.quiet {
+            return;
+        }
+
+        eprintln!(
+            "  {} its cleanup has not finished; `kamu delete {}` retries it",
+            console::style("hint").yellow().bold(),
+            target.id
+        );
+    }
+
+    fn print_rolled_back(target: &DeleteResourceTarget, output_config: &OutputConfig) {
+        if output_config.quiet {
+            return;
+        }
+
+        eprintln!(
+            "{}: {}",
+            console::style("Not deleted (rolled back)").yellow().bold(),
+            target.display_name()
+        );
+    }
+
+    fn print_dry_run_success(target: &DeleteResourceTarget, output_config: &OutputConfig) {
+        if output_config.quiet {
+            return;
+        }
+
+        eprintln!(
+            "{}: {}",
+            console::style("Deleted (dry-run)").cyan().bold(),
+            target.display_name()
+        );
     }
 
     fn print_ignored(selector: &str, dry_run: bool, output_config: &OutputConfig) {
@@ -472,8 +687,19 @@ impl DeleteResourcesPrinter {
             "deleted"
         };
 
+        let deleting = if summary.deleting > 0 {
+            format!(", {} deleting", summary.deleting)
+        } else {
+            String::new()
+        };
+        let rolled_back = if summary.rolled_back > 0 {
+            format!(", {} rolled back", summary.rolled_back)
+        } else {
+            String::new()
+        };
+
         eprintln!(
-            "{} {} item(s): {} {}, {} ignored, {} failed",
+            "{} {} item(s): {} {}{deleting}, {} ignored, {} failed{rolled_back}",
             console::style("Summary").bold(),
             summary.total_items,
             summary.deleted,

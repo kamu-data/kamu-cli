@@ -240,6 +240,9 @@ pub struct SearchResourcesInput {
     /// conjunction. Omitted spans every type; an empty list matches nothing — a
     /// narrowing to zero, not a widening to everything.
     pub selectors: Option<Vec<ResourceSelectorInput>>,
+    /// Also match resources whose deletion is in progress
+    #[graphql(default)]
+    pub include_deleting: bool,
 }
 
 impl SearchResourcesInput {
@@ -252,6 +255,7 @@ impl SearchResourcesInput {
                 Some(selectors) => into_resource_selectors(selectors)?,
                 None => vec![any_resource_selector()],
             },
+            visibility: kamu_resources::ResourceVisibility::with_deleting(self.include_deleting),
             pagination,
         })
     }
@@ -259,7 +263,9 @@ impl SearchResourcesInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Reference to exactly one resource, mirroring the ODF `ResourceRef`.
+/// Reference to one resource, mirroring the ODF `ResourceRef`. A name matches
+/// the live resource holding it; with `includeDeleting` it also matches
+/// resources being deleted, so it may resolve to several.
 ///
 /// A resource is addressed either by `id`, or by `type` **and** `name` — ODF's
 /// uniqueness key is `(account, type, name)`, and resources of different types
@@ -272,7 +278,7 @@ impl SearchResourcesInput {
 ///
 /// To match resources *without* knowing their type, use a selector
 /// (`bySelectors`): selectors ask which resources match and may span every
-/// type, while a ref names exactly one.
+/// type, while a ref names one resource.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceRefInput {
     /// Account owning the resource, defaults to the calling account
@@ -657,7 +663,8 @@ pub enum BatchResourcesOutcome {
 /// Resources found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourcesResult {
-    /// Resources found, one per resolved reference
+    /// Resources found, one per resolved reference; with `includeDeleting` a
+    /// name may match several, which share its `requestIndex`
     pub resources: Vec<BatchResourceSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -703,7 +710,8 @@ pub enum BatchResourceManifestsOutcome {
 /// Rendered manifests and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestsResult {
-    /// Manifests rendered, one per resolved reference
+    /// Manifests rendered, one per resolved reference; with `includeDeleting`
+    /// a name may match several, which share its `requestIndex`
     pub manifests: Vec<BatchResourceManifestSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -752,7 +760,8 @@ pub enum BatchResourceHandlesOutcome {
 /// Resource handles found and references that could not be resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceHandlesResult {
-    /// Handles found, one per resolved reference
+    /// Handles found, one per resolved reference; with `includeDeleting` a
+    /// name may match several, which share its `requestIndex`
     pub handles: Vec<BatchResourceHandleSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
@@ -1011,7 +1020,7 @@ impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Number of resources in each reconciliation phase
+/// Number of resources in each phase
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourcePhaseCounts {
     /// Resources waiting to be reconciled
@@ -1024,6 +1033,8 @@ pub struct ResourcePhaseCounts {
     pub degraded: UInt64,
     /// Resources that failed and were never reconciled
     pub failed: UInt64,
+    /// Resources whose deletion waits for their controllers to clean up
+    pub deleting: UInt64,
 }
 
 impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
@@ -1034,6 +1045,7 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
             ready,
             degraded,
             failed,
+            deleting,
         } = value;
         Self {
             pending: pending.into(),
@@ -1041,6 +1053,7 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
             ready: ready.into(),
             degraded: degraded.into(),
             failed: failed.into(),
+            deleting: deleting.into(),
         }
     }
 }

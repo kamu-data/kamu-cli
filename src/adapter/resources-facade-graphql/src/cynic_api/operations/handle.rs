@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use kamu_resources::ResourceRef;
+use kamu_resources::{ResourceRef, ResourceVisibility};
 
 use crate::cynic_api::fragments::{
     BatchResourceProblem,
@@ -30,7 +30,7 @@ pub(crate) struct GetResourceHandlesQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ResourceHandleRefsVariables")]
 pub(crate) struct ResourceHandlesResources {
-    #[arguments(resourceRefs: $resource_refs)]
+    #[arguments(resourceRefs: $resource_refs, includeDeleting: $include_deleting)]
     pub handles_by_refs: BatchResourceHandlesOutcome,
 }
 
@@ -60,12 +60,14 @@ pub(crate) struct BatchResourceHandleSuccess {
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceHandleRefsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
+    pub include_deleting: bool,
 }
 
 impl ResourceHandleRefsVariables {
-    pub(crate) fn new(resource_refs: &[ResourceRef]) -> Self {
+    pub(crate) fn new(resource_refs: &[ResourceRef], visibility: ResourceVisibility) -> Self {
         Self {
             resource_refs: resource_ref_inputs(resource_refs),
+            include_deleting: visibility.includes_deleting(),
         }
     }
 }

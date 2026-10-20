@@ -197,6 +197,7 @@ pub fn get_command(
                 c.max_results,
                 c.unbounded,
                 c.label_selectors,
+                c.include_deleting,
             )
             .cast(),
         ),
@@ -258,6 +259,7 @@ pub fn get_command(
                 c.max_results,
                 c.unbounded,
                 c.label_selectors,
+                c.include_deleting,
             )
             .cast(),
         ),

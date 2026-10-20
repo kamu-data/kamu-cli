@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
+use kamu_resources::{ResourceRef, ResourceSchemaProvider, ResourceVisibility, TypeName};
 use kamu_resources_facade::{ResourceLookupProblem, ResourceSchemaMismatchError, SpecViewOpts};
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -59,8 +59,6 @@ fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceRef {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // RF-030
 contract_test!(get_by_name, super::test_get_by_name);
 
@@ -73,6 +71,7 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
             .get(
                 vec![by_name_selector("get-name-test")],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -94,7 +93,11 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
 
     let view_by_uid = assert_single_batch_success(
         facade
-            .get(vec![by_id_selector(&id)], SpecViewOpts::ENCRYPTED)
+            .get(
+                vec![by_id_selector(&id)],
+                SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
+            )
             .await
             .unwrap(),
     );
@@ -114,7 +117,10 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
 
     let handle = assert_single_batch_success(
         facade
-            .get_handles(vec![by_name_selector("ident-name-test")])
+            .get_handles(
+                vec![by_name_selector("ident-name-test")],
+                ResourceVisibility::Active,
+            )
             .await
             .unwrap(),
     );
@@ -144,12 +150,19 @@ pub async fn test_get_handle_by_uid(h: &impl FacadeContractHarness) {
 
     let handle_by_name = assert_single_batch_success(
         facade
-            .get_handles(vec![by_name_selector("ident-id-test")])
+            .get_handles(
+                vec![by_name_selector("ident-id-test")],
+                ResourceVisibility::Active,
+            )
             .await
             .unwrap(),
     );
-    let handle_by_uid =
-        assert_single_batch_success(facade.get_handles(vec![by_id_selector(&id)]).await.unwrap());
+    let handle_by_uid = assert_single_batch_success(
+        facade
+            .get_handles(vec![by_id_selector(&id)], ResourceVisibility::Active)
+            .await
+            .unwrap(),
+    );
 
     assert_eq!(
         handle_by_name.id, handle_by_uid.id,
@@ -174,6 +187,7 @@ pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarn
         .get(
             vec![by_name_selector("no-such-resource")],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -184,7 +198,10 @@ pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarn
     );
 
     let handle_result = facade
-        .get_handles(vec![by_name_selector("no-such-resource")])
+        .get_handles(
+            vec![by_name_selector("no-such-resource")],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -207,7 +224,11 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let get_result = facade
-        .get(vec![by_id_selector(&absent_uid)], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![by_id_selector(&absent_uid)],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -217,7 +238,10 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
     );
 
     let handle_result = facade
-        .get_handles(vec![by_id_selector(&absent_uid)])
+        .get_handles(
+            vec![by_id_selector(&absent_uid)],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -253,7 +277,11 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
     };
 
     let result = facade
-        .get(vec![wrong_schema_selector.clone()], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![wrong_schema_selector.clone()],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -263,7 +291,7 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
     );
 
     let handle_result = facade
-        .get_handles(vec![wrong_schema_selector])
+        .get_handles(vec![wrong_schema_selector], ResourceVisibility::Active)
         .await
         .unwrap();
     assert_matches!(
@@ -301,7 +329,11 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
     };
 
     let result = facade
-        .get(vec![wrong_schema_selector.clone()], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![wrong_schema_selector.clone()],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     let problem = assert_single_batch_problem(result);
@@ -325,7 +357,7 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
     );
 
     let handle_result = facade
-        .get_handles(vec![wrong_schema_selector])
+        .get_handles(vec![wrong_schema_selector], ResourceVisibility::Active)
         .await
         .unwrap();
     assert_matches!(

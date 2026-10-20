@@ -46,6 +46,17 @@ where
             Err(ProjectionError::new(Some(s), event))
         }
 
+        // While deletion is in progress only controllers write status and complete it
+        (
+            Some(s),
+            event @ (E::Created(_)
+            | E::HeadersUpdated(_)
+            | E::SpecUpdated(_)
+            | E::DeletionRequested(_)),
+        ) if s.headers().deletion_requested_at.is_some() => {
+            Err(ProjectionError::new(Some(s), event))
+        }
+
         (Some(mut s), E::HeadersUpdated(e)) => {
             assert_eq!(s.id(), &e.id);
 
@@ -80,12 +91,25 @@ where
             Ok(s)
         }
 
+        (Some(mut s), E::DeletionRequested(e)) => {
+            assert_eq!(s.id(), &e.id);
+
+            s.headers_mut().deletion_requested_at = Some(e.event_time);
+            s.headers_mut().updated_at = e.event_time;
+            align_phase(&mut s);
+
+            Ok(s)
+        }
+
         (Some(mut s), E::Deleted(e)) => {
             assert_eq!(s.id(), &e.id);
 
-            s.headers_mut().deleted_at = Some(e.event_time);
-            s.headers_mut().updated_at = e.event_time;
-            s.headers_mut().name = e.tombstone_name;
+            let headers = s.headers_mut();
+            headers.deletion_requested_at.get_or_insert(e.event_time);
+            headers.deleted_at = Some(e.event_time);
+            headers.updated_at = e.event_time;
+            headers.name = e.tombstone_name;
+            align_phase(&mut s);
 
             Ok(s)
         }
@@ -97,8 +121,8 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn align_phase<TState: DeclarativeResourceState>(state: &mut TState) {
-    let generation = state.headers().generation;
-    state.status_mut().align_phase_with_generation(generation);
+    let headers = state.headers().clone();
+    state.status_mut().align_phase(&headers);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -48,8 +48,13 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
-            $crate::declare_delete_resources_use_case!(
-                use_case = [<$name DeleteResourcesUseCaseImpl>],
+            $crate::declare_request_resources_deletion_use_case!(
+                use_case = [<$name RequestResourcesDeletionUseCaseImpl>],
+                resource = $resource
+            );
+
+            $crate::declare_complete_resource_deletion_use_case!(
+                use_case = [<$name CompleteResourceDeletionUseCaseImpl>],
                 resource = $resource
             );
 
@@ -58,7 +63,7 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
-            $crate::declare_resource_lifecycle_reconcile_dispatcher!(
+            $crate::declare_resource_lifecycle_controller_dispatcher!(
                 dispatcher = [<$name ResourceLifecycleDispatcher>],
                 resource = $resource
             );
@@ -67,7 +72,8 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder: &mut dill::CatalogBuilder,
             ) {
                 catalog_builder.add::<[<$name ApplyResourceUseCaseImpl>]>();
-                catalog_builder.add::<[<$name DeleteResourcesUseCaseImpl>]>();
+                catalog_builder.add::<[<$name CompleteResourceDeletionUseCaseImpl>]>();
+                catalog_builder.add::<[<$name RequestResourcesDeletionUseCaseImpl>]>();
                 catalog_builder.add::<[<$name EventStoreBridge>]>();
                 catalog_builder.add::<[<$name ResourceAggregateLoaderImpl>]>();
                 catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();

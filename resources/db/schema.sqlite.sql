@@ -192,7 +192,8 @@ CREATE INDEX idx_resource_labels_projection_key_value_resource_id
     ON resource_labels_projection (label_key, label_value, resource_id);
 
 CREATE UNIQUE INDEX idx_resources_account_schema_name_ci
-    ON resources (account_id, resource_schema, resource_name);
+    ON resources (account_id, resource_schema, resource_name)
+    WHERE deletion_requested_at IS NULL;
 
 CREATE INDEX idx_resources_account_schema_updated_at
     ON resources (account_id, resource_schema, updated_at DESC);
@@ -577,7 +578,7 @@ CREATE TABLE resources (
     updated_at             TIMESTAMPTZ NOT NULL,
     deleted_at             TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL
-, status_generation BIGINT NOT NULL DEFAULT 1);
+, status_generation BIGINT NOT NULL DEFAULT 1, deletion_requested_at TIMESTAMPTZ NULL);
 
 CREATE TABLE sqlite_sequence(name,seq);
 

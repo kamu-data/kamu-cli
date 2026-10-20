@@ -10,7 +10,7 @@
 use std::assert_matches;
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dill::CatalogBuilder;
 use kamu_resources::{
     DeclarativeResource,
@@ -20,6 +20,7 @@ use kamu_resources::{
     ResourceLabelProjectionRepository,
     ResourcePersistenceError,
     ResourcePersistenceService,
+    ResourcePhase,
     ResourceRawEventQuery,
     ResourceSchemaProvider,
     ResourceSnapshot,
@@ -28,7 +29,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::utils::{
     TestResource,
-    TestResourceReconciler,
+    TestResourceController,
     TestResourceSpec,
     make_fresh_aggregate,
     register_test_resource_resource_service_layer,
@@ -142,7 +143,7 @@ async fn test_save_resource_resyncs_label_projection() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_resource_clears_label_projection() {
+async fn test_completed_deletion_clears_label_projection() {
     // Stale rows are only invisible today because every query filters
     // `deleted_at IS NULL`; they would become wrong without that join.
     let harness = ResourcePersistenceServiceHarness::new();
@@ -175,15 +176,23 @@ async fn test_delete_resource_clears_label_projection() {
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     harness
-        .persistence_svc()
-        .delete(&mut loaded, Utc::now())
-        .await
-        .unwrap();
+        .save_deletion_requested(&mut loaded, Utc::now())
+        .await;
+
+    assert_eq!(
+        harness.label_projection_entries(&id).await,
+        vec![("env".to_string(), "staging".to_string())],
+        "a resource being deleted keeps its projection rows"
+    );
+
+    harness
+        .save_deletion_completed(&mut loaded, Utc::now())
+        .await;
 
     assert_eq!(
         harness.label_projection_entries(&id).await,
         Vec::<(String, String)>::new(),
-        "deleting the resource must clear its projection rows"
+        "completing the deletion must clear the projection rows"
     );
 }
 
@@ -236,24 +245,41 @@ async fn test_save_resource_updates_snapshot() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_resource_marks_deleted() {
+async fn test_requested_deletion_keeps_resource_live() {
     let harness = ResourcePersistenceServiceHarness::new();
     let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     let now = Utc::now();
-    harness
-        .persistence_svc()
-        .delete(&mut loaded, now)
-        .await
-        .unwrap();
+    harness.save_deletion_requested(&mut loaded, now).await;
 
     let reloaded = harness.aggregate_loader().load(&id).await.unwrap();
-    assert!(
-        reloaded.headers().deleted_at.is_some(),
-        "expected deleted_at to be set after deletion"
-    );
+    assert_eq!(reloaded.headers().deletion_requested_at, Some(now));
+    assert_eq!(reloaded.headers().deleted_at, None);
+    assert_eq!(reloaded.status().phase, ResourcePhase::Deleting);
+
+    let snapshot = harness.find_snapshot(&id).await;
+    assert_eq!(snapshot.headers.name.as_str(), "res-a");
+    assert_eq!(snapshot.last_event_id, reloaded.last_stored_event_id());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_completed_deletion_hides_resource() {
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    let now = Utc::now();
+    harness.save_deletion_requested(&mut loaded, now).await;
+    harness.save_deletion_completed(&mut loaded, now).await;
+
+    let reloaded = harness.aggregate_loader().load(&id).await.unwrap();
+    assert_eq!(reloaded.headers().deleted_at, Some(now));
+    assert_eq!(reloaded.status().phase, ResourcePhase::Deleted);
 
     // Deleted snapshots are hidden from live lookups — finding None is correct
     assert!(
@@ -265,7 +291,7 @@ async fn test_delete_resource_marks_deleted() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_many_resources_batch() {
+async fn test_save_many_resources_batch() {
     let harness = ResourcePersistenceServiceHarness::new();
 
     let (id_a, mut agg_a) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
@@ -281,23 +307,30 @@ async fn test_delete_many_resources_batch() {
     let loaded_c = harness.aggregate_loader().load(&id_c).await.unwrap();
 
     let now = Utc::now();
+    let mut resources = [loaded_a, loaded_b, loaded_c];
+    for resource in &mut resources {
+        resource.try_request_deletion(now).unwrap();
+    }
     harness
         .persistence_svc()
-        .delete_many(&mut [loaded_a, loaded_b, loaded_c], now)
+        .save_many(&mut resources)
         .await
         .unwrap();
 
     for id in [&id_a, &id_b, &id_c] {
         let reloaded = harness.aggregate_loader().load(id).await.unwrap();
-        assert!(
-            reloaded.headers().deleted_at.is_some(),
-            "expected deleted_at set in aggregate for {id:?}"
+        assert_eq!(
+            reloaded.headers().deletion_requested_at,
+            Some(now),
+            "expected deletion requested for {id:?}"
         );
-
-        // Deleted snapshots are hidden from live lookups — finding None is correct
-        assert!(
-            harness.snapshot_not_found(id).await,
-            "deleted resource must not appear in live snapshot lookup for {id:?}"
+        assert_eq!(
+            harness
+                .find_snapshot(id)
+                .await
+                .headers
+                .deletion_requested_at,
+            Some(now)
         );
     }
 }
@@ -364,7 +397,7 @@ impl ResourcePersistenceServiceHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
+        b.add::<TestResourceController>();
 
         Self {
             base,
@@ -375,6 +408,16 @@ impl ResourcePersistenceServiceHarness {
 
     fn persistence_svc(&self) -> Arc<dyn ResourcePersistenceService<TestResource>> {
         self.catalog.get_one().unwrap()
+    }
+
+    async fn save_deletion_requested(&self, resource: &mut TestResource, now: DateTime<Utc>) {
+        resource.try_request_deletion(now).unwrap();
+        self.persistence_svc().save(resource).await.unwrap();
+    }
+
+    async fn save_deletion_completed(&self, resource: &mut TestResource, now: DateTime<Utc>) {
+        resource.try_complete_deletion(now).unwrap();
+        self.persistence_svc().save(resource).await.unwrap();
     }
 
     fn aggregate_loader(&self) -> Arc<dyn ResourceAggregateLoader<TestResource>> {

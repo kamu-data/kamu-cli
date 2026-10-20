@@ -22,7 +22,7 @@ use kamu_resources::{
     ApplyManifestApplicationDecision,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
-    ResourceCrudDispatcherDeleteRequest,
+    ResourceCrudDispatcherDeletionRequest,
     ResourceHeadersExt,
     ResourceHeadersInputExt,
     ResourceID,
@@ -124,8 +124,8 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
     /// Grouped by owner because `account_id` here is an ownership scope, not an
     /// actor claim -- the use case rejects ids owned by anyone else.
     ///
-    /// Projection GC is inherited: the resulting `Deleted` message is already
-    /// handled by `ConfigurationResourceLifecycleMessageConsumer`.
+    /// Projection cleanup is inherited: the controllers' `cleanup` runs when
+    /// the deletion completes.
     async fn delete_auto_managed(
         dispatcher: &Arc<dyn ResourceCrudDispatcher>,
         snapshots: Vec<ResourceSnapshot>,
@@ -152,7 +152,7 @@ impl ConfigurationDatasetLifecycleMessageConsumer {
 
         for (account_id, ids) in ids_by_owner {
             dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest { account_id, ids })
+                .request_deletion(ResourceCrudDispatcherDeletionRequest { account_id, ids })
                 .await
                 // A foreign-owner rejection would mean a snapshot disagrees
                 // about its own owner: integrity bug, not a user denial.

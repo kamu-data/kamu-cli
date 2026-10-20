@@ -73,9 +73,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         resource_refs: Vec<ResourceRef>,
         spec_view: SpecViewOpts,
+        visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError> {
-        let (mut indexed_resources, problems) =
-            self.resolve_multiple_resource_views(resource_refs).await?;
+        let (mut indexed_resources, problems) = self
+            .resolve_multiple_resource_views(resource_refs, visibility)
+            .await?;
 
         self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
@@ -96,6 +98,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     async fn get_handles(
         &self,
         resource_refs: Vec<ResourceRef>,
+        visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>
     {
         // An empty batch names nothing, so it yields an empty response.
@@ -111,6 +114,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &group.account.did,
                 &group.schema,
                 grouped,
+                visibility,
             )
             .await?;
 
@@ -153,12 +157,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
         spec_view: SpecViewOpts,
+        visibility: ResourceVisibility,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     > {
-        let (mut indexed_resources, problems) =
-            self.resolve_multiple_resource_views(resource_refs).await?;
+        let (mut indexed_resources, problems) = self
+            .resolve_multiple_resource_views(resource_refs, visibility)
+            .await?;
 
         self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
@@ -207,11 +213,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         // produce this: page 2 of a merged result is not page 2 of each type.
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots(&target_account.did, &scope, request.pagination)
+            .list_snapshots(
+                &target_account.did,
+                &scope,
+                request.visibility,
+                request.pagination,
+            )
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope)
+            .count_search_resource_handles(&target_account.did, &scope, request.visibility)
             .await?;
 
         let items = self.summary_views_with_columns(snapshots)?;
@@ -242,11 +253,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows = self
             .generic_resource_query_service
-            .search_resource_handles(&target_account.did, &scope, request.pagination)
+            .search_resource_handles(
+                &target_account.did,
+                &scope,
+                request.visibility,
+                request.pagination,
+            )
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope)
+            .count_search_resource_handles(&target_account.did, &scope, request.visibility)
             .await?;
 
         let items = rows
@@ -371,7 +387,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,
-    ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError> {
+    ) -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, BatchResourceError>
+    {
         // An empty batch names nothing, so it yields an empty response.
         let mut successes = Vec::new();
         let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
@@ -380,8 +397,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         // runs inside a single database transaction — opened by the
         // `#[transactional_handler]` GraphQL handler, or by the CLI's
         // `DatabaseTransactionRunner` — so a failure in a later group rolls back
-        // the deletes an earlier one performed. Fanning out therefore does not
-        // introduce partial-delete semantics.
+        // the deletion requests an earlier one made. Fanning out therefore does
+        // not introduce partial-delete semantics.
         for group in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
@@ -391,6 +408,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &group.account.did,
                 &group.schema,
                 grouped,
+                ResourceVisibility::Active,
             )
             .await?;
 
@@ -403,6 +421,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
             let mut seen_valid_ids = HashSet::new();
             let mut ids_to_delete = Vec::<ResourceID>::new();
+            let mut deleted_entries = Vec::new();
 
             let ids = resolution_response
                 .id_entries
@@ -441,10 +460,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                     )
                 }) {
                     Ok(_) => {
-                        successes.push(BatchResourceSuccess {
-                            request_index: indexes[request_index],
-                            item: id,
-                        });
+                        deleted_entries.push((indexes[request_index], id));
 
                         if seen_valid_ids.insert(id) {
                             ids_to_delete.push(id);
@@ -457,18 +473,44 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 }
             }
 
-            if !ids_to_delete.is_empty() {
-                // Registered selector schemas must have a dispatcher.
-                let dispatcher = self
-                    .dispatcher_factory
-                    .crud_dispatcher_for_trusted_schema(group.schema.as_str())?;
-                dispatcher
-                    .delete(ResourceCrudDispatcherDeleteRequest {
-                        account_id: group.account.did.clone(),
-                        ids: ids_to_delete,
-                    })
-                    .await?;
+            if ids_to_delete.is_empty() {
+                continue;
             }
+
+            // Registered selector schemas must have a dispatcher.
+            let dispatcher = self
+                .dispatcher_factory
+                .crud_dispatcher_for_trusted_schema(group.schema.as_str())?;
+            dispatcher
+                .request_deletion(ResourceCrudDispatcherDeletionRequest {
+                    account_id: group.account.did.clone(),
+                    ids: ids_to_delete.clone(),
+                })
+                .await?;
+
+            // Controllers may complete a deletion within the request, which
+            // removes the resource from the lookup by id
+            let being_deleted = self
+                .generic_resource_query_service
+                .find_resource_handles_by_ids(&group.account.did, &ids_to_delete)
+                .await?
+                .into_iter()
+                .map(|row| ResourceID::new(row.id))
+                .collect::<HashSet<_>>();
+
+            successes.extend(deleted_entries.into_iter().map(|(request_index, id)| {
+                BatchResourceSuccess {
+                    request_index,
+                    item: ResourceDeletion {
+                        id,
+                        phase: if being_deleted.contains(&id) {
+                            ResourcePhase::Deleting
+                        } else {
+                            ResourcePhase::Deleted
+                        },
+                    },
+                }
+            }));
         }
 
         successes.sort_by_key(|success| success.request_index);
@@ -828,6 +870,7 @@ impl LocalResourceFacadeImpl {
     async fn resolve_multiple_resource_views(
         &self,
         resource_refs: Vec<ResourceRef>,
+        visibility: ResourceVisibility,
     ) -> Result<
         (
             Vec<IndexedResource<Resource>>,
@@ -850,6 +893,7 @@ impl LocalResourceFacadeImpl {
                 &group.account.did,
                 &group.schema,
                 grouped,
+                visibility,
             )
             .await?;
 

@@ -12,6 +12,7 @@ use cynic::MutationBuilder;
 use crate::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceAccountResolutionProblem,
+    ResourcePhase,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::cynic_api::inputs::ResourceRefInput;
@@ -55,6 +56,7 @@ pub(crate) struct ResourceDeleteResult {
 pub(crate) struct ResourceDeleteSuccess {
     pub request_index: i32,
     pub resource_id: kamu_resources::ResourceID,
+    pub phase: ResourcePhase,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

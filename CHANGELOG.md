@@ -33,8 +33,14 @@ Recommendation: for ease of reading, use the following format:
   the `pauseAccountDatasetFlows` and `resumeAccountDatasetFlows` mutations, with the now-empty
   `AccountMut.flows`. Pause and resume flows per dataset instead
 - GraphQL: `ResourceHeaders` has `statusGeneration`, counting status updates, and `deletionRequestedAt`,
-  and `ResourcePhase` has `DELETING` and `DELETED`, following ODF. `deletionRequestedAt`, `DELETING` and
-  `DELETED` are not populated yet
+  and `ResourcePhase` has `DELETING` and `DELETED`, following ODF
+- Resources: deleting a resource takes two steps. It shows `Deleting` until its controller has cleaned up,
+  then `Deleted`; a failed cleanup keeps it `Deleting`, and deleting it again by id retries. Its name is
+  free at once: applying a manifest with that name creates a new resource and warns about the one being
+  deleted. `kamu delete` prints `Deleting` or `Deleted`, and GraphQL `ResourceDeleteSuccess.phase`
+  reports it. Resources being deleted are hidden unless asked for with `--include-deleting` on
+  `kamu list` and `kamu get`, or `includeDeleting` in the GraphQL resource queries. The summary counts
+  them as `deleting` (`kamu summary`, GraphQL `ResourcePhaseCounts.deleting`)
 - Resources: `updatedAt` also moves when the status changes
 - Resources: changing only the labels or annotations of a resource bumps its `generation` and reconciles
   it again

@@ -31,7 +31,7 @@ use odf::metadata::resources::TypeUri;
 
 use crate::tests::utils::{
     TestResource,
-    TestResourceReconciler,
+    TestResourceController,
     TestResourceSpec,
     make_id,
     make_resource_params,
@@ -202,7 +202,7 @@ impl ApplyResourcePlannerHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         register_test_resource_resource_service_layer(&mut b);
-        b.add::<TestResourceReconciler>();
+        b.add::<TestResourceController>();
 
         let catalog = b.build();
 

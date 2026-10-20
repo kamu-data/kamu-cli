@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{ResourceConditionValue, ResourcePhase, empty_resource_conditions};
+use crate::{ResourceConditionValue, ResourceHeaders, ResourcePhase, empty_resource_conditions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,9 +46,10 @@ pub trait ResourceStatusExt {
 
     fn was_reconciled(&self, generation: u64) -> bool;
 
-    /// Shows `Pending` while the main controller has not observed `generation`.
-    /// The phase is derived, so this runs after every change of the resource.
-    fn align_phase_with_generation(&mut self, generation: u64);
+    /// Derives the phase from the headers: deletion phases take precedence,
+    /// then `Pending` while the main controller has not observed the current
+    /// generation. Runs after every change of the resource.
+    fn align_phase(&mut self, headers: &ResourceHeaders);
 
     /// Updates observed generation and indicates that reconcilation had started
     fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>);
@@ -63,6 +64,9 @@ pub trait ResourceStatusExt {
         message: impl Into<String>,
         now: DateTime<Utc>,
     );
+
+    /// Indicates that cleaning up a resource being deleted failed
+    fn mark_cleanup_failed(&mut self, message: impl Into<String>, now: DateTime<Utc>);
 }
 
 impl ResourceStatusExt for ResourceStatus {
@@ -76,8 +80,12 @@ impl ResourceStatusExt for ResourceStatus {
             .is_some_and(|reconciled_generation| reconciled_generation >= generation)
     }
 
-    fn align_phase_with_generation(&mut self, generation: u64) {
-        if !self.was_observed(generation) {
+    fn align_phase(&mut self, headers: &ResourceHeaders) {
+        if headers.deleted_at.is_some() {
+            self.phase = ResourcePhase::Deleted;
+        } else if headers.deletion_requested_at.is_some() {
+            self.phase = ResourcePhase::Deleting;
+        } else if !self.was_observed(headers.generation) {
             self.phase = ResourcePhase::Pending;
         }
     }
@@ -147,6 +155,13 @@ impl ResourceStatusExt for ResourceStatus {
         ResourceConditionValue::set_condition(
             &mut self.conditions.entries,
             ResourceConditionValue::reconciling_false(now),
+        );
+    }
+
+    fn mark_cleanup_failed(&mut self, message: impl Into<String>, now: DateTime<Utc>) {
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::ready_false(now, "CleanupFailed", message),
         );
     }
 }
