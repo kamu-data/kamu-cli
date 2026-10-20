@@ -61,6 +61,8 @@ pub trait ResourceRepository: Send + Sync {
         Ok(())
     }
 
+    /// Finds the live resource holding the name; resources being deleted no
+    /// longer hold one.
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
@@ -68,9 +70,10 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
-    /// Returns rows in the order their IDs appear in `ids`. IDs that do not
-    /// exist, are deleted, or belong to another account are absent, so the
-    /// result may be shorter than the request but never reordered.
+    /// Returns rows in the order their IDs appear in `ids`, including resources
+    /// being deleted. IDs that do not exist, are deleted, or belong to another
+    /// account are absent, so the result may be shorter than the request but
+    /// never reordered.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -78,7 +81,8 @@ pub trait ResourceRepository: Send + Sync {
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
     /// Matches names case-insensitively. Names that do not exist are absent
-    /// from the result.
+    /// from the result. With [`ResourceVisibility::IncludeDeleting`] a name may
+    /// resolve to several IDs: one live resource and those being deleted.
     ///
     /// Returns pairs in the order their names appear in `names`.
     async fn resolve_resource_ids_by_names(
@@ -86,9 +90,11 @@ pub trait ResourceRepository: Send + Sync {
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
+        visibility: ResourceVisibility,
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
-    /// Returns IDs of live resources of `schema` owned by `account_id` and
+    /// Returns IDs of live resources, not being deleted, of `schema` owned by
+    /// `account_id` and
     /// carrying the exact label pair, oldest first.
     ///
     /// `account_id` is a security boundary, not an optimization: label values
@@ -126,6 +132,7 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -133,6 +140,7 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
     ) -> Result<usize, InternalError>;
 
     async fn find_resource_snapshot(
@@ -168,6 +176,7 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
@@ -175,6 +184,29 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which resources a lookup by name, search or listing returns. Deleted
+/// resources are never returned; lookups by ID always return resources being
+/// deleted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ResourceVisibility {
+    /// Resources whose deletion was not requested
+    #[default]
+    Active,
+    /// Also resources whose deletion is in progress
+    IncludeDeleting,
+}
+
+impl ResourceVisibility {
+    pub fn includes_deleting(self) -> bool {
+        match self {
+            Self::Active => false,
+            Self::IncludeDeleting => true,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -428,6 +460,7 @@ pub struct ResourceSnapshotRow {
     pub status_generation: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub deletion_requested_at: Option<DateTime<Utc>>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub last_event_id: Option<i64>,
 }
@@ -453,7 +486,7 @@ impl ResourceSnapshotRow {
                 status_generation: u64::try_from(self.status_generation).unwrap(),
                 created_at: self.created_at,
                 updated_at: self.updated_at,
-                deletion_requested_at: None,
+                deletion_requested_at: self.deletion_requested_at,
                 deleted_at: self.deleted_at,
                 owner_references: None,
             },

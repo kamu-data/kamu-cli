@@ -32,6 +32,7 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    ResourceVisibility,
     TypeUri,
     UpdateResourceError,
 };
@@ -90,9 +91,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 updated_at,
                 deleted_at,
                 last_event_id,
-                status_generation
+                status_generation,
+                deletion_requested_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
             resource_id,
             account_id_str,
@@ -108,6 +110,7 @@ impl ResourceRepository for PostgresResourceRepository {
             resource_snapshot.headers.deleted_at,
             last_event_id,
             status_generation,
+            resource_snapshot.headers.deletion_requested_at,
         )
         .execute(connection_mut)
         .await
@@ -167,6 +170,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 generation,
                 status_generation,
                 updated_at,
+                deletion_requested_at,
                 deleted_at,
                 last_event_id,
                 expected_last_event_id
@@ -204,6 +208,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 .push_bind(i64::try_from(resource_snapshot.headers.generation).unwrap())
                 .push_bind(i64::try_from(resource_snapshot.headers.status_generation).unwrap())
                 .push_bind(resource_snapshot.headers.updated_at)
+                .push_bind(resource_snapshot.headers.deletion_requested_at)
                 .push_bind(resource_snapshot.headers.deleted_at)
                 .push_bind(resource_snapshot.last_event_id.map(EventID::into_inner))
                 .push_bind(
@@ -238,6 +243,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 generation = u.generation,
                 status_generation = u.status_generation,
                 updated_at = u.updated_at,
+                deletion_requested_at = u.deletion_requested_at,
                 deleted_at = u.deleted_at,
                 last_event_id = u.last_event_id
             FROM matched_resource_updates AS u
@@ -297,7 +303,7 @@ impl ResourceRepository for PostgresResourceRepository {
             WHERE account_id = $1
               AND resource_schema = $2
               AND LOWER(resource_name) = LOWER($3)
-              AND deleted_at IS NULL
+              AND deletion_requested_at IS NULL
             "#,
             account_id_stack.as_str(),
             schema.as_str(),
@@ -364,6 +370,7 @@ impl ResourceRepository for PostgresResourceRepository {
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
+        visibility: ResourceVisibility,
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         if names.is_empty() {
             return Ok(Vec::new());
@@ -384,10 +391,15 @@ impl ResourceRepository for PostgresResourceRepository {
               AND r.resource_schema = $2
               AND LOWER(r.resource_name) = ANY($3)
               AND r.deleted_at IS NULL
+              AND (r.deletion_requested_at IS NULL OR $4)
             -- Request order, matching the in-memory backend: callers pair the
             -- result back to the names they asked for. Without this the row
-            -- order is whatever the scan happens to produce.
-            ORDER BY array_position($3, LOWER(r.resource_name))
+            -- order is whatever the scan happens to produce. Within a name the
+            -- live resource comes first, then those being deleted, oldest first.
+            ORDER BY
+                array_position($3, LOWER(r.resource_name)),
+                r.deletion_requested_at NULLS FIRST,
+                r.resource_id
             "#,
             account_id_stack.as_str(),
             schema.as_str(),
@@ -395,6 +407,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 .iter()
                 .map(|n| n.to_ascii_lowercase())
                 .collect::<Vec<_>>() as _,
+            visibility.includes_deleting(),
         )
         .fetch_all(connection_mut)
         .await
@@ -415,6 +428,7 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         let flat = FlatScope::new(scope, account_id);
@@ -442,6 +456,7 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.deleted_at IS NULL
+              AND (r.deletion_requested_at IS NULL OR $12)
               -- Each type carries its own query, account and label pairs,
               -- re-paired here. A NULL schema array means "every type", in
               -- which case the single row of query columns applies uniformly.
@@ -495,6 +510,7 @@ impl ResourceRepository for PostgresResourceRepository {
             limit,
             kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
             offset,
+            visibility.includes_deleting(),
         )
         .fetch_all(connection_mut)
         .await
@@ -505,6 +521,7 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
     ) -> Result<usize, InternalError> {
         let flat = FlatScope::new(scope, account_id);
         if flat.vacuous {
@@ -519,6 +536,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT COUNT(*) AS "count!: i64"
             FROM resources r
             WHERE r.deleted_at IS NULL
+              AND (r.deletion_requested_at IS NULL OR $9)
               -- Each type carries its own query, account and label pairs,
               -- re-paired here. See `search_resource_handles` for the shape.
               AND EXISTS (
@@ -561,6 +579,7 @@ impl ResourceRepository for PostgresResourceRepository {
             flat.label_row_numbers(),
             flat.label_keys(),
             flat.label_values(),
+            visibility.includes_deleting(),
         )
         .fetch_one(connection_mut)
         .await
@@ -597,6 +616,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.status_generation,
                 r.created_at,
                 r.updated_at,
+                r.deletion_requested_at,
                 r.deleted_at,
                 r.last_event_id
             FROM resources r
@@ -631,7 +651,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
-                deletion_requested_at: None,
+                deletion_requested_at: row.deletion_requested_at,
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
@@ -665,7 +685,7 @@ impl ResourceRepository for PostgresResourceRepository {
               AND r.resource_schema = $2
               AND rl.label_key = $3
               AND rl.label_value = $4
-              AND r.deleted_at IS NULL
+              AND r.deletion_requested_at IS NULL
             ORDER BY r.created_at ASC, r.resource_id ASC
             "#,
             account_id_stack.as_str(),
@@ -702,7 +722,7 @@ impl ResourceRepository for PostgresResourceRepository {
             WHERE r.resource_schema = $1
               AND rl.label_key = $2
               AND rl.label_value = $3
-              AND r.deleted_at IS NULL
+              AND r.deletion_requested_at IS NULL
             ORDER BY r.created_at ASC, r.resource_id ASC
             "#,
             resource_schema,
@@ -749,6 +769,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.status_generation,
                 r.created_at,
                 r.updated_at,
+                r.deletion_requested_at,
                 r.deleted_at,
                 r.last_event_id
             FROM resources r
@@ -805,6 +826,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.status_generation,
                 r.created_at,
                 r.updated_at,
+                r.deletion_requested_at,
                 r.deleted_at,
                 r.last_event_id
             FROM resources r
@@ -837,7 +859,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 status_generation: u64::try_from(row.status_generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
-                deletion_requested_at: None,
+                deletion_requested_at: row.deletion_requested_at,
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
@@ -883,6 +905,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.status_generation,
                 r.created_at,
                 r.updated_at,
+                r.deletion_requested_at,
                 r.deleted_at,
                 r.last_event_id
             FROM resources r
@@ -923,7 +946,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     status_generation: u64::try_from(row.status_generation).unwrap(),
                     created_at: row.created_at,
                     updated_at: row.updated_at,
-                    deletion_requested_at: None,
+                    deletion_requested_at: row.deletion_requested_at,
                     deleted_at: row.deleted_at,
                 },
                 spec: row.spec,
@@ -940,9 +963,11 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let flat = FlatScope::new(scope, account_id);
+        let include_deleting = visibility.includes_deleting();
 
         Box::pin(async_stream::stream! {
             if flat.vacuous {
@@ -977,11 +1002,13 @@ impl ResourceRepository for PostgresResourceRepository {
                     r.status_generation,
                     r.created_at,
                     r.updated_at,
+                    r.deletion_requested_at,
                     r.deleted_at,
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
                 WHERE r.deleted_at IS NULL
+                  AND (r.deletion_requested_at IS NULL OR $12)
                   -- Each type carries its own query, account and label pairs,
                   -- re-paired here. See `search_resource_handles` for the shape.
                   AND EXISTS (
@@ -1029,6 +1056,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 limit,
                 kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
                 offset,
+                include_deleting,
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
@@ -1052,7 +1080,7 @@ impl ResourceRepository for PostgresResourceRepository {
                         status_generation: u64::try_from(row.status_generation).unwrap(),
                         created_at: row.created_at,
                         updated_at: row.updated_at,
-                        deletion_requested_at: None,
+                        deletion_requested_at: row.deletion_requested_at,
                         deleted_at: row.deleted_at,
                     },
                     spec: row.spec,
@@ -1084,6 +1112,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 COUNT(*) FILTER (WHERE status ->> 'phase' = 'Ready') as "ready_count!",
                 COUNT(*) FILTER (WHERE status ->> 'phase' = 'Degraded') as "degraded_count!",
                 COUNT(*) FILTER (WHERE status ->> 'phase' = 'Failed') as "failed_count!",
+                COUNT(*) FILTER (WHERE status ->> 'phase' = 'Deleting') as "deleting_count!",
                 COUNT(*) FILTER (
                     WHERE COALESCE(status ->> 'phase', 'Pending') = 'Pending'
                 ) as "pending_count!"
@@ -1110,6 +1139,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     ready: u64::try_from(row.ready_count).unwrap(),
                     degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
+                    deleting: u64::try_from(row.deleting_count).unwrap(),
                 },
             })
             .collect())

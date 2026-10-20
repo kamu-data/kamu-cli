@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                -- LEFT JOIN: a.resource_id is NULL only when the owning account\n                -- row is gone (deletion racing async cleanup), same case the\n                -- account_name sentinel covers. Substitute the nil resource id.\n                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $2) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels,\n                r.annotations,\n                r.spec,\n                r.status,\n                r.generation,\n                r.status_generation,\n                r.created_at,\n                r.updated_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.deleted_at IS NULL\n            ",
+  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                -- LEFT JOIN: a.resource_id is NULL only when the owning account\n                -- row is gone (deletion racing async cleanup), same case the\n                -- account_name sentinel covers. Substitute the nil resource id.\n                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as \"account_resource_id!: uuid::Uuid\",\n                COALESCE(a.account_name, $2) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels,\n                r.annotations,\n                r.spec,\n                r.status,\n                r.generation,\n                r.status_generation,\n                r.created_at,\n                r.updated_at,\n                r.deletion_requested_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
@@ -149,6 +149,17 @@
       },
       {
         "ordinal": 14,
+        "name": "deletion_requested_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "resources",
+            "name": "deletion_requested_at"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
         "name": "deleted_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -159,7 +170,7 @@
         }
       },
       {
-        "ordinal": 15,
+        "ordinal": 16,
         "name": "last_event_id",
         "type_info": "Int8",
         "origin": {
@@ -192,8 +203,9 @@
       false,
       false,
       true,
+      true,
       true
     ]
   },
-  "hash": "95cb1b7a600ae553ab6079cb5e18d9107488ec08f46ca3de6c081220e3fbc49e"
+  "hash": "3e5b02743c4a4bdd160ea6ab45fd834a5d300bb1616eb38da5da808eb15d4006"
 }
