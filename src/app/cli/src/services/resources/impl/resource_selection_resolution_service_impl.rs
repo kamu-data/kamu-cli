@@ -953,7 +953,7 @@ impl ResourceSelectionResolutionServiceImpl {
         visibility: ResourceVisibility,
         expected_count: usize,
     ) -> Result<Vec<ResourceHandle>, CLIError> {
-        let search = |limit| {
+        let search = |visibility, limit| {
             resource_facade.search_handles(SearchResourcesRequest {
                 selectors: selectors.clone(),
                 visibility,
@@ -961,12 +961,25 @@ impl ResourceSelectionResolutionServiceImpl {
             })
         };
 
-        let response = search(expected_count).await?;
-        if response.total_count <= response.items.len() {
-            return Ok(response.items);
+        let mut response = search(visibility, expected_count).await?;
+        if response.total_count > response.items.len() {
+            response = search(visibility, response.total_count).await?;
+        }
+        let mut handles = response.items;
+
+        // A search orders by name, not by phase: put live resources first, as
+        // a lookup by name does
+        if visibility.includes_deleting() {
+            let live_ids = search(ResourceVisibility::Active, handles.len())
+                .await?
+                .items
+                .into_iter()
+                .map(|handle| handle.id)
+                .collect::<HashSet<_>>();
+            handles.sort_by_key(|handle| !live_ids.contains(&handle.id));
         }
 
-        Ok(search(response.total_count).await?.items)
+        Ok(handles)
     }
 
     /// Keys by the lowercase name, keeping the order of the handles.

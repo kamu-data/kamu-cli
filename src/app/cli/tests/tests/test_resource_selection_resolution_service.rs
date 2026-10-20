@@ -1071,6 +1071,55 @@ async fn resolves_exact_name_to_every_resource_holding_it_when_including_deletin
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn labelled_exact_name_lists_live_resource_first_when_including_deleting() {
+    let handle = |name: &str| ResourceHandle {
+        r#type: variableset_type_uri().clone(),
+        did: None,
+        id: ResourceID::new(uuid::Uuid::new_v4()),
+        name: name.parse().unwrap(),
+        account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
+    };
+    let being_deleted = handle("vars-a");
+    let live = handle("vars-a");
+
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    // A search orders by name and id, which may put the one being deleted first
+    harness.expect_search_handles_by_visibility(
+        vec![being_deleted.clone(), live.clone()],
+        vec![live.clone()],
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![harness.exact_selection_item("vars-a")],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::IncludeDeleting,
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: Some(environment_label_filter()),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result
+            .targets
+            .iter()
+            .map(|target| target.id)
+            .collect::<Vec<_>>(),
+        vec![live.id, being_deleted.id]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn environment_label_filter() -> kamu_resources::ResourceLabelFilterInput {
     kamu_resources::ResourceLabelFilterInput {
         entries: std::collections::BTreeMap::from([(
@@ -1176,6 +1225,28 @@ impl ResourceSelectionResolutionHarness {
                         })
                         .collect(),
                     problems: Vec::new(),
+                })
+            });
+    }
+
+    /// Answers searches including resources being deleted with
+    /// `including_deleting`, and the others with `live`.
+    fn expect_search_handles_by_visibility(
+        &mut self,
+        including_deleting: Vec<ResourceHandle>,
+        live: Vec<ResourceHandle>,
+    ) {
+        self.facade
+            .expect_search_handles()
+            .returning(move |request| {
+                let items = if request.visibility.includes_deleting() {
+                    including_deleting.clone()
+                } else {
+                    live.clone()
+                };
+                Ok(SearchResourceHandlesResponse {
+                    total_count: items.len(),
+                    items,
                 })
             });
     }
