@@ -1,0 +1,248 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use kamu_resources::{
+    DeclarativeResource,
+    ResourceAggregateLoader,
+    ResourceConditionStatus,
+    ResourceID,
+    ResourcePhase,
+    ready_condition_type_ref,
+};
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
+    BaseResourceServiceHarnessOpts,
+};
+use messaging_outbox::{MockOutbox, OutboxProvider};
+
+use super::resource_use_case_base_harness::{
+    ResourceUseCaseBaseHarness,
+    ResourceUseCaseBaseHarnessOpts,
+    SanitizerKind,
+};
+use crate::tests::utils::{TestResource, TestResourceControllerProvider};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cleanup_completes_requested_deletion() {
+    let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
+
+    harness.complete_deletion(&[id]).await;
+
+    let resource = harness.load(&id).await;
+    assert!(resource.headers().deleted_at.is_some());
+    assert_eq!(resource.headers().name.as_str(), format!("deleted-{id}"));
+    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
+    assert!(harness.get_snapshot_by_id(&id).await.is_none());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_completed_deletion_posts_deleted_message() {
+    let mut mock_outbox = MockOutbox::new();
+    BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
+    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
+
+    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
+
+    harness
+        .complete_deletion_test_uc()
+        .execute(&[id])
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_failed_cleanup_keeps_deletion_in_progress() {
+    let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Failing);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
+    let status_generation_before = harness.load(&id).await.headers().status_generation;
+
+    // A failed cleanup is an outcome recorded in the status, not an error
+    harness.complete_deletion(&[id]).await;
+
+    let resource = harness.load(&id).await;
+    assert!(resource.headers().deleted_at.is_none());
+    assert_eq!(resource.headers().name.as_str(), "res-a");
+    assert_eq!(resource.status().phase, ResourcePhase::Deleting);
+    assert_eq!(
+        resource.headers().status_generation,
+        status_generation_before + 1
+    );
+    BaseResourceServiceHarness::assert_condition(
+        resource.status(),
+        &ready_condition_type_ref(),
+        ResourceConditionStatus::False,
+        Some("CleanupFailed"),
+        Some(true),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_completing_unrequested_deletion_is_no_op() {
+    let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    let last_event_id_before = harness.load(&id).await.last_stored_event_id();
+
+    harness.complete_deletion(&[id]).await;
+
+    let resource = harness.load(&id).await;
+    assert!(resource.headers().deletion_requested_at.is_none());
+    assert_eq!(resource.last_stored_event_id(), last_event_id_before);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_completing_deletion_twice_records_it_once() {
+    let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Stub);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
+
+    harness.complete_deletion(&[id]).await;
+    let last_event_id = harness.load(&id).await.last_stored_event_id();
+
+    harness.complete_deletion(&[id]).await;
+
+    assert_eq!(
+        harness.load(&id).await.last_stored_event_id(),
+        last_event_id
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_batch_posts_one_deleted_message() {
+    let mut mock_outbox = MockOutbox::new();
+    BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 2, None);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 2);
+    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 2);
+
+    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
+    let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
+    harness
+        .delete_resources(account_handle.did, vec![id_a, id_b])
+        .await;
+
+    harness
+        .complete_deletion_test_uc()
+        .execute(&[id_a, id_b])
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_failed_cleanup_holds_back_only_its_resource() {
+    let harness = CompleteDeletionTestHarness::dispatching(
+        TestResourceControllerProvider::FailingCleanupOf("res-b"),
+    );
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
+    let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
+    harness
+        .delete_resources(account_handle.did, vec![id_a, id_b])
+        .await;
+
+    harness.complete_deletion(&[id_a, id_b]).await;
+
+    assert_eq!(
+        harness.load(&id_a).await.status().phase,
+        ResourcePhase::Deleted
+    );
+    assert_eq!(
+        harness.load(&id_b).await.status().phase,
+        ResourcePhase::Deleting
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_concurrent_modification_of_batch_completes_deletions_one_by_one() {
+    let harness = CompleteDeletionTestHarness::dispatching(
+        TestResourceControllerProvider::InterferingCleanup,
+    );
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
+    let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
+    harness
+        .delete_resources(account_handle.did, vec![id_a, id_b])
+        .await;
+
+    harness.complete_deletion(&[id_a, id_b]).await;
+
+    assert_eq!(
+        harness.load(&id_a).await.status().phase,
+        ResourcePhase::Deleted
+    );
+    assert_eq!(
+        harness.load(&id_b).await.status().phase,
+        ResourcePhase::Deleted
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Local harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(ResourceUseCaseBaseHarness, base)]
+struct CompleteDeletionTestHarness {
+    base: ResourceUseCaseBaseHarness,
+    loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
+}
+
+impl CompleteDeletionTestHarness {
+    /// Messages wait in the outbox, so each step runs only when a test calls it.
+    fn dispatching(controller_provider: TestResourceControllerProvider) -> Self {
+        let base = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+            base_opts: BaseResourceServiceHarnessOpts {
+                outbox_provider: OutboxProvider::Dispatching,
+            },
+            controller_provider,
+            sanitizer: SanitizerKind::None,
+        });
+
+        Self {
+            loader: base.catalog().get_one().unwrap(),
+            base,
+        }
+    }
+
+    async fn load(&self, id: &ResourceID) -> TestResource {
+        self.loader.load(id).await.unwrap()
+    }
+
+    async fn complete_deletion(&self, ids: &[ResourceID]) {
+        self.complete_deletion_test_uc().execute(ids).await.unwrap();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

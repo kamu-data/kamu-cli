@@ -13,7 +13,6 @@ use crate::{
     DeclarativeResource,
     ResourceCleanupError,
     ResourceDeletionInProgressError,
-    ResourceName,
     ResourceReconcileError,
     ResourceStatus,
     StatusConflictOf,
@@ -80,12 +79,8 @@ pub trait ManagedResource: DeclarativeResource {
     where
         Self: Sized;
 
-    /// Completes the deletion and renames the resource to `tombstone_name`.
-    fn try_complete_deletion(
-        &mut self,
-        now: DateTime<Utc>,
-        tombstone_name: ResourceName,
-    ) -> Result<(), Self::LifecycleError>
+    /// Completes the deletion and renames the resource to `deleted-<id>`.
+    fn try_complete_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;
 

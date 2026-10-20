@@ -87,6 +87,22 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
 
                 dispatcher.handle_reconciliation_failed(resource).await
             }
+            ResourceLifecycleMessage::DeletionRequested(requested_message) => {
+                debug_assert!(
+                    !requested_message.resources.is_empty(),
+                    "deletion requested message must contain at least one resource"
+                );
+
+                let first = &requested_message.resources[0];
+                let dispatcher = ResourceDispatcherFactory::lifecycle_dispatcher_in(
+                    target_catalog,
+                    &first.schema,
+                )?;
+
+                dispatcher
+                    .handle_deletion_requested(&requested_message.resources)
+                    .await
+            }
             ResourceLifecycleMessage::Deleted(deleted_message) => {
                 debug_assert!(
                     !deleted_message.resources.is_empty(),

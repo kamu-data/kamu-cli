@@ -12,7 +12,10 @@ use dill::CatalogBuilder;
 use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 use kamu_resources::{
+    CompleteResourceDeletionUseCase,
+    CompleteResourceDeletionUseCaseError,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    MockCompleteResourceDeletionUseCase,
     MockReconcileResourceUseCase,
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
@@ -101,9 +104,87 @@ async fn test_applied_message_skips_reconciliation_concurrent_modification() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_deletion_requested_message_completes_deletions_in_one_batch() {
+    let id_a = make_id();
+    let id_b = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
+        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id_a, id_b], || Ok(())),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::deletion_requested(
+            Utc::now(),
+            vec![
+                ResourceLifecycleConsumerHarness::make_snapshot(id_a),
+                ResourceLifecycleConsumerHarness::make_snapshot(id_b),
+            ],
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_deletion_requested_message_skips_status_conflict() {
+    // Another completion of the same deletion records its own outcome
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
+        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id], || {
+            Err(CompleteResourceDeletionUseCaseError::StatusConflict(
+                ResourceStatusConflictError {
+                    expected: 3,
+                    actual: 4,
+                },
+            ))
+        }),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::deletion_requested(
+            Utc::now(),
+            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_deletion_requested_message_skips_concurrent_modification() {
+    let id = make_id();
+
+    let harness = ResourceLifecycleConsumerHarness::new_with_deletion(
+        ResourceLifecycleConsumerHarness::expect_no_execute(),
+        ResourceLifecycleConsumerHarness::expect_complete_deletion(&[id], || {
+            Err(
+                CompleteResourceDeletionUseCaseError::ConcurrentModification(
+                    ConcurrentModificationError {},
+                ),
+            )
+        }),
+    );
+
+    harness
+        .consume_message(&ResourceLifecycleMessage::deletion_requested(
+            Utc::now(),
+            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
+        ))
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_deleted_message_is_no_op_for_controller() {
     // Deleted message → handle_deleted, which is a no-op in the generated
-    // reconcile dispatcher.  Verified: reconcile use case is never called.
+    // controller dispatcher: the controller already cleaned up.
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
@@ -205,7 +286,33 @@ impl ResourceLifecycleConsumerHarness {
         mock
     }
 
+    fn expect_complete_deletion(
+        ids: &[ResourceID],
+        outcome: fn() -> Result<(), CompleteResourceDeletionUseCaseError<TestResource>>,
+    ) -> MockCompleteResourceDeletionUseCase<TestResource> {
+        let ids = ids.to_vec();
+        let mut mock = MockCompleteResourceDeletionUseCase::<TestResource>::new();
+        mock.expect_execute()
+            .once()
+            .withf(move |ids_| *ids_ == ids[..])
+            .returning(move |_| outcome());
+        mock
+    }
+
+    fn expect_no_complete_deletion() -> MockCompleteResourceDeletionUseCase<TestResource> {
+        let mut mock = MockCompleteResourceDeletionUseCase::<TestResource>::new();
+        mock.expect_execute().never();
+        mock
+    }
+
     fn new(mock_reconcile_uc: MockReconcileResourceUseCase<TestResource>) -> Self {
+        Self::new_with_deletion(mock_reconcile_uc, Self::expect_no_complete_deletion())
+    }
+
+    fn new_with_deletion(
+        mock_reconcile_uc: MockReconcileResourceUseCase<TestResource>,
+        mock_complete_deletion_uc: MockCompleteResourceDeletionUseCase<TestResource>,
+    ) -> Self {
         let mut b = CatalogBuilder::new();
 
         OutboxProvider::Immediate {
@@ -215,6 +322,8 @@ impl ResourceLifecycleConsumerHarness {
 
         b.add_value(mock_reconcile_uc)
             .bind::<dyn ReconcileResourceUseCase<TestResource>, MockReconcileResourceUseCase<TestResource>>();
+        b.add_value(mock_complete_deletion_uc)
+            .bind::<dyn CompleteResourceDeletionUseCase<TestResource>, MockCompleteResourceDeletionUseCase<TestResource>>();
 
         b.add::<TestResourceResourceLifecycleDispatcher>();
         b.add::<kamu_resources_services::ResourceLifecycleMessageConsumer>();

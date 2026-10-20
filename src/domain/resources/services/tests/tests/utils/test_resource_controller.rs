@@ -8,9 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
-use kamu_resources::{ResourceCleanupError, ResourceController};
+use internal_error::ErrorIntoInternal;
+use kamu_resources::{
+    DeclarativeResource,
+    ManagedResource,
+    ResourceAggregateLoader,
+    ResourceCleanupError,
+    ResourceController,
+    ResourcePersistenceService,
+};
 
 use crate::tests::utils::{TestResource, TestResourceReconcileError};
 
@@ -81,6 +89,82 @@ impl ResourceController<TestResource> for TestResourceCountingController {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceSelectiveCleanupController
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails the cleanup of the resource named `failing_name` only.
+pub struct TestResourceSelectiveCleanupController {
+    pub failing_name: &'static str,
+}
+
+#[async_trait::async_trait]
+impl ResourceController<TestResource> for TestResourceSelectiveCleanupController {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        if resource.headers().name.as_str() == self.failing_name {
+            return Err(ResourceCleanupError::Internal(
+                "simulated cleanup failure".int_err(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceInterferingCleanupController
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// During its first cleanup, plays another writer that updates the status of
+/// the resource being cleaned up, so the batch it belongs to conflicts.
+#[dill::component(pub)]
+#[dill::interface(dyn ResourceController<TestResource>)]
+pub struct TestResourceInterferingCleanupController {
+    catalog: dill::Catalog,
+    interference: Arc<TestCleanupInterference>,
+}
+
+#[derive(Default)]
+pub struct TestCleanupInterference {
+    done: AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl ResourceController<TestResource> for TestResourceInterferingCleanupController {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        if self.interference.done.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        let loader = self
+            .catalog
+            .get_one::<dyn ResourceAggregateLoader<TestResource>>()
+            .unwrap();
+        let persistence = self
+            .catalog
+            .get_one::<dyn ResourcePersistenceService<TestResource>>()
+            .unwrap();
+
+        let mut other = loader.load(resource.id()).await.unwrap();
+        let mut new_status = other.status().clone();
+        new_status.observed_at = Some(chrono::Utc::now());
+        let status_generation = other.headers().status_generation;
+        other
+            .try_update_status(chrono::Utc::now(), status_generation, new_status)
+            .unwrap();
+        persistence.save(&mut other).await.unwrap();
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 pub enum TestResourceControllerProvider {
@@ -88,6 +172,8 @@ pub enum TestResourceControllerProvider {
     Stub,
     Failing,
     Counting(Arc<AtomicU32>),
+    FailingCleanupOf(&'static str),
+    InterferingCleanup,
 }
 
 impl TestResourceControllerProvider {
@@ -104,6 +190,14 @@ impl TestResourceControllerProvider {
                     call_count: counter,
                 })
                 .bind::<dyn ResourceController<TestResource>, TestResourceCountingController>();
+            }
+            TestResourceControllerProvider::FailingCleanupOf(failing_name) => {
+                b.add_value(TestResourceSelectiveCleanupController { failing_name })
+                    .bind::<dyn ResourceController<TestResource>, TestResourceSelectiveCleanupController>();
+            }
+            TestResourceControllerProvider::InterferingCleanup => {
+                b.add_value(TestCleanupInterference::default());
+                b.add::<TestResourceInterferingCleanupController>();
             }
         }
     }

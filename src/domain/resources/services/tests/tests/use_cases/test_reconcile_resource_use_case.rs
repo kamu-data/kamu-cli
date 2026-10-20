@@ -427,7 +427,7 @@ async fn test_reconcile_counts_status_updates() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_reconcile_after_delete_is_no_op() {
+async fn test_reconcile_of_resource_being_deleted_is_no_op() {
     let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -438,14 +438,14 @@ async fn test_reconcile_after_delete_is_no_op() {
     harness.reconcile_test_uc().execute(&id).await.unwrap();
 
     let resource = harness.load(&id).await;
-    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
+    assert_eq!(resource.status().phase, ResourcePhase::Deleting);
     assert_eq!(resource.headers().status_generation, 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_finish_phase_discards_outcome_of_deleted_resource() {
+async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
     let harness = ReconcileTestHarness::dispatching(TestResourceControllerProvider::Stub);
 
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -464,8 +464,8 @@ async fn test_finish_phase_discards_outcome_of_deleted_resource() {
     helper.finish_reconciliation_phase(started).await.unwrap();
 
     let resource = harness.load(&id).await;
-    assert!(resource.headers().deleted_at.is_some());
-    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
+    assert!(resource.headers().deletion_requested_at.is_some());
+    assert_eq!(resource.status().phase, ResourcePhase::Deleting);
     assert_eq!(resource.headers().status_generation, 2);
 }
 

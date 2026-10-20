@@ -105,14 +105,24 @@ where
 
         let mut resources = self.load_resources(&owned_resource_ids).await?;
 
+        for resource in &mut resources {
+            resource.try_request_deletion(now).map_err(|err| {
+                RequestResourcesDeletionError::Internal(
+                    format!("{err}")
+                        .int_err()
+                        .with_context(format!("Failed to request deletion of {}", resource.id())),
+                )
+            })?;
+        }
+
         match self
             .resource_persistence_service
-            .delete_many(&mut resources, now)
+            .save_many(&mut resources)
             .await
         {
             Ok(()) => Ok(()),
             Err(ResourcePersistenceError::Duplicate(_)) => {
-                unreachable!("delete_many() must not expose duplicate persistence errors")
+                unreachable!("save_many() must not expose duplicate persistence errors")
             }
             Err(ResourcePersistenceError::ConcurrentModification(err)) => {
                 Err(RequestResourcesDeletionError::ConcurrentModification(err))
@@ -120,18 +130,18 @@ where
             Err(ResourcePersistenceError::InvalidDurableState(err)) => {
                 Err(RequestResourcesDeletionError::Internal(
                     err.int_err()
-                        .with_context("Failed to persist deleted resources"),
+                        .with_context("Failed to persist resources being deleted"),
                 ))
             }
             Err(ResourcePersistenceError::Internal(err)) => {
                 Err(RequestResourcesDeletionError::Internal(
-                    err.with_context("Failed to persist deleted resources"),
+                    err.with_context("Failed to persist resources being deleted"),
                 ))
             }
         }?;
 
         if !resources.is_empty() {
-            self.notify_resources_deleted(now, resources).await?;
+            self.notify_deletion_requested(now, resources).await?;
         }
 
         Ok(())
@@ -165,12 +175,12 @@ where
             .collect()
     }
 
-    async fn notify_resources_deleted(
+    async fn notify_deletion_requested(
         &self,
         now: DateTime<Utc>,
         resources: Vec<R>,
     ) -> Result<(), RequestResourcesDeletionError> {
-        let resource_snashots = resources
+        let resource_snapshots = resources
             .into_iter()
             .map(|resource| {
                 resource
@@ -182,7 +192,7 @@ where
         self.outbox
             .post_message(
                 MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-                ResourceLifecycleMessage::deleted(now, resource_snashots),
+                ResourceLifecycleMessage::deletion_requested(now, resource_snapshots),
             )
             .await
             .map_err(RequestResourcesDeletionError::Internal)?;

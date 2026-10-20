@@ -256,9 +256,8 @@ macro_rules! impl_event_sourced_resource {
             fn try_complete_deletion(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
-                tombstone_name: $crate::ResourceName,
             ) -> Result<(), Self::LifecycleError> {
-                $crate::try_complete_resource_deletion(self, now, tombstone_name)
+                $crate::try_complete_resource_deletion(self, now)
             }
 
             fn try_update_status(

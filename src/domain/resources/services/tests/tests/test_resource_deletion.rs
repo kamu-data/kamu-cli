@@ -94,7 +94,10 @@ fn test_completed_deletion_renames_to_tombstone() {
     harness.complete_deletion();
 
     let headers = harness.resource.headers();
-    assert_eq!(headers.name.as_str(), "deleted-res");
+    assert_eq!(
+        headers.name.as_str(),
+        format!("deleted-{}", harness.resource.id())
+    );
     assert_eq!(headers.deletion_requested_at, Some(requested_at));
     assert_eq!(headers.deleted_at, Some(harness.now));
     assert_eq!(harness.phase(), ResourcePhase::Deleted);
@@ -291,9 +294,7 @@ impl ResourceDeletionHarness {
 
     fn complete_deletion(&mut self) {
         let now = self.tick();
-        self.resource
-            .try_complete_deletion(now, Self::tombstone_name())
-            .unwrap();
+        self.resource.try_complete_deletion(now).unwrap();
     }
 
     /// Applies a deletion as stored before it was preceded by a request.

@@ -101,7 +101,7 @@ async fn test_delete_resource_owned_by_other_account_fails() {
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
 
     let result = harness
-        .delete_test_uc()
+        .request_deletion_test_uc()
         .execute(account_handle_b.did, vec![id])
         .await;
 
@@ -121,11 +121,11 @@ async fn test_delete_resource_owned_by_other_account_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_emits_deleted_lifecycle_message() {
+async fn test_delete_emits_deletion_requested_lifecycle_message() {
     let mut mock_outbox = MockOutbox::new();
-    // apply_and_get_id posts one Applied message; expect it before the Deleted one
+    // apply_and_get_id posts one Applied message; expect it before the DeletionRequested one
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
-    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -142,9 +142,9 @@ async fn test_delete_emits_deleted_lifecycle_message() {
 async fn test_delete_multiple_emits_single_message_with_all_resources() {
     let mut mock_outbox = MockOutbox::new();
     // Three apply calls → three Applied messages;
-    // one delete call → one Deleted message
+    // one delete call → one DeletionRequested message
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 3, None);
-    BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 3);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 3);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -156,7 +156,29 @@ async fn test_delete_multiple_emits_single_message_with_all_resources() {
     harness
         .delete_resources(account_handle.did, vec![id_a, id_b, id_c])
         .await;
-    // MockOutbox verifies exactly one Deleted message with 3 resources on drop
+    // MockOutbox verifies exactly one DeletionRequested message with 3 resources on drop
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_repeated_delete_requests_deletion_again() {
+    // Requesting the deletion again re-drives the cleanup of a resource whose
+    // earlier cleanup failed
+    let mut mock_outbox = MockOutbox::new();
+    BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
+    BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
+
+    let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+
+    harness
+        .delete_resources(account_handle.did.clone(), vec![id])
+        .await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,7 +186,7 @@ async fn test_delete_multiple_emits_single_message_with_all_resources() {
 #[test_log::test(tokio::test)]
 async fn test_delete_no_op_emits_no_message() {
     // Deleting non-existent UIDs must not post any outbox message.
-    // Covers the `if !resources.is_empty()` guard in delete.rs.
+    // Covers the `if !resources.is_empty()` guard in request_deletion.rs.
     let mut mock_outbox = MockOutbox::new();
     mock_outbox.expect_post_message_as_json().times(0);
 
@@ -179,8 +201,8 @@ async fn test_delete_no_op_emits_no_message() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deleted_message_carries_correct_snapshot_data() {
-    // Verify the Deleted message payload contains the correct UID and spec.
+async fn test_deletion_requested_message_carries_correct_snapshot_data() {
+    // Verify the DeletionRequested message payload contains the correct UID and spec.
     let mut mock_outbox = MockOutbox::new();
 
     // apply_and_get_id posts one Applied message; accept it first
@@ -202,7 +224,7 @@ async fn test_deleted_message_carries_correct_snapshot_data() {
             if producer != MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE {
                 return false;
             }
-            let ResourceLifecycleMessage::Deleted(m) =
+            let ResourceLifecycleMessage::DeletionRequested(m) =
                 serde_json::from_value(message.clone()).unwrap()
             else {
                 return false;

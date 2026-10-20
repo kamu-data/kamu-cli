@@ -163,3 +163,59 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cleanup_variable_set_removes_only_its_projection_entries() {
+    let harness = BaseConfigurationServiceHarness::new();
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+
+    let mut ids = Vec::new();
+    for name in ["vars-deleted", "vars-other"] {
+        let decision = harness
+            .apply_variable_use_case()
+            .apply(ApplyResourceParams {
+                id: None,
+                headers: BaseResourceServiceHarness::make_headers_input(
+                    account_handle.clone(),
+                    name,
+                ),
+                spec: make_variable_set_spec([("KEY", "value")]),
+            })
+            .await
+            .unwrap();
+        ids.push(decision.expect_applied().id);
+    }
+    let [id_deleted, id_other] = ids[..] else {
+        unreachable!()
+    };
+
+    let resource = harness.load_variable_set(&id_deleted).await;
+    harness
+        .variable_set_controller()
+        .cleanup(&resource)
+        .await
+        .unwrap();
+
+    let repo = harness.variable_set_projection_repo();
+    assert!(
+        repo.get_latest_entries(&id_deleted)
+            .await
+            .unwrap()
+            .is_empty(),
+        "cleanup must remove the projection entries of the resource"
+    );
+    assert_eq!(
+        repo.get_latest_entries(&id_other).await.unwrap().len(),
+        1,
+        "entries of other resources must be untouched"
+    );
+
+    // Cleanup may run again after a failure
+    harness
+        .variable_set_controller()
+        .cleanup(&resource)
+        .await
+        .unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
