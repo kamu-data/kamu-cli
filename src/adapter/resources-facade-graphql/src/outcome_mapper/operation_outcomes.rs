@@ -132,6 +132,7 @@ pub(crate) fn map_search_handles_outcome(
 pub(crate) fn map_batch_get_resources_outcome(
     outcome: cynic_api::operations::get::BatchResourcesOutcome,
     resource_refs: &[domain::ResourceRef],
+    visibility: domain::ResourceVisibility,
 ) -> Result<BatchResourceResponse<domain::Resource, ResourceLookupProblem>, BatchResourceError> {
     use cynic_api::operations::get::BatchResourcesOutcome as O;
     match outcome {
@@ -150,6 +151,7 @@ pub(crate) fn map_batch_get_resources_outcome(
                 &successes,
                 &problems,
                 resource_refs.len(),
+                visibility,
                 "resource",
             )?;
             Ok(BatchResourceResponse {
@@ -174,6 +176,7 @@ pub(crate) fn map_batch_get_resources_outcome(
 pub(crate) fn map_batch_get_handles_outcome(
     outcome: cynic_api::operations::handle::BatchResourceHandlesOutcome,
     resource_refs: &[domain::ResourceRef],
+    visibility: domain::ResourceVisibility,
 ) -> Result<BatchResourceResponse<domain::ResourceHandle, ResourceLookupProblem>, BatchResourceError>
 {
     use cynic_api::operations::handle::BatchResourceHandlesOutcome as O;
@@ -184,7 +187,13 @@ pub(crate) fn map_batch_get_handles_outcome(
                     Ok((s.request_index, s.handle.into()))
                 })?;
             let problems = collect_batch_problems(batch.problems, resource_refs.len(), "handle")?;
-            validate_batch_response_indexes(&successes, &problems, resource_refs.len(), "handle")?;
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                resource_refs.len(),
+                visibility,
+                "handle",
+            )?;
             Ok(BatchResourceResponse {
                 successes,
                 problems,
@@ -207,6 +216,7 @@ pub(crate) fn map_batch_get_handles_outcome(
 pub(crate) fn map_batch_render_manifests_outcome(
     outcome: cynic_api::operations::render_manifest::BatchResourceManifestsOutcome,
     resource_refs: &[domain::ResourceRef],
+    visibility: domain::ResourceVisibility,
 ) -> Result<
     BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
     BatchResourceError,
@@ -223,6 +233,7 @@ pub(crate) fn map_batch_render_manifests_outcome(
                 &successes,
                 &problems,
                 resource_refs.len(),
+                visibility,
                 "manifest",
             )?;
             Ok(BatchResourceResponse {
@@ -263,7 +274,14 @@ pub(crate) fn map_batch_delete_outcome(
                     ))
                 })?;
             let problems = collect_batch_problems(batch.problems, resource_refs.len(), "delete")?;
-            validate_batch_response_indexes(&successes, &problems, resource_refs.len(), "delete")?;
+            // Names resolve to live resources only, one per name
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                resource_refs.len(),
+                domain::ResourceVisibility::Active,
+                "delete",
+            )?;
             Ok(BatchResourceResponse {
                 successes,
                 problems,

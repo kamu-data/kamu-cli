@@ -108,7 +108,11 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_batch_get_resources_outcome(response.resources.by_refs, &resource_refs)
+        outcome_mapper::map_batch_get_resources_outcome(
+            response.resources.by_refs,
+            &resource_refs,
+            visibility,
+        )
     }
 
     async fn get_handles(
@@ -131,6 +135,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         outcome_mapper::map_batch_get_handles_outcome(
             response.resources.handles_by_refs,
             &resource_refs,
+            visibility,
         )
     }
 
@@ -161,6 +166,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         outcome_mapper::map_batch_render_manifests_outcome(
             response.resources.render_manifests,
             &resource_refs,
+            visibility,
         )
     }
 
