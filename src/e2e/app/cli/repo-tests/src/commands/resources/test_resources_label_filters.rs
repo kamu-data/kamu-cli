@@ -188,7 +188,7 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
         "delete variablesets --all -l environment=staging --dry-run",
     );
 
-    ctx.assert_success(
+    ctx.assert_deleted(
         [
             "delete",
             "variablesets",
@@ -197,10 +197,7 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
             "environment=staging",
             "--force",
         ],
-        Some(&[
-            r#"Deleting: VariableSet/stage-vars"#,
-            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
-        ]),
+        &["VariableSet/stage-vars"],
     )
     .await;
 

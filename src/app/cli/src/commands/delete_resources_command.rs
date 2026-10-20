@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
-use internal_error::{BoxedError, InternalError};
+use internal_error::{BoxedError, InternalError, ResultIntoInternal};
 use kamu_resources::{ResourceID, ResourcePhase, ResourceVisibility, TypeUri};
 use kamu_resources_facade::{
     BatchResourceError,
@@ -20,7 +20,6 @@ use kamu_resources_facade::{
 };
 
 use super::{BatchError, CLIError, Command};
-use crate::Interact;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResolvedResourceContext, ResourceContextReporter};
 use crate::resources::{
@@ -29,6 +28,7 @@ use crate::resources::{
     ResourceSelectionSyntax,
     ResourceTarget,
 };
+use crate::{Interact, PostCommandAction, PostCommandActions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,6 +38,7 @@ pub struct DeleteResourcesCommand {
     resource_context_reporter: Arc<ResourceContextReporter>,
     interact: Arc<Interact>,
     output_config: Arc<OutputConfig>,
+    post_command_actions: Arc<PostCommandActions>,
 
     resolved_context: ResolvedResourceContext,
     syntax: ResourceSelectionSyntax,
@@ -56,6 +57,7 @@ impl DeleteResourcesCommand {
         resource_context_reporter: Arc<ResourceContextReporter>,
         interact: Arc<Interact>,
         output_config: Arc<OutputConfig>,
+        post_command_actions: Arc<PostCommandActions>,
         resolved_context: ResolvedResourceContext,
         syntax: ResourceSelectionSyntax,
         label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
@@ -69,6 +71,7 @@ impl DeleteResourcesCommand {
             resource_context_reporter,
             interact,
             output_config,
+            post_command_actions,
             resolved_context,
             syntax,
             label_filter,
@@ -171,9 +174,23 @@ impl DeleteResourcesCommand {
             self.confirm_delete(&targets)?;
         }
 
-        self.execute_delete_phase(targets, &mut summary, &mut errors)
+        let deletions = self
+            .execute_delete_phase(targets, &mut summary, &mut errors)
             .await;
 
+        if errors.is_empty() && !deletions.is_empty() && self.phases_known_after_command() {
+            self.post_command_actions.add(ReportDeletionPhases {
+                targets: deletions.into_iter().map(|(target, _)| target).collect(),
+                summary,
+                output_config: self.output_config.clone(),
+            });
+            return Ok(());
+        }
+
+        for (target, phase) in &deletions {
+            summary.record_success(*phase);
+            DeleteResourcesPrinter::print_success(target, *phase, self.output_config.as_ref());
+        }
         DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
 
         if errors.is_empty() {
@@ -184,6 +201,16 @@ impl DeleteResourcesCommand {
                 errors_with_context: errors,
             }
             .into())
+        }
+    }
+
+    /// A local workspace processes the messages of a command once its
+    /// transaction has committed, so controllers clean up only then. A server
+    /// reports the phase at the time of its response.
+    fn phases_known_after_command(&self) -> bool {
+        match self.resolved_context {
+            ResolvedResourceContext::LocalWorkspace => true,
+            ResolvedResourceContext::RemoteWorkspace { .. } => false,
         }
     }
 
@@ -206,18 +233,21 @@ impl DeleteResourcesCommand {
         ))
     }
 
+    /// Returns the deleted targets with the phase each one reached
     async fn execute_delete_phase(
         &self,
         targets: Vec<DeleteResourceTarget>,
         summary: &mut DeleteResourcesSummary,
         errors: &mut Vec<(BoxedError, String)>,
-    ) {
+    ) -> Vec<(DeleteResourceTarget, ResourcePhase)> {
+        let mut deletions = Vec::new();
+
         if self.dry_run {
             for target in targets {
                 summary.record_deleted();
                 DeleteResourcesPrinter::print_dry_run_success(&target, self.output_config.as_ref());
             }
-            return;
+            return deletions;
         }
 
         // The facade batches by descriptor, so cross-type selections are split into one
@@ -232,6 +262,7 @@ impl DeleteResourcesCommand {
                     self.handle_delete_result(
                         &entries,
                         response,
+                        &mut deletions,
                         summary,
                         errors,
                         self.output_config.as_ref(),
@@ -252,6 +283,8 @@ impl DeleteResourcesCommand {
                 break;
             }
         }
+
+        deletions
     }
 
     /// Builds one ref per already-resolved target, naming the type by its
@@ -261,13 +294,7 @@ impl DeleteResourcesCommand {
     ) -> Vec<kamu_resources::ResourceRef> {
         entries
             .iter()
-            .map(|(_, target)| kamu_resources::ResourceRef {
-                account: None,
-                r#type: Some(target.schema.clone().into()),
-                id: Some(target.id),
-                did: None,
-                name: None,
-            })
+            .map(|(_, target)| target.resource_ref())
             .collect()
     }
 
@@ -293,6 +320,7 @@ impl DeleteResourcesCommand {
             ResourceDeletion,
             ResourceLookupProblem,
         >,
+        deletions: &mut Vec<(DeleteResourceTarget, ResourcePhase)>,
         summary: &mut DeleteResourcesSummary,
         errors: &mut Vec<(BoxedError, String)>,
         output_config: &OutputConfig,
@@ -302,8 +330,7 @@ impl DeleteResourcesCommand {
         // descriptor group.
         for success in response.successes {
             let (_, target) = &entries[success.request_index];
-            summary.record_success(success.item.phase);
-            DeleteResourcesPrinter::print_success(target, success.item.phase, output_config);
+            deletions.push((target.clone(), success.item.phase));
         }
 
         for problem in response.problems {
@@ -373,6 +400,51 @@ impl Command for DeleteResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reports the phase each resource reached once its controllers had the chance
+/// to clean up: still found by its id means `Deleting`, gone means `Deleted`
+struct ReportDeletionPhases {
+    targets: Vec<DeleteResourceTarget>,
+    summary: DeleteResourcesSummary,
+    output_config: Arc<OutputConfig>,
+}
+
+#[async_trait::async_trait]
+impl PostCommandAction for ReportDeletionPhases {
+    async fn run(self: Box<Self>, catalog: dill::Catalog) -> Result<(), CLIError> {
+        let resource_facade = catalog.get_one::<dyn ResourceFacade>().int_err()?;
+        let resource_refs = self
+            .targets
+            .iter()
+            .map(DeleteResourceTarget::resource_ref)
+            .collect();
+
+        let being_deleted = resource_facade
+            .get_handles(resource_refs, ResourceVisibility::Active)
+            .await
+            .map_err(CLIError::critical)?
+            .successes
+            .into_iter()
+            .map(|success| success.item.id)
+            .collect::<HashSet<_>>();
+
+        let mut summary = self.summary;
+        for target in &self.targets {
+            let phase = if being_deleted.contains(&target.id) {
+                ResourcePhase::Deleting
+            } else {
+                ResourcePhase::Deleted
+            };
+            summary.record_success(phase);
+            DeleteResourcesPrinter::print_success(target, phase, self.output_config.as_ref());
+        }
+        DeleteResourcesPrinter::print_summary(&summary, false);
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub(super) struct PreparedDeleteTargets {
     targets: Vec<DeleteResourceTarget>,
@@ -401,6 +473,16 @@ impl DeleteResourceTarget {
 
     fn display_name(&self) -> String {
         format!("{}/{}", self.canonical_selector, self.name)
+    }
+
+    fn resource_ref(&self) -> kamu_resources::ResourceRef {
+        kamu_resources::ResourceRef {
+            account: None,
+            r#type: Some(self.schema.clone().into()),
+            id: Some(self.id),
+            did: None,
+            name: None,
+        }
     }
 }
 

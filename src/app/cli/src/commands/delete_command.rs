@@ -30,7 +30,13 @@ use crate::resources::{
     is_dataset_target,
     is_resource_id,
 };
-use crate::{ConfirmDeleteService, Interact, WorkspaceService, cli_value_parser as parsers};
+use crate::{
+    ConfirmDeleteService,
+    Interact,
+    PostCommandActions,
+    WorkspaceService,
+    cli_value_parser as parsers,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,6 +70,7 @@ pub struct DeleteCommand {
     resource_context_reporter: Arc<ResourceContextReporter>,
     interact: Arc<Interact>,
     output_config: Arc<OutputConfig>,
+    post_command_actions: Arc<PostCommandActions>,
 
     #[dill::component(explicit)]
     target: Option<String>,
@@ -194,6 +201,7 @@ impl DeleteCommand {
             self.resource_context_reporter.clone(),
             self.interact.clone(),
             self.output_config.clone(),
+            self.post_command_actions.clone(),
             resolved_context,
             syntax,
             ResourceLabelSelectorParser::parse(&self.label_selectors)?,
