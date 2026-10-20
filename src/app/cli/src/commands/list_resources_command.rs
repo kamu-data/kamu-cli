@@ -55,6 +55,7 @@ pub struct ListResourcesCommand {
     detail_level: u8,
     max_results: Option<NonZeroUsize>,
     label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+    visibility: kamu_resources::ResourceVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,6 +71,7 @@ impl ListResourcesCommand {
         detail_level: u8,
         max_results: Option<NonZeroUsize>,
         label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+        visibility: kamu_resources::ResourceVisibility,
     ) -> Self {
         Self {
             resource_facade,
@@ -81,6 +83,7 @@ impl ListResourcesCommand {
             detail_level,
             max_results,
             label_filter,
+            visibility,
         }
     }
 
@@ -293,6 +296,7 @@ impl ListResourcesCommand {
                 .resource_facade
                 .search(kamu_resources_facade::SearchResourcesRequest {
                     selectors: selectors.to_vec(),
+                    visibility: self.visibility,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
                 .await?;
@@ -303,6 +307,7 @@ impl ListResourcesCommand {
                     .resource_facade
                     .search(kamu_resources_facade::SearchResourcesRequest {
                         selectors: selectors.to_vec(),
+                        visibility: self.visibility,
                         pagination,
                     })
                     .await?;

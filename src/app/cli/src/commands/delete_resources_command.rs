@@ -11,8 +11,13 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
-use kamu_resources::{ResourceID, TypeUri};
-use kamu_resources_facade::{BatchResourceError, ResourceFacade, ResourceLookupProblem};
+use kamu_resources::{ResourceID, ResourcePhase, ResourceVisibility, TypeUri};
+use kamu_resources_facade::{
+    BatchResourceError,
+    ResourceDeletion,
+    ResourceFacade,
+    ResourceLookupProblem,
+};
 
 use super::{BatchError, CLIError, Command};
 use crate::Interact;
@@ -37,6 +42,7 @@ pub struct DeleteResourcesCommand {
     resolved_context: ResolvedResourceContext,
     syntax: ResourceSelectionSyntax,
     label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+    visibility: ResourceVisibility,
     force: bool,
     ignore_not_found: bool,
     dry_run: bool,
@@ -54,6 +60,7 @@ impl DeleteResourcesCommand {
         resolved_context: ResolvedResourceContext,
         syntax: ResourceSelectionSyntax,
         label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
+        visibility: ResourceVisibility,
         force: bool,
         ignore_not_found: bool,
         dry_run: bool,
@@ -67,6 +74,7 @@ impl DeleteResourcesCommand {
             resolved_context,
             syntax,
             label_filter,
+            visibility,
             force,
             ignore_not_found,
             dry_run,
@@ -85,6 +93,7 @@ impl DeleteResourcesCommand {
                     ignore_not_found: self.ignore_not_found,
                     max_expanded_results: None,
                     label_filter: self.label_filter.clone(),
+                    visibility: self.visibility,
                 },
             )
             .await?;
@@ -208,7 +217,7 @@ impl DeleteResourcesCommand {
         if self.dry_run {
             for target in targets {
                 summary.record_deleted();
-                DeleteResourcesPrinter::print_success(&target, true, self.output_config.as_ref());
+                DeleteResourcesPrinter::print_dry_run_success(&target, self.output_config.as_ref());
             }
             return;
         }
@@ -218,7 +227,7 @@ impl DeleteResourcesCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             match self
                 .resource_facade
-                .delete(Self::entry_resource_refs(&entries))
+                .delete(Self::entry_resource_refs(&entries), self.visibility)
                 .await
             {
                 Ok(response) => {
@@ -282,7 +291,10 @@ impl DeleteResourcesCommand {
     fn handle_delete_result(
         &self,
         entries: &[(usize, DeleteResourceTarget)],
-        response: kamu_resources_facade::BatchResourceResponse<ResourceID, ResourceLookupProblem>,
+        response: kamu_resources_facade::BatchResourceResponse<
+            ResourceDeletion,
+            ResourceLookupProblem,
+        >,
         summary: &mut DeleteResourcesSummary,
         errors: &mut Vec<(BoxedError, String)>,
         output_config: &OutputConfig,
@@ -292,8 +304,8 @@ impl DeleteResourcesCommand {
         // descriptor group.
         for success in response.successes {
             let (_, target) = &entries[success.request_index];
-            summary.record_deleted();
-            DeleteResourcesPrinter::print_success(target, false, output_config);
+            summary.record_success(success.item.phase);
+            DeleteResourcesPrinter::print_success(target, success.item.phase, output_config);
         }
 
         for problem in response.problems {
@@ -400,6 +412,7 @@ impl DeleteResourceTarget {
 struct DeleteResourcesSummary {
     total_items: usize,
     deleted: usize,
+    deleting: usize,
     ignored: usize,
     failed: usize,
 }
@@ -408,6 +421,22 @@ impl DeleteResourcesSummary {
     fn record_deleted(&mut self) {
         self.total_items += 1;
         self.deleted += 1;
+    }
+
+    /// Controllers may still be cleaning up after the deletion was requested.
+    fn record_success(&mut self, phase: ResourcePhase) {
+        match phase {
+            ResourcePhase::Deleting => {
+                self.total_items += 1;
+                self.deleting += 1;
+            }
+            ResourcePhase::Pending
+            | ResourcePhase::Reconciling
+            | ResourcePhase::Ready
+            | ResourcePhase::Degraded
+            | ResourcePhase::Failed
+            | ResourcePhase::Deleted => self.record_deleted(),
+        }
     }
 
     fn record_ignored(&mut self) {
@@ -426,18 +455,38 @@ impl DeleteResourcesSummary {
 struct DeleteResourcesPrinter;
 
 impl DeleteResourcesPrinter {
-    fn print_success(target: &DeleteResourceTarget, dry_run: bool, output_config: &OutputConfig) {
+    fn print_success(
+        target: &DeleteResourceTarget,
+        phase: ResourcePhase,
+        output_config: &OutputConfig,
+    ) {
         if output_config.quiet {
             return;
         }
 
-        let label = if dry_run {
-            console::style("Deleted (dry-run)").cyan().bold()
-        } else {
-            console::style("Deleted").green().bold()
+        let label = match phase {
+            ResourcePhase::Deleting => console::style("Deleting").yellow().bold(),
+            ResourcePhase::Pending
+            | ResourcePhase::Reconciling
+            | ResourcePhase::Ready
+            | ResourcePhase::Degraded
+            | ResourcePhase::Failed
+            | ResourcePhase::Deleted => console::style("Deleted").green().bold(),
         };
 
         eprintln!("{label}: {}", target.display_name());
+    }
+
+    fn print_dry_run_success(target: &DeleteResourceTarget, output_config: &OutputConfig) {
+        if output_config.quiet {
+            return;
+        }
+
+        eprintln!(
+            "{}: {}",
+            console::style("Deleted (dry-run)").cyan().bold(),
+            target.display_name()
+        );
     }
 
     fn print_ignored(selector: &str, dry_run: bool, output_config: &OutputConfig) {
@@ -472,8 +521,14 @@ impl DeleteResourcesPrinter {
             "deleted"
         };
 
+        let deleting = if summary.deleting > 0 {
+            format!(", {} deleting", summary.deleting)
+        } else {
+            String::new()
+        };
+
         eprintln!(
-            "{} {} item(s): {} {}, {} ignored, {} failed",
+            "{} {} item(s): {} {}{deleting}, {} ignored, {} failed",
             console::style("Summary").bold(),
             summary.total_items,
             summary.deleted,

@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ApplyManifestApplicationDecision, ResourcePhase, ResourceRef, TypeName};
+use kamu_resources::{
+    ApplyManifestApplicationDecision,
+    ResourcePhase,
+    ResourceRef,
+    ResourceVisibility,
+    TypeName,
+};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceFacade,
@@ -110,6 +116,7 @@ async fn observe(facade: &dyn ResourceFacade) -> (u64, u64, ResourcePhase) {
                     name: Some(RESOURCE_NAME.parse().unwrap()),
                 }],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),

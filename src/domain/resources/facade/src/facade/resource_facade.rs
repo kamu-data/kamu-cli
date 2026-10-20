@@ -15,10 +15,12 @@ use domain::{
     ResourceHandle,
     ResourceID,
     ResourceOwnerRef,
+    ResourcePhase,
     ResourceRef,
     ResourceSelector,
     ResourceSummaryView,
     ResourceTypeDescriptor,
+    ResourceVisibility,
     ResourcesSummary,
 };
 use kamu_resources as domain;
@@ -49,6 +51,12 @@ use crate::{
 /// `plan_apply_manifest`/`apply_manifest`, and the per-item transaction
 /// boundary belongs to the caller (the CLI's `--continue-on-error` path opens
 /// one transaction per manifest), not to the facade.
+///
+/// Name lookups and searches see resources being deleted only under
+/// [`ResourceVisibility::IncludeDeleting`]. A name may then resolve to several
+/// resources: the live one first, then those being deleted, each reported as a
+/// success at the same `request_index`. A lookup by id finds a resource being
+/// deleted either way.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
@@ -65,11 +73,13 @@ pub trait ResourceFacade: Send + Sync {
         &self,
         resource_refs: Vec<ResourceRef>,
         spec_view: SpecViewOpts,
+        visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError>;
 
     async fn get_handles(
         &self,
         resource_refs: Vec<ResourceRef>,
+        visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>;
 
     async fn render_manifests(
@@ -77,6 +87,7 @@ pub trait ResourceFacade: Send + Sync {
         resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
         spec_view: SpecViewOpts,
+        visibility: ResourceVisibility,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
@@ -121,10 +132,13 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestBatchRequest,
     ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
+    /// Requests deletion of the resources. A resource whose deletion is
+    /// already in progress is included again, which retries its cleanup.
     async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,
-    ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError>;
+        visibility: ResourceVisibility,
+    ) -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, BatchResourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,6 +168,16 @@ pub struct BatchResourceSuccess<T> {
 pub struct BatchResourceProblem<E> {
     pub request_index: usize,
     pub error: E,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResourceDeletion {
+    pub id: ResourceID,
+    /// `Deleting` while the controllers clean up, `Deleted` once they finished
+    /// within the request.
+    pub phase: ResourcePhase,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,6 +238,7 @@ pub struct SearchResourcesRequest {
     /// filter or account — a uniform one is the special case where every
     /// selector carries the same.
     pub selectors: Vec<ResourceSelector>,
+    pub visibility: ResourceVisibility,
     pub pagination: PaginationOpts,
 }
 

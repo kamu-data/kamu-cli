@@ -12,7 +12,7 @@ use std::future::Future;
 
 use database_common::{PaginationOpts, sql_like_escape_literal};
 use internal_error::InternalError;
-use kamu_resources::{ResourceHandle, ResourceTypeDescriptor};
+use kamu_resources::{ResourceHandle, ResourceTypeDescriptor, ResourceVisibility};
 use kamu_resources_facade::{
     GetResourceError,
     ResourceFacade,
@@ -66,6 +66,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
             &selection,
             resource_facade,
             options.label_filter.as_ref(),
+            options.visibility,
         )
         .await?;
         let mut exact_any_type_results = exact_any_type_results.into_iter();
@@ -75,6 +76,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
             &selection,
             resource_facade,
             options.label_filter.as_ref(),
+            options.visibility,
         )
         .await?;
         let mut exact_results = exact_results.into_iter();
@@ -264,11 +266,14 @@ impl ResourceSelectionResolutionServiceImpl {
         }
     }
 
+    /// An exact name resolves to several resources only when resources being
+    /// deleted are visible.
     async fn fetch_exact_identities(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
-    ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
+        visibility: ResourceVisibility,
+    ) -> Result<Vec<Result<Vec<ResourceHandle>, GetResourceError>>, CLIError> {
         let exact_selectors = selection
             .items
             .iter()
@@ -292,7 +297,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let exact_request_count = exact_selectors.len();
         let mut exact_results = (0..exact_request_count)
             .map(|_| None)
-            .collect::<Vec<Option<Result<ResourceHandle, GetResourceError>>>>();
+            .collect::<Vec<Option<Result<Vec<ResourceHandle>, GetResourceError>>>>();
         let mut groups: BTreeMap<
             kamu_resources::ResourceTypeSelectorRaw,
             (kamu_resources::TypeUri, Vec<_>),
@@ -334,6 +339,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             ),
                             label_filter,
                         ),
+                        visibility,
                         pagination: PaginationOpts {
                             limit: by_id.len(),
                             offset: 0,
@@ -347,7 +353,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
                 for (exact_index, id) in by_id {
                     exact_results[exact_index] = Some(match found.get(&id) {
-                        Some(handle) => Ok(handle.clone()),
+                        Some(handle) => Ok(vec![handle.clone()]),
                         None => Err(GetResourceError::LookupProblem(
                             kamu_resources_facade::ResourceLookupProblem::IDNotFound(
                                 kamu_resources::ResourceIDNotFoundError(id),
@@ -370,30 +376,24 @@ impl ResourceSelectionResolutionServiceImpl {
                 // costs one `ILIKE` row per name, which is the price of
                 // filtering; correctness wins over the batching.
                 let found = if let Some(label_filter) = label_filter {
-                    resource_facade
-                        .search_handles(SearchResourcesRequest {
-                            selectors: with_labels(
-                                by_name
-                                    .iter()
-                                    .map(|(_, name)| {
-                                        kamu_resources::ResourceSelector::name_pattern(
-                                            schema.clone().into(),
-                                            sql_like_escape_literal(name.as_str()),
-                                        )
-                                    })
-                                    .collect(),
-                                Some(label_filter),
-                            ),
-                            pagination: PaginationOpts {
-                                limit: by_name.len(),
-                                offset: 0,
-                            },
-                        })
-                        .await?
-                        .items
-                        .into_iter()
-                        .map(|handle| (handle.name.to_ascii_lowercase(), handle))
-                        .collect::<HashMap<_, _>>()
+                    Self::search_all_handles(
+                        resource_facade,
+                        with_labels(
+                            by_name
+                                .iter()
+                                .map(|(_, name)| {
+                                    kamu_resources::ResourceSelector::name_pattern(
+                                        schema.clone().into(),
+                                        sql_like_escape_literal(name.as_str()),
+                                    )
+                                })
+                                .collect(),
+                            Some(label_filter),
+                        ),
+                        visibility,
+                        by_name.len(),
+                    )
+                    .await?
                 } else {
                     let refs = by_name
                         .iter()
@@ -407,14 +407,15 @@ impl ResourceSelectionResolutionServiceImpl {
                         .collect::<Vec<_>>();
 
                     resource_facade
-                        .get_handles(refs)
+                        .get_handles(refs, visibility)
                         .await
                         .map_err(CLIError::critical)?
                         .successes
                         .into_iter()
-                        .map(|success| (success.item.name.to_ascii_lowercase(), success.item))
-                        .collect::<HashMap<_, _>>()
+                        .map(|success| success.item)
+                        .collect()
                 };
+                let found = Self::group_handles_by_name(found);
 
                 // Registered descriptor schemas must parse back into TypeUri.
                 let type_name =
@@ -423,7 +424,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 for (exact_index, name) in by_name {
                     exact_results[exact_index] =
                         Some(match found.get(&name.to_ascii_lowercase()) {
-                            Some(handle) => Ok(handle.clone()),
+                            Some(handles) => Ok(handles.clone()),
                             None => Err(GetResourceError::LookupProblem(
                                 kamu_resources_facade::ResourceLookupProblem::NameNotFound(
                                     kamu_resources::ResourceNameNotFoundError {
@@ -446,6 +447,7 @@ impl ResourceSelectionResolutionServiceImpl {
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+        visibility: ResourceVisibility,
     ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
         let ids = selection
             .items
@@ -474,6 +476,7 @@ impl ResourceSelectionResolutionServiceImpl {
                     kamu_resources::ResourceSelector::any_type_ids(ids.clone()),
                     label_filter,
                 ),
+                visibility,
                 pagination: PaginationOpts {
                     limit: ids.len(),
                     offset: 0,
@@ -568,6 +571,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![kamu_resources::ResourceSelector::default()],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await?;
@@ -636,6 +640,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await?;
@@ -685,6 +690,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await
@@ -761,6 +767,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![request_selector],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await
@@ -818,6 +825,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await
@@ -893,7 +901,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
     fn process_exact_item(
         selector: crate::resources::ResourceExactSelector,
-        exact_results: &mut std::vec::IntoIter<Result<ResourceHandle, GetResourceError>>,
+        exact_results: &mut std::vec::IntoIter<Result<Vec<ResourceHandle>, GetResourceError>>,
         seen_target_keys: &mut HashSet<ResourceTargetKey>,
         targets: &mut Vec<ResourceTarget>,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
@@ -903,15 +911,17 @@ impl ResourceSelectionResolutionServiceImpl {
             .next()
             .expect("Every exact selector must have a batch result")
         {
-            Ok(handle) => {
-                let target = Self::target_from_handle(
-                    handle,
-                    selector.type_descriptor.canonical_selector,
-                    selector.selector_input,
-                );
+            Ok(handles) => {
+                for handle in handles {
+                    let target = Self::target_from_handle(
+                        handle,
+                        selector.type_descriptor.canonical_selector.clone(),
+                        selector.selector_input.clone(),
+                    );
 
-                if seen_target_keys.insert(Self::target_key(&target)) {
-                    targets.push(target);
+                    if seen_target_keys.insert(Self::target_key(&target)) {
+                        targets.push(target);
+                    }
                 }
             }
             Err(GetResourceError::LookupProblem(
@@ -925,6 +935,42 @@ impl ResourceSelectionResolutionServiceImpl {
             Err(error) => return Err(error.into()),
         }
         Ok(())
+    }
+
+    /// Searches past `expected_count` when the name patterns match more
+    /// resources, as a name does with resources being deleted visible.
+    async fn search_all_handles(
+        resource_facade: &dyn ResourceFacade,
+        selectors: Vec<kamu_resources::ResourceSelector>,
+        visibility: ResourceVisibility,
+        expected_count: usize,
+    ) -> Result<Vec<ResourceHandle>, CLIError> {
+        let search = |limit| {
+            resource_facade.search_handles(SearchResourcesRequest {
+                selectors: selectors.clone(),
+                visibility,
+                pagination: PaginationOpts { limit, offset: 0 },
+            })
+        };
+
+        let response = search(expected_count).await?;
+        if response.total_count <= response.items.len() {
+            return Ok(response.items);
+        }
+
+        Ok(search(response.total_count).await?.items)
+    }
+
+    /// Keys by the lowercase name, keeping the order of the handles.
+    fn group_handles_by_name(handles: Vec<ResourceHandle>) -> HashMap<String, Vec<ResourceHandle>> {
+        let mut grouped = HashMap::<_, Vec<_>>::new();
+        for handle in handles {
+            grouped
+                .entry(handle.name.to_ascii_lowercase())
+                .or_default()
+                .push(handle);
+        }
+        grouped
     }
 
     async fn collect_unique_bounded_identities<F, Fut>(

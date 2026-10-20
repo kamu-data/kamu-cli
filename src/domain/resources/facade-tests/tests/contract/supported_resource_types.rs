@@ -15,6 +15,7 @@ use kamu_resources::{
     ResourceRef,
     ResourceSchemaProvider,
     ResourceSelector,
+    ResourceVisibility,
     TypeName,
     UnsupportedResourceSelectorError,
 };
@@ -128,6 +129,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // Canonical selector name works for search, search_handles, and get
     let summaries = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -145,6 +147,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     let handles = facade
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -176,6 +179,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
                     name: Some("alias-check".parse().unwrap()),
                 }],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .expect("get with canonical selector must succeed"),
@@ -184,6 +188,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // Short name "vs" resolves to the canonical VariableSet schema.
     let short_name_summaries = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type("vs".parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -202,6 +207,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // canonical/alias selector.
     let type_name_summaries = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type("VariableSet".parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -219,6 +225,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // (selectors are exact registered strings, not inflected).
     let bad_result = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 "NoSuchResourceTypeXYZ".parse().unwrap(),
             )],
@@ -278,6 +285,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
                 name: Some("unsupported-type-base".parse().unwrap()),
             }],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await;
     match get_by_name {
@@ -291,13 +299,16 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // get_handle by ByName — same UnsupportedSelector behavior
     let gi_by_name = facade
-        .get_handles(vec![ResourceRef {
-            account: None,
-            r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
-            id: None,
-            did: None,
-            name: Some("unsupported-type-base".parse().unwrap()),
-        }])
+        .get_handles(
+            vec![ResourceRef {
+                account: None,
+                r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
+                id: None,
+                did: None,
+                name: Some("unsupported-type-base".parse().unwrap()),
+            }],
+            ResourceVisibility::Active,
+        )
         .await;
     match gi_by_name {
         Err(BatchResourceError::UnsupportedSelector(err)) => {
@@ -312,6 +323,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // search — UnsupportedSelector (type validated before DB query)
     let list_result = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -328,6 +340,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // search_handles — UnsupportedSelector
     let li_result = facade
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -358,13 +371,16 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // delete by ById — UnsupportedSelector (type validated after UID is known)
     let delete_result = facade
-        .delete(vec![ResourceRef {
-            account: None,
-            r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
-            id: Some(id),
-            did: None,
-            name: None,
-        }])
+        .delete(
+            vec![ResourceRef {
+                account: None,
+                r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
+                id: Some(id),
+                did: None,
+                name: None,
+            }],
+            ResourceVisibility::Active,
+        )
         .await;
     match delete_result {
         Err(BatchResourceError::UnsupportedSelector(err)) => {

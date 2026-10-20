@@ -14,6 +14,7 @@ use kamu_resources_facade::{
     BatchResourceResponse,
     ListResourcesError,
     RenderResourceManifestResult,
+    ResourceDeletion,
     ResourceLookupProblem,
     ResourcesSummaryError,
     SearchResourceHandlesResponse,
@@ -247,13 +248,19 @@ pub(crate) fn map_batch_render_manifests_outcome(
 pub(crate) fn map_batch_delete_outcome(
     outcome: cynic_api::operations::delete::ResourceDeleteOutcome,
     resource_refs: &[domain::ResourceRef],
-) -> Result<BatchResourceResponse<domain::ResourceID, ResourceLookupProblem>, BatchResourceError> {
+) -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, BatchResourceError> {
     use cynic_api::operations::delete::ResourceDeleteOutcome as O;
     match outcome {
         O::ResourceDeleteResult(batch) => {
             let successes =
                 collect_batch_successes(resource_refs.len(), batch.resources, "delete", |s| {
-                    Ok((s.request_index, s.resource_id))
+                    Ok((
+                        s.request_index,
+                        ResourceDeletion {
+                            id: s.resource_id,
+                            phase: s.phase.into(),
+                        },
+                    ))
                 })?;
             let problems = collect_batch_problems(batch.problems, resource_refs.len(), "delete")?;
             validate_batch_response_indexes(&successes, &problems, resource_refs.len(), "delete")?;

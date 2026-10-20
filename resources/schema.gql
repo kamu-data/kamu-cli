@@ -6876,11 +6876,12 @@ Result of deleting resources by reference
 union ResourceDeleteOutcome = ResourceDeleteResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 """
-Resources deleted and references that could not be resolved
+Resources whose deletion was requested and references that could not be
+resolved
 """
 type ResourceDeleteResult {
 	"""
-	Resources that were deleted
+	Resources whose deletion was requested
 	"""
 	resources: [ResourceDeleteSuccess!]!
 	"""
@@ -6890,7 +6891,7 @@ type ResourceDeleteResult {
 }
 
 """
-Resource deleted for one reference of a batch
+Resource whose deletion was requested for one reference of a batch
 """
 type ResourceDeleteSuccess {
 	"""
@@ -6898,9 +6899,13 @@ type ResourceDeleteSuccess {
 	"""
 	requestIndex: Int!
 	"""
-	Unique identifier of the deleted resource
+	Unique identifier of the resource
 	"""
 	resourceId: ResourceID!
+	"""
+	`DELETING` while controllers clean up, `DELETED` once they finished
+	"""
+	phase: ResourcePhase!
 }
 
 """
@@ -7787,11 +7792,21 @@ type Resources {
 	"""
 	Returns resources by refs
 	"""
-	byRefs(resourceRefs: [ResourceRefInput!]!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourcesOutcome!
+	byRefs(		resourceRefs: [ResourceRefInput!]!,		opts: SpecViewOptsInput! = {revealed: false},
+		"""
+		Also find resources whose deletion is in progress; a name may then match several resources, the live one first
+		"""
+		includeDeleting: Boolean! = false
+	): BatchResourcesOutcome!
 	"""
 	Returns resource handles by refs
 	"""
-	handlesByRefs(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
+	handlesByRefs(		resourceRefs: [ResourceRefInput!]!,
+		"""
+		Also find resources whose deletion is in progress; a name may then match several resources, the live one first
+		"""
+		includeDeleting: Boolean! = false
+	): BatchResourceHandlesOutcome!
 	"""
 	Returns resources matching the given selectors, which act as a logical
 	OR and may span several resource types and accounts
@@ -7804,7 +7819,12 @@ type Resources {
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourceManifestsOutcome!
+	renderManifests(		resourceRefs: [ResourceRefInput!]!,		format: ResourceManifestFormat!,		opts: SpecViewOptsInput! = {revealed: false},
+		"""
+		Also find resources whose deletion is in progress; a name may then match several resources, the live one first
+		"""
+		includeDeleting: Boolean! = false
+	): BatchResourceManifestsOutcome!
 }
 
 """
@@ -7822,9 +7842,14 @@ type ResourcesMut {
 	"""
 	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
 	"""
-	Deletes the resources identified by the given references
+	Requests deletion of the resources identified by the given references
 	"""
-	delete(resourceRefs: [ResourceRefInput!]!): ResourceDeleteOutcome!
+	delete(		resourceRefs: [ResourceRefInput!]!,
+		"""
+		Also find resources whose deletion is in progress, to retry their cleanup
+		"""
+		includeDeleting: Boolean! = false
+	): ResourceDeleteOutcome!
 }
 
 """
@@ -8023,6 +8048,10 @@ input SearchResourcesInput {
 	narrowing to zero, not a widening to everything.
 	"""
 	selectors: [ResourceSelectorInput!]
+	"""
+	Also match resources whose deletion is in progress
+	"""
+	includeDeleting: Boolean! = false
 }
 
 """

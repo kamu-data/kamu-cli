@@ -20,6 +20,8 @@ use crate::cynic_api;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A name may match several resources, so several successes may share an
+/// index.
 pub(crate) fn collect_batch_successes<S, T, F>(
     request_len: usize,
     items: Vec<S>,
@@ -29,7 +31,6 @@ pub(crate) fn collect_batch_successes<S, T, F>(
 where
     F: Fn(S) -> Result<(i32, T), BatchResourceError>,
 {
-    let mut seen = std::collections::BTreeSet::new();
     items
         .into_iter()
         .map(|s| {
@@ -42,11 +43,6 @@ where
             if request_index >= request_len {
                 return Err(BatchResourceError::Internal(InternalError::new(format!(
                     "Remote {context} success index {request_index} is out of bounds",
-                ))));
-            }
-            if !seen.insert(request_index) {
-                return Err(BatchResourceError::Internal(InternalError::new(format!(
-                    "Remote {context} returned duplicate success index {request_index}",
                 ))));
             }
             Ok(BatchResourceSuccess {
@@ -104,12 +100,7 @@ pub(crate) fn validate_batch_response_indexes<T, E>(
                 s.request_index,
             ))));
         }
-        if seen.insert(s.request_index, "success").is_some() {
-            return Err(BatchResourceError::Internal(InternalError::new(format!(
-                "Remote {context} returned duplicate result index {}",
-                s.request_index,
-            ))));
-        }
+        seen.insert(s.request_index, "success");
     }
 
     for p in problems {
@@ -213,12 +204,14 @@ mod tests {
     }
 
     #[test]
-    fn collect_batch_successes_duplicate_index_is_error() {
-        let err = collect(3, vec![(1_i32, "a"), (1_i32, "b")]).unwrap_err();
-        assert_matches!(
-            err,
-            BatchResourceError::Internal(_),
-            "expected Internal error for duplicate index"
+    fn collect_batch_successes_keeps_repeated_index() {
+        let result = collect(3, vec![(1_i32, "a"), (1_i32, "b")]).unwrap();
+        assert_eq!(
+            result
+                .iter()
+                .map(|success| (success.request_index, success.item))
+                .collect::<Vec<_>>(),
+            vec![(1, "a"), (1, "b")]
         );
     }
 

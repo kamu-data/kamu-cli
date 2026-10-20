@@ -201,6 +201,14 @@ pub enum ResourceVisibility {
 }
 
 impl ResourceVisibility {
+    pub fn with_deleting(include_deleting: bool) -> Self {
+        if include_deleting {
+            Self::IncludeDeleting
+        } else {
+            Self::Active
+        }
+    }
+
     pub fn includes_deleting(self) -> bool {
         match self {
             Self::Active => false,

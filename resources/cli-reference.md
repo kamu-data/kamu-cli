@@ -712,6 +712,7 @@ Delete datasets or resources
 * `--ignore-not-found` — Exit successfully when a selected resource does not exist
 * `--dry-run` — Preview the resolved resource deletions without deleting anything
 * `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
+* `--include-deleting` — Also include resources whose deletion is in progress
 
 This command deletes datasets using the legacy dataset path by default, or
 resources when a resource target is specified explicitly.
@@ -841,6 +842,7 @@ Returns manifest representation of a resource
   Default value: `100`
 * `--unbounded` — Disable the limit for expanding selectors
 * `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
+* `--include-deleting` — Also include resources whose deletion is in progress
 
 Returns the current state of one or more resources as YAML or JSON.
 
@@ -1107,6 +1109,7 @@ List datasets or resources
 * `--max-results <N>` — Maximum number of results to list
 * `--unbounded` — Disable the result limit
 * `-l`, `--label <LABEL_SELECTOR>` — Narrow the listing to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
+* `--include-deleting` — Also include resources whose deletion is in progress
 
 **Examples:**
 

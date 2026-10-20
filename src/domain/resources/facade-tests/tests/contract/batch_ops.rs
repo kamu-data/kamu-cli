@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
+use kamu_resources::{ResourceRef, ResourceSchemaProvider, ResourceVisibility, TypeName};
 use kamu_resources_facade::{
     BatchResourceError,
     BatchResourceResponse,
@@ -71,7 +71,14 @@ pub async fn test_get_all_successes(h: &impl FacadeContractHarness) {
         },
     ];
 
-    let response = facade.get(selector, SpecViewOpts::ENCRYPTED).await.unwrap();
+    let response = facade
+        .get(
+            selector,
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
+        .await
+        .unwrap();
 
     assert_batch_indexes(&response, &[0, 1], &[]);
     assert_eq!(response.successes.len(), 2);
@@ -158,6 +165,7 @@ pub async fn test_get_mixed_successes_problems(h: &impl FacadeContractHarness) {
                 }, // idx 3 — missing id
             ],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -223,6 +231,7 @@ pub async fn test_get_duplicate_refs(h: &impl FacadeContractHarness) {
                 }, // idx 1 — same ref
             ],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -247,11 +256,17 @@ contract_test!(get_empty_refs, super::test_get_empty_refs);
 pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let response = facade.get(vec![], SpecViewOpts::ENCRYPTED).await.unwrap();
+    let response = facade
+        .get(vec![], SpecViewOpts::ENCRYPTED, ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert!(response.successes.is_empty(), "get successes must be empty");
     assert!(response.problems.is_empty(), "get problems must be empty");
 
-    let response = facade.get_handles(vec![]).await.unwrap();
+    let response = facade
+        .get_handles(vec![], ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert!(
         response.successes.is_empty(),
         "get_handles successes must be empty"
@@ -266,6 +281,7 @@ pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
             vec![],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -278,7 +294,10 @@ pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
         "render_manifests problems must be empty"
     );
 
-    let response = facade.delete(vec![]).await.unwrap();
+    let response = facade
+        .delete(vec![], ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert!(
         response.successes.is_empty(),
         "delete successes must be empty"
@@ -315,6 +334,7 @@ pub async fn test_get_wrong_schema(h: &impl FacadeContractHarness) {
                 }, // idx 0 — exists but wrong schema
             ],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -339,44 +359,47 @@ pub async fn test_get_handles_mirrors_get(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .get_handles(vec![
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("idents-a".parse().unwrap()),
-            }, // idx 0 — exists
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("no-such-ident".parse().unwrap()),
-            }, // idx 1 — missing
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: Some(absent_uid),
-                did: None,
-                name: None,
-            }, // idx 2 — missing id
-        ])
+        .get_handles(
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("idents-a".parse().unwrap()),
+                }, // idx 0 — exists
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("no-such-ident".parse().unwrap()),
+                }, // idx 1 — missing
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: Some(absent_uid),
+                    did: None,
+                    name: None,
+                }, // idx 2 — missing id
+            ],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
 
@@ -443,6 +466,7 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                 ],
                 format,
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap();
@@ -530,6 +554,7 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
             ],
             kamu_resources_facade::ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -562,44 +587,47 @@ pub async fn test_delete_all_successes(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete(vec![
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("del-many-a".parse().unwrap()),
-            }, // idx 0
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: Some(id_b),
-                did: None,
-                name: None,
-            }, // idx 1
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("del-many-c".parse().unwrap()),
-            }, // idx 2
-        ])
+        .delete(
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("del-many-a".parse().unwrap()),
+                }, // idx 0
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: Some(id_b),
+                    did: None,
+                    name: None,
+                }, // idx 1
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("del-many-c".parse().unwrap()),
+                }, // idx 2
+            ],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
 
@@ -608,7 +636,7 @@ pub async fn test_delete_all_successes(h: &impl FacadeContractHarness) {
     let deleted_by_index: std::collections::HashMap<usize, kamu_resources::ResourceID> = response
         .successes
         .into_iter()
-        .map(|s| (s.request_index, s.item))
+        .map(|s| (s.request_index, s.item.id))
         .collect();
 
     assert_eq!(deleted_by_index[&0], id_a, "idx 0 must return id_a");
@@ -636,6 +664,7 @@ pub async fn test_delete_all_successes(h: &impl FacadeContractHarness) {
                     name: Some(name.parse().unwrap()),
                 }],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap();
@@ -661,51 +690,54 @@ pub async fn test_delete_mixed_successes_problems(h: &impl FacadeContractHarness
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete(vec![
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("del-mix-exists".parse().unwrap()),
-            }, // idx 0 — exists
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("del-mix-missing".parse().unwrap()),
-            }, /* idx 1 — missing
-                * name */
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: Some(absent_uid),
-                did: None,
-                name: None,
-            }, // idx 2 — missing id
-        ])
+        .delete(
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("del-mix-exists".parse().unwrap()),
+                }, // idx 0 — exists
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("del-mix-missing".parse().unwrap()),
+                }, /* idx 1 — missing
+                    * name */
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: Some(absent_uid),
+                    did: None,
+                    name: None,
+                }, // idx 2 — missing id
+            ],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
 
     assert_batch_indexes(&response, &[0], &[1, 2]);
     assert_eq!(
-        response.successes[0].item, uid_existing,
+        response.successes[0].item.id, uid_existing,
         "success must return the deleted id"
     );
 
@@ -745,32 +777,35 @@ pub async fn test_delete_duplicate_refs_is_deterministic(h: &impl FacadeContract
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete(vec![
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("del-dup-ref".parse().unwrap()),
-            }, // idx 0
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("del-dup-ref".parse().unwrap()),
-            }, // idx 1 — duplicate
-        ])
+        .delete(
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("del-dup-ref".parse().unwrap()),
+                }, // idx 0
+                ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("del-dup-ref".parse().unwrap()),
+                }, // idx 1 — duplicate
+            ],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
 
@@ -783,12 +818,15 @@ pub async fn test_delete_duplicate_refs_is_deterministic(h: &impl FacadeContract
 
     if response.successes.len() == 2 {
         for s in &response.successes {
-            assert_eq!(s.item, id, "duplicate delete success must refer to same id");
+            assert_eq!(
+                s.item.id, id,
+                "duplicate delete success must refer to same id"
+            );
         }
     } else {
         assert_eq!(response.successes.len(), 1);
         assert_eq!(response.problems.len(), 1);
-        assert_eq!(response.successes[0].item, id);
+        assert_eq!(response.successes[0].item.id, id);
         assert_matches!(
             &response.problems[0].error,
             ResourceLookupProblem::NameNotFound(_),
@@ -823,14 +861,22 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         name: None,
     }];
 
-    let gm = facade.get(selector.clone(), SpecViewOpts::ENCRYPTED).await;
+    let gm = facade
+        .get(
+            selector.clone(),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
+        .await;
     assert_matches!(
         gm,
         Err(BatchResourceError::UnsupportedSelector(_)),
         "get: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
     );
 
-    let gi = facade.get_handles(selector.clone()).await;
+    let gi = facade
+        .get_handles(selector.clone(), ResourceVisibility::Active)
+        .await;
     assert_matches!(
         gi,
         Err(BatchResourceError::UnsupportedSelector(_)),
@@ -842,6 +888,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
             selector.clone(),
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await;
     assert_matches!(
@@ -850,7 +897,9 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         "render_manifests: unsupported type must be a batch-level UnsupportedSelector, got: {rm:?}"
     );
 
-    let dm = facade.delete(selector.clone()).await;
+    let dm = facade
+        .delete(selector.clone(), ResourceVisibility::Active)
+        .await;
     assert_matches!(
         dm,
         Err(BatchResourceError::UnsupportedSelector(_)),
@@ -920,13 +969,17 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
     // the grouping — a fan-out that lost order would still "succeed" here, so
     // the indexes are the real assertion.
     let response = facade
-        .get(mixed_types(), SpecViewOpts::ENCRYPTED)
+        .get(
+            mixed_types(),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .expect("a batch spanning two types must resolve");
     assert_batch_indexes(&response, &[0, 1], &[]);
 
     let handles = facade
-        .get_handles(mixed_types())
+        .get_handles(mixed_types(), ResourceVisibility::Active)
         .await
         .expect("get_handles must span two types");
     assert_batch_indexes(&handles, &[0, 1], &[]);
@@ -936,6 +989,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
             mixed_types(),
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .expect("render_manifests must span two types");
@@ -976,14 +1030,14 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
         },
     ];
     let handles = facade
-        .get_handles(spelled_out)
+        .get_handles(spelled_out, ResourceVisibility::Active)
         .await
         .expect("one account spelled two ways must not split the batch");
     assert_batch_indexes(&handles, &[0, 1], &[]);
 
     // The write path last, since it consumes the fixtures.
     let deleted = facade
-        .delete(mixed_types())
+        .delete(mixed_types(), ResourceVisibility::Active)
         .await
         .expect("delete must span two types");
     assert_batch_indexes(&deleted, &[0, 1], &[]);
@@ -1045,38 +1099,45 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     };
 
     let response = facade
-        .get(mismatched(), SpecViewOpts::ENCRYPTED)
+        .get(
+            mismatched(),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .expect("a mismatched ref is a per-item problem, not a batch failure");
     assert_batch_indexes(&response, &[1], &[0]);
 
     let handles = facade
-        .get_handles(mismatched())
+        .get_handles(mismatched(), ResourceVisibility::Active)
         .await
         .expect("get_handles must report the mismatch per item");
     assert_batch_indexes(&handles, &[1], &[0]);
 
     // The one that would silently destroy the wrong resource.
     let deleted = facade
-        .delete(mismatched())
+        .delete(mismatched(), ResourceVisibility::Active)
         .await
         .expect("delete must report the mismatch per item");
     assert_batch_indexes(&deleted, &[1], &[0]);
 
     // Alpha must still be there: its id was named, but under the wrong name.
     let survivors = facade
-        .get_handles(vec![ResourceRef {
-            account: None,
-            r#type: Some(
-                VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
-            ),
-            id: Some(alpha_id),
-            did: None,
-            name: None,
-        }])
+        .get_handles(
+            vec![ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: Some(alpha_id),
+                did: None,
+                name: None,
+            }],
+            ResourceVisibility::Active,
+        )
         .await
         .expect("alpha must survive a delete that named it by a mismatched pair");
     assert_batch_indexes(&survivors, &[0], &[]);
@@ -1102,13 +1163,17 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     };
 
     let response = facade
-        .get(case_variant(), SpecViewOpts::ENCRYPTED)
+        .get(
+            case_variant(),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .expect("a case-only name variant must resolve");
     assert_batch_indexes(&response, &[0], &[]);
 
     let handles = facade
-        .get_handles(case_variant())
+        .get_handles(case_variant(), ResourceVisibility::Active)
         .await
         .expect("get_handles must accept a case-only name variant");
     assert_batch_indexes(&handles, &[0], &[]);
@@ -1118,6 +1183,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
             case_variant(),
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .expect("render_manifests must accept a case-only name variant");
@@ -1159,35 +1225,50 @@ pub async fn test_type_less_named_ref_is_refused(h: &impl FacadeContractHarness)
         }]
     };
 
-    assert_type_less_ref_refused(facade.get(refs(), SpecViewOpts::ENCRYPTED).await, "get");
-    assert_type_less_ref_refused(facade.get_handles(refs()).await, "get_handles");
+    assert_type_less_ref_refused(
+        facade
+            .get(refs(), SpecViewOpts::ENCRYPTED, ResourceVisibility::Active)
+            .await,
+        "get",
+    );
+    assert_type_less_ref_refused(
+        facade.get_handles(refs(), ResourceVisibility::Active).await,
+        "get_handles",
+    );
     assert_type_less_ref_refused(
         facade
             .render_manifests(
                 refs(),
                 ResourceManifestFormat::Json,
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await,
         "render_manifests",
     );
-    assert_type_less_ref_refused(facade.delete(refs()).await, "delete");
+    assert_type_less_ref_refused(
+        facade.delete(refs(), ResourceVisibility::Active).await,
+        "delete",
+    );
 
     // The refusal must not have deleted anything: naming the type still
     // resolves the resource the ref failed to address.
     let survivor = facade
-        .get_handles(vec![ResourceRef {
-            account: None,
-            r#type: Some(
-                VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
-            ),
-            id: None,
-            did: None,
-            name: Some("typeless-vars".parse().unwrap()),
-        }])
+        .get_handles(
+            vec![ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("typeless-vars".parse().unwrap()),
+            }],
+            ResourceVisibility::Active,
+        )
         .await
         .expect("naming the type must resolve what the type-less ref could not");
     assert_batch_indexes(&survivor, &[0], &[]);
