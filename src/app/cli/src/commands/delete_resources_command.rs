@@ -42,7 +42,6 @@ pub struct DeleteResourcesCommand {
     resolved_context: ResolvedResourceContext,
     syntax: ResourceSelectionSyntax,
     label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
-    visibility: ResourceVisibility,
     force: bool,
     ignore_not_found: bool,
     dry_run: bool,
@@ -60,7 +59,6 @@ impl DeleteResourcesCommand {
         resolved_context: ResolvedResourceContext,
         syntax: ResourceSelectionSyntax,
         label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
-        visibility: ResourceVisibility,
         force: bool,
         ignore_not_found: bool,
         dry_run: bool,
@@ -74,7 +72,6 @@ impl DeleteResourcesCommand {
             resolved_context,
             syntax,
             label_filter,
-            visibility,
             force,
             ignore_not_found,
             dry_run,
@@ -93,7 +90,8 @@ impl DeleteResourcesCommand {
                     ignore_not_found: self.ignore_not_found,
                     max_expanded_results: None,
                     label_filter: self.label_filter.clone(),
-                    visibility: self.visibility,
+                    // A resource being deleted is selected by its id only
+                    visibility: ResourceVisibility::Active,
                 },
             )
             .await?;
@@ -227,7 +225,7 @@ impl DeleteResourcesCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             match self
                 .resource_facade
-                .delete(Self::entry_resource_refs(&entries), self.visibility)
+                .delete(Self::entry_resource_refs(&entries))
                 .await
             {
                 Ok(response) => {

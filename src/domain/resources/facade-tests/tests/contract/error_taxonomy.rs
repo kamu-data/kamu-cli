@@ -151,10 +151,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected NameNotFound"
     );
 
-    let del = facade
-        .delete(vec![by_name(missing_name)], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    let del = facade.delete(vec![by_name(missing_name)]).await.unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::NameNotFound(_),
@@ -201,10 +198,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected IDNotFound"
     );
 
-    let del = facade
-        .delete(vec![by_id(&absent_uid)], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    let del = facade.delete(vec![by_id(&absent_uid)]).await.unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::IDNotFound(_),
@@ -267,10 +261,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected SchemaMismatch"
     );
 
-    let del = facade
-        .delete(vec![wrong_schema_selector], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    let del = facade.delete(vec![wrong_schema_selector]).await.unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::SchemaMismatch(_),
@@ -451,10 +442,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- NameNotFound in delete ---
     let resp = facade
-        .delete(
-            batch_by_name("taxonomy-batch-missing-del"),
-            ResourceVisibility::Active,
-        )
+        .delete(batch_by_name("taxonomy-batch-missing-del"))
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
@@ -553,21 +541,18 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- delete ---
     let result = facade
-        .delete(
-            vec![ResourceRef {
-                account: Some(unknown_account.clone()),
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("bad-acct-delete".parse().unwrap()),
-            }],
-            ResourceVisibility::Active,
-        )
+        .delete(vec![ResourceRef {
+            account: Some(unknown_account.clone()),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
+            id: None,
+            did: None,
+            name: Some("bad-acct-delete".parse().unwrap()),
+        }])
         .await;
     assert_matches!(
         result,
@@ -577,10 +562,10 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- delete, multi-ref ---
     let result = facade
-        .delete(
-            batch_by_name_for_account("bad-acct-delete-many", unknown_account.clone()),
-            ResourceVisibility::Active,
-        )
+        .delete(batch_by_name_for_account(
+            "bad-acct-delete-many",
+            unknown_account.clone(),
+        ))
         .await;
     assert_matches!(
         result,

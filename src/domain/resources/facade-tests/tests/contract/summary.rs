@@ -13,7 +13,6 @@ use kamu_resources::{
     ResourcePhaseCounts,
     ResourceRef,
     ResourceSchemaProvider,
-    ResourceVisibility,
     ResourcesSummary,
 };
 use kamu_resources_facade::{
@@ -185,16 +184,13 @@ pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContract
     let id = create_variable_set(h, TestAccount::Alice, "phase-deleting").await;
     let facade = h.facade_for(TestAccount::Alice);
     facade
-        .delete(
-            vec![ResourceRef {
-                account: None,
-                r#type: None,
-                id: Some(id),
-                did: None,
-                name: None,
-            }],
-            ResourceVisibility::Active,
-        )
+        .delete(vec![ResourceRef {
+            account: None,
+            r#type: None,
+            id: Some(id),
+            did: None,
+            name: None,
+        }])
         .await
         .unwrap();
 

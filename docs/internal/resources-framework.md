@@ -744,15 +744,16 @@ pub trait ResourceFacade: Send + Sync {
 
     // Each success carries the id and the phase: `Deleting`, or `Deleted` when the
     // controllers cleaned up within the request
-    async fn delete(&self, resource_refs: Vec<ResourceRef>, visibility: ResourceVisibility)
+    async fn delete(&self, resource_refs: Vec<ResourceRef>)
         -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, ...>;
 }
 ```
 
 **Resources being deleted are hidden unless asked for.** With `ResourceVisibility::IncludeDeleting`
 a ref by name may match several resources: each is a success at the same `request_index`, the live
-resource first. A ref by id finds a resource being deleted either way, so `delete` by id retries its
-cleanup.
+resource first. A ref by id finds a resource being deleted either way. `delete` takes no visibility:
+a name finds the live resource only, and a resource being deleted is deleted again by its id, which
+retries its cleanup.
 
 **The two families are deliberately asymmetric about which form is the
 primitive.** Ref-keyed reads and deletes (`get`, `get_handles`,
@@ -909,11 +910,11 @@ Every resolver delegates to `ResourceFacade`.
 `handlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
 query takes `[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
 `opts: SpecViewOptsInput` argument (`{ revealed: bool }`) maps to the facade's `SpecViewOpts`.
-`includeDeleting: Boolean = false` on the ref-keyed queries and `delete`, and on
+`includeDeleting: Boolean = false` on the ref-keyed queries and on
 `SearchResourcesInput`, maps to `ResourceVisibility::IncludeDeleting`.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
-`apply_manifests(manifests, dry_run?)`, `delete(resourceRefs, includeDeleting)`. `dry_run` routes to
+`apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
 `plan_apply_manifest`, otherwise `apply_manifest`. `delete` requests deletion, and each
 `ResourceDeleteSuccess` reports the `phase` the resource reached: `DELETING`, or `DELETED` when its
 controllers cleaned up within the request.
@@ -1029,7 +1030,7 @@ implementation files carry `_resource(s)_` names:
 | `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them as a single all-or-nothing batch by default; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
 | `kamu list` | `list_resources_command.rs` | List resources by type or `%` for all; renders Table/CSV/JSON/Parquet. `--include-deleting` lists resources being deleted too. |
 | `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`, `--include-deleting`. |
-| `kamu delete` | `delete_resources_command.rs` | Request deletion by selector(s), printing `Deleting` or `Deleted` per resource; `--force`, `--ignore-not-found`, `--dry-run`, `--include-deleting` to retry the cleanup of resources being deleted. |
+| `kamu delete` | `delete_resources_command.rs` | Request deletion by selector(s), printing `Deleting` or `Deleted` per resource; `--force`, `--ignore-not-found`, `--dry-run`. |
 
 **Context commands** (manage which server/workspace resources target): `kamu context add` / `list` /
 `check` / `use` / `delete`, and `kamu context api-resources` (list supported resource types for a
@@ -1078,7 +1079,7 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
 | Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
-| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several | hidden; `--include-deleting` lists them | hidden; `--include-deleting` selects them again, retrying their cleanup |
+| Resources being deleted | a manifest taking the name of one creates a new resource and warns | hidden; `--include-deleting` shows them, and a name may then match several | hidden; `--include-deleting` lists them | names select live resources only; an id selects a resource being deleted, retrying its cleanup |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
@@ -1376,8 +1377,8 @@ Deletion runs in two steps, as the ODF resource framework defines them
 
 - **Requesting deletion** moves the resource to `Deleting` and frees its name
   ([§6](#6-persistence-model)). Its headers and spec can no longer change, and it is no longer
-  reconciled. Requesting the deletion of a resource already being deleted posts the message again,
-  which retries its cleanup.
+  reconciled. Requesting the deletion of a resource already being deleted, by its id, posts the
+  message again, which retries its cleanup.
 - **Completing the deletion** runs the main controller's `cleanup`, then appends `Deleted`, which
   renames the resource to its tombstone. Resources that do not wait for cleanup are skipped, so a
   message delivered twice completes a deletion once.
@@ -1387,7 +1388,7 @@ Deletion runs in two steps, as the ODF resource framework defines them
   requests it again.
 - **A failed cleanup is an outcome, not an error.** The resource stays `Deleting` with a
   `Ready=False` condition, reason `CleanupFailed`. Nothing retries it automatically; deleting the
-  resource again does.
+  resource again by its id does.
 - **The phase a delete reports** is the one at the time of the response. The CLI's outbox delivers
   messages once the command's transaction commits, so `kamu delete` on a workspace prints `Deleting`
   and the deletion completes before the command exits.

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{DatasetRegistry, DeleteDatasetUseCase};
-use kamu_resources::{ResourceTypeDescriptor, ResourceVisibility};
+use kamu_resources::ResourceTypeDescriptor;
 
 use super::{CLIError, Command, DeleteDatasetsCommand, DeleteResourcesCommand};
 use crate::cli_commands::validate_many_dataset_patterns_with_workspace;
@@ -91,9 +91,6 @@ pub struct DeleteCommand {
 
     #[dill::component(explicit)]
     label_selectors: Vec<String>,
-
-    #[dill::component(explicit)]
-    include_deleting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -200,7 +197,6 @@ impl DeleteCommand {
             resolved_context,
             syntax,
             ResourceLabelSelectorParser::parse(&self.label_selectors)?,
-            ResourceVisibility::with_deleting(self.include_deleting),
             self.force,
             self.ignore_not_found,
             self.dry_run,
@@ -244,12 +240,6 @@ impl Command for DeleteCommand {
 
                 if !self.label_selectors.is_empty() {
                     return Err(Self::label_selector_unsupported_for_datasets_error());
-                }
-
-                if self.include_deleting {
-                    return Err(CLIError::usage_error(
-                        "--include-deleting is supported only when deleting resources",
-                    ));
                 }
 
                 self.make_delete_datasets_command(&request)?

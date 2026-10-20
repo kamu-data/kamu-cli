@@ -260,7 +260,7 @@ pub async fn test_resources_bare_id_selector(ctx: ResourceCtx) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Scenario: `--include-deleting` on `get`, `list` and `delete`
+// Scenario: `--include-deleting` on `get` and `list`
 //
 // The flag also shows resources whose deletion waits for their controllers.
 // The controllers clean up once the delete command has finished, so a deleted
@@ -284,7 +284,7 @@ pub async fn test_resources_include_deleting(ctx: ResourceCtx) {
     );
 
     ctx.assert_success(
-        ["delete", "vs", gone, "--include-deleting", "--force"],
+        ["delete", "vs", gone, "--force"],
         Some(&[r#"Deleting: VariableSet/gone-vars"#]),
     )
     .await;

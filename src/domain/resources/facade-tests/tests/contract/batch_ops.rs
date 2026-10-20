@@ -294,10 +294,7 @@ pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
         "render_manifests problems must be empty"
     );
 
-    let response = facade
-        .delete(vec![], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    let response = facade.delete(vec![]).await.unwrap();
     assert!(
         response.successes.is_empty(),
         "delete successes must be empty"
@@ -587,47 +584,44 @@ pub async fn test_delete_all_successes(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete(
-            vec![
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some("del-many-a".parse().unwrap()),
-                }, // idx 0
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: Some(id_b),
-                    did: None,
-                    name: None,
-                }, // idx 1
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some("del-many-c".parse().unwrap()),
-                }, // idx 2
-            ],
-            ResourceVisibility::Active,
-        )
+        .delete(vec![
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("del-many-a".parse().unwrap()),
+            }, // idx 0
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: Some(id_b),
+                did: None,
+                name: None,
+            }, // idx 1
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("del-many-c".parse().unwrap()),
+            }, // idx 2
+        ])
         .await
         .unwrap();
 
@@ -690,48 +684,45 @@ pub async fn test_delete_mixed_successes_problems(h: &impl FacadeContractHarness
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete(
-            vec![
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some("del-mix-exists".parse().unwrap()),
-                }, // idx 0 — exists
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some("del-mix-missing".parse().unwrap()),
-                }, /* idx 1 — missing
-                    * name */
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: Some(absent_uid),
-                    did: None,
-                    name: None,
-                }, // idx 2 — missing id
-            ],
-            ResourceVisibility::Active,
-        )
+        .delete(vec![
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("del-mix-exists".parse().unwrap()),
+            }, // idx 0 — exists
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("del-mix-missing".parse().unwrap()),
+            }, /* idx 1 — missing
+                * name */
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: Some(absent_uid),
+                did: None,
+                name: None,
+            }, // idx 2 — missing id
+        ])
         .await
         .unwrap();
 
@@ -777,35 +768,32 @@ pub async fn test_delete_duplicate_refs_is_deterministic(h: &impl FacadeContract
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete(
-            vec![
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some("del-dup-ref".parse().unwrap()),
-                }, // idx 0
-                ResourceRef {
-                    account: None,
-                    r#type: Some(
-                        VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
-                    ),
-                    id: None,
-                    did: None,
-                    name: Some("del-dup-ref".parse().unwrap()),
-                }, // idx 1 — duplicate
-            ],
-            ResourceVisibility::Active,
-        )
+        .delete(vec![
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("del-dup-ref".parse().unwrap()),
+            }, // idx 0
+            ResourceRef {
+                account: None,
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("del-dup-ref".parse().unwrap()),
+            }, // idx 1 — duplicate
+        ])
         .await
         .unwrap();
 
@@ -897,9 +885,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         "render_manifests: unsupported type must be a batch-level UnsupportedSelector, got: {rm:?}"
     );
 
-    let dm = facade
-        .delete(selector.clone(), ResourceVisibility::Active)
-        .await;
+    let dm = facade.delete(selector.clone()).await;
     assert_matches!(
         dm,
         Err(BatchResourceError::UnsupportedSelector(_)),
@@ -1037,7 +1023,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
 
     // The write path last, since it consumes the fixtures.
     let deleted = facade
-        .delete(mixed_types(), ResourceVisibility::Active)
+        .delete(mixed_types())
         .await
         .expect("delete must span two types");
     assert_batch_indexes(&deleted, &[0, 1], &[]);
@@ -1116,7 +1102,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
 
     // The one that would silently destroy the wrong resource.
     let deleted = facade
-        .delete(mismatched(), ResourceVisibility::Active)
+        .delete(mismatched())
         .await
         .expect("delete must report the mismatch per item");
     assert_batch_indexes(&deleted, &[1], &[0]);
@@ -1246,10 +1232,7 @@ pub async fn test_type_less_named_ref_is_refused(h: &impl FacadeContractHarness)
             .await,
         "render_manifests",
     );
-    assert_type_less_ref_refused(
-        facade.delete(refs(), ResourceVisibility::Active).await,
-        "delete",
-    );
+    assert_type_less_ref_refused(facade.delete(refs()).await, "delete");
 
     // The refusal must not have deleted anything: naming the type still
     // resolves the resource the ref failed to address.

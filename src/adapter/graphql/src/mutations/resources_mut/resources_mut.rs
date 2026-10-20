@@ -146,19 +146,11 @@ impl ResourcesMut {
         &self,
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
-        #[graphql(
-            default,
-            desc = "Also find resources whose deletion is in progress, to retry their cleanup"
-        )]
-        include_deleting: bool,
     ) -> Result<ResourceDeleteOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade
-            .delete(
-                into_resource_refs(resource_refs)?,
-                kamu_resources::ResourceVisibility::with_deleting(include_deleting),
-            )
+            .delete(into_resource_refs(resource_refs)?)
             .await
         {
             Ok(response) => Ok(ResourceDeleteOutcome::Success(response.into())),

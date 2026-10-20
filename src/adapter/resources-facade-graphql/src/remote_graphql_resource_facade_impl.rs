@@ -294,14 +294,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,
-        visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, BatchResourceError>
     {
         use cynic_api::operations::delete as Operation;
 
         let variables = Operation::DeleteVariables {
             resource_refs: cynic_api::inputs::resource_ref_inputs(&resource_refs),
-            include_deleting: visibility.includes_deleting(),
         };
 
         let response: Operation::DeleteMutation = self

@@ -371,16 +371,13 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // delete by ById — UnsupportedSelector (type validated after UID is known)
     let delete_result = facade
-        .delete(
-            vec![ResourceRef {
-                account: None,
-                r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
-                id: Some(id),
-                did: None,
-                name: None,
-            }],
-            ResourceVisibility::Active,
-        )
+        .delete(vec![ResourceRef {
+            account: None,
+            r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
+            id: Some(id),
+            did: None,
+            name: None,
+        }])
         .await;
     match delete_result {
         Err(BatchResourceError::UnsupportedSelector(err)) => {

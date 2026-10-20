@@ -7801,12 +7801,7 @@ type ResourcesMut {
 	"""
 	Requests deletion of the resources identified by the given references
 	"""
-	delete(		resourceRefs: [ResourceRefInput!]!,
-		"""
-		Also find resources whose deletion is in progress, to retry their cleanup
-		"""
-		includeDeleting: Boolean! = false
-	): ResourceDeleteOutcome!
+	delete(resourceRefs: [ResourceRefInput!]!): ResourceDeleteOutcome!
 }
 
 """

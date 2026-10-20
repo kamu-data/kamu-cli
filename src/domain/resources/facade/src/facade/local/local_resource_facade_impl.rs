@@ -387,7 +387,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,
-        visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, BatchResourceError>
     {
         // An empty batch names nothing, so it yields an empty response.
@@ -409,7 +408,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &group.account.did,
                 &group.schema,
                 grouped,
-                visibility,
+                ResourceVisibility::Active,
             )
             .await?;
 
