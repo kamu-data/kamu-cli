@@ -116,7 +116,7 @@ impl ResourceController<TestResource> for TestResourceSelectiveCleanupController
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// During its first cleanup, plays another writer that updates the status of
-/// the resource being cleaned up, so the batch it belongs to conflicts.
+/// the resource being cleaned up, then fails that cleanup if asked to.
 #[dill::component(pub)]
 #[dill::interface(dyn ResourceController<TestResource>)]
 pub struct TestResourceInterferingCleanupController {
@@ -127,6 +127,7 @@ pub struct TestResourceInterferingCleanupController {
 #[derive(Default)]
 pub struct TestCleanupInterference {
     done: AtomicBool,
+    then_fails: bool,
 }
 
 #[async_trait::async_trait]
@@ -158,6 +159,11 @@ impl ResourceController<TestResource> for TestResourceInterferingCleanupControll
             .unwrap();
         persistence.save(&mut other).await.unwrap();
 
+        if self.interference.then_fails {
+            return Err(ResourceCleanupError::Internal(
+                "simulated cleanup failure".int_err(),
+            ));
+        }
         Ok(())
     }
 }
@@ -204,7 +210,9 @@ pub enum TestResourceControllerProvider {
     Failing,
     Counting(Arc<AtomicU32>),
     FailingCleanupOf(&'static str),
-    InterferingCleanup,
+    InterferingCleanup {
+        then_fails: bool,
+    },
     FailingCleanupOnce,
 }
 
@@ -227,8 +235,11 @@ impl TestResourceControllerProvider {
                 b.add_value(TestResourceSelectiveCleanupController { failing_name })
                     .bind::<dyn ResourceController<TestResource>, TestResourceSelectiveCleanupController>();
             }
-            TestResourceControllerProvider::InterferingCleanup => {
-                b.add_value(TestCleanupInterference::default());
+            TestResourceControllerProvider::InterferingCleanup { then_fails } => {
+                b.add_value(TestCleanupInterference {
+                    done: AtomicBool::new(false),
+                    then_fails,
+                });
                 b.add::<TestResourceInterferingCleanupController>();
             }
             TestResourceControllerProvider::FailingCleanupOnce => {

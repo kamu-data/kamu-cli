@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
+use event_sourcing::ConcurrentModificationError;
 use kamu_resources::{
+    CompleteResourceDeletionUseCaseError,
     DeclarativeResource,
     ResourceAggregateLoader,
     ResourceConditionStatus,
@@ -20,6 +22,11 @@ use kamu_resources::{
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
     BaseResourceServiceHarnessOpts,
+};
+use kamu_resources_services::{
+    CompleteResourceDeletionPhases,
+    ResourceCleanupAttempt,
+    ResourceCleanupTransactionError,
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
@@ -213,9 +220,9 @@ async fn test_failed_cleanup_holds_back_only_its_resource() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_concurrent_modification_of_batch_completes_deletions_one_by_one() {
+async fn test_status_update_during_cleanup_does_not_hold_back_completion() {
     let harness = CompleteDeletionTestHarness::dispatching(
-        TestResourceControllerProvider::InterferingCleanup,
+        TestResourceControllerProvider::InterferingCleanup { then_fails: false },
     );
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
@@ -233,6 +240,60 @@ async fn test_concurrent_modification_of_batch_completes_deletions_one_by_one() 
     assert_eq!(
         harness.load(&id_b).await.status().phase,
         ResourcePhase::Deleted
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_failed_cleanup_after_concurrent_status_update_is_not_recorded() {
+    // The other writer's status wins; a repeated deletion request retries
+    let harness = CompleteDeletionTestHarness::dispatching(
+        TestResourceControllerProvider::InterferingCleanup { then_fails: true },
+    );
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res").await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
+
+    harness.complete_deletion(&[id]).await;
+
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.status().phase, ResourcePhase::Deleting);
+    assert!(resource.status().observed_at.is_some());
+    harness.assert_cleanup_not_failed(&id).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_concurrent_modification_of_batch_records_outcomes_one_by_one() {
+    let id_a = ResourceID::new(uuid::Uuid::new_v4());
+    let id_b = ResourceID::new(uuid::Uuid::new_v4());
+    let recorder = OutcomeRecorder::conflicting_on(vec![vec![id_a, id_b]]);
+
+    recorder.record_in_batch(&[id_a, id_b]).await.unwrap();
+
+    assert_eq!(
+        recorder.recorded_batches(),
+        vec![vec![id_a, id_b], vec![id_a], vec![id_b]]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_concurrent_modification_of_one_outcome_holds_back_only_its_resource() {
+    let id_a = ResourceID::new(uuid::Uuid::new_v4());
+    let id_b = ResourceID::new(uuid::Uuid::new_v4());
+    let recorder = OutcomeRecorder::conflicting_on(vec![vec![id_a, id_b], vec![id_a]]);
+
+    recorder.record_in_batch(&[id_a, id_b]).await.unwrap();
+
+    assert_eq!(
+        recorder.recorded_batches(),
+        vec![vec![id_a, id_b], vec![id_a], vec![id_b]]
     );
 }
 
@@ -267,6 +328,17 @@ impl CompleteDeletionTestHarness {
         self.loader.load(id).await.unwrap()
     }
 
+    async fn assert_cleanup_not_failed(&self, id: &ResourceID) {
+        let resource = self.load(id).await;
+        let cleanup_failed = resource
+            .status()
+            .conditions
+            .entries
+            .values()
+            .any(|condition| condition["reason"] == "CleanupFailed");
+        assert!(!cleanup_failed, "no cleanup failure must be recorded");
+    }
+
     async fn assert_cleanup_failed(&self, id: &ResourceID) {
         let resource = self.load(id).await;
         assert_eq!(resource.status().phase, ResourcePhase::Deleting);
@@ -277,6 +349,76 @@ impl CompleteDeletionTestHarness {
             Some("CleanupFailed"),
             Some(true),
         );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records batches of cleanup outcomes, failing the listed ones with a
+/// concurrent modification
+struct OutcomeRecorder {
+    conflicting: Vec<Vec<ResourceID>>,
+    recorded: Mutex<Vec<Vec<ResourceID>>>,
+}
+
+impl OutcomeRecorder {
+    fn conflicting_on(conflicting: Vec<Vec<ResourceID>>) -> Self {
+        Self {
+            conflicting,
+            recorded: Mutex::new(Vec::new()),
+        }
+    }
+
+    async fn record_in_batch(
+        &self,
+        ids: &[ResourceID],
+    ) -> Result<(), CompleteResourceDeletionUseCaseError<TestResource>> {
+        let attempts = ids
+            .iter()
+            .map(|&id| ResourceCleanupAttempt {
+                id,
+                status_generation: 1,
+                failure: None,
+            })
+            .collect();
+
+        self.record_outcomes_in_batch(attempts).await
+    }
+
+    fn recorded_batches(&self) -> Vec<Vec<ResourceID>> {
+        self.recorded.lock().unwrap().clone()
+    }
+}
+
+#[async_trait::async_trait]
+impl CompleteResourceDeletionPhases<TestResource> for OutcomeRecorder {
+    async fn run_cleanup(
+        &self,
+        _id: ResourceID,
+    ) -> Result<Option<ResourceCleanupAttempt>, ResourceCleanupTransactionError<TestResource>> {
+        Ok(None)
+    }
+
+    async fn record_outcomes(
+        &self,
+        attempts: Vec<ResourceCleanupAttempt>,
+    ) -> Result<(), CompleteResourceDeletionUseCaseError<TestResource>> {
+        let ids = attempts
+            .iter()
+            .map(|attempt| attempt.id)
+            .collect::<Vec<_>>();
+        let conflicts = self.conflicting.contains(&ids);
+        self.recorded.lock().unwrap().push(ids);
+
+        if conflicts {
+            Err(
+                CompleteResourceDeletionUseCaseError::ConcurrentModification(
+                    ConcurrentModificationError {},
+                ),
+            )
+        } else {
+            Ok(())
+        }
     }
 }
 
