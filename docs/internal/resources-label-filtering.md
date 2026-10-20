@@ -184,14 +184,16 @@ It is maintained by a dedicated sibling trait, `ResourceLabelProjectionRepositor
 `find_entries(resource_id)`), **not** inline inside `ResourceRepository`'s
 `create_resource`/`update_resource(s)`. It is invoked from
 `ResourcePersistenceServiceHelper::sync_snapshots` — the single choke point behind
-`create`/`save`/`delete(_many)` — immediately after
+`create`/`save`/`save_many` — immediately after
 `resource_repository.update_resources(...)` succeeds, with both repositories
 resolved from the same transactional DI scope so the snapshot write and the
 projection write commit or roll back together. A snapshot that arrives already
 tombstoned (`headers.deleted_at.is_some()`) has its entries **cleared** rather than
 rewritten, keyed off the snapshot rather than the call site since `sync_snapshots`
-is shared by all three paths. Live queries all join `resources` with
-`deleted_at IS NULL`, so stale rows were invisible rather than wrong — but they
+is shared by all three paths. Entries of a resource being deleted are kept until
+its deletion completes, so label filters still match it when resources being
+deleted are asked for. Queries join `resources` and skip `deleted_at` rows, so
+stale rows were invisible rather than wrong — but they
 cost index space for nothing and would become wrong for any query that read the
 projection without that join. This keeps `ResourceRepository`
 scoped to `resources`/`resource_events` and gives the projection's read side room

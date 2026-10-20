@@ -12,7 +12,10 @@ use dill::CatalogBuilder;
 use email_utils::Email;
 use internal_error::InternalError;
 use kamu_accounts::{AccountLifecycleMessage, MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE};
-use kamu_resources::{DeleteAccountResourcesUseCase, MockDeleteAccountResourcesUseCase};
+use kamu_resources::{
+    MockRequestAccountResourcesDeletionUseCase,
+    RequestAccountResourcesDeletionUseCase,
+};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,11 +93,11 @@ struct AccountLifecycleConsumerHarness {
 }
 
 impl AccountLifecycleConsumerHarness {
-    fn new(mock: MockDeleteAccountResourcesUseCase) -> Self {
+    fn new(mock: MockRequestAccountResourcesDeletionUseCase) -> Self {
         // Minimal catalog: only the consumer and its single dependency (the mock
         // use case). Deliberately not chained from BaseResourceServiceHarness to
         // avoid the ambiguous binding that would arise from the real
-        // DeleteAccountResourcesUsecaseImpl registered there.
+        // RequestAccountResourcesDeletionUseCaseImpl registered there.
         let mut b = CatalogBuilder::new();
 
         OutboxProvider::Immediate {
@@ -103,7 +106,7 @@ impl AccountLifecycleConsumerHarness {
         .embed_into_catalog(&mut b);
 
         b.add_value(mock)
-            .bind::<dyn DeleteAccountResourcesUseCase, MockDeleteAccountResourcesUseCase>();
+            .bind::<dyn RequestAccountResourcesDeletionUseCase, MockRequestAccountResourcesDeletionUseCase>();
 
         b.add::<kamu_resources_services::AccountLifecycleMessageConsumer>();
 
@@ -115,8 +118,10 @@ impl AccountLifecycleConsumerHarness {
         Self { catalog: b.build() }
     }
 
-    fn expect_execute_once(account_id: odf::AccountID) -> MockDeleteAccountResourcesUseCase {
-        let mut mock = MockDeleteAccountResourcesUseCase::new();
+    fn expect_execute_once(
+        account_id: odf::AccountID,
+    ) -> MockRequestAccountResourcesDeletionUseCase {
+        let mut mock = MockRequestAccountResourcesDeletionUseCase::new();
         mock.expect_execute()
             .once()
             .withf(move |id| id == &account_id)
@@ -124,8 +129,8 @@ impl AccountLifecycleConsumerHarness {
         mock
     }
 
-    fn expect_no_execute() -> MockDeleteAccountResourcesUseCase {
-        let mut mock = MockDeleteAccountResourcesUseCase::new();
+    fn expect_no_execute() -> MockRequestAccountResourcesDeletionUseCase {
+        let mut mock = MockRequestAccountResourcesDeletionUseCase::new();
         mock.expect_execute().never();
         mock
     }

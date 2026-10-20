@@ -139,7 +139,9 @@ impl ResourcesMut {
         }
     }
 
-    /// Deletes the resources identified by the given references
+    /// Requests deletion of the resources identified by the given references.
+    /// Names match live resources only; an id also matches a resource being
+    /// deleted, which retries its cleanup
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(
@@ -406,17 +408,18 @@ pub enum ResourceDeleteOutcome {
     AccountResolution(ResourceAccountResolutionProblem),
 }
 
-/// Resources deleted and references that could not be resolved
+/// Resources whose deletion was requested and references that could not be
+/// resolved
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteResult {
-    /// Resources that were deleted
+    /// Resources whose deletion was requested
     pub resources: Vec<ResourceDeleteSuccess>,
     /// References that could not be resolved
     pub problems: Vec<BatchResourceProblem>,
 }
 
 type BatchDeleteResourcesResponse = kamu_resources_facade::BatchResourceResponse<
-    kamu_resources::ResourceID,
+    kamu_resources_facade::ResourceDeletion,
     kamu_resources_facade::ResourceLookupProblem,
 >;
 
@@ -428,7 +431,8 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteResult {
                 .into_iter()
                 .map(|success| ResourceDeleteSuccess {
                     request_index: success.request_index,
-                    resource_id: success.item.into(),
+                    resource_id: success.item.id.into(),
+                    phase: success.item.phase.into(),
                 })
                 .collect(),
             problems: value.problems.into_iter().map(Into::into).collect(),
@@ -438,13 +442,15 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resource deleted for one reference of a batch
+/// Resource whose deletion was requested for one reference of a batch
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteSuccess {
     /// Zero-based position of the reference in the request
     pub request_index: usize,
-    /// Unique identifier of the deleted resource
+    /// Unique identifier of the resource
     pub resource_id: ResourceID<'static>,
+    /// `DELETING` while controllers clean up, `DELETED` once they finished
+    pub phase: ResourcePhase,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

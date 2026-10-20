@@ -98,6 +98,9 @@ pub enum TestResourceLifecycleError {
 
     #[error(transparent)]
     StatusConflict(#[from] ResourceStatusConflictError),
+
+    #[error(transparent)]
+    DeletionInProgress(#[from] ResourceDeletionInProgressError),
 }
 
 kamu_resources::impl_resource_lifecycle_error!(TestResourceLifecycleError, TestResourceState);
@@ -124,6 +127,12 @@ impl IntoApplyResourceRejection for TestResourceLifecycleError {
             Self::StatusConflict(err) => {
                 use internal_error::ErrorIntoInternal;
                 ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
+            }
+            Self::DeletionInProgress(err) => {
+                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
+                    category: ApplyResourceRejectionCategory::LifecycleRuleConflict,
+                    message: err.to_string(),
+                })
             }
         }
     }

@@ -15,11 +15,7 @@ use kamu_configuration::{
     VariableSetProjectionRepository,
     VariableSetResource,
 };
-use kamu_resources::{
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ResourceID,
-    ResourceLifecycleMessage,
-};
+use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
 use messaging_outbox::{
     InitialConsumerBoundary,
     MessageConsumer,
@@ -96,40 +92,11 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                     _ => Ok(()),
                 }
             }
-            ResourceLifecycleMessage::Deleted(deleted_message) => {
-                debug_assert!(
-                    !deleted_message.resources.is_empty(),
-                    "deleted message must contain at least one resource"
-                );
-
-                match deleted_message.resources[0].schema.as_str() {
-                    VariableSetResource::SCHEMA_STR => {
-                        let repo = target_catalog
-                            .get_one::<dyn VariableSetProjectionRepository>()
-                            .map_err(ErrorIntoInternal::int_err)?;
-
-                        let ids: Vec<ResourceID> =
-                            deleted_message.resources.iter().map(|r| r.id).collect();
-                        repo.delete_all_entries(&ids).await
-                    }
-                    SecretSetResource::SCHEMA_STR => {
-                        let repo = target_catalog
-                            .get_one::<dyn SecretSetProjectionRepository>()
-                            .map_err(ErrorIntoInternal::int_err)?;
-
-                        let ids: Vec<ResourceID> =
-                            deleted_message.resources.iter().map(|r| r.id).collect();
-                        repo.delete_all_entries(&ids).await
-                    }
-                    _ => Ok(()),
-                }
-            }
-
+            // Deletion cleanup belongs to the controllers
             ResourceLifecycleMessage::Applied(_)
-            | ResourceLifecycleMessage::ReconciliationFailed(_) => {
-                // Nothing to do here
-                Ok(())
-            }
+            | ResourceLifecycleMessage::ReconciliationFailed(_)
+            | ResourceLifecycleMessage::DeletionRequested(_)
+            | ResourceLifecycleMessage::Deleted(_) => Ok(()),
         }
     }
 }

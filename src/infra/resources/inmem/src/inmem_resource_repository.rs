@@ -33,6 +33,7 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    ResourceVisibility,
     TypeUri,
     UpdateResourceError,
     deleted_account_name_sentinel,
@@ -200,8 +201,10 @@ impl ResourceRepository for InMemoryResourceRepository {
             name: resource_snapshot.headers.name.clone(),
         };
 
+        let holds_name = resource_snapshot.headers.deletion_requested_at.is_none();
+
         if guard.snapshots_by_id.contains_key(&resource_snapshot.id)
-            || guard.ids_by_lookup_key.contains_key(&lookup_key)
+            || holds_name && guard.ids_by_lookup_key.contains_key(&lookup_key)
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
                 account_id: resource_snapshot.headers.account.did.clone(),
@@ -210,9 +213,11 @@ impl ResourceRepository for InMemoryResourceRepository {
             }));
         }
 
-        guard
-            .ids_by_lookup_key
-            .insert(lookup_key, resource_snapshot.id);
+        if holds_name {
+            guard
+                .ids_by_lookup_key
+                .insert(lookup_key, resource_snapshot.id);
+        }
         guard
             .snapshots_by_id
             .insert(resource_snapshot.id, resource_snapshot.clone());
@@ -264,7 +269,12 @@ impl ResourceRepository for InMemoryResourceRepository {
                 name: resource_snapshot.headers.name.clone(),
             };
 
-            if let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
+            // Mirrors the partial unique index of the SQL backends: only
+            // resources whose deletion was not requested hold their name
+            let holds_name = resource_snapshot.headers.deletion_requested_at.is_none();
+
+            if holds_name
+                && let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
                 && *existing_resource_id != resource_snapshot.id
             {
                 return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
@@ -277,15 +287,20 @@ impl ResourceRepository for InMemoryResourceRepository {
             prepared_updates.push((
                 resource_snapshot.clone(),
                 previous_lookup_key,
-                next_lookup_key,
+                holds_name.then_some(next_lookup_key),
             ));
         }
 
         for (resource_snapshot, previous_lookup_key, next_lookup_key) in prepared_updates {
-            guard.ids_by_lookup_key.remove(&previous_lookup_key);
-            guard
-                .ids_by_lookup_key
-                .insert(next_lookup_key, resource_snapshot.id);
+            // A newer resource may hold the name this one gave up
+            if guard.ids_by_lookup_key.get(&previous_lookup_key) == Some(&resource_snapshot.id) {
+                guard.ids_by_lookup_key.remove(&previous_lookup_key);
+            }
+            if let Some(next_lookup_key) = next_lookup_key {
+                guard
+                    .ids_by_lookup_key
+                    .insert(next_lookup_key, resource_snapshot.id);
+            }
             guard
                 .snapshots_by_id
                 .insert(resource_snapshot.id, resource_snapshot);
@@ -310,7 +325,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 name: name.clone(),
             })
             .and_then(|id| guard.snapshots_by_id.get(id))
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
             .map(|snapshot| snapshot.id))
     }
 
@@ -343,30 +358,54 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
+        visibility: ResourceVisibility,
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        Ok(names
-            .iter()
-            .filter_map(|name| {
-                guard
-                    .ids_by_lookup_key
-                    .get(&ResourceLookupKey {
-                        account_id: account_id.clone(),
-                        schema: schema.clone(),
-                        name: name.clone(),
+        let mut resolved = Vec::new();
+        for name in names {
+            let live = guard
+                .ids_by_lookup_key
+                .get(&ResourceLookupKey {
+                    account_id: account_id.clone(),
+                    schema: schema.clone(),
+                    name: name.clone(),
+                })
+                .and_then(|id| guard.snapshots_by_id.get(id))
+                .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none());
+            resolved.extend(live.map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)));
+
+            if visibility.includes_deleting() {
+                // Oldest deletion request first, as the SQL backends order them
+                let mut deleting = guard
+                    .snapshots_by_id
+                    .values()
+                    .filter(|snapshot| {
+                        snapshot.headers.account.did == *account_id
+                            && snapshot.schema == *schema
+                            && snapshot.headers.name == *name
+                            && snapshot.headers.deletion_requested_at.is_some()
+                            && snapshot.headers.deleted_at.is_none()
                     })
-                    .and_then(|id| guard.snapshots_by_id.get(id))
-            })
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-            .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id))
-            .collect())
+                    .collect::<Vec<_>>();
+                deleting
+                    .sort_by_key(|snapshot| (snapshot.headers.deletion_requested_at, snapshot.id));
+                resolved.extend(
+                    deleting
+                        .into_iter()
+                        .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id)),
+                );
+            }
+        }
+
+        Ok(resolved)
     }
 
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
@@ -375,7 +414,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let mut snapshots = {
             let guard = self.state.lock().unwrap();
-            filter_scoped_snapshots(&guard, account_id, scope)
+            filter_scoped_snapshots(&guard, account_id, scope, visibility)
                 .into_iter()
                 .cloned()
                 .collect::<Vec<_>>()
@@ -407,6 +446,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
@@ -414,7 +454,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let guard = self.state.lock().unwrap();
 
-        Ok(filter_scoped_snapshots(&guard, account_id, scope).len())
+        Ok(filter_scoped_snapshots(&guard, account_id, scope, visibility).len())
     }
 
     async fn find_resource_snapshot(
@@ -451,7 +491,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .values()
             .filter(|snapshot| snapshot.headers.account.did == *account_id)
             .filter(|snapshot| snapshot.schema == *schema)
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
             .filter(|snapshot| {
                 // Reads labels off the snapshot rather than a projection, the
                 // same way `snapshot_matches_label_pairs` does, so the two
@@ -480,7 +520,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .snapshots_by_id
             .values()
             .filter(|snapshot| snapshot.schema == *schema)
-            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deletion_requested_at.is_none())
             .filter(|snapshot| {
                 // Reads labels off the snapshot rather than a projection, the
                 // same way `snapshot_matches_label_pairs` does, so the two
@@ -558,6 +598,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
@@ -566,7 +607,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let stream = futures::stream::once(async move {
             let mut snapshots_page: Vec<_> = {
                 let guard = self.state.lock().unwrap();
-                filter_scoped_snapshots(&guard, &account_id, &scope)
+                filter_scoped_snapshots(&guard, &account_id, &scope, visibility)
                     .into_iter()
                     .cloned()
                     .collect()
@@ -624,8 +665,9 @@ impl ResourceRepository for InMemoryResourceRepository {
                 Some(ResourcePhase::Ready) => row.phase_counts.increment_ready(),
                 Some(ResourcePhase::Degraded) => row.phase_counts.increment_degraded(),
                 Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),
-                // No bucket for these yet: counted in the total only, as the SQL storages do
-                Some(ResourcePhase::Deleting | ResourcePhase::Deleted) => {}
+                Some(ResourcePhase::Deleting) => row.phase_counts.increment_deleting(),
+                // Deleted resources are filtered out above
+                Some(ResourcePhase::Deleted) => {}
             }
         }
 
@@ -739,11 +781,15 @@ fn filter_scoped_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
     scope: &ResourceScope,
+    visibility: ResourceVisibility,
 ) -> Vec<&'a ResourceSnapshot> {
     guard
         .snapshots_by_id
         .values()
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+        .filter(|snapshot| {
+            snapshot.headers.deletion_requested_at.is_none() || visibility.includes_deleting()
+        })
         // Account and labels are both matched inside the scope, not here: a row
         // may name its own account and carry its own label pairs, and
         // `account_id` is only the default for rows that do not.

@@ -267,6 +267,25 @@ impl BaseResourceServiceHarness {
             .returning(|_, _, _| Ok(()));
     }
 
+    pub fn expect_deletion_requested_message(
+        mock_outbox: &mut MockOutbox,
+        expected_resource_count: usize,
+    ) {
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(1)
+            .withf(move |producer, message, _version| {
+                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
+                    && matches!(
+                        serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
+                            .unwrap(),
+                        ResourceLifecycleMessage::DeletionRequested(ref m)
+                            if m.resources.len() == expected_resource_count
+                    )
+            })
+            .returning(|_, _, _| Ok(()));
+    }
+
     pub fn expect_deleted_message(mock_outbox: &mut MockOutbox, expected_resource_count: usize) {
         mock_outbox
             .expect_post_message_as_json()

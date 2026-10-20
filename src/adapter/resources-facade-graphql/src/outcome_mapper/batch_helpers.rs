@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use kamu_resources::ResourceVisibility;
 use kamu_resources_facade::{
     BatchResourceError,
     BatchResourceProblem,
@@ -20,6 +21,7 @@ use crate::cynic_api;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Repeated indexes are checked by [`validate_batch_response_indexes`].
 pub(crate) fn collect_batch_successes<S, T, F>(
     request_len: usize,
     items: Vec<S>,
@@ -29,7 +31,6 @@ pub(crate) fn collect_batch_successes<S, T, F>(
 where
     F: Fn(S) -> Result<(i32, T), BatchResourceError>,
 {
-    let mut seen = std::collections::BTreeSet::new();
     items
         .into_iter()
         .map(|s| {
@@ -42,11 +43,6 @@ where
             if request_index >= request_len {
                 return Err(BatchResourceError::Internal(InternalError::new(format!(
                     "Remote {context} success index {request_index} is out of bounds",
-                ))));
-            }
-            if !seen.insert(request_index) {
-                return Err(BatchResourceError::Internal(InternalError::new(format!(
-                    "Remote {context} returned duplicate success index {request_index}",
                 ))));
             }
             Ok(BatchResourceSuccess {
@@ -89,10 +85,14 @@ pub(crate) fn collect_batch_problems(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Several successes may share an index only under
+/// [`ResourceVisibility::IncludeDeleting`], where a name may match the live
+/// resource and those being deleted.
 pub(crate) fn validate_batch_response_indexes<T, E>(
     successes: &[BatchResourceSuccess<T>],
     problems: &[BatchResourceProblem<E>],
     request_len: usize,
+    visibility: ResourceVisibility,
     context: &str,
 ) -> Result<(), BatchResourceError> {
     let mut seen: std::collections::BTreeMap<usize, &str> = std::collections::BTreeMap::new();
@@ -104,9 +104,9 @@ pub(crate) fn validate_batch_response_indexes<T, E>(
                 s.request_index,
             ))));
         }
-        if seen.insert(s.request_index, "success").is_some() {
+        if seen.insert(s.request_index, "success").is_some() && !visibility.includes_deleting() {
             return Err(BatchResourceError::Internal(InternalError::new(format!(
-                "Remote {context} returned duplicate result index {}",
+                "Remote {context} returned duplicate success index {}",
                 s.request_index,
             ))));
         }
@@ -213,12 +213,14 @@ mod tests {
     }
 
     #[test]
-    fn collect_batch_successes_duplicate_index_is_error() {
-        let err = collect(3, vec![(1_i32, "a"), (1_i32, "b")]).unwrap_err();
-        assert_matches!(
-            err,
-            BatchResourceError::Internal(_),
-            "expected Internal error for duplicate index"
+    fn collect_batch_successes_keeps_repeated_index() {
+        let result = collect(3, vec![(1_i32, "a"), (1_i32, "b")]).unwrap();
+        assert_eq!(
+            result
+                .iter()
+                .map(|success| (success.request_index, success.item))
+                .collect::<Vec<_>>(),
+            vec![(1, "a"), (1, "b")]
         );
     }
 
@@ -240,14 +242,63 @@ mod tests {
     fn validate_batch_response_indexes_happy_path() {
         let successes = vec![make_success(0), make_success(2)];
         let problems = vec![make_domain_problem(1)];
-        assert!(validate_batch_response_indexes(&successes, &problems, 3, "test").is_ok());
+        assert!(
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                3,
+                ResourceVisibility::Active,
+                "test"
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn validate_batch_response_indexes_duplicate_success_index_is_error() {
+        let successes = vec![make_success(1), make_success(1)];
+        let err = validate_batch_response_indexes(
+            &successes,
+            &Vec::<kamu_resources_facade::BatchResourceProblem<()>>::new(),
+            2,
+            ResourceVisibility::Active,
+            "test",
+        )
+        .unwrap_err();
+        assert_matches!(
+            err,
+            BatchResourceError::Internal(_),
+            "expected Internal error for duplicate success index"
+        );
+    }
+
+    #[test]
+    fn validate_batch_response_indexes_allows_duplicate_success_index_including_deleting() {
+        let successes = vec![make_success(1), make_success(1)];
+        assert!(
+            validate_batch_response_indexes(
+                &successes,
+                &Vec::<kamu_resources_facade::BatchResourceProblem<()>>::new(),
+                2,
+                ResourceVisibility::IncludeDeleting,
+                "test",
+            )
+            .is_ok()
+        );
     }
 
     #[test]
     fn validate_batch_response_indexes_overlap_is_error() {
         let successes = vec![make_success(0)];
         let problems = vec![make_domain_problem(0)];
-        let err = validate_batch_response_indexes(&successes, &problems, 2, "test").unwrap_err();
+        let err = validate_batch_response_indexes(
+            &successes,
+            &problems,
+            2,
+            ResourceVisibility::Active,
+            "test",
+        )
+        .unwrap_err();
         assert_matches!(
             err,
             BatchResourceError::Internal(_),
@@ -259,7 +310,14 @@ mod tests {
     fn validate_batch_response_indexes_duplicate_problem_index_is_error() {
         let successes: Vec<BatchResourceSuccess<()>> = vec![];
         let problems = vec![make_domain_problem(0), make_domain_problem(0)];
-        let err = validate_batch_response_indexes(&successes, &problems, 2, "test").unwrap_err();
+        let err = validate_batch_response_indexes(
+            &successes,
+            &problems,
+            2,
+            ResourceVisibility::Active,
+            "test",
+        )
+        .unwrap_err();
         assert_matches!(
             err,
             BatchResourceError::Internal(_),

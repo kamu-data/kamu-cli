@@ -12,7 +12,12 @@ use std::future::Future;
 
 use database_common::{PaginationOpts, sql_like_escape_literal};
 use internal_error::InternalError;
-use kamu_resources::{ResourceHandle, ResourceTypeDescriptor};
+use kamu_resources::{
+    ResourceHandle,
+    ResourceSelector,
+    ResourceTypeDescriptor,
+    ResourceVisibility,
+};
 use kamu_resources_facade::{
     GetResourceError,
     ResourceFacade,
@@ -75,6 +80,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
             &selection,
             resource_facade,
             options.label_filter.as_ref(),
+            options.visibility,
         )
         .await?;
         let mut exact_results = exact_results.into_iter();
@@ -215,6 +221,12 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// An id finds a resource being deleted, as the facade's lookups by id do, so
+/// that deleting it again retries its cleanup
+const ID_LOOKUP_VISIBILITY: ResourceVisibility = ResourceVisibility::IncludeDeleting;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ResourceSelectionResolutionServiceImpl {
     fn target_key_from_handle(handle: &ResourceHandle) -> ResourceTargetKey {
         (handle.r#type.clone(), handle.id)
@@ -264,11 +276,14 @@ impl ResourceSelectionResolutionServiceImpl {
         }
     }
 
+    /// An exact name resolves to several resources only when resources being
+    /// deleted are visible.
     async fn fetch_exact_identities(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
-    ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
+        visibility: ResourceVisibility,
+    ) -> Result<Vec<Result<Vec<ResourceHandle>, GetResourceError>>, CLIError> {
         let exact_selectors = selection
             .items
             .iter()
@@ -292,7 +307,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let exact_request_count = exact_selectors.len();
         let mut exact_results = (0..exact_request_count)
             .map(|_| None)
-            .collect::<Vec<Option<Result<ResourceHandle, GetResourceError>>>>();
+            .collect::<Vec<Option<Result<Vec<ResourceHandle>, GetResourceError>>>>();
         let mut groups: BTreeMap<
             kamu_resources::ResourceTypeSelectorRaw,
             (kamu_resources::TypeUri, Vec<_>),
@@ -328,12 +343,10 @@ impl ResourceSelectionResolutionServiceImpl {
                 let found = resource_facade
                     .search_handles(SearchResourcesRequest {
                         selectors: with_labels(
-                            kamu_resources::ResourceSelector::ids_of_type(
-                                &schema.clone().into(),
-                                ids,
-                            ),
+                            ResourceSelector::ids_of_type(&schema.clone().into(), ids),
                             label_filter,
                         ),
+                        visibility: ID_LOOKUP_VISIBILITY,
                         pagination: PaginationOpts {
                             limit: by_id.len(),
                             offset: 0,
@@ -347,7 +360,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
                 for (exact_index, id) in by_id {
                     exact_results[exact_index] = Some(match found.get(&id) {
-                        Some(handle) => Ok(handle.clone()),
+                        Some(handle) => Ok(vec![handle.clone()]),
                         None => Err(GetResourceError::LookupProblem(
                             kamu_resources_facade::ResourceLookupProblem::IDNotFound(
                                 kamu_resources::ResourceIDNotFoundError(id),
@@ -370,30 +383,24 @@ impl ResourceSelectionResolutionServiceImpl {
                 // costs one `ILIKE` row per name, which is the price of
                 // filtering; correctness wins over the batching.
                 let found = if let Some(label_filter) = label_filter {
-                    resource_facade
-                        .search_handles(SearchResourcesRequest {
-                            selectors: with_labels(
-                                by_name
-                                    .iter()
-                                    .map(|(_, name)| {
-                                        kamu_resources::ResourceSelector::name_pattern(
-                                            schema.clone().into(),
-                                            sql_like_escape_literal(name.as_str()),
-                                        )
-                                    })
-                                    .collect(),
-                                Some(label_filter),
-                            ),
-                            pagination: PaginationOpts {
-                                limit: by_name.len(),
-                                offset: 0,
-                            },
-                        })
-                        .await?
-                        .items
-                        .into_iter()
-                        .map(|handle| (handle.name.to_ascii_lowercase(), handle))
-                        .collect::<HashMap<_, _>>()
+                    Self::search_all_handles(
+                        resource_facade,
+                        with_labels(
+                            by_name
+                                .iter()
+                                .map(|(_, name)| {
+                                    ResourceSelector::name_pattern(
+                                        schema.clone().into(),
+                                        sql_like_escape_literal(name.as_str()),
+                                    )
+                                })
+                                .collect(),
+                            Some(label_filter),
+                        ),
+                        visibility,
+                        by_name.len(),
+                    )
+                    .await?
                 } else {
                     let refs = by_name
                         .iter()
@@ -407,14 +414,15 @@ impl ResourceSelectionResolutionServiceImpl {
                         .collect::<Vec<_>>();
 
                     resource_facade
-                        .get_handles(refs)
+                        .get_handles(refs, visibility)
                         .await
                         .map_err(CLIError::critical)?
                         .successes
                         .into_iter()
-                        .map(|success| (success.item.name.to_ascii_lowercase(), success.item))
-                        .collect::<HashMap<_, _>>()
+                        .map(|success| success.item)
+                        .collect()
                 };
+                let found = Self::group_handles_by_name(found);
 
                 // Registered descriptor schemas must parse back into TypeUri.
                 let type_name =
@@ -423,7 +431,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 for (exact_index, name) in by_name {
                     exact_results[exact_index] =
                         Some(match found.get(&name.to_ascii_lowercase()) {
-                            Some(handle) => Ok(handle.clone()),
+                            Some(handles) => Ok(handles.clone()),
                             None => Err(GetResourceError::LookupProblem(
                                 kamu_resources_facade::ResourceLookupProblem::NameNotFound(
                                     kamu_resources::ResourceNameNotFoundError {
@@ -470,10 +478,8 @@ impl ResourceSelectionResolutionServiceImpl {
 
         let found = resource_facade
             .search_handles(SearchResourcesRequest {
-                selectors: with_labels(
-                    kamu_resources::ResourceSelector::any_type_ids(ids.clone()),
-                    label_filter,
-                ),
+                selectors: with_labels(ResourceSelector::any_type_ids(ids.clone()), label_filter),
+                visibility: ID_LOOKUP_VISIBILITY,
                 pagination: PaginationOpts {
                     limit: ids.len(),
                     offset: 0,
@@ -565,9 +571,10 @@ impl ResourceSelectionResolutionServiceImpl {
                             // A lone type-less unnarrowed selector spans every
                             // type.
                             selectors: with_labels(
-                                vec![kamu_resources::ResourceSelector::default()],
+                                vec![ResourceSelector::default()],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await?;
@@ -631,11 +638,12 @@ impl ResourceSelectionResolutionServiceImpl {
                     let response = resource_facade
                         .search_handles(SearchResourcesRequest {
                             selectors: with_labels(
-                                vec![kamu_resources::ResourceSelector::of_type(
+                                vec![ResourceSelector::of_type(
                                     type_descriptor.schema.clone().into(),
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await?;
@@ -679,12 +687,13 @@ impl ResourceSelectionResolutionServiceImpl {
                     resource_facade
                         .search_handles(SearchResourcesRequest {
                             selectors: with_labels(
-                                vec![kamu_resources::ResourceSelector::name_pattern(
+                                vec![ResourceSelector::name_pattern(
                                     type_descriptor.schema.clone().into(),
                                     request_name_pattern,
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await
@@ -738,16 +747,17 @@ impl ResourceSelectionResolutionServiceImpl {
         // One exact ref spanning every type. A single selector, so the
         // escape-to-pattern cost that rules selectors out for name *batches*
         // does not apply here.
-        let selector = match &resource_ref {
-            ExactResourceRef::ById(id) => kamu_resources::ResourceSelector::any_type_id(*id),
-            ExactResourceRef::ByName(name) => {
-                kamu_resources::ResourceSelector::any_type_name_pattern(sql_like_escape_literal(
-                    name.as_str(),
-                ))
+        let (selector, visibility) = match &resource_ref {
+            ExactResourceRef::ById(id) => {
+                (ResourceSelector::any_type_id(*id), ID_LOOKUP_VISIBILITY)
             }
+            ExactResourceRef::ByName(name) => (
+                ResourceSelector::any_type_name_pattern(sql_like_escape_literal(name.as_str())),
+                options.visibility,
+            ),
         };
 
-        let collected = Self::collect_unique_bounded_identities(
+        let mut collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
             seen_target_keys,
@@ -761,6 +771,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![request_selector],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility,
                             pagination,
                         })
                         .await
@@ -768,6 +779,14 @@ impl ResourceSelectionResolutionServiceImpl {
                         .map_err(Into::into)
                 }
             },
+        )
+        .await?;
+
+        Self::put_live_resources_first(
+            resource_facade,
+            with_labels(vec![selector], options.label_filter.as_ref()),
+            visibility,
+            &mut collected.identities,
         )
         .await?;
 
@@ -813,11 +832,12 @@ impl ResourceSelectionResolutionServiceImpl {
                     resource_facade
                         .search_handles(SearchResourcesRequest {
                             selectors: with_labels(
-                                vec![kamu_resources::ResourceSelector::any_type_name_pattern(
+                                vec![ResourceSelector::any_type_name_pattern(
                                     request_name_pattern,
                                 )],
                                 request_label_filter.as_ref(),
                             ),
+                            visibility: options.visibility,
                             pagination,
                         })
                         .await
@@ -893,7 +913,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
     fn process_exact_item(
         selector: crate::resources::ResourceExactSelector,
-        exact_results: &mut std::vec::IntoIter<Result<ResourceHandle, GetResourceError>>,
+        exact_results: &mut std::vec::IntoIter<Result<Vec<ResourceHandle>, GetResourceError>>,
         seen_target_keys: &mut HashSet<ResourceTargetKey>,
         targets: &mut Vec<ResourceTarget>,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
@@ -903,15 +923,17 @@ impl ResourceSelectionResolutionServiceImpl {
             .next()
             .expect("Every exact selector must have a batch result")
         {
-            Ok(handle) => {
-                let target = Self::target_from_handle(
-                    handle,
-                    selector.type_descriptor.canonical_selector,
-                    selector.selector_input,
-                );
+            Ok(handles) => {
+                for handle in handles {
+                    let target = Self::target_from_handle(
+                        handle,
+                        selector.type_descriptor.canonical_selector.clone(),
+                        selector.selector_input.clone(),
+                    );
 
-                if seen_target_keys.insert(Self::target_key(&target)) {
-                    targets.push(target);
+                    if seen_target_keys.insert(Self::target_key(&target)) {
+                        targets.push(target);
+                    }
                 }
             }
             Err(GetResourceError::LookupProblem(
@@ -925,6 +947,80 @@ impl ResourceSelectionResolutionServiceImpl {
             Err(error) => return Err(error.into()),
         }
         Ok(())
+    }
+
+    /// Searches past `expected_count` when the name patterns match more
+    /// resources, as a name does with resources being deleted visible.
+    async fn search_all_handles(
+        resource_facade: &dyn ResourceFacade,
+        selectors: Vec<ResourceSelector>,
+        visibility: ResourceVisibility,
+        expected_count: usize,
+    ) -> Result<Vec<ResourceHandle>, CLIError> {
+        let search = |visibility, limit| {
+            resource_facade.search_handles(SearchResourcesRequest {
+                selectors: selectors.clone(),
+                visibility,
+                pagination: PaginationOpts { limit, offset: 0 },
+            })
+        };
+
+        let mut response = search(visibility, expected_count).await?;
+        if response.total_count > response.items.len() {
+            response = search(visibility, response.total_count).await?;
+        }
+        let mut handles = response.items;
+
+        Self::put_live_resources_first(resource_facade, selectors, visibility, &mut handles)
+            .await?;
+
+        Ok(handles)
+    }
+
+    /// A search orders by last update, not by phase. With resources being
+    /// deleted visible, this puts the live ones first, as a lookup by name
+    /// does; the others keep the search order.
+    async fn put_live_resources_first(
+        resource_facade: &dyn ResourceFacade,
+        selectors: Vec<ResourceSelector>,
+        visibility: ResourceVisibility,
+        handles: &mut [ResourceHandle],
+    ) -> Result<(), CLIError> {
+        if !visibility.includes_deleting() || handles.len() < 2 {
+            return Ok(());
+        }
+
+        // Live resources are a subsequence of the search order, so those among
+        // `handles` come within its first `handles.len()`
+        let live_ids = resource_facade
+            .search_handles(SearchResourcesRequest {
+                selectors,
+                visibility: ResourceVisibility::Active,
+                pagination: PaginationOpts {
+                    limit: handles.len(),
+                    offset: 0,
+                },
+            })
+            .await?
+            .items
+            .into_iter()
+            .map(|handle| handle.id)
+            .collect::<HashSet<_>>();
+        handles.sort_by_key(|handle| !live_ids.contains(&handle.id));
+
+        Ok(())
+    }
+
+    /// Keys by the lowercase name, keeping the order of the handles.
+    fn group_handles_by_name(handles: Vec<ResourceHandle>) -> HashMap<String, Vec<ResourceHandle>> {
+        let mut grouped = HashMap::<_, Vec<_>>::new();
+        for handle in handles {
+            grouped
+                .entry(handle.name.to_ascii_lowercase())
+                .or_default()
+                .push(handle);
+        }
+        grouped
     }
 
     async fn collect_unique_bounded_identities<F, Fut>(
@@ -1081,16 +1177,16 @@ struct CollectedUniqueIdentities {
 /// selector's fields are a conjunction, so `(A ∧ L) ∨ (B ∧ L)` is exactly
 /// `(A ∨ B) ∧ L` — the same query the retired call-level filter ran.
 fn with_labels(
-    selectors: Vec<kamu_resources::ResourceSelector>,
+    selectors: Vec<ResourceSelector>,
     label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
-) -> Vec<kamu_resources::ResourceSelector> {
+) -> Vec<ResourceSelector> {
     let Some(label_filter) = label_filter else {
         return selectors;
     };
 
     selectors
         .into_iter()
-        .map(|selector| kamu_resources::ResourceSelector {
+        .map(|selector| ResourceSelector {
             labels: Some(label_filter.clone()),
             ..selector
         })

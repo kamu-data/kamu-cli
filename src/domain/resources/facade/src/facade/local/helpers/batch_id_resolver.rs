@@ -16,6 +16,7 @@ use kamu_resources::{
     ResourceName,
     ResourceNameNotFoundError,
     ResourceRef,
+    ResourceVisibility,
     TypeUri,
     resource_type_name,
 };
@@ -82,12 +83,14 @@ pub(crate) fn group_batch_resource_refs(resource_refs: Vec<ResourceRef>) -> Batc
 
 /// Resolve all `ByName` groups to UIDs using a single batched query per schema.
 /// Returns a combined list of `(request_index, request, id)` entries plus any
-/// name-not-found problems.
+/// name-not-found problems. Under [`ResourceVisibility::IncludeDeleting`] a
+/// name may yield several entries, the live resource first.
 pub(crate) async fn resolve_batch_ids(
     query_service: &dyn GenericResourceQueryService,
     account_id: &odf::AccountID,
     schema: &TypeUri,
     groups: BatchResourceRefGroups,
+    visibility: ResourceVisibility,
 ) -> Result<BatchIdsResolutionResponse, BatchResourceError> {
     let mut id_entries = groups.id_entries;
     let mut problems = groups.problems;
@@ -99,15 +102,24 @@ pub(crate) async fn resolve_batch_ids(
             .map(|(_, _, name)| name.clone())
             .collect::<Vec<_>>();
 
-        let id_by_name = query_service
-            .resolve_resource_ids_by_names(account_id, schema, &names)
+        let mut ids_by_name = HashMap::<_, Vec<_>>::new();
+        for (name, id) in query_service
+            .resolve_resource_ids_by_names(account_id, schema, &names, visibility)
             .await?
-            .into_iter()
-            .collect::<HashMap<_, _>>();
+        {
+            // A name repeated in the request may come back once per occurrence
+            let ids = ids_by_name.entry(name).or_default();
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
 
         for (request_index, resource_ref, name) in groups.name_entries {
-            match id_by_name.get(&name) {
-                Some(id) => id_entries.push((request_index, resource_ref, *id)),
+            match ids_by_name.get(&name) {
+                Some(ids) => id_entries.extend(
+                    ids.iter()
+                        .map(|id| (request_index, resource_ref.clone(), *id)),
+                ),
                 None => problems.push(BatchResourceProblem {
                     request_index,
                     error: ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {

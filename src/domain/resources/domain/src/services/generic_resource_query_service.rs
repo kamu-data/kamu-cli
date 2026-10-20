@@ -18,6 +18,7 @@ use crate::{
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
+    ResourceVisibility,
     TypeUri,
 };
 
@@ -53,12 +54,14 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
+        visibility: ResourceVisibility,
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -66,6 +69,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
     ) -> Result<usize, InternalError>;
 
     async fn find_owned_snapshot(
@@ -97,6 +101,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 

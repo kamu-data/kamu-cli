@@ -11,7 +11,8 @@ use chrono::{DateTime, Utc};
 
 use crate::{
     DeclarativeResource,
-    ResourceName,
+    ResourceCleanupError,
+    ResourceDeletionInProgressError,
     ResourceReconcileError,
     ResourceStatus,
     StatusConflictOf,
@@ -27,19 +28,24 @@ use crate::{
 /// stale.
 pub trait ManagedResource: DeclarativeResource {
     type ReconcileError: ResourceReconcileError;
-    type LifecycleError: StatusConflictOf;
+    type LifecycleError: StatusConflictOf + From<ResourceDeletionInProgressError>;
 
-    /// A deleted resource never needs reconciliation.
+    /// A resource being deleted never needs reconciliation.
     fn needs_reconciliation(&self) -> bool {
         use crate::ResourceStatusExt;
 
-        if self.headers().deleted_at.is_some() {
+        if self.headers().deletion_requested_at.is_some() {
             return false;
         }
 
         let generation = self.headers().generation;
 
         !self.status().was_observed(generation) || !self.status().was_reconciled(generation)
+    }
+
+    /// True while the deletion waits for the controllers to clean up.
+    fn needs_cleanup(&self) -> bool {
+        self.headers().deletion_requested_at.is_some() && self.headers().deleted_at.is_none()
     }
 
     fn try_create(
@@ -52,7 +58,8 @@ pub trait ManagedResource: DeclarativeResource {
         Self: Sized;
 
     /// Sets the generation to `new_generation`, unless the headers are
-    /// unchanged, in which case nothing is recorded.
+    /// unchanged, in which case nothing is recorded. Fails once deletion was
+    /// requested, as does a spec update.
     fn try_update_headers(
         &mut self,
         now: DateTime<Utc>,
@@ -67,11 +74,15 @@ pub trait ManagedResource: DeclarativeResource {
         new_generation: u64,
     ) -> Result<(), Self::LifecycleError>;
 
-    fn try_delete(
-        &mut self,
-        now: DateTime<Utc>,
-        tombstone_name: ResourceName,
-    ) -> Result<(), Self::LifecycleError>
+    /// Starts the deletion; the resource keeps its name until it completes.
+    fn try_request_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
+    where
+        Self: Sized;
+
+    /// Completes a requested deletion and renames the resource to
+    /// `deleted-<id>`. Fails with an invariant violation if the deletion was
+    /// not requested.
+    fn try_complete_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;
 
@@ -109,6 +120,16 @@ pub trait ManagedResource: DeclarativeResource {
         expected_generation: u64,
         expected_status_generation: u64,
         error: &Self::ReconcileError,
+    ) -> Result<(), Self::LifecycleError>
+    where
+        Self: Sized;
+
+    /// Skipped when the resource does not wait for a cleanup.
+    fn try_mark_cleanup_failed(
+        &mut self,
+        now: DateTime<Utc>,
+        expected_status_generation: u64,
+        error: &ResourceCleanupError,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;

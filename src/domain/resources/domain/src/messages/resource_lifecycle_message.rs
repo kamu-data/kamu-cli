@@ -24,6 +24,7 @@ pub enum ResourceLifecycleMessage {
     Applied(ResourceLifecycleMessageApplied),
     ReconciliationSucceeded(ResourceLifecycleMessageReconciliationSucceeded),
     ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed),
+    DeletionRequested(ResourceLifecycleMessageDeletionRequested),
     Deleted(ResourceLifecycleMessageDeleted),
 }
 
@@ -51,6 +52,23 @@ impl ResourceLifecycleMessage {
         Self::ReconciliationFailed(ResourceLifecycleMessageReconciliationFailed {
             event_time,
             resource,
+        })
+    }
+
+    pub fn deletion_requested(event_time: DateTime<Utc>, resources: Vec<ResourceSnapshot>) -> Self {
+        debug_assert!(
+            !resources.is_empty(),
+            "deletion requested message must contain at least one resource"
+        );
+
+        debug_assert!(
+            ResourceSnapshot::check_homogeneous(&resources),
+            "all resources in a deletion requested message must share the same schema"
+        );
+
+        Self::DeletionRequested(ResourceLifecycleMessageDeletionRequested {
+            event_time,
+            resources,
         })
     }
 
@@ -115,6 +133,18 @@ pub struct ResourceLifecycleMessageReconciliationFailed {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Deletion of the resources was requested, or requested again to retry a
+/// failed cleanup. The resources are in the `Deleting` phase.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceLifecycleMessageDeletionRequested {
+    pub event_time: DateTime<Utc>,
+    // all resources share the same `schema`
+    pub resources: Vec<ResourceSnapshot>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The controllers cleaned up and the deletion of the resources completed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceLifecycleMessageDeleted {
     pub event_time: DateTime<Utc>,

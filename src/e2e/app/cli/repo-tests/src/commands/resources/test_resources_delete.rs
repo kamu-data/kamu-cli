@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::resources::{ResourceCtx, assert_output_contains_all};
+use crate::resources::{ResourceCtx, assert_output_contains_all, fixtures};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: resource delete semantics (QA scenario 10)
@@ -30,12 +30,9 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     seed_delete_fixtures(&ctx, app_vars, temp_vars, app_secrets, temp_secrets).await;
 
     // -- 2. Explicit type/name selector deletes only the selected VariableSet -
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "vs", app_vars, "--force"],
-        Some(&[
-            r#"Deleted: VariableSet/app-vars"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
-        ]),
+        &["VariableSet/app-vars"],
     )
     .await;
 
@@ -45,12 +42,9 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", temp_secrets).await;
 
     // -- 3. Slash selector deletes the other VariableSet ----------------------
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "vs/temp-vars", "--force"],
-        Some(&[
-            r#"Deleted: VariableSet/temp-vars"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
-        ]),
+        &["VariableSet/temp-vars"],
     )
     .await;
 
@@ -59,12 +53,9 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", temp_secrets).await;
 
     // -- 4. Pattern selector deletes matching SecretSets only -----------------
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "ss", "temp-%", "--force"],
-        Some(&[
-            r#"Deleted: SecretSet/temp-secrets"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
-        ]),
+        &["SecretSet/temp-secrets"],
     )
     .await;
 
@@ -94,18 +85,11 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_absent("ss", temp_secrets).await;
 
     // -- 6. Type-scoped --all deletes only VariableSets -----------------------
-    let variableset_delete = ctx
-        .stderr(["delete", "variablesets", "--all", "--force"])
-        .await;
-    assert_output_contains_all(
-        &variableset_delete,
-        &[
-            "Deleted: VariableSet/app-vars",
-            "Deleted: VariableSet/temp-vars",
-            "Summary 2 item(s): 2 deleted, 0 ignored, 0 failed",
-        ],
-        "delete variablesets --all --force",
-    );
+    ctx.assert_deleted_in_any_order(
+        ["delete", "variablesets", "--all", "--force"],
+        &["VariableSet/app-vars", "VariableSet/temp-vars"],
+    )
+    .await;
 
     ctx.assert_resource_absent("vs", app_vars).await;
     ctx.assert_resource_absent("vs", temp_vars).await;
@@ -181,18 +165,16 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", app_secrets).await;
 
     // -- 8. Cross-type all deletes everything ---------------------------------
-    let all_delete = ctx.stderr(["delete", "%/%", "--force"]).await;
-    assert_output_contains_all(
-        &all_delete,
+    ctx.assert_deleted_in_any_order(
+        ["delete", "%/%", "--force"],
         &[
-            "Deleted: VariableSet/app-vars",
-            "Deleted: VariableSet/temp-vars",
-            "Deleted: SecretSet/app-secrets",
-            "Deleted: SecretSet/temp-secrets",
-            "Summary 4 item(s): 4 deleted, 0 ignored, 0 failed",
+            "VariableSet/app-vars",
+            "VariableSet/temp-vars",
+            "SecretSet/app-secrets",
+            "SecretSet/temp-secrets",
         ],
-        "delete %/% --force",
-    );
+    )
+    .await;
 
     ctx.assert_resource_absent("vs", app_vars).await;
     ctx.assert_resource_absent("vs", temp_vars).await;
@@ -244,19 +226,68 @@ pub async fn test_resources_bare_id_selector(ctx: ResourceCtx) {
     let missing_id = "51a420dc-f0a0-4842-a148-4481195a4b34";
     ctx.assert_failure(["get", missing_id], None).await;
 
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", &vars_id, "--force"],
-        Some(&[format!(r#"Deleted: VariableSet/{vars_name}"#).as_str()]),
+        &[&format!("VariableSet/{vars_name}")],
     )
     .await;
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", &secrets_id, "--force"],
-        Some(&[format!(r#"Deleted: SecretSet/{secrets_name}"#).as_str()]),
+        &[&format!("SecretSet/{secrets_name}")],
     )
     .await;
 
     ctx.assert_resource_absent("vs", vars_name).await;
     ctx.assert_resource_absent("ss", secrets_name).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scenario: `--include-deleting` on `get` and `list`
+//
+// The flag also shows resources whose deletion waits for their controllers.
+// The controllers clean up once the delete command has finished, so a deleted
+// resource is gone with or without the flag.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_resources_include_deleting(ctx: ResourceCtx) {
+    let kept = "kept-vars";
+    let gone = "gone-vars";
+    let vs_schema = fixtures::VARIABLE_SET_SCHEMA.to_string();
+
+    ctx.apply_variable_set(kept, "one").await;
+    ctx.apply_variable_set(gone, "two").await;
+
+    assert_eq!(
+        ctx.get_idents(["get", "vs/%", "--include-deleting"]).await,
+        vec![
+            (vs_schema.clone(), gone.to_string()),
+            (vs_schema.clone(), kept.to_string()),
+        ]
+    );
+
+    ctx.assert_deleted(
+        ["delete", "vs", gone, "--force"],
+        &["VariableSet/gone-vars"],
+    )
+    .await;
+
+    ctx.assert_failure(
+        ["get", "vs", gone, "--include-deleting"],
+        Some(&[&format!(
+            "Resource '{gone}' of type 'VariableSet' was not found"
+        )]),
+    )
+    .await;
+    assert_eq!(
+        ctx.get_idents(["get", "vs/%", "--include-deleting"]).await,
+        vec![(vs_schema, kept.to_string())]
+    );
+
+    let listed = ctx.stdout(["list", "vs", "--include-deleting"]).await;
+    assert!(
+        listed.contains(kept) && !listed.contains(gone),
+        "`list vs --include-deleting` should show only {kept}, got:\n{listed}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

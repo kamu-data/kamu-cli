@@ -258,6 +258,38 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = resource_repo_suite::test_resource_being_deleted_round_trips,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_resource_being_deleted_is_hidden_unless_included,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_name_of_resource_being_deleted_can_be_taken,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_summarize_resources_counts_deleting,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = resource_repo_suite::test_resource_name_case_insensitive,
     harness = InMemoryResourceRepositoryHarness
 );

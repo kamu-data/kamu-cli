@@ -12,6 +12,8 @@ use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
     EventSourcedResource,
+    ResourceCleanupError,
+    ResourceDeletionInProgressError,
     ResourceEvent,
     ResourceHeadersExt,
     ResourceHeadersInput,
@@ -107,6 +109,7 @@ where
     R::LifecycleError:
         From<ResourceHeadersValidationError> + InvariantViolationOf<R::ResourceState>,
 {
+    ensure_not_being_deleted(resource)?;
     new_headers.validate()?;
 
     if resource.headers().is_equivalent_to(&new_headers) {
@@ -132,6 +135,7 @@ where
     R::LifecycleError: From<<R::SpecInput as ResourceValidateSpec>::ValidationError>
         + InvariantViolationOf<R::ResourceState>,
 {
+    ensure_not_being_deleted(resource)?;
     new_spec.validate()?;
 
     // Compare after normalizing (not the raw input) so a resubmitted-but-equivalent
@@ -146,10 +150,32 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn try_delete_resource<R>(
+/// Starts the deletion: the resource keeps its name and waits for its
+/// controllers to clean up. Requesting it again is not an update.
+pub fn try_request_resource_deletion<R>(
     resource: &mut R,
     now: DateTime<Utc>,
-    tombstone_name: ResourceName,
+) -> Result<(), R::LifecycleError>
+where
+    R: EventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
+{
+    if resource.headers().deletion_requested_at.is_some() {
+        return Ok(());
+    }
+
+    let event = resource.make_deletion_requested_event(now);
+    resource.apply_event(event)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Completes a requested deletion and renames the resource to its tombstone
+/// name. Completing it again is not an update; completing a deletion that was
+/// never requested is an invariant violation, since it would skip the cleanup.
+pub fn try_complete_resource_deletion<R>(
+    resource: &mut R,
+    now: DateTime<Utc>,
 ) -> Result<(), R::LifecycleError>
 where
     R: EventSourcedResource,
@@ -159,8 +185,28 @@ where
         return Ok(());
     }
 
+    let tombstone_name = ResourceName::new_unchecked(&format!("deleted-{}", resource.id()));
     let event = resource.make_deleted_event(now, tombstone_name);
+
+    if resource.headers().deletion_requested_at.is_none() {
+        return Err(R::LifecycleError::invariant_violation(
+            ProjectionError::new(Some(resource.aggregate().as_state().clone()), event),
+        ));
+    }
+
     resource.apply_event(event)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn ensure_not_being_deleted<R>(resource: &R) -> Result<(), ResourceDeletionInProgressError>
+where
+    R: EventSourcedResource,
+{
+    if resource.headers().deletion_requested_at.is_some() {
+        return Err(ResourceDeletionInProgressError { id: *resource.id() });
+    }
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -256,6 +302,11 @@ where
         return Ok(());
     }
 
+    if resource.headers().deletion_requested_at.is_some() {
+        tracing::warn!("Skipping reconciliation success of a resource being deleted");
+        return Ok(());
+    }
+
     ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
@@ -286,10 +337,41 @@ where
         return Ok(());
     }
 
+    if resource.headers().deletion_requested_at.is_some() {
+        tracing::warn!("Skipping reconciliation failure of a resource being deleted");
+        return Ok(());
+    }
+
     ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
     new_status.mark_failed_or_degraded(error.reason_code(), error.user_message(), now);
+
+    try_update_resource_status(resource, now, expected_status_generation, new_status)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records a failed cleanup of a resource being deleted. The deletion stays
+/// in progress until a cleanup succeeds.
+pub fn try_mark_resource_cleanup_failed<R>(
+    resource: &mut R,
+    now: DateTime<Utc>,
+    expected_status_generation: u64,
+    error: &ResourceCleanupError,
+) -> Result<(), R::LifecycleError>
+where
+    R: EventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState> + StatusConflictOf,
+{
+    if !resource.needs_cleanup() {
+        return Ok(());
+    }
+
+    ensure_status_generation(resource, expected_status_generation)?;
+
+    let mut new_status = resource.status().clone();
+    new_status.mark_cleanup_failed(error.to_string(), now);
 
     try_update_resource_status(resource, now, expected_status_generation, new_status)
 }

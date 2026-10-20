@@ -16,6 +16,7 @@ use kamu_resources::{
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceRef,
     ResourceSchemaProvider,
+    ResourceVisibility,
     ResourceWarning,
     TypeName,
     WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS,
@@ -121,6 +122,7 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
                 "my-vars",
             )],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -169,6 +171,7 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
                 "my-yaml-vars",
             )],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -234,6 +237,7 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
                     "plan-upd-vars",
                 )],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -352,6 +356,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
                 "schema-invalid-vars",
             )],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -431,6 +436,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
                 "biz-invalid-vars",
             )],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -474,6 +480,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
                     "alpha",
                 )],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -513,6 +520,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
                     "yaml-vars",
                 )],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -572,6 +580,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
                     "upd-vars",
                 )],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -1176,9 +1185,9 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-143: ImmutableFieldChanged, ReferencedObjectMissing and
-// LifecycleRuleConflict are not triggerable by VariableSet/SecretSet, so they
-// stay deferred until a resource type can trigger them.
+// RF-143: ImmutableFieldChanged and ReferencedObjectMissing are not triggerable
+// by VariableSet/SecretSet, so they stay deferred until a resource type can
+// trigger them. LifecycleRuleConflict is covered by RF-182 in delete.rs.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1315,6 +1324,7 @@ pub async fn test_apply_documents_match_rendered_manifest(h: &impl FacadeContrac
                 )],
                 ResourceManifestFormat::Json,
                 SpecViewOpts::default(),
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),

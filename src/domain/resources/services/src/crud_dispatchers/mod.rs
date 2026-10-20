@@ -18,10 +18,10 @@ pub use kamu_resources::{
     ApplyManifestPlanningDecision,
     ApplyManifestRejection,
     ApplyResourceCrudDispatcherError,
-    DeleteResourcesCrudDispatcherError,
+    RequestResourcesDeletionCrudDispatcherError,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
-    ResourceCrudDispatcherDeleteRequest,
+    ResourceCrudDispatcherDeletionRequest,
     UnsupportedResourceDescriptorError,
 };
 pub use resource_crud_dispatcher_helpers::*;

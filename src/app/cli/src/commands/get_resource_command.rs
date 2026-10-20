@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
-use kamu_resources::TypeUri;
+use kamu_resources::{ResourceVisibility, TypeUri};
 use kamu_resources_facade::{
     BatchResourceProblem,
     GetResourceError,
@@ -69,6 +69,9 @@ pub struct GetResourceCommand {
 
     #[dill::component(explicit)]
     label_selectors: Vec<String>,
+
+    #[dill::component(explicit)]
+    include_deleting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,7 +88,12 @@ impl GetResourceCommand {
                 Some(self.max_results.get())
             },
             label_filter: ResourceLabelSelectorParser::parse(&self.label_selectors)?,
+            visibility: self.visibility(),
         })
+    }
+
+    fn visibility(&self) -> ResourceVisibility {
+        ResourceVisibility::with_deleting(self.include_deleting)
     }
 
     fn spec_view(&self) -> kamu_resources_facade::SpecViewOpts {
@@ -223,7 +231,12 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .render_manifests(Self::chunk_resource_refs(chunk), format, self.spec_view())
+                    .render_manifests(
+                        Self::chunk_resource_refs(chunk),
+                        format,
+                        self.spec_view(),
+                        self.visibility(),
+                    )
                     .await?;
 
                 self.handle_lookup_problems(result.problems)?;
@@ -249,7 +262,11 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .get(Self::chunk_resource_refs(chunk), self.spec_view())
+                    .get(
+                        Self::chunk_resource_refs(chunk),
+                        self.spec_view(),
+                        self.visibility(),
+                    )
                     .await?;
 
                 self.handle_lookup_problems(result.problems)?;

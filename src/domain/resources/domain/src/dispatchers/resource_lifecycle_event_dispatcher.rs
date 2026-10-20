@@ -27,6 +27,12 @@ pub trait ResourceLifecycleEventDispatcher: Send + Sync {
         resource: &ResourceSnapshot,
     ) -> Result<(), InternalError>;
 
+    /// All resources share the schema of the dispatcher.
+    async fn handle_deletion_requested(
+        &self,
+        resources: &[ResourceSnapshot],
+    ) -> Result<(), InternalError>;
+
     async fn handle_deleted(&self, resource: &ResourceSnapshot) -> Result<(), InternalError>;
 }
 

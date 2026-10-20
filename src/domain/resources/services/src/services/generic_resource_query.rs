@@ -27,6 +27,7 @@ use crate::domain::{
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
+    ResourceVisibility,
     TypeUri,
 };
 
@@ -72,9 +73,10 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
+        visibility: ResourceVisibility,
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         self.resource_repository
-            .resolve_resource_ids_by_names(account_id, schema, names)
+            .resolve_resource_ids_by_names(account_id, schema, names, visibility)
             .await
     }
 
@@ -82,10 +84,11 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(account_id, scope, pagination)
+            .search_resource_handles(account_id, scope, visibility, pagination)
             .await
     }
 
@@ -93,9 +96,10 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(account_id, scope)
+            .count_search_resource_handles(account_id, scope, visibility)
             .await
     }
 
@@ -217,11 +221,12 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
+        visibility: ResourceVisibility,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots(account_id, scope, pagination);
+            .list_resource_snapshots(account_id, scope, visibility, pagination);
 
         use tokio_stream::StreamExt;
 

@@ -8,7 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_resources::ResourceWarning;
+use kamu_resources::{
+    ResourceVisibility,
+    ResourceWarning,
+    resource_replaces_resource_being_deleted_warning,
+};
 use serde::Serialize;
 use time_source::SystemTimeSource;
 
@@ -161,7 +165,8 @@ where
             .await
             .map_err(ApplyResourceUseCaseError::Internal)?;
 
-        let warnings = params.spec.lint_warnings();
+        let mut warnings = params.spec.lint_warnings();
+        warnings.extend(self.replaced_resources_warnings(&params.headers).await?);
 
         let resource =
             match <R as ManagedResource>::try_create(now, id, params.headers, params.spec) {
@@ -184,6 +189,35 @@ where
                 previous_state: None,
             },
         ))
+    }
+
+    /// Warns about each resource being deleted whose name the created resource
+    /// takes.
+    async fn replaced_resources_warnings(
+        &self,
+        headers: &ResourceHeadersInput,
+    ) -> Result<Vec<ResourceWarning>, ApplyResourceUseCaseError<R>> {
+        let account_id = headers
+            .account
+            .as_ref()
+            .and_then(|a| a.did.as_ref())
+            .expect("resource headers must carry a resolved account by apply time");
+
+        let replaced = self
+            .generic_resource_query_service
+            .resolve_resource_ids_by_names(
+                account_id,
+                R::schema(),
+                std::slice::from_ref(&headers.name),
+                ResourceVisibility::IncludeDeleting,
+            )
+            .await
+            .map_err(ApplyResourceUseCaseError::Internal)?;
+
+        Ok(replaced
+            .iter()
+            .map(|(_, id)| resource_replaces_resource_being_deleted_warning(id))
+            .collect())
     }
 
     pub(crate) fn plan_update_resource(

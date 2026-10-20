@@ -66,6 +66,15 @@ pub struct ResourceStatusConflictError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The resource is being deleted, so its headers and spec can no longer change.
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
+#[error("Resource {id} is being deleted")]
+pub struct ResourceDeletionInProgressError {
+    pub id: ResourceID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
 #[error("Resource '{id}' of type '{resource_type}' is not owned by the specified account")]
 pub struct ResourceNotOwnedByAccountError {
