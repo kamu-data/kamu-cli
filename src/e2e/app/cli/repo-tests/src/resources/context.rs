@@ -199,6 +199,51 @@ impl ResourceCtx {
             .await;
     }
 
+    /// Lines `kamu delete` prints when it deleted `deleted`, given as
+    /// `Type/name`. A local workspace reports the deletion once controllers
+    /// have cleaned up; a server reports it at the time of its response, before
+    /// it processes the deletion's messages.
+    pub fn delete_report(&self, deleted: &[&str]) -> Vec<String> {
+        let count = deleted.len();
+        let (label, summary) = match self {
+            Self::Local(_) => (
+                "Deleted",
+                format!("Summary {count} item(s): {count} deleted, 0 ignored, 0 failed"),
+            ),
+            Self::Remote { .. } => (
+                "Deleting",
+                format!(
+                    "Summary {count} item(s): 0 deleted, {count} deleting, 0 ignored, 0 failed"
+                ),
+            ),
+        };
+
+        deleted
+            .iter()
+            .map(|name| format!("{label}: {name}"))
+            .chain([summary])
+            .collect()
+    }
+
+    /// Run a `kamu delete` and assert it deleted exactly `deleted`, given as
+    /// `Type/name`
+    pub async fn assert_deleted<I, S>(&self, args: I, deleted: &[&str])
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let expected = self
+            .delete_report(deleted)
+            .iter()
+            .map(|line| regex::escape(line))
+            .collect::<Vec<_>>();
+        self.assert_success(
+            args,
+            Some(&expected.iter().map(String::as_str).collect::<Vec<_>>()),
+        )
+        .await;
+    }
+
     /// Write `content` to `<workspace>/<rel_path>`, creating parent directories
     /// as needed, and return the absolute path to the written file.
     ///

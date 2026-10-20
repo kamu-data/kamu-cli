@@ -1389,9 +1389,10 @@ Deletion runs in two steps, as the ODF resource framework defines them
 - **A failed cleanup is an outcome, not an error.** The resource stays `Deleting` with a
   `Ready=False` condition, reason `CleanupFailed`. Nothing retries it automatically; deleting the
   resource again by its id does.
-- **The phase a delete reports** is the one at the time of the response. The CLI's outbox delivers
-  messages once the command's transaction commits, so `kamu delete` on a workspace prints `Deleting`
-  and the deletion completes before the command exits.
+- **The phase a delete reports** is the one at the time of the response: `Deleted` only if the
+  controllers cleaned up within the request. A local workspace processes a command's messages once
+  its transaction has committed, so `kamu delete` there reports afterwards, through a
+  `PostCommandActions` step: a resource still found by its id is `Deleting`, one gone is `Deleted`.
 
 ### Outbox connections
 

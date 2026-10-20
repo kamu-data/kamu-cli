@@ -30,12 +30,9 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     seed_delete_fixtures(&ctx, app_vars, temp_vars, app_secrets, temp_secrets).await;
 
     // -- 2. Explicit type/name selector deletes only the selected VariableSet -
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "vs", app_vars, "--force"],
-        Some(&[
-            r#"Deleting: VariableSet/app-vars"#,
-            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
-        ]),
+        &["VariableSet/app-vars"],
     )
     .await;
 
@@ -45,12 +42,9 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", temp_secrets).await;
 
     // -- 3. Slash selector deletes the other VariableSet ----------------------
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "vs/temp-vars", "--force"],
-        Some(&[
-            r#"Deleting: VariableSet/temp-vars"#,
-            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
-        ]),
+        &["VariableSet/temp-vars"],
     )
     .await;
 
@@ -59,12 +53,9 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", temp_secrets).await;
 
     // -- 4. Pattern selector deletes matching SecretSets only -----------------
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "ss", "temp-%", "--force"],
-        Some(&[
-            r#"Deleting: SecretSet/temp-secrets"#,
-            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
-        ]),
+        &["SecretSet/temp-secrets"],
     )
     .await;
 
@@ -99,11 +90,10 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
         .await;
     assert_output_contains_all(
         &variableset_delete,
-        &[
-            "Deleting: VariableSet/app-vars",
-            "Deleting: VariableSet/temp-vars",
-            "Summary 2 item(s): 0 deleted, 2 deleting, 0 ignored, 0 failed",
-        ],
+        &ctx.delete_report(&["VariableSet/app-vars", "VariableSet/temp-vars"])
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
         "delete variablesets --all --force",
     );
 
@@ -184,13 +174,15 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     let all_delete = ctx.stderr(["delete", "%/%", "--force"]).await;
     assert_output_contains_all(
         &all_delete,
-        &[
-            "Deleting: VariableSet/app-vars",
-            "Deleting: VariableSet/temp-vars",
-            "Deleting: SecretSet/app-secrets",
-            "Deleting: SecretSet/temp-secrets",
-            "Summary 4 item(s): 0 deleted, 4 deleting, 0 ignored, 0 failed",
-        ],
+        &ctx.delete_report(&[
+            "VariableSet/app-vars",
+            "VariableSet/temp-vars",
+            "SecretSet/app-secrets",
+            "SecretSet/temp-secrets",
+        ])
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>(),
         "delete %/% --force",
     );
 
@@ -244,14 +236,14 @@ pub async fn test_resources_bare_id_selector(ctx: ResourceCtx) {
     let missing_id = "51a420dc-f0a0-4842-a148-4481195a4b34";
     ctx.assert_failure(["get", missing_id], None).await;
 
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", &vars_id, "--force"],
-        Some(&[format!(r#"Deleting: VariableSet/{vars_name}"#).as_str()]),
+        &[&format!("VariableSet/{vars_name}")],
     )
     .await;
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", &secrets_id, "--force"],
-        Some(&[format!(r#"Deleting: SecretSet/{secrets_name}"#).as_str()]),
+        &[&format!("SecretSet/{secrets_name}")],
     )
     .await;
 
@@ -283,9 +275,9 @@ pub async fn test_resources_include_deleting(ctx: ResourceCtx) {
         ]
     );
 
-    ctx.assert_success(
+    ctx.assert_deleted(
         ["delete", "vs", gone, "--force"],
-        Some(&[r#"Deleting: VariableSet/gone-vars"#]),
+        &["VariableSet/gone-vars"],
     )
     .await;
 
