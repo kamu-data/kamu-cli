@@ -131,6 +131,11 @@ where
         &self,
         snapshot: &ResourceSnapshot,
     ) -> Result<(), ResourcePersistenceError> {
+        // State that no longer validates must not block the deletion that removes it
+        if snapshot.headers.deletion_requested_at.is_some() {
+            return Ok(());
+        }
+
         ResourceDurableStateValidator::new(self.extension_schema_registry)
             .validate_snapshot(snapshot)
             .map_err(ResourcePersistenceError::InvalidDurableState)

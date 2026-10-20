@@ -10,13 +10,18 @@
 use database_common::PaginationOpts;
 use kamu_resources::{
     ApplyResourceOutcome,
+    ResourceID,
+    ResourcePhase,
     ResourceRef,
     ResourceSelector,
     ResourceVisibility,
     TypeName,
+    WARNING_CODE_REPLACES_RESOURCE_BEING_DELETED,
 };
 use kamu_resources_facade::{
     ApplyManifestRequest,
+    ResourceDeletion,
+    ResourceFacade,
     ResourceLookupProblem,
     ResourceManifestFormat,
     SearchResourcesRequest,
@@ -84,7 +89,14 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
             .unwrap(),
     );
 
-    assert_eq!(deleted_uid.id, id, "deleted id must match created id");
+    // Controllers clean up within the request
+    assert_eq!(
+        deleted_uid,
+        ResourceDeletion {
+            id,
+            phase: ResourcePhase::Deleted
+        }
+    );
 
     // Resource must not be found by name
     let get_by_name = facade
@@ -342,7 +354,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-136
-// Deleting the same resource twice: second call must return a not-found error.
+// Deleting a deleted resource again must return a not-found error.
 contract_test!(
     repeated_delete_is_deterministic,
     super::test_repeated_delete_is_deterministic
@@ -372,6 +384,258 @@ pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarnes
         ResourceLookupProblem::IDNotFound(_),
         "second delete must return IDNotFound"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-137
+contract_test!(
+    delete_waits_for_cleanup,
+    super::test_delete_waits_for_cleanup,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_delete_waits_for_cleanup(h: &impl FacadeContractHarness) {
+    let id = create_variable_set(h, TestAccount::Alice, "del-phases").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let deletion = assert_single_batch_success(
+        facade
+            .delete(vec![by_name("del-phases")], ResourceVisibility::Active)
+            .await
+            .unwrap(),
+    );
+    assert_eq!(
+        deletion,
+        ResourceDeletion {
+            id,
+            phase: ResourcePhase::Deleting
+        }
+    );
+
+    // Found by id while controllers clean up
+    let resource = assert_single_batch_success(
+        facade
+            .get(
+                vec![by_id(&id)],
+                SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
+            )
+            .await
+            .unwrap(),
+    );
+    assert_eq!(resource.headers.name.as_str(), "del-phases");
+    assert_eq!(resource.status.phase, ResourcePhase::Deleting);
+    assert!(resource.headers.deletion_requested_at.is_some());
+    assert!(resource.headers.deleted_at.is_none());
+
+    // Hidden from names and searches unless asked for
+    assert_matches!(
+        assert_single_batch_problem(
+            facade
+                .get_handles(vec![by_name("del-phases")], ResourceVisibility::Active)
+                .await
+                .unwrap()
+        ),
+        ResourceLookupProblem::NameNotFound(_)
+    );
+    assert_eq!(
+        found_by_name(facade.as_ref(), "del-phases").await,
+        vec![(0, id)]
+    );
+    assert_eq!(
+        searched_ids(facade.as_ref(), ResourceVisibility::Active).await,
+        Vec::<ResourceID>::new()
+    );
+    assert_eq!(
+        searched_ids(facade.as_ref(), ResourceVisibility::IncludeDeleting).await,
+        vec![id]
+    );
+
+    h.flush_outbox().await;
+
+    assert_matches!(
+        assert_single_batch_problem(
+            facade
+                .get(
+                    vec![by_id(&id)],
+                    SpecViewOpts::ENCRYPTED,
+                    ResourceVisibility::IncludeDeleting,
+                )
+                .await
+                .unwrap()
+        ),
+        ResourceLookupProblem::IDNotFound(_)
+    );
+    assert_eq!(
+        found_by_name(facade.as_ref(), "del-phases").await,
+        Vec::<(usize, ResourceID)>::new()
+    );
+    assert_eq!(
+        searched_ids(facade.as_ref(), ResourceVisibility::IncludeDeleting).await,
+        Vec::<ResourceID>::new()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-138
+contract_test!(
+    name_of_resource_being_deleted_can_be_reused,
+    super::test_name_of_resource_being_deleted_can_be_reused,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeContractHarness) {
+    let old_id = create_variable_set(h, TestAccount::Alice, "reused").await;
+    let facade = h.facade_for(TestAccount::Alice);
+    facade
+        .delete(vec![by_id(&old_id)], ResourceVisibility::Active)
+        .await
+        .unwrap();
+
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("reused", None, &[("K", "v2")]),
+        })
+        .await
+        .unwrap();
+    let new_id = assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
+        .headers
+        .id;
+    assert_ne!(new_id, old_id);
+    assert_eq!(
+        decision
+            .expect_applied()
+            .warnings
+            .into_iter()
+            .filter(|warning| warning.code == WARNING_CODE_REPLACES_RESOURCE_BEING_DELETED)
+            .map(|warning| warning.message)
+            .collect::<Vec<_>>(),
+        vec![format!(
+            "Resource replaces a resource that is still being deleted ({old_id})"
+        )]
+    );
+
+    // The live resource comes first
+    assert_eq!(
+        found_by_name(facade.as_ref(), "reused").await,
+        vec![(0, new_id), (0, old_id)]
+    );
+
+    h.flush_outbox().await;
+
+    assert_eq!(
+        found_by_name(facade.as_ref(), "reused").await,
+        vec![(0, new_id)]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-139
+contract_test!(
+    repeated_delete_of_resource_being_deleted_retries,
+    super::test_repeated_delete_of_resource_being_deleted_retries,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_repeated_delete_of_resource_being_deleted_retries(
+    h: &impl FacadeContractHarness,
+) {
+    let id = create_variable_set(h, TestAccount::Alice, "retry-del").await;
+    let facade = h.facade_for(TestAccount::Alice);
+    let deleting = ResourceDeletion {
+        id,
+        phase: ResourcePhase::Deleting,
+    };
+
+    facade
+        .delete(vec![by_id(&id)], ResourceVisibility::Active)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        assert_single_batch_success(
+            facade
+                .delete(vec![by_id(&id)], ResourceVisibility::Active)
+                .await
+                .unwrap()
+        ),
+        deleting
+    );
+    assert_matches!(
+        assert_single_batch_problem(
+            facade
+                .delete(vec![by_name("retry-del")], ResourceVisibility::Active)
+                .await
+                .unwrap()
+        ),
+        ResourceLookupProblem::NameNotFound(_)
+    );
+    assert_eq!(
+        assert_single_batch_success(
+            facade
+                .delete(
+                    vec![by_name("retry-del")],
+                    ResourceVisibility::IncludeDeleting
+                )
+                .await
+                .unwrap()
+        ),
+        deleting
+    );
+
+    h.flush_outbox().await;
+
+    assert_matches!(
+        assert_single_batch_problem(
+            facade
+                .delete(vec![by_id(&id)], ResourceVisibility::IncludeDeleting)
+                .await
+                .unwrap()
+        ),
+        ResourceLookupProblem::IDNotFound(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `(request_index, id)` of the resources a name resolves to, resources being
+/// deleted included
+async fn found_by_name(facade: &dyn ResourceFacade, name: &str) -> Vec<(usize, ResourceID)> {
+    facade
+        .get_handles(vec![by_name(name)], ResourceVisibility::IncludeDeleting)
+        .await
+        .unwrap()
+        .successes
+        .into_iter()
+        .map(|success| (success.request_index, success.item.id))
+        .collect()
+}
+
+async fn searched_ids(
+    facade: &dyn ResourceFacade,
+    visibility: ResourceVisibility,
+) -> Vec<ResourceID> {
+    facade
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
+            visibility,
+            pagination: PaginationOpts {
+                limit: 100,
+                offset: 0,
+            },
+        })
+        .await
+        .unwrap()
+        .items
+        .into_iter()
+        .map(|handle| handle.id)
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

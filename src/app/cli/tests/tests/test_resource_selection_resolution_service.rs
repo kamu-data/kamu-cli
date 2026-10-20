@@ -967,6 +967,56 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn resolves_exact_name_to_every_resource_holding_it_when_including_deleting() {
+    let handle = |name: &str| ResourceHandle {
+        r#type: variableset_type_uri().clone(),
+        did: None,
+        id: ResourceID::new(uuid::Uuid::new_v4()),
+        name: name.parse().unwrap(),
+        account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
+    };
+    // A live resource, then one being deleted, which keeps its name
+    let handles = vec![handle("vars-a"), handle("vars-a")];
+
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    let visibilities = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_handles_of_one_ref(handles.clone(), Arc::clone(&visibilities));
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![harness.exact_selection_item("vars-a")],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::IncludeDeleting,
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result
+            .targets
+            .iter()
+            .map(|target| target.id)
+            .collect::<Vec<_>>(),
+        handles.iter().map(|handle| handle.id).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        *visibilities.lock().unwrap(),
+        vec![ResourceVisibility::IncludeDeleting]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn environment_label_filter() -> kamu_resources::ResourceLabelFilterInput {
     kamu_resources::ResourceLabelFilterInput {
         entries: std::collections::BTreeMap::from([(
@@ -1045,6 +1095,30 @@ impl ResourceSelectionResolutionHarness {
                                 request_index,
                                 item: handle.clone(),
                             }
+                        })
+                        .collect(),
+                    problems: Vec::new(),
+                })
+            });
+    }
+
+    /// Every handle answers the first ref, as resources sharing a name do.
+    fn expect_get_handles_of_one_ref(
+        &mut self,
+        handles: Vec<ResourceHandle>,
+        visibilities: Arc<Mutex<Vec<ResourceVisibility>>>,
+    ) {
+        self.facade
+            .expect_get_handles()
+            .times(1)
+            .returning(move |_, visibility| {
+                visibilities.lock().unwrap().push(visibility);
+                Ok(kamu_resources_facade::BatchResourceResponse {
+                    successes: handles
+                        .iter()
+                        .map(|handle| kamu_resources_facade::BatchResourceSuccess {
+                            request_index: 0,
+                            item: handle.clone(),
                         })
                         .collect(),
                     problems: Vec::new(),
