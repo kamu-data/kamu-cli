@@ -79,7 +79,9 @@ pub trait ManagedResource: DeclarativeResource {
     where
         Self: Sized;
 
-    /// Completes the deletion and renames the resource to `deleted-<id>`.
+    /// Completes a requested deletion and renames the resource to
+    /// `deleted-<id>`. Fails with an invariant violation if the deletion was
+    /// not requested.
     fn try_complete_deletion(&mut self, now: DateTime<Utc>) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;

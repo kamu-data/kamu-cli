@@ -1082,6 +1082,53 @@ async fn labelled_exact_name_lists_live_resource_first_when_including_deleting()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn any_type_exact_name_lists_live_resource_first_when_including_deleting() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_resource_types(vec![harness.variableset_type_descriptor()]);
+    let being_deleted = harness.variableset_handle("vars-a");
+    let live = harness.variableset_handle("vars-a");
+
+    // A search orders by last update, which may put the one being deleted
+    // first
+    harness.expect_search_handles_by_visibility(
+        vec![being_deleted.clone(), live.clone()],
+        vec![live.clone()],
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::AnyTypeExactRef {
+                    selector_input: "%/vars-a".to_string(),
+                    resource_ref: ExactResourceRef::ByName("vars-a".parse().unwrap()),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::IncludeDeleting,
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result
+            .targets
+            .iter()
+            .map(|target| target.id)
+            .collect::<Vec<_>>(),
+        vec![live.id, being_deleted.id]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn environment_label_filter() -> kamu_resources::ResourceLabelFilterInput {
     kamu_resources::ResourceLabelFilterInput {
         entries: std::collections::BTreeMap::from([(

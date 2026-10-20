@@ -420,6 +420,52 @@ mod tests {
         assert!(!scope.is_generic(), "a pattern must not change the columns");
     }
 
+    fn id_query() -> ResourceQuery {
+        ResourceQuery::ExactIds(vec![kamu_resources::ResourceID::new(uuid::Uuid::new_v4())])
+    }
+
+    // Ids always find resources being deleted, as `get` and `delete` do
+    #[test]
+    fn test_scope_of_ids_alone_includes_resources_being_deleted() {
+        let by_type = ListResourcesScope::ByType(descriptor("variablesets"), Some(id_query()));
+        let types = ListResourcesScope::Types(vec![
+            (descriptor("variablesets"), Some(id_query())),
+            (descriptor("secretsets"), Some(id_query())),
+        ]);
+        let all = ListResourcesScope::All(Some(id_query()));
+
+        for scope in [by_type, types, all] {
+            assert_eq!(
+                scope.effective_visibility(ResourceVisibility::Active),
+                ResourceVisibility::IncludeDeleting
+            );
+        }
+    }
+
+    // Visibility applies to the whole search, so ids mixed with patterns
+    // follow the requested one
+    #[test]
+    fn test_scope_mixing_ids_with_patterns_follows_requested_visibility() {
+        let scope = ListResourcesScope::Types(vec![
+            (descriptor("variablesets"), Some(id_query())),
+            (
+                descriptor("secretsets"),
+                Some(ResourceQuery::NamePattern("my-%".to_string())),
+            ),
+        ]);
+
+        for requested in [
+            ResourceVisibility::Active,
+            ResourceVisibility::IncludeDeleting,
+        ] {
+            assert_eq!(scope.effective_visibility(requested), requested);
+        }
+        assert_eq!(
+            ListResourcesScope::All(None).effective_visibility(ResourceVisibility::Active),
+            ResourceVisibility::Active
+        );
+    }
+
     #[test]
     fn test_resolve_mode_datasets() {
         assert_matches!(resolve(&[]), Ok(ListMode::Datasets));

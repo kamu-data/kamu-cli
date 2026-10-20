@@ -757,7 +757,7 @@ impl ResourceSelectionResolutionServiceImpl {
             ),
         };
 
-        let collected = Self::collect_unique_bounded_identities(
+        let mut collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
             seen_target_keys,
@@ -779,6 +779,14 @@ impl ResourceSelectionResolutionServiceImpl {
                         .map_err(Into::into)
                 }
             },
+        )
+        .await?;
+
+        Self::put_live_resources_first(
+            resource_facade,
+            with_labels(vec![selector], options.label_filter.as_ref()),
+            visibility,
+            &mut collected.identities,
         )
         .await?;
 
@@ -963,19 +971,44 @@ impl ResourceSelectionResolutionServiceImpl {
         }
         let mut handles = response.items;
 
-        // A search orders by last update, not by phase: put live resources
-        // first, as a lookup by name does
-        if visibility.includes_deleting() {
-            let live_ids = search(ResourceVisibility::Active, handles.len())
-                .await?
-                .items
-                .into_iter()
-                .map(|handle| handle.id)
-                .collect::<HashSet<_>>();
-            handles.sort_by_key(|handle| !live_ids.contains(&handle.id));
-        }
+        Self::put_live_resources_first(resource_facade, selectors, visibility, &mut handles)
+            .await?;
 
         Ok(handles)
+    }
+
+    /// A search orders by last update, not by phase. With resources being
+    /// deleted visible, this puts the live ones first, as a lookup by name
+    /// does; the others keep the search order.
+    async fn put_live_resources_first(
+        resource_facade: &dyn ResourceFacade,
+        selectors: Vec<ResourceSelector>,
+        visibility: ResourceVisibility,
+        handles: &mut [ResourceHandle],
+    ) -> Result<(), CLIError> {
+        if !visibility.includes_deleting() || handles.len() < 2 {
+            return Ok(());
+        }
+
+        // Live resources are a subsequence of the search order, so those among
+        // `handles` come within its first `handles.len()`
+        let live_ids = resource_facade
+            .search_handles(SearchResourcesRequest {
+                selectors,
+                visibility: ResourceVisibility::Active,
+                pagination: PaginationOpts {
+                    limit: handles.len(),
+                    offset: 0,
+                },
+            })
+            .await?
+            .items
+            .into_iter()
+            .map(|handle| handle.id)
+            .collect::<HashSet<_>>();
+        handles.sort_by_key(|handle| !live_ids.contains(&handle.id));
+
+        Ok(())
     }
 
     /// Keys by the lowercase name, keeping the order of the handles.

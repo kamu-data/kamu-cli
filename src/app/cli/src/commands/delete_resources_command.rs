@@ -195,9 +195,15 @@ impl DeleteResourcesCommand {
             return Ok(());
         }
 
+        let rolled_back = !errors.is_empty() && self.errors_roll_back_deletions();
         for (target, phase) in &deletions {
-            summary.record_success(*phase);
-            DeleteResourcesPrinter::print_success(target, *phase, self.output_config.as_ref());
+            if rolled_back {
+                summary.record_rolled_back();
+                DeleteResourcesPrinter::print_rolled_back(target, self.output_config.as_ref());
+            } else {
+                summary.record_success(*phase);
+                DeleteResourcesPrinter::print_success(target, *phase, self.output_config.as_ref());
+            }
         }
         DeleteResourcesPrinter::print_summary(&summary, self.dry_run);
 
@@ -216,6 +222,16 @@ impl DeleteResourcesCommand {
     /// transaction has committed, so controllers clean up only then. A server
     /// reports the phase at the time of its response.
     fn phases_known_after_command(&self) -> bool {
+        match self.resolved_context {
+            ResolvedResourceContext::LocalWorkspace => true,
+            ResolvedResourceContext::RemoteWorkspace { .. } => false,
+        }
+    }
+
+    /// A local workspace runs the whole command in one transaction, which an
+    /// error rolls back together with the deletions requested before it. A
+    /// server commits each request on its own.
+    fn errors_roll_back_deletions(&self) -> bool {
         match self.resolved_context {
             ResolvedResourceContext::LocalWorkspace => true,
             ResolvedResourceContext::RemoteWorkspace { .. } => false,
@@ -459,6 +475,11 @@ impl PostCommandAction for ReportDeletionPhases {
         for ((target, _), phase) in self.deletions.iter().zip(reached_phases) {
             summary.record_success(phase);
             DeleteResourcesPrinter::print_success(target, phase, self.output_config.as_ref());
+            // Controllers had their chance to clean up, so a resource still
+            // being deleted is waiting for a retry
+            if phase == ResourcePhase::Deleting {
+                DeleteResourcesPrinter::print_retry_hint(target, self.output_config.as_ref());
+            }
         }
         DeleteResourcesPrinter::print_summary(&summary, false);
 
@@ -530,6 +551,7 @@ struct DeleteResourcesSummary {
     deleting: usize,
     ignored: usize,
     failed: usize,
+    rolled_back: usize,
 }
 
 impl DeleteResourcesSummary {
@@ -563,6 +585,11 @@ impl DeleteResourcesSummary {
         self.total_items += 1;
         self.failed += 1;
     }
+
+    fn record_rolled_back(&mut self) {
+        self.total_items += 1;
+        self.rolled_back += 1;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -590,6 +617,30 @@ impl DeleteResourcesPrinter {
         };
 
         eprintln!("{label}: {}", target.display_name());
+    }
+
+    fn print_retry_hint(target: &DeleteResourceTarget, output_config: &OutputConfig) {
+        if output_config.quiet {
+            return;
+        }
+
+        eprintln!(
+            "  {} its cleanup has not finished; `kamu delete {}` retries it",
+            console::style("hint").yellow().bold(),
+            target.id
+        );
+    }
+
+    fn print_rolled_back(target: &DeleteResourceTarget, output_config: &OutputConfig) {
+        if output_config.quiet {
+            return;
+        }
+
+        eprintln!(
+            "{}: {}",
+            console::style("Not deleted (rolled back)").yellow().bold(),
+            target.display_name()
+        );
     }
 
     fn print_dry_run_success(target: &DeleteResourceTarget, output_config: &OutputConfig) {
@@ -641,9 +692,14 @@ impl DeleteResourcesPrinter {
         } else {
             String::new()
         };
+        let rolled_back = if summary.rolled_back > 0 {
+            format!(", {} rolled back", summary.rolled_back)
+        } else {
+            String::new()
+        };
 
         eprintln!(
-            "{} {} item(s): {} {}{deleting}, {} ignored, {} failed",
+            "{} {} item(s): {} {}{deleting}, {} ignored, {} failed{rolled_back}",
             console::style("Summary").bold(),
             summary.total_items,
             summary.deleted,

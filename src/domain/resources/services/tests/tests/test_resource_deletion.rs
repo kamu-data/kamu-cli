@@ -108,15 +108,18 @@ fn test_completed_deletion_renames_to_tombstone() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_completing_unrequested_deletion_requests_it_first() {
+fn test_completing_unrequested_deletion_is_an_invariant_violation() {
     let mut harness = ResourceDeletionHarness::reconciled();
 
-    harness.complete_deletion();
+    assert_matches!(
+        harness.try_complete_deletion(),
+        Err(TestResourceLifecycleError::InvariantViolation(_))
+    );
 
     let headers = harness.resource.headers();
-    assert_eq!(headers.deletion_requested_at, Some(harness.now));
-    assert_eq!(headers.deleted_at, Some(harness.now));
-    assert_eq!(harness.phase(), ResourcePhase::Deleted);
+    assert_eq!(headers.deletion_requested_at, None);
+    assert_eq!(headers.deleted_at, None);
+    assert_eq!(harness.phase(), ResourcePhase::Ready);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -313,8 +316,12 @@ impl ResourceDeletionHarness {
     }
 
     fn complete_deletion(&mut self) {
+        self.try_complete_deletion().unwrap();
+    }
+
+    fn try_complete_deletion(&mut self) -> Result<(), TestResourceLifecycleError> {
         let now = self.tick();
-        self.resource.try_complete_deletion(now).unwrap();
+        self.resource.try_complete_deletion(now)
     }
 
     /// Applies a deletion as stored before it was preceded by a request.
