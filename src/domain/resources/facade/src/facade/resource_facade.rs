@@ -56,7 +56,7 @@ use crate::{
 /// [`ResourceVisibility::IncludeDeleting`]. A name may then resolve to several
 /// resources: the live one first, then those being deleted, each reported as a
 /// success at the same `request_index`. A lookup by id finds a resource being
-/// deleted either way.
+/// deleted either way. `delete` resolves names to live resources only.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
@@ -133,11 +133,11 @@ pub trait ResourceFacade: Send + Sync {
     ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
     /// Requests deletion of the resources. A resource whose deletion is
-    /// already in progress is included again, which retries its cleanup.
+    /// already in progress, which only its id finds, is included again, which
+    /// retries its cleanup.
     async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,
-        visibility: ResourceVisibility,
     ) -> Result<BatchResourceResponse<ResourceDeletion, ResourceLookupProblem>, BatchResourceError>;
 }
 

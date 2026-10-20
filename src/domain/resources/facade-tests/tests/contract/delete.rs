@@ -82,12 +82,8 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
     let id = create_variable_set(h, TestAccount::Alice, "del-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let deleted_uid = assert_single_batch_success(
-        facade
-            .delete(vec![by_name("del-name-test")], ResourceVisibility::Active)
-            .await
-            .unwrap(),
-    );
+    let deleted_uid =
+        assert_single_batch_success(facade.delete(vec![by_name("del-name-test")]).await.unwrap());
 
     // Controllers clean up within the request
     assert_eq!(
@@ -159,12 +155,7 @@ pub async fn test_delete_by_uid(h: &impl FacadeContractHarness) {
     let id = create_variable_set(h, TestAccount::Alice, "del-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let deleted_uid = assert_single_batch_success(
-        facade
-            .delete(vec![by_id(&id)], ResourceVisibility::Active)
-            .await
-            .unwrap(),
-    );
+    let deleted_uid = assert_single_batch_success(facade.delete(vec![by_id(&id)]).await.unwrap());
 
     assert_eq!(deleted_uid.id, id, "deleted id must match created id");
 
@@ -196,7 +187,7 @@ pub async fn test_delete_missing_name_returns_not_found(h: &impl FacadeContractH
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .delete(vec![by_name("no-such-delete")], ResourceVisibility::Active)
+        .delete(vec![by_name("no-such-delete")])
         .await
         .unwrap();
     let err = assert_single_batch_problem(result);
@@ -219,10 +210,7 @@ pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHa
     let facade = h.facade_for(TestAccount::Alice);
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
-    let result = facade
-        .delete(vec![by_id(&absent_uid)], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    let result = facade.delete(vec![by_id(&absent_uid)]).await.unwrap();
     let err = assert_single_batch_problem(result);
     assert_matches!(
         err,
@@ -256,10 +244,7 @@ pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
         name: None,
     };
     let result = facade
-        .delete(
-            vec![wrong_schema_selector.clone()],
-            ResourceVisibility::Active,
-        )
+        .delete(vec![wrong_schema_selector.clone()])
         .await
         .unwrap();
     let err = assert_single_batch_problem(result);
@@ -269,10 +254,7 @@ pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
         "expected SchemaMismatch"
     );
 
-    let result = facade
-        .delete(vec![wrong_schema_selector], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    let result = facade.delete(vec![wrong_schema_selector]).await.unwrap();
     let err = assert_single_batch_problem(result);
     assert_matches!(
         err,
@@ -314,7 +296,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
     let alice_facade = h.facade_for(TestAccount::Alice);
     let deleted_uid = assert_single_batch_success(
         alice_facade
-            .delete(vec![by_name("scoped-del")], ResourceVisibility::Active)
+            .delete(vec![by_name("scoped-del")])
             .await
             .unwrap(),
     );
@@ -365,19 +347,11 @@ pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarnes
     let facade = h.facade_for(TestAccount::Alice);
 
     // First delete succeeds.
-    let deleted = assert_single_batch_success(
-        facade
-            .delete(vec![by_id(&id)], ResourceVisibility::Active)
-            .await
-            .unwrap(),
-    );
+    let deleted = assert_single_batch_success(facade.delete(vec![by_id(&id)]).await.unwrap());
     assert_eq!(deleted.id, id);
 
     // Second delete must return not-found.
-    let result = facade
-        .delete(vec![by_id(&id)], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    let result = facade.delete(vec![by_id(&id)]).await.unwrap();
     let err = assert_single_batch_problem(result);
     assert_matches!(
         err,
@@ -399,12 +373,8 @@ pub async fn test_delete_waits_for_cleanup(h: &impl FacadeContractHarness) {
     let id = create_variable_set(h, TestAccount::Alice, "del-phases").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let deletion = assert_single_batch_success(
-        facade
-            .delete(vec![by_name("del-phases")], ResourceVisibility::Active)
-            .await
-            .unwrap(),
-    );
+    let deletion =
+        assert_single_batch_success(facade.delete(vec![by_name("del-phases")]).await.unwrap());
     assert_eq!(
         deletion,
         ResourceDeletion {
@@ -489,10 +459,7 @@ contract_test!(
 pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeContractHarness) {
     let old_id = create_variable_set(h, TestAccount::Alice, "reused").await;
     let facade = h.facade_for(TestAccount::Alice);
-    facade
-        .delete(vec![by_id(&old_id)], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    facade.delete(vec![by_id(&old_id)]).await.unwrap();
 
     let decision = facade
         .apply_manifest(ApplyManifestRequest {
@@ -551,51 +518,22 @@ pub async fn test_repeated_delete_of_resource_being_deleted_retries(
         phase: ResourcePhase::Deleting,
     };
 
-    facade
-        .delete(vec![by_id(&id)], ResourceVisibility::Active)
-        .await
-        .unwrap();
+    facade.delete(vec![by_id(&id)]).await.unwrap();
 
     assert_eq!(
-        assert_single_batch_success(
-            facade
-                .delete(vec![by_id(&id)], ResourceVisibility::Active)
-                .await
-                .unwrap()
-        ),
+        assert_single_batch_success(facade.delete(vec![by_id(&id)]).await.unwrap()),
         deleting
     );
+    // Its name no longer finds it
     assert_matches!(
-        assert_single_batch_problem(
-            facade
-                .delete(vec![by_name("retry-del")], ResourceVisibility::Active)
-                .await
-                .unwrap()
-        ),
+        assert_single_batch_problem(facade.delete(vec![by_name("retry-del")]).await.unwrap()),
         ResourceLookupProblem::NameNotFound(_)
-    );
-    assert_eq!(
-        assert_single_batch_success(
-            facade
-                .delete(
-                    vec![by_name("retry-del")],
-                    ResourceVisibility::IncludeDeleting
-                )
-                .await
-                .unwrap()
-        ),
-        deleting
     );
 
     h.flush_outbox().await;
 
     assert_matches!(
-        assert_single_batch_problem(
-            facade
-                .delete(vec![by_id(&id)], ResourceVisibility::IncludeDeleting)
-                .await
-                .unwrap()
-        ),
+        assert_single_batch_problem(facade.delete(vec![by_id(&id)]).await.unwrap()),
         ResourceLookupProblem::IDNotFound(_)
     );
 }

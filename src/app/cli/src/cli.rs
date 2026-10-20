@@ -1003,9 +1003,6 @@ pub struct Delete {
     /// as `key=value` pairs (repeatable, or comma-separated)
     #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
     pub label_selectors: Vec<String>,
-    /// Also include resources whose deletion is in progress
-    #[arg(long)]
-    pub include_deleting: bool,
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1154,6 +1151,7 @@ pub struct Get {
     /// as `key=value` pairs (repeatable, or comma-separated)
     #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
     pub label_selectors: Vec<String>,
+
     /// Also include resources whose deletion is in progress
     #[arg(long)]
     pub include_deleting: bool,
@@ -1444,6 +1442,7 @@ pub struct List {
     /// as `key=value` pairs (repeatable, or comma-separated)
     #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
     pub label_selectors: Vec<String>,
+
     /// Also include resources whose deletion is in progress
     #[arg(long)]
     pub include_deleting: bool,

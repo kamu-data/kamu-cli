@@ -29,7 +29,7 @@ pub(crate) struct DeleteMutation {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteVariables")]
 pub(crate) struct ResourcesMutDelete {
-    #[arguments(resourceRefs: $resource_refs, includeDeleting: $include_deleting)]
+    #[arguments(resourceRefs: $resource_refs)]
     pub delete: ResourceDeleteOutcome,
 }
 
@@ -64,7 +64,6 @@ pub(crate) struct ResourceDeleteSuccess {
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct DeleteVariables {
     pub resource_refs: Vec<ResourceRefInput>,
-    pub include_deleting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

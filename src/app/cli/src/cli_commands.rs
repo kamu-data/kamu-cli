@@ -171,7 +171,6 @@ pub fn get_command(
                 c.ignore_not_found,
                 c.dry_run,
                 c.label_selectors,
-                c.include_deleting,
             )
             .cast(),
         ),

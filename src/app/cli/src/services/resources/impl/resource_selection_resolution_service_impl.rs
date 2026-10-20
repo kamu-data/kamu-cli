@@ -66,7 +66,6 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
             &selection,
             resource_facade,
             options.label_filter.as_ref(),
-            options.visibility,
         )
         .await?;
         let mut exact_any_type_results = exact_any_type_results.into_iter();
@@ -217,6 +216,12 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// An id finds a resource being deleted, as the facade's lookups by id do, so
+/// that deleting it again retries its cleanup
+const ID_LOOKUP_VISIBILITY: ResourceVisibility = ResourceVisibility::IncludeDeleting;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ResourceSelectionResolutionServiceImpl {
     fn target_key_from_handle(handle: &ResourceHandle) -> ResourceTargetKey {
         (handle.r#type.clone(), handle.id)
@@ -339,7 +344,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             ),
                             label_filter,
                         ),
-                        visibility,
+                        visibility: ID_LOOKUP_VISIBILITY,
                         pagination: PaginationOpts {
                             limit: by_id.len(),
                             offset: 0,
@@ -447,7 +452,6 @@ impl ResourceSelectionResolutionServiceImpl {
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
-        visibility: ResourceVisibility,
     ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
         let ids = selection
             .items
@@ -476,7 +480,7 @@ impl ResourceSelectionResolutionServiceImpl {
                     kamu_resources::ResourceSelector::any_type_ids(ids.clone()),
                     label_filter,
                 ),
-                visibility,
+                visibility: ID_LOOKUP_VISIBILITY,
                 pagination: PaginationOpts {
                     limit: ids.len(),
                     offset: 0,
@@ -744,13 +748,17 @@ impl ResourceSelectionResolutionServiceImpl {
         // One exact ref spanning every type. A single selector, so the
         // escape-to-pattern cost that rules selectors out for name *batches*
         // does not apply here.
-        let selector = match &resource_ref {
-            ExactResourceRef::ById(id) => kamu_resources::ResourceSelector::any_type_id(*id),
-            ExactResourceRef::ByName(name) => {
+        let (selector, visibility) = match &resource_ref {
+            ExactResourceRef::ById(id) => (
+                kamu_resources::ResourceSelector::any_type_id(*id),
+                ID_LOOKUP_VISIBILITY,
+            ),
+            ExactResourceRef::ByName(name) => (
                 kamu_resources::ResourceSelector::any_type_name_pattern(sql_like_escape_literal(
                     name.as_str(),
-                ))
-            }
+                )),
+                options.visibility,
+            ),
         };
 
         let collected = Self::collect_unique_bounded_identities(
@@ -767,7 +775,7 @@ impl ResourceSelectionResolutionServiceImpl {
                                 vec![request_selector],
                                 request_label_filter.as_ref(),
                             ),
-                            visibility: options.visibility,
+                            visibility,
                             pagination,
                         })
                         .await

@@ -316,6 +316,60 @@ async fn exact_any_type_searches_across_every_supported_type() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn ids_find_resources_being_deleted() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    let id = ResourceID::new(uuid::Uuid::new_v4());
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
+        1,
+        vec![ResourceHandle {
+            r#type: variableset_type_uri().clone(),
+            did: None,
+            id,
+            name: "vars-a".parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone().into(),
+        }],
+        Arc::clone(&search_requests),
+    );
+
+    harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::Exact(
+                    resources::ResourceExactSelector {
+                        type_descriptor: harness.variableset_type_descriptor(),
+                        selector_input: format!("{VARIABLESETS_SHORT_NAME}/{id}"),
+                        resource_ref: ExactResourceRef::ById(id),
+                    },
+                )],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        search_requests
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|request| request.visibility)
+            .collect::<Vec<_>>(),
+        vec![ResourceVisibility::IncludeDeleting]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn exact_any_type_not_found_errors_by_default() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let id = ResourceID::new(uuid::Uuid::new_v4());
