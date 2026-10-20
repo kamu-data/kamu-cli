@@ -25,6 +25,7 @@ use crate::domain::{
     ResourceSnapshot,
     ResourceTypeMismatchError,
     ResourceTypeQuery,
+    ResourceVisibility,
     TypedResourceQueryError,
 };
 
@@ -129,9 +130,12 @@ where
             label_pairs,
         }]);
 
-        let mut resource_snapshots_stream =
-            self.resource_repository
-                .list_resource_snapshots(&account_id, &scope, pagination);
+        let mut resource_snapshots_stream = self.resource_repository.list_resource_snapshots(
+            &account_id,
+            &scope,
+            ResourceVisibility::Active,
+            pagination,
+        );
 
         let mut resource_states = Vec::new();
         while let Some(resource_snapshot) = resource_snapshots_stream.next().await {

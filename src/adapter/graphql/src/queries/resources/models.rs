@@ -1011,7 +1011,7 @@ impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Number of resources in each reconciliation phase
+/// Number of resources in each phase
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourcePhaseCounts {
     /// Resources waiting to be reconciled
@@ -1024,6 +1024,8 @@ pub struct ResourcePhaseCounts {
     pub degraded: UInt64,
     /// Resources that failed and were never reconciled
     pub failed: UInt64,
+    /// Resources whose deletion waits for their controllers to clean up
+    pub deleting: UInt64,
 }
 
 impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
@@ -1034,6 +1036,7 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
             ready,
             degraded,
             failed,
+            deleting,
         } = value;
         Self {
             pending: pending.into(),
@@ -1041,6 +1044,7 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
             ready: ready.into(),
             degraded: degraded.into(),
             failed: failed.into(),
+            deleting: deleting.into(),
         }
     }
 }

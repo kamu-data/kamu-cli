@@ -860,7 +860,8 @@ CREATE TABLE public.resources (
     updated_at timestamp with time zone NOT NULL,
     deleted_at timestamp with time zone,
     last_event_id bigint,
-    status_generation bigint DEFAULT 1 NOT NULL
+    status_generation bigint DEFAULT 1 NOT NULL,
+    deletion_requested_at timestamp with time zone
 );
 
 
@@ -1692,7 +1693,7 @@ CREATE INDEX idx_resource_labels_projection_key_value_resource_id ON public.reso
 -- Name: idx_resources_account_schema_name_ci; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_resources_account_schema_name_ci ON public.resources USING btree (account_id, resource_schema, lower((resource_name)::text));
+CREATE UNIQUE INDEX idx_resources_account_schema_name_ci ON public.resources USING btree (account_id, resource_schema, lower((resource_name)::text)) WHERE (deletion_requested_at IS NULL);
 
 
 --

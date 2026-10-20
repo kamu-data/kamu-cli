@@ -43,9 +43,12 @@ impl RequestAccountResourcesDeletionUseCaseImpl {
         collect_all_pages(PAGE_SIZE, |pagination| async move {
             self.generic_resource_query_service
                 // Account teardown sweeps every resource, never a subset.
+                // Requesting the deletion of a resource being deleted again
+                // retries its cleanup.
                 .list_snapshots(
                     account_id,
                     &kamu_resources::ResourceScope::default(),
+                    kamu_resources::ResourceVisibility::IncludeDeleting,
                     pagination,
                 )
                 .await

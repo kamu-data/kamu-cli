@@ -38,6 +38,7 @@ pub struct ResourcePhaseCounts {
     pub ready: u64,
     pub degraded: u64,
     pub failed: u64,
+    pub deleting: u64,
 }
 
 impl ResourcePhaseCounts {
@@ -59,6 +60,10 @@ impl ResourcePhaseCounts {
 
     pub fn increment_failed(&mut self) {
         self.failed += 1;
+    }
+
+    pub fn increment_deleting(&mut self) {
+        self.deleting += 1;
     }
 }
 

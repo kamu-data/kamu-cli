@@ -16,6 +16,7 @@ use kamu_resources::{
     ResourceName,
     ResourceNameNotFoundError,
     ResourceRef,
+    ResourceVisibility,
     TypeUri,
     resource_type_name,
 };
@@ -100,7 +101,7 @@ pub(crate) async fn resolve_batch_ids(
             .collect::<Vec<_>>();
 
         let id_by_name = query_service
-            .resolve_resource_ids_by_names(account_id, schema, &names)
+            .resolve_resource_ids_by_names(account_id, schema, &names, ResourceVisibility::Active)
             .await?
             .into_iter()
             .collect::<HashMap<_, _>>();

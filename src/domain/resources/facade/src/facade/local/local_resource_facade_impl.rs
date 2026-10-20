@@ -207,11 +207,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         // produce this: page 2 of a merged result is not page 2 of each type.
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots(&target_account.did, &scope, request.pagination)
+            .list_snapshots(
+                &target_account.did,
+                &scope,
+                ResourceVisibility::Active,
+                request.pagination,
+            )
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope)
+            .count_search_resource_handles(&target_account.did, &scope, ResourceVisibility::Active)
             .await?;
 
         let items = self.summary_views_with_columns(snapshots)?;
@@ -242,11 +247,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows = self
             .generic_resource_query_service
-            .search_resource_handles(&target_account.did, &scope, request.pagination)
+            .search_resource_handles(
+                &target_account.did,
+                &scope,
+                ResourceVisibility::Active,
+                request.pagination,
+            )
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope)
+            .count_search_resource_handles(&target_account.did, &scope, ResourceVisibility::Active)
             .await?;
 
         let items = rows

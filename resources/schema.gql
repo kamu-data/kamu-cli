@@ -7369,7 +7369,7 @@ enum ResourcePhase {
 }
 
 """
-Number of resources in each reconciliation phase
+Number of resources in each phase
 """
 type ResourcePhaseCounts {
 	"""
@@ -7392,6 +7392,10 @@ type ResourcePhaseCounts {
 	Resources that failed and were never reconciled
 	"""
 	failed: Uint64!
+	"""
+	Resources whose deletion waits for their controllers to clean up
+	"""
+	deleting: Uint64!
 }
 
 """
