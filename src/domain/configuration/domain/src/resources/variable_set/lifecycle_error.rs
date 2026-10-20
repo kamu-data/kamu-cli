@@ -14,6 +14,7 @@ use kamu_resources::{
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
     IntoApplyResourceRejection,
+    ResourceDeletionInProgressError,
     ResourceHeadersValidationError,
     ResourceStatusConflictError,
 };
@@ -36,6 +37,9 @@ pub enum VariableSetLifecycleError {
 
     #[error(transparent)]
     StatusConflict(#[from] ResourceStatusConflictError),
+
+    #[error(transparent)]
+    DeletionInProgress(#[from] ResourceDeletionInProgressError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,6 +68,12 @@ impl IntoApplyResourceRejection for VariableSetLifecycleError {
             }
             Self::StatusConflict(err) => {
                 ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
+            }
+            Self::DeletionInProgress(err) => {
+                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
+                    category: ApplyResourceRejectionCategory::LifecycleRuleConflict,
+                    message: err.to_string(),
+                })
             }
         }
     }

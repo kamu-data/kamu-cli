@@ -17,7 +17,13 @@ use kamu_configuration::{
     VariableSetReconcileError,
     VariableSetResource,
 };
-use kamu_resources::{DeclarativeResource, ManagedResource, ResourceController, ResourceID};
+use kamu_resources::{
+    DeclarativeResource,
+    ManagedResource,
+    ResourceCleanupError,
+    ResourceController,
+    ResourceID,
+};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -82,6 +88,14 @@ impl ResourceController<VariableSetResource> for VariableSetControllerImpl {
                     VariableSetReconcileError::Internal(err)
                 }
             })?;
+
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &VariableSetResource) -> Result<(), ResourceCleanupError> {
+        self.variable_set_projection_repository
+            .delete_all_entries(&[*resource.id()])
+            .await?;
 
         Ok(())
     }

@@ -22,6 +22,7 @@ pub enum ResourceEvent<TSpec> {
     HeadersUpdated(ResourceEventHeadersUpdated),
     SpecUpdated(ResourceEventSpecUpdated<TSpec>),
     StatusUpdated(ResourceEventStatusUpdated),
+    DeletionRequested(ResourceEventDeletionRequested),
     Deleted(ResourceEventDeleted),
 }
 
@@ -68,6 +69,15 @@ pub struct ResourceEventStatusUpdated {
     pub new_status: ResourceStatus,
 }
 
+/// Deletion was requested; the controllers clean up before it completes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceEventDeletionRequested {
+    pub event_time: DateTime<Utc>,
+    pub id: ResourceID,
+}
+
+/// Deletion completed. Events stored before deletion had two steps have no
+/// preceding [`ResourceEventDeletionRequested`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventDeleted {
     pub event_time: DateTime<Utc>,
@@ -88,6 +98,7 @@ impl<TSpec> ResourceEvent<TSpec> {
             ResourceEvent::HeadersUpdated(e) => &e.id,
             ResourceEvent::SpecUpdated(e) => &e.id,
             ResourceEvent::StatusUpdated(e) => &e.id,
+            ResourceEvent::DeletionRequested(e) => &e.id,
             ResourceEvent::Deleted(e) => &e.id,
         }
     }
@@ -98,6 +109,7 @@ impl<TSpec> ResourceEvent<TSpec> {
             ResourceEvent::HeadersUpdated(e) => e.event_time,
             ResourceEvent::SpecUpdated(e) => e.event_time,
             ResourceEvent::StatusUpdated(e) => e.event_time,
+            ResourceEvent::DeletionRequested(e) => e.event_time,
             ResourceEvent::Deleted(e) => e.event_time,
         }
     }
@@ -121,6 +133,7 @@ impl_enum_variant!(ResourceEvent<TSpec>::Created(ResourceEventCreated<TSpec>));
 impl_enum_variant!(ResourceEvent<TSpec>::HeadersUpdated(ResourceEventHeadersUpdated));
 impl_enum_variant!(ResourceEvent<TSpec>::SpecUpdated(ResourceEventSpecUpdated<TSpec>));
 impl_enum_variant!(ResourceEvent<TSpec>::StatusUpdated(ResourceEventStatusUpdated));
+impl_enum_variant!(ResourceEvent<TSpec>::DeletionRequested(ResourceEventDeletionRequested));
 impl_enum_variant!(ResourceEvent<TSpec>::Deleted(ResourceEventDeleted));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use kamu_resources::ResourceController;
+use kamu_resources::{ResourceCleanupError, ResourceController};
 
 use crate::tests::utils::{TestResource, TestResourceReconcileError};
 
@@ -25,6 +25,10 @@ pub struct TestResourceController;
 #[async_trait::async_trait]
 impl ResourceController<TestResource> for TestResourceController {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
         Ok(())
     }
 }
@@ -45,6 +49,13 @@ impl ResourceController<TestResource> for TestResourceFailingController {
             "simulated reconcile failure".int_err(),
         ))
     }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        use internal_error::ErrorIntoInternal;
+        Err(ResourceCleanupError::Internal(
+            "simulated cleanup failure".int_err(),
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +72,10 @@ pub struct TestResourceCountingController {
 impl ResourceController<TestResource> for TestResourceCountingController {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
         Ok(())
     }
 }

@@ -161,13 +161,15 @@ where
         let tombstone_name =
             kamu_resources::ResourceName::new_unchecked(&format!("deleted-{}", resource.id()));
 
-        resource.try_delete(now, tombstone_name).map_err(|err| {
-            ResourcePersistenceError::Internal(
-                format!("{err}")
-                    .int_err()
-                    .with_context(format!("Failed to delete resource {}", resource.id())),
-            )
-        })
+        resource
+            .try_complete_deletion(now, tombstone_name)
+            .map_err(|err| {
+                ResourcePersistenceError::Internal(
+                    format!("{err}")
+                        .int_err()
+                        .with_context(format!("Failed to delete resource {}", resource.id())),
+                )
+            })
     }
 }
 

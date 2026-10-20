@@ -438,7 +438,7 @@ async fn test_reconcile_after_delete_is_no_op() {
     harness.reconcile_test_uc().execute(&id).await.unwrap();
 
     let resource = harness.load(&id).await;
-    assert_eq!(resource.status().phase, ResourcePhase::Pending);
+    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
     assert_eq!(resource.headers().status_generation, 1);
 }
 
@@ -465,7 +465,7 @@ async fn test_finish_phase_discards_outcome_of_deleted_resource() {
 
     let resource = harness.load(&id).await;
     assert!(resource.headers().deleted_at.is_some());
-    assert_eq!(resource.status().phase, ResourcePhase::Reconciling);
+    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
     assert_eq!(resource.headers().status_generation, 2);
 }
 
