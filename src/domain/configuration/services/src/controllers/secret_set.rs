@@ -22,7 +22,13 @@ use kamu_configuration::{
     SecretSetResource,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{DeclarativeResource, ManagedResource, ResourceController, ResourceID};
+use kamu_resources::{
+    DeclarativeResource,
+    ManagedResource,
+    ResourceCleanupError,
+    ResourceController,
+    ResourceID,
+};
 use odf::AccountID;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
@@ -77,6 +83,14 @@ impl ResourceController<SecretSetResource> for SecretSetControllerImpl {
                     SecretSetReconcileError::Internal(err)
                 }
             })?;
+
+        Ok(())
+    }
+
+    async fn cleanup(&self, resource: &SecretSetResource) -> Result<(), ResourceCleanupError> {
+        self.secret_set_projection_repository
+            .delete_all_entries(&[*resource.id()])
+            .await?;
 
         Ok(())
     }

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ManagedResource, ResourceController};
+use kamu_resources::{ManagedResource, ResourceCleanupError, ResourceController};
 use kamu_storage::StorageResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,6 +26,10 @@ impl ResourceController<StorageResource> for StorageControllerImpl {
     ) -> Result<(), <StorageResource as ManagedResource>::ReconcileError> {
         // TODO: actually synchronize storage and resolve references
 
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &StorageResource) -> Result<(), ResourceCleanupError> {
         Ok(())
     }
 }
