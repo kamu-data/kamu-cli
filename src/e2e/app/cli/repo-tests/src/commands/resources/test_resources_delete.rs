@@ -33,8 +33,8 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "vs", app_vars, "--force"],
         Some(&[
-            r#"Deleted: VariableSet/app-vars"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
+            r#"Deleting: VariableSet/app-vars"#,
+            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
         ]),
     )
     .await;
@@ -48,8 +48,8 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "vs/temp-vars", "--force"],
         Some(&[
-            r#"Deleted: VariableSet/temp-vars"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
+            r#"Deleting: VariableSet/temp-vars"#,
+            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
         ]),
     )
     .await;
@@ -62,8 +62,8 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "ss", "temp-%", "--force"],
         Some(&[
-            r#"Deleted: SecretSet/temp-secrets"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
+            r#"Deleting: SecretSet/temp-secrets"#,
+            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
         ]),
     )
     .await;
@@ -100,9 +100,9 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     assert_output_contains_all(
         &variableset_delete,
         &[
-            "Deleted: VariableSet/app-vars",
-            "Deleted: VariableSet/temp-vars",
-            "Summary 2 item(s): 2 deleted, 0 ignored, 0 failed",
+            "Deleting: VariableSet/app-vars",
+            "Deleting: VariableSet/temp-vars",
+            "Summary 2 item(s): 0 deleted, 2 deleting, 0 ignored, 0 failed",
         ],
         "delete variablesets --all --force",
     );
@@ -185,11 +185,11 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     assert_output_contains_all(
         &all_delete,
         &[
-            "Deleted: VariableSet/app-vars",
-            "Deleted: VariableSet/temp-vars",
-            "Deleted: SecretSet/app-secrets",
-            "Deleted: SecretSet/temp-secrets",
-            "Summary 4 item(s): 4 deleted, 0 ignored, 0 failed",
+            "Deleting: VariableSet/app-vars",
+            "Deleting: VariableSet/temp-vars",
+            "Deleting: SecretSet/app-secrets",
+            "Deleting: SecretSet/temp-secrets",
+            "Summary 4 item(s): 0 deleted, 4 deleting, 0 ignored, 0 failed",
         ],
         "delete %/% --force",
     );
@@ -246,12 +246,12 @@ pub async fn test_resources_bare_id_selector(ctx: ResourceCtx) {
 
     ctx.assert_success(
         ["delete", &vars_id, "--force"],
-        Some(&[format!(r#"Deleted: VariableSet/{vars_name}"#).as_str()]),
+        Some(&[format!(r#"Deleting: VariableSet/{vars_name}"#).as_str()]),
     )
     .await;
     ctx.assert_success(
         ["delete", &secrets_id, "--force"],
-        Some(&[format!(r#"Deleted: SecretSet/{secrets_name}"#).as_str()]),
+        Some(&[format!(r#"Deleting: SecretSet/{secrets_name}"#).as_str()]),
     )
     .await;
 

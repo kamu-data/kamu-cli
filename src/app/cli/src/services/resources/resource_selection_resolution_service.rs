@@ -13,6 +13,7 @@ use kamu_resources::{
     ResourceName,
     ResourceSelectorName,
     ResourceTypeDescriptor,
+    ResourceVisibility,
     TypeUri,
 };
 use kamu_resources_facade::ResourceFacade;
@@ -43,6 +44,8 @@ pub struct ResourceSelectionResolutionOptions {
     /// during identifier expansion rather than after it, so `--max-results`
     /// counts only resources that actually match.
     pub label_filter: Option<ResourceLabelFilterInput>,
+
+    pub visibility: ResourceVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

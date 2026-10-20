@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use kamu_resources::ResourceRef;
+use kamu_resources::{ResourceRef, ResourceVisibility};
 use kamu_resources_facade::{ResourceManifestFormat as DomainFormat, SpecViewOpts};
 
 use crate::cynic_api::fragments::{
@@ -35,7 +35,12 @@ pub(crate) struct RenderManifestsQuery {
     variables = "RenderResourceManifestsVariables"
 )]
 pub(crate) struct RenderManifestsResources {
-    #[arguments(resourceRefs: $resource_refs, format: $format, opts: $opts)]
+    #[arguments(
+        resourceRefs: $resource_refs,
+        format: $format,
+        opts: $opts,
+        includeDeleting: $include_deleting
+    )]
     pub render_manifests: BatchResourceManifestsOutcome,
 }
 
@@ -67,6 +72,7 @@ pub(crate) struct RenderResourceManifestsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
     pub format: ResourceManifestFormat,
     pub opts: SpecViewOptsInput,
+    pub include_deleting: bool,
 }
 
 impl RenderResourceManifestsVariables {
@@ -74,11 +80,13 @@ impl RenderResourceManifestsVariables {
         resource_refs: &[ResourceRef],
         format: DomainFormat,
         spec_view: SpecViewOpts,
+        visibility: ResourceVisibility,
     ) -> Self {
         Self {
             resource_refs: resource_ref_inputs(resource_refs),
             format: format.into(),
             opts: spec_view.into(),
+            include_deleting: visibility.includes_deleting(),
         }
     }
 }

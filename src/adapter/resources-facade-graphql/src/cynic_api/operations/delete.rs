@@ -12,6 +12,7 @@ use cynic::MutationBuilder;
 use crate::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceAccountResolutionProblem,
+    ResourcePhase,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::cynic_api::inputs::ResourceRefInput;
@@ -28,7 +29,7 @@ pub(crate) struct DeleteMutation {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteVariables")]
 pub(crate) struct ResourcesMutDelete {
-    #[arguments(resourceRefs: $resource_refs)]
+    #[arguments(resourceRefs: $resource_refs, includeDeleting: $include_deleting)]
     pub delete: ResourceDeleteOutcome,
 }
 
@@ -55,6 +56,7 @@ pub(crate) struct ResourceDeleteResult {
 pub(crate) struct ResourceDeleteSuccess {
     pub request_index: i32,
     pub resource_id: kamu_resources::ResourceID,
+    pub phase: ResourcePhase,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +64,7 @@ pub(crate) struct ResourceDeleteSuccess {
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct DeleteVariables {
     pub resource_refs: Vec<ResourceRefInput>,
+    pub include_deleting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

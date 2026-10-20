@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 use kamu_datasets::DatasetRegistry;
-use kamu_resources::ResourceQuery;
+use kamu_resources::{ResourceQuery, ResourceVisibility};
 
 use super::{CLIError, Command, ListDatasetsCommand, ListResourcesCommand, ListResourcesScope};
 use crate::accounts;
@@ -72,6 +72,9 @@ pub struct ListCommand {
 
     #[dill::component(explicit)]
     label_selectors: Vec<String>,
+
+    #[dill::component(explicit)]
+    include_deleting: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,6 +255,7 @@ impl ListCommand {
                 self.max_results
             },
             ResourceLabelSelectorParser::parse(&self.label_selectors)?,
+            ResourceVisibility::with_deleting(self.include_deleting),
         ))
     }
 
@@ -286,6 +290,12 @@ impl Command for ListCommand {
                 if !self.label_selectors.is_empty() {
                     return Err(CLIError::usage_error(
                         "Label selectors are not supported when listing datasets",
+                    ));
+                }
+
+                if self.include_deleting {
+                    return Err(CLIError::usage_error(
+                        "--include-deleting is supported only when listing resources",
                     ));
                 }
 

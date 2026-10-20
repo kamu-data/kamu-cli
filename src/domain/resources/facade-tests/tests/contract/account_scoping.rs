@@ -15,6 +15,7 @@ use kamu_resources::{
     ResourceRef,
     ResourceSchemaProvider,
     ResourceSelector,
+    ResourceVisibility,
     TypeName,
 };
 use kamu_resources_facade::{
@@ -164,6 +165,7 @@ pub async fn test_default_account_selector_resolves_current_account(
             .get(
                 vec![selector_by_name("acct-default", None)],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -202,6 +204,7 @@ pub async fn test_account_by_name_resolves_correctly(h: &impl FacadeContractHarn
                     Some(account_by_name(&h.account_name(TestAccount::Alice))),
                 )],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -235,6 +238,7 @@ pub async fn test_account_by_id_resolves_correctly(h: &impl FacadeContractHarnes
                     Some(account_by_id(h.account_id(TestAccount::Alice))),
                 )],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -264,6 +268,7 @@ pub async fn test_account_by_name_and_id_agree_resolves_correctly(h: &impl Facad
             .get(
                 vec![selector_by_name("acct-both-agree", Some(agreeing))],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -305,6 +310,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
         .get(
             vec![selector_by_name("acct-mismatch", Some(mismatch))],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await;
     assert_matches!(
@@ -316,6 +322,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
     let list = h
         .facade_for(TestAccount::Alice)
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -340,6 +347,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
 
     let by_name = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector {
                 account: Some(unknown_account_by_name()),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
@@ -351,6 +359,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
     // per-type row.
     let by_id = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector {
                 account: Some(unknown_account_by_id()),
@@ -393,6 +402,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             .get(
                 vec![selector_by_name("acct-isolated", None)],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -401,6 +411,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         bob.get(
             vec![selector_by_name("acct-isolated", None)],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap(),
@@ -410,26 +421,36 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_handle = assert_single_batch_success(
         alice
-            .get_handles(vec![selector_by_name("acct-isolated", None)])
+            .get_handles(
+                vec![selector_by_name("acct-isolated", None)],
+                ResourceVisibility::Active,
+            )
             .await
             .unwrap(),
     );
     let bob_handle = assert_single_batch_success(
-        bob.get_handles(vec![selector_by_name("acct-isolated", None)])
-            .await
-            .unwrap(),
+        bob.get_handles(
+            vec![selector_by_name("acct-isolated", None)],
+            ResourceVisibility::Active,
+        )
+        .await
+        .unwrap(),
     );
     assert_eq!(alice_handle.id, alice_id);
     assert_eq!(bob_handle.id, bob_id);
 
     let alice_batch = alice
-        .get_handles(batch_selector_by_name("acct-isolated", None))
+        .get_handles(
+            batch_selector_by_name("acct-isolated", None),
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     let bob_batch = bob
         .get(
             batch_selector_by_name("acct-isolated", None),
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -438,6 +459,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_list = alice
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -448,6 +470,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .items;
     let bob_list = bob
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -467,6 +490,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_search = alice
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "acct-%".to_string(),
@@ -478,6 +502,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .items;
     let bob_search = bob
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "acct-%".to_string(),
@@ -498,6 +523,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_all = alice
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             // A default selector narrows by nothing, so it spans every type.
             selectors: vec![ResourceSelector::default()],
             pagination: PaginationOpts::from_max_results(1000),
@@ -507,6 +533,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .items;
     let bob_all = bob
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],
         })

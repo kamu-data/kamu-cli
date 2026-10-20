@@ -240,6 +240,9 @@ pub struct SearchResourcesInput {
     /// conjunction. Omitted spans every type; an empty list matches nothing — a
     /// narrowing to zero, not a widening to everything.
     pub selectors: Option<Vec<ResourceSelectorInput>>,
+    /// Also match resources whose deletion is in progress
+    #[graphql(default)]
+    pub include_deleting: bool,
 }
 
 impl SearchResourcesInput {
@@ -252,6 +255,7 @@ impl SearchResourcesInput {
                 Some(selectors) => into_resource_selectors(selectors)?,
                 None => vec![any_resource_selector()],
             },
+            visibility: kamu_resources::ResourceVisibility::with_deleting(self.include_deleting),
             pagination,
         })
     }

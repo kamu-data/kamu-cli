@@ -198,8 +198,8 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
             "--force",
         ],
         Some(&[
-            r#"Deleted: VariableSet/stage-vars"#,
-            r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
+            r#"Deleting: VariableSet/stage-vars"#,
+            r#"Summary 1 item\(s\): 0 deleted, 1 deleting, 0 ignored, 0 failed"#,
         ]),
     )
     .await;

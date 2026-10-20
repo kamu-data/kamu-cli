@@ -20,7 +20,13 @@ use kamu_cli::services::resources::{
     ResourceSelectionResolutionService,
     ResourceSelectionSyntax,
 };
-use kamu_resources::{ResourceHandle, ResourceID, ResourceTypeDescriptor, TypeUri};
+use kamu_resources::{
+    ResourceHandle,
+    ResourceID,
+    ResourceTypeDescriptor,
+    ResourceVisibility,
+    TypeUri,
+};
 use kamu_resources_facade::{
     MockResourceFacade,
     SearchResourceHandlesResponse,
@@ -154,6 +160,7 @@ async fn resolves_exact_type_name_patterns_via_search() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -198,6 +205,7 @@ async fn ignores_unmatched_name_patterns_when_requested() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -234,6 +242,7 @@ async fn errors_on_unmatched_name_patterns_by_default() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -285,6 +294,7 @@ async fn exact_any_type_searches_across_every_supported_type() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -326,6 +336,7 @@ async fn exact_any_type_not_found_errors_by_default() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -384,6 +395,7 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -490,6 +502,7 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
@@ -546,6 +559,7 @@ async fn ignores_unmatched_any_type_selectors_when_requested() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -575,6 +589,7 @@ async fn any_type_miss_message(item: ResourceSelectionItem) -> String {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -668,6 +683,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
                 label_filter: None,
@@ -733,6 +749,7 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
                 label_filter: None,
@@ -782,6 +799,7 @@ async fn passes_the_label_filter_to_pattern_expansion() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
@@ -826,6 +844,7 @@ async fn passes_the_label_filter_to_the_all_selector() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
@@ -871,6 +890,7 @@ async fn narrows_exact_selectors_by_the_label_filter() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
@@ -920,6 +940,7 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
+                visibility: ResourceVisibility::Active,
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
                 label_filter: None,
@@ -1013,7 +1034,7 @@ impl ResourceSelectionResolutionHarness {
         self.facade
             .expect_get_handles()
             .times(times)
-            .returning(move |resource_refs| {
+            .returning(move |resource_refs, _| {
                 requests.lock().unwrap().push(resource_refs);
                 Ok(kamu_resources_facade::BatchResourceResponse {
                     successes: handles

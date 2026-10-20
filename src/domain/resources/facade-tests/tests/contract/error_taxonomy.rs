@@ -16,7 +16,13 @@
 //! account-accepting API (not demoted to internal errors).
 
 use database_common::PaginationOpts;
-use kamu_resources::{ResourceOwnerRef, ResourceRef, ResourceSelector, TypeName};
+use kamu_resources::{
+    ResourceOwnerRef,
+    ResourceRef,
+    ResourceSelector,
+    ResourceVisibility,
+    TypeName,
+};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -107,7 +113,11 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     let missing_name = "taxonomy-missing";
 
     let get = facade
-        .get(vec![by_name(missing_name)], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![by_name(missing_name)],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -117,7 +127,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     );
 
     let get_id = facade
-        .get_handles(vec![by_name(missing_name)])
+        .get_handles(vec![by_name(missing_name)], ResourceVisibility::Active)
         .await
         .unwrap();
     assert_matches!(
@@ -131,6 +141,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
             vec![by_name(missing_name)],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -140,7 +151,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected NameNotFound"
     );
 
-    let del = facade.delete(vec![by_name(missing_name)]).await.unwrap();
+    let del = facade
+        .delete(vec![by_name(missing_name)], ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::NameNotFound(_),
@@ -149,7 +163,11 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 
     // --- IDNotFound ---
     let get = facade
-        .get(vec![by_id(&absent_uid)], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![by_id(&absent_uid)],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -158,7 +176,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "get: expected IDNotFound"
     );
 
-    let get_id = facade.get_handles(vec![by_id(&absent_uid)]).await.unwrap();
+    let get_id = facade
+        .get_handles(vec![by_id(&absent_uid)], ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert_matches!(
         assert_single_batch_problem(get_id),
         ResourceLookupProblem::IDNotFound(_),
@@ -170,6 +191,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
             vec![by_id(&absent_uid)],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -179,7 +201,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected IDNotFound"
     );
 
-    let del = facade.delete(vec![by_id(&absent_uid)]).await.unwrap();
+    let del = facade
+        .delete(vec![by_id(&absent_uid)], ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::IDNotFound(_),
@@ -201,7 +226,11 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     };
 
     let get = facade
-        .get(vec![wrong_schema_selector.clone()], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![wrong_schema_selector.clone()],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -211,7 +240,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     );
 
     let get_id = facade
-        .get_handles(vec![wrong_schema_selector.clone()])
+        .get_handles(
+            vec![wrong_schema_selector.clone()],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_matches!(
@@ -225,6 +257,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
             vec![wrong_schema_selector.clone()],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -234,7 +267,10 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "render_manifest: expected SchemaMismatch"
     );
 
-    let del = facade.delete(vec![wrong_schema_selector]).await.unwrap();
+    let del = facade
+        .delete(vec![wrong_schema_selector], ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert_matches!(
         assert_single_batch_problem(del),
         ResourceLookupProblem::SchemaMismatch(_),
@@ -290,7 +326,11 @@ pub async fn test_untyped_name_ref_is_refused(h: &impl FacadeContractHarness) {
 
     // --- get ---
     match facade
-        .get(vec![untyped.clone()], SpecViewOpts::ENCRYPTED)
+        .get(
+            vec![untyped.clone()],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
     {
         // Local: refused per item, and specifically not as `EmptyRef`.
@@ -308,7 +348,10 @@ pub async fn test_untyped_name_ref_is_refused(h: &impl FacadeContractHarness) {
 
     // --- get_handles: the same ref must not resolve through a second entry
     // point, which is what a per-pipeline check would let slip.
-    match facade.get_handles(vec![untyped.clone()]).await {
+    match facade
+        .get_handles(vec![untyped.clone()], ResourceVisibility::Active)
+        .await
+    {
         Ok(response) => assert_matches!(
             assert_single_batch_problem(response),
             ResourceLookupProblem::UntypedName,
@@ -320,7 +363,10 @@ pub async fn test_untyped_name_ref_is_refused(h: &impl FacadeContractHarness) {
     // --- the same name *with* its type still resolves, so the refusal is
     // about the missing type and not about the resource being absent.
     let typed = facade
-        .get_handles(vec![by_name("untyped-ref-target")])
+        .get_handles(
+            vec![by_name("untyped-ref-target")],
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -344,6 +390,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         .get(
             batch_by_name("taxonomy-batch-missing"),
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -356,7 +403,11 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- IDNotFound in get ---
     let resp = facade
-        .get(batch_by_id(absent_uid), SpecViewOpts::ENCRYPTED)
+        .get(
+            batch_by_id(absent_uid),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
@@ -368,7 +419,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- NameNotFound in get_handles ---
     let resp = facade
-        .get_handles(batch_by_name("taxonomy-batch-missing-id"))
+        .get_handles(
+            batch_by_name("taxonomy-batch-missing-id"),
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
@@ -384,6 +438,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
             batch_by_name("taxonomy-batch-missing-render"),
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -396,7 +451,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- NameNotFound in delete ---
     let resp = facade
-        .delete(batch_by_name("taxonomy-batch-missing-del"))
+        .delete(
+            batch_by_name("taxonomy-batch-missing-del"),
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
@@ -444,6 +502,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
                 name: Some("bad-acct-get".parse().unwrap()),
             }],
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await;
     assert_matches!(
@@ -457,6 +516,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
         .get(
             batch_by_name_for_account("bad-acct-get-many", unknown_account.clone()),
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await;
     assert_matches!(
@@ -482,6 +542,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
             }],
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await;
     assert_matches!(
@@ -492,18 +553,21 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- delete ---
     let result = facade
-        .delete(vec![ResourceRef {
-            account: Some(unknown_account.clone()),
-            r#type: Some(
-                VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
-            ),
-            id: None,
-            did: None,
-            name: Some("bad-acct-delete".parse().unwrap()),
-        }])
+        .delete(
+            vec![ResourceRef {
+                account: Some(unknown_account.clone()),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
+                id: None,
+                did: None,
+                name: Some("bad-acct-delete".parse().unwrap()),
+            }],
+            ResourceVisibility::Active,
+        )
         .await;
     assert_matches!(
         result,
@@ -513,10 +577,10 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- delete, multi-ref ---
     let result = facade
-        .delete(batch_by_name_for_account(
-            "bad-acct-delete-many",
-            unknown_account.clone(),
-        ))
+        .delete(
+            batch_by_name_for_account("bad-acct-delete-many", unknown_account.clone()),
+            ResourceVisibility::Active,
+        )
         .await;
     assert_matches!(
         result,
@@ -527,6 +591,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     // --- search ---
     let result = facade
         .search(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             selectors: vec![ResourceSelector {
                 account: Some(unknown_account.clone()),
                 ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
@@ -543,6 +608,7 @@ pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     // --- search_handles ---
     let result = facade
         .search_handles(SearchResourcesRequest {
+            visibility: ResourceVisibility::Active,
             pagination: PaginationOpts::from_max_results(1),
             selectors: vec![ResourceSelector {
                 account: Some(unknown_account.clone()),

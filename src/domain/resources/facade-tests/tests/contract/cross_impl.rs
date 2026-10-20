@@ -23,6 +23,7 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ResourceRef,
     ResourceSchemaProvider,
+    ResourceVisibility,
     TypeName,
 };
 use kamu_resources_facade::{
@@ -114,6 +115,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
             .get(
                 vec![by_name("cross-local-to-remote")],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -160,6 +162,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
             .get(
                 vec![by_name("cross-remote-to-local")],
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -202,6 +205,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
                 vec![selector.clone()],
                 ResourceManifestFormat::Json,
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -213,6 +217,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
                 vec![selector.clone()],
                 ResourceManifestFormat::Json,
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -232,6 +237,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
                 vec![selector.clone()],
                 ResourceManifestFormat::Yaml,
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -243,6 +249,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
                 vec![selector.clone()],
                 ResourceManifestFormat::Yaml,
                 SpecViewOpts::ENCRYPTED,
+                ResourceVisibility::Active,
             )
             .await
             .unwrap(),
@@ -321,11 +328,19 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
 
     // get: both facades must return the same structure
     let local_get = local
-        .get(batch_selector.clone(), SpecViewOpts::ENCRYPTED)
+        .get(
+            batch_selector.clone(),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     let remote_get = remote
-        .get(batch_selector.clone(), SpecViewOpts::ENCRYPTED)
+        .get(
+            batch_selector.clone(),
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
+        )
         .await
         .unwrap();
     assert_batch_indexes(&local_get, &[0], &[1, 2]);
@@ -370,8 +385,14 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
     );
 
     // get_handles: both facades must agree on success id and problem indexes
-    let local_id = local.get_handles(batch_selector.clone()).await.unwrap();
-    let remote_id = remote.get_handles(batch_selector.clone()).await.unwrap();
+    let local_id = local
+        .get_handles(batch_selector.clone(), ResourceVisibility::Active)
+        .await
+        .unwrap();
+    let remote_id = remote
+        .get_handles(batch_selector.clone(), ResourceVisibility::Active)
+        .await
+        .unwrap();
     assert_batch_indexes(&local_id, &[0], &[1, 2]);
     assert_batch_indexes(&remote_id, &[0], &[1, 2]);
     assert_eq!(local_id.successes[0].item.id, uid_a);
@@ -384,6 +405,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             batch_selector.clone(),
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();
@@ -392,6 +414,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             batch_selector.clone(),
             ResourceManifestFormat::Json,
             SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::Active,
         )
         .await
         .unwrap();

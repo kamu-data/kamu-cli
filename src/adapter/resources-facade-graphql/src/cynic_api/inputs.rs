@@ -184,6 +184,7 @@ pub(crate) fn resource_selector_inputs(
 #[cynic(graphql_type = "SearchResourcesInput")]
 pub(crate) struct SearchResourcesInput {
     pub selectors: Option<Vec<ResourceSelectorInput>>,
+    pub include_deleting: bool,
 }
 
 impl TryFrom<&SearchResourcesRequest> for SearchResourcesInput {
@@ -195,6 +196,7 @@ impl TryFrom<&SearchResourcesRequest> for SearchResourcesInput {
             // spans every type, but the facade has already resolved that to a
             // concrete selector list by this point.
             selectors: Some(resource_selector_inputs(&value.selectors)),
+            include_deleting: value.visibility.includes_deleting(),
         })
     }
 }
