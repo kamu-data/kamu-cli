@@ -172,18 +172,26 @@ impl ResourceUseCaseBaseHarness {
             .unwrap();
     }
 
-    pub async fn delete_resources(&self, account_id: odf::AccountID, ids: Vec<ResourceID>) {
+    pub async fn request_resources_deletion(
+        &self,
+        account_id: odf::AccountID,
+        ids: Vec<ResourceID>,
+    ) {
         self.request_deletion_test_uc()
             .execute(account_id, ids)
             .await
             .unwrap();
     }
 
-    pub async fn delete_account_resources(&self, account_id: odf::AccountID) {
+    pub async fn request_account_resources_deletion(&self, account_id: odf::AccountID) {
         self.request_account_resources_deletion_uc()
             .execute(account_id)
             .await
             .unwrap();
+    }
+
+    pub async fn complete_deletion(&self, ids: &[ResourceID]) {
+        self.complete_deletion_test_uc().execute(ids).await.unwrap();
     }
 
     pub async fn apply_and_assert_snapshot(

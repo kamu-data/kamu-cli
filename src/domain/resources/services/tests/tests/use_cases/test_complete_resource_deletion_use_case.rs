@@ -37,7 +37,9 @@ async fn test_cleanup_completes_requested_deletion() {
     let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Stub);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.delete_resources(account_handle.did, vec![id]).await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
 
     harness.complete_deletion(&[id]).await;
 
@@ -60,13 +62,11 @@ async fn test_completed_deletion_posts_deleted_message() {
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.delete_resources(account_handle.did, vec![id]).await;
-
     harness
-        .complete_deletion_test_uc()
-        .execute(&[id])
-        .await
-        .unwrap();
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
+
+    harness.complete_deletion(&[id]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +76,9 @@ async fn test_failed_cleanup_keeps_deletion_in_progress() {
     let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Failing);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.delete_resources(account_handle.did, vec![id]).await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
     let status_generation_before = harness.load(&id).await.headers().status_generation;
 
     // A failed cleanup is an outcome recorded in the status, not an error
@@ -102,6 +104,31 @@ async fn test_failed_cleanup_keeps_deletion_in_progress() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_repeated_deletion_request_retries_failed_cleanup() {
+    let harness = CompleteDeletionTestHarness::dispatching(
+        TestResourceControllerProvider::FailingCleanupOnce,
+    );
+    let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
+    harness
+        .request_resources_deletion(account_handle.did.clone(), vec![id])
+        .await;
+    harness.complete_deletion(&[id]).await;
+    harness.assert_cleanup_failed(&id).await;
+
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
+    harness.complete_deletion(&[id]).await;
+
+    let resource = harness.load(&id).await;
+    assert_eq!(resource.status().phase, ResourcePhase::Deleted);
+    assert_eq!(resource.headers().name.as_str(), format!("deleted-{id}"));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_completing_unrequested_deletion_is_no_op() {
     let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Stub);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -122,7 +149,9 @@ async fn test_completing_deletion_twice_records_it_once() {
     let harness = CompleteDeletionTestHarness::dispatching(TestResourceControllerProvider::Stub);
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
-    harness.delete_resources(account_handle.did, vec![id]).await;
+    harness
+        .request_resources_deletion(account_handle.did, vec![id])
+        .await;
 
     harness.complete_deletion(&[id]).await;
     let last_event_id = harness.load(&id).await.last_stored_event_id();
@@ -134,6 +163,8 @@ async fn test_completing_deletion_twice_records_it_once() {
         last_event_id
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_batch_posts_one_deleted_message() {
@@ -147,14 +178,10 @@ async fn test_batch_posts_one_deleted_message() {
     let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
     let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
     harness
-        .delete_resources(account_handle.did, vec![id_a, id_b])
+        .request_resources_deletion(account_handle.did, vec![id_a, id_b])
         .await;
 
-    harness
-        .complete_deletion_test_uc()
-        .execute(&[id_a, id_b])
-        .await
-        .unwrap();
+    harness.complete_deletion(&[id_a, id_b]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -168,7 +195,7 @@ async fn test_failed_cleanup_holds_back_only_its_resource() {
     let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
     let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
     harness
-        .delete_resources(account_handle.did, vec![id_a, id_b])
+        .request_resources_deletion(account_handle.did, vec![id_a, id_b])
         .await;
 
     harness.complete_deletion(&[id_a, id_b]).await;
@@ -194,7 +221,7 @@ async fn test_concurrent_modification_of_batch_completes_deletions_one_by_one() 
     let id_a = harness.apply_and_get_id(&account_handle, "res-a").await;
     let id_b = harness.apply_and_get_id(&account_handle, "res-b").await;
     harness
-        .delete_resources(account_handle.did, vec![id_a, id_b])
+        .request_resources_deletion(account_handle.did, vec![id_a, id_b])
         .await;
 
     harness.complete_deletion(&[id_a, id_b]).await;
@@ -240,8 +267,16 @@ impl CompleteDeletionTestHarness {
         self.loader.load(id).await.unwrap()
     }
 
-    async fn complete_deletion(&self, ids: &[ResourceID]) {
-        self.complete_deletion_test_uc().execute(ids).await.unwrap();
+    async fn assert_cleanup_failed(&self, id: &ResourceID) {
+        let resource = self.load(id).await;
+        assert_eq!(resource.status().phase, ResourcePhase::Deleting);
+        BaseResourceServiceHarness::assert_condition(
+            resource.status(),
+            &ready_condition_type_ref(),
+            ResourceConditionStatus::False,
+            Some("CleanupFailed"),
+            Some(true),
+        );
     }
 }
 

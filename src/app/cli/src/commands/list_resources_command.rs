@@ -29,6 +29,7 @@ use kamu_resources::{
     ResourceQuery,
     ResourceSummaryView,
     ResourceTypeDescriptor,
+    ResourceVisibility,
     resource_type_name,
 };
 use kamu_resources_facade::ResourceFacade;
@@ -55,7 +56,7 @@ pub struct ListResourcesCommand {
     detail_level: u8,
     max_results: Option<NonZeroUsize>,
     label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
-    visibility: kamu_resources::ResourceVisibility,
+    visibility: ResourceVisibility,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +72,7 @@ impl ListResourcesCommand {
         detail_level: u8,
         max_results: Option<NonZeroUsize>,
         label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
-        visibility: kamu_resources::ResourceVisibility,
+        visibility: ResourceVisibility,
     ) -> Self {
         Self {
             resource_facade,
@@ -609,8 +610,6 @@ enum ResourceGenericColumn {
     ReconciledAt,
     Age,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

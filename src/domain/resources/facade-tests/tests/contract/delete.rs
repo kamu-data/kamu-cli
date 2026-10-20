@@ -9,7 +9,11 @@
 
 use database_common::PaginationOpts;
 use kamu_resources::{
+    ApplyManifestApplicationDecision,
+    ApplyManifestPlanningDecision,
+    ApplyManifestRejection,
     ApplyResourceOutcome,
+    ApplyResourceRejectionCategory,
     ResourceID,
     ResourcePhase,
     ResourceRef,
@@ -34,6 +38,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_CANONICAL_SELECTOR,
+    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_single_batch_problem,
     assert_single_batch_success,
@@ -421,6 +426,14 @@ pub async fn test_delete_waits_for_cleanup(h: &impl FacadeContractHarness) {
         searched_ids(facade.as_ref(), ResourceVisibility::IncludeDeleting).await,
         vec![id]
     );
+    assert_eq!(
+        searched_summaries(facade.as_ref(), ResourceVisibility::Active).await,
+        Vec::<(ResourceID, Option<ResourcePhase>)>::new()
+    );
+    assert_eq!(
+        searched_summaries(facade.as_ref(), ResourceVisibility::IncludeDeleting).await,
+        vec![(id, Some(ResourcePhase::Deleting))]
+    );
 
     h.flush_outbox().await;
 
@@ -444,6 +457,10 @@ pub async fn test_delete_waits_for_cleanup(h: &impl FacadeContractHarness) {
     assert_eq!(
         searched_ids(facade.as_ref(), ResourceVisibility::IncludeDeleting).await,
         Vec::<ResourceID>::new()
+    );
+    assert_eq!(
+        searched_summaries(facade.as_ref(), ResourceVisibility::IncludeDeleting).await,
+        Vec::<(ResourceID, Option<ResourcePhase>)>::new()
     );
 }
 
@@ -489,6 +506,18 @@ pub async fn test_name_of_resource_being_deleted_can_be_reused(h: &impl FacadeCo
     assert_eq!(
         found_by_name(facade.as_ref(), "reused").await,
         vec![(0, new_id), (0, old_id)]
+    );
+    assert_eq!(
+        got_by_name(facade.as_ref(), "reused").await,
+        vec![
+            (0, new_id, ResourcePhase::Pending),
+            (0, old_id, ResourcePhase::Deleting)
+        ]
+    );
+    // Rendered manifests carry no id: the variable value tells them apart
+    assert_eq!(
+        rendered_variable_by_name(facade.as_ref(), "reused", "K").await,
+        vec![(0, "v2".to_string()), (0, "v".to_string())]
     );
 
     h.flush_outbox().await;
@@ -540,6 +569,56 @@ pub async fn test_repeated_delete_of_resource_being_deleted_retries(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-182
+contract_test!(
+    apply_by_id_of_resource_being_deleted_is_rejected,
+    super::test_apply_by_id_of_resource_being_deleted_is_rejected,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_apply_by_id_of_resource_being_deleted_is_rejected(
+    h: &impl FacadeContractHarness,
+) {
+    let id = create_variable_set(h, TestAccount::Alice, "apply-deleting").await;
+    let facade = h.facade_for(TestAccount::Alice);
+    facade.delete(vec![by_id(&id)]).await.unwrap();
+
+    let request = ApplyManifestRequest {
+        format: ResourceManifestFormat::Json,
+        manifest: variable_set_manifest_json_with_id(id, "apply-deleting", "v2"),
+    };
+    assert_matches!(
+        facade.plan_apply_manifest(request.clone()).await,
+        Ok(ApplyManifestPlanningDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::LifecycleRuleConflict,
+                ..
+            }
+        ))
+    );
+    assert_matches!(
+        facade.apply_manifest(request).await,
+        Ok(ApplyManifestApplicationDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::LifecycleRuleConflict,
+                ..
+            }
+        ))
+    );
+
+    // The rejected apply leaves the resource being deleted, spec untouched
+    assert_eq!(
+        rendered_variable_by_name(facade.as_ref(), "apply-deleting", "K").await,
+        vec![(0, "v".to_string())]
+    );
+    assert_eq!(
+        got_by_name(facade.as_ref(), "apply-deleting").await,
+        vec![(0, id, ResourcePhase::Deleting)]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// `(request_index, id)` of the resources a name resolves to, resources being
 /// deleted included
 async fn found_by_name(facade: &dyn ResourceFacade, name: &str) -> Vec<(usize, ResourceID)> {
@@ -553,27 +632,116 @@ async fn found_by_name(facade: &dyn ResourceFacade, name: &str) -> Vec<(usize, R
         .collect()
 }
 
+/// `(request_index, id, phase)` of the resources a name resolves to, resources
+/// being deleted included
+async fn got_by_name(
+    facade: &dyn ResourceFacade,
+    name: &str,
+) -> Vec<(usize, ResourceID, ResourcePhase)> {
+    facade
+        .get(
+            vec![by_name(name)],
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::IncludeDeleting,
+        )
+        .await
+        .unwrap()
+        .successes
+        .into_iter()
+        .map(|success| {
+            (
+                success.request_index,
+                success.item.headers.id,
+                success.item.status.phase,
+            )
+        })
+        .collect()
+}
+
+/// `(request_index, value of the variable)` of the manifests rendered for a
+/// name, resources being deleted included
+async fn rendered_variable_by_name(
+    facade: &dyn ResourceFacade,
+    name: &str,
+    variable: &str,
+) -> Vec<(usize, String)> {
+    facade
+        .render_manifests(
+            vec![by_name(name)],
+            ResourceManifestFormat::Json,
+            SpecViewOpts::ENCRYPTED,
+            ResourceVisibility::IncludeDeleting,
+        )
+        .await
+        .unwrap()
+        .successes
+        .into_iter()
+        .map(|success| {
+            let manifest: serde_json::Value = serde_json::from_str(&success.item.manifest).unwrap();
+            let value = manifest["spec"]["variables"][variable]["value"]
+                .as_str()
+                .unwrap()
+                .to_string();
+            (success.request_index, value)
+        })
+        .collect()
+}
+
+fn search_request(visibility: ResourceVisibility) -> SearchResourcesRequest {
+    SearchResourcesRequest {
+        selectors: vec![ResourceSelector::of_type(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        )],
+        visibility,
+        pagination: PaginationOpts {
+            limit: 100,
+            offset: 0,
+        },
+    }
+}
+
 async fn searched_ids(
     facade: &dyn ResourceFacade,
     visibility: ResourceVisibility,
 ) -> Vec<ResourceID> {
     facade
-        .search_handles(SearchResourcesRequest {
-            selectors: vec![ResourceSelector::of_type(
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            )],
-            visibility,
-            pagination: PaginationOpts {
-                limit: 100,
-                offset: 0,
-            },
-        })
+        .search_handles(search_request(visibility))
         .await
         .unwrap()
         .items
         .into_iter()
         .map(|handle| handle.id)
         .collect()
+}
+
+async fn searched_summaries(
+    facade: &dyn ResourceFacade,
+    visibility: ResourceVisibility,
+) -> Vec<(ResourceID, Option<ResourcePhase>)> {
+    facade
+        .search(search_request(visibility))
+        .await
+        .unwrap()
+        .items
+        .into_iter()
+        .map(|summary| (summary.id, summary.status.and_then(|status| status.phase)))
+        .collect()
+}
+
+fn variable_set_manifest_json_with_id(id: ResourceID, name: &str, value: &str) -> String {
+    serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "id": id,
+            "name": name
+        },
+        "spec": {
+            "variables": {
+                "K": {"value": value}
+            }
+        }
+    })
+    .to_string()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

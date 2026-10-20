@@ -85,17 +85,11 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_absent("ss", temp_secrets).await;
 
     // -- 6. Type-scoped --all deletes only VariableSets -----------------------
-    let variableset_delete = ctx
-        .stderr(["delete", "variablesets", "--all", "--force"])
-        .await;
-    assert_output_contains_all(
-        &variableset_delete,
-        &ctx.delete_report(&["VariableSet/app-vars", "VariableSet/temp-vars"])
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
-        "delete variablesets --all --force",
-    );
+    ctx.assert_deleted_in_any_order(
+        ["delete", "variablesets", "--all", "--force"],
+        &["VariableSet/app-vars", "VariableSet/temp-vars"],
+    )
+    .await;
 
     ctx.assert_resource_absent("vs", app_vars).await;
     ctx.assert_resource_absent("vs", temp_vars).await;
@@ -171,20 +165,16 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", app_secrets).await;
 
     // -- 8. Cross-type all deletes everything ---------------------------------
-    let all_delete = ctx.stderr(["delete", "%/%", "--force"]).await;
-    assert_output_contains_all(
-        &all_delete,
-        &ctx.delete_report(&[
+    ctx.assert_deleted_in_any_order(
+        ["delete", "%/%", "--force"],
+        &[
             "VariableSet/app-vars",
             "VariableSet/temp-vars",
             "SecretSet/app-secrets",
             "SecretSet/temp-secrets",
-        ])
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>(),
-        "delete %/% --force",
-    );
+        ],
+    )
+    .await;
 
     ctx.assert_resource_absent("vs", app_vars).await;
     ctx.assert_resource_absent("vs", temp_vars).await;
@@ -281,8 +271,13 @@ pub async fn test_resources_include_deleting(ctx: ResourceCtx) {
     )
     .await;
 
-    ctx.assert_failure(["get", "vs", gone, "--include-deleting"], None)
-        .await;
+    ctx.assert_failure(
+        ["get", "vs", gone, "--include-deleting"],
+        Some(&[&format!(
+            "Resource '{gone}' of type 'VariableSet' was not found"
+        )]),
+    )
+    .await;
     assert_eq!(
         ctx.get_idents(["get", "vs/%", "--include-deleting"]).await,
         vec![(vs_schema, kept.to_string())]

@@ -15,8 +15,6 @@ Recommendation: for ease of reading, use the following format:
 
 ## [Unreleased]
 ### Added
-- Resources: `--include-deleting` on `kamu list` and `kamu get`, and `includeDeleting` in the GraphQL
-  resource queries, also show resources being deleted
 - `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
   a `blockHash` field
 - GraphQL: `DatasetMetadata.currentDownstreamDependenciesCount` returns the number of direct downstream
@@ -35,7 +33,9 @@ Recommendation: for ease of reading, use the following format:
   then `Deleted`; a failed cleanup keeps it `Deleting`, and deleting it again by id retries. Its name is
   free at once: applying a manifest with that name creates a new resource and warns about the one being
   deleted. `kamu delete` prints `Deleting` or `Deleted`, and GraphQL `ResourceDeleteSuccess.phase`
-  reports it
+  reports it. Resources being deleted are hidden unless asked for with `--include-deleting` on
+  `kamu list` and `kamu get`, or `includeDeleting` in the GraphQL resource queries. The summary counts
+  them as `deleting` (`kamu summary`, GraphQL `ResourcePhaseCounts.deleting`)
 - Resources: `updatedAt` also moves when the status changes
 - Resources: changing only the labels or annotations of a resource bumps its `generation` and reconciles
   it again

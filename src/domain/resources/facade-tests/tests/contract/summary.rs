@@ -10,6 +10,7 @@
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ApplyResourceOutcome,
+    ResourceID,
     ResourcePhaseCounts,
     ResourceRef,
     ResourceSchemaProvider,
@@ -173,48 +174,6 @@ fn vs_phase_counts(summary: &ResourcesSummary) -> ResourcePhaseCounts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-114
-contract_test!(
-    summary_counts_resources_being_deleted,
-    super::test_summary_counts_resources_being_deleted,
-    messaging_outbox::OutboxProvider::Dispatching
-);
-
-pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContractHarness) {
-    let id = create_variable_set(h, TestAccount::Alice, "phase-deleting").await;
-    let facade = h.facade_for(TestAccount::Alice);
-    facade
-        .delete(vec![ResourceRef {
-            account: None,
-            r#type: None,
-            id: Some(id),
-            did: None,
-            name: None,
-        }])
-        .await
-        .unwrap();
-
-    let summary = facade
-        .summary(ResourcesSummaryRequest { account: None })
-        .await
-        .unwrap();
-    assert_eq!(vs_phase_counts(&summary).deleting, 1);
-
-    h.flush_outbox().await;
-
-    let summary = facade
-        .summary(ResourcesSummaryRequest { account: None })
-        .await
-        .unwrap();
-    assert_eq!(vs_phase_counts(&summary).deleting, 0);
-    assert_eq!(
-        total_schema_count(summary, VariableSetResource::schema()),
-        0
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // RF-113
 contract_test!(summary_account_scoping, super::test_summary_account_scoping);
 
@@ -250,6 +209,49 @@ pub async fn test_summary_account_scoping(h: &impl FacadeContractHarness) {
 
     assert_eq!(alice_vs, 1, "Alice must have exactly 1 VariableSet");
     assert_eq!(bob_vs, 1, "Bob must have exactly 1 VariableSet");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-114
+contract_test!(
+    summary_counts_resources_being_deleted,
+    super::test_summary_counts_resources_being_deleted,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_summary_counts_resources_being_deleted(h: &impl FacadeContractHarness) {
+    let id = create_variable_set(h, TestAccount::Alice, "phase-deleting").await;
+    let facade = h.facade_for(TestAccount::Alice);
+    facade.delete(vec![by_id(id)]).await.unwrap();
+
+    let summary = facade
+        .summary(ResourcesSummaryRequest { account: None })
+        .await
+        .unwrap();
+    assert_eq!(vs_phase_counts(&summary).deleting, 1);
+
+    h.flush_outbox().await;
+
+    let summary = facade
+        .summary(ResourcesSummaryRequest { account: None })
+        .await
+        .unwrap();
+    assert_eq!(vs_phase_counts(&summary).deleting, 0);
+    assert_eq!(
+        total_schema_count(summary, VariableSetResource::schema()),
+        0
+    );
+}
+
+fn by_id(id: ResourceID) -> ResourceRef {
+    ResourceRef {
+        account: None,
+        r#type: None,
+        id: Some(id),
+        did: None,
+        name: None,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

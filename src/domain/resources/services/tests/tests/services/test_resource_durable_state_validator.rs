@@ -247,20 +247,12 @@ async fn test_invalid_state_does_not_block_deletion() {
         )
         .await;
 
-    resource
-        .try_mark_reconciliation_started(Utc::now(), resource.headers().status_generation)
-        .unwrap();
-    pretty_assertions::assert_matches!(
-        harness.save_many(&mut resource).await,
-        Err(ResourcePersistenceError::InvalidDurableState(_))
-    );
-    kamu_resources::EventSourcedResource::revert(&mut resource);
+    harness
+        .assert_status_update_rejected_as_invalid_state(&mut resource)
+        .await;
 
-    resource.try_request_deletion(Utc::now()).unwrap();
-    harness.save_many(&mut resource).await.unwrap();
-
-    resource.try_complete_deletion(Utc::now()).unwrap();
-    harness.save_many(&mut resource).await.unwrap();
+    harness.save_deletion_request(&mut resource).await;
+    harness.save_deletion_completion(&mut resource).await;
 
     assert!(resource.headers().deleted_at.is_some());
 }
@@ -425,6 +417,29 @@ impl ResourceDurableStateValidatorHarness {
         self.persistence_svc()
             .save_many(std::slice::from_mut(resource))
             .await
+    }
+
+    /// Records the start of a reconciliation, expects the durable-state guard
+    /// to reject saving it, and reverts the unsaved change.
+    async fn assert_status_update_rejected_as_invalid_state(&self, resource: &mut TestResource) {
+        resource
+            .try_mark_reconciliation_started(Utc::now(), resource.headers().status_generation)
+            .unwrap();
+        pretty_assertions::assert_matches!(
+            self.save_many(resource).await,
+            Err(ResourcePersistenceError::InvalidDurableState(_))
+        );
+        kamu_resources::EventSourcedResource::revert(resource);
+    }
+
+    async fn save_deletion_request(&self, resource: &mut TestResource) {
+        resource.try_request_deletion(Utc::now()).unwrap();
+        self.save_many(resource).await.unwrap();
+    }
+
+    async fn save_deletion_completion(&self, resource: &mut TestResource) {
+        resource.try_complete_deletion(Utc::now()).unwrap();
+        self.save_many(resource).await.unwrap();
     }
 
     /// A stored resource whose status carries a condition the durable-state

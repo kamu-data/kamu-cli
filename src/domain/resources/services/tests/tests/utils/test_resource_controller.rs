@@ -52,14 +52,12 @@ pub struct TestResourceFailingController;
 #[async_trait::async_trait]
 impl ResourceController<TestResource> for TestResourceFailingController {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
-        use internal_error::ErrorIntoInternal;
         Err(TestResourceReconcileError::Internal(
             "simulated reconcile failure".int_err(),
         ))
     }
 
     async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
-        use internal_error::ErrorIntoInternal;
         Err(ResourceCleanupError::Internal(
             "simulated cleanup failure".int_err(),
         ))
@@ -165,6 +163,39 @@ impl ResourceController<TestResource> for TestResourceInterferingCleanupControll
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceFailingCleanupOnceController
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fails its first cleanup and succeeds on every later one.
+#[dill::component(pub)]
+#[dill::interface(dyn ResourceController<TestResource>)]
+pub struct TestResourceFailingCleanupOnceController {
+    failure: Arc<TestCleanupFailureOnce>,
+}
+
+#[derive(Default)]
+pub struct TestCleanupFailureOnce {
+    done: AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl ResourceController<TestResource> for TestResourceFailingCleanupOnceController {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        Ok(())
+    }
+
+    async fn cleanup(&self, _resource: &TestResource) -> Result<(), ResourceCleanupError> {
+        if self.failure.done.swap(true, Ordering::SeqCst) {
+            return Ok(());
+        }
+
+        Err(ResourceCleanupError::Internal(
+            "simulated cleanup failure".int_err(),
+        ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 pub enum TestResourceControllerProvider {
@@ -174,6 +205,7 @@ pub enum TestResourceControllerProvider {
     Counting(Arc<AtomicU32>),
     FailingCleanupOf(&'static str),
     InterferingCleanup,
+    FailingCleanupOnce,
 }
 
 impl TestResourceControllerProvider {
@@ -198,6 +230,10 @@ impl TestResourceControllerProvider {
             TestResourceControllerProvider::InterferingCleanup => {
                 b.add_value(TestCleanupInterference::default());
                 b.add::<TestResourceInterferingCleanupController>();
+            }
+            TestResourceControllerProvider::FailingCleanupOnce => {
+                b.add_value(TestCleanupFailureOnce::default());
+                b.add::<TestResourceFailingCleanupOnceController>();
             }
         }
     }

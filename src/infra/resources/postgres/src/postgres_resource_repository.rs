@@ -380,47 +380,74 @@ impl ResourceRepository for PostgresResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
+        let lowercase_names = names
+            .iter()
+            .map(|n| n.to_ascii_lowercase())
+            .collect::<Vec<_>>();
 
-        let rows = sqlx::query!(
-            r#"
-            SELECT
-                r.resource_id as "id: uuid::Uuid",
-                r.resource_name as name
-            FROM resources r
-            WHERE r.account_id = $1
-              AND r.resource_schema = $2
-              AND LOWER(r.resource_name) = ANY($3)
-              AND r.deleted_at IS NULL
-              AND (r.deletion_requested_at IS NULL OR $4)
-            -- Request order, matching the in-memory backend: callers pair the
-            -- result back to the names they asked for. Without this the row
-            -- order is whatever the scan happens to produce. Within a name the
-            -- live resource comes first, then those being deleted, oldest first.
-            ORDER BY
-                array_position($3, LOWER(r.resource_name)),
-                r.deletion_requested_at NULLS FIRST,
-                r.resource_id
-            "#,
-            account_id_stack.as_str(),
-            schema.as_str(),
-            names
-                .iter()
-                .map(|n| n.to_ascii_lowercase())
-                .collect::<Vec<_>>() as _,
-            visibility.includes_deleting(),
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
+        // Request order, matching the in-memory backend: callers pair the
+        // result back to the names they asked for. Without it the row order is
+        // whatever the scan happens to produce. Two statements rather than a
+        // bound flag, so that for live resources the planner can use the
+        // partial unique index on names.
+        let rows = match visibility {
+            ResourceVisibility::Active => sqlx::query!(
+                r#"
+                SELECT
+                    r.resource_id as "id: uuid::Uuid",
+                    r.resource_name as name
+                FROM resources r
+                WHERE r.account_id = $1
+                  AND r.resource_schema = $2
+                  AND LOWER(r.resource_name) = ANY($3)
+                  AND r.deleted_at IS NULL
+                  AND r.deletion_requested_at IS NULL
+                ORDER BY
+                    array_position($3, LOWER(r.resource_name)),
+                    r.resource_id
+                "#,
+                account_id_stack.as_str(),
+                schema.as_str(),
+                &lowercase_names,
+            )
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?
+            .into_iter()
+            .map(|row| (row.name, row.id))
+            .collect::<Vec<_>>(),
+            // Within a name the live resource comes first, then those being
+            // deleted, oldest first
+            ResourceVisibility::IncludeDeleting => sqlx::query!(
+                r#"
+                SELECT
+                    r.resource_id as "id: uuid::Uuid",
+                    r.resource_name as name
+                FROM resources r
+                WHERE r.account_id = $1
+                  AND r.resource_schema = $2
+                  AND LOWER(r.resource_name) = ANY($3)
+                  AND r.deleted_at IS NULL
+                ORDER BY
+                    array_position($3, LOWER(r.resource_name)),
+                    r.deletion_requested_at NULLS FIRST,
+                    r.resource_id
+                "#,
+                account_id_stack.as_str(),
+                schema.as_str(),
+                &lowercase_names,
+            )
+            .fetch_all(connection_mut)
+            .await
+            .int_err()?
+            .into_iter()
+            .map(|row| (row.name, row.id))
+            .collect(),
+        };
 
         Ok(rows
             .into_iter()
-            .map(|row| {
-                (
-                    ResourceName::new_unchecked(&row.name),
-                    ResourceID::new(row.id),
-                )
-            })
+            .map(|(name, id)| (ResourceName::new_unchecked(&name), ResourceID::new(id)))
             .collect())
     }
 
@@ -1327,7 +1354,5 @@ impl FlatScope {
         &self.label_values
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -84,7 +84,9 @@ pub trait ResourceRepository: Send + Sync {
     /// from the result. With [`ResourceVisibility::IncludeDeleting`] a name may
     /// resolve to several IDs: one live resource and those being deleted.
     ///
-    /// Returns pairs in the order their names appear in `names`.
+    /// Returns pairs in the order their names appear in `names`. Within a name
+    /// the live resource comes first, then those being deleted, oldest request
+    /// first.
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
@@ -94,8 +96,7 @@ pub trait ResourceRepository: Send + Sync {
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
     /// Returns IDs of live resources, not being deleted, of `schema` owned by
-    /// `account_id` and
-    /// carrying the exact label pair, oldest first.
+    /// `account_id` and carrying the exact label pair, oldest first.
     ///
     /// `account_id` is a security boundary, not an optimization: label values
     /// are caller-supplied and unvalidated, so matching across accounts would
@@ -161,9 +162,10 @@ pub trait ResourceRepository: Send + Sync {
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    /// Returns snapshots in the order their IDs appear in `ids`. IDs that do
-    /// not exist, are deleted, or belong to another account are absent, so the
-    /// result may be shorter than the request but never reordered.
+    /// Returns snapshots in the order their IDs appear in `ids`, including
+    /// resources being deleted. IDs that do not exist, are deleted, or belong
+    /// to another account are absent, so the result may be shorter than the
+    /// request but never reordered.
     async fn find_resource_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -189,8 +191,9 @@ pub trait ResourceRepository: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Which resources a lookup by name, search or listing returns. Deleted
-/// resources are never returned; lookups by ID always return resources being
-/// deleted.
+/// resources are never returned. The reads by ID (`find_resource_snapshot*`,
+/// `find_resource_handles_by_ids`) always return resources being deleted; an
+/// ID query in a search scope follows the visibility like any other.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ResourceVisibility {
     /// Resources whose deletion was not requested

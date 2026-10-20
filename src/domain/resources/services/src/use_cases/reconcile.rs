@@ -85,8 +85,8 @@ where
 
     /// Records the outcome of reconciling `started`, the resource as phase 1
     /// left it. The outcome is written to the current state of the resource,
-    /// provided its deletion was not requested, its generation is still the reconciled one
-    /// and no other writer updated the status since phase 1.
+    /// provided its deletion was not requested, its generation is still the
+    /// reconciled one and no other writer updated the status since phase 1.
     pub async fn finish_reconciliation_phase(
         &self,
         started: R,

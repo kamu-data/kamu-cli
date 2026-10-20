@@ -10,7 +10,7 @@
 use kamu_configuration::SecretSetSpecInput;
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY;
-use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceParams};
+use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceParams, ResourcePhase};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,56 +104,68 @@ async fn test_cleanup_secret_set_removes_its_projection_entries() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("secret-set-owner");
 
-    let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
-        secrets: odf::metadata::config::Secrets {
-            entries: [(
-                "API_TOKEN".to_string(),
-                odf::metadata::config::Secret {
-                    value: "my-secret-token".to_string(),
-                    content_encoding: None,
-                },
-            )]
-            .into_iter()
-            .collect(),
-        },
-    });
-
-    let decision = harness
-        .apply_secret_use_case()
-        .apply(ApplyResourceParams {
-            id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
-            spec,
-        })
-        .await
-        .unwrap();
-    let id = decision.expect_applied().id;
+    let id = harness
+        .apply_secret_set(
+            &account_handle,
+            "test-secrets",
+            [("API_TOKEN", "my-secret-token")],
+        )
+        .await;
     assert_eq!(
-        harness
-            .secret_set_projection_repo()
-            .get_latest_entries(&id)
-            .await
-            .unwrap()
-            .len(),
+        harness.secret_set_projection_entry_count(&id).await,
         1,
         "precondition: the secret is projected"
     );
 
-    let resource = harness.load_secret_set(&id).await;
-    harness
-        .secret_set_controller()
-        .cleanup(&resource)
-        .await
-        .unwrap();
+    harness.cleanup_secret_set(&id).await;
 
-    assert!(
-        harness
-            .secret_set_projection_repo()
-            .get_latest_entries(&id)
-            .await
-            .unwrap()
-            .is_empty(),
+    assert_eq!(
+        harness.secret_set_projection_entry_count(&id).await,
+        0,
         "cleanup must remove the projection entries of the resource"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_requested_deletion_of_secret_set_removes_its_projection_entries() {
+    let harness = BaseConfigurationServiceHarness::new();
+    let account_handle = odf::ResourceOwnerHandle::new_test("secret-set-owner");
+
+    let id_deleted = harness
+        .apply_secret_set(
+            &account_handle,
+            "secrets-deleted",
+            [("API_TOKEN", "my-secret-token")],
+        )
+        .await;
+    let id_other = harness
+        .apply_secret_set(
+            &account_handle,
+            "secrets-other",
+            [("API_TOKEN", "my-secret-token")],
+        )
+        .await;
+
+    harness
+        .request_secret_sets_deletion(&account_handle.did, vec![id_deleted])
+        .await;
+
+    assert_eq!(
+        harness.secret_set_phase(&id_deleted).await,
+        ResourcePhase::Deleted
+    );
+    assert!(harness.get_snapshot_by_id(&id_deleted).await.is_none());
+    assert_eq!(
+        harness.secret_set_projection_entry_count(&id_deleted).await,
+        0,
+        "completing the deletion must remove the projection entries of the resource"
+    );
+    assert_eq!(
+        harness.secret_set_projection_entry_count(&id_other).await,
+        1,
+        "entries of other resources must be untouched"
     );
 }
 

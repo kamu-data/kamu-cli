@@ -389,7 +389,8 @@ forward-only assertion.
 **Resources being deleted** are found by id. Name resolution, searches, listings and their counts
 take a `ResourceVisibility`: `Active` hides resources being deleted, `IncludeDeleting` returns them
 too, and a name may then resolve to several IDs, the live resource first. `find_resource_id_by_name`
-and the label lookups see live resources only. Deleted resources are never returned.
+and `find_resource_ids_by_schema_and_label(_any_account)` see live resources only; label filters in
+a search follow its visibility. Deleted resources are never returned.
 
 **Label filters apply only to scoped searches**, never to direct identity reads: the scoped calls
 carry their pairs per row inside `ResourceScope`, while the by-id/by-name reads take none at all.
@@ -421,7 +422,8 @@ Only a subset of a resource is user-authored: a manifest carries `$schema`,
 `headers.{id?, account?, name, labels, annotations}` and `spec`, and nothing else —
 `deny_unknown_fields` rejects `status`, timestamps and `generation`, which are server-owned. The
 framework generates the remaining headers (`id`, resolved `account`, `generation`,
-`created_at`/`updated_at`/`deleted_at`) and the whole `status`. `SecretSet` goes further: authored
+`status_generation`, `created_at`/`updated_at`/`deletion_requested_at`/`deleted_at`) and the whole
+`status`. `SecretSet` goes further: authored
 plaintext is encrypted *before the first durable write*, so its persisted `spec` is server-derived
 too (see [Secret handling](#secret-handling-invariant)).
 
@@ -481,9 +483,8 @@ returns `UpdateResourceError::concurrent_modification()`. A unique-constraint vi
   carries it.
 - Completing the deletion sets `deleted_at` and renames the resource to the tombstone
   `deleted-<id>`.
-- Reads return resources being deleted only by id, or when asked with
-  `ResourceVisibility::IncludeDeleting` ([Repository](#repository)); deleted ones never. The
-  summary counts resources being deleted as `deleting`.
+- Reads hide resources being deleted unless asked; see [Repository](#repository). The summary
+  counts resources being deleted as `deleting`.
 
 **Migration / backfill.** Schema changes are ordinary SQLx migrations under `migrations/{postgres,sqlite}`.
 There is a precedent for data backfill into resources —
@@ -910,7 +911,7 @@ Every resolver delegates to `ResourceFacade`.
 `handlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
 query takes `[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
 `opts: SpecViewOptsInput` argument (`{ revealed: bool }`) maps to the facade's `SpecViewOpts`.
-`includeDeleting: Boolean = false` on the ref-keyed queries and on
+`includeDeleting: Boolean! = false` on the ref-keyed queries and on
 `SearchResourcesInput`, maps to `ResourceVisibility::IncludeDeleting`.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
@@ -1664,9 +1665,8 @@ on the way through; that still bumps the generation only once. The `aes256gcm` f
 the auto-managed sets (those are deleted, not stripped), and a normally-authored set is always
 already `jwe`.
 
-*Projection GC is inherited, not repeated.* Deleting posts `ResourceLifecycleMessage::Deleted`,
-which `ConfigurationResourceLifecycleMessageConsumer` already handles by dropping the read-side
-entries.
+*Projection GC is inherited, not repeated.* Deleting runs the controller's `cleanup`, which drops
+the read-side entries ([(c) Deletion](#c-deletion)).
 
 The bindings system had an equivalent consumer before the label replaced it, but it was strictly
 worse: neither Postgres nor SQLite had an FK on `dataset_id`, so a lost lifecycle message already
@@ -1777,7 +1777,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    `declare_resource_presentation_dispatcher!` (and a spec-view dispatcher if the type has sensitive
    fields) and add a `register_<type>_resource_crud_dispatcher(builder)` function.
 4. **Wire it into DI** — generate the per-type service layer (event-store bridge, loader,
-   persistence, typed query, all use cases, and the lifecycle reconcile dispatcher) with the
+   persistence, typed query, all use cases, and the lifecycle controller dispatcher) with the
    `declare_resource_service_layer!` umbrella macro, then call its
    `register_<type>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
    `register_*` from the crate's `dependencies.rs`, and `add` the `ResourceController<R>` impl.
@@ -1827,6 +1827,13 @@ context and a registered remote context. The `get_view.rs` helper parses `get -o
 queryable `ResourceView` (`ident()`, `variable()`, `has_secret()`, `id()`, …) so assertions are
 targeted rather than brittle; a golden-view test pins the whole-document shape once per type.
 
+**CLI E2E tests cannot observe `Deleting`.** The e2e server drains the outbox after every mutating
+request ([`e2e_middleware.rs`](/src/adapter/http/src/e2e/e2e_middleware.rs)), and the local CLI
+drains it before it reports, so a deletion has completed by the time a command returns. The window
+in between is covered by the facade contract tests, which hold messages back with
+`OutboxProvider::Dispatching`. Slowing cleanup down or sleeping in an e2e scenario was rejected:
+such tests depend on timing.
+
 ### Testing policy — what belongs where
 
 Each tier has a distinct job; put a test at the lowest tier that can express it:
@@ -1854,7 +1861,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels, annotations, and status conditions. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,request_deletion,complete_deletion}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |

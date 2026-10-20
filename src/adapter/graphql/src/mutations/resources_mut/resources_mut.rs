@@ -139,7 +139,9 @@ impl ResourcesMut {
         }
     }
 
-    /// Requests deletion of the resources identified by the given references
+    /// Requests deletion of the resources identified by the given references.
+    /// Names match live resources only; an id also matches a resource being
+    /// deleted, which retries its cleanup
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(

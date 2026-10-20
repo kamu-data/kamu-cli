@@ -14,8 +14,8 @@ use crate::CLIError;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Steps a command defers until its transaction has committed and the outbox
-/// messages it posted have been processed. Each step runs in a transaction of
-/// its own. Nothing runs when the command fails.
+/// messages it posted have been processed. For a transactional command each
+/// step runs in a transaction of its own. Nothing runs when the command fails.
 #[derive(Default)]
 pub struct PostCommandActions {
     actions: Mutex<Vec<Box<dyn PostCommandAction>>>,
