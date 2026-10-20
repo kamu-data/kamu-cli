@@ -235,6 +235,39 @@ async fn test_unknown_condition_uri_fails_durable_state_guard() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_invalid_state_does_not_block_deletion() {
+    let harness = ResourceDurableStateValidatorHarness::new();
+    let mut resource = harness
+        .stored_with_condition(
+            "res-invalid-deleted",
+            "https://example.com/schemas/resource/conditions/Unknown"
+                .parse()
+                .unwrap(),
+            ResourceDurableStateValidatorHarness::valid_condition_value(),
+        )
+        .await;
+
+    resource
+        .try_mark_reconciliation_started(Utc::now(), resource.headers().status_generation)
+        .unwrap();
+    pretty_assertions::assert_matches!(
+        harness.save_many(&mut resource).await,
+        Err(ResourcePersistenceError::InvalidDurableState(_))
+    );
+    kamu_resources::EventSourcedResource::revert(&mut resource);
+
+    resource.try_request_deletion(Utc::now()).unwrap();
+    harness.save_many(&mut resource).await.unwrap();
+
+    resource.try_complete_deletion(Utc::now()).unwrap();
+    harness.save_many(&mut resource).await.unwrap();
+
+    assert!(resource.headers().deleted_at.is_some());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_malformed_condition_value_fails_durable_state_guard() {
     let harness = ResourceDurableStateValidatorHarness::new();
 
@@ -384,6 +417,24 @@ impl ResourceDurableStateValidatorHarness {
         key: TypeRef,
         value: serde_json::Value,
     ) -> Result<(), ResourcePersistenceError> {
+        let mut corrupted = self.stored_with_condition(name, key, value).await;
+        self.persistence_svc().save(&mut corrupted).await
+    }
+
+    async fn save_many(&self, resource: &mut TestResource) -> Result<(), ResourcePersistenceError> {
+        self.persistence_svc()
+            .save_many(std::slice::from_mut(resource))
+            .await
+    }
+
+    /// A stored resource whose status carries a condition the durable-state
+    /// guard would reject.
+    async fn stored_with_condition(
+        &self,
+        name: &str,
+        key: TypeRef,
+        value: serde_json::Value,
+    ) -> TestResource {
         let agg = self.create_and_load(name).await;
         let mut snapshot =
             <TestResource as kamu_resources::EventSourcedResource>::make_resource_snapshot(&agg)
@@ -397,13 +448,11 @@ impl ResourceDurableStateValidatorHarness {
             .insert(key, value);
         let state = TestResourceState::try_from(snapshot.clone()).unwrap();
         let last_event_id = snapshot.last_event_id.unwrap();
-        let mut corrupted = TestResource(Aggregate::from_stored_snapshot(
+        TestResource(Aggregate::from_stored_snapshot(
             snapshot.id,
             last_event_id,
             state,
-        ));
-
-        self.persistence_svc().save(&mut corrupted).await
+        ))
     }
 
     async fn create_and_load(&self, name: &str) -> TestResource {
