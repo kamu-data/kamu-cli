@@ -563,12 +563,7 @@ async fn test_to_table_dataset_is_part_of_query_state() {
         .await;
 
     // The state must pin every dataset the result depends on to be reproducible
-    let state = harness
-        .query_svc
-        .sql_statement("SELECT * FROM to_table(foo)", QueryOptions::default())
-        .await
-        .unwrap()
-        .state;
+    let state = harness.sql_state("SELECT * FROM to_table(foo)").await;
 
     assert_eq!(
         state.input_datasets,
@@ -587,10 +582,7 @@ async fn test_to_table_dataset_is_part_of_query_state() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_to_table_inaccessible_dataset_is_reported_as_missing() {
-    let harness =
-        ToTableHarness::with_authorizer(MockDatasetActionAuthorizer::denying_ids(HashSet::from([
-            ToTableHarness::dataset_id("secret"),
-        ])));
+    let harness = ToTableHarness::denying(&["secret"]);
     let secret = harness
         .create_dataset("secret", ToTableHarness::changelog_stream(&["city"]), None)
         .await;
@@ -626,11 +618,8 @@ async fn test_to_table_inaccessible_dataset_is_reported_as_missing() {
 
         assert!(err.contains("not found"), "{err}");
         assert_eq!(
-            err.replace(&secret.get_id().to_string(), "<ref>")
-                .replace("secret", "<ref>"),
-            missing_err
-                .replace(&ToTableHarness::dataset_id("missing").to_string(), "<ref>")
-                .replace("missing", "<ref>"),
+            ToTableHarness::mask_dataset_ref(&err, "secret"),
+            ToTableHarness::mask_dataset_ref(&missing_err, "missing"),
         );
     }
 }
@@ -691,6 +680,194 @@ async fn test_to_table_reads_only_input_datasets_of_the_query() {
         )
         .await;
     assert!(err.contains("not found"), "{err}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_inaccessible_input_dataset_is_reported_like_table_reference() {
+    let harness = ToTableHarness::denying(&["secret"]);
+    let secret = harness
+        .create_dataset("secret", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+    harness
+        .write(
+            &secret,
+            indoc!(
+                r#"
+                op,city,population
+                0,A,1000
+                "#
+            ),
+            "op INT NOT NULL, city STRING NOT NULL, population BIGINT",
+        )
+        .await;
+
+    // Passing the dataset among the inputs of the query does not grant access to it: both a
+    // plain table reference and `to_table()` fail as if the dataset did not exist
+    let secret_id = secret.get_id();
+    let missing_id = ToTableHarness::dataset_id("missing");
+    for (statement, missing) in [
+        (
+            "SELECT * FROM secret".to_string(),
+            "SELECT * FROM missing".to_string(),
+        ),
+        (
+            "SELECT * FROM to_table(secret)".to_string(),
+            "SELECT * FROM to_table(missing)".to_string(),
+        ),
+        (
+            format!("SELECT * FROM to_table(`{secret_id}`)"),
+            format!("SELECT * FROM to_table(`{missing_id}`)"),
+        ),
+    ] {
+        let options = ToTableHarness::input_datasets(&[(&secret, "secret")]);
+
+        assert_matches!(
+            harness.sql_query_error(&statement, options.clone()).await,
+            QueryError::BadQuery(_)
+        );
+
+        let err = harness.sql_error(&statement, options.clone()).await;
+        let missing_err = harness.sql_error(&missing, options).await;
+
+        assert!(err.contains("not found"), "{err}");
+        assert_eq!(
+            ToTableHarness::mask_dataset_ref(&err, "secret"),
+            ToTableHarness::mask_dataset_ref(&missing_err, "missing"),
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_in_session_reads_dataset_at_head() {
+    let harness = ToTableHarness::new();
+    let foo = harness
+        .create_dataset("foo", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+    let schema = "op INT NOT NULL, city STRING NOT NULL, population BIGINT";
+
+    harness
+        .write(
+            &foo,
+            indoc!(
+                r#"
+                op,city,population
+                0,A,1000
+                0,B,2000
+                "#
+            ),
+            schema,
+        )
+        .await;
+    harness
+        .write(
+            &foo,
+            indoc!(
+                r#"
+                op,city,population
+                2,A,1000
+                3,A,1100
+                1,B,2000
+                "#
+            ),
+            schema,
+        )
+        .await;
+
+    let expected = indoc!(
+        r#"
+        +--------+------+------------+
+        | offset | city | population |
+        +--------+------+------------+
+        | 3      | A    | 1100       |
+        +--------+------+------------+
+        "#
+    );
+
+    let foo_id = foo.get_id();
+    for statement in [
+        "SELECT offset, city, population FROM to_table(foo)".to_string(),
+        format!("SELECT offset, city, population FROM to_table(`{foo_id}`)"),
+    ] {
+        assert_data_eq(harness.session_sql(&statement).await, expected).await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_in_session_inaccessible_dataset_is_reported_as_missing() {
+    let harness = ToTableHarness::denying(&["secret"]);
+    let schema = "op INT NOT NULL, city STRING NOT NULL, population BIGINT";
+    let foo = harness
+        .create_dataset("foo", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+    let secret = harness
+        .create_dataset("secret", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+    for dataset in [&foo, &secret] {
+        harness
+            .write(
+                dataset,
+                indoc!(
+                    r#"
+                    op,city,population
+                    0,A,1000
+                    "#
+                ),
+                schema,
+            )
+            .await;
+    }
+
+    // Readable datasets stay reachable in the same session
+    assert_data_eq(
+        harness
+            .session_sql("SELECT city, population FROM to_table(foo)")
+            .await,
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            +------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    let secret_id = secret.get_id();
+    let missing_id = ToTableHarness::dataset_id("missing");
+    for (statement, missing) in [
+        (
+            "SELECT * FROM secret".to_string(),
+            "SELECT * FROM missing".to_string(),
+        ),
+        (
+            "SELECT * FROM to_table(secret)".to_string(),
+            "SELECT * FROM to_table(missing)".to_string(),
+        ),
+        (
+            format!("SELECT * FROM to_table(`{secret_id}`)"),
+            format!("SELECT * FROM to_table(`{missing_id}`)"),
+        ),
+    ] {
+        let err = harness.session_sql_error(&statement).await;
+        let missing_err = harness.session_sql_error(&missing).await;
+
+        assert!(err.contains("not found"), "{err}");
+        assert_eq!(
+            ToTableHarness::mask_dataset_ref(&err, "secret"),
+            ToTableHarness::mask_dataset_ref(&missing_err, "missing"),
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -840,14 +1017,11 @@ async fn test_to_table_requires_primary_key() {
         )
         .await;
 
-    let res = harness
-        .query_svc
-        .sql_statement("SELECT * FROM to_table(foo)", QueryOptions::default())
-        .await;
-
     assert_matches!(
-        res,
-        Err(QueryError::Internal(e))
+        harness
+            .sql_query_error("SELECT * FROM to_table(foo)", QueryOptions::default())
+            .await,
+        QueryError::Internal(e)
             if ToTableHarness::error_chain(&e).contains("'foo' has no primary keys")
     );
 }
@@ -916,7 +1090,29 @@ struct ToTableHarness {
 
 impl ToTableHarness {
     fn new() -> Self {
-        Self::with_authorizer(MockDatasetActionAuthorizer::allowing())
+        Self::denying(&[])
+    }
+
+    /// Datasets of the specified names cannot be read
+    fn denying(names: &[&str]) -> Self {
+        let denied_ids = names
+            .iter()
+            .map(|name| Self::dataset_id(name))
+            .collect::<HashSet<_>>();
+
+        let mut dataset_action_authorizer =
+            MockDatasetActionAuthorizer::denying_ids(denied_ids.clone());
+        // Sessions register only the datasets that pass this filter
+        dataset_action_authorizer
+            .expect_filter_datasets_allowing()
+            .returning(move |handles, _| {
+                Ok(handles
+                    .into_iter()
+                    .filter(|hdl| !denied_ids.contains(&hdl.id))
+                    .collect())
+            });
+
+        Self::with_authorizer(dataset_action_authorizer)
     }
 
     fn with_authorizer(dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
@@ -1067,6 +1263,13 @@ impl ToTableHarness {
             .join(": ")
     }
 
+    /// Replaces the name and the ID of the dataset in an error message, so that errors about
+    /// different datasets can be compared
+    fn mask_dataset_ref(err: &str, name: &str) -> String {
+        err.replace(&Self::dataset_id(name).to_string(), "<ref>")
+            .replace(name, "<ref>")
+    }
+
     async fn sql(&self, statement: &str) -> odf::utils::data::DataFrameExt {
         self.query_svc
             .sql_statement(statement, QueryOptions::default())
@@ -1075,9 +1278,42 @@ impl ToTableHarness {
             .df
     }
 
+    async fn sql_state(&self, statement: &str) -> QueryState {
+        self.query_svc
+            .sql_statement(statement, QueryOptions::default())
+            .await
+            .unwrap()
+            .state
+    }
+
+    async fn sql_query_error(&self, statement: &str, options: QueryOptions) -> QueryError {
+        let Err(err) = self.query_svc.sql_statement(statement, options).await else {
+            panic!("Expected statement to fail: {statement}");
+        };
+        err
+    }
+
     /// Error messages of a failing statement, including all their sources
     async fn sql_error(&self, statement: &str, options: QueryOptions) -> String {
-        let Err(err) = self.query_svc.sql_statement(statement, options).await else {
+        Self::error_chain(&self.sql_query_error(statement, options).await)
+    }
+
+    /// Runs the statement in a session of the kind `FlightSQL` and the SQL shell use
+    async fn session_sql(&self, statement: &str) -> odf::utils::data::DataFrameExt {
+        self.query_svc
+            .create_session()
+            .await
+            .unwrap()
+            .sql(statement)
+            .await
+            .unwrap()
+            .into()
+    }
+
+    /// Error messages of a statement failing in a session, including all their sources
+    async fn session_sql_error(&self, statement: &str) -> String {
+        let session = self.query_svc.create_session().await.unwrap();
+        let Err(err) = session.sql(statement).await else {
             panic!("Expected statement to fail: {statement}");
         };
         Self::error_chain(&err)
