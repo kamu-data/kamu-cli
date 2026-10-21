@@ -27,7 +27,6 @@ use crate::resources::{ResourceCtx, fixtures};
 // Volatile fields are stripped from the actual document before comparison:
 //   - headers.id / account / generation / createdAt / updatedAt — per-run / per-context
 //   - status.observedAt / reconciledAt — controller timestamps
-//   - status.conditions.*.lastTransitionTime — controller timestamps
 // Everything else is asserted verbatim against an expected document built from
 // the fixture constants.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +101,7 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
         },
         "spec": { "variables": { "MESSAGE": { "value": message_value } } },
         "status": {
-            "conditions": successful_conditions(),
+            "conditions": {},
             "observedGeneration": 1,
             "reconciledGeneration": 1,
             "phase": "Ready"
@@ -128,7 +127,7 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
         },
         "spec": { "variables": { "MESSAGE": { "value": message_value } } },
         "status": {
-            "conditions": successful_conditions(),
+            "conditions": {},
             "observedGeneration": 1,
             "reconciledGeneration": 1,
             "phase": "Ready"
@@ -152,7 +151,7 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
         // the non-deterministic encrypted values, leaving `spec` empty here.
         "spec": {},
         "status": {
-            "conditions": successful_conditions(),
+            "conditions": {},
             "observedGeneration": 1,
             "reconciledGeneration": 1,
             "phase": "Ready"
@@ -164,21 +163,6 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
 // Helpers (local to the golden test — the only place that touches whole docs)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn successful_conditions() -> serde_json::Value {
-    serde_json::json!({
-        "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready": {
-            "reason": "Reconciled",
-            "value": "True"
-        },
-        "https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling": {
-            "reason": "Idle",
-            "value": "False"
-        }
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Remove fields that vary per run or per context so the remaining document is
 /// deterministic and can be asserted verbatim.
 fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
@@ -187,22 +171,9 @@ fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
             headers.remove(k).unwrap();
         }
     }
-    if let Some(obj) = doc.as_object_mut() {
-        if let Some(status) = obj.get_mut("status").and_then(|s| s.as_object_mut()) {
-            status.remove("observedAt").unwrap();
-            status.remove("reconciledAt").unwrap();
-        }
-        if let Some(conditions) = obj
-            .get_mut("status")
-            .and_then(|s| s.get_mut("conditions"))
-            .and_then(|c| c.as_object_mut())
-        {
-            for condition in conditions.values_mut() {
-                if let Some(c) = condition.as_object_mut() {
-                    c.remove("lastTransitionTime").unwrap();
-                }
-            }
-        }
+    if let Some(status) = doc.get_mut("status").and_then(|s| s.as_object_mut()) {
+        status.remove("observedAt").unwrap();
+        status.remove("reconciledAt").unwrap();
     }
     doc
 }

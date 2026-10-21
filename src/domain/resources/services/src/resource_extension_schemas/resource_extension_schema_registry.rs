@@ -33,7 +33,7 @@ pub struct ResourceExtensionSchemaRegistration {
     schema_id: ResourceSchemaId,
     kind: ResourceExtensionKind,
     applications: Vec<ResourceExtensionApplication>,
-    document: &'static str,
+    document: Option<&'static str>,
     dispatcher: Arc<dyn ResourceExtensionSchemaDispatcher>,
 }
 
@@ -46,7 +46,7 @@ impl ResourceExtensionSchemaRegistration {
         self.kind
     }
 
-    pub fn document(&self) -> &'static str {
+    pub fn document(&self) -> Option<&'static str> {
         self.document
     }
 

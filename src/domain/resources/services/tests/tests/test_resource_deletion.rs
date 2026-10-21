@@ -16,7 +16,6 @@ use kamu_resources::{
     EventSourcedResource,
     ManagedResource,
     ResourceCleanupError,
-    ResourceConditionStatus,
     ResourceDeletionInProgressError,
     ResourceEvent,
     ResourceEventDeleted,
@@ -24,7 +23,6 @@ use kamu_resources::{
     ResourceHeadersInput,
     ResourceName,
     ResourcePhase,
-    ready_condition_type_ref,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 use pretty_assertions::assert_eq;
@@ -203,12 +201,9 @@ fn test_failed_cleanup_is_recorded_while_deletion_stays_in_progress() {
     assert_eq!(harness.generations(), (1, 4));
     assert_eq!(harness.phase(), ResourcePhase::Deleting);
     assert!(harness.resource.needs_cleanup());
-    BaseResourceServiceHarness::assert_condition(
+    BaseResourceServiceHarness::assert_reconciliation_error(
         harness.resource.status(),
-        &ready_condition_type_ref(),
-        ResourceConditionStatus::False,
-        Some("CleanupFailed"),
-        Some(true),
+        Some("cleanup-failed"),
     );
 }
 

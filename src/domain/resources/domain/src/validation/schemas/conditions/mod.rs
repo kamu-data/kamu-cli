@@ -7,24 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod ready;
-mod reconciling;
+mod reconciliation_error;
 
-pub use ready::*;
-pub use reconciling::*;
-
-use crate::{ResourceConditionValue, ResourceExtensionValueError};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn validate_resource_condition_value(
-    value: &serde_json::Value,
-) -> Result<(), ResourceExtensionValueError> {
-    serde_json::from_value::<ResourceConditionValue>(value.clone())
-        .map(|_| ())
-        .map_err(|err| {
-            ResourceExtensionValueError::new(format!("condition value is invalid: {err}"))
-        })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub use reconciliation_error::*;

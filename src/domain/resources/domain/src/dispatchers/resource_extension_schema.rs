@@ -39,7 +39,9 @@ pub enum ResourceExtensionScope {
 pub struct ResourceExtensionSchemaMeta {
     pub schema_id: &'static str,
     pub kind: ResourceExtensionKind,
-    pub document: &'static str,
+    /// JSON schema of a Kamu-defined extension. `None` for one defined by ODF,
+    /// whose schema lives in the ODF spec
+    pub document: Option<&'static str>,
     pub applications: &'static [ResourceExtensionApplicationMeta],
 }
 

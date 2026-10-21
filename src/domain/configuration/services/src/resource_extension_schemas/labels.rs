@@ -44,7 +44,7 @@ declare_resource_extension_schema_dispatcher!(
     value = LegacyConfigTargetDataset,
     schema_id = RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     kind = ResourceExtensionKind::Label,
-    document = RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_DOC,
+    document = Some(RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_DOC),
     applications = LEGACY_CONFIG_TARGET_DATASET_APPLICATIONS
 );
 

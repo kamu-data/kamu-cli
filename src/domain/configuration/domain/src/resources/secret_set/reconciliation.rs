@@ -8,7 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::ConcurrentModificationError;
-use kamu_resources::ResourceReconcileError;
+use kamu_resources::{
+    RECONCILIATION_ERROR_CODE_CONCURRENT_MODIFICATION,
+    RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
+    ResourceReconcileError,
+};
 
 use crate::{SecretSetLifecycleError, SecretSetResource};
 
@@ -36,10 +40,12 @@ pub enum SecretSetReconcileError {
 }
 
 impl ResourceReconcileError for SecretSetReconcileError {
-    fn reason_code(&self) -> &'static str {
+    fn code(&self) -> &'static str {
         match self {
-            SecretSetReconcileError::ConcurrentModification(_) => "concurrent_modification",
-            SecretSetReconcileError::Internal(_) => "internal_error",
+            SecretSetReconcileError::ConcurrentModification(_) => {
+                RECONCILIATION_ERROR_CODE_CONCURRENT_MODIFICATION
+            }
+            SecretSetReconcileError::Internal(_) => RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
         }
     }
 
