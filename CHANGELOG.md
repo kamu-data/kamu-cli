@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.271.0] - 2026-10-21
 ### Added
 - `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
   a `blockHash` field
