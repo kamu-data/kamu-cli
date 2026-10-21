@@ -278,7 +278,7 @@ where
     ) -> Result<ApplyResourceRejection, ApplyResourceUseCaseError<R>> {
         match err.into_apply_resource_rejection() {
             ApplyResourceLifecycleErrorHandling::Rejected(rejection) => Ok(rejection),
-            ApplyResourceLifecycleErrorHandling::Technical(err) => {
+            ApplyResourceLifecycleErrorHandling::Internal(err) => {
                 Err(ApplyResourceUseCaseError::Internal(err))
             }
         }

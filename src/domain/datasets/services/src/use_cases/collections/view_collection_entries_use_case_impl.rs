@@ -24,6 +24,7 @@ use kamu_datasets::{
     ViewCollectionEntriesUseCase,
 };
 
+use super::project_collection_state;
 use crate::utils::{self, DataFrameExtraDataFieldsFilterApplyError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,13 +92,7 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
             df
         };
 
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
+        let df = project_collection_state(df)?;
 
         // Extra data is filtered on the current state of entries
         let df = if let Some(extra_data_fields_filter) = filter {

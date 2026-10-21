@@ -45,11 +45,37 @@ pub trait StatusConflictOf: From<ResourceStatusConflictError> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Implements [`InvariantViolationOf`] and [`StatusConflictOf`] for a lifecycle
-/// error enum with `InvariantViolation` and `StatusConflict` variants.
+/// Implements [`InvariantViolationOf`], [`StatusConflictOf`] and
+/// [`IntoApplyResourceRejection`](crate::IntoApplyResourceRejection) for a
+/// lifecycle error enum with the variants `HeadersValidation`,
+/// `SpecValidation`, `InvariantViolation`, `StatusConflict` and
+/// `DeletionInProgress`.
 #[macro_export]
 macro_rules! impl_resource_lifecycle_error {
     ($lifecycle_error:ty, $state:ty) => {
+        impl $crate::IntoApplyResourceRejection for $lifecycle_error {
+            fn into_apply_resource_rejection(self) -> $crate::ApplyResourceLifecycleErrorHandling {
+                use $crate::{
+                    ApplyResourceLifecycleErrorHandling as Handling,
+                    ApplyResourceRejectionCategory as Category,
+                };
+
+                match self {
+                    Self::HeadersValidation(err) => {
+                        Handling::rejected(Category::BusinessValidationFailed, err)
+                    }
+                    Self::SpecValidation(err) => {
+                        Handling::rejected(Category::BusinessValidationFailed, err)
+                    }
+                    Self::InvariantViolation(err) => Handling::internal(err),
+                    Self::StatusConflict(err) => Handling::internal(err),
+                    Self::DeletionInProgress(err) => {
+                        Handling::rejected(Category::LifecycleRuleConflict, err)
+                    }
+                }
+            }
+        }
+
         impl $crate::InvariantViolationOf<$state> for $lifecycle_error {
             fn invariant_violation(error: ::event_sourcing::ProjectionError<$state>) -> Self {
                 Self::InvariantViolation(::std::boxed::Box::new(error))
