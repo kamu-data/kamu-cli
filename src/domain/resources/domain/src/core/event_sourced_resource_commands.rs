@@ -12,6 +12,7 @@ use event_sourcing::{Projection, ProjectionError};
 
 use crate::{
     EventSourcedResource,
+    IllegalStatusTransitionError,
     ResourceCleanupError,
     ResourceDeletionInProgressError,
     ResourceEvent,
@@ -261,6 +262,28 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// An invariant violation for a status change the current status does not
+/// allow, reported with the unchanged status as the rejected update
+fn illegal_status_transition<R>(
+    resource: &R,
+    now: DateTime<Utc>,
+    error: &IllegalStatusTransitionError,
+) -> R::LifecycleError
+where
+    R: EventSourcedResource,
+    R::LifecycleError: InvariantViolationOf<R::ResourceState>,
+{
+    tracing::error!(resource_id = %resource.id(), %error, "Illegal resource status transition");
+
+    let event = resource.make_status_updated_event(now, resource.status().clone());
+    R::LifecycleError::invariant_violation(ProjectionError::new(
+        Some(resource.aggregate().as_state().clone()),
+        event,
+    ))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Checked before a new status is derived from the current one, since a
 /// transition derived from another writer's status may be invalid.
 fn ensure_status_generation<R>(
@@ -302,7 +325,9 @@ where
     ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
-    new_status.mark_reconciling(resource.headers().generation, now);
+    if let Err(err) = new_status.mark_reconciling(resource.headers().generation, now) {
+        return Err(illegal_status_transition(resource, now, &err));
+    }
 
     try_update_resource_status(resource, now, expected_status_generation, new_status)
 }
@@ -336,7 +361,9 @@ where
     ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
-    new_status.mark_ready(expected_generation, now);
+    if let Err(err) = new_status.mark_ready(expected_generation, now) {
+        return Err(illegal_status_transition(resource, now, &err));
+    }
 
     try_update_resource_status(resource, now, expected_status_generation, new_status)
 }

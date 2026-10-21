@@ -187,15 +187,26 @@ impl ResourceLifecycleHarness {
     }
 
     pub fn mark_started(&mut self) {
+        self.try_mark_started().unwrap();
+    }
+
+    pub fn try_mark_started(&mut self) -> Result<(), TestResourceLifecycleError> {
         let now = self.tick();
         let status_generation = self.resource.headers().status_generation;
         self.resource
             .try_mark_reconciliation_started(now, status_generation)
-            .unwrap();
     }
 
     pub fn mark_succeeded(&mut self) {
         self.mark_succeeded_for_generation(self.resource.headers().generation);
+    }
+
+    pub fn try_mark_succeeded(&mut self) -> Result<(), TestResourceLifecycleError> {
+        let now = self.tick();
+        let generation = self.resource.headers().generation;
+        let status_generation = self.resource.headers().status_generation;
+        self.resource
+            .try_mark_reconciliation_succeeded(now, generation, status_generation)
     }
 
     pub fn mark_succeeded_for_generation(&mut self, generation: u64) {

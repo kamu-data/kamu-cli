@@ -1488,7 +1488,9 @@ come from `ResourceStatusExt` in
 [`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)
 (`mark_reconciling` → `Reconciling`, `mark_ready` → `Ready`, `mark_failed_or_degraded` → `Failed`
 or `Degraded`, `mark_cleanup_failed` → still `Deleting`); `Pending`, `Deleting` and `Deleted` are
-derived by `align_phase`.
+derived by `align_phase`. A `mark_reconciling` that would move `observedGeneration` back, or a
+`mark_ready` for a generation not observed or already reconciled, fails the command with an
+invariant violation and leaves the status unchanged.
 
 ```mermaid
 stateDiagram-v2

@@ -188,3 +188,37 @@ fn test_outcome_for_superseded_generation_is_skipped() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_success_of_unobserved_generation_is_an_invariant_violation() {
+    let mut harness = ResourceLifecycleHarness::reconciled();
+    harness.apply(None, "v2");
+    let generations = harness.generations();
+
+    assert_matches!(
+        harness.try_mark_succeeded(),
+        Err(TestResourceLifecycleError::InvariantViolation(_))
+    );
+    assert_eq!(harness.generations(), generations);
+    assert_eq!(harness.phase(), ResourcePhase::Pending);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_observing_an_older_generation_is_an_invariant_violation() {
+    let mut harness = ResourceLifecycleHarness::new();
+    let mut status = harness.status();
+    status.observed_generation = Some(5);
+    let status_generation = harness.generations().1;
+    harness.update_status(status_generation, status).unwrap();
+    let generations = harness.generations();
+
+    assert_matches!(
+        harness.try_mark_started(),
+        Err(TestResourceLifecycleError::InvariantViolation(_))
+    );
+    assert_eq!(harness.generations(), generations);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

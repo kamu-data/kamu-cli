@@ -60,10 +60,21 @@ pub trait ResourceStatusExt {
 
     /// Updates observed generation and indicates that reconciliation had started.
     /// The error of a previous attempt stays until this one has a result.
-    fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>);
+    /// Fails, leaving the status as is, if the generation moves backwards.
+    fn mark_reconciling(
+        &mut self,
+        observed_generation: u64,
+        now: DateTime<Utc>,
+    ) -> Result<(), IllegalStatusTransitionError>;
 
-    /// Updates reconciled generation and clears the reconciliation error
-    fn mark_ready(&mut self, reconciled_generation: u64, now: DateTime<Utc>);
+    /// Updates reconciled generation and clears the reconciliation error.
+    /// Fails, leaving the status as is, if the generation was not observed or
+    /// was already reconciled.
+    fn mark_ready(
+        &mut self,
+        reconciled_generation: u64,
+        now: DateTime<Utc>,
+    ) -> Result<(), IllegalStatusTransitionError>;
 
     /// Indicates failed reconciliation attempt
     fn mark_failed_or_degraded(&mut self, code: impl Into<String>, message: impl Into<String>);
@@ -93,37 +104,49 @@ impl ResourceStatusExt for ResourceStatus {
         }
     }
 
-    fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>) {
+    fn mark_reconciling(
+        &mut self,
+        observed_generation: u64,
+        now: DateTime<Utc>,
+    ) -> Result<(), IllegalStatusTransitionError> {
         // Equal when retrying a generation that failed to reconcile
-        assert!(
-            self.observed_generation.is_none()
-                || self.observed_generation.unwrap() <= observed_generation,
-            "Previous observed generation {:?} > {observed_generation}",
-            self.observed_generation,
-        );
+        if let Some(previous) = self.observed_generation
+            && previous > observed_generation
+        {
+            return Err(IllegalStatusTransitionError::new(format!(
+                "Previous observed generation {previous} > {observed_generation}"
+            )));
+        }
+
         self.phase = ResourcePhase::Reconciling;
         self.observed_generation = Some(observed_generation);
         self.observed_at = Some(now);
+        Ok(())
     }
 
-    fn mark_ready(&mut self, reconciled_generation: u64, now: DateTime<Utc>) {
-        assert!(
-            self.observed_generation.is_some()
-                && self.observed_generation.unwrap() >= reconciled_generation,
-            "Observed generation {:?} < {reconciled_generation}",
-            self.observed_generation,
-        );
-        assert!(
-            self.reconciled_generation.is_none()
-                || self.reconciled_generation.unwrap() < reconciled_generation,
-            "Previous reconciled generation {:?} >= {reconciled_generation}",
-            self.reconciled_generation,
-        );
+    fn mark_ready(
+        &mut self,
+        reconciled_generation: u64,
+        now: DateTime<Utc>,
+    ) -> Result<(), IllegalStatusTransitionError> {
+        if !self.was_observed(reconciled_generation) {
+            return Err(IllegalStatusTransitionError::new(format!(
+                "Observed generation {:?} < {reconciled_generation}",
+                self.observed_generation,
+            )));
+        }
+        if self.was_reconciled(reconciled_generation) {
+            return Err(IllegalStatusTransitionError::new(format!(
+                "Previous reconciled generation {:?} >= {reconciled_generation}",
+                self.reconciled_generation,
+            )));
+        }
 
         self.phase = ResourcePhase::Ready;
         self.reconciled_generation = Some(reconciled_generation);
         self.reconciled_at = Some(now);
         self.conditions.clear_reconciliation_error();
+        Ok(())
     }
 
     fn mark_failed_or_degraded(&mut self, code: impl Into<String>, message: impl Into<String>) {
@@ -146,6 +169,21 @@ impl ResourceStatusExt for ResourceStatus {
                 code: RECONCILIATION_ERROR_CODE_CLEANUP_FAILED.to_string(),
                 message: message.into(),
             });
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A status change that contradicts the generations already recorded
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct IllegalStatusTransitionError {
+    message: String,
+}
+
+impl IllegalStatusTransitionError {
+    fn new(message: String) -> Self {
+        Self { message }
     }
 }
 
