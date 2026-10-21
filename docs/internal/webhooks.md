@@ -92,7 +92,7 @@ subscription, but the create and update use cases reach `unimplemented!()` for i
 | --- | --- | --- |
 | `kamu-webhooks` | `src/domain/webhooks/domain` | aggregates, entities, repository traits, use case and service traits, outbox messages, `WebhooksConfig` |
 | `kamu-webhooks-services` | `src/domain/webhooks/services` | use cases, secret generator, signer, sender, delivery worker, query service, dataset removal handler |
-| `kamu-webhooks-inmem` / `-postgres` / `-sqlite` | `src/infra/webhooks/*` | subscription event store and delivery repository |
+| `kamu-webhooks-inmem` / `-postgres` / `-sqlite` | `src/infra/webhooks/*` | subscription event store, delivery repository and watermark repository |
 | `kamu-webhooks-repo-tests` | `src/infra/webhooks/repo-tests` | shared repository test suites |
 | `kamu-adapter-flow-webhook` | `src/adapter/flow-webhook` | flow scope, deliver controller, sensor, payload, event bridge, startup recovery job |
 | `kamu-adapter-task-webhook` | `src/adapter/task-webhook` | deliver task planner and runner |
@@ -203,9 +203,10 @@ worker, `WebhookDeliveryWorkerImpl::deliver_webhook`:
    payload once, build the headers and signature over those exact bytes, and insert a
    `WebhookDelivery` with the request.
 2. **Send** (no transaction): `WebhookSenderImpl` posts the bytes.
-3. **Record** (own transaction): store the response status, headers and body on the delivery. Any
-   send error (connect, timeout or other) skips this step, leaving a request-only delivery. A body
-   that cannot be read is recorded as empty.
+3. **Record** (own transaction): store the response status, headers and body on the delivery, and
+   on a 2xx status the watermark the task carries ([§8](#8-flow-integration)). Any send error
+   (connect, timeout or other) skips this step, leaving a request-only delivery. A body that
+   cannot be read is recorded as empty.
 4. A non-2xx status becomes `UnsuccessfulResponse` after the response is recorded.
 
 The worker never retries; every attempt is a new task with a new delivery ID.
@@ -366,7 +367,7 @@ position the receiver answered with 2xx:
 | Update, event type disabled | removed |
 | Pause, resume, mark unreachable, reactivate | kept, so activation catches up from it |
 | Remove the subscription, by the use case or with its dataset | removed; subscription rows are kept with status `REMOVED`, so this is not a cascade |
-| Delivery answered 2xx | set to the watermark the delivery plan carries, in the transaction that records the response |
+| Delivery answered 2xx | set to the watermark the delivery plan carries, in the transaction that records the response. A delivery still running when its event type is disabled or its subscription removed sets it again; nothing reads it then, and enabling the event type replaces it with a starting value |
 
 The deliver controller puts the new watermark (`{ "head": new_hash }`) into the logical plan next
 to the payload, and `WebhookDeliveryWorkerImpl` stores it once the receiver accepts the delivery.
@@ -381,7 +382,7 @@ before it is (right after a subscription is created, while it is paused or unrea
 server is down) are caught up when the trigger is activated: `DatasetUpdatedWebhookSensor::on_activated`
 compares the dataset's head with the watermark and, if they differ, runs one deliver flow covering
 the range, with an `ExternallyDetectedChange` cause (`Breaking` when the watermark is no longer in
-the history, so `BreakingChangeRule` applies). Without a watermark nothing is caught up.
+the history, or is no block of the dataset at all, so `BreakingChangeRule` applies). Without a watermark nothing is caught up.
 
 A dataset-update message can still reach the sensor after a catch-up already covered its update,
 since the messages and the trigger activation come from different outbox producers. The sensor
@@ -469,7 +470,7 @@ The startup checks are in `src/app/cli/src/app.rs`; the full reference is genera
 | GraphQL subscription management | `src/adapter/graphql/tests/tests/test_gql_webhook_subscriptions.rs` |
 | GraphQL view of delivery flows: description, failure reasons, history, unreachable and reactivated subscriptions | `src/adapter/graphql/tests/tests/flows/test_gql_webhook_flow_runs.rs` |
 | End to end against a local `wiremock` receiver: signed delivery, tampering rejected, secret rotation, failure reasons, retry, unreachable and reactivated subscriptions, external targets rejected | `src/e2e/app/cli/repo-tests/src/test_webhooks.rs`, wired in `src/e2e/app/cli/{sqlite,postgres}/tests/tests/test_webhooks.rs` |
-| Receiver-side verification, as a customer implements it from [§6](#6-delivery), checked against a real recorded delivery | `src/e2e/app/cli/repo-tests/src/webhook_receiver.rs` |
+| Receiver-side verification, as a customer implements it from [§6](#6-delivery), checked against a real recorded delivery | `src/e2e/app/cli/repo-tests/src/webhook_receiver/` |
 
 ### Behaviour by design
 

@@ -840,6 +840,37 @@ async fn test_versioned_file_extra_data_legacy_ddl() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_versioned_file_extra_data_without_versions() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .build()
+        .await;
+
+    let did = harness
+        .create_versioned_file(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::new_unchecked("empty-file"),
+        ))
+        .await;
+
+    let update_result = harness.try_update_extra_data(&did, json!({})).await;
+
+    pretty_assertions::assert_eq!(
+        update_result,
+        json!({
+            "__typename": "UpdateVersionErrorNoVersions",
+            "isSuccess": false,
+            "message": "File has no versions to update extra data of",
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_versioned_file_quota_exceeded() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -1103,6 +1134,44 @@ impl GraphQLDatasetsHarness {
 
         assert!(res.is_ok(), "{res:#?}");
         res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["uploadNewVersion"]
+            .clone()
+    }
+
+    /// Updates the extra data of the latest version and returns the
+    /// `updateExtraData` result, which may be a failure.
+    pub async fn try_update_extra_data(
+        &self,
+        dataset_did_str: &str,
+        extra_data: serde_json::Value,
+    ) -> serde_json::Value {
+        let res = self
+            .execute_authorized_query(
+                async_graphql::Request::new(indoc!(
+                    r#"
+                    mutation ($datasetId: DatasetID!, $extraData: ExtraData!) {
+                        datasets {
+                            byId(datasetId: $datasetId) {
+                                asVersionedFile {
+                                    updateExtraData(extraData: $extraData) {
+                                        __typename
+                                        isSuccess
+                                        message
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "#
+                ))
+                .variables(async_graphql::Variables::from_json(json!({
+                    "datasetId": dataset_did_str,
+                    "extraData": extra_data,
+                }))),
+            )
+            .await;
+
+        assert!(res.is_ok(), "{res:#?}");
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["updateExtraData"]
             .clone()
     }
 

@@ -97,7 +97,6 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
             // Created, then one status update when reconciliation started
             // and one with its outcome
             "statusGeneration": 3,
-            "deletedAt": null,
         },
         "spec": { "variables": { "MESSAGE": { "value": message_value } } },
         "status": {
@@ -123,7 +122,6 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
                 "owner": "https://github.com/open-data-fabric"
             },
             "statusGeneration": 3,
-            "deletedAt": null,
         },
         "spec": { "variables": { "MESSAGE": { "value": message_value } } },
         "status": {
@@ -145,7 +143,6 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
                 (fixtures::DESCRIPTION_ANNOTATION_SCHEMA): fixtures::DEFAULT_DESCRIPTION
             },
             "statusGeneration": 3,
-            "deletedAt": null,
         },
         // `spec` is asserted separately: `take_secret_keys_encrypted` removes
         // the non-deterministic encrypted values, leaving `spec` empty here.

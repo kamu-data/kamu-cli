@@ -68,7 +68,11 @@ Recommendation: for ease of reading, use the following format:
 - Collection entries are filtered by extra data and found by linked dataset using their current values
 - SQL `to_table()` reads datasets at the query's pinned blocks and includes them in the query state
 - SQL `to_table()` on a missing dataset is a bad query error instead of an internal error
+- SQL queries can read datasets in subqueries inside expressions, such as scalar subqueries, `EXISTS`
+  and `IN (SELECT ...)`, which previously reported the dataset as not found
 - Concurrent uploads to a versioned file fail with a conflict instead of creating duplicate versions
+- GraphQL `updateExtraData` on a versioned file without versions returns `UpdateVersionErrorNoVersions`
+  instead of an internal error
 
 ## [0.270.0] - 2026-10-12
 ### Added

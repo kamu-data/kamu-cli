@@ -141,7 +141,7 @@ long-term goal. This page documents what exists now.
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
 | **Condition** | A status signal keyed by a condition schema URI. The only built-in is ODF `ReconciliationError` (`code`, `message`), present while the latest reconciliation or cleanup has failed. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
-| **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated` event. A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
+| **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated`, `DeletionRequested` and `Deleted` event (the last two move the derived phase). A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by UID or by exact name **plus type** — a name alone is not unique across types — optionally account-scoped. A batch is `Vec<ResourceRef>`. |
 | **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
@@ -161,8 +161,9 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **`ResourceID` is immutable and server-allocated.** A new resource's UID comes from
   `GenericResourceQueryService::allocate_uid()`; callers cannot choose it. Once assigned it never
   changes (it is the primary key — see [§6](#6-persistence-model)).
-- **`(account_id, schema, name)` is unique.** Enforced by a DB unique constraint
-  `UNIQUE (account_id, resource_schema, resource_name)`. Names are stored lowercased.
+- **`(account_id, schema, name)` is unique among resources not being deleted.** Enforced by a
+  case-insensitive unique index on `(account_id, resource_schema, resource_name)`, partial
+  `WHERE deletion_requested_at IS NULL` ([§6](#6-persistence-model)). Names are stored lowercased.
 - **`$schema` is the resource type identity.** A schema URL is parsed into base/context/version/name
   for validation and display, but dispatch and persistence compare the full canonical schema — carried
   as a `TypeUri` and string-equal on the wire/in storage (the dill registry key is an equivalent
@@ -176,8 +177,8 @@ not break; most are enforced in code and exercised by tests — pointers given w
   per apply even when both change; an unchanged apply is `Untouched` and does not bump it.
 - **Status is written only through `StatusUpdated`, by controllers.** Header and spec updates never
   write status ([`Pending` is derived](#lifecycle-state-machine)). Each `StatusUpdated` bumps
-  `headers.statusGeneration`, and every status write is conditional on the `statusGeneration` its
-  writer read.
+  `headers.statusGeneration`, as do `DeletionRequested` and `Deleted`, since they change the derived
+  phase. Every status write is conditional on the `statusGeneration` its writer read.
 - **`status.observedGeneration <= headers.generation`** when present. A new resource has no
   observed generation. Reconciliation sets `observedGeneration` to the generation it starts on;
   `needs_reconciliation()` is true until that generation is also reconciled, so a `Failed` resource
@@ -316,7 +317,8 @@ pub trait ManagedResource: DeclarativeResource {
     // A repeated request is a no-op. Headers and spec updates are then rejected with
     // `ResourceDeletionInProgressError`
     fn try_request_deletion(&mut self, now) -> ...;
-    // Renames to the tombstone `deleted-<id>`. Requests deletion first if needed; no-op once deleted
+    // Renames to the tombstone `deleted-<id>`; a no-op once deleted. An invariant violation
+    // unless deletion was requested, since completing it would skip the cleanup
     fn try_complete_deletion(&mut self, now) -> ...;
     // Compare-and-swap on `statusGeneration`: a stale expected value is a status conflict
     fn try_update_status(&mut self, now, expected_status_generation, new_status) -> ...;
@@ -356,10 +358,11 @@ and an aggregate. This is the bound that all generic use cases require.
   optional; an event without it leaves the generation as is.
 - `StatusUpdated` carries the whole new status, written by a controller. It bumps
   `statusGeneration` and `updatedAt`.
-- `DeletionRequested` sets `deletionRequestedAt`. After it the projector accepts only
-  `StatusUpdated` and `Deleted`.
-- `Deleted` sets `deletedAt` and the tombstone name. Resources deleted before `DeletionRequested`
-  existed have a `Deleted` event alone; replaying it also sets `deletionRequestedAt`.
+- `DeletionRequested` sets `deletionRequestedAt` and bumps `statusGeneration`. After it the
+  projector accepts only `StatusUpdated` and `Deleted`.
+- `Deleted` sets `deletedAt` and the tombstone name, and bumps `statusGeneration`. Resources
+  deleted before `DeletionRequested` existed have a `Deleted` event alone; replaying it also sets
+  `deletionRequestedAt`.
 - The projector derives the `Pending`, `Deleting` and `Deleted` phases after each of them
   ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
 
@@ -441,7 +444,7 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 `ResourceRepository` + raw event-store traits and sharing the cross-backend test suite in
 `src/infra/resources/repo-tests/`. Schema is defined by
 [`migrations/postgres/20260815100000_resources.sql`](/migrations/postgres/20260815100000_resources.sql)
-(SQLite mirror alongside).
+and the later `*_resource_*` migrations (SQLite mirrors alongside).
 
 **Two tables:**
 
@@ -466,7 +469,7 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 transaction as the event append; it exists for efficient queries/listing/uniqueness and should never
 diverge. If they ever disagree, the events win and the snapshot is the bug.
 
-**List columns.** Concrete resources no longer extend status with per-type `stats`. Presentation
+**List columns.** Concrete resources do not extend status with per-type `stats`. Presentation
 columns are derived from the current spec/read model instead: `VariableSet.variables` is
 `spec.variables.entries.len()`, `SecretSet.secrets` is `spec.secrets.entries.len()`, and
 `Storage.provider` / `Storage.detail` are derived from the storage spec.
@@ -492,13 +495,20 @@ There is a precedent for data backfill into resources —
 resources; new types that supersede existing data should follow that pattern (additive migration +
 backfill, never rewriting the event log in place).
 
-**The one rewrite of the event log in place**, `20261015072340_resource_status_events.sql`, replaced
-the events `ReconciliationStarted`/`Succeeded`/`Failed` with `StatusUpdated`. It is the exception, not
-a pattern for routine changes, which add an event and keep old ones readable: these events have no
-Rust type to decode into, and keeping them readable would mean keeping their whole status logic. It
-folds each resource's events in SQL into the status each of them produced, aborts unless the folded
-final status matches `resources.status` (timestamps aside, as their text form varies), and derives
-the snapshot rows again the way the rewritten events replay.
+**Rewrites of the event log in place** are the exception, not a pattern for routine changes, which
+add an event and keep old ones readable. There are two:
+
+- `20261015072340_resource_status_events.sql` replaced the events
+  `ReconciliationStarted`/`Succeeded`/`Failed` with `StatusUpdated`: these events have no Rust type
+  to decode into, and keeping them readable would mean keeping their whole status logic. It folds
+  each resource's events in SQL into the status each of them produced, aborts unless the folded
+  final status matches `resources.status` (timestamps aside, as their text form varies), and
+  derives the snapshot rows again the way the rewritten events replay.
+- `20261021120000_resource_reconciliation_error_condition.sql` rewrites the conditions in
+  `StatusUpdated` payloads and in `resources.status`: it drops the Kamu `Ready`/`Reconciling`
+  conditions, which have no registered extension dispatcher, so durable-state validation would
+  reject them ([§9](#9-services-kamu-resources-services)), and turns a failed `Ready` into the ODF
+  `ReconciliationError` condition.
 
 A backfill that synthesizes an event log must satisfy two invariants that are easy to miss in SQL,
 because both produce resources that load fine at the SQL level yet are unreadable and unwritable
@@ -839,12 +849,14 @@ be unambiguous by construction rather than by luck. Note this is a constraint on
 on searching across types — see the CLI's `%/<name>`, which keeps working precisely because it is a
 search (§ 12).
 
-A `ResourceRef` may carry **both** an `id` and a `name`. ODF treats the pair as a *consistency
-assertion* rather than two lookups: the `id` is the authoritative half the lookup uses, and the
-`name` is verified against the resolved resource. If they disagree the entry fails with a
-`NameMismatch` problem (RF-170) — otherwise pairing one resource's id with another's name would
-read, render, or delete the resource the `id` names while the caller believes they addressed the
-one they spelled out.
+A `ResourceRef` may carry **both** an `id` and a `name`. ODF does not define this case for refs: it
+keeps the `name` in handles only for readability, and in a manifest an `id` with a `name` means a
+rename. Kamu treats the pair in a ref as a *consistency assertion* rather than two lookups: the
+`id` is the authoritative half the lookup uses, and the `name` is verified against the resolved
+resource. If they disagree the entry fails with a `NameMismatch` problem (RF-170) — otherwise
+pairing one resource's id with another's name would read, render, or delete the resource the `id`
+names while the caller believes they addressed the one they spelled out. The cost is that a stored
+ref with both fields stops resolving once its target is renamed.
 
 The fields *within* one selector are a **conjunction**, but the repository's per-type rows are
 OR'd — so a selector narrowing by more than one of `id` / `name` cannot be expressed as rows
@@ -881,9 +893,11 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
   canonicalizes and validates labels/annotations, collects header warnings, then builds
   `ResourceHeadersInput`; this is why plan/apply accept, reject, and warn identically.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
-  mutations of a remote server (whose resolvers use a *local* facade there). Operations live under
-  `facade/graphql/cynic_api/operations/`; responses are mapped back to domain views/errors in
-  `facade/graphql/outcome_mapper/`.
+  mutations of a remote server (whose resolvers use a *local* facade there). It lives in the
+  `kamu-adapter-resources-facade-graphql` crate: operations under
+  [`cynic_api/operations/`](/src/adapter/resources-facade-graphql/src/cynic_api/operations);
+  responses are mapped back to domain views/errors in
+  [`outcome_mapper/`](/src/adapter/resources-facade-graphql/src/outcome_mapper).
 
 **Registration** ([`dependencies.rs`](/src/domain/resources/facade/src/dependencies.rs)) adds
 `ResourceAccountResolverImpl` and `LocalResourceFacadeImpl`. (The remote impl is constructed
@@ -958,14 +972,13 @@ carries the filter, where each entry is `{ key: String!, value: JSON! }`. It app
 the `delete` mutation take `[ResourceRefInput!]!` and carry no filter at all.
 
 Both `bySelectors` and `handlesBySelectors` take the **same** `SearchResourcesInput`; only the
-response shape differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). They were separate
-inputs whose fields were identical, so keeping two was pure duplication.
+response shape differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). Two inputs would
+have identical fields, so there is one.
 
 **Listing takes a selector list.** `ResourceSelectorInput` mirrors the ODF `ResourceSelector`
-(`account`, `type`, `id`, `name`, `labels`) and replaced four earlier inputs — `ResourceQueryInput`,
-`ResourceTypeQueryInput`, `ResourceAnyTypeScopeInput`, and `ResourceScopeInput`. Every field is
-optional; several selectors act as a logical OR, which is what lets one call span resource types.
-A selector with no `type` spans every type.
+(`account`, `type`, `id`, `name`, `labels`). Every field is optional; several selectors act as a
+logical OR, which is what lets one call span resource types. A selector with no `type` spans every
+type.
 
 `account` is honoured per selector, so one call can span several accounts — the second headline
 benefit of the ODF-shaped API. Naming an account you are not allowed to read denies the **whole**
@@ -984,7 +997,7 @@ the path (`/<context>/<version>/<type>`) and scopes it with a single `?account=`
 own `ResourceSelector` (§ Selectors), and means a request is read one way wherever it appears.
 
 `labels` is honoured per selector, so one call can filter differently per type — the third headline
-benefit of the ODF-shaped API, and the reason the repository's label pairs moved inside the per-row
+benefit of the ODF-shaped API, and the reason the repository's label pairs live inside the per-row
 scope predicate. `did` remains the one field that exists on the wire but cannot be resolved; it is
 rejected rather than ignored, so a caller learns their request was not what they asked for.
 
@@ -1205,8 +1218,8 @@ resource half of a mixed delete would still delete every named dataset unfiltere
 call-level filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
 `selectors_for_query` for `list`, and via `with_labels` in the selection-resolution service for
 `get`/`delete`. Because selectors are OR'd, `(A ∧ L) ∨ (B ∧ L)` is exactly `(A ∨ B) ∧ L`, so
-`kamu list vs/a-% ss/b-% -l env=prod` runs the identical query it did when the filter was
-call-level. The CLI has **no syntax** for per-selector labels; that capability is reachable through
+`kamu list vs/a-% ss/b-% -l env=prod` runs the same query a call-level filter would. The CLI has
+**no syntax** for per-selector labels; that capability is reachable through
 GraphQL and the facade API. Adding one would be a grammar extension, not a reinterpretation of
 input that parses today.
 
@@ -1262,10 +1275,9 @@ annotations}` + `spec` — deliberately excluding `headers.id`, `generation`, th
 
 - **An unchanged apply yields byte-identical documents** (`before == Some(after)`, which
   `ApplyManifestDocuments::has_changes()` reports). There are no spurious differences to normalize:
-  the earlier mechanism had to truncate timestamps to microseconds to suppress Postgres-precision
-  noise, and that whole bug class is now structurally absent rather than papered over.
-- **`generation` never appears in a diff.** It changed on every non-`Untouched` apply, so it was
-  pure noise.
+  timestamps are not in the documents, so Postgres timestamp precision cannot surface as a change.
+- **`generation` never appears in a diff.** It changes on every non-`Untouched` apply, so it would
+  be pure noise.
 
 **Ordering constraint.** The documents are *computed on demand*, via `ApplyManifestPlan::documents()`,
 never stored mid-construction. `headers.account` is part of the canonical manifest and the facade
@@ -1478,7 +1490,9 @@ come from `ResourceStatusExt` in
 [`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)
 (`mark_reconciling` → `Reconciling`, `mark_ready` → `Ready`, `mark_failed_or_degraded` → `Failed`
 or `Degraded`, `mark_cleanup_failed` → still `Deleting`); `Pending`, `Deleting` and `Deleted` are
-derived by `align_phase`.
+derived by `align_phase`. A `mark_reconciling` that would move `observedGeneration` back, or a
+`mark_ready` for a generation not observed or already reconciled, fails the command with an
+invariant violation and leaves the status unchanged.
 
 ```mermaid
 stateDiagram-v2
@@ -1873,7 +1887,8 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
 | Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,request_deletion,complete_deletion}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
-| Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
+| Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/` |
+| Remote facade | `kamu-adapter-resources-facade-graphql` | `src/adapter/resources-facade-graphql/src` | `remote_graphql_resource_facade_impl.rs`, `cynic_api/`, `outcome_mapper/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |
 | CLI services | (app/cli) | `src/app/cli/src/services/resources` | `resource_facade_factory.rs`, `resource_manifest_{discovery,execution}_service.rs`, `resource_type_lookup_service.rs`, `resource_selection_*_service.rs`, `resource_summary_service.rs`, `impl/` |

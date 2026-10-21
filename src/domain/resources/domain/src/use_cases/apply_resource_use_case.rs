@@ -196,7 +196,20 @@ impl ApplyResourceRejectionCategory {
 
 pub enum ApplyResourceLifecycleErrorHandling {
     Rejected(ApplyResourceRejection),
-    Technical(InternalError),
+    Internal(InternalError),
+}
+
+impl ApplyResourceLifecycleErrorHandling {
+    pub fn rejected(category: ApplyResourceRejectionCategory, err: impl std::fmt::Display) -> Self {
+        Self::Rejected(ApplyResourceRejection {
+            category,
+            message: err.to_string(),
+        })
+    }
+
+    pub fn internal(err: impl ErrorIntoInternal) -> Self {
+        Self::Internal(err.int_err())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -190,15 +190,13 @@ resolved from the same transactional DI scope so the snapshot write and the
 projection write commit or roll back together. A snapshot that arrives already
 tombstoned (`headers.deleted_at.is_some()`) has its entries **cleared** rather than
 rewritten, keyed off the snapshot rather than the call site since `sync_snapshots`
-is shared by all three paths. Entries of a resource being deleted are kept until
+is shared by every path. Entries of a resource being deleted are kept until
 its deletion completes, so label filters still match it when resources being
 deleted are asked for. Queries join `resources` and skip `deleted_at` rows, so
-stale rows were invisible rather than wrong — but they
+stale rows would be invisible rather than wrong — but they would
 cost index space for nothing and would become wrong for any query that read the
 projection without that join. This keeps `ResourceRepository`
-scoped to `resources`/`resource_events` and gives the projection's read side room
-to grow into real filtered queries (Phase 9) without touching `ResourceRepository`'s
-surface. Implemented per backend (`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,
+scoped to `resources`/`resource_events`. Implemented per backend (`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,
 registered alongside `ResourceRepository` at every composition root and test
 harness); Postgres's `replace_entries` insert uses a compile-time checked static
 query via `UNNEST($2::text[], $3::text[])` over paired key/value arrays rather than

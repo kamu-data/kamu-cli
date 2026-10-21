@@ -25,7 +25,7 @@ use crate::tests::utils::make_id;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_single_resource_success() {
+async fn test_request_deletion_of_single_resource_completes() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -44,7 +44,7 @@ async fn test_delete_single_resource_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_multiple_resources_in_one_call() {
+async fn test_request_deletion_of_multiple_resources_in_one_call() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -77,7 +77,7 @@ async fn test_delete_multiple_resources_in_one_call() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_nonexistent_id_is_idempotent() {
+async fn test_request_deletion_of_nonexistent_id_is_idempotent() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -92,7 +92,7 @@ async fn test_delete_nonexistent_id_is_idempotent() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_resource_owned_by_other_account_fails() {
+async fn test_request_deletion_of_resource_owned_by_other_account_fails() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
     let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
@@ -123,7 +123,7 @@ async fn test_delete_resource_owned_by_other_account_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_emits_deletion_requested_lifecycle_message() {
+async fn test_request_deletion_emits_deletion_requested_lifecycle_message() {
     let mut mock_outbox = MockOutbox::new();
     // apply_and_get_id posts one Applied message; expect it before the DeletionRequested one
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
@@ -143,7 +143,7 @@ async fn test_delete_emits_deletion_requested_lifecycle_message() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_multiple_emits_single_message_with_all_resources() {
+async fn test_request_deletion_of_multiple_emits_single_message_with_all_resources() {
     let mut mock_outbox = MockOutbox::new();
     // Three apply calls → three Applied messages;
     // one delete call → one DeletionRequested message
@@ -166,7 +166,7 @@ async fn test_delete_multiple_emits_single_message_with_all_resources() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_repeated_delete_requests_deletion_again() {
+async fn test_repeated_deletion_request_posts_message_again() {
     // Requesting the deletion again re-drives the cleanup of a resource whose
     // earlier cleanup failed
     let mut mock_outbox = MockOutbox::new();
@@ -190,7 +190,7 @@ async fn test_repeated_delete_requests_deletion_again() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_no_op_emits_no_message() {
+async fn test_request_deletion_no_op_emits_no_message() {
     // A request that matches no resources posts no outbox message
     let mut mock_outbox = MockOutbox::new();
     mock_outbox.expect_post_message_as_json().times(0);

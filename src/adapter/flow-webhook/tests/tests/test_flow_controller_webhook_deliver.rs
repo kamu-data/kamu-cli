@@ -333,6 +333,52 @@ async fn test_delivery_logical_plan_breaking_when_delivered_head_rewritten() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_delivery_logical_plan_breaking_when_delivered_head_missing() {
+    let [head_2, head_3] = [2, 3].map(LinearDatasetHistory::head);
+    let missing_head = LinearDatasetHistory::missing_head();
+
+    let harness = FlowControllerWebhookDeliverHarness::new();
+
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+    harness.register_dataset(&foo_dataset_id);
+    harness.set_dataset_head(&foo_dataset_id, &head_3);
+
+    let subscription_id = WebhookSubscriptionID::new(Uuid::new_v4());
+    let event_type = WebhookEventTypeCatalog::dataset_ref_updated();
+
+    // The receiver has a head that is not a block of the dataset
+    harness
+        .set_delivered_head(subscription_id, &missing_head)
+        .await;
+
+    let delivery_flow = harness
+        .make_delivery_flow_new_data(
+            FlowID::new(1),
+            subscription_id,
+            &event_type,
+            &foo_dataset_id,
+            Some(&head_2),
+            vec![&head_3],
+        )
+        .await;
+
+    pretty_assertions::assert_eq!(
+        harness.build_webhook_payload(&delivery_flow).await,
+        json!({
+            "block_ref": "head",
+            "dataset_id": foo_dataset_id.to_string(),
+            "is_breaking_change": true,
+            "new_hash": head_3.to_string(),
+            "old_hash": missing_head.to_string(),
+            "owner_account_id": TEST_ACCOUNT_ID.to_string(),
+            "version": 2,
+        }),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_delivery_logical_plan_breaking_when_reset_before_delivered_head() {
     let [head_2, head_3] = [2, 3].map(LinearDatasetHistory::head);
 

@@ -94,8 +94,9 @@ where
         }
     }
 
-    /// Runs the cleanup of one resource within a transaction of its own.
-    /// Returns `None` when the resource does not wait for a cleanup.
+    /// Runs the cleanup of one resource. A failed cleanup is returned as an
+    /// error, so that the transaction of the caller rolls back. Returns `None`
+    /// when the resource does not wait for a cleanup.
     pub async fn cleanup(
         &self,
         id: ResourceID,

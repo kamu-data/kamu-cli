@@ -20,6 +20,8 @@ use kamu_datasets::{
     ReadCheckedDataset,
 };
 
+use super::project_collection_state;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -66,13 +68,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         // record set before projecting
         let df = df.filter(col("path").eq(lit(path.to_string()))).int_err()?;
 
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
+        let df = project_collection_state(df)?;
 
         let records = df.collect_json_aos().await.int_err()?;
 
@@ -147,13 +143,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
             df
         };
 
-        // Project changelog into a state
-        let df = odf::utils::data::changelog::project(
-            df,
-            &["path".to_string()],
-            &odf::metadata::DatasetVocabulary::default(),
-        )
-        .int_err()?;
+        let df = project_collection_state(df)?;
 
         // Refs are filtered on the current state of entries, as a correction can change them
         let df = df

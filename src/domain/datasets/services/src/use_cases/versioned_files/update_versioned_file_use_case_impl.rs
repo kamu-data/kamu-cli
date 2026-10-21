@@ -122,10 +122,7 @@ impl UpdateVersionedFileUseCase for UpdateVersionedFileUseCaseImpl {
             )
         } else {
             let Some(mut last_entity) = latest_entry else {
-                return Err(InternalError::new(
-                    "Cannot update extra data of a versioned file without versions",
-                )
-                .into());
+                return Err(UpdateVersionFileUseCaseError::NoVersions);
             };
 
             // Increment version to match next record value

@@ -32,9 +32,11 @@ Mechanics (wiring new messages and consumers, consumption modes, ordering) are i
 
 ### 3. Cleanup Failure Handling
 
-- If the cleanup transaction fails, log the error with full context.
-- The message consumer framework will retry the message using its configured retry strategy.
-- For persistent failures, ensure dead-letter handling is configured to capture unprocessable messages.
+- If the cleanup transaction fails, return the error with full context: the consumer stops at that
+  message instead of skipping it.
+- The outbox has no automatic retries and no dead-letter queue; see
+  [outbox failures](../../../docs/internal/outbox.md#54-failures) for what happens to a failing
+  consumer.
 
 ### 4. Examples
 

@@ -105,39 +105,6 @@ pub enum TestResourceLifecycleError {
 
 kamu_resources::impl_resource_lifecycle_error!(TestResourceLifecycleError, TestResourceState);
 
-impl IntoApplyResourceRejection for TestResourceLifecycleError {
-    fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
-        match self {
-            Self::HeadersValidation(err) => {
-                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    message: err.to_string(),
-                })
-            }
-            Self::SpecValidation(err) => {
-                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    message: err.to_string(),
-                })
-            }
-            Self::InvariantViolation(err) => {
-                use internal_error::ErrorIntoInternal;
-                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
-            }
-            Self::StatusConflict(err) => {
-                use internal_error::ErrorIntoInternal;
-                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
-            }
-            Self::DeletionInProgress(err) => {
-                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
-                    category: ApplyResourceRejectionCategory::LifecycleRuleConflict,
-                    message: err.to_string(),
-                })
-            }
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceReconcileError
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

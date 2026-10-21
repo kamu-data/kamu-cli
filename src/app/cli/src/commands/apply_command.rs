@@ -11,7 +11,6 @@ use std::io::Read as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
@@ -31,7 +30,8 @@ use kamu_resources_facade::{
 use thiserror::Error;
 
 use super::resource_manifest_diff::{ManifestDiffOptions, render_manifest_diff};
-use super::{BatchError, CLIError, Command, common};
+use super::resource_manifest_rendering::render_resource_yaml;
+use super::{BatchError, CLIError, Command};
 use crate::cli::ResourceManifestFormat;
 use crate::output::{ApplyMultiProgress, OutputConfig};
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
@@ -940,7 +940,7 @@ impl ApplyPrinter<'_> {
         progress: Option<&ApplyMultiProgress>,
         resource: &Resource,
     ) -> Result<(), CLIError> {
-        let rendered = Self::render_verbose_resource(resource)?;
+        let rendered = render_resource_yaml(resource)?;
 
         self.print_line(
             progress,
@@ -952,66 +952,6 @@ impl ApplyPrinter<'_> {
         );
 
         Ok(())
-    }
-
-    fn render_verbose_resource(resource: &Resource) -> Result<String, CLIError> {
-        #[serde_with::serde_as]
-        #[derive(serde::Serialize)]
-        #[serde(rename_all = "camelCase")]
-        struct RenderedResourceHeaders<'a> {
-            id: &'a kamu_resources::ResourceID,
-            #[serde_as(as = "odf::metadata::serde::yaml::auth::ResourceOwnerHandle")]
-            account: &'a odf::ResourceOwnerHandle,
-            name: &'a str,
-            #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceLabels")]
-            labels: &'a kamu_resources::ResourceLabels,
-            #[serde_as(as = "odf::metadata::serde::yaml::resources::ResourceAnnotations")]
-            annotations: &'a kamu_resources::ResourceAnnotations,
-            generation: u64,
-            status_generation: u64,
-            created_at: &'a DateTime<Utc>,
-            updated_at: &'a DateTime<Utc>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            deletion_requested_at: &'a Option<DateTime<Utc>>,
-            deleted_at: &'a Option<DateTime<Utc>>,
-        }
-
-        impl<'a> RenderedResourceHeaders<'a> {
-            fn new(resource: &'a Resource) -> Self {
-                Self {
-                    id: &resource.headers.id,
-                    account: &resource.headers.account,
-                    name: &resource.headers.name,
-                    labels: &resource.headers.labels,
-                    annotations: &resource.headers.annotations,
-                    generation: resource.headers.generation,
-                    status_generation: resource.headers.status_generation,
-                    created_at: &resource.headers.created_at,
-                    updated_at: &resource.headers.updated_at,
-                    deletion_requested_at: &resource.headers.deletion_requested_at,
-                    deleted_at: &resource.headers.deleted_at,
-                }
-            }
-        }
-
-        #[derive(serde::Serialize)]
-        struct RenderedResource<'a> {
-            #[serde(rename = "$schema")]
-            schema: &'a str,
-            headers: RenderedResourceHeaders<'a>,
-            spec: serde_yaml::Value,
-            status: serde_yaml::Value,
-        }
-
-        serde_yaml::to_string(&RenderedResource {
-            schema: resource.schema.as_str(),
-            headers: RenderedResourceHeaders::new(resource),
-            spec: common::json_to_yaml_value(&resource.spec),
-            status: common::json_to_yaml_value(&kamu_resources::resource_status_to_json(
-                &resource.status,
-            )),
-        })
-        .map_err(CLIError::critical)
     }
 
     fn accepted_status_line(

@@ -9,12 +9,21 @@
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use cheap_clone::CheapClone;
 use datafusion::common::TableReference;
 use datafusion::prelude::*;
+use datafusion::sql::sqlparser::ast::{
+    ObjectName,
+    Query,
+    TableFactor,
+    TableFunctionArgs,
+    Visit,
+    Visitor,
+};
 use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
@@ -157,7 +166,7 @@ impl QueryServiceImpl {
                 {
                     is_restricted_set = true;
                     needs_schema = true;
-                    extract_table_refs_rec(query, &mut table_refs)?;
+                    table_refs.collect_from(query);
                 }
             }
 
@@ -807,98 +816,75 @@ impl QueryService for QueryServiceImpl {
 #[derive(Debug, Default)]
 struct QueryTableRefs {
     /// Datasets referenced as tables
-    tables: Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+    tables: Vec<ObjectName>,
     /// Datasets passed to `to_table()`
-    to_table_datasets: Vec<datafusion::sql::sqlparser::ast::ObjectName>,
+    to_table_datasets: Vec<ObjectName>,
 }
 
-// TODO: This is too complex - we should explore better ways to associate a
-// query with a certain state
-fn extract_table_refs_rec(
-    query: &datafusion::sql::sqlparser::ast::Query,
-    tables: &mut QueryTableRefs,
-) -> Result<(), QueryError> {
-    if let Some(with) = &query.with {
-        for cte in &with.cte_tables {
-            extract_table_refs_rec(&cte.query, tables)?;
-        }
-    }
-    extract_table_refs_rec_set_expr(&query.body, tables)?;
-
-    // Another pass to remove CTEs from table refs
-    // TODO: This may fail in some tricky cases like nested CTEs
-    if let Some(with) = &query.with {
-        for cte in &with.cte_tables {
-            tables
-                .tables
-                .retain(|tn| tn.0.len() != 1 || tn.0[0].as_ident() != Some(&cte.alias.name));
-        }
-    }
-
-    Ok(())
-}
-
-fn extract_table_refs_rec_set_expr(
-    expr: &datafusion::sql::sqlparser::ast::SetExpr,
-    tables: &mut QueryTableRefs,
-) -> Result<(), QueryError> {
-    use datafusion::sql::sqlparser::ast::SetExpr;
-
-    match expr {
-        SetExpr::Select(select) => {
-            for twj in &select.from {
-                extract_table_refs_rec_table_factor(&twj.relation, tables)?;
-                for join in &twj.joins {
-                    extract_table_refs_rec_table_factor(&join.relation, tables)?;
-                }
-            }
-            Ok(())
-        }
-        SetExpr::Query(query) => extract_table_refs_rec(query, tables),
-        SetExpr::SetOperation { left, right, .. } => {
-            extract_table_refs_rec_set_expr(left, tables)?;
-            extract_table_refs_rec_set_expr(right, tables)?;
-            Ok(())
-        }
-        SetExpr::Table(_)
-        | SetExpr::Values(_)
-        | SetExpr::Insert(_)
-        | SetExpr::Update(_)
-        | SetExpr::Delete(_)
-        | SetExpr::Merge(_) => Ok(()),
+impl QueryTableRefs {
+    /// Collects the datasets of a query and of every query nested in it,
+    /// including subqueries in expressions and predicates
+    fn collect_from(&mut self, query: &Query) {
+        let mut collector = QueryTableRefsCollector {
+            refs: self,
+            query_tables_start: Vec::new(),
+        };
+        let ControlFlow::Continue(()) = query.visit(&mut collector);
     }
 }
 
-fn extract_table_refs_rec_table_factor(
-    expr: &datafusion::sql::sqlparser::ast::TableFactor,
-    tables: &mut QueryTableRefs,
-) -> Result<(), QueryError> {
-    use datafusion::sql::sqlparser::ast::TableFactor;
+struct QueryTableRefsCollector<'a> {
+    refs: &'a mut QueryTableRefs,
+    /// Number of tables collected before each query being visited
+    query_tables_start: Vec<usize>,
+}
 
-    #[expect(
-        clippy::wildcard_enum_match_arm,
-        reason = "sqlparser's TableFactor is foreign; only tables and subqueries are resolved"
-    )]
-    match expr {
-        TableFactor::Table {
-            name,
-            args: Some(args),
-            ..
-        } if is_to_table_function(name) => {
+impl Visitor for QueryTableRefsCollector<'_> {
+    type Break = Infallible;
+
+    fn pre_visit_query(&mut self, _query: &Query) -> ControlFlow<Infallible> {
+        self.query_tables_start.push(self.refs.tables.len());
+        ControlFlow::Continue(())
+    }
+
+    fn post_visit_query(&mut self, query: &Query) -> ControlFlow<Infallible> {
+        let start = self.query_tables_start.pop().unwrap();
+
+        // Within the query that defines a CTE, a table of that name is the CTE, not a dataset
+        if let Some(with) = &query.with {
+            let mut query_tables = self.refs.tables.split_off(start);
+            query_tables.retain(|table| {
+                !with.cte_tables.iter().any(|cte| {
+                    matches!(table.0.as_slice(), [part] if part.as_ident() == Some(&cte.alias.name))
+                })
+            });
+            self.refs.tables.extend(query_tables);
+        }
+
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_table_factor(&mut self, table_factor: &TableFactor) -> ControlFlow<Infallible> {
+        let TableFactor::Table { name, args, .. } = table_factor else {
+            return ControlFlow::Continue(());
+        };
+
+        if let Some(args) = args
+            && is_to_table_function(name)
+        {
             // The dataset read by `to_table()` is a part of the query state like any table
-            tables.to_table_datasets.extend(to_table_dataset_arg(args));
-            Ok(())
+            self.refs
+                .to_table_datasets
+                .extend(to_table_dataset_arg(args));
+        } else {
+            self.refs.tables.push(name.clone());
         }
-        TableFactor::Table { name, .. } => {
-            tables.tables.push(name.clone());
-            Ok(())
-        }
-        TableFactor::Derived { subquery, .. } => extract_table_refs_rec(subquery, tables),
-        _ => Ok(()),
+
+        ControlFlow::Continue(())
     }
 }
 
-fn is_to_table_function(name: &datafusion::sql::sqlparser::ast::ObjectName) -> bool {
+fn is_to_table_function(name: &ObjectName) -> bool {
     matches!(
         name.0.as_slice(),
         [part] if part
@@ -909,16 +895,8 @@ fn is_to_table_function(name: &datafusion::sql::sqlparser::ast::ObjectName) -> b
 
 /// Returns the dataset reference passed to `to_table()`, if it is a single identifier.
 /// Other argument shapes are rejected when the function is planned.
-fn to_table_dataset_arg(
-    args: &datafusion::sql::sqlparser::ast::TableFunctionArgs,
-) -> Option<datafusion::sql::sqlparser::ast::ObjectName> {
-    use datafusion::sql::sqlparser::ast::{
-        Expr,
-        FunctionArg,
-        FunctionArgExpr,
-        ObjectName,
-        ObjectNamePart,
-    };
+fn to_table_dataset_arg(args: &TableFunctionArgs) -> Option<ObjectName> {
+    use datafusion::sql::sqlparser::ast::{Expr, FunctionArg, FunctionArgExpr, ObjectNamePart};
 
     let [FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Identifier(ident)))] =
         args.args.as_slice()
