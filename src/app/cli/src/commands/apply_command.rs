@@ -973,6 +973,7 @@ impl ApplyPrinter<'_> {
             updated_at: &'a DateTime<Utc>,
             #[serde(skip_serializing_if = "Option::is_none")]
             deletion_requested_at: &'a Option<DateTime<Utc>>,
+            #[serde(skip_serializing_if = "Option::is_none")]
             deleted_at: &'a Option<DateTime<Utc>>,
         }
 

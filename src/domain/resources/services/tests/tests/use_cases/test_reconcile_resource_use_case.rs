@@ -405,7 +405,7 @@ async fn test_reconcile_of_resource_being_deleted_is_no_op() {
 
     let resource = harness.load(&id).await;
     assert_eq!(resource.status().phase, ResourcePhase::Deleting);
-    assert_eq!(resource.headers().status_generation, 1);
+    assert_eq!(resource.headers().status_generation, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -434,7 +434,7 @@ async fn test_finish_phase_discards_outcome_of_resource_being_deleted() {
     let resource = harness.load(&id).await;
     assert!(resource.headers().deletion_requested_at.is_some());
     assert_eq!(resource.status().phase, ResourcePhase::Deleting);
-    assert_eq!(resource.headers().status_generation, 2);
+    assert_eq!(resource.headers().status_generation, 3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

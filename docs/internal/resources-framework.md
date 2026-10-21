@@ -141,7 +141,7 @@ long-term goal. This page documents what exists now.
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
 | **Condition** | A status signal keyed by a condition schema URI. The only built-in is ODF `ReconciliationError` (`code`, `message`), present while the latest reconciliation or cleanup has failed. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
-| **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated` event. A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
+| **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated`, `DeletionRequested` and `Deleted` event (the last two move the derived phase). A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by UID or by exact name **plus type** — a name alone is not unique across types — optionally account-scoped. A batch is `Vec<ResourceRef>`. |
 | **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
@@ -176,8 +176,8 @@ not break; most are enforced in code and exercised by tests — pointers given w
   per apply even when both change; an unchanged apply is `Untouched` and does not bump it.
 - **Status is written only through `StatusUpdated`, by controllers.** Header and spec updates never
   write status ([`Pending` is derived](#lifecycle-state-machine)). Each `StatusUpdated` bumps
-  `headers.statusGeneration`, and every status write is conditional on the `statusGeneration` its
-  writer read.
+  `headers.statusGeneration`, as do `DeletionRequested` and `Deleted`, since they change the derived
+  phase. Every status write is conditional on the `statusGeneration` its writer read.
 - **`status.observedGeneration <= headers.generation`** when present. A new resource has no
   observed generation. Reconciliation sets `observedGeneration` to the generation it starts on;
   `needs_reconciliation()` is true until that generation is also reconciled, so a `Failed` resource
@@ -356,9 +356,9 @@ and an aggregate. This is the bound that all generic use cases require.
   optional; an event without it leaves the generation as is.
 - `StatusUpdated` carries the whole new status, written by a controller. It bumps
   `statusGeneration` and `updatedAt`.
-- `DeletionRequested` sets `deletionRequestedAt`. After it the projector accepts only
-  `StatusUpdated` and `Deleted`.
-- `Deleted` sets `deletedAt` and the tombstone name. Resources deleted before `DeletionRequested`
+- `DeletionRequested` sets `deletionRequestedAt` and bumps `statusGeneration`. After it the
+  projector accepts only `StatusUpdated` and `Deleted`.
+- `Deleted` sets `deletedAt` and the tombstone name, and bumps `statusGeneration`. Resources deleted before `DeletionRequested`
   existed have a `Deleted` event alone; replaying it also sets `deletionRequestedAt`.
 - The projector derives the `Pending`, `Deleting` and `Deleted` phases after each of them
   ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
@@ -839,12 +839,14 @@ be unambiguous by construction rather than by luck. Note this is a constraint on
 on searching across types — see the CLI's `%/<name>`, which keeps working precisely because it is a
 search (§ 12).
 
-A `ResourceRef` may carry **both** an `id` and a `name`. ODF treats the pair as a *consistency
-assertion* rather than two lookups: the `id` is the authoritative half the lookup uses, and the
-`name` is verified against the resolved resource. If they disagree the entry fails with a
-`NameMismatch` problem (RF-170) — otherwise pairing one resource's id with another's name would
-read, render, or delete the resource the `id` names while the caller believes they addressed the
-one they spelled out.
+A `ResourceRef` may carry **both** an `id` and a `name`. ODF does not define this case for refs: it
+keeps the `name` in handles only for readability, and in a manifest an `id` with a `name` means a
+rename. Kamu treats the pair in a ref as a *consistency assertion* rather than two lookups: the
+`id` is the authoritative half the lookup uses, and the `name` is verified against the resolved
+resource. If they disagree the entry fails with a `NameMismatch` problem (RF-170) — otherwise
+pairing one resource's id with another's name would read, render, or delete the resource the `id`
+names while the caller believes they addressed the one they spelled out. The cost is that a stored
+ref with both fields stops resolving once its target is renamed.
 
 The fields *within* one selector are a **conjunction**, but the repository's per-type rows are
 OR'd — so a selector narrowing by more than one of `id` / `name` cannot be expressed as rows

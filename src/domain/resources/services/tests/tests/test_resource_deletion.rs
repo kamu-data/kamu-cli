@@ -44,8 +44,8 @@ fn test_requested_deletion_keeps_name_and_shows_deleting() {
     assert_eq!(headers.updated_at, harness.now);
     assert_eq!(
         harness.generations(),
-        (1, 3),
-        "a deletion request is not a status update"
+        (1, 4),
+        "a deletion request moves the phase, which is a status update"
     );
     assert_eq!(harness.phase(), ResourcePhase::Deleting);
     assert!(harness.resource.needs_cleanup());
@@ -156,7 +156,7 @@ fn test_headers_and_spec_of_resource_being_deleted_cannot_change() {
         harness.try_apply_spec("v2"),
         Err(TestResourceLifecycleError::DeletionInProgress(_))
     );
-    assert_eq!(harness.generations(), (1, 3));
+    assert_eq!(harness.generations(), (1, 4));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,7 +170,7 @@ fn test_stored_headers_update_after_deletion_request_is_an_invariant_violation()
         harness.try_apply_stored_headers_update(Some("prod")),
         Err(TestResourceLifecycleError::InvariantViolation(_))
     );
-    assert_eq!(harness.generations(), (1, 3));
+    assert_eq!(harness.generations(), (1, 4));
     assert_eq!(harness.phase(), ResourcePhase::Deleting);
 }
 
@@ -185,7 +185,7 @@ fn test_reconciliation_of_resource_being_deleted_is_skipped() {
     harness.mark_succeeded();
     harness.mark_started();
 
-    assert_eq!(harness.generations(), (1, 2));
+    assert_eq!(harness.generations(), (1, 3));
     assert_eq!(harness.phase(), ResourcePhase::Deleting);
 }
 
@@ -198,7 +198,7 @@ fn test_failed_cleanup_is_recorded_while_deletion_stays_in_progress() {
 
     harness.mark_cleanup_failed();
 
-    assert_eq!(harness.generations(), (1, 4));
+    assert_eq!(harness.generations(), (1, 5));
     assert_eq!(harness.phase(), ResourcePhase::Deleting);
     assert!(harness.resource.needs_cleanup());
     BaseResourceServiceHarness::assert_reconciliation_error(
