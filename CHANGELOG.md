@@ -16,15 +16,19 @@ Recommendation: for ease of reading, use the following format:
 ## [Unreleased]
 ### Added
 - Molecule: `molecule.sandbox` org account, with its own projects separate from `molecule` and `molecule.dev`
-- `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
-  a `blockHash` field
-- GraphQL: `DatasetMetadata.currentDownstreamDependenciesCount` returns the number of direct downstream
-  datasets. Accounts that can maintain the dataset also get the private ones they cannot read
 ### Changed
 - Molecule: an org account can no longer create datasets in or sign with keys of another org's project accounts
   (e.g. `molecule` in `molecule.dev.*`); account names in these checks compare case-insensitively
 - Molecule: `createProject` rejects a symbol whose project account would name another org or its project
   (e.g. `dev`, `sandbox`, `sandbox.x` for `molecule`)
+
+## [0.271.0] - 2026-10-21
+### Added
+- `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus
+  a `blockHash` field
+- GraphQL: `DatasetMetadata.currentDownstreamDependenciesCount` returns the number of direct downstream
+  datasets. Accounts that can maintain the dataset also get the private ones they cannot read
+### Changed
 - Updated to ODF spec v0.42.1
 - GraphQL (breaking): `AccountHandle` is renamed to `ResourceOwnerHandle` and `AccountRefInput` to
   `ResourceOwnerRefInput`, following ODF. Remote resource commands need both the `kamu` CLI and the node on
