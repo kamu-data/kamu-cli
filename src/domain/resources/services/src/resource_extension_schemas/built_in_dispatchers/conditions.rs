@@ -9,12 +9,8 @@
 
 use dill::CatalogBuilder;
 use kamu_resources::{
-    RESOURCE_CONDITION_READY_SCHEMA_DOC,
-    RESOURCE_CONDITION_READY_SCHEMA_URI,
-    RESOURCE_CONDITION_RECONCILING_SCHEMA_DOC,
-    RESOURCE_CONDITION_RECONCILING_SCHEMA_URI,
-    ReadyCondition,
-    ReconcilingCondition,
+    RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
+    ReconciliationErrorCondition,
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
     ResourceExtensionScopeMeta,
@@ -32,28 +28,18 @@ const CONDITION_APPLICATIONS: &[ResourceExtensionApplicationMeta] =
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 declare_resource_extension_schema_dispatcher!(
-    dispatcher = ReadyConditionDispatcher,
-    value = ReadyCondition,
-    schema_id = RESOURCE_CONDITION_READY_SCHEMA_URI,
+    dispatcher = ReconciliationErrorConditionDispatcher,
+    value = ReconciliationErrorCondition,
+    schema_id = RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     kind = ResourceExtensionKind::Condition,
-    document = RESOURCE_CONDITION_READY_SCHEMA_DOC,
-    applications = CONDITION_APPLICATIONS
-);
-
-declare_resource_extension_schema_dispatcher!(
-    dispatcher = ReconcilingConditionDispatcher,
-    value = ReconcilingCondition,
-    schema_id = RESOURCE_CONDITION_RECONCILING_SCHEMA_URI,
-    kind = ResourceExtensionKind::Condition,
-    document = RESOURCE_CONDITION_RECONCILING_SCHEMA_DOC,
+    document = None,
     applications = CONDITION_APPLICATIONS
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_built_in_condition_schema_dispatchers(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<ReadyConditionDispatcher>();
-    catalog_builder.add::<ReconcilingConditionDispatcher>();
+    catalog_builder.add::<ReconciliationErrorConditionDispatcher>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

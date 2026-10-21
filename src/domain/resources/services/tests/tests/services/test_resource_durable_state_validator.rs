@@ -16,11 +16,10 @@ use internal_error::InternalError;
 use kamu_resources::{
     DeclarativeResource,
     ManagedResource,
-    RESOURCE_CONDITION_READY_SCHEMA_URI,
+    RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceAggregateLoader,
     ResourceAnnotations,
-    ResourceConditionValue,
     ResourceDurableStateValidationError,
     ResourceExtensionKind,
     ResourceExtensionResolutionError,
@@ -266,15 +265,19 @@ async fn test_malformed_condition_value_fails_durable_state_guard() {
     let result = harness
         .save_with_condition(
             "res-malformed-condition",
-            RESOURCE_CONDITION_READY_SCHEMA_URI.parse().unwrap(),
-            serde_json::json!({ "value": "True" }),
+            RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI
+                .parse()
+                .unwrap(),
+            serde_json::json!({ "code": "internal-error" }),
         )
         .await;
 
     harness.assert_invalid_extension_value_error(
         result,
         ResourceExtensionKind::Condition,
-        &RESOURCE_CONDITION_READY_SCHEMA_URI.parse().unwrap(),
+        &RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI
+            .parse()
+            .unwrap(),
     );
 }
 
@@ -338,7 +341,7 @@ impl ResourceDurableStateValidatorHarness {
     }
 
     fn valid_condition_value() -> serde_json::Value {
-        serde_json::to_value(ResourceConditionValue::ready_true(Utc::now()).1).unwrap()
+        serde_json::json!({ "code": "internal-error", "message": "Internal error" })
     }
 
     async fn create_with_labels(

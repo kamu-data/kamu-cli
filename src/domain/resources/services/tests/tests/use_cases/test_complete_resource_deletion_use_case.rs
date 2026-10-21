@@ -14,10 +14,8 @@ use kamu_resources::{
     CompleteResourceDeletionUseCaseError,
     DeclarativeResource,
     ResourceAggregateLoader,
-    ResourceConditionStatus,
     ResourceID,
     ResourcePhase,
-    ready_condition_type_ref,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -99,12 +97,9 @@ async fn test_failed_cleanup_keeps_deletion_in_progress() {
         resource.headers().status_generation,
         status_generation_before + 1
     );
-    BaseResourceServiceHarness::assert_condition(
+    BaseResourceServiceHarness::assert_reconciliation_error(
         resource.status(),
-        &ready_condition_type_ref(),
-        ResourceConditionStatus::False,
-        Some("CleanupFailed"),
-        Some(true),
+        Some("cleanup-failed"),
     );
 }
 
@@ -330,24 +325,15 @@ impl CompleteDeletionTestHarness {
 
     async fn assert_cleanup_not_failed(&self, id: &ResourceID) {
         let resource = self.load(id).await;
-        let cleanup_failed = resource
-            .status()
-            .conditions
-            .entries
-            .values()
-            .any(|condition| condition["reason"] == "CleanupFailed");
-        assert!(!cleanup_failed, "no cleanup failure must be recorded");
+        BaseResourceServiceHarness::assert_reconciliation_error(resource.status(), None);
     }
 
     async fn assert_cleanup_failed(&self, id: &ResourceID) {
         let resource = self.load(id).await;
         assert_eq!(resource.status().phase, ResourcePhase::Deleting);
-        BaseResourceServiceHarness::assert_condition(
+        BaseResourceServiceHarness::assert_reconciliation_error(
             resource.status(),
-            &ready_condition_type_ref(),
-            ResourceConditionStatus::False,
-            Some("CleanupFailed"),
-            Some(true),
+            Some("cleanup-failed"),
         );
     }
 }

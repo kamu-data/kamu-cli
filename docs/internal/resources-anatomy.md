@@ -176,15 +176,16 @@ The behaviorally-significant consequences of adopting these shapes:
   `DatasetEntry.owner_id`/`owner_name` before building headers). The use case enforces this
   defensively because the downstream event-sourced projector is pure/sync and cannot resolve
   accounts.
-- **Built-in conditions** are Kamu extensions keyed by stable URIs under
-  `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Ready,Reconciling}`; each value
-  carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
-  meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
+- **The only built-in condition is ODF `ReconciliationError`**
+  (`https://opendatafabric.org/schemas/resources/v1alpha1/ReconciliationError`, with `code` and
+  `message`). It is present while the latest reconciliation or cleanup of the resource has failed;
+  the phase carries everything else, so Kamu defines no conditions of its own. Codes are
+  kebab-case: the shared ones are `RECONCILIATION_ERROR_CODE_*` constants, and each resource type
+  adds its own through `ResourceReconcileError::code`.
   New resources have no conditions; only a status update replaces them
-  ([state machine](resources-framework.md#lifecycle-state-machine)). The schema docs under
-  `src/domain/resources/schemas/…/conditions/` are embedded from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
-  dispatchers; value validation is strict serde over `ResourceConditionValue` (unknown fields are
-  rejected).
+  ([state machine](resources-framework.md#lifecycle-state-machine)). Its DI-registered extension
+  dispatcher carries no schema document, since ODF owns the schema; value validation is strict
+  serde over the generated ODF proxy (unknown fields are rejected).
 - **Manifest labels/annotations reject duplicate keys.** The ODF proxy deserializes into a `BTreeMap`
   that silently drops duplicates (last-write-wins), so `ResourceManifestHeaders.{labels,annotations}`
   stay `Vec<(TypeRef, serde_json::Value)>` with a custom visitor that errors on a repeated key. An

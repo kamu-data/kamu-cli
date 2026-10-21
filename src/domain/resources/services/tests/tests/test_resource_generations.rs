@@ -172,17 +172,24 @@ fn test_failed_then_retried_then_degraded() {
     harness.mark_failed();
     assert_eq!(harness.phase(), ResourcePhase::Failed);
     assert!(harness.needs_reconciliation());
+    harness.assert_reconciliation_error(Some("internal-error"));
 
+    // The error of the previous attempt stays visible during a retry
     harness.mark_started();
+    assert_eq!(harness.phase(), ResourcePhase::Reconciling);
+    harness.assert_reconciliation_error(Some("internal-error"));
+
     harness.mark_succeeded();
     assert_eq!(harness.phase(), ResourcePhase::Ready);
     assert_eq!(harness.generations(), (1, 5));
+    harness.assert_reconciliation_error(None);
 
     harness.apply(None, "v2");
     harness.mark_started();
     harness.mark_failed();
     assert_eq!(harness.phase(), ResourcePhase::Degraded);
     assert_eq!(harness.generations(), (2, 7));
+    harness.assert_reconciliation_error(Some("internal-error"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -351,6 +358,14 @@ impl ResourceGenerationsHarness {
 
     fn phase(&self) -> ResourcePhase {
         self.resource.status().phase
+    }
+
+    #[track_caller]
+    fn assert_reconciliation_error(&self, expected_code: Option<&str>) {
+        BaseResourceServiceHarness::assert_reconciliation_error(
+            self.resource.status(),
+            expected_code,
+        );
     }
 
     fn status(&self) -> ResourceStatus {

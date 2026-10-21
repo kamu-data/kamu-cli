@@ -13,10 +13,7 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
-    ResourceConditionStatus,
     ResourcePhase,
-    ready_condition_type_ref,
-    reconciling_condition_type_ref,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -70,20 +67,7 @@ async fn test_apply_end_to_end_create_and_retrieve() {
         status.reconciled_at.is_some(),
         "status.reconciledAt must be populated after auto-reconcile"
     );
-    BaseResourceServiceHarness::assert_condition(
-        &status,
-        &ready_condition_type_ref(),
-        ResourceConditionStatus::True,
-        Some("Reconciled"),
-        None,
-    );
-    BaseResourceServiceHarness::assert_condition(
-        &status,
-        &reconciling_condition_type_ref(),
-        ResourceConditionStatus::False,
-        Some("Idle"),
-        None,
-    );
+    BaseResourceServiceHarness::assert_reconciliation_error(&status, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -277,13 +261,7 @@ async fn test_apply_update_resets_status_to_pending() {
     let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
-    BaseResourceServiceHarness::assert_condition(
-        &status,
-        &ready_condition_type_ref(),
-        ResourceConditionStatus::True,
-        Some("Reconciled"),
-        None,
-    );
+    BaseResourceServiceHarness::assert_reconciliation_error(&status, None);
 
     // Spec update → gen bumped to 2, phase reset to Pending
     let update_params = ApplyResourceParams {

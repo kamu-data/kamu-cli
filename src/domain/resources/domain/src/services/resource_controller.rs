@@ -29,7 +29,8 @@ pub trait ResourceController<R: ManagedResource>: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceReconcileError: std::error::Error + Send + Sync {
-    fn reason_code(&self) -> &'static str;
+    /// Machine-readable kebab-case code of the reported `ReconciliationError`
+    fn code(&self) -> &'static str;
     fn user_message(&self) -> String;
     fn is_transient(&self) -> bool;
 }

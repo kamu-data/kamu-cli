@@ -36,6 +36,10 @@ Recommendation: for ease of reading, use the following format:
   reports it. Resources being deleted are hidden unless asked for with `--include-deleting` on
   `kamu list` and `kamu get`, or `includeDeleting` in the GraphQL resource queries. The summary counts
   them as `deleting` (`kamu summary`, GraphQL `ResourcePhaseCounts.deleting`)
+- Resources (breaking): status conditions follow ODF. The Kamu `Ready` and `Reconciling` conditions are
+  gone, since the phase tells the same. A failed reconciliation or cleanup is reported by the ODF
+  `ReconciliationError` condition with a kebab-case `code` (e.g. `missing-secret-ref`, `cleanup-failed`)
+  and a `message`, until the next successful reconciliation. Stored statuses are migrated
 - Resources: `updatedAt` also moves when the status changes
 - Resources: changing only the labels or annotations of a resource bumps its `generation` and reconciles
   it again

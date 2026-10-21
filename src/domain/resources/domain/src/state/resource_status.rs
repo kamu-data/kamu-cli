@@ -9,7 +9,14 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{ResourceConditionValue, ResourceHeaders, ResourcePhase, empty_resource_conditions};
+use crate::{
+    RECONCILIATION_ERROR_CODE_CLEANUP_FAILED,
+    ReconciliationError,
+    ResourceConditionsReconciliationErrorExt,
+    ResourceHeaders,
+    ResourcePhase,
+    empty_resource_conditions,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,22 +58,18 @@ pub trait ResourceStatusExt {
     /// generation. Runs after every change of the resource.
     fn align_phase(&mut self, headers: &ResourceHeaders);
 
-    /// Updates observed generation and indicates that reconcilation had started
+    /// Updates observed generation and indicates that reconciliation had started.
+    /// The error of a previous attempt stays until this one has a result.
     fn mark_reconciling(&mut self, observed_generation: u64, now: DateTime<Utc>);
 
-    /// Updated reconciled generation
+    /// Updates reconciled generation and clears the reconciliation error
     fn mark_ready(&mut self, reconciled_generation: u64, now: DateTime<Utc>);
 
     /// Indicates failed reconciliation attempt
-    fn mark_failed_or_degraded(
-        &mut self,
-        reason: impl Into<String>,
-        message: impl Into<String>,
-        now: DateTime<Utc>,
-    );
+    fn mark_failed_or_degraded(&mut self, code: impl Into<String>, message: impl Into<String>);
 
     /// Indicates that cleaning up a resource being deleted failed
-    fn mark_cleanup_failed(&mut self, message: impl Into<String>, now: DateTime<Utc>);
+    fn mark_cleanup_failed(&mut self, message: impl Into<String>);
 }
 
 impl ResourceStatusExt for ResourceStatus {
@@ -101,11 +104,6 @@ impl ResourceStatusExt for ResourceStatus {
         self.phase = ResourcePhase::Reconciling;
         self.observed_generation = Some(observed_generation);
         self.observed_at = Some(now);
-
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
-            ResourceConditionValue::reconciling_true(now),
-        );
     }
 
     fn mark_ready(&mut self, reconciled_generation: u64, now: DateTime<Utc>) {
@@ -125,44 +123,29 @@ impl ResourceStatusExt for ResourceStatus {
         self.phase = ResourcePhase::Ready;
         self.reconciled_generation = Some(reconciled_generation);
         self.reconciled_at = Some(now);
-
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
-            ResourceConditionValue::ready_true(now),
-        );
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
-            ResourceConditionValue::reconciling_false(now),
-        );
+        self.conditions.clear_reconciliation_error();
     }
 
-    fn mark_failed_or_degraded(
-        &mut self,
-        reason: impl Into<String>,
-        message: impl Into<String>,
-        now: DateTime<Utc>,
-    ) {
+    fn mark_failed_or_degraded(&mut self, code: impl Into<String>, message: impl Into<String>) {
         self.phase = if self.reconciled_generation.is_none() {
             ResourcePhase::Failed
         } else {
             ResourcePhase::Degraded
         };
 
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
-            ResourceConditionValue::ready_false(now, reason, message),
-        );
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
-            ResourceConditionValue::reconciling_false(now),
-        );
+        self.conditions
+            .set_reconciliation_error(ReconciliationError {
+                code: code.into(),
+                message: message.into(),
+            });
     }
 
-    fn mark_cleanup_failed(&mut self, message: impl Into<String>, now: DateTime<Utc>) {
-        ResourceConditionValue::set_condition(
-            &mut self.conditions.entries,
-            ResourceConditionValue::ready_false(now, "CleanupFailed", message),
-        );
+    fn mark_cleanup_failed(&mut self, message: impl Into<String>) {
+        self.conditions
+            .set_reconciliation_error(ReconciliationError {
+                code: RECONCILIATION_ERROR_CODE_CLEANUP_FAILED.to_string(),
+                message: message.into(),
+            });
     }
 }
 
