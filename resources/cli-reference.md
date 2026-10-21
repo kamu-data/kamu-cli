@@ -1188,7 +1188,7 @@ Shows dataset metadata history
   - `json`:
     Array of blocks, each in the YAML manifest shape plus its `blockHash`
   - `ndjson`:
-    One Json block object per line - easily splittable format
+    One JSON block object per line - easily splittable format
 
 * `-f`, `--filter <FLT>` — Types of events to include
 * `--limit <LIMIT>` — Maximum number of blocks to display

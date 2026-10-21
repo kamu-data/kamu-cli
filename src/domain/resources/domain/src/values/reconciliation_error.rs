@@ -38,37 +38,12 @@ pub fn reconciliation_error_type_ref() -> TypeRef {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceConditionsReconciliationErrorExt {
-    fn reconciliation_error(&self) -> Option<ReconciliationError>;
-
     fn set_reconciliation_error(&mut self, error: ReconciliationError);
 
     fn clear_reconciliation_error(&mut self);
 }
 
 impl ResourceConditionsReconciliationErrorExt for ResourceConditions {
-    fn reconciliation_error(&self) -> Option<ReconciliationError> {
-        let condition_key = reconciliation_error_type_ref();
-        let value = self.entries.get(&condition_key)?;
-
-        match serde_json::from_value::<odf::metadata::serde::yaml::resources::ReconciliationError>(
-            value.clone(),
-        )
-        .map_err(|err| err.to_string())
-        .and_then(|proxy| ReconciliationError::try_from(proxy).map_err(|err| err.to_string()))
-        {
-            Ok(error) => Some(error),
-            Err(error) => {
-                tracing::warn!(
-                    %condition_key,
-                    %value,
-                    %error,
-                    "Failed to parse condition value - ignoring",
-                );
-                None
-            }
-        }
-    }
-
     fn set_reconciliation_error(&mut self, error: ReconciliationError) {
         let proxy = odf::metadata::serde::yaml::resources::ReconciliationError::from(error);
         self.entries.insert(

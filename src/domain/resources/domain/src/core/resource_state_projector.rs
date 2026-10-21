@@ -94,7 +94,9 @@ where
         (Some(mut s), E::DeletionRequested(e)) => {
             assert_eq!(s.id(), &e.id);
 
+            // The derived phase moves to `Deleting`, which ODF counts as a status update
             s.headers_mut().deletion_requested_at = Some(e.event_time);
+            s.headers_mut().status_generation += 1;
             s.headers_mut().updated_at = e.event_time;
             align_phase(&mut s);
 
@@ -107,6 +109,7 @@ where
             let headers = s.headers_mut();
             headers.deletion_requested_at.get_or_insert(e.event_time);
             headers.deleted_at = Some(e.event_time);
+            headers.status_generation += 1;
             headers.updated_at = e.event_time;
             headers.name = e.tombstone_name;
             align_phase(&mut s);

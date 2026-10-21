@@ -64,6 +64,9 @@ pub enum UpdateVersionFileUseCaseError {
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
 
+    #[error("Cannot update extra data of a versioned file without versions")]
+    NoVersions,
+
     #[error("Quota exceeded")]
     QuotaExceeded(
         #[from]

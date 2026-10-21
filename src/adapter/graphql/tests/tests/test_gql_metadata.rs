@@ -630,11 +630,55 @@ async fn test_current_downstream_dependencies_count_hides_private_from_readers()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_current_downstream_dependencies_count_includes_unreadable_for_maintainer() {
+    let harness = DatasetMetadataHarness::new().await;
+
+    let create_root_result = harness
+        .create_root_dataset_with_visibility(odf::DatasetVisibility::Public)
+        .await;
+    harness
+        .create_derived_dataset_by(
+            &harness.catalog_other_account,
+            "baz",
+            odf::DatasetVisibility::Private,
+        )
+        .await;
+
+    let root_id = &create_root_result.dataset_handle.id;
+
+    // The root owner maintains it, so the count includes the private downstream
+    // of another account, which the owner cannot list
+    assert_eq!(
+        harness
+            .get_downstream_dependencies(&harness.catalog_authorized, root_id)
+            .await,
+        (vec![], 1)
+    );
+    // A reader of the root who cannot read the downstream sees no count of it
+    assert_eq!(
+        harness
+            .get_downstream_dependencies(&harness.catalog_third_account, root_id)
+            .await,
+        (vec![], 0)
+    );
+    // The downstream owner reads it, so it is both listed and counted
+    assert_eq!(
+        harness
+            .get_downstream_dependencies(&harness.catalog_other_account, root_id)
+            .await,
+        (vec!["baz".to_string()], 1)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseGQLDatasetHarness, base_gql_harness)]
 struct DatasetMetadataHarness {
     base_gql_harness: BaseGQLDatasetHarness,
     catalog_authorized: dill::Catalog,
     catalog_other_account: dill::Catalog,
+    catalog_third_account: dill::Catalog,
 }
 
 impl DatasetMetadataHarness {
@@ -671,10 +715,15 @@ impl DatasetMetadataHarness {
             .add_value(CurrentAccountSubject::new_test_with(&"other-account"))
             .build();
 
+        let catalog_third_account = dill::CatalogBuilder::new_chained(&catalog_no_subject)
+            .add_value(CurrentAccountSubject::new_test_with(&"third-account"))
+            .build();
+
         Self {
             base_gql_harness,
             catalog_authorized,
             catalog_other_account,
+            catalog_third_account,
         }
     }
 
@@ -727,8 +776,24 @@ impl DatasetMetadataHarness {
         name: &str,
         visibility: odf::DatasetVisibility,
     ) -> CreateDatasetResult {
-        let create_dataset_from_snapshot = self
-            .catalog_authorized
+        self.create_derived_dataset_by(&self.catalog_authorized, name, visibility)
+            .await
+    }
+
+    /// Creates a derivative of `foo` owned by the subject of the given catalog
+    async fn create_derived_dataset_by(
+        &self,
+        catalog: &dill::Catalog,
+        name: &str,
+        visibility: odf::DatasetVisibility,
+    ) -> CreateDatasetResult {
+        let owner_name = catalog
+            .get_one::<CurrentAccountSubject>()
+            .unwrap()
+            .account_name()
+            .clone();
+
+        let create_dataset_from_snapshot = catalog
             .get_one::<dyn CreateDatasetFromSnapshotUseCase>()
             .unwrap();
 
@@ -736,7 +801,7 @@ impl DatasetMetadataHarness {
             .execute(
                 MetadataFactory::dataset_snapshot()
                     .name(odf::DatasetAlias::new(
-                        Some(DEFAULT_ACCOUNT_NAME.clone()),
+                        Some(owner_name),
                         odf::DatasetName::new_unchecked(name),
                     ))
                     .kind(odf::DatasetKind::Derivative)

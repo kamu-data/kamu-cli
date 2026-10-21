@@ -478,7 +478,8 @@ The success result is `TaskResultDatasetReset { reset_result: ResetResult { old_
 ### 7.4 Webhook delivery
 
 **Planning** (`DeliverWebhookTaskPlanner`, no database access) copies the subscription ID, event
-type and payload from the logical plan into `TaskDefinitionWebhookDeliver`, adding the task ID.
+type, payload and watermark from the logical plan into `TaskDefinitionWebhookDeliver`, adding the
+task ID.
 
 **Running**: `DeliverWebhookTaskRunner` generates a fresh `WebhookDeliveryID` and calls
 `WebhookDeliveryWorker::deliver_webhook`, which signs, sends and records the delivery in its own

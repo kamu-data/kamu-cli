@@ -90,7 +90,8 @@ During PR or release finalization:
 
 ### Location
 
-`src/domain/resources/facade/src/facade/graphql/cynic_api/`
+`src/adapter/resources-facade-graphql/src/cynic_api/` (crate `kamu-adapter-resources-facade-graphql`;
+responses are mapped back to domain types in the sibling `outcome_mapper/`)
 
 ### Mechanism
 
@@ -99,17 +100,22 @@ The facade uses [Cynic](https://cynic-rs.dev/) for typed, compile-time-checked G
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Declares `#[cynic::schema("kamu")] mod schema {}` and submodules |
-| `operations/` | One file per operation (query or mutation) |
+| `operations/` | One file per operation (query or mutation), with its `#[derive(cynic::QueryVariables)]` struct |
 | `fragments.rs` | Reusable `#[derive(cynic::QueryFragment)]` types |
 | `inputs.rs` | `#[derive(cynic::InputObject)]` types |
-| `variables.rs` | `#[derive(cynic::QueryVariables)]` structs |
 | `scalars.rs` | Custom scalar mappings via `cynic::impl_scalar!` |
 | `conversions.rs` | `From`/`TryFrom` impls between Cynic types and domain types |
 
-Schema registration happens in `build.rs`:
+Schema registration happens in `build.rs`, which skips regeneration while the schema's content hash
+is unchanged:
 ```rust
+let schema_path = manifest_dir
+    .join("../../../resources/schema.gql")
+    .canonicalize()
+    .unwrap();
+
 cynic_codegen::register_schema("kamu")
-    .from_sdl_file("../../../../resources/schema.gql")
+    .from_sdl_file(schema_path)
     .unwrap()
     .as_default()
     .unwrap();

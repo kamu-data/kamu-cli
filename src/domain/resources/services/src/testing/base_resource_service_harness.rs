@@ -18,7 +18,7 @@ use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ResourceConditionsReconciliationErrorExt,
+    ReconciliationError,
     ResourceHeadersInput,
     ResourceID,
     ResourceLifecycleMessage,
@@ -27,6 +27,7 @@ use kamu_resources::{
     ResourceSnapshot,
     ResourceStatus,
     TypeUri,
+    reconciliation_error_type_ref,
 };
 use kamu_resources_inmem::{
     InMemoryRawResourceEventStore,
@@ -338,7 +339,17 @@ impl BaseResourceServiceHarness {
         resource_status: &ResourceStatus,
         expected_code: Option<&str>,
     ) {
-        let error = resource_status.conditions.reconciliation_error();
+        let error = resource_status
+            .conditions
+            .entries
+            .get(&reconciliation_error_type_ref())
+            .map(|value| {
+                let proxy: odf::metadata::serde::yaml::resources::ReconciliationError =
+                    serde_json::from_value(value.clone()).unwrap_or_else(|err| {
+                        panic!("Malformed ReconciliationError {value}: {err}")
+                    });
+                ReconciliationError::try_from(proxy).unwrap()
+            });
 
         assert_eq!(
             error.as_ref().map(|error| error.code.as_str()),

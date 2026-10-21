@@ -2605,6 +2605,12 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
         .unwrap();
     assert!(by_name.is_none());
 
+    let handles_by_ids = repo
+        .find_resource_handles_by_ids(&account_handle.did, &[id])
+        .await
+        .unwrap();
+    assert_eq!(handles_by_ids.len(), 0);
+
     let name: ResourceName = "to-delete".parse().unwrap();
     let scope = ResourceScope::one_type(TEST_KIND.clone(), None);
     for visibility in [

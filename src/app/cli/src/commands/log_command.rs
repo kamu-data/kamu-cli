@@ -32,7 +32,7 @@ pub enum MetadataLogOutputFormat {
     #[clap(name = "json")]
     Json,
 
-    /// One Json block object per line - easily splittable format
+    /// One JSON block object per line - easily splittable format
     #[clap(name = "ndjson")]
     NdJson,
 }
@@ -726,11 +726,7 @@ impl JsonBlockRecord {
     fn new(block_hash: odf::Multihash, block: odf::MetadataBlock) -> Self {
         Self {
             block_hash,
-            manifest: odf::serde::yaml::legacy::Manifest {
-                kind: "MetadataBlock".to_owned(),
-                version: odf::serde::METADATA_BLOCK_CURRENT_VERSION as i32,
-                content: odf::serde::yaml::datasets::MetadataBlock::from(block),
-            },
+            manifest: odf::serde::yaml::legacy::Manifest::from(block),
         }
     }
 }

@@ -81,7 +81,7 @@ pub struct ResourceHeaders {
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub generation: u64,                     // generated — bumps once per apply that changes headers or spec
-    pub status_generation: u64,              // generated — bumps on every status update
+    pub status_generation: u64,              // generated — bumps on every status update, deletion request and deletion
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
     pub deletion_requested_at: Option<DateTime<Utc>>, // generated — deletion requested

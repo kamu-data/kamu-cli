@@ -8,12 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::ProjectionError;
-use internal_error::ErrorIntoInternal;
 use kamu_resources::{
-    ApplyResourceLifecycleErrorHandling,
-    ApplyResourceRejection,
-    ApplyResourceRejectionCategory,
-    IntoApplyResourceRejection,
     ResourceDeletionInProgressError,
     ResourceHeadersValidationError,
     ResourceStatusConflictError,
@@ -44,38 +39,5 @@ pub enum SecretSetLifecycleError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_resources::impl_resource_lifecycle_error!(SecretSetLifecycleError, SecretSetState);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl IntoApplyResourceRejection for SecretSetLifecycleError {
-    fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
-        match self {
-            Self::HeadersValidation(err) => {
-                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    message: err.to_string(),
-                })
-            }
-            Self::SpecValidation(err) => {
-                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    message: err.to_string(),
-                })
-            }
-            Self::InvariantViolation(err) => {
-                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
-            }
-            Self::StatusConflict(err) => {
-                ApplyResourceLifecycleErrorHandling::Technical(err.int_err())
-            }
-            Self::DeletionInProgress(err) => {
-                ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
-                    category: ApplyResourceRejectionCategory::LifecycleRuleConflict,
-                    message: err.to_string(),
-                })
-            }
-        }
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

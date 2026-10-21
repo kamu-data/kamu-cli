@@ -234,7 +234,7 @@ mod tests {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // `ResourceOwnerRef`'s own serde contract (id/name/both, empty rejection) is
-    // covered in ODF's `test_serde_account_ref`; this just confirms the field
+    // covered in ODF's `test_serde_resource_owner_ref`; this just confirms the field
     // is wired through `ResourceManifestHeaders`.
     #[test]
     fn deserializes_and_round_trips_account_field() {

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::time::{Duration, Instant};
 
 use odf_metadata::*;
 use odf_storage::testing::test_object_repository_shared;
@@ -100,15 +101,14 @@ async fn test_cancelled_insert_stream_leaves_no_staging_file() {
         Box::pin(repo.insert_stream(Box::new(StalledStream::new(b"foo")), InsertOpts::default()));
 
     // Drive the write until the staging file exists, then cancel it
-    let mut polls = 0;
+    let deadline = Instant::now() + Duration::from_secs(10);
     while std::fs::read_dir(tmp_repo_dir.path()).unwrap().count() == 0 {
         tokio::select! {
             biased;
             res = &mut insert => panic!("Stalled insert completed: {res:?}"),
             () = tokio::task::yield_now() => {}
         }
-        polls += 1;
-        assert!(polls < 10_000, "Staging file never appeared");
+        assert!(Instant::now() < deadline, "Staging file never appeared");
     }
     drop(insert);
 

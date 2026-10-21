@@ -135,12 +135,13 @@ impl MockDatasetActionAuthorizer {
                 })
             });
 
+        let denied = denied_ids.clone();
         mock_dataset_action_authorizer
             .expect_classify_dataset_handles_by_allowance()
             .returning(move |handles, action| {
                 let (unauthorized, authorized): (Vec<_>, Vec<_>) = handles
                     .into_iter()
-                    .partition(|hdl| denied_ids.contains(&hdl.id));
+                    .partition(|hdl| denied.contains(&hdl.id));
                 Ok(ClassifyByAllowanceResponse {
                     authorized_handles: authorized,
                     unauthorized_handles_with_errors: unauthorized
@@ -155,6 +156,15 @@ impl MockDatasetActionAuthorizer {
                         })
                         .collect(),
                 })
+            });
+
+        mock_dataset_action_authorizer
+            .expect_filter_datasets_allowing()
+            .returning(move |handles, _| {
+                Ok(handles
+                    .into_iter()
+                    .filter(|hdl| !denied_ids.contains(&hdl.id))
+                    .collect())
             });
 
         mock_dataset_action_authorizer
@@ -181,6 +191,9 @@ impl MockDatasetActionAuthorizer {
                     unauthorized_handles_with_errors: Vec::new(),
                 })
             });
+        mock_dataset_action_authorizer
+            .expect_filter_datasets_allowing()
+            .returning(|handles, _| Ok(handles));
         mock_dataset_action_authorizer
     }
 

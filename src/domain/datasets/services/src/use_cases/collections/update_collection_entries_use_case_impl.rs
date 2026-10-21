@@ -36,6 +36,8 @@ use kamu_datasets::{
 use odf::metadata::OperationType as Op;
 use tokio::time::{Duration, sleep};
 
+use super::project_collection_state;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
@@ -66,12 +68,7 @@ impl UpdateCollectionEntriesUseCaseImpl {
         let entries: BTreeMap<_, _> = match query_res.df {
             None => Default::default(),
             Some(df) => {
-                let df = odf::utils::data::changelog::project(
-                    df,
-                    &["path".to_string()],
-                    &odf::metadata::DatasetVocabulary::default(),
-                )
-                .int_err()?;
+                let df = project_collection_state(df)?;
 
                 df.collect_json_aos()
                     .await
