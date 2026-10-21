@@ -370,11 +370,11 @@ pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarnes
 // RF-137
 contract_test!(
     delete_waits_for_cleanup,
-    super::test_delete_waits_for_cleanup,
+    super::test_delete_reports_deleting_until_cleanup,
     messaging_outbox::OutboxProvider::Dispatching
 );
 
-pub async fn test_delete_waits_for_cleanup(h: &impl FacadeContractHarness) {
+pub async fn test_delete_reports_deleting_until_cleanup(h: &impl FacadeContractHarness) {
     let id = create_variable_set(h, TestAccount::Alice, "del-phases").await;
     let facade = h.facade_for(TestAccount::Alice);
 

@@ -22,7 +22,7 @@ use crate::tests::use_cases::resource_use_case_base_harness::ResourceUseCaseBase
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_no_resources_succeeds() {
+async fn test_request_account_deletion_no_resources_succeeds() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -34,7 +34,7 @@ async fn test_delete_account_no_resources_succeeds() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_deletes_all_owned_resources() {
+async fn test_request_account_deletion_deletes_all_owned_resources() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
 
@@ -65,7 +65,7 @@ async fn test_delete_account_deletes_all_owned_resources() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_leaves_other_accounts_intact() {
+async fn test_request_account_deletion_leaves_other_accounts_intact() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle_a = odf::ResourceOwnerHandle::new_test("test-owner-a");
     let account_handle_b = odf::ResourceOwnerHandle::new_test("test-owner-b");
@@ -91,7 +91,7 @@ async fn test_delete_account_leaves_other_accounts_intact() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_handles_pagination() {
+async fn test_request_account_deletion_handles_pagination() {
     // 101 resources span more than one page of the account listing (100 per page)
     let harness = ResourceUseCaseBaseHarness::new();
     let account_handle = odf::ResourceOwnerHandle::new_test("test-owner");
@@ -117,7 +117,7 @@ async fn test_delete_account_handles_pagination() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_emits_deletion_requested_lifecycle_message() {
+async fn test_request_account_deletion_emits_deletion_requested_lifecycle_message() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 1);
@@ -136,7 +136,7 @@ async fn test_delete_account_emits_deletion_requested_lifecycle_message() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_multiple_resources_emits_single_message() {
+async fn test_request_account_deletion_multiple_resources_emits_single_message() {
     let mut mock_outbox = MockOutbox::new();
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 3, None);
     BaseResourceServiceHarness::expect_deletion_requested_message(&mut mock_outbox, 3);
@@ -157,7 +157,7 @@ async fn test_delete_account_multiple_resources_emits_single_message() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_no_resources_emits_no_message() {
+async fn test_request_account_deletion_no_resources_emits_no_message() {
     let mut mock_outbox = MockOutbox::new();
     mock_outbox.expect_post_message_as_json().times(0);
 
@@ -172,7 +172,7 @@ async fn test_delete_account_no_resources_emits_no_message() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_account_message_carries_correct_snapshot_data() {
+async fn test_request_account_deletion_message_carries_correct_snapshot_data() {
     let mut mock_outbox = MockOutbox::new();
 
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);

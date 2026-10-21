@@ -22,17 +22,26 @@ pub struct YamlMetadataBlockSerializer;
 
 impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
     fn write_manifest(&self, block: &dtos::datasets::MetadataBlock) -> Result<bytes::Bytes, Error> {
-        let manifest = serde::legacy::Manifest {
-            version: METADATA_BLOCK_CURRENT_VERSION as i32,
-            kind: "MetadataBlock".to_owned(),
-            content: serde::datasets::MetadataBlock::from(block.clone()),
-        };
+        let manifest = serde::legacy::Manifest::from(block.clone());
 
         let buf = serde_yaml::to_string(&manifest)
             .map_err(Error::serde)?
             .into_bytes();
 
         Ok(bytes::Bytes::from(buf))
+    }
+}
+
+/// The manifest a block is stored in, at the current block version
+impl From<dtos::datasets::MetadataBlock>
+    for serde::legacy::Manifest<serde::datasets::MetadataBlock>
+{
+    fn from(block: dtos::datasets::MetadataBlock) -> Self {
+        Self {
+            version: METADATA_BLOCK_CURRENT_VERSION as i32,
+            kind: "MetadataBlock".to_owned(),
+            content: serde::datasets::MetadataBlock::from(block),
+        }
     }
 }
 

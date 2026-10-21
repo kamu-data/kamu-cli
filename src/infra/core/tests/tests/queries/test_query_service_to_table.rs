@@ -1100,19 +1100,7 @@ impl ToTableHarness {
             .map(|name| Self::dataset_id(name))
             .collect::<HashSet<_>>();
 
-        let mut dataset_action_authorizer =
-            MockDatasetActionAuthorizer::denying_ids(denied_ids.clone());
-        // Sessions register only the datasets that pass this filter
-        dataset_action_authorizer
-            .expect_filter_datasets_allowing()
-            .returning(move |handles, _| {
-                Ok(handles
-                    .into_iter()
-                    .filter(|hdl| !denied_ids.contains(&hdl.id))
-                    .collect())
-            });
-
-        Self::with_authorizer(dataset_action_authorizer)
+        Self::with_authorizer(MockDatasetActionAuthorizer::denying_ids(denied_ids))
     }
 
     fn with_authorizer(dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
