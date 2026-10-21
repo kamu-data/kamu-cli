@@ -666,7 +666,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 Some(ResourcePhase::Degraded) => row.phase_counts.increment_degraded(),
                 Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),
                 Some(ResourcePhase::Deleting) => row.phase_counts.increment_deleting(),
-                // Deleted resources are filtered out above
+                // Excluded by the `deleted_at` filter
                 Some(ResourcePhase::Deleted) => {}
             }
         }

@@ -126,22 +126,27 @@ where
     ) -> Result<Option<ResourceID>, ApplyResourceUseCaseError<R>> {
         match id {
             Some(id) => Ok(Some(id)),
-            None => {
-                // Account resolution (id + did + name lookup) already happened upstream,
-                // as part of the apply process (see `ResourceAccountResolver`);
-                // `headers.account` is always fully resolved by this point.
-                let account_id = headers
-                    .account
-                    .as_ref()
-                    .and_then(|a| a.did.as_ref())
-                    .expect("resource headers must carry a resolved account by apply time");
-
-                self.generic_resource_query_service
-                    .find_resource_id_by_name(account_id, R::schema(), &headers.name)
-                    .await
-                    .map_err(ApplyResourceUseCaseError::Internal)
-            }
+            None => self
+                .generic_resource_query_service
+                .find_resource_id_by_name(
+                    Self::resolved_account_id(headers),
+                    R::schema(),
+                    &headers.name,
+                )
+                .await
+                .map_err(ApplyResourceUseCaseError::Internal),
         }
+    }
+
+    /// Account resolution (id + did + name lookup) already happened upstream,
+    /// as part of the apply process (see `ResourceAccountResolver`), so
+    /// `headers.account` is always fully resolved by this point.
+    fn resolved_account_id(headers: &ResourceHeadersInput) -> &odf::AccountID {
+        headers
+            .account
+            .as_ref()
+            .and_then(|a| a.did.as_ref())
+            .expect("resource headers must carry a resolved account by apply time")
     }
 
     pub(crate) async fn ensure_resource_id_matches_type(
@@ -197,16 +202,10 @@ where
         &self,
         headers: &ResourceHeadersInput,
     ) -> Result<Vec<ResourceWarning>, ApplyResourceUseCaseError<R>> {
-        let account_id = headers
-            .account
-            .as_ref()
-            .and_then(|a| a.did.as_ref())
-            .expect("resource headers must carry a resolved account by apply time");
-
         let replaced = self
             .generic_resource_query_service
             .resolve_resource_ids_by_names(
-                account_id,
+                Self::resolved_account_id(headers),
                 R::schema(),
                 std::slice::from_ref(&headers.name),
                 ResourceVisibility::IncludeDeleting,

@@ -28,10 +28,4 @@ impl From<WebhookWatermark> for serde_json::Value {
     }
 }
 
-impl AsRef<serde_json::Value> for WebhookWatermark {
-    fn as_ref(&self) -> &serde_json::Value {
-        &self.0
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

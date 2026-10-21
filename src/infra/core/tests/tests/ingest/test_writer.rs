@@ -1218,7 +1218,7 @@ async fn test_data_writer_changelog_stream_preserves_input_order() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test]
-fn test_data_writer_changelog_stream_preserves_input_order() {
+fn test_data_writer_changelog_stream_preserves_input_order_partitioned() {
     // Setting multiple partitions here to ensure that the merge strategy will override this value
     // to preserve input order
     let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(4));
@@ -1228,7 +1228,7 @@ fn test_data_writer_changelog_stream_preserves_input_order() {
         .worker_threads(4)
         .build()
         .unwrap()
-        .block_on(test_data_writer_changelog_stream_natural_order_impl(ctx));
+        .block_on(test_data_writer_changelog_stream_preserves_input_order_impl(ctx));
 
     // No sort may precede the window that assigns offsets, and the input is scanned in a
     // single partition whatever the session configures
@@ -1248,7 +1248,9 @@ fn test_data_writer_changelog_stream_preserves_input_order() {
     );
 }
 
-async fn test_data_writer_changelog_stream_natural_order_impl(ctx: SessionContext) -> String {
+async fn test_data_writer_changelog_stream_preserves_input_order_impl(
+    ctx: SessionContext,
+) -> String {
     use std::io::Write;
 
     testing_logger::setup();

@@ -124,7 +124,6 @@ pub struct TestResourceInterferingCleanupController {
     interference: Arc<TestCleanupInterference>,
 }
 
-#[derive(Default)]
 pub struct TestCleanupInterference {
     done: AtomicBool,
     then_fails: bool,

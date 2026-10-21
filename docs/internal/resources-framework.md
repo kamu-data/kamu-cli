@@ -161,8 +161,9 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **`ResourceID` is immutable and server-allocated.** A new resource's UID comes from
   `GenericResourceQueryService::allocate_uid()`; callers cannot choose it. Once assigned it never
   changes (it is the primary key — see [§6](#6-persistence-model)).
-- **`(account_id, schema, name)` is unique.** Enforced by a DB unique constraint
-  `UNIQUE (account_id, resource_schema, resource_name)`. Names are stored lowercased.
+- **`(account_id, schema, name)` is unique among resources not being deleted.** Enforced by a
+  case-insensitive unique index on `(account_id, resource_schema, resource_name)`, partial
+  `WHERE deletion_requested_at IS NULL` ([§6](#6-persistence-model)). Names are stored lowercased.
 - **`$schema` is the resource type identity.** A schema URL is parsed into base/context/version/name
   for validation and display, but dispatch and persistence compare the full canonical schema — carried
   as a `TypeUri` and string-equal on the wire/in storage (the dill registry key is an equivalent
@@ -316,7 +317,8 @@ pub trait ManagedResource: DeclarativeResource {
     // A repeated request is a no-op. Headers and spec updates are then rejected with
     // `ResourceDeletionInProgressError`
     fn try_request_deletion(&mut self, now) -> ...;
-    // Renames to the tombstone `deleted-<id>`. Requests deletion first if needed; no-op once deleted
+    // Renames to the tombstone `deleted-<id>`; a no-op once deleted. An invariant violation
+    // unless deletion was requested, since completing it would skip the cleanup
     fn try_complete_deletion(&mut self, now) -> ...;
     // Compare-and-swap on `statusGeneration`: a stale expected value is a status conflict
     fn try_update_status(&mut self, now, expected_status_generation, new_status) -> ...;
@@ -358,8 +360,9 @@ and an aggregate. This is the bound that all generic use cases require.
   `statusGeneration` and `updatedAt`.
 - `DeletionRequested` sets `deletionRequestedAt` and bumps `statusGeneration`. After it the
   projector accepts only `StatusUpdated` and `Deleted`.
-- `Deleted` sets `deletedAt` and the tombstone name, and bumps `statusGeneration`. Resources deleted before `DeletionRequested`
-  existed have a `Deleted` event alone; replaying it also sets `deletionRequestedAt`.
+- `Deleted` sets `deletedAt` and the tombstone name, and bumps `statusGeneration`. Resources
+  deleted before `DeletionRequested` existed have a `Deleted` event alone; replaying it also sets
+  `deletionRequestedAt`.
 - The projector derives the `Pending`, `Deleting` and `Deleted` phases after each of them
   ([state machine](#lifecycle-state-machine)); that derivation is not a status update.
 
@@ -441,7 +444,7 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 `ResourceRepository` + raw event-store traits and sharing the cross-backend test suite in
 `src/infra/resources/repo-tests/`. Schema is defined by
 [`migrations/postgres/20260815100000_resources.sql`](/migrations/postgres/20260815100000_resources.sql)
-(SQLite mirror alongside).
+and the later `*_resource_*` migrations (SQLite mirrors alongside).
 
 **Two tables:**
 
@@ -466,7 +469,7 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 transaction as the event append; it exists for efficient queries/listing/uniqueness and should never
 diverge. If they ever disagree, the events win and the snapshot is the bug.
 
-**List columns.** Concrete resources no longer extend status with per-type `stats`. Presentation
+**List columns.** Concrete resources do not extend status with per-type `stats`. Presentation
 columns are derived from the current spec/read model instead: `VariableSet.variables` is
 `spec.variables.entries.len()`, `SecretSet.secrets` is `spec.secrets.entries.len()`, and
 `Storage.provider` / `Storage.detail` are derived from the storage spec.
@@ -492,13 +495,20 @@ There is a precedent for data backfill into resources —
 resources; new types that supersede existing data should follow that pattern (additive migration +
 backfill, never rewriting the event log in place).
 
-**The one rewrite of the event log in place**, `20261015072340_resource_status_events.sql`, replaced
-the events `ReconciliationStarted`/`Succeeded`/`Failed` with `StatusUpdated`. It is the exception, not
-a pattern for routine changes, which add an event and keep old ones readable: these events have no
-Rust type to decode into, and keeping them readable would mean keeping their whole status logic. It
-folds each resource's events in SQL into the status each of them produced, aborts unless the folded
-final status matches `resources.status` (timestamps aside, as their text form varies), and derives
-the snapshot rows again the way the rewritten events replay.
+**Rewrites of the event log in place** are the exception, not a pattern for routine changes, which
+add an event and keep old ones readable. There are two:
+
+- `20261015072340_resource_status_events.sql` replaced the events
+  `ReconciliationStarted`/`Succeeded`/`Failed` with `StatusUpdated`: these events have no Rust type
+  to decode into, and keeping them readable would mean keeping their whole status logic. It folds
+  each resource's events in SQL into the status each of them produced, aborts unless the folded
+  final status matches `resources.status` (timestamps aside, as their text form varies), and
+  derives the snapshot rows again the way the rewritten events replay.
+- `20261021120000_resource_reconciliation_error_condition.sql` rewrites the conditions in
+  `StatusUpdated` payloads and in `resources.status`: it drops the Kamu `Ready`/`Reconciling`
+  conditions, which have no registered extension dispatcher, so durable-state validation would
+  reject them ([§9](#9-services-kamu-resources-services)), and turns a failed `Ready` into the ODF
+  `ReconciliationError` condition.
 
 A backfill that synthesizes an event log must satisfy two invariants that are easy to miss in SQL,
 because both produce resources that load fine at the SQL level yet are unreadable and unwritable
@@ -960,14 +970,13 @@ carries the filter, where each entry is `{ key: String!, value: JSON! }`. It app
 the `delete` mutation take `[ResourceRefInput!]!` and carry no filter at all.
 
 Both `bySelectors` and `handlesBySelectors` take the **same** `SearchResourcesInput`; only the
-response shape differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). They were separate
-inputs whose fields were identical, so keeping two was pure duplication.
+response shape differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). Two inputs would
+have identical fields, so there is one.
 
 **Listing takes a selector list.** `ResourceSelectorInput` mirrors the ODF `ResourceSelector`
-(`account`, `type`, `id`, `name`, `labels`) and replaced four earlier inputs — `ResourceQueryInput`,
-`ResourceTypeQueryInput`, `ResourceAnyTypeScopeInput`, and `ResourceScopeInput`. Every field is
-optional; several selectors act as a logical OR, which is what lets one call span resource types.
-A selector with no `type` spans every type.
+(`account`, `type`, `id`, `name`, `labels`). Every field is optional; several selectors act as a
+logical OR, which is what lets one call span resource types. A selector with no `type` spans every
+type.
 
 `account` is honoured per selector, so one call can span several accounts — the second headline
 benefit of the ODF-shaped API. Naming an account you are not allowed to read denies the **whole**
@@ -986,7 +995,7 @@ the path (`/<context>/<version>/<type>`) and scopes it with a single `?account=`
 own `ResourceSelector` (§ Selectors), and means a request is read one way wherever it appears.
 
 `labels` is honoured per selector, so one call can filter differently per type — the third headline
-benefit of the ODF-shaped API, and the reason the repository's label pairs moved inside the per-row
+benefit of the ODF-shaped API, and the reason the repository's label pairs live inside the per-row
 scope predicate. `did` remains the one field that exists on the wire but cannot be resolved; it is
 rejected rather than ignored, so a caller learns their request was not what they asked for.
 
@@ -1207,8 +1216,8 @@ resource half of a mixed delete would still delete every named dataset unfiltere
 call-level filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
 `selectors_for_query` for `list`, and via `with_labels` in the selection-resolution service for
 `get`/`delete`. Because selectors are OR'd, `(A ∧ L) ∨ (B ∧ L)` is exactly `(A ∨ B) ∧ L`, so
-`kamu list vs/a-% ss/b-% -l env=prod` runs the identical query it did when the filter was
-call-level. The CLI has **no syntax** for per-selector labels; that capability is reachable through
+`kamu list vs/a-% ss/b-% -l env=prod` runs the same query a call-level filter would. The CLI has
+**no syntax** for per-selector labels; that capability is reachable through
 GraphQL and the facade API. Adding one would be a grammar extension, not a reinterpretation of
 input that parses today.
 
@@ -1264,10 +1273,9 @@ annotations}` + `spec` — deliberately excluding `headers.id`, `generation`, th
 
 - **An unchanged apply yields byte-identical documents** (`before == Some(after)`, which
   `ApplyManifestDocuments::has_changes()` reports). There are no spurious differences to normalize:
-  the earlier mechanism had to truncate timestamps to microseconds to suppress Postgres-precision
-  noise, and that whole bug class is now structurally absent rather than papered over.
-- **`generation` never appears in a diff.** It changed on every non-`Untouched` apply, so it was
-  pure noise.
+  timestamps are not in the documents, so Postgres timestamp precision cannot surface as a change.
+- **`generation` never appears in a diff.** It changes on every non-`Untouched` apply, so it would
+  be pure noise.
 
 **Ordering constraint.** The documents are *computed on demand*, via `ApplyManifestPlan::documents()`,
 never stored mid-construction. `headers.account` is part of the canonical manifest and the facade

@@ -685,17 +685,14 @@ impl DatasetUpdatedWebhookSensorHarness {
         event_type: &WebhookEventType,
         dataset_id: &odf::DatasetID,
     ) {
-        let dataset_id_clone_1 = dataset_id.clone();
-        let dataset_id_clone_2 = dataset_id.clone();
-
-        let event_type_clone_1 = event_type.clone();
-        let event_type_clone_2 = event_type.clone();
+        let dataset_id = dataset_id.clone();
+        let event_type = event_type.clone();
 
         mock_flow_run_service
             .expect_run_flow_automatically()
             .withf(
                 move |_,
-                      flow_binding: &kamu_flow_system::FlowBinding,
+                      flow_binding: &FlowBinding,
                       _,
                       maybe_flow_trigger_rule,
                       maybe_forced_flow_config_rule| {
@@ -706,45 +703,14 @@ impl DatasetUpdatedWebhookSensorHarness {
 
                     let webhook_scope = FlowScopeSubscription::new(&flow_binding.scope);
                     webhook_scope.subscription_id() == subscription_id
-                        && webhook_scope.event_type() == event_type_clone_1
+                        && webhook_scope.event_type() == event_type
                         && webhook_scope
                             .maybe_dataset_id()
                             .as_ref()
-                            .is_some_and(|id| id == &dataset_id_clone_1)
+                            .is_some_and(|id| id == &dataset_id)
                 },
             )
-            .returning(move |_, _, _, _, _| {
-                let now = Utc::now();
-
-                Ok(FlowState {
-                    flow_id: FlowID::new(1),
-                    flow_binding: webhook_deliver_binding(
-                        subscription_id,
-                        &event_type_clone_2,
-                        Some(&dataset_id_clone_2),
-                    ),
-                    start_condition: None,
-                    task_ids: vec![],
-                    activation_causes: vec![
-                        // wrong, but irrelevant for the tests
-                        FlowActivationCause::AutoPolling(FlowActivationCauseAutoPolling {
-                            activation_time: now,
-                        }),
-                    ],
-                    late_activation_causes: vec![],
-                    outcome: None,
-                    timing: FlowTimingRecords {
-                        first_activated_at: None,
-                        scheduled_for_activation_at: Some(now),
-                        running_since: None,
-                        awaiting_executor_since: None,
-                        last_attempt_finished_at: None,
-                        completed_at: None,
-                    },
-                    config_snapshot: None,
-                    retry_policy: None,
-                })
-            });
+            .returning(|_, flow_binding, _, _, _| Ok(Self::flow_state(flow_binding.clone())));
     }
 }
 
