@@ -107,7 +107,7 @@ impl<E: opentelemetry_sdk::trace::SpanExporter> opentelemetry_sdk::trace::SpanEx
     }
 
     fn set_resource(&mut self, resource: &opentelemetry_sdk::Resource) {
-        self.0.set_resource(resource)
+        self.0.set_resource(resource);
     }
 }
 
