@@ -418,7 +418,7 @@ backgroundAgents:
 | Task queue triggers / SQLite query filter | `src/infra/task-system/{postgres,sqlite}/tests/tests/test_*_task_queue_wakeup_source.rs` |
 | Agent wakes on a queued task, not on timeout | `src/domain/task-system/services/tests/tests/test_task_agent_impl.rs` |
 | Flow activation triggers / SQLite query filter | `src/infra/flow-system/{postgres,sqlite}/tests/tests/test_*_flow_activation_wakeup_source.rs` |
-| Flow agent: earlier activation wakes it, failing flow doesn't block others | `src/domain/flow-system/services/tests/tests/test_flow_agent_impl.rs` (`test_flow_scheduled_earlier_than_awaited_activation`, `test_flow_failing_to_schedule_does_not_block_later_flows`) |
+| Flow agent: earlier activation wakes it, failing flow doesn't block others | `src/domain/flow-system/services/tests/tests/test_flow_agent/`: `test_pending_flow_updates.rs` (`test_flow_scheduled_earlier_than_awaited_activation`), `test_scheduling.rs` (`test_flow_failing_to_schedule_does_not_block_later_flows`) |
 
 Gotchas:
 - **Never skip the re-check after `Timeout`** — it is the only thing covering a missing trigger.

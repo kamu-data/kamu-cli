@@ -893,9 +893,11 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
   canonicalizes and validates labels/annotations, collects header warnings, then builds
   `ResourceHeadersInput`; this is why plan/apply accept, reject, and warn identically.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
-  mutations of a remote server (whose resolvers use a *local* facade there). Operations live under
-  `facade/graphql/cynic_api/operations/`; responses are mapped back to domain views/errors in
-  `facade/graphql/outcome_mapper/`.
+  mutations of a remote server (whose resolvers use a *local* facade there). It lives in the
+  `kamu-adapter-resources-facade-graphql` crate: operations under
+  [`cynic_api/operations/`](/src/adapter/resources-facade-graphql/src/cynic_api/operations);
+  responses are mapped back to domain views/errors in
+  [`outcome_mapper/`](/src/adapter/resources-facade-graphql/src/outcome_mapper).
 
 **Registration** ([`dependencies.rs`](/src/domain/resources/facade/src/dependencies.rs)) adds
 `ResourceAccountResolverImpl` and `LocalResourceFacadeImpl`. (The remote impl is constructed
@@ -1885,7 +1887,8 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
 | Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,request_deletion,complete_deletion}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
-| Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
+| Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/` |
+| Remote facade | `kamu-adapter-resources-facade-graphql` | `src/adapter/resources-facade-graphql/src` | `remote_graphql_resource_facade_impl.rs`, `cynic_api/`, `outcome_mapper/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |
 | CLI services | (app/cli) | `src/app/cli/src/services/resources` | `resource_facade_factory.rs`, `resource_manifest_{discovery,execution}_service.rs`, `resource_type_lookup_service.rs`, `resource_selection_*_service.rs`, `resource_summary_service.rs`, `impl/` |

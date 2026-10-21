@@ -581,6 +581,144 @@ async fn test_to_table_dataset_is_part_of_query_state() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_to_table_in_expression_subqueries() {
+    let harness = ToTableHarness::new();
+    let foo = harness
+        .create_dataset("foo", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+
+    let head = harness
+        .write(
+            &foo,
+            indoc!(
+                r#"
+                op,city,population
+                0,A,1000
+                0,B,2000
+                "#
+            ),
+            "op INT NOT NULL, city STRING NOT NULL, population BIGINT",
+        )
+        .await;
+
+    for (statement, expected) in [
+        (
+            "SELECT (SELECT count(*) FROM to_table(foo)) AS n",
+            indoc!(
+                r#"
+                +---+
+                | n |
+                +---+
+                | 2 |
+                +---+
+                "#
+            ),
+        ),
+        (
+            "SELECT 1 AS n WHERE EXISTS (SELECT 1 FROM to_table(foo) WHERE city = 'B')",
+            indoc!(
+                r#"
+                +---+
+                | n |
+                +---+
+                | 1 |
+                +---+
+                "#
+            ),
+        ),
+        (
+            "SELECT x FROM (VALUES ('A'), ('C')) AS t(x) WHERE x IN (SELECT city FROM \
+             to_table(foo))",
+            indoc!(
+                r#"
+                +---+
+                | x |
+                +---+
+                | A |
+                +---+
+                "#
+            ),
+        ),
+    ] {
+        assert_data_eq(harness.sql(statement).await, expected).await;
+
+        assert_eq!(
+            harness.sql_state(statement).await.input_datasets,
+            BTreeMap::from([(
+                foo.get_id().clone(),
+                QueryStateDataset {
+                    alias: "foo".to_string(),
+                    block_hash: head.clone(),
+                }
+            )]),
+            "{statement}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_table_in_expression_subquery_is_not_hidden_by_cte_of_another_subquery() {
+    let harness = ToTableHarness::new();
+    let foo = harness
+        .create_dataset("foo", ToTableHarness::changelog_stream(&["city"]), None)
+        .await;
+
+    let head = harness
+        .write(
+            &foo,
+            indoc!(
+                r#"
+                op,city,population
+                0,A,1000
+                0,B,2000
+                "#
+            ),
+            "op INT NOT NULL, city STRING NOT NULL, population BIGINT",
+        )
+        .await;
+
+    // The CTE named `foo` exists only within the first subquery
+    let statement = indoc!(
+        r#"
+        SELECT
+            (WITH foo AS (SELECT 1 AS x) SELECT count(*) FROM foo) AS cte_rows,
+            (SELECT count(*) FROM foo) AS dataset_rows
+        "#
+    );
+
+    assert_data_eq(
+        harness.sql(statement).await,
+        indoc!(
+            r#"
+            +----------+--------------+
+            | cte_rows | dataset_rows |
+            +----------+--------------+
+            | 1        | 2            |
+            +----------+--------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        harness.sql_state(statement).await.input_datasets,
+        BTreeMap::from([(
+            foo.get_id().clone(),
+            QueryStateDataset {
+                alias: "foo".to_string(),
+                block_hash: head,
+            }
+        )])
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_to_table_inaccessible_dataset_is_reported_as_missing() {
     let harness = ToTableHarness::denying(&["secret"]);
     let secret = harness

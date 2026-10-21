@@ -436,8 +436,8 @@ hours. A long-running server does not evict while it runs.
 - Writer and merge strategy tests live in `src/infra/ingest-datafusion/tests/`; polling and push
   service tests in `src/infra/core/tests/tests/ingest/`; CLI scenarios in
   `src/e2e/app/cli/repo-tests/src/commands/` (`test_ingest_command.rs`, `test_pull_command.rs`).
-- `MockPollingIngestService` (`src/infra/core/src/testing/mock_polling_source_service.rs`) stands
-  in for the polling service where a test needs no fetching.
+- `MockPollingIngestService` (helpers in `src/domain/core/src/testing/mock_polling_ingest_service.rs`)
+  stands in for the polling service where a test needs no fetching.
 - Containerized fetch and preprocess tests need Podman or Docker and are grouped separately; see
   [`DEVELOPER.md`](../../DEVELOPER.md).
 - Changing what `stage` considers an empty commit changes which runs produce blocks — and so which
