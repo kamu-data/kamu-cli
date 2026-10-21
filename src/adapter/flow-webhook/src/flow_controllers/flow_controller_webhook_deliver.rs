@@ -29,10 +29,9 @@ use crate::{
     DatasetUpdatedWebhookSensor,
     FLOW_TYPE_WEBHOOK_DELIVER,
     FlowScopeSubscription,
-    HeadRelation,
     WEBHOOK_DATASET_REF_UPDATED_VERSION,
     WebhookDatasetRefUpdatedPayload,
-    relation_between_heads,
+    dataset_changes_between,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,7 +137,7 @@ impl FlowControllerWebhookDeliver {
             .or(first_old_head);
 
         let is_breaking_change = match &old_head {
-            Some(old_head) => match relation_between_heads(
+            Some(old_head) => match dataset_changes_between(
                 self.dataset_increment_query_service.as_ref(),
                 input_dataset_id,
                 old_head,
@@ -146,8 +145,8 @@ impl FlowControllerWebhookDeliver {
             )
             .await?
             {
-                HeadRelation::Same | HeadRelation::Before => false,
-                HeadRelation::After | HeadRelation::Diverged => true,
+                fs::ResourceChanges::NewData(_) => false,
+                fs::ResourceChanges::Breaking => true,
             },
             None => false,
         };

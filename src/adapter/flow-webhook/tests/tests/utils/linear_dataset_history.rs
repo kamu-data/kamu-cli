@@ -12,7 +12,7 @@ use kamu_datasets::{GetIncrementError, MockDatasetIncrementQueryService};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A dataset whose history is `head(1)` .. `head(LENGTH)`, plus a head of a
-/// history rewritten after the first block
+/// history rewritten after the first block and a hash of no block at all
 pub(crate) struct LinearDatasetHistory;
 
 impl LinearDatasetHistory {
@@ -27,8 +27,12 @@ impl LinearDatasetHistory {
         odf::Multihash::from_digest_sha3_256(b"diverged")
     }
 
+    pub(crate) fn missing_head() -> odf::Multihash {
+        odf::Multihash::from_digest_sha3_256(b"missing")
+    }
+
     /// Increments within the history; any interval leaving it is invalid, as
-    /// for a rewritten history
+    /// for a rewritten history, and one starting at the missing head fails
     pub(crate) fn increments() -> MockDatasetIncrementQueryService {
         let history: Vec<_> = (1..=Self::LENGTH).map(Self::head).collect();
 
@@ -37,6 +41,13 @@ impl LinearDatasetHistory {
             .returning(move |_, old_head, new_head| {
                 let old_index = history.iter().position(|h| Some(h) == old_head);
                 let new_index = history.iter().position(|h| h == new_head);
+                if *new_head == Self::missing_head() {
+                    return Err(GetIncrementError::BlockNotFound(
+                        odf::storage::BlockNotFoundError {
+                            hash: new_head.clone(),
+                        },
+                    ));
+                }
                 match (old_index, new_index) {
                     (Some(old_index), Some(new_index)) if old_index <= new_index => {
                         Ok(odf::dataset::MetadataChainIncrementInterval {

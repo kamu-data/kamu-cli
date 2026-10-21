@@ -367,7 +367,7 @@ position the receiver answered with 2xx:
 | Update, event type disabled | removed |
 | Pause, resume, mark unreachable, reactivate | kept, so activation catches up from it |
 | Remove the subscription, by the use case or with its dataset | removed; subscription rows are kept with status `REMOVED`, so this is not a cascade |
-| Delivery answered 2xx | set to the watermark the delivery plan carries, in the transaction that records the response |
+| Delivery answered 2xx | set to the watermark the delivery plan carries, in the transaction that records the response. A delivery still running when its event type is disabled or its subscription removed sets it again; nothing reads it then, and enabling the event type replaces it with a starting value |
 
 The deliver controller puts the new watermark (`{ "head": new_hash }`) into the logical plan next
 to the payload, and `WebhookDeliveryWorkerImpl` stores it once the receiver accepts the delivery.
@@ -382,7 +382,7 @@ before it is (right after a subscription is created, while it is paused or unrea
 server is down) are caught up when the trigger is activated: `DatasetUpdatedWebhookSensor::on_activated`
 compares the dataset's head with the watermark and, if they differ, runs one deliver flow covering
 the range, with an `ExternallyDetectedChange` cause (`Breaking` when the watermark is no longer in
-the history, so `BreakingChangeRule` applies). Without a watermark nothing is caught up.
+the history, or is no block of the dataset at all, so `BreakingChangeRule` applies). Without a watermark nothing is caught up.
 
 A dataset-update message can still reach the sensor after a catch-up already covered its update,
 since the messages and the trigger activation come from different outbox producers. The sensor
