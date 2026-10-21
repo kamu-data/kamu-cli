@@ -11,6 +11,7 @@ use file_utils::MediaType;
 use kamu::domain;
 use kamu_accounts::{CurrentAccountSubject, QuotaError};
 use kamu_datasets::{
+    UpdateVersionFileResult,
     UpdateVersionFileUseCaseError,
     UpdateVersionedFileUseCase,
     WriteCheckedDataset,
@@ -67,7 +68,7 @@ impl<'a> VersionedFileMut<'a> {
 
         let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_versioned_file
+        let result = update_versioned_file
             .execute(
                 WriteCheckedDataset::from_ref(file_dataset),
                 None,
@@ -75,39 +76,9 @@ impl<'a> VersionedFileMut<'a> {
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
             )
-            .await
-        {
-            Ok(res) => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
-                new_version: res.new_version,
-                old_head: res.old_head.into(),
-                new_head: res.new_head.into(),
-                content_hash: res.content_hash.into(),
-            })),
-            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
-                UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
-                    expected_head: err.expected.unwrap().into(),
-                    actual_head: err.actual.unwrap().into(),
-                }),
-            ),
-            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => match err {
-                QuotaError::Exceeded(e) => Ok(UpdateVersionResult::QuotaExceeded(
-                    UpdateVersionErrorQuotaExceeded {
-                        used: Some(e.used),
-                        incoming: Some(e.incoming),
-                        limit: Some(e.limit),
-                    },
-                )),
-                QuotaError::NotConfigured => Ok(UpdateVersionResult::QuotaExceeded(
-                    UpdateVersionErrorQuotaExceeded {
-                        used: None,
-                        incoming: None,
-                        limit: None,
-                    },
-                )),
-                QuotaError::Internal(e) => Err(e.into()),
-            },
-            Err(e) => Err(e.int_err().into()),
-        }
+            .await;
+
+        update_version_result(result)
     }
 
     /// Returns a pre-signed URL and upload token for direct uploads of large
@@ -179,7 +150,7 @@ impl<'a> VersionedFileMut<'a> {
 
         let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_versioned_file
+        let result = update_versioned_file
             .execute(
                 WriteCheckedDataset::from_ref(file_dataset),
                 None,
@@ -187,39 +158,9 @@ impl<'a> VersionedFileMut<'a> {
                 expected_head.map(Into::into),
                 extra_data.map(Into::into),
             )
-            .await
-        {
-            Ok(res) => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
-                new_version: res.new_version,
-                old_head: res.old_head.into(),
-                new_head: res.new_head.into(),
-                content_hash: res.content_hash.into(),
-            })),
-            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
-                UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
-                    expected_head: err.expected.unwrap().into(),
-                    actual_head: err.actual.unwrap().into(),
-                }),
-            ),
-            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => match err {
-                QuotaError::Exceeded(e) => Ok(UpdateVersionResult::QuotaExceeded(
-                    UpdateVersionErrorQuotaExceeded {
-                        used: Some(e.used),
-                        incoming: Some(e.incoming),
-                        limit: Some(e.limit),
-                    },
-                )),
-                QuotaError::NotConfigured => Ok(UpdateVersionResult::QuotaExceeded(
-                    UpdateVersionErrorQuotaExceeded {
-                        used: None,
-                        incoming: None,
-                        limit: None,
-                    },
-                )),
-                QuotaError::Internal(e) => Err(e.into()),
-            },
-            Err(e) => Err(e.int_err().into()),
-        }
+            .await;
+
+        update_version_result(result)
     }
 
     /// Creating a new version with that has updated values of extra columns but
@@ -237,7 +178,7 @@ impl<'a> VersionedFileMut<'a> {
 
         let file_dataset = self.writable_state.resolved_dataset(ctx).await?;
 
-        match update_versioned_file
+        let result = update_versioned_file
             .execute(
                 WriteCheckedDataset::from_ref(file_dataset),
                 None,
@@ -245,39 +186,9 @@ impl<'a> VersionedFileMut<'a> {
                 expected_head.map(Into::into),
                 Some(extra_data.into()),
             )
-            .await
-        {
-            Ok(res) => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
-                new_version: res.new_version,
-                old_head: res.old_head.into(),
-                new_head: res.new_head.into(),
-                content_hash: res.content_hash.into(),
-            })),
-            Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
-                UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
-                    expected_head: err.expected.unwrap().into(),
-                    actual_head: err.actual.unwrap().into(),
-                }),
-            ),
-            Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => match err {
-                QuotaError::Exceeded(e) => Ok(UpdateVersionResult::QuotaExceeded(
-                    UpdateVersionErrorQuotaExceeded {
-                        used: Some(e.used),
-                        incoming: Some(e.incoming),
-                        limit: Some(e.limit),
-                    },
-                )),
-                QuotaError::NotConfigured => Ok(UpdateVersionResult::QuotaExceeded(
-                    UpdateVersionErrorQuotaExceeded {
-                        used: None,
-                        incoming: None,
-                        limit: None,
-                    },
-                )),
-                QuotaError::Internal(e) => Err(e.into()),
-            },
-            Err(e) => Err(e.int_err().into()),
-        }
+            .await;
+
+        update_version_result(result)
     }
 }
 
@@ -301,6 +212,7 @@ pub enum UpdateVersionResult {
     Success(UpdateVersionSuccess),
     CasFailed(UpdateVersionErrorCasFailed),
     InvalidExtraData(UpdateVersionErrorInvalidExtraData),
+    NoVersions(UpdateVersionErrorNoVersions),
     QuotaExceeded(UpdateVersionErrorQuotaExceeded),
 }
 
@@ -362,6 +274,21 @@ impl UpdateVersionErrorInvalidExtraData {
     /// Always false
     pub async fn is_success(&self) -> bool {
         false
+    }
+}
+
+pub struct UpdateVersionErrorNoVersions;
+
+/// Extra data cannot be updated, as the file has no versions yet
+#[Object]
+impl UpdateVersionErrorNoVersions {
+    /// Always false
+    pub async fn is_success(&self) -> bool {
+        false
+    }
+    /// Human-readable error message
+    pub async fn message(&self) -> String {
+        "File has no versions to update extra data of".to_string()
     }
 }
 
@@ -502,6 +429,49 @@ pub fn map_get_content_args_error(e: GetContentArgsError) -> GqlError {
     match e {
         GetContentArgsError::TokenDecode(e) => GqlError::gql(e.message),
         e @ GetContentArgsError::Internal(_) => e.int_err().into(),
+    }
+}
+
+fn update_version_result(
+    result: Result<UpdateVersionFileResult, UpdateVersionFileUseCaseError>,
+) -> Result<UpdateVersionResult> {
+    match result {
+        Ok(res) => Ok(UpdateVersionResult::Success(UpdateVersionSuccess {
+            new_version: res.new_version,
+            old_head: res.old_head.into(),
+            new_head: res.new_head.into(),
+            content_hash: res.content_hash.into(),
+        })),
+        Err(UpdateVersionFileUseCaseError::RefCASFailed(err)) => Ok(
+            UpdateVersionResult::CasFailed(UpdateVersionErrorCasFailed {
+                expected_head: err.expected.unwrap().into(),
+                actual_head: err.actual.unwrap().into(),
+            }),
+        ),
+        Err(UpdateVersionFileUseCaseError::NoVersions) => Ok(UpdateVersionResult::NoVersions(
+            UpdateVersionErrorNoVersions,
+        )),
+        Err(UpdateVersionFileUseCaseError::QuotaExceeded(err)) => match err {
+            QuotaError::Exceeded(e) => Ok(UpdateVersionResult::QuotaExceeded(
+                UpdateVersionErrorQuotaExceeded {
+                    used: Some(e.used),
+                    incoming: Some(e.incoming),
+                    limit: Some(e.limit),
+                },
+            )),
+            QuotaError::NotConfigured => Ok(UpdateVersionResult::QuotaExceeded(
+                UpdateVersionErrorQuotaExceeded {
+                    used: None,
+                    incoming: None,
+                    limit: None,
+                },
+            )),
+            QuotaError::Internal(e) => Err(e.into()),
+        },
+        Err(
+            e @ (UpdateVersionFileUseCaseError::Access(_)
+            | UpdateVersionFileUseCaseError::Internal(_)),
+        ) => Err(e.int_err().into()),
     }
 }
 

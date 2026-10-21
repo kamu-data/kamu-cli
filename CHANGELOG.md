@@ -69,6 +69,8 @@ Recommendation: for ease of reading, use the following format:
 - SQL `to_table()` reads datasets at the query's pinned blocks and includes them in the query state
 - SQL `to_table()` on a missing dataset is a bad query error instead of an internal error
 - Concurrent uploads to a versioned file fail with a conflict instead of creating duplicate versions
+- GraphQL `updateExtraData` on a versioned file without versions returns `UpdateVersionErrorNoVersions`
+  instead of an internal error
 
 ## [0.270.0] - 2026-10-12
 ### Added

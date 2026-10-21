@@ -163,8 +163,9 @@ SELECT * FROM fold;
 /*
  * Guard: the final folded status of each resource must match the stored one.
  * Timestamps are left out, as their text form varies. Condition fields are
- * picked out by name, since SQLite compares JSON as text and key order varies. A mismatch fails the
- * CHECK constraint below, which aborts the migration.
+ * picked out by name, since SQLite compares JSON as text and key order
+ * varies. A mismatch fails the CHECK constraint below, which aborts the
+ * migration.
  */
 CREATE TEMP TABLE resource_status_check AS
 SELECT

@@ -65,7 +65,7 @@ async fn test_update_versioned_file_extra_data_only_without_versions_fails() {
         .update_extra_data_res(&file, serde_json::json!({"tag": "x"}))
         .await;
 
-    assert_matches!(res, Err(UpdateVersionFileUseCaseError::Internal(_)));
+    assert_matches!(res, Err(UpdateVersionFileUseCaseError::NoVersions));
     assert_eq!(harness.chain_len(&file).await, chain_len);
 }
 

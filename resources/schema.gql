@@ -9005,6 +9005,20 @@ type UpdateVersionErrorInvalidExtraData implements UpdateVersionResult {
 }
 
 """
+Extra data cannot be updated, as the file has no versions yet
+"""
+type UpdateVersionErrorNoVersions implements UpdateVersionResult {
+	"""
+	Always false
+	"""
+	isSuccess: Boolean!
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
 Update would exceed the storage quota of the account
 """
 type UpdateVersionErrorQuotaExceeded implements UpdateVersionResult {

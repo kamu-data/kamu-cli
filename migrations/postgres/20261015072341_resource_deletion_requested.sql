@@ -3,8 +3,8 @@
  * deletion is requested, `deleted_at` once the controllers cleaned up.
  *
  * Resources deleted before that went through both steps at once, and their
- * events replay so: the request takes the time of the deletion, and the phase
- * is `Deleted`.
+ * events replay so: the request takes the time of the deletion, the phase is
+ * `Deleted`, and the deletion counts as one more status update.
  */
 
 ALTER TABLE resources ADD COLUMN deletion_requested_at TIMESTAMPTZ NULL;
@@ -12,6 +12,7 @@ ALTER TABLE resources ADD COLUMN deletion_requested_at TIMESTAMPTZ NULL;
 UPDATE resources
 SET
     deletion_requested_at = deleted_at,
+    status_generation = status_generation + 1,
     status = jsonb_set(status, '{phase}', '"Deleted"')
 WHERE deleted_at IS NOT NULL;
 
