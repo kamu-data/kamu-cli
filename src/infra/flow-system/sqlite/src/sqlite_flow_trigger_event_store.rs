@@ -7,19 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::num::NonZeroUsize;
-
-use database_common::{
-    EventModel,
-    TransactionRefT,
-    sqlite_datetime_text,
-    sqlite_generate_placeholders_list,
-};
+use database_common::{EventModel, TransactionRefT, sqlite_datetime_text};
 use dill::*;
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use serde_json::json;
-use sqlx::{AssertSqlSafe, Sqlite};
+use sqlx::Sqlite;
 
 use crate::helpers::{flow_bindings_to_json, global_counter_event_ids_per_item};
 
@@ -490,58 +483,6 @@ impl FlowTriggerEventStore for SqliteFlowTriggerEventStore {
                 })
             })
             .collect()
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn has_active_triggers_for_scopes(
-        &self,
-        scopes: &[FlowScope],
-    ) -> Result<bool, InternalError> {
-        if scopes.is_empty() {
-            return Ok(false);
-        }
-
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let query_str = format!(
-            r#"
-            SELECT EXISTS (
-                SELECT 1
-                FROM (
-                    SELECT
-                        flow_type,
-                        scope_data,
-                        event_type,
-                        event_payload,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY flow_type, scope_data
-                            ORDER BY event_id DESC
-                        ) AS row_num
-                    FROM flow_trigger_events
-                ) AS latest_events
-                WHERE row_num = 1
-                AND scope_data IN ({})
-                AND (
-                    (event_type = 'FlowTriggerEventCreated' AND json_extract(event_payload, '$.Created.paused') = false)
-                    OR
-                    (event_type = 'FlowTriggerEventModified' AND json_extract(event_payload, '$.Modified.paused') = false)
-                )
-            )
-            "#,
-            sqlite_generate_placeholders_list(scopes.len(), NonZeroUsize::new(1).unwrap())
-        );
-
-        let mut query = sqlx::query_scalar(AssertSqlSafe(query_str));
-        for scope in scopes {
-            let scope_json = serde_json::to_value(scope).int_err()?;
-            let scope_json_str = canonical_json::to_string(&scope_json).int_err()?;
-            query = query.bind(scope_json_str);
-        }
-
-        let has_active_triggers: Option<bool> = query.fetch_one(connection_mut).await.int_err()?;
-        Ok(has_active_triggers.unwrap_or_default())
     }
 }
 

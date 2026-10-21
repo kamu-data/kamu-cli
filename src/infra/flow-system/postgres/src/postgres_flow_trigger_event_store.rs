@@ -445,54 +445,6 @@ impl FlowTriggerEventStore for PostgresFlowTriggerEventStore {
             })
             .collect()
     }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn has_active_triggers_for_scopes(
-        &self,
-        scopes: &[FlowScope],
-    ) -> Result<bool, InternalError> {
-        if scopes.is_empty() {
-            return Ok(false);
-        }
-
-        let mut tr = self.transaction.lock().await;
-
-        let connection_mut = tr.connection_mut().await?;
-
-        let scopes_json = scopes
-            .iter()
-            .map(serde_json::to_value)
-            .collect::<Result<Vec<_>, _>>()
-            .int_err()?;
-
-        let has_active_triggers = sqlx::query_scalar!(
-            r#"
-            SELECT EXISTS (
-                SELECT 1
-                FROM (
-                    SELECT DISTINCT ON (flow_type, scope_data)
-                        scope_data,
-                        event_type,
-                        event_payload
-                    FROM flow_trigger_events
-                    WHERE
-                        scope_data = ANY($1)
-                    ORDER BY flow_type, scope_data, event_id DESC
-                ) AS latest_events
-                WHERE (
-                    (event_type = 'FlowTriggerEventCreated' AND (event_payload#>>'{Created,paused}') = 'false') OR
-                    (event_type = 'FlowTriggerEventModified' AND (event_payload#>>'{Modified,paused}') = 'false')
-                )
-            )
-            "#,
-            &scopes_json,
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
-
-        Ok(has_active_triggers.unwrap_or(false))
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -24,6 +24,9 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL (breaking): `AccountHandle` is renamed to `ResourceOwnerHandle` and `AccountRefInput` to
   `ResourceOwnerRefInput`, following ODF. Remote resource commands need both the `kamu` CLI and the node on
   this version or later
+- GraphQL (breaking): removed account-wide flow pausing: the `Account.flows.triggers.allPaused` query and
+  the `pauseAccountDatasetFlows` and `resumeAccountDatasetFlows` mutations, with the now-empty
+  `AccountMut.flows`. Pause and resume flows per dataset instead
 - GraphQL: `ResourceHeaders` has `statusGeneration`, counting status updates, and `deletionRequestedAt`,
   and `ResourcePhase` has `DELETING` and `DELETED`, following ODF. `deletionRequestedAt`, `DELETING` and
   `DELETED` are not populated yet

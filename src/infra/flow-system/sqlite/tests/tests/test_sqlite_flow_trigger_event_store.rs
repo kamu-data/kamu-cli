@@ -50,14 +50,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_has_active_trigger_for_datasets,
-    harness = SqliteFlowTriggerEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = sqlite,
     fixture =
         kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_latest_event_is_last_saved,
     harness = SqliteFlowTriggerEventStoreHarness

@@ -330,18 +330,6 @@ impl FlowTriggerService for FlowTriggerServiceImpl {
         .await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(?scopes))]
-    async fn has_active_triggers_for_scopes(
-        &self,
-        scopes: &[FlowScope],
-    ) -> Result<bool, InternalError> {
-        tracing::info!(?scopes, "Checking for active triggers for scopes");
-
-        self.flow_trigger_event_store
-            .has_active_triggers_for_scopes(scopes)
-            .await
-    }
-
     #[tracing::instrument(level = "info", skip_all, fields(?flow_binding))]
     async fn apply_trigger_auto_stop_decision(
         &self,

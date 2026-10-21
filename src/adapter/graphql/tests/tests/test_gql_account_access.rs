@@ -107,7 +107,6 @@ async fn test_flows() {
         "flows { processes { allCards { nodes { __typename } } } }",
         "flows { runs { listFlows { nodes { flowId } } } }",
         "flows { runs { listDatasetsWithFlow { nodes { name } } } }",
-        "flows { triggers { allPaused } }",
     ] {
         let access = AccountAccessHarness::query_access_matrix(selection).await;
 
@@ -134,7 +133,6 @@ async fn test_flows_include_private_datasets_for_owner_and_admin() {
                 listFlows { nodes { flowId } }
                 listDatasetsWithFlow { nodes { name } }
             }
-            triggers { allPaused }
         }
         "#
     );
@@ -148,7 +146,6 @@ async fn test_flows_include_private_datasets_for_owner_and_admin() {
                 "listFlows": { "nodes": [{ "flowId": "0" }] },
                 "listDatasetsWithFlow": { "nodes": [{ "name": "private-dataset" }] },
             },
-            "triggers": { "allPaused": false },
         }
     });
 
@@ -284,24 +281,6 @@ async fn test_delete() {
     let access = AccountAccessHarness::mutation_access_matrix("delete { __typename }").await;
 
     assert_eq!(access, AccessMatrix::owner_and_admin(UNAUTHENTICATED_ERROR));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_flow_triggers_mut() {
-    for selection in [
-        "flows { triggers { pauseAccountDatasetFlows } }",
-        "flows { triggers { resumeAccountDatasetFlows } }",
-    ] {
-        let access = AccountAccessHarness::mutation_access_matrix(selection).await;
-
-        assert_eq!(
-            access,
-            AccessMatrix::owner_only(ACCOUNT_ACCESS_ERROR),
-            "{selection}"
-        );
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

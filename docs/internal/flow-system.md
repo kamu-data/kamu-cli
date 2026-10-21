@@ -701,13 +701,13 @@ Empty changes are skipped. Dependency updates refresh sensor inputs.
 
 ## 12. GraphQL API
 
-Flows have **no query root of their own**: every flow query and mutation hangs off a dataset or an
-account. Rust paths below are relative to `src/adapter/graphql/src`; schema field names are the
-camelCase forms of the Rust methods. The GraphQL layer only calls the flow services
-(`FlowQueryService`, `FlowRunService`, `FlowTriggerService`, `FlowConfigurationService`,
-`FlowProcessStateQuery`) — with two read-side exceptions: `Flow.history` reads
-`FlowEventStore::get_events` directly, and `Flow.relatedTrigger` loads triggers in bulk from
-`FlowTriggerEventStore`.
+Flows have **no query root of their own**: every flow query hangs off a dataset or an account,
+and every flow mutation off a dataset. Rust paths below are relative to
+`src/adapter/graphql/src`; schema field names are the camelCase forms of the Rust methods. The
+GraphQL layer only calls the flow services (`FlowQueryService`, `FlowRunService`,
+`FlowTriggerService`, `FlowConfigurationService`, `FlowProcessStateQuery`) — with two read-side
+exceptions: `Flow.history` reads `FlowEventStore::get_events` directly, and `Flow.relatedTrigger`
+loads triggers in bulk from `FlowTriggerEventStore`.
 
 ```mermaid
 flowchart LR
@@ -717,14 +717,12 @@ flowchart LR
         DS --> DRUN["runs: getFlow, listFlows, listFlowInitiators"]
         DS --> DPROC["processes: primary, webhooks { rollup, subprocesses }"]
         AC["accounts.byName(name).flows"] --> ARUN["runs: listFlows, listDatasetsWithFlow"]
-        AC --> ATRG["triggers.allPaused"]
         AC --> APROC["processes: primary/webhook/full rollups, primary/webhook/all cards"]
     end
     subgraph M["Mutation"]
         DSM["datasets.byId(id).flows"] --> MRUN["runs: trigger*Flow, cancelFlowRun"]
         DSM --> MTRG["triggers: setTrigger, pauseFlow(s), resumeFlow(s)"]
         DSM --> MCFG["configs: setIngestConfig, setCompactionConfig"]
-        ACM["accounts.byName(name).flows.triggers"] --> MATRG["pause/resumeAccountDatasetFlows"]
     end
 ```
 
@@ -752,7 +750,6 @@ kind: ingest and hard compaction need a root dataset, transform a derivative one
 | `Dataset.flows.processes.webhooks { rollup, subprocesses }` | `queries/webhooks/webhook_flow_subprocess_group.rs` | `FlowProcessStateQuery::rollup` / `list_processes` over the dataset's subscription scopes |
 | `Account.flows.runs.listFlows(…)` | `queries/accounts/account_flow_runs.rs` | `list_scoped_flows` over the account's owned datasets |
 | `Account.flows.runs.listDatasetsWithFlow` | same | `FlowQueryService::filter_flow_scopes_having_flows` |
-| `Account.flows.triggers.allPaused` | `queries/accounts/account_flow_triggers.rs` | `FlowTriggerService::has_active_triggers_for_scopes` |
 | `Account.flows.processes.{primaryRollup, webhookRollup, fullRollup}` | `queries/accounts/account_flow_processes.rs` | `FlowProcessStateQuery::rollup` |
 | `Account.flows.processes.{primaryCards, webhookCards, allCards}` | same | `FlowProcessStateQuery::list_processes`; `allCards` returns the union `AccountFlowProcessCard = Dataset \| Webhook` |
 
@@ -786,7 +783,6 @@ Dataset mutations live under `mutations/flows_mut/`. Each leaf requires a logged
 | `triggers.pauseFlows` / `resumeFlows` | `pause_/resume_flow_triggers_for_scopes` | — |
 | `configs.setIngestConfig(ingestConfigInput, retryPolicyInput?)` | `FlowConfigurationService::set_configuration` | root, flow preconditions |
 | `configs.setCompactionConfig(compactionConfigInput, retryPolicyInput?)` | same | root, config validated |
-| `Account.flows.triggers.pause/resumeAccountDatasetFlows` (`mutations/flows_mut/account_flow_triggers_mut.rs`) | `FlowTriggerService` over owned dataset scopes | caller is that account |
 
 A manual run passes the given configuration as a forced snapshot ([§6](#6-scheduling)); the stored
 configuration is untouched. Reset configuration can only be passed this way — there is no setter.

@@ -205,49 +205,6 @@ impl FlowTriggerEventStore for InMemoryFlowTriggerEventStore {
 
         Ok(bindings)
     }
-
-    async fn has_active_triggers_for_scopes(
-        &self,
-        scopes: &[FlowScope],
-    ) -> Result<bool, InternalError> {
-        if scopes.is_empty() {
-            return Ok(false);
-        }
-
-        let state = self.inner.as_state();
-        let g = state.lock().unwrap();
-
-        let scopes: HashSet<&FlowScope> = scopes.iter().collect();
-        let mut seen_bindings = HashSet::new();
-
-        for event in g.events.iter().rev() {
-            // Skip if we've already seen this binding (we only want the latest event)
-            let flow_binding = event.flow_binding();
-            if !seen_bindings.insert(flow_binding) {
-                continue;
-            }
-
-            if scopes.contains(&flow_binding.scope) {
-                match event {
-                    FlowTriggerEvent::Created(e) => {
-                        if !e.paused {
-                            return Ok(true);
-                        }
-                    }
-                    FlowTriggerEvent::Modified(e) => {
-                        if !e.paused {
-                            return Ok(true);
-                        }
-                    }
-                    FlowTriggerEvent::AutoStopped(_) | FlowTriggerEvent::ScopeRemoved(_) => {
-                        // auto-stopped or permanently stopped — not active
-                    }
-                }
-            }
-        }
-
-        Ok(false)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
