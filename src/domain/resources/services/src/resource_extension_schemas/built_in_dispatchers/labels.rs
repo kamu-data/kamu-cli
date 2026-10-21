@@ -34,7 +34,7 @@ declare_resource_extension_schema_dispatcher!(
     value = Environment,
     schema_id = RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     kind = ResourceExtensionKind::Label,
-    document = RESOURCE_LABEL_ENVIRONMENT_SCHEMA_DOC,
+    document = Some(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_DOC),
     applications = ENVIRONMENT_APPLICATIONS
 );
 

@@ -10,7 +10,7 @@
 use dill::CatalogBuilder;
 use kamu_resources::{
     RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
-    RESOURCE_CONDITION_READY_SCHEMA_URI,
+    RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
@@ -96,11 +96,10 @@ fn test_condition_unknown_field_is_rejected() {
 
     harness.assert_value_invalid_contains(
         ResourceExtensionKind::Condition,
-        RESOURCE_CONDITION_READY_SCHEMA_URI,
+        RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI,
         &serde_json::json!({
-            "value": "True",
-            "reason": "Reconciled",
-            "lastTransitionTime": "2026-01-01T00:00:00Z",
+            "code": "internal-error",
+            "message": "Internal error",
             "extra": true
         }),
         "condition value is invalid: unknown field `extra`",
@@ -385,7 +384,7 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     value = TestStringValue,
     schema_id = EXACT_ONLY_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
-    document = "{}",
+    document = None,
     applications = EXACT_ONLY_APPLICATIONS
 );
 
@@ -404,7 +403,7 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     value = TestStringValue,
     schema_id = ANY_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
-    document = "{}",
+    document = None,
     applications = ANY_TIER_APPLICATIONS
 );
 
@@ -416,7 +415,7 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     value = TestStringValue,
     schema_id = ANY_TIER_ALIAS_CONFLICT_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
-    document = "{}",
+    document = None,
     applications = ANY_TIER_APPLICATIONS
 );
 
@@ -440,7 +439,7 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     value = TestStringValue,
     schema_id = CONTEXT_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
-    document = "{}",
+    document = None,
     applications = CONTEXT_TIER_APPLICATIONS
 );
 
@@ -464,7 +463,7 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     value = TestStringValue,
     schema_id = VERSIONED_CONTEXT_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
-    document = "{}",
+    document = None,
     applications = VERSIONED_CONTEXT_TIER_APPLICATIONS
 );
 
@@ -485,7 +484,7 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     value = TestStringValue,
     schema_id = EXACT_TIER_SCHEMA_ID,
     kind = ResourceExtensionKind::Label,
-    document = "{}",
+    document = None,
     applications = EXACT_TIER_APPLICATIONS
 );
 
@@ -496,7 +495,7 @@ kamu_resources_services::declare_resource_extension_schema_dispatcher!(
     value = TestStringValue,
     schema_id = RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     kind = ResourceExtensionKind::Label,
-    document = "{}",
+    document = None,
     applications = ANY_TIER_APPLICATIONS
 );
 

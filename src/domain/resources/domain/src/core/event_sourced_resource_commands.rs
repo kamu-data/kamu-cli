@@ -345,7 +345,7 @@ where
     ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
-    new_status.mark_failed_or_degraded(error.reason_code(), error.user_message(), now);
+    new_status.mark_failed_or_degraded(error.code(), error.user_message());
 
     try_update_resource_status(resource, now, expected_status_generation, new_status)
 }
@@ -371,7 +371,7 @@ where
     ensure_status_generation(resource, expected_status_generation)?;
 
     let mut new_status = resource.status().clone();
-    new_status.mark_cleanup_failed(error.to_string(), now);
+    new_status.mark_cleanup_failed(error.to_string());
 
     try_update_resource_status(resource, now, expected_status_generation, new_status)
 }

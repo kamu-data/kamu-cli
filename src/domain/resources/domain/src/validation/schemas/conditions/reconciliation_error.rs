@@ -11,20 +11,24 @@ use crate::{ResourceExtensionValueError, ResourceValidateSchemaValue};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const RESOURCE_CONDITION_READY_SCHEMA_URI: &str =
-    "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready";
-pub const RESOURCE_CONDITION_READY_SCHEMA_DOC: &str =
-    include_str!("../../../../../schemas/resource/v1alpha1/conditions/Ready.json");
+pub const RESOURCE_CONDITION_RECONCILIATION_ERROR_SCHEMA_URI: &str =
+    "https://opendatafabric.org/schemas/resources/v1alpha1/ReconciliationError";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ReadyCondition;
+pub struct ReconciliationErrorCondition;
 
-impl ResourceValidateSchemaValue for ReadyCondition {
+impl ResourceValidateSchemaValue for ReconciliationErrorCondition {
     type ValidationError = ResourceExtensionValueError;
 
     fn validate(value: &serde_json::Value) -> Result<(), Self::ValidationError> {
-        super::validate_resource_condition_value(value)
+        serde_json::from_value::<odf::metadata::serde::yaml::resources::ReconciliationError>(
+            value.clone(),
+        )
+        .map(|_| ())
+        .map_err(|err| {
+            ResourceExtensionValueError::new(format!("condition value is invalid: {err}"))
+        })
     }
 }
 

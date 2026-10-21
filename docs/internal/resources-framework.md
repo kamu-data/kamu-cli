@@ -139,7 +139,7 @@ long-term goal. This page documents what exists now.
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Degraded`, `Failed`, `Deleting`, `Deleted` (ODF `ResourcePhase`). `Pending`, `Deleting` and `Deleted` are derived from the headers, deletion first: `Deleted` once `deletedAt` is set, `Deleting` once `deletionRequestedAt` is set, otherwise `Pending` whenever `observedGeneration` is absent or lower than `generation`. See [§13 state machine](#lifecycle-state-machine). |
 | **Two-phase deletion** | Deleting a resource requests its deletion (`Deleting`); its main controller cleans up, then the deletion completes (`Deleted`). A resource being deleted gives up its name at once. See [(c) Deletion](#c-deletion). |
-| **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
+| **Condition** | A status signal keyed by a condition schema URI. The only built-in is ODF `ReconciliationError` (`code`, `message`), present while the latest reconciliation or cleanup has failed. |
 | **generation / observedGeneration / reconciledGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` is the last one a reconciliation started on, `reconciledGeneration` the last one reconciled successfully. Reconciliation is needed while `reconciledGeneration` is absent or lower than `generation`. |
 | **statusGeneration** | Header counting status updates: 1 for a new resource, +1 per `StatusUpdated` event. A status writer passes the value it read as a precondition and fails with a status conflict if it is stale (compare-and-swap). |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
@@ -325,7 +325,7 @@ pub trait ManagedResource: DeclarativeResource {
     fn try_mark_reconciliation_started(&mut self, now, expected_status_generation) -> ...;
     fn try_mark_reconciliation_succeeded(&mut self, now, expected_generation, expected_status_generation) -> ...;
     fn try_mark_reconciliation_failed(&mut self, now, expected_generation, expected_status_generation, error) -> ...;
-    // `Ready=False` with reason `CleanupFailed`; skipped unless the resource waits for cleanup
+    // `ReconciliationError` with code `cleanup-failed`; skipped unless the resource waits for cleanup
     fn try_mark_cleanup_failed(&mut self, now, expected_status_generation, error) -> ...;
 }
 ```
@@ -1368,7 +1368,7 @@ sequenceDiagram
         alt cleaned up
             CD->>CD: try_complete_deletion → Deleted (tombstone name)
         else cleanup failed
-            CD->>CD: try_mark_cleanup_failed → StatusUpdated (CleanupFailed)
+            CD->>CD: try_mark_cleanup_failed → StatusUpdated (cleanup-failed)
         end
     end
     CD->>ST: save the batch
@@ -1394,7 +1394,7 @@ Deletion runs in two steps, as the ODF resource framework defines them
   deletion or requests it again. The orchestration lives in `CompleteResourceDeletionPhases`, which
   each generated use case implements with its two transactional phases.
 - **A failed cleanup is an outcome, not an error.** The resource stays `Deleting` with a
-  `Ready=False` condition, reason `CleanupFailed`, unless another writer updated its status since
+  `ReconciliationError` condition, code `cleanup-failed`, unless another writer updated its status since
   the cleanup started; that status then stands. Nothing retries it automatically; deleting the
   resource again by its id does. Since the failure never reaches the outbox consumer, it cannot
   stall the processing of other resource messages.
@@ -1505,9 +1505,10 @@ stateDiagram-v2
 
 - **`Pending` is not written, it is derived.** A spec or header change bumps `generation` and leaves
   the status as the controller wrote it, so the conditions of the previous reconciliation stay
-  visible while the phase shows `Pending`. The next `Reconciling` status replaces them.
+  visible while the phase shows `Pending` and then `Reconciling`. The outcome of that
+  reconciliation replaces them: success clears `ReconciliationError`, a failure sets it again.
 - **`Failed` and `Degraded` are the unhealthy phases**, set by `mark_failed_or_degraded` with a
-  `Ready=false` condition carrying the reason and message: `Failed` when no generation was ever
+  `ReconciliationError` condition carrying the code and message: `Failed` when no generation was ever
   reconciled, `Degraded` when an earlier one was and is presumably still in effect.
 - **Neither is terminal, nor retried automatically.** There is no background reconcile worker or
   scheduler yet. Recovery is driven by the user re-applying a changed manifest: the generation bumps
@@ -1870,7 +1871,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
-| Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels, annotations, and status conditions. |
+| Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels and annotations. ODF-defined extensions, such as the `ReconciliationError` condition, have none here. |
 | Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,request_deletion,complete_deletion}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
@@ -1903,7 +1904,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   concrete typed target. Selectors may span types; refs may not. A future reader tempted to
   "fix" the inconsistency should change neither — they are the two halves of the same rule.
 - **Extension-schema dispatch is also by schema URI.** Built-in extension dispatchers are registered
-  for `description`, `environment`, and the three status conditions. Registry construction is an
+  for `description`, `environment`, and the `ReconciliationError` status condition. Registry construction is an
   explicit catalog-assembly step and fails on duplicate extension schema IDs, invalid `https://`
   metadata, or same-tier short-name conflicts. Full URI keys are exact and strict; short names are
   human-authored aliases resolved through case-insensitive `TypeName` precedence tiers. Unknown short

@@ -8,7 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::ConcurrentModificationError;
-use kamu_resources::ResourceReconcileError;
+use kamu_resources::{
+    RECONCILIATION_ERROR_CODE_CONCURRENT_MODIFICATION,
+    RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
+    ResourceReconcileError,
+};
 
 use crate::{VariableSetLifecycleError, VariableSetResource};
 
@@ -36,10 +40,12 @@ pub enum VariableSetReconcileError {
 }
 
 impl ResourceReconcileError for VariableSetReconcileError {
-    fn reason_code(&self) -> &'static str {
+    fn code(&self) -> &'static str {
         match self {
-            VariableSetReconcileError::ConcurrentModification(_) => "concurrent_modification",
-            VariableSetReconcileError::Internal(_) => "internal_error",
+            VariableSetReconcileError::ConcurrentModification(_) => {
+                RECONCILIATION_ERROR_CODE_CONCURRENT_MODIFICATION
+            }
+            VariableSetReconcileError::Internal(_) => RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
         }
     }
 

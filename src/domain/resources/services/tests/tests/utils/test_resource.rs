@@ -152,10 +152,10 @@ pub enum TestResourceReconcileError {
 }
 
 impl ResourceReconcileError for TestResourceReconcileError {
-    fn reason_code(&self) -> &'static str {
+    fn code(&self) -> &'static str {
         match self {
-            Self::ConcurrentModification(_) => "concurrent_modification",
-            Self::Internal(_) => "internal_error",
+            Self::ConcurrentModification(_) => RECONCILIATION_ERROR_CODE_CONCURRENT_MODIFICATION,
+            Self::Internal(_) => RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
         }
     }
 

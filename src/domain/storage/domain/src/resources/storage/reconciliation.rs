@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_resources::ResourceReconcileError;
+use kamu_resources::{RECONCILIATION_ERROR_CODE_INTERNAL_ERROR, ResourceReconcileError};
 
 use crate::{StorageLifecycleError, StorageResource};
 
@@ -35,13 +35,13 @@ pub enum StorageReconcileError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceReconcileError for StorageReconcileError {
-    fn reason_code(&self) -> &'static str {
+    fn code(&self) -> &'static str {
         match self {
-            Self::MissingVariableRef { .. } => "MissingVariableRef",
-            Self::MissingSecretRef { .. } => "MissingSecretRef",
-            Self::InvalidConfiguration { .. } => "InvalidConfiguration",
-            Self::DependencyUnavailable { .. } => "DependencyUnavailable",
-            Self::Internal(_) => "InternalError",
+            Self::MissingVariableRef { .. } => "missing-variable-ref",
+            Self::MissingSecretRef { .. } => "missing-secret-ref",
+            Self::InvalidConfiguration { .. } => "invalid-configuration",
+            Self::DependencyUnavailable { .. } => "dependency-unavailable",
+            Self::Internal(_) => RECONCILIATION_ERROR_CODE_INTERNAL_ERROR,
         }
     }
 
