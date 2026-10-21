@@ -239,25 +239,6 @@ pub(crate) async fn check_access_token_valid(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn check_logged_account_name_match(
-    ctx: &Context<'_>,
-    account_name: &odf::AccountName,
-) -> Result<(), GqlError> {
-    let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
-
-    if let CurrentAccountSubject::Logged(logged_account) = current_account_subject.as_ref()
-        && logged_account.account_handle.name == *account_name
-    {
-        return Ok(());
-    }
-
-    Err(GqlError::gql_extended("Account access error", |eev| {
-        eev.set("account_name", account_name.to_string());
-    }))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn check_multi_tenant_config(ctx: &Context<'_>) -> Result<(), GqlError> {
     let tenancy_config = from_catalog_n!(ctx, TenancyConfig);
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_gql_account_flow_processes;
-mod test_gql_account_flow_triggers;
+mod test_gql_account_flow_runs;
 mod test_gql_dataset_flow_configs;
 mod test_gql_dataset_flow_processes;
 mod test_gql_dataset_flow_runs;

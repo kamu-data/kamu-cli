@@ -311,30 +311,6 @@ type AccountFlowRuns {
 }
 
 """
-Flow trigger queries across datasets owned by an account
-"""
-type AccountFlowTriggers {
-	"""
-	Checks if all triggers of all datasets in account are disabled
-	"""
-	allPaused: Boolean!
-}
-
-"""
-Flow trigger mutations across all datasets owned by an account
-"""
-type AccountFlowTriggersMut {
-	"""
-	Resumes flow triggers of all datasets owned by the account
-	"""
-	resumeAccountDatasetFlows: Boolean!
-	"""
-	Pauses flow triggers of all datasets owned by the account
-	"""
-	pauseAccountDatasetFlows: Boolean!
-}
-
-"""
 Flow queries scoped to an account
 """
 type AccountFlows {
@@ -346,20 +322,6 @@ type AccountFlows {
 	Returns interface for flow runs queries
 	"""
 	runs: AccountFlowRuns!
-	"""
-	Returns interface for flow triggers queries
-	"""
-	triggers: AccountFlowTriggers!
-}
-
-"""
-Flow mutations scoped to an account
-"""
-type AccountFlowsMut {
-	"""
-	Flow trigger mutations for the account's datasets
-	"""
-	triggers: AccountFlowTriggersMut!
 }
 
 """
@@ -410,11 +372,6 @@ type AccountMut {
 	Allowed only to the account itself and to administrators.
 	"""
 	delete: DeleteAccountResult!
-	"""
-	Access to the mutable flow configurations of this account.
-	Available only to the account itself.
-	"""
-	flows: AccountFlowsMut!
 	"""
 	Access to the access token management of this account.
 	Available only to the account itself.

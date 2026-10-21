@@ -75,12 +75,6 @@ pub trait FlowTriggerService: Sync + Send {
         scopes: &[FlowScope],
     ) -> Result<(), InternalError>;
 
-    /// Checks if there are any active triggers for the given list of scopes
-    async fn has_active_triggers_for_scopes(
-        &self,
-        scopes: &[FlowScope],
-    ) -> Result<bool, InternalError>;
-
     /// Automatically stops trigger
     async fn apply_trigger_auto_stop_decision(
         &self,

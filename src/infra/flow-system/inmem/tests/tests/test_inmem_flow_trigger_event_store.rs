@@ -51,14 +51,6 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_has_active_trigger_for_datasets,
-    harness = InMemoryFlowTriggerEventStoreHarness
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-database_transactional_test!(
-    storage = inmem,
     fixture =
         kamu_flow_system_repo_tests::test_flow_trigger_event_store::test_latest_event_is_last_saved,
     harness = InMemoryFlowTriggerEventStoreHarness

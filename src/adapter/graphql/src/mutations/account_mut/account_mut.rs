@@ -9,7 +9,7 @@
 
 use kamu_accounts::*;
 
-use crate::mutations::{AccountAccessTokensMut, AccountFlowsMut, AccountQuotasMut};
+use crate::mutations::{AccountAccessTokensMut, AccountQuotasMut};
 use crate::prelude::*;
 use crate::utils;
 
@@ -172,18 +172,6 @@ impl AccountMut {
             Err(E::Access(access_error)) => Err(access_error.into()),
             Err(e @ E::Internal(_)) => Err(e.int_err().into()),
         }
-    }
-
-    /// Access to the mutable flow configurations of this account.
-    /// Available only to the account itself.
-    #[expect(
-        clippy::unused_async,
-        reason = "async-graphql resolvers are async by framework contract"
-    )]
-    async fn flows(&self, ctx: &Context<'_>) -> Result<AccountFlowsMut<'_>> {
-        utils::check_logged_account_name_match(ctx, &self.account.account_name)?;
-
-        Ok(AccountFlowsMut::new(&self.account))
     }
 
     /// Access to the access token management of this account.
