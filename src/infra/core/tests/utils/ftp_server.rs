@@ -17,8 +17,7 @@ use kamu::utils::docker_images;
 pub struct FtpServer {
     pub container_name: String,
     pub host_port: u16,
-    #[allow(dead_code)]
-    container: ContainerProcess,
+    _container: ContainerProcess,
 }
 
 impl FtpServer {
@@ -61,7 +60,7 @@ impl FtpServer {
 
         Self {
             container_name: container.container_name().to_string(),
-            container,
+            _container: container,
             host_port,
         }
     }

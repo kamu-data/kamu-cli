@@ -39,7 +39,12 @@ impl FetchService {
     // TODO: convert to non-blocking
     // TODO: not implementing caching as some FTP servers throw errors at us
     // when we request filetime :(
-    #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+    #[expect(
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation,
+        reason = "curl reports byte counts as f64 and std has no float-to-int conversion; `as` \
+                  saturates"
+    )]
     fn fetch_ftp_impl(
         url: &Url,
         target_path: &Path,
