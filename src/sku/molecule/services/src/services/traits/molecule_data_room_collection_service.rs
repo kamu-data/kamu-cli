@@ -76,11 +76,14 @@ pub trait MoleculeDataRoomCollectionService: Send + Sync {
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
 
+    /// Retracts the entry at `path`. With `extra_data`, the entry is first
+    /// corrected to it in the same block, so the retraction carries those values
     async fn remove_data_room_collection_entry_by_path(
         &self,
         data_room_dataset_id: &odf::DatasetID,
         source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
+        extra_data: Option<kamu_datasets::ExtraDataFields>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError>;
 }

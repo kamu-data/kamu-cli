@@ -399,12 +399,23 @@ impl MoleculeDataRoomCollectionService for MoleculeDataRoomCollectionServiceImpl
         data_room_dataset_id: &odf::DatasetID,
         source_event_time: Option<DateTime<Utc>>,
         path: CollectionPath,
+        extra_data: Option<kamu_datasets::ExtraDataFields>,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeDataRoomCollectionWriteError> {
+        let mut operations = Vec::with_capacity(2);
+        if let Some(extra_data) = extra_data {
+            operations.push(CollectionUpdateOperation::r#move(
+                path.clone(),
+                path.clone(),
+                Some(extra_data),
+            ));
+        }
+        operations.push(CollectionUpdateOperation::remove(path));
+
         self.execute_collection_update(
             data_room_dataset_id,
             source_event_time,
-            vec![CollectionUpdateOperation::remove(path)],
+            operations,
             expected_head,
         )
         .await

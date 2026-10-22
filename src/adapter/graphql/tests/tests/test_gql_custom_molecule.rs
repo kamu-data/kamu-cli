@@ -491,6 +491,10 @@ test_gql_custom_molecule!(test_molecule_data_room_as_of_block_hash);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+test_gql_custom_molecule!(test_molecule_data_room_remove_entry_with_another_change_by);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 test_gql_custom_molecule!(test_molecule_alternative_encryption_metadata);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4471,6 +4475,131 @@ async fn test_molecule_data_room_as_of_block_hash(
                 }
             }
         })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_molecule_data_room_remove_entry_with_another_change_by(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
+) {
+    const OCL_ID: &str = OCL_ID_1;
+
+    let harness = GraphQLMoleculeHarness::builder()
+        .search_variant(search_variant)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let create_res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "symbol": "vitafast",
+                "oclId": OCL_ID,
+            })),
+        ))
+        .await;
+    assert!(create_res.is_ok(), "{create_res:#?}");
+
+    let data_room_did = create_res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]
+        ["project"]["dataRoom"]["dataset"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let data_room_ref = odf::DatasetID::from_did_str(&data_room_did)
+        .unwrap()
+        .as_local_ref();
+
+    let upload_res = GraphQLQueryRequest::new(
+        CREATE_VERSIONED_FILE,
+        async_graphql::Variables::from_value(value!({
+            "oclId": OCL_ID,
+            "path": "/foo.txt",
+            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+            "contentType": "text/plain",
+            "changeBy": USER_1,
+            "accessLevel": "public",
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await
+    .into_json_data();
+    let upload_node = &upload_res["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"];
+    pretty_assertions::assert_eq!(upload_node["isSuccess"], json!(true));
+    let file_ref = upload_node["entry"]["ref"].as_str().unwrap().to_string();
+
+    let data_room_chain_len_before_removal =
+        harness.dataset_metadata_chain_len(&data_room_ref).await;
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            REMOVE_ENTRY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+                "path": "/foo.txt",
+                "changeBy": USER_2,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["removeEntry"]["isSuccess"],
+        json!(true),
+    );
+
+    // The change_by correction and the retraction are committed together
+    pretty_assertions::assert_eq!(
+        harness.dataset_metadata_chain_len(&data_room_ref).await,
+        data_room_chain_len_before_removal + 1,
+    );
+
+    harness.synchronize_agents().await;
+
+    let expected_activity_nodes = json!([
+        {
+            "__typename": "MoleculeActivityFileRemoved",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": file_ref,
+                "accessLevel": "public",
+                "changeBy": USER_2,
+            }
+        },
+        {
+            "__typename": "MoleculeActivityFileAdded",
+            "entry": {
+                "path": "/foo.txt",
+                "ref": file_ref,
+                "accessLevel": "public",
+                "changeBy": USER_1,
+            }
+        },
+    ]);
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_PROJECT_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .into_json_data()["molecule"]["v3"]["project"]["activity"]["nodes"],
+        expected_activity_nodes,
+    );
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_GLOBAL_ACTIVITY_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "filters": null,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .into_json_data()["molecule"]["v3"]["activity"]["nodes"],
+        expected_activity_nodes,
     );
 }
 
@@ -12753,16 +12882,18 @@ impl GraphQLMoleculeHarness {
     }
 
     async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
+        self.dataset_metadata_chain_len(&dataset_alias.as_local_ref())
+            .await
+    }
+
+    async fn dataset_metadata_chain_len(&self, dataset_ref: &odf::DatasetRef) -> usize {
         let dataset_reg = self
             .catalog_authorized
             .get_one::<dyn DatasetRegistry>()
             .unwrap();
-        let projects_dataset = dataset_reg
-            .get_dataset_by_ref(&dataset_alias.as_local_ref())
-            .await
-            .unwrap();
+        let dataset = dataset_reg.get_dataset_by_ref(dataset_ref).await.unwrap();
 
-        let last_block = projects_dataset
+        let last_block = dataset
             .as_metadata_chain()
             .get_block_by_ref(&odf::BlockRef::Head)
             .await

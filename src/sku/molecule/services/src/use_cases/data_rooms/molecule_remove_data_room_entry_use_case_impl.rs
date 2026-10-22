@@ -51,58 +51,24 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
         change_by: String,
         expected_head: Option<odf::Multihash>,
     ) -> Result<MoleculeUpdateDataRoomEntryResult, MoleculeRemoveDataRoomEntryError> {
-        // Inspect latest entry to see if we need to correct change_by before retracting
-        let (updated_extra_data, needs_correction): (Option<kamu_datasets::ExtraDataFields>, bool) =
-            self.data_room_collection_service
-                .find_data_room_collection_entry_by_path(
-                    &molecule_project.data_room_dataset_id,
-                    None,
-                    path.clone(),
-                )
-                .await
-                .map_err(MoleculeRemoveDataRoomEntryError::from)?
-                .map(|entry| -> Result<_, MoleculeRemoveDataRoomEntryError> {
-                    let mut denorm = MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(
-                        entry.extra_data,
-                    )
-                    .int_err()?;
-                    let needs_correction = denorm.change_by != change_by;
-                    denorm.change_by.clone_from(&change_by);
-                    Ok((
-                        Some(denorm.to_collection_extra_data_fields()),
-                        needs_correction,
-                    ))
-                })
-                .transpose()?
-                .unwrap_or((None, false));
-
-        // If change_by differs, first write a correction (path move with updated
-        // extra_data)
-        let mut next_expected_head = expected_head.clone();
-        if needs_correction {
-            let extra_data = updated_extra_data.clone().expect("extra_data must exist");
-
-            match self
-                .data_room_collection_service
-                .move_data_room_collection_entry_by_path(
-                    &molecule_project.data_room_dataset_id,
-                    source_event_time,
-                    path.clone(),
-                    path.clone(),
-                    Some(extra_data),
-                    next_expected_head.clone(),
-                )
-                .await?
-            {
-                MoleculeUpdateDataRoomEntryResult::Success(success) => {
-                    next_expected_head = Some(success.new_head);
-                }
-                MoleculeUpdateDataRoomEntryResult::UpToDate
-                | MoleculeUpdateDataRoomEntryResult::EntryNotFound(_) => {
-                    // No-op, proceed with removal
-                }
-            }
-        }
+        // The entry is retracted with the caller's change_by, so the removal is attributed to them
+        let updated_extra_data = self
+            .data_room_collection_service
+            .find_data_room_collection_entry_by_path(
+                &molecule_project.data_room_dataset_id,
+                None,
+                path.clone(),
+            )
+            .await
+            .map_err(MoleculeRemoveDataRoomEntryError::from)?
+            .map(|entry| -> Result<_, MoleculeRemoveDataRoomEntryError> {
+                let mut denorm =
+                    MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(entry.extra_data)
+                        .int_err()?;
+                denorm.change_by.clone_from(&change_by);
+                Ok(denorm.to_collection_extra_data_fields())
+            })
+            .transpose()?;
 
         let mut result = self
             .data_room_collection_service
@@ -110,23 +76,16 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
                 &molecule_project.data_room_dataset_id,
                 source_event_time,
                 path.clone(),
-                next_expected_head,
+                updated_extra_data,
+                expected_head,
             )
             .await?;
 
+        // Only the retraction describes the removal; a change_by correction before it does not
         if let MoleculeUpdateDataRoomEntryResult::Success(success) = &mut result {
-            for (_op, record) in &mut success.inserted_records {
-                if let Some(extra_data) = updated_extra_data.clone() {
-                    record.extra_data = extra_data;
-                } else {
-                    let mut denorm = MoleculeDenormalizeFileToDataRoom::try_from_extra_data_fields(
-                        record.extra_data.clone(),
-                    )
-                    .int_err()?;
-                    denorm.change_by.clone_from(&change_by);
-                    record.extra_data = denorm.to_collection_extra_data_fields();
-                }
-            }
+            success
+                .inserted_records
+                .retain(|(op, _)| *op == odf::metadata::OperationType::Retract);
         }
 
         match result {
