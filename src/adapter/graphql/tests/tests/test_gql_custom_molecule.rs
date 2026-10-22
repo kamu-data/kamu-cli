@@ -14,7 +14,13 @@ use base64::Engine as _;
 use bon::bon;
 use chrono::Utc;
 use indoc::indoc;
-use kamu_accounts::{AccountQuotaService, CurrentAccountSubject, LoggedAccount, QuotaType};
+use kamu_accounts::{
+    AccountHandle,
+    AccountQuotaService,
+    CurrentAccountSubject,
+    LoggedAccount,
+    QuotaType,
+};
 use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_handle_data_loader};
 use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_core::*;
@@ -12554,7 +12560,7 @@ struct GraphQLMoleculeHarness {
     schema: kamu_adapter_graphql::Schema,
     catalog_authorized: dill::Catalog,
     outbox_agent: Arc<dyn OutboxAgent>,
-    molecule_account_handle: odf::AccountHandle,
+    molecule_account_handle: AccountHandle,
 }
 
 #[bon]
@@ -12653,7 +12659,7 @@ impl GraphQLMoleculeHarness {
         // Finalize catalog
         let base_catalog = base_builder.build();
 
-        let molecule_account_handle = odf::AccountHandle {
+        let molecule_account_handle = AccountHandle {
             id: odf::ResourceID::new(uuid::Uuid::new_v4()),
             did: odf::AccountID::new_generated_ed25519().1,
             name: "molecule".parse().unwrap(),

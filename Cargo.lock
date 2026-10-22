@@ -3905,7 +3905,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 3.0.9",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -9240,7 +9240,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-molecule-domain"
-version = "0.270.0"
+version = "0.271.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -9271,7 +9271,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-molecule-services"
-version = "0.270.0"
+version = "0.271.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -13407,9 +13407,9 @@ dependencies = [
 
 [[package]]
 name = "ruint"
-version = "1.21.0"
+version = "1.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3fd047ac072f7d50e8374d249f1e407b53aed2a8af8cff67f1aa7ed669087c5"
+checksum = "2973657b5127d510e230f5c63d2d106af9c8f79393d8b9f4647323e8196bdde5"
 dependencies = [
  "alloy-rlp",
  "ark-ff 0.3.0",
@@ -13425,7 +13425,6 @@ dependencies = [
  "parity-scale-codec",
  "primitive-types 0.12.2",
  "proptest",
- "rand 0.10.3",
  "rand 0.8.8",
  "rand 0.9.5",
  "rlp",

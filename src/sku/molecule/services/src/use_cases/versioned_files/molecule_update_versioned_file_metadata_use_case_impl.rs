@@ -111,6 +111,8 @@ impl MoleculeUpdateVersionedFileMetadataUseCase for MoleculeUpdateVersionedFileM
                 UpdateVersionFileUseCaseError::QuotaExceeded(e) => {
                     MoleculeUpdateVersionedFileMetadataError::QuotaExceeded(e)
                 }
+                // The caller passes an existing entry, so the file always has a version
+                e @ UpdateVersionFileUseCaseError::NoVersions => e.int_err().into(),
                 UpdateVersionFileUseCaseError::Internal(e) => {
                     MoleculeUpdateVersionedFileMetadataError::Internal(e)
                 }
