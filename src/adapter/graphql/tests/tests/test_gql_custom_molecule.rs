@@ -495,6 +495,10 @@ test_gql_custom_molecule!(test_molecule_data_room_remove_entry_with_another_chan
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+test_gql_custom_molecule!(test_molecule_data_room_update_file_metadata_with_expected_head);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 test_gql_custom_molecule!(test_molecule_alternative_encryption_metadata);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4600,6 +4604,157 @@ async fn test_molecule_data_room_remove_entry_with_another_change_by(
         .await
         .into_json_data()["molecule"]["v3"]["activity"]["nodes"],
         expected_activity_nodes,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_molecule_data_room_update_file_metadata_with_expected_head(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
+) {
+    const OCL_ID: &str = OCL_ID_1;
+
+    const UPDATE_METADATA_QUERY: &str = indoc!(
+        r#"
+        mutation ($oclId: String!, $ref: DatasetID!, $expectedHead: String, $changeBy: String!, $accessLevel: String!, $description: String) {
+          molecule {
+            v3 {
+              project(oclId: $oclId) {
+                dataRoom {
+                  updateFileMetadata(
+                    ref: $ref
+                    expectedHead: $expectedHead
+                    accessLevel: $accessLevel
+                    changeBy: $changeBy
+                    description: $description
+                  ) {
+                    isSuccess
+                    message
+                    __typename
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+    const LIST_ENTRIES_QUERY: &str = indoc!(
+        r#"
+        query ($oclId: String!) {
+          molecule {
+            v3 {
+              project(oclId: $oclId) {
+                dataRoom {
+                  latest {
+                    entries {
+                      nodes {
+                        path
+                        changeBy
+                        asVersionedFile {
+                          latest {
+                            accessLevel
+                            version
+                            description
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        "#
+    );
+
+    let harness = GraphQLMoleculeHarness::builder()
+        .search_variant(search_variant)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    let create_res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "symbol": "vitafast",
+                "oclId": OCL_ID,
+            })),
+        ))
+        .await;
+    assert!(create_res.is_ok(), "{create_res:#?}");
+
+    let upload_res = GraphQLQueryRequest::new(
+        CREATE_VERSIONED_FILE,
+        async_graphql::Variables::from_value(value!({
+            "oclId": OCL_ID,
+            "path": "/foo.txt",
+            "content": base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(b"hello"),
+            "contentType": "text/plain",
+            "changeBy": USER_1,
+            "accessLevel": "public",
+            "description": "Plain text file",
+        })),
+    )
+    .execute(&harness.schema, &harness.catalog_authorized)
+    .await
+    .into_json_data();
+    let upload_node = &upload_res["molecule"]["v3"]["project"]["dataRoom"]["uploadFile"];
+    pretty_assertions::assert_eq!(upload_node["isSuccess"], json!(true));
+    let file_ref = odf::DatasetID::from_did_str(upload_node["entry"]["ref"].as_str().unwrap())
+        .unwrap()
+        .as_local_ref();
+
+    let file_head = harness.dataset_head(&file_ref).await;
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            UPDATE_METADATA_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+                "ref": file_ref.to_string(),
+                "expectedHead": file_head.to_string(),
+                "accessLevel": "holders",
+                "changeBy": USER_2,
+                "description": "Updated plain text file",
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["updateFileMetadata"],
+        json!({
+            "isSuccess": true,
+            "message": "",
+            "__typename": "MoleculeDataRoomUpdateFileMetadataResultSuccess",
+        }),
+    );
+
+    harness.synchronize_agents().await;
+
+    pretty_assertions::assert_eq!(
+        GraphQLQueryRequest::new(
+            LIST_ENTRIES_QUERY,
+            async_graphql::Variables::from_json(json!({
+                "oclId": OCL_ID,
+            })),
+        )
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await
+        .into_json_data()["molecule"]["v3"]["project"]["dataRoom"]["latest"]["entries"]["nodes"],
+        json!([
+            {
+                "path": "/foo.txt",
+                "changeBy": USER_2,
+                "asVersionedFile": {
+                    "latest": {
+                        "accessLevel": "holders",
+                        "version": 2,
+                        "description": "Updated plain text file",
+                    }
+                }
+            },
+        ]),
     );
 }
 
@@ -12884,6 +13039,20 @@ impl GraphQLMoleculeHarness {
     async fn projects_metadata_chain_len(&self, dataset_alias: &odf::DatasetAlias) -> usize {
         self.dataset_metadata_chain_len(&dataset_alias.as_local_ref())
             .await
+    }
+
+    async fn dataset_head(&self, dataset_ref: &odf::DatasetRef) -> odf::Multihash {
+        let dataset_reg = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap();
+        let dataset = dataset_reg.get_dataset_by_ref(dataset_ref).await.unwrap();
+
+        dataset
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap()
     }
 
     async fn dataset_metadata_chain_len(&self, dataset_ref: &odf::DatasetRef) -> usize {

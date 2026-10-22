@@ -6135,7 +6135,7 @@ type MoleculeDataRoomMut {
 	"""
 	updateFileMetadata(		ref: DatasetID!,
 		"""
-		Expected head block hash to prevent concurrent updates
+		Expected head block hash of the versioned file to prevent concurrent updates
 		"""
 		expectedHead: Multihash,		accessLevel: String!,		changeBy: String!,		description: String,		categories: [String!],		tags: [String!],		contentText: String
 	): MoleculeDataRoomUpdateFileMetadataResult!

@@ -839,7 +839,9 @@ impl MoleculeDataRoomMut {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "ref")] reference: DatasetID<'static>,
-        #[graphql(desc = "Expected head block hash to prevent concurrent updates")]
+        #[graphql(
+            desc = "Expected head block hash of the versioned file to prevent concurrent updates"
+        )]
         expected_head: Option<Multihash<'static>>,
         // TODO: not optional?
         access_level: MoleculeAccessLevel,
@@ -908,7 +910,7 @@ impl MoleculeDataRoomMut {
                 reference.as_ref(),
                 existing_file_entry,
                 Some(event_time),
-                expected_head.clone(),
+                expected_head,
                 MoleculeVersionedFileEntryBasicInfo {
                     access_level,
                     change_by,
@@ -954,7 +956,8 @@ impl MoleculeDataRoomMut {
                 Some(event_time),
                 existing_data_room_entry.path.clone().into_v1(),
                 reference.into(),
-                expected_head,
+                // `expected_head` is the head of the versioned file, not of the data room
+                None,
                 new_denormalized_file_info.clone(),
                 updated_versioned_file_entry
                     .detailed_info
