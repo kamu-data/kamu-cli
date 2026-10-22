@@ -60,6 +60,21 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         ocl_id: OclId,
         symbol: Symbol,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
+        // The project account `<org>.<symbol>` must belong to the creating org:
+        // symbols like `dev` or `sandbox.x` would name another org or its project
+        let org_account_name = molecule_subject.account_handle.name.as_str();
+        let derived_account_name = format!("{org_account_name}.{symbol}");
+        if !molecule_org_account_owns(org_account_name, &derived_account_name) {
+            return Err(odf::AccessError::Unauthorized(
+                format!(
+                    "Project symbol '{symbol}' is not allowed: account '{derived_account_name}' \
+                     would not belong to '{org_account_name}'"
+                )
+                .into(),
+            )
+            .into());
+        }
+
         // Gain write access to `projects` dataset
         let projects_writer = self
             .projects_service

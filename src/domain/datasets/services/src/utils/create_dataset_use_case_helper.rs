@@ -70,25 +70,16 @@ impl CreateDatasetUseCaseHelper {
                     && *account_name != subject.account_handle.name
                 {
                     // Creating dataset for account different that the subject
-                    //
-                    // TODO: HACK: SEC: Validate subject account has permissions to create datasets
-                    // in target account e.g. by checking `member-of` relationship for
-                    // organizations. Currently only allowing cross-account creation for `kamu` and
-                    // `molecule` / `molecule.dev`.
-                    //
-                    // See: https://github.com/kamu-data/kamu-node/issues/233
                     if let Some(account) = self
                         .account_svc
                         .get()
                         .int_err()?
                         .account_by_name(account_name)
                         .await?
-                        && (subject.account_handle.name == "kamu"
-                            || subject.account_handle.name == "molecule"
-                            || subject.account_handle.name == "molecule.dev")
-                        && account
-                            .account_name
-                            .starts_with(subject.account_handle.name.as_str())
+                        && Self::has_cross_account_create_access(
+                            subject.account_handle.name.as_str(),
+                            account.account_name.as_str(),
+                        )
                     {
                         Ok((CanonicalDatasetAlias::new(raw_alias.clone()), account.id))
                     } else {
@@ -108,6 +99,48 @@ impl CreateDatasetUseCaseHelper {
                 }
             }
         }
+    }
+
+    // TODO: HACK: SEC: Validate subject account has permissions to create datasets
+    // in target account e.g. by checking `member-of` relationship for
+    // organizations. Currently only allowing cross-account creation for `kamu`
+    // and for Molecule org accounts into their project accounts.
+    //
+    // See: https://github.com/kamu-data/kamu-node/issues/233
+    //
+    // Public only for tests
+    pub fn has_cross_account_create_access(
+        subject_account_name: &str,
+        target_account_name: &str,
+    ) -> bool {
+        // Mirrors `kamu_molecule_domain::MOLECULE_ORG_ACCOUNTS`, which this crate
+        // cannot depend on
+        const MOLECULE_ORG_ACCOUNTS: [&str; 3] = ["molecule", "molecule.dev", "molecule.sandbox"];
+
+        if subject_account_name == "kamu" {
+            return target_account_name.starts_with(subject_account_name);
+        }
+
+        // A project account `<org>.<suffix>` belongs to the longest matching org,
+        // so `molecule` cannot reach into `molecule.dev.*` or `molecule.sandbox.*`.
+        // Names compare case-insensitively, as account names do.
+        let is_project_of = |org: &str| {
+            target_account_name.as_bytes().get(org.len()) == Some(&b'.')
+                && target_account_name
+                    .get(..org.len())
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(org))
+        };
+
+        let is_org = MOLECULE_ORG_ACCOUNTS
+            .iter()
+            .any(|org| org.eq_ignore_ascii_case(target_account_name));
+
+        !is_org
+            && MOLECULE_ORG_ACCOUNTS
+                .into_iter()
+                .filter(|org| is_project_of(org))
+                .max_by_key(|org| org.len())
+                .is_some_and(|org| org.eq_ignore_ascii_case(subject_account_name))
     }
 
     pub fn canonical_dataset_alias(

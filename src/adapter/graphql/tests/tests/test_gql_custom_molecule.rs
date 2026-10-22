@@ -469,6 +469,10 @@ test_gql_custom_molecule!(test_molecule_cannot_recreate_disabled_project_with_sa
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+test_gql_custom_molecule!(test_molecule_create_project_rejects_symbols_of_other_orgs);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 test_gql_custom_molecule!(test_molecule_data_room_quota_exceeded);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1291,6 +1295,57 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
             "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
             "__typename": "CreateProjectErrorConflict",
         }),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_molecule_create_project_rejects_symbols_of_other_orgs(
+    search_variant: GraphQLMoleculeHarnessSearchVariant,
+) {
+    let harness = GraphQLMoleculeHarness::builder()
+        .search_variant(search_variant)
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .build()
+        .await;
+
+    harness.create_projects_dataset().await;
+
+    // Each would name another org account or a project account of another org
+    for symbol in [
+        "dev",
+        "sandbox",
+        "dev.vitafast",
+        "sandbox.vitafast",
+        "SANDBOX",
+    ] {
+        let res = GraphQLQueryRequest::new(
+            CREATE_PROJECT,
+            async_graphql::Variables::from_json(json!({
+                "symbol": symbol,
+                "oclId": OCL_ID_1,
+            })),
+        )
+        .expect_error()
+        .execute(&harness.schema, &harness.catalog_authorized)
+        .await;
+
+        pretty_assertions::assert_eq!(res.errors[0].message, "Unauthorized", "{symbol}");
+    }
+
+    // A symbol that only starts like another org name stays with `molecule`
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "symbol": "sandboxes",
+                "oclId": OCL_ID_1,
+            })),
+        ))
+        .await;
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"]["isSuccess"],
+        json!(true),
     );
 }
 

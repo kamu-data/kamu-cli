@@ -95,6 +95,30 @@ fn test_has_access_by_name_matrix() {
         (MOLECULE_DEV, MOLECULE_PROJECT, false),
         (MOLECULE_DEV, "molecule.devops", false),
         (MOLECULE_DEV, "molecule.dev.probe8503325863", true),
+        // molecule.sandbox
+        (MOLECULE, "molecule.sandbox", false),
+        (MOLECULE, "molecule.sandbox.project", false),
+        (MOLECULE, "molecule.sandboxes", true),
+        (MOLECULE_DEV, "molecule.sandbox", false),
+        (MOLECULE_DEV, "molecule.sandbox.project", false),
+        ("molecule.sandbox", "molecule.sandbox", true),
+        ("molecule.sandbox", "molecule.sandbox.project", true),
+        ("molecule.sandbox", "molecule.sandboxes", false),
+        ("molecule.sandbox", MOLECULE, false),
+        ("molecule.sandbox", MOLECULE_PROJECT, false),
+        ("molecule.sandbox", MOLECULE_DEV, false),
+        ("molecule.sandbox", MOLECULE_DEV_PROJECT, false),
+        // Not a project account: no dot after the org name
+        (MOLECULE, "moleculex", false),
+        // Account names compare case-insensitively
+        (MOLECULE, "Molecule", true),
+        (MOLECULE, "Molecule.Project", true),
+        (MOLECULE, "molecule.DEV.project", false),
+        (MOLECULE, "Molecule.Sandbox", false),
+        ("molecule.sandbox", "MOLECULE.SANDBOX.project", true),
+        // Non-org accounts
+        (USER, "user.project", false),
+        (USER, MOLECULE_PROJECT, false),
     ] {
         let actual = SignEip712UseCaseImpl::has_access_by_account_name(
             subject_account_name,
