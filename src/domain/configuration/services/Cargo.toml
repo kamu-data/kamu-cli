@@ -62,7 +62,6 @@ chrono = { version = "0.4", default-features = false, features = [
 ] }
 dill = { version = "0.17", default-features = false }
 oop = { version = "0.0.2", optional = true }
-paste = { version = "1", default-features = false }
 secrecy = { version = "0.10", default-features = false }
 serde = { version = "1.0", features = [
     "derive",

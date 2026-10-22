@@ -9,6 +9,7 @@
 
 use kamu_resources as domain;
 pub use messaging_outbox;
+pub use paste;
 
 #[cfg(feature = "testing")]
 pub mod testing;

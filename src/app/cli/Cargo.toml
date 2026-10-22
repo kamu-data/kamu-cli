@@ -43,7 +43,6 @@ ingest-ftp = [
     "kamu/ingest-ftp",
 ]
 ingest-mqtt = [
-    "dep:rumqttc",
     "kamu/ingest-mqtt",
 ]
 query-extensions-json = [
@@ -168,9 +167,6 @@ alloy = { optional = true, version = "~1.7.3", default-features = false, feature
 ] }
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-webpki-roots",
-] }
-rumqttc = { optional = true, version = "0.25", default-features = false, features = [
-    "use-rustls",
 ] }
 rustls = { version = "0.23", default-features = false, features = [
     "aws-lc-rs",

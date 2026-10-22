@@ -41,7 +41,6 @@ time-source = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.17", default-features = false }
-paste = { version = "1", default-features = false }
 serde = { version = "1.0", features = [
     "derive",
 ] }

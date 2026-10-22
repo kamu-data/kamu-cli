@@ -17,7 +17,7 @@ macro_rules! declare_resource_service_layer {
         resource = $resource:ty,
         state_model = $state_model:ty
     ) => {
-        ::paste::paste! {
+        $crate::paste::paste! {
             $crate::declare_resource_event_store_bridge!(
                 bridge = [<$name EventStoreBridge>],
                 store = $domain::[<$name EventStore>],
