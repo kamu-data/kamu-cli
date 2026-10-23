@@ -13,6 +13,11 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Fixed
+- `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
+  Only queries that request a `Proof` need the key
+
 ## [0.271.0] - 2026-10-21
 ### Added
 - `kamu log` supports `--output-format json` and `ndjson`: each block is its YAML manifest as JSON, plus

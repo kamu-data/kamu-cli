@@ -705,6 +705,80 @@ async fn test_data_verify_handler() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_data_query_handler_without_identity() {
+    let harness = DataQueryHarness::new_without_identity().await;
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+
+        let query = format!(
+            "select offset, city, population from \"{}\" order by offset desc",
+            harness.dataset_handle.alias
+        );
+        let query_url = format!("{}query", harness.root_url);
+
+        // 1: No proof requested - signing key is not needed
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": query,
+                "include": ["Input", "Schema"],
+                "schemaFormat": "OdfJson",
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.json::<serde_json::Value>().await.unwrap();
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::OK,
+            status,
+            "Unexpected response: {status} {body}"
+        );
+        pretty_assertions::assert_eq!(
+            json!([
+                {"city": "B", "offset": 1, "population": 200},
+                {"city": "A", "offset": 0, "population": 100},
+            ]),
+            body["output"]["data"]
+        );
+
+        // 2: Proof requested - signing key is required
+        let res = cl
+            .post(&query_url)
+            .json(&json!({
+                "query": query,
+                "include": ["Proof"],
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        let status = res.status();
+        let body = res.json::<serde_json::Value>().await.unwrap();
+
+        pretty_assertions::assert_eq!(
+            http::StatusCode::NOT_IMPLEMENTED,
+            status,
+            "Unexpected response: {status} {body}"
+        );
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Response signing is not enabled by the node operator"
+            }),
+            body
+        );
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_data_query_handler_error_sql_unparsable() {
     let harness = DataQueryHarness::new().await;
 
@@ -1766,9 +1840,6 @@ struct DataQueryHarness {
 
 impl DataQueryHarness {
     async fn new() -> Self {
-        // TODO: Need access to these from harness level
-        let run_info_dir = tempfile::tempdir().unwrap();
-
         let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
         let identity_config = kamu_signing::entities::IdentityConfig {
             ed25519_private_key: Some(ed25519_private_key.clone()),
@@ -1776,6 +1847,30 @@ impl DataQueryHarness {
                 kamu_signing::utils::Secp256k1Signer::from_bytes(&[124; _].into()).unwrap(),
             ),
         };
+
+        Self::new_with_identity(identity_config, ed25519_private_key).await
+    }
+
+    /// The node has no signing keys configured.
+    async fn new_without_identity() -> Self {
+        let identity_config = kamu_signing::entities::IdentityConfig {
+            ed25519_private_key: None,
+            secp256k1_private_key: None,
+        };
+
+        Self::new_with_identity(
+            identity_config,
+            odf::metadata::PrivateKey::from_bytes(&[123; _]),
+        )
+        .await
+    }
+
+    async fn new_with_identity(
+        identity_config: kamu_signing::entities::IdentityConfig,
+        ed25519_private_key: odf::metadata::PrivateKey,
+    ) -> Self {
+        // TODO: Need access to these from harness level
+        let run_info_dir = tempfile::tempdir().unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add_value(RunInfoDir::new(run_info_dir.path()))
