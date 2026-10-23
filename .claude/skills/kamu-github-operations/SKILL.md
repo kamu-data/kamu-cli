@@ -14,6 +14,7 @@ one the session is working on (a merged PR, someone else's issue) is outward-fac
 | Symptom | Cause | Workaround |
 |---|---|---|
 | `gh pr edit` fails with `GraphQL: Projects (classic) is being deprecated … (repository.pullRequest.projectCards)` | `gh pr edit` reads the PR's classic project cards, which GitHub's API now refuses; the edit is never sent | Use the REST API, below. `gh pr create` and `gh pr view` are not affected |
+| Uploading a text file (`.md`, `.txt`) to `uploads.github.com/user-attachments/assets` fails with `content_type is not included in the list of allowed content types` | The attachment endpoint takes images and other media only, whatever `content_type` is sent | Post long text as issue or PR comments, each under the 65,536-character body limit and split at heading boundaries, and link them from the description |
 
 ### Editing a PR through the REST API
 
