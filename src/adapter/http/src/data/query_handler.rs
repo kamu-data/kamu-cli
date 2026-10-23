@@ -184,13 +184,21 @@ pub async fn query_handler_impl(
         .get_one::<kamu_signing::entities::IdentityConfig>()
         .unwrap();
 
-    let Some(ed25519_private_key) = &identity_config.ed25519_private_key else {
-        return Err(ApiError::not_implemented(ResponseSigningNotConfigured));
+    let include_proof = body.include.contains(&Include::Proof);
+
+    // Only signed responses need the key: fail before running the query
+    let ed25519_private_key = if include_proof {
+        let Some(ed25519_private_key) = &identity_config.ed25519_private_key else {
+            return Err(ApiError::not_implemented(ResponseSigningNotConfigured));
+        };
+        Some(ed25519_private_key)
+    } else {
+        None
     };
 
     // Automatically add `Input` if proof is requested, as proof depends on input
     // for verifiability
-    if body.include.contains(&Include::Proof) {
+    if include_proof {
         body.include.insert(Include::Input);
     }
     // Automatically add `Schema` if user specified schema format
@@ -242,26 +250,15 @@ pub async fn query_handler_impl(
         schema_format,
     };
 
-    let include_proof = body.include.contains(&Include::Proof);
-
-    let input =
-        if !body.include.contains(&Include::Input) && !body.include.contains(&Include::Proof) {
-            None
-        } else {
-            body.datasets = Some(QueryRequest::query_state_to_datasets(res.state));
-            body.schema_format = schema_format;
-            Some(body)
-        };
-
-    let response = if !include_proof {
-        QueryResponse {
-            input,
-            output,
-            sub_queries: None,
-            commitment: None,
-            proof: None,
-        }
+    let input = if !body.include.contains(&Include::Input) && !include_proof {
+        None
     } else {
+        body.datasets = Some(QueryRequest::query_state_to_datasets(res.state));
+        body.schema_format = schema_format;
+        Some(body)
+    };
+
+    let response = if let Some(ed25519_private_key) = ed25519_private_key {
         use odf::metadata::ed25519::Signer;
 
         let sub_queries = Vec::new();
@@ -289,6 +286,14 @@ pub async fn query_handler_impl(
                 verification_method: ed25519_private_key.verifying_key(),
                 proof_value: signature.into(),
             }),
+        }
+    } else {
+        QueryResponse {
+            input,
+            output,
+            sub_queries: None,
+            commitment: None,
+            proof: None,
         }
     };
 
