@@ -11,8 +11,10 @@ use std::sync::Arc;
 
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
+use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets_services::DatasetHeadCommitterImpl;
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,6 +183,39 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_compact_dataset_head_moved_concurrently() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+    let reported_heads = ReportedHeads::default();
+
+    let harness = CompactUseCaseHarness::with_compaction_executor(
+        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, true),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+        MockCompactionExecutor::new()
+            .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let compacted_head = harness.append_unreferenced_block(&foo, "compacted").await;
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    reported_heads.set(&foo.head, &compacted_head);
+    harness.move_head(&foo, &foo.head, &concurrent_head).await;
+
+    assert_matches!(
+        harness
+            .compact_dataset(ResolvedDataset::from_created(&foo))
+            .await,
+        Err(CompactionError::HeadMoved(odf::dataset::RefCASError {
+            expected: Some(expected),
+            actual: Some(actual),
+            ..
+        })) if expected == foo.head && actual == concurrent_head
+    );
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct CompactUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -192,19 +227,45 @@ impl CompactUseCaseHarness {
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
+        Self::build(mock_dataset_action_authorizer, mock_did_generator, None)
+    }
+
+    fn with_compaction_executor(
+        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_did_generator: MockDidGenerator,
+        mock_compaction_executor: MockCompactionExecutor,
+    ) -> Self {
+        Self::build(
+            mock_dataset_action_authorizer,
+            mock_did_generator,
+            Some(mock_compaction_executor),
+        )
+    }
+
+    fn build(
+        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_did_generator: MockDidGenerator,
+        maybe_mock_compaction_executor: Option<MockCompactionExecutor>,
+    ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 
-        let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
-            .add::<CompactDatasetUseCaseImpl>()
+        let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        b.add::<CompactDatasetUseCaseImpl>()
             .add::<CompactionPlannerImpl>()
             .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
-            .add::<CompactionExecutorImpl>()
             .add::<ObjectStoreRegistryImpl>()
-            .build();
+            .add::<DatasetHeadCommitterImpl>();
+        if let Some(mock_compaction_executor) = maybe_mock_compaction_executor {
+            b.add_value(mock_compaction_executor)
+                .bind::<dyn CompactionExecutor, MockCompactionExecutor>();
+        } else {
+            b.add::<CompactionExecutorImpl>();
+        }
+        let catalog = b.build();
 
         let use_case = catalog.get_one::<dyn CompactDatasetUseCase>().unwrap();
 

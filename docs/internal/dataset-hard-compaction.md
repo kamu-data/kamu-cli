@@ -117,8 +117,8 @@ outbox afterwards. If any dataset fails, the command returns an error and the tr
 back the `HEAD` updates of every dataset, including those reported as compacted.
 
 **Use case.** `CompactDatasetUseCaseImpl::execute` resolves the dataset with
-`DatasetAction::Maintain`, plans, executes, and on `Success` sets `HEAD` with
-`check_ref_is: Some(old_head)` and `validate_block_present`. `execute_multi` calls `execute` per
+`DatasetAction::Maintain`, plans, executes, and on `Success` moves `HEAD`
+from `old_head` through `DatasetHeadCommitter`, in the command's transaction. `execute_multi` calls `execute` per
 dataset and returns one `CompactionResponse` each; one failure does not stop the others.
 
 **Flow.** The flow's preconditions, configuration and logical plan are owned by
@@ -177,8 +177,10 @@ count.
    moves `HEAD`.
 
 The caller moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
-after planning (an ingest, a push, another compaction) makes the swap fail; the failure surfaces as
-an internal error, and the new blocks and merged files stay unreferenced.
+after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and merged files
+stay unreferenced. The use case returns `CompactionError::HeadMoved` with the expected and actual
+heads; the task runners return the recoverable `DatasetCommitError`
+([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 
 `CompactionListener` receives the plan, the result, and the `GatherChainInfo`, `MergeDataslices`
 and `CommitNewBlocks` phases. In the CLI, `CompactionMultiProgress` (a

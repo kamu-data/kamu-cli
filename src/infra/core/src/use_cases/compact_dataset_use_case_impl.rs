@@ -24,7 +24,7 @@ use kamu_core::{
     CompactionResult,
     NullCompactionMultiListener,
 };
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{DatasetAction, DatasetHeadCommitter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,6 +34,7 @@ pub struct CompactDatasetUseCaseImpl {
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
     rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
 }
 
 #[common_macros::method_names_consts]
@@ -86,16 +87,8 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
                 old_head, new_head, ..
             } => {
                 tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
-                target
-                    .as_metadata_chain()
-                    .set_ref(
-                        &odf::BlockRef::Head,
-                        new_head,
-                        odf::dataset::SetRefOpts {
-                            validate_block_present: true,
-                            check_ref_is: Some(Some(old_head)),
-                        },
-                    )
+                self.dataset_head_committer
+                    .commit_head(&target, Some(old_head), new_head)
                     .await?;
             }
         }

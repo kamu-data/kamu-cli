@@ -70,6 +70,10 @@ pub enum CompactionError {
         CompactionExecutionError,
     ),
 
+    /// `HEAD` was moved concurrently; nothing was committed.
+    #[error(transparent)]
+    HeadMoved(#[from] odf::dataset::RefCASError),
+
     #[error(transparent)]
     Access(
         #[from]
@@ -102,8 +106,8 @@ impl From<odf::dataset::SetChainRefError> for CompactionError {
         match v {
             odf::dataset::SetChainRefError::Access(e) => Self::Access(e),
             odf::dataset::SetChainRefError::Internal(e) => Self::Internal(e),
-            odf::dataset::SetChainRefError::BlockNotFound(_)
-            | odf::dataset::SetChainRefError::CASFailed(_) => Self::Internal(v.int_err()),
+            odf::dataset::SetChainRefError::CASFailed(e) => Self::HeadMoved(e),
+            odf::dataset::SetChainRefError::BlockNotFound(_) => Self::Internal(v.int_err()),
         }
     }
 }

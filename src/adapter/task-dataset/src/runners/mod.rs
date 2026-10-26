@@ -10,6 +10,7 @@
 mod hard_compact_dataset_task_runner;
 mod reset_dataset_task_runner;
 mod reset_dataset_to_metadata_runner;
+mod task_dataset_head_committer;
 mod update_dataset_task_runner;
 
 pub use hard_compact_dataset_task_runner::*;

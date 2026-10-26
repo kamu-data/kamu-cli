@@ -18,6 +18,9 @@ use crate::ResetPlan;
 
 #[async_trait::async_trait]
 pub trait ResetExecutor: Send + Sync {
+    /// Moves `HEAD` from `plan.old_head` to `plan.new_head` in the current
+    /// transaction. Fails with `SetReferenceFailed(CASFailed)` when `HEAD`
+    /// moved after planning.
     async fn execute(
         &self,
         target: ResolvedDataset,

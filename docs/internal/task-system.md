@@ -327,7 +327,7 @@ task is `Running` if and only if its `Running` message exists, and likewise for 
 A dataset planner resolves a `ResolvedDataset` inside its transaction and calls
 `detach_from_transaction()` before returning, so the definition can outlive that transaction and
 be used by the runner. A runner that needs the database again opens a new transaction and
-re-resolves what it needs (`commit_dataset_head`, `combine_task_result`).
+re-resolves what it needs (`TaskDatasetHeadCommitter`, `combine_task_result`).
 
 `TaskSchedulerImpl` itself opens no transactions: `create_task`, `cancel_task` and `try_take` run in
 the caller's, which is how the flow system creates a task atomically with the flow event that
@@ -355,9 +355,8 @@ before touching them.
 Ingest, transform and compaction share one shape: **the core service writes new blocks with
 `update_block_ref: false` outside any transaction, and the runner then moves `HEAD` in a short
 transaction with compare-and-swap** — the runner re-resolves the dataset through
-`DatasetRegistry` and moves `HEAD` from `old_head` to `new_head`: the update runner through
-`DatasetHeadCommitter` (`commit_dataset_head`), the compaction runners through
-`set_ref(Head, new_head, check_ref_is: Some(old_head))` (`update_dataset_head`). Blocks
+`DatasetRegistry` and moves `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter`
+(`TaskDatasetHeadCommitter`, shared by the update and compaction runners). Blocks
 written by an attempt that never reaches that step stay unreferenced, so a re-run after a crash,
 or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and reset differ:
 
@@ -367,7 +366,7 @@ or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync a
 | Update → transform | `TransformExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Update → sync | `SyncService` | the sync itself ([dataset-sync.md](dataset-sync.md#11-committing-validation-and-errors)) | one around the call in the runner; the protocol appends and sets `HEAD` in transactions of its own |
 | Hard compact / reset to metadata | `CompactionExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Reset | — (existing block) | `ResetExecutor`, **no** CAS at execution | one for the whole reset |
+| Reset | — (existing block) | `ResetExecutor`, CAS on the planned `old_head` | one for the whole reset |
 
 On DB-backed datasets `set_ref` goes through `DatasetReferenceServiceImpl::set_reference`, which
 posts `DatasetReferenceMessage::Updated` in the same transaction; the read models catch up from
@@ -451,8 +450,8 @@ definition. A planning error, `InvalidDatasetKind` included, becomes an internal
 **Running**: `CompactionExecutor::execute` runs outside any transaction. On `Success` the runner
 moves `HEAD` by CAS and returns `TaskResultDatasetHardCompact` / `TaskResultDatasetResetToMetadata`
 carrying the `CompactionResult` (`Success { old_head, new_head, old_num_blocks, new_num_blocks }`
-or `NothingToDo`). Any executor error is a recoverable empty failure; a lost `HEAD` CAS is returned
-from the runner as an internal error, which the task agent also records as a recoverable failure.
+or `NothingToDo`). Any executor error is a recoverable empty failure; a lost `HEAD` CAS is the
+recoverable typed `DatasetCommitError` → `HeadMoved`, as in [§7.1](#71-update-dataset).
 
 Compaction rewrites history, so derivative datasets that consumed the old blocks can no longer
 continue incrementally; that is what `InputDatasetCompacted` in [§7.1](#71-update-dataset)
@@ -467,14 +466,14 @@ the new and old heads from the logical plan
 `OldHeadMismatch` included, becomes an internal error.
 
 **Running** (`ResetDatasetTaskRunner`, one transaction around the whole run): re-resolves the
-dataset and calls `ResetExecutor::execute`. The executor does not compare against the planned
-head, so the `old_head` check happens only at planning time; a `HEAD` change between planning and
-running is not detected.
+dataset and calls `ResetExecutor::execute`, which moves `HEAD` by CAS on the planned `old_head`,
+so a `HEAD` change between planning and running fails the task.
 
 | Error | Becomes |
 | --- | --- |
 | `SetReferenceFailed(BlockNotFound)` — the target block is not in the dataset's block store | typed `TaskErrorDatasetReset::ResetHeadNotFound`, unrecoverable |
-| other `SetReferenceFailed`, `Internal` | empty, recoverable |
+| `SetReferenceFailed(CASFailed)` — `HEAD` moved after planning | typed `DatasetCommitError` → `HeadMoved`, recoverable |
+| `SetReferenceFailed(Access)`, `SetReferenceFailed(Internal)`, `Internal` | empty, recoverable |
 
 The success result is `TaskResultDatasetReset { reset_result: ResetResult { old_head, new_head } }`.
 

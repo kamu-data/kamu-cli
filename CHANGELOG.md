@@ -17,6 +17,10 @@ Recommendation: for ease of reading, use the following format:
 ### Changed
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again
+- When a dataset's head moves while `kamu pull`, `kamu system compact` or `kamu reset` runs, or while an
+  update, compaction or reset task runs, the command or task now fails with a head-moved conflict that
+  names the expected and actual heads, instead of an internal error. Such tasks fail as recoverable
+- `kamu reset` and reset tasks no longer overwrite a head that moved after the reset was planned
 ### Fixed
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key

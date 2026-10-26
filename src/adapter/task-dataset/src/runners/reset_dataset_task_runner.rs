@@ -15,6 +15,7 @@ use kamu_core::{ResetExecutionError, ResetExecutor};
 use kamu_datasets::DatasetRegistry;
 use kamu_task_system::*;
 
+use super::task_dataset_head_committer::TaskDatasetHeadCommitter;
 use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,7 +56,16 @@ impl ResetDatasetTaskRunner {
                 ) => Ok(TaskOutcome::Failed(
                     TaskErrorDatasetReset::ResetHeadNotFound.into_task_error(),
                 )),
-                err @ (ResetExecutionError::SetReferenceFailed(_)
+                ResetExecutionError::SetReferenceFailed(
+                    odf::dataset::SetChainRefError::CASFailed(e),
+                ) => Ok(TaskDatasetHeadCommitter::head_moved_outcome(
+                    task_reset.dataset_handle.id,
+                    e,
+                )),
+                err @ (ResetExecutionError::SetReferenceFailed(
+                    odf::dataset::SetChainRefError::Access(_)
+                    | odf::dataset::SetChainRefError::Internal(_),
+                )
                 | ResetExecutionError::Internal(_)) => {
                     tracing::error!(
                         error = ?err,

@@ -104,8 +104,8 @@ latest block. The ideas reset relies on:
 
 | Entry point | Mechanism | Authorization | `HEAD` swap |
 | --- | --- | --- | --- |
-| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain, in the use case | none, see [§5](#5-reset-to-a-block) |
-| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as the system | none |
+| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain, in the use case | CAS on the planned head, see [§5](#5-reset-to-a-block) |
+| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as the system | CAS on the planned head |
 | `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain, in the use case | CAS on the planned head |
 | GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task | Maintain, checked by the mutation | CAS on the planned head |
 | `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as the system | CAS on the planned head |
@@ -135,15 +135,12 @@ head:
 
 The planner does not check that the new head is an ancestor of the current one.
 
-**Execute.** `ResetExecutorImpl::execute` calls `set_ref(Head, new_head)` with
-`validate_block_present: true` and `check_ref_is: None`. "Present" means the block exists in the
-dataset's block store, which also holds blocks no longer reachable from `HEAD` (from an earlier
-reset, compaction, or an attempt that lost its `HEAD` swap). With no expected value, the
-database-backed reference repository uses the dataset's cached reference as the expected head. In
-the CLI the planner and executor share one resolved dataset, so that is the head the planner read
-and a concurrent move fails as `CASFailed`; the reset task re-resolves the dataset in a new
-transaction, reads the current head, and overwrites a move that landed after planning without an
-error ([task-system.md](task-system.md#73-reset)).
+**Execute.** `ResetExecutorImpl::execute` moves `HEAD` from the plan's `old_head` to its
+`new_head` through `DatasetHeadCommitter`, which checks that the new block is present. "Present"
+means the block exists in the dataset's block store, which also holds blocks no longer reachable
+from `HEAD` (from an earlier reset, compaction, or an attempt that lost its `HEAD` swap). A `HEAD`
+moved after planning fails the swap as `SetReferenceFailed(CASFailed)` and nothing changes, in the
+CLI and in the reset task alike ([task-system.md](task-system.md#73-reset)).
 
 Nothing else changes: no block is written, and data, checkpoints and blocks after the new head
 stay in storage. The dataset's watermark, offsets, checkpoint and source state are whatever the
@@ -207,7 +204,8 @@ consumers handle a rewrite as follows:
 | `ResetError::NotFound`, `Access` | use case | the dataset is missing, or the caller lacks Maintain |
 | `ResetPlanningError::OldHeadMismatch` | planner | the head changed since the caller looked |
 | `ResetExecutionError::SetReferenceFailed(BlockNotFound)` | executor | the target block is not in the dataset's block store |
-| `ResetExecutionError::SetReferenceFailed(…)`, `Internal` | executor | storage or database failure, or a lost compare-and-swap (`CASFailed`) |
+| `ResetExecutionError::SetReferenceFailed(CASFailed)` | executor | `HEAD` moved after planning |
+| `ResetExecutionError::SetReferenceFailed(…)`, `Internal` | executor | storage or database failure |
 
 `ResetResult { old_head, new_head }` reports the head the planner read and the new head. The CLI
 prints errors as failures; task and GraphQL mappings are owned by

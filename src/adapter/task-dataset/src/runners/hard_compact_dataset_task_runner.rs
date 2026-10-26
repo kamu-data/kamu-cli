@@ -9,12 +9,11 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
 use internal_error::InternalError;
 use kamu_core::{CompactionExecutor, CompactionResult};
-use kamu_datasets::DatasetRegistry;
 use kamu_task_system::*;
 
+use super::task_dataset_head_committer::TaskDatasetHeadCommitter;
 use crate::{TaskDefinitionDatasetHardCompact, TaskResultDatasetHardCompact};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,14 +55,11 @@ impl HardCompactDatasetTaskRunner {
                 if let CompactionResult::Success {
                     old_head, new_head, ..
                 } = &compaction_result
+                    && let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
+                        .commit(task_compact.target.get_handle(), old_head, new_head)
+                        .await?
                 {
-                    // Update the reference transactionally
-                    self.update_dataset_head(
-                        task_compact.target.get_handle(),
-                        Some(old_head),
-                        new_head,
-                    )
-                    .await?;
+                    return Ok(failed);
                 }
 
                 Ok(TaskOutcome::Success(
@@ -82,30 +78,6 @@ impl HardCompactDatasetTaskRunner {
                 Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
             }
         }
-    }
-
-    #[tracing::instrument(name = HardCompactDatasetTaskRunner_update_dataset_head, level = "debug", skip_all, fields(%dataset_handle, %new_head))]
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn update_dataset_head(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        old_head: Option<&odf::Multihash>,
-        new_head: &odf::Multihash,
-    ) -> Result<(), InternalError> {
-        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
-
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(old_head),
-                },
-            )
-            .await
-            .int_err()
     }
 }
 
