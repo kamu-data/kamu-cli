@@ -13,6 +13,12 @@ edition = { workspace = true }
 publish = { workspace = true }
 
 
+# The in-process FTP test server is used only with the `ingest-ftp` feature,
+# and dev-dependencies cannot be optional
+[package.metadata.cargo-udeps.ignore]
+development = ["libunftp", "unftp-sbe-fs"]
+
+
 [lints]
 workspace = true
 
@@ -214,6 +220,9 @@ datafusion = { version = "55", default-features = false, features = [
 ] }
 filetime = "0.2"
 indoc = "2"
+libunftp = { version = "0.23", default-features = false, features = [
+    "aws_lc_rs",
+] }
 mockall = { version = "0.15", default-features = false }
 nanoid = "0.5"
 pretty_assertions = { version = "1", default-features = false, features = [
@@ -227,8 +236,10 @@ test-log = { version = "0.2", features = [
 testing_logger = { version = "0.1" }
 tokio = { version = "1", default-features = false, features = [
     "macros",
+    "net",
     "rt",
 ] }
+unftp-sbe-fs = "0.4"
 
 [[bench]]
 name = "parallel_simple_transfer_protocol"

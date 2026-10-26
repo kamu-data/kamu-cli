@@ -14,6 +14,9 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Changed
+- Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
+  enabled again
 ### Fixed
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key

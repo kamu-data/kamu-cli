@@ -8,60 +8,53 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
-use std::time::Duration;
 
-use container_runtime::*;
-use kamu::utils::docker_images;
+use libunftp::ServerBuilder;
+use tokio::net::TcpListener;
+use tokio::task::JoinHandle;
+use unftp_sbe_fs::Filesystem;
 
-// TODO: Consider replacing with in-process server for speed
+/// In-process FTP server that serves files from a local directory.
+///
+/// Accepts any user name and password. The control port is ephemeral, and
+/// passive data connections use the library's default unprivileged port range.
 pub struct FtpServer {
-    pub container_name: String,
     pub host_port: u16,
-    _container: ContainerProcess,
+    accept_loop: JoinHandle<()>,
 }
 
 impl FtpServer {
-    pub const IMAGE: &'static str = docker_images::FTP;
-
     pub async fn new(server_dir: &Path) -> Self {
-        let container_runtime = ContainerRuntime::default();
-
-        container_runtime
-            .ensure_image(Self::IMAGE, None)
-            .await
-            .unwrap();
-
         if !server_dir.exists() {
             std::fs::create_dir(server_dir).unwrap();
         }
 
-        // TODO: this is likely very brittle because of all the port mapping
-        // FTP is a crazy protocol :(
-        let container = container_runtime
-            .run_attached(Self::IMAGE)
-            .random_container_name_with_prefix("kamu-test-ftp-")
-            .expose_port(21)
-            .map_port_range((47400, 47470), (47400, 47470))
-            .volume((server_dir, "/home/vsftpd"))
-            .environment_vars([
-                ("FTP_USER", "foo"),
-                ("FTP_PASS", "bar"),
-                ("PASV_ADDRESS", "localhost"),
-            ])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let host_port = listener.local_addr().unwrap().port();
 
-        let host_port = container
-            .wait_for_host_socket(21, Duration::from_secs(20))
-            .await
-            .unwrap();
+        let server_dir = server_dir.to_path_buf();
+        let accept_loop = tokio::spawn(async move {
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let server_dir = server_dir.clone();
+                let server = ServerBuilder::new(Box::new(move || {
+                    Filesystem::new(server_dir.clone()).unwrap()
+                }))
+                .build()
+                .unwrap();
+                tokio::spawn(server.service(stream));
+            }
+        });
 
         Self {
-            container_name: container.container_name().to_string(),
-            _container: container,
             host_port,
+            accept_loop,
         }
+    }
+}
+
+impl Drop for FtpServer {
+    fn drop(&mut self) {
+        self.accept_loop.abort();
     }
 }
