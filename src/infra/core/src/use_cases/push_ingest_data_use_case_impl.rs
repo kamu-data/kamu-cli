@@ -9,12 +9,13 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
+    DatasetHeadCommitter,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ResolvedDataset,
 };
@@ -27,6 +28,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 pub struct PushIngestDataUseCaseImpl {
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
+    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -47,26 +49,65 @@ impl PushIngestDataUseCaseImpl {
             skip_quota_check,
         } = options;
 
+        let opts = PushIngestOpts {
+            media_type,
+            source_event_time,
+            schema_inference: SchemaInferenceOpts::default(),
+            expected_head,
+            skip_quota_check,
+        };
+
+        if is_ingest_from_upload
+            && let Some(push_source) = self
+                .push_ingest_planner
+                .plan_push_source_creation(target.clone(), source_name.as_deref(), &opts)
+                .await?
+        {
+            self.add_push_source(&target, push_source, source_event_time)
+                .await?;
+        }
+
         let ingest_plan = self
             .push_ingest_planner
-            .plan_ingest(
-                target.clone(),
-                source_name.as_deref(),
-                PushIngestOpts {
-                    media_type,
-                    source_event_time,
-                    auto_create_push_source: is_ingest_from_upload,
-                    schema_inference: SchemaInferenceOpts::default(),
-                    expected_head,
-                    skip_quota_check,
-                },
-            )
+            .plan_ingest(target.clone(), source_name.as_deref(), opts)
             .await?;
 
         self.push_ingest_executor
             .execute_ingest(target, ingest_plan, data_source, listener_maybe)
             .await
             .map_err(Into::into)
+    }
+
+    /// Commits the push source on top of `HEAD` as it is now
+    async fn add_push_source(
+        &self,
+        target: &ResolvedDataset,
+        push_source: odf::metadata::AddPushSource,
+        system_time: Option<DateTime<Utc>>,
+    ) -> Result<(), PushIngestDataError> {
+        let old_head = target
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?;
+
+        let commit_result = target
+            .commit_event(
+                odf::MetadataEvent::AddPushSource(push_source),
+                odf::dataset::CommitOpts {
+                    system_time,
+                    prev_block_hash: Some(Some(&old_head)),
+                    update_block_ref: false,
+                    ..Default::default()
+                },
+            )
+            .await
+            .map_err(|e| PushIngestDataError::Execution(e.into()))?;
+
+        self.dataset_head_committer
+            .commit_head(target, Some(&old_head), &commit_result.new_head)
+            .await
+            .map_err(|e| PushIngestDataError::Execution(odf::dataset::CommitError::from(e).into()))
     }
 
     async fn finalize_head_update(
@@ -76,21 +117,11 @@ impl PushIngestDataUseCaseImpl {
         old_head: &odf::Multihash,
         new_head: &odf::Multihash,
     ) -> Result<(), PushIngestDataError> {
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(Some(old_head)),
-                },
-            )
+        self.dataset_head_committer
+            .commit_head(target, Some(old_head), new_head)
             .await
             .map_err(|e| {
-                PushIngestDataError::Execution(
-                    odf::dataset::CommitError::MetadataAppendError(e.into()).into(),
-                )
+                PushIngestDataError::Execution(odf::dataset::CommitError::from(e).into())
             })?;
 
         self.outbox

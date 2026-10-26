@@ -98,7 +98,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Smart protocol client trait | `kamu` — [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) | `SmartTransferProtocolClient`, `TransferOptions` |
 | Smart protocol client and server | `kamu-adapter-http` — [`src/adapter/http/src/smart_protocol/`](../../src/adapter/http/src/smart_protocol) | `WsSmartTransferProtocolClient`, `AxumServerPullProtocolInstance`, `AxumServerPushProtocolInstance`, messages, `protocol_dataset_helper` |
 | Server HTTP endpoints | `kamu-adapter-http` — [`simple_protocol/handlers.rs`](../../src/adapter/http/src/simple_protocol/handlers.rs), [`http_server_dataset_router.rs`](../../src/adapter/http/src/http_server_dataset_router.rs) | `refs`, `blocks`, `data`, `checkpoints` (GET and PUT), `pull` and `push` WebSocket upgrades |
-| Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`, `CreateDatasetUseCaseImpl` | block validation, `HEAD` update |
+| Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`, `CreateDatasetUseCaseImpl`; `odf` — `MetadataChainExt::append_batch` | block validation, `HEAD` update |
 | Push | `kamu` — [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs); CLI [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) | `kamu push` |
 | Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteAliasResolverImpl` |
 
@@ -196,8 +196,11 @@ sequenceDiagram
    precomputed; otherwise the local filesystem repo recomputes and checks it. The S3 repo requires
    a precomputed hash (it panics without one), so a sync into S3 storage works only from a trusted
    source, and then stores the stream without checking it.
-4. **Blocks.** All new blocks are appended in one call of `AppendDatasetMetadataBatchUseCase`, in
-   a transaction, followed by one `set_ref` with `SetRefCheckRefMode::Explicit(dst_head)`: a
+4. **Blocks.** All new blocks are appended at once, and then `HEAD` is moved once with a CAS on
+   `dst_head`, as `SetRefCheckRefMode::Explicit(dst_head)`. A local destination goes through
+   `AppendDatasetMetadataBatchUseCase` in a transaction, which commits through
+   `DatasetHeadCommitter`. A remote destination is written with `MetadataChainExt::append_batch` and
+   a CAS `set_ref` on its storage, since its `HEAD` is not a dataset reference of this node. A
    destination that moved since step 1 fails with `UpdatedConcurrently`.
 
 Objects land before the blocks that reference them, so a failure leaves at most unreferenced
@@ -261,7 +264,7 @@ sequenceDiagram
         par max_parallel_transfers
             C->>O: GET object
         end
-        Note over C: append blocks, set HEAD<br/>(CAS on the first block's prevBlockHash unless force)
+        Note over C: append blocks, set HEAD<br/>(CAS on the first block's prevBlockHash, or on the current head with force)
     end
 ```
 
@@ -298,7 +301,7 @@ sequenceDiagram
     end
     C->>S: DatasetPushObjectsUploadProgressResponse { Complete }
     C->>S: DatasetPushComplete
-    Note over S: append blocks, set HEAD (CAS unless force),<br/>post DatasetExternallyChangedMessage
+    Note over S: append blocks, set HEAD (CAS),<br/>post DatasetExternallyChangedMessage
     S-->>C: DatasetPushCompleteConfirmed
 ```
 
@@ -394,15 +397,18 @@ nothing themselves; callers own authorization.
 | --- | --- | --- |
 | Simple protocol, local source | none (trusted), hashes not recomputed | CAS on the destination head read at the start |
 | Simple protocol, remote source | full, hashes recomputed | as above |
-| Smart pull client | full | CAS on the first new block's `prevBlockHash`; none with `force` |
+| Smart pull client | full | CAS on the first new block's `prevBlockHash`; with `force`, on the head read in the committing transaction |
 | Smart push server | full | as above |
 
-Every block except the `Seed` of a newly created dataset passes through
-`AppendDatasetMetadataBatchUseCase` (IPFS publishing aside), which appends without moving the
-ref and sets `HEAD` once at the end, so readers see either the old or the new head. Setting `HEAD`
+Every block except the `Seed` of a newly created dataset is appended by
+`MetadataChainExt::append_batch` (IPFS publishing aside), which moves no reference; `HEAD` is set
+once at the end, so readers see either the old or the new head. For a local destination
+`AppendDatasetMetadataBatchUseCase` does both and moves `HEAD` through `DatasetHeadCommitter`. Setting `HEAD`
 posts `DatasetReferenceMessage`; the smart push server also posts `DatasetExternallyChangedMessage`.
 
-The variants are in `SyncError` (`sync_service.rs`). Two mappings are surprising: a Smart-protocol push
+The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `UpdatedConcurrently`
+for the Simple protocol and the Smart pull client alike; on the Smart push server it is an internal
+failure. Two mappings are surprising: a Smart-protocol push
 onto a remote that is ahead or has diverged fails with `InvalidInterval`, not `DestinationAhead` or
 `DatasetsDiverged`; and server-side internal failures reach the client as `Internal` with the
 generic message "Internal error", the cause staying in the server log (the one exception is a

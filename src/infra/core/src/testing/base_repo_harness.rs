@@ -16,7 +16,7 @@ use kamu_core::{DidGenerator, DidGeneratorDefault, MockDidGenerator, RunInfoDir,
 use kamu_datasets::{CreateDatasetResult, DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use odf::dataset::DatasetStorageUnitLocalFs;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::metadata::testing::MetadataFactory;
+use odf::metadata::testing::{DatasetSnapshotBuilder, MetadataFactory};
 use time_source::{SystemTimeSource, SystemTimeSourceDefault, SystemTimeSourceStub};
 
 use crate::DatasetRegistrySoloUnitBridge;
@@ -122,33 +122,44 @@ impl BaseRepoHarness {
     }
 
     pub async fn create_root_dataset(&self, alias: &odf::DatasetAlias) -> CreateDatasetResult {
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(odf::DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build();
-
-        let store_result = create_test_dataset_from_snapshot(
-            self.dataset_registry.as_ref(),
-            self.dataset_storage_unit_writer.as_ref(),
-            snapshot,
-            self.did_generator.generate_dataset_id().0,
-            self.system_time_source.now(),
+        self.create_root_dataset_with_events(
+            alias,
+            vec![MetadataFactory::set_polling_source().build().into()],
         )
         .await
-        .unwrap();
-
-        CreateDatasetResult::from_stored(store_result, alias.clone())
     }
 
     pub async fn create_root_dataset_with_push_source(
         &self,
         alias: &odf::DatasetAlias,
     ) -> CreateDatasetResult {
-        let snapshot = MetadataFactory::dataset_snapshot()
-            .name(alias.clone())
-            .kind(odf::DatasetKind::Root)
-            .push_event(MetadataFactory::add_push_source().build())
+        self.create_root_dataset_with_events(
+            alias,
+            vec![MetadataFactory::add_push_source().build().into()],
+        )
+        .await
+    }
+
+    pub async fn create_root_dataset_without_source(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> CreateDatasetResult {
+        self.create_root_dataset_with_events(alias, vec![]).await
+    }
+
+    async fn create_root_dataset_with_events(
+        &self,
+        alias: &odf::DatasetAlias,
+        events: Vec<odf::MetadataEvent>,
+    ) -> CreateDatasetResult {
+        let snapshot = events
+            .into_iter()
+            .fold(
+                MetadataFactory::dataset_snapshot()
+                    .name(alias.clone())
+                    .kind(odf::DatasetKind::Root),
+                DatasetSnapshotBuilder::push_event,
+            )
             .build();
 
         let store_result = create_test_dataset_from_snapshot(

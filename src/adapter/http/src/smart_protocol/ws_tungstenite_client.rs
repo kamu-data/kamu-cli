@@ -18,6 +18,7 @@ use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, Transfer
 use kamu_core::*;
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
+    AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
     CreateDatasetResult,
     CreateDatasetUseCase,
@@ -585,23 +586,21 @@ impl WsSmartTransferProtocolClient {
         if res.head != *expected_head {
             // Return the same kind of error as AppendDatasetMetadataBatchUseCase would on
             // hash mismatch
-            return Err(
-                kamu_datasets::AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
-                    kamu_datasets::AppendDatasetMetadataBatchUseCaseBlockAppendError {
-                        append_error: odf::dataset::AppendError::InvalidBlock(
-                            odf::dataset::AppendValidationError::HashMismatch(
-                                odf::storage::HashMismatchError {
-                                    expected: expected_head.clone(),
-                                    actual: res.head,
-                                },
-                            ),
+            return Err(AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
+                odf::dataset::AppendBatchError {
+                    append_error: odf::dataset::AppendError::InvalidBlock(
+                        odf::dataset::AppendValidationError::HashMismatch(
+                            odf::storage::HashMismatchError {
+                                expected: expected_head.clone(),
+                                actual: res.head,
+                            },
                         ),
-                        block_sequence_number: 0,
-                        block_hash: expected_head.clone(),
-                    },
-                )
-                .into(),
-            );
+                    ),
+                    block_sequence_number: 0,
+                    block_hash: expected_head.clone(),
+                },
+            )
+            .into());
         }
 
         res.dataset.detach_from_transaction();
@@ -620,16 +619,28 @@ impl WsSmartTransferProtocolClient {
 
         let head = append_dataset_metadata_batch_use_case
             .execute(
-                transactional_target.as_ref(),
+                &transactional_target,
                 Box::new(new_blocks.into_iter()),
                 AppendDatasetMetadataBatchUseCaseOptions {
-                    set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(
+                    set_ref_check_ref_mode: SetRefCheckRefMode::ForceUpdateIfDiverged(
                         force_update_if_diverged,
-                    )),
+                    ),
                     ..Default::default()
                 },
             )
-            .await?;
+            .await
+            .map_err(|e| match e {
+                AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                    odf::dataset::SetChainRefError::CASFailed(e),
+                ) => SyncError::UpdatedConcurrently(e.into()),
+                e @ (AppendDatasetMetadataBatchUseCaseError::BlockAppendError(_)
+                | AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                    odf::dataset::SetChainRefError::BlockNotFound(_)
+                    | odf::dataset::SetChainRefError::Access(_)
+                    | odf::dataset::SetChainRefError::Internal(_),
+                )
+                | AppendDatasetMetadataBatchUseCaseError::Internal(_)) => e.into(),
+            })?;
 
         Ok(head)
     }

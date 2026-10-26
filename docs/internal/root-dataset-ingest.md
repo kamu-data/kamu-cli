@@ -160,7 +160,8 @@ stage(df?, opts)                                   commit(staged)
 
 `write` is `stage` followed by `commit`; `write_watermark` commits an `AddData` that carries no data,
 only a watermark and optionally a source state (used by `SetWatermarkExecutorImpl` on behalf of
-`SetWatermarkUseCase`, not by ingest).
+`SetWatermarkUseCase`, not by ingest). The executor moves `HEAD` through `DatasetHeadCommitter`; if
+`HEAD` moved after planning it fails with `SetWatermarkExecutionError::RefCASFailed`.
 
 ### 4.3 What `stage` decides
 
@@ -304,25 +305,31 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 `PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)`:
 
-1. **Plan** — `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
-   `expected_head` when given) for `source_name`.
-   - If there is no matching push source and `auto_create_push_source` is set (only for uploads
-     through the HTTP endpoint), it commits an `AddPushSource { source_name: "auto", merge: Append }`
-     whose read step is guessed from the media type, then rebuilds the state. This commit moves
-     `HEAD` at once (no CAS), separately from the data commit, so the source stays even if the
-     ingest that follows fails. Without a media type the push fails with `SourceNotFound`.
-   - Otherwise a missing source is `SourceNotFound`. With no `source_name` and several push
-     sources, `WriterSourceEventVisitor` reports the ambiguity as `SourceNotFound` too.
-2. **Execute** — `PushIngestExecutorImpl::execute_ingest`:
+1. **Add a push source** (uploads through the HTTP endpoint only) —
+   `PushIngestPlannerImpl::plan_push_source_creation` returns an
+   `AddPushSource { source_name: "auto", merge: Append }`, with a read step guessed from the media
+   type, when the dataset has no source at all. The use case appends it on top of the current
+   `HEAD` and moves `HEAD` through `DatasetHeadCommitter`, comparing against the head it read at
+   that moment, separately from the data commit: the source stays even if the ingest that
+   follows fails. Without a media type the push fails with `SourceNotFound`.
+2. **Plan** — `PushIngestPlannerImpl::plan_ingest` builds the writer state at `HEAD` (or at
+   `expected_head` when given) for `source_name`. The planner writes nothing. A missing source is
+   `SourceNotFound`; with no `source_name` and several push sources, `WriterSourceEventVisitor`
+   reports the ambiguity as `SourceNotFound` too.
+3. **Execute** — `PushIngestExecutorImpl::execute_ingest`:
    materialize the `DataSource` into a file (a `file://` URL is used in place unless it is a FIFO
    or device, which is copied first; buffers and streams are written to the operation directory),
    read it — overriding the source's read step with a compatible one when the caller supplied a
    media type — preprocess, `stage`, check the account storage quota on the staged file size unless
    `skip_quota_check` (always skipped in single-tenant workspaces), then `commit`.
-3. **Finalize** — move `HEAD` from `old_head` to `new_head` with CAS and post
+4. **Finalize** — move `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter` and post
    `DatasetExternallyChangedMessage::ingest_http`.
 
-`execute_multi` runs steps 1 and 2 for each data source in turn, threading the new head through
+A lost CAS in step 1 or 4 is
+`PushIngestError::CommitError(CommitError::MetadataAppendError(AppendError::RefCASFailed))` with
+the expected and actual heads; nothing is committed.
+
+`execute_multi` runs steps 1 to 3 for each data source in turn, threading the new head through
 `expected_head`, and moves `HEAD` once at the end from the first `old_head` to the last `new_head`.
 
 Push ingest stores no source state (`new_source_state: None`), so `AddPushSource`'s capacity for
@@ -368,8 +375,8 @@ Ingest separates **appending blocks** from **publishing them**:
 1. The writer appends `SetDataSchema` / `AddData` with `prev_block_hash = meta.head` and
    `update_block_ref: false`. Data files and blocks land in storage; `HEAD` does not move, so no
    reader sees them yet.
-2. The caller sets `HEAD` with `check_ref_is: Some(old_head)`. This goes through
-   `DatasetReferenceServiceImpl::set_reference`, which writes the reference row and posts
+2. The caller moves `HEAD` from `old_head` through `DatasetHeadCommitter`, a CAS in the caller's
+   transaction. This goes through `DatasetReferenceServiceImpl::set_reference`, which writes the reference row and posts
    `DatasetReferenceMessage::Updated` in the same transaction; consumers write the storage-level
    reference, index the new blocks (which feeds the dependency graph), and update statistics and
    search ([outbox.md](outbox.md)).
@@ -400,7 +407,7 @@ Consequences:
 `Unreachable`, `ProcessError`, `ImagePull`, `PipeError`), `EngineProvisioningError`, and template
 and parameter errors. Only push has `UnsupportedMediaType`, `QuotaExceeded` and `Access`. Push
 planning fails separately with `PushIngestPlanningError` (`SourceNotFound`, `HeadNotFound`,
-`UnsupportedMediaType`, `CommitError`, `Internal`).
+`UnsupportedMediaType`, `Internal`).
 
 How each `PollingIngestError` becomes a recoverable or unrecoverable task outcome is in
 [task-system.md](task-system.md#71-update-dataset). A CAS conflict when moving `HEAD` after a

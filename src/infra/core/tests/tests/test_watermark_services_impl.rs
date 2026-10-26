@@ -21,13 +21,16 @@ use kamu::{
 use kamu_core::{
     MetadataQueryService,
     SetWatermarkError,
+    SetWatermarkExecutionError,
     SetWatermarkExecutor,
+    SetWatermarkPlan,
     SetWatermarkPlanner,
     SetWatermarkPlanningError,
     SetWatermarkResult,
     TenancyConfig,
 };
 use kamu_datasets::ResolvedDataset;
+use kamu_datasets_services::DatasetHeadCommitterImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -198,6 +201,52 @@ async fn test_set_watermark_rejects_on_derivative() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_set_watermark_head_moved_after_planning() {
+    let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
+
+    let foo = harness
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::try_from("foo").unwrap(),
+        ))
+        .await;
+    let planned_head = harness.get_head(&foo).await;
+
+    let plan = harness
+        .plan_set_watermark(
+            ResolvedDataset::from_created(&foo),
+            Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap(),
+        )
+        .await;
+
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    harness
+        .move_head(&foo, &planned_head, &concurrent_head)
+        .await;
+
+    assert_matches!(
+        harness
+            .set_watermark_executor
+            .execute(ResolvedDataset::from_created(&foo), plan)
+            .await,
+        Err(SetWatermarkExecutionError::RefCASFailed(odf::dataset::RefCASError {
+            expected,
+            actual,
+            ..
+        })) if expected == Some(planned_head) && actual == Some(concurrent_head.clone())
+    );
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from_created(&foo))
+            .await,
+        None,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct WatermarkTestHarness {
     base_repo_harness: BaseRepoHarness,
@@ -216,6 +265,7 @@ impl WatermarkTestHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<MetadataQueryServiceImpl>()
             .build();
 
@@ -225,6 +275,17 @@ impl WatermarkTestHarness {
             set_watermark_executor: catalog.get_one().unwrap(),
             metadata_query_svc: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn plan_set_watermark(
+        &self,
+        target: ResolvedDataset,
+        new_watermark: DateTime<Utc>,
+    ) -> SetWatermarkPlan {
+        self.set_watermark_planner
+            .plan_set_watermark(target, new_watermark)
+            .await
+            .unwrap()
     }
 
     async fn set_watermark(

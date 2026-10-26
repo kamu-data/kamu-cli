@@ -103,7 +103,8 @@ async fn do_test_sync(
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
-        .add::<AppendDatasetMetadataBatchUseCaseImpl>();
+        .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+        .add::<DatasetHeadCommitterImpl>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut catalog_foo_builder,
@@ -153,6 +154,7 @@ async fn do_test_sync(
         .add::<CreateDatasetUseCaseImpl>()
         .add::<CreateDatasetUseCaseHelper>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+        .add::<DatasetHeadCommitterImpl>()
         .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
             messaging_outbox::ConsumerFilter::AllConsumers,
         ))

@@ -205,7 +205,7 @@ async fn test_compact_dataset_head_moved_concurrently() {
         harness
             .compact_dataset(ResolvedDataset::from_created(&foo))
             .await,
-        Err(CompactionError::HeadMoved(odf::dataset::RefCASError {
+        Err(CompactionError::RefCASFailed(odf::dataset::RefCASError {
             expected: Some(expected),
             actual: Some(actual),
             ..

@@ -17,7 +17,6 @@ use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
-    AppendDatasetMetadataBatchUseCaseBlockAppendError,
     AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
     CreateDatasetResult,
@@ -27,7 +26,11 @@ use kamu_datasets::{
     DatasetRegistryExt,
     SetRefCheckRefMode,
 };
-use odf::dataset::{MetadataChainImpl, MetadataChainReferenceRepositoryImpl};
+use odf::dataset::{
+    MetadataChainExt as _,
+    MetadataChainImpl,
+    MetadataChainReferenceRepositoryImpl,
+};
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 
@@ -318,23 +321,21 @@ impl SimpleTransferProtocol {
         if res.head != *expected_hash {
             // Return the same kind of error as AppendDatasetMetadataBatchUseCase would on
             // hash mismatch
-            return Err(
-                kamu_datasets::AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
-                    kamu_datasets::AppendDatasetMetadataBatchUseCaseBlockAppendError {
-                        append_error: odf::dataset::AppendError::InvalidBlock(
-                            odf::dataset::AppendValidationError::HashMismatch(
-                                odf::storage::HashMismatchError {
-                                    expected: expected_hash.clone(),
-                                    actual: res.head,
-                                },
-                            ),
+            return Err(AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
+                odf::dataset::AppendBatchError {
+                    append_error: odf::dataset::AppendError::InvalidBlock(
+                        odf::dataset::AppendValidationError::HashMismatch(
+                            odf::storage::HashMismatchError {
+                                expected: expected_hash.clone(),
+                                actual: res.head,
+                            },
                         ),
-                        block_sequence_number: 0,
-                        block_hash: expected_hash.clone(),
-                    },
-                )
-                .into(),
-            );
+                    ),
+                    block_sequence_number: 0,
+                    block_hash: expected_hash.clone(),
+                },
+            )
+            .into());
         }
 
         res.dataset.detach_from_transaction();
@@ -342,8 +343,7 @@ impl SimpleTransferProtocol {
         Ok(res)
     }
 
-    #[transactional_method2(append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>, dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn append_metadata_transactional(
+    async fn append_metadata(
         &self,
         dst: &dyn odf::Dataset,
         dst_alias: Option<&odf::DatasetAlias>,
@@ -351,19 +351,64 @@ impl SimpleTransferProtocol {
         options: AppendDatasetMetadataBatchUseCaseOptions,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
         if let Some(alias) = dst_alias {
-            let res = dataset_registry
-                .get_dataset_by_ref(&alias.clone().into())
-                .await
-                .int_err()?;
-
-            append_dataset_metadata_batch_use_case
-                .execute(res.as_ref(), new_blocks, options)
+            self.append_metadata_transactional(alias, new_blocks, options)
                 .await
         } else {
-            append_dataset_metadata_batch_use_case
-                .execute(dst, new_blocks, options)
-                .await
+            Self::append_metadata_to_remote(dst, new_blocks, options).await
         }
+    }
+
+    #[transactional_method2(append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>, dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn append_metadata_transactional(
+        &self,
+        dst_alias: &odf::DatasetAlias,
+        new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
+        options: AppendDatasetMetadataBatchUseCaseOptions,
+    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
+        let target = dataset_registry
+            .get_dataset_by_ref(&dst_alias.clone().into())
+            .await
+            .int_err()?;
+
+        append_dataset_metadata_batch_use_case
+            .execute(&target, new_blocks, options)
+            .await
+    }
+
+    /// The `HEAD` of a remote repository is not a dataset reference of this
+    /// node, so it is moved directly rather than through
+    /// `DatasetHeadCommitter`
+    async fn append_metadata_to_remote(
+        dst: &dyn odf::Dataset,
+        new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
+        options: AppendDatasetMetadataBatchUseCaseOptions,
+    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
+        let dst_chain = dst.as_metadata_chain();
+
+        let Some(appended) = dst_chain
+            .append_batch(new_blocks, options.append_opts)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        let expected_head = options
+            .set_ref_check_ref_mode
+            .expected_head(dst_chain, appended.base_head)
+            .await?;
+
+        dst_chain
+            .set_ref(
+                &odf::BlockRef::Head,
+                &appended.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: false,
+                    check_ref_is: Some(expected_head.as_ref()),
+                },
+            )
+            .await?;
+
+        Ok(Some(appended.new_head))
     }
 
     async fn download_block_data<'a>(
@@ -601,14 +646,16 @@ impl SimpleTransferProtocol {
             Some(boxed_closure)
         };
 
-        self.append_metadata_transactional(
+        self.append_metadata(
             dst,
             dst_alias,
             Box::new(blocks_desc_ordered.into_iter().rev()),
             AppendDatasetMetadataBatchUseCaseOptions {
-                set_ref_check_ref_mode: Some(SetRefCheckRefMode::Explicit(dst_head)),
-                trust_source_hashes: Some(trust_source_hashes),
-                append_validation: Some(validation),
+                set_ref_check_ref_mode: SetRefCheckRefMode::Explicit(dst_head),
+                append_opts: odf::dataset::AppendBatchOpts {
+                    validation,
+                    trust_hashes: trust_source_hashes,
+                },
                 on_append_metadata_block_callback,
             },
         )
@@ -618,7 +665,7 @@ impl SimpleTransferProtocol {
 
             match use_case_error {
                 AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
-                    AppendDatasetMetadataBatchUseCaseBlockAppendError {
+                    odf::dataset::AppendBatchError {
                         append_error,
                         block_sequence_number,
                         block_hash,

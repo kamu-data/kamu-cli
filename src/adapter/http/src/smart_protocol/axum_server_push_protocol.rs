@@ -502,8 +502,8 @@ impl AxumServerPushProtocolInstance {
                     let resolved_dataset = dataset_registry.get_dataset_by_handle(&dataset_handle).await;
 
                     append_dataset_metadata_batch
-                        .execute(resolved_dataset.as_ref(), Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
-                            set_ref_check_ref_mode: Some(SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged)),
+                        .execute(&resolved_dataset, Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
+                            set_ref_check_ref_mode: SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged),
                             ..Default::default()
                         })
                         .await.int_err()?;

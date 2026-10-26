@@ -162,6 +162,7 @@ impl ServerSideLocalFsHarness {
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<RemoteRepositoryRegistryImpl>()
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+                .add::<DatasetHeadCommitterImpl>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()

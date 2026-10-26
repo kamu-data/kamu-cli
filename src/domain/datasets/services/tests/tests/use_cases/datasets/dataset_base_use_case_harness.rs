@@ -247,6 +247,7 @@ impl DatasetBaseUseCaseHarness {
             Err(InjectionError::Unregistered(_)) => {
                 let mut b = CatalogBuilder::new_chained(catalog);
                 b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
+                b.add::<DatasetHeadCommitterImpl>();
                 let catalog = b.build();
                 catalog
                     .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
@@ -284,7 +285,7 @@ impl DatasetBaseUseCaseHarness {
         // Execute append use case
         use_case
             .execute(
-                dataset.as_ref(),
+                &dataset,
                 Box::new(new_hashed_blocks.into_iter()),
                 AppendDatasetMetadataBatchUseCaseOptions::default(),
             )

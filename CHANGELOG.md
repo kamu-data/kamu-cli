@@ -21,6 +21,8 @@ Recommendation: for ease of reading, use the following format:
   update, compaction or reset task runs, the command or task now fails with a head-moved conflict that
   names the expected and actual heads, instead of an internal error. Such tasks fail as recoverable
 - `kamu reset` and reset tasks no longer overwrite a head that moved after the reset was planned
+- A forced pull or push (`--force`) no longer overwrites a head that another writer moved while the
+  new blocks were being committed
 ### Fixed
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key

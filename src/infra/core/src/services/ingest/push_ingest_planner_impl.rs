@@ -60,47 +60,26 @@ impl PushIngestPlannerImpl {
         Ok(metadata_state)
     }
 
-    async fn auto_create_push_source(
+    fn make_auto_push_source(
         &self,
-        target: ResolvedDataset,
-        source_name: &str,
         opts: &PushIngestOpts,
     ) -> Result<odf::metadata::AddPushSource, PushIngestPlanningError> {
         let read = match &opts.media_type {
-            Some(media_type) => {
-                match self
-                    .data_format_registry
-                    .get_best_effort_config(None, media_type)
-                {
-                    Ok(read_step) => Ok(read_step),
-                    Err(e) => Err(PushIngestPlanningError::UnsupportedMediaType(e)),
-                }
-            }
+            Some(media_type) => self
+                .data_format_registry
+                .get_best_effort_config(None, media_type)
+                .map_err(PushIngestPlanningError::UnsupportedMediaType),
             None => Err(PushIngestPlanningError::SourceNotFound(
-                PushSourceNotFoundError::new(Some(source_name)),
+                PushSourceNotFoundError::new(Some("auto")),
             )),
         }?;
 
-        let add_push_source_event = odf::metadata::AddPushSource {
+        Ok(odf::metadata::AddPushSource {
             source_name: String::from("auto"),
             read,
             preprocess: None,
             merge: odf::metadata::MergeStrategy::Append(odf::metadata::MergeStrategyAppend {}),
-        };
-
-        let commit_result = target
-            .commit_event(
-                odf::MetadataEvent::AddPushSource(add_push_source_event.clone()),
-                odf::dataset::CommitOpts {
-                    system_time: opts.source_event_time,
-                    ..Default::default()
-                },
-            )
-            .await;
-        match commit_result {
-            Ok(_) => Ok(add_push_source_event),
-            Err(e) => Err(PushIngestPlanningError::CommitError(e)),
-        }
+        })
     }
 }
 
@@ -109,8 +88,6 @@ impl PushIngestPlannerImpl {
 #[common_macros::method_names_consts]
 #[async_trait::async_trait]
 impl PushIngestPlanner for PushIngestPlannerImpl {
-    /// Uses or auto-creates push source definition in metadata to plan
-    /// ingestion
     #[tracing::instrument(
         name = PushIngestPlannerImpl_plan_ingest
         level = "debug",
@@ -123,33 +100,17 @@ impl PushIngestPlanner for PushIngestPlannerImpl {
         source_name: Option<&str>,
         opts: PushIngestOpts,
     ) -> Result<PushIngestPlan, PushIngestPlanningError> {
-        let mut metadata_state = self
-            .prepare_metadata_state(target.clone(), source_name, opts.expected_head.clone())
+        let metadata_state = self
+            .prepare_metadata_state(target, source_name, opts.expected_head.clone())
             .await?;
 
-        let push_source = match (&metadata_state.source_event, opts.auto_create_push_source) {
-            // No push source, and it's allowed to create
-            (None, true) => {
-                tracing::debug!("Auto-creating new push source");
-                let add_push_source_event = self
-                    .auto_create_push_source(target.clone(), "auto", &opts)
-                    .await?;
-
-                // Update data writer, as we've modified the dataset
-                metadata_state = self
-                    .prepare_metadata_state(target, source_name, opts.expected_head.clone())
-                    .await?;
-                Ok(add_push_source_event)
-            }
-
-            // Got existing push source
-            (Some(odf::MetadataEvent::AddPushSource(e)), _) => Ok(e.clone()),
-
-            // No push source and not allowed to create
-            _ => Err(PushIngestPlanningError::SourceNotFound(
+        let Some(odf::MetadataEvent::AddPushSource(push_source)) = &metadata_state.source_event
+        else {
+            return Err(PushIngestPlanningError::SourceNotFound(
                 PushSourceNotFoundError::new(source_name),
-            )),
-        }?;
+            ));
+        };
+        let push_source = push_source.clone();
 
         let operation_id = get_random_name(None, 10);
         let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
@@ -164,6 +125,30 @@ impl PushIngestPlanner for PushIngestPlannerImpl {
             },
             metadata_state: Box::new(metadata_state),
         })
+    }
+
+    #[tracing::instrument(
+        name = PushIngestPlannerImpl_plan_push_source_creation
+        level = "debug",
+        skip_all,
+        fields(target=%target.get_handle(), ?source_name, ?opts)
+    )]
+    async fn plan_push_source_creation(
+        &self,
+        target: ResolvedDataset,
+        source_name: Option<&str>,
+        opts: &PushIngestOpts,
+    ) -> Result<Option<odf::metadata::AddPushSource>, PushIngestPlanningError> {
+        let metadata_state = self
+            .prepare_metadata_state(target, source_name, opts.expected_head.clone())
+            .await?;
+
+        if metadata_state.source_event.is_some() {
+            return Ok(None);
+        }
+
+        tracing::debug!("Dataset has no source, planning to add a push source");
+        self.make_auto_push_source(opts).map(Some)
     }
 }
 

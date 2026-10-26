@@ -28,7 +28,11 @@ use kamu::{
 use kamu_core::utils::metadata_chain_comparator::CompareChainsResult;
 use kamu_core::*;
 use kamu_datasets::CreateDatasetResult;
-use kamu_datasets_services::{AppendDatasetMetadataBatchUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    DatasetHeadCommitterImpl,
+    DependencyGraphServiceImpl,
+};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use url::Url;
@@ -260,6 +264,7 @@ impl RemoteStatusTestHarness {
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<DependencyGraphServiceImpl>();
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);

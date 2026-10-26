@@ -178,7 +178,7 @@ count.
 
 The caller moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
 after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and merged files
-stay unreferenced. The use case returns `CompactionError::HeadMoved` with the expected and actual
+stay unreferenced. The use case returns `CompactionError::RefCASFailed` with the expected and actual
 heads; the task runners return the recoverable `DatasetCommitError`
 ([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 

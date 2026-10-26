@@ -14,6 +14,7 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets_services::DatasetHeadCommitterImpl;
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,6 +118,7 @@ impl SetWatermarkUseCaseHarness {
             .add::<SetWatermarkUseCaseImpl>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<MetadataQueryServiceImpl>()
             .build();

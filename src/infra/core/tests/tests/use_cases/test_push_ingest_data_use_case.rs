@@ -23,10 +23,11 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_core::*;
-use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{CreateDatasetResult, MockDatasetActionAuthorizer, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
+    DatasetHeadCommitterImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -222,6 +223,115 @@ async fn test_push_ingest_data_execute_multi() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_upload_adds_push_source() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset_without_source(&alias_foo).await;
+    let seed_head = harness.get_head(&foo).await;
+
+    assert_matches!(
+        harness.ingest_ndjson(&foo, None, true).await,
+        Ok(PushIngestResult::Updated { old_head, .. }) if old_head != seed_head
+    );
+
+    // The source is committed, so an ingest that may not add one finds it
+    assert_matches!(
+        harness.ingest_ndjson(&foo, None, false).await,
+        Ok(PushIngestResult::Updated { .. })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_head_moved_concurrently() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness
+        .create_root_dataset_with_push_source(&alias_foo)
+        .await;
+    let planned_head = harness.get_head(&foo).await;
+
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    harness
+        .move_head(&foo, &planned_head, &concurrent_head)
+        .await;
+
+    assert_matches!(
+        harness.ingest_ndjson(&foo, Some(planned_head.clone()), false).await,
+        Err(PushIngestDataError::Execution(PushIngestError::CommitError(
+            odf::dataset::CommitError::MetadataAppendError(
+                odf::dataset::AppendError::RefCASFailed(odf::dataset::RefCASError {
+                    expected,
+                    actual,
+                    ..
+                })
+            )
+        ))) if expected == Some(planned_head) && actual == Some(concurrent_head.clone())
+    );
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_execute_multi_head_moved_concurrently() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness
+        .create_root_dataset_with_push_source(&alias_foo)
+        .await;
+    let planned_head = harness.get_head(&foo).await;
+
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    harness
+        .move_head(&foo, &planned_head, &concurrent_head)
+        .await;
+
+    assert_matches!(
+        harness
+            .ingest_multi_data(
+                ResolvedDataset::from_created(&foo),
+                vec![
+                    PushIngestDataUseCaseHarness::ndjson_source(),
+                    PushIngestDataUseCaseHarness::ndjson_source(),
+                ],
+                PushIngestDataUseCaseHarness::ndjson_options(Some(planned_head), false),
+            )
+            .await,
+        Err(PushIngestDataError::Execution(
+            PushIngestError::CommitError(odf::dataset::CommitError::MetadataAppendError(
+                odf::dataset::AppendError::RefCASFailed(_)
+            ))
+        ))
+    );
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -243,6 +353,7 @@ impl PushIngestDataUseCaseHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
 
         b.add::<PushIngestDataUseCaseImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
@@ -288,6 +399,40 @@ impl PushIngestDataUseCaseHarness {
         self.use_case
             .execute(target, data_source, options, None)
             .await
+    }
+
+    async fn ingest_ndjson(
+        &self,
+        created: &CreateDatasetResult,
+        expected_head: Option<odf::Multihash>,
+        is_ingest_from_upload: bool,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.ingest_data(
+            ResolvedDataset::from_created(created),
+            Self::ndjson_source(),
+            Self::ndjson_options(expected_head, is_ingest_from_upload),
+        )
+        .await
+    }
+
+    fn ndjson_source() -> DataSource {
+        DataSource::Stream(Box::new(std::io::Cursor::new(
+            "{\"city\":\"foo\", \"population\":100}",
+        )))
+    }
+
+    fn ndjson_options(
+        expected_head: Option<odf::Multihash>,
+        is_ingest_from_upload: bool,
+    ) -> PushIngestDataUseCaseOptions {
+        PushIngestDataUseCaseOptions {
+            source_name: None,
+            source_event_time: None,
+            is_ingest_from_upload,
+            media_type: Some(MediaType::NDJSON.to_owned()),
+            expected_head,
+            skip_quota_check: false,
+        }
     }
 
     async fn ingest_multi_data(

@@ -15,7 +15,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
@@ -47,12 +47,27 @@ pub enum SetWatermarkResult {
 
 #[derive(Debug, Error)]
 pub enum SetWatermarkExecutionError {
+    /// `HEAD` was moved concurrently; nothing was committed.
+    #[error(transparent)]
+    RefCASFailed(#[from] odf::dataset::RefCASError),
+
     #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<odf::dataset::SetChainRefError> for SetWatermarkExecutionError {
+    fn from(v: odf::dataset::SetChainRefError) -> Self {
+        match v {
+            odf::dataset::SetChainRefError::CASFailed(e) => Self::RefCASFailed(e),
+            e @ (odf::dataset::SetChainRefError::BlockNotFound(_)
+            | odf::dataset::SetChainRefError::Access(_)
+            | odf::dataset::SetChainRefError::Internal(_)) => Self::Internal(e.int_err()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

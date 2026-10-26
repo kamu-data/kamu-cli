@@ -21,7 +21,11 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, DatasetAction, MockDatasetActionAuthorizer};
-use kamu_datasets_services::{AppendDatasetMetadataBatchUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    DatasetHeadCommitterImpl,
+    DependencyGraphServiceImpl,
+};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
@@ -372,6 +376,7 @@ impl PushUseCaseHarness {
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<DependencyGraphServiceImpl>();
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
