@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n                    UPDATE dataset_references SET block_hash_bin = $3\n                        WHERE dataset_id = $1\n                            AND block_ref_name = $2\n                            AND block_hash_bin = $4\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "122b413bfd5b8f4cfc068eea8cab604b42c6f062fd2d73e58a162b873d8eed55"
+}

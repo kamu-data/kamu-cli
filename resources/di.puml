@@ -50,6 +50,7 @@ interface "DatasetEnvVarResolver" <<i>>
 interface "DatasetEnvVarService" <<i>>
 interface "DatasetEnvVarSpecResolver" <<i>>
 interface "DatasetFactory" <<i>>
+interface "DatasetHeadCommitter" <<i>>
 interface "DatasetIncrementQueryService" <<i>>
 interface "DatasetKeyBlockRepository" <<i>>
 interface "DatasetKeyValueService" <<i>>
@@ -241,6 +242,7 @@ class "DatasetEnvVarResolverImpl"
 class "DatasetEnvVarServiceNull"
 class "DatasetEnvVarSpecResolverImpl"
 class "DatasetFactoryImpl"
+class "DatasetHeadCommitterImpl"
 class "DatasetIncrementQueryServiceImpl"
 class "DatasetKeyValueServiceSysEnv"
 class "DatasetLfsBuilderDatabaseBackedImpl"
@@ -1044,6 +1046,7 @@ class "WsSmartTransferProtocolClient"
 "DatasetLfsBuilder" <|-- "DatasetLfsBuilderDatabaseBackedImpl"
 "DatasetLfsBuilderDatabaseBackedImpl"  --> "Catalog"
 "DatasetLfsBuilderDatabaseBackedImpl"  --> "MetadataChainDbBackedConfig"
+"DatasetHeadCommitter" <|-- "DatasetHeadCommitterImpl"
 "InitOnStartup" <|-- "DatasetReferenceIndexer"
 "DatasetReferenceIndexer"  --> "DatasetEntryRepository"
 "DatasetReferenceIndexer"  --> "DatasetReferenceRepository"

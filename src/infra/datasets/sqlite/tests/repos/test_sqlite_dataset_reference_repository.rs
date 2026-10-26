@@ -43,6 +43,22 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = dataset_reference_repo::test_update_reference_from_stale_hash_provoke_cas_violation,
+    harness = SqliteDatasetReferenceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = dataset_reference_repo::test_update_missing_reference_provoke_cas_violation,
+    harness = SqliteDatasetReferenceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = dataset_reference_repo::test_set_and_remove_reference,
     harness = SqliteDatasetReferenceRepositoryHarness
 );
