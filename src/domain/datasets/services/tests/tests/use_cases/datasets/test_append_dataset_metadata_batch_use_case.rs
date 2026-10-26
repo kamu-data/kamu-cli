@@ -22,7 +22,7 @@ use kamu_datasets::{
     ResolvedDataset,
     SetRefCheckRefMode,
 };
-use kamu_datasets_services::{AppendDatasetMetadataBatchUseCaseImpl, DatasetHeadCommitterImpl};
+use kamu_datasets_services::AppendDatasetMetadataBatchUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -424,7 +424,6 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
         let catalog =
             dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog())
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-                .add::<DatasetHeadCommitterImpl>()
                 .build();
 
         Self {

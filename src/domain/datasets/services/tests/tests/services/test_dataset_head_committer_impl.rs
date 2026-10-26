@@ -18,8 +18,6 @@ use kamu_datasets::{
     DatasetReferenceRepository,
     ResolvedDataset,
 };
-use kamu_datasets_services::DatasetHeadCommitterImpl;
-use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
 
@@ -166,10 +164,7 @@ impl DatasetHeadCommitterHarness {
             })
             .await;
 
-        let catalog =
-            dill::CatalogBuilder::new_chained(dataset_base_use_case_harness.intermediate_catalog())
-                .add::<DatasetHeadCommitterImpl>()
-                .build();
+        let catalog = dataset_base_use_case_harness.intermediate_catalog().clone();
 
         Self {
             dataset_base_use_case_harness,
@@ -185,36 +180,6 @@ impl DatasetHeadCommitterHarness {
         let foo = self.create_root_dataset(&self.catalog, &alias_foo).await;
         self.reset_collected_outbox_messages();
         foo
-    }
-
-    /// Appends a `SetInfo` block after `prev_block_hash` without moving any
-    /// reference.
-    async fn append_unreferenced_block(
-        &self,
-        dataset: &CreateDatasetResult,
-        prev_block_hash: &odf::Multihash,
-        description: &str,
-    ) -> odf::Multihash {
-        let chain = dataset.dataset.as_metadata_chain();
-        let prev_block = chain.get_block(prev_block_hash).await.unwrap();
-
-        let block = MetadataFactory::metadata_block(
-            MetadataFactory::set_info().description(description).build(),
-        )
-        .prev(prev_block_hash, prev_block.sequence_number)
-        .system_time(self.system_time_source().now())
-        .build();
-
-        chain
-            .append(
-                block,
-                odf::dataset::AppendOpts {
-                    update_ref: None,
-                    ..odf::dataset::AppendOpts::default()
-                },
-            )
-            .await
-            .unwrap()
     }
 
     async fn commit_head(

@@ -12,7 +12,13 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{CreateDatasetUseCase, DatasetReferenceRepository};
+use kamu_datasets::{
+    CreateDatasetError,
+    CreateDatasetResult,
+    CreateDatasetUseCase,
+    DatasetReferenceRepository,
+    ResolvedDataset,
+};
 use kamu_datasets_services::CreateDatasetUseCaseImpl;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
@@ -97,10 +103,35 @@ async fn test_create_root_dataset() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_create_dataset_head_already_set() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = CreateUseCaseHarness::new(predefined_foo_id.clone()).await;
+    let foo = harness.create_root(&alias_foo, &predefined_foo_id).await;
+
+    assert_matches!(
+        harness.set_created_head(&foo).await,
+        Err(CreateDatasetError::CASFailed(e))
+            if e.expected_prev_block_hash.is_none()
+                && e.actual_prev_block_hash == Some(foo.head.clone())
+    );
+    assert_eq!(
+        harness
+            .get_dataset_reference(&predefined_foo_id, &odf::BlockRef::Head)
+            .await,
+        foo.head,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct CreateUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetUseCase>,
+    create_helper: Arc<CreateDatasetUseCaseHelper>,
     dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
 }
 
@@ -131,8 +162,40 @@ impl CreateUseCaseHarness {
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
+            create_helper: catalog.get_one().unwrap(),
             dataset_reference_repo: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn create_root(
+        &self,
+        alias: &odf::DatasetAlias,
+        dataset_id: &odf::DatasetID,
+    ) -> CreateDatasetResult {
+        self.use_case
+            .execute(
+                alias,
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(odf::DatasetKind::Root)
+                        .id(dataset_id.clone())
+                        .build(),
+                )
+                .system_time(self.system_time_source().now())
+                .build_typed(),
+                Default::default(),
+            )
+            .await
+            .unwrap()
+    }
+
+    /// Sets the first `HEAD` of a dataset again, as a concurrent creation would
+    async fn set_created_head(
+        &self,
+        dataset: &CreateDatasetResult,
+    ) -> Result<(), CreateDatasetError> {
+        self.create_helper
+            .set_created_head(ResolvedDataset::from_created(dataset), &dataset.head)
+            .await
     }
 
     async fn get_dataset_reference(

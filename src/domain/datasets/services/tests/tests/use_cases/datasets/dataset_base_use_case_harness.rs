@@ -26,6 +26,8 @@ use messaging_outbox::*;
 use odf::dataset::MetadataChainExt;
 use time_source::*;
 
+use super::racing_dataset_head_committer::RacingDatasetHeadCommitter;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetBaseUseCaseHarness {
@@ -86,6 +88,13 @@ impl DatasetBaseUseCaseHarness {
                     .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
             } else {
                 b.add::<AlwaysHappyDatasetActionAuthorizer>();
+            }
+
+            if opts.racing_head_committer {
+                b.add_value(RacingDatasetHeadCommitter::default())
+                    .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
+            } else {
+                b.add::<DatasetHeadCommitterImpl>();
             }
 
             if let Some(mock_did_generator) = opts.maybe_mock_did_generator {
@@ -247,7 +256,6 @@ impl DatasetBaseUseCaseHarness {
             Err(InjectionError::Unregistered(_)) => {
                 let mut b = CatalogBuilder::new_chained(catalog);
                 b.add::<AppendDatasetMetadataBatchUseCaseImpl>();
-                b.add::<DatasetHeadCommitterImpl>();
                 let catalog = b.build();
                 catalog
                     .get_one::<dyn AppendDatasetMetadataBatchUseCase>()
@@ -346,6 +354,37 @@ impl DatasetBaseUseCaseHarness {
         use_case.execute_plan(plan).await.unwrap();
     }
 
+    /// Appends a `SetInfo` block after `prev_block_hash` without moving any
+    /// reference.
+    pub async fn append_unreferenced_block(
+        &self,
+        dataset: &CreateDatasetResult,
+        prev_block_hash: &odf::Multihash,
+        description: &str,
+    ) -> odf::Multihash {
+        let chain = dataset.dataset.as_metadata_chain();
+        let prev_block = chain.get_block(prev_block_hash).await.unwrap();
+
+        use odf::metadata::testing::MetadataFactory;
+        let block = MetadataFactory::metadata_block(
+            MetadataFactory::set_info().description(description).build(),
+        )
+        .prev(prev_block_hash, prev_block.sequence_number)
+        .system_time(self.system_time_source().now())
+        .build();
+
+        chain
+            .append(
+                block,
+                odf::dataset::AppendOpts {
+                    update_ref: None,
+                    ..odf::dataset::AppendOpts::default()
+                },
+            )
+            .await
+            .unwrap()
+    }
+
     pub fn collected_outbox_messages(&self) -> String {
         format!("{}", self.test_dataset_outbox_listener.as_ref())
     }
@@ -364,6 +403,9 @@ pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
     pub outbox_provider: OutboxProvider,
     pub system_time_source_provider: SystemTimeSourceProvider,
+    /// Registers `RacingDatasetHeadCommitter` in place of
+    /// `DatasetHeadCommitterImpl`
+    pub racing_head_committer: bool,
 }
 
 impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
@@ -378,6 +420,7 @@ impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
                 force_immediate: true,
             },
             system_time_source_provider: SystemTimeSourceProvider::Default,
+            racing_head_committer: false,
         }
     }
 }

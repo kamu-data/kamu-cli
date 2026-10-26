@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub mod dataset_base_use_case_harness;
+mod racing_dataset_head_committer;
 
 mod test_append_dataset_metadata_batch_use_case;
 mod test_commit_dataset_event_use_case;

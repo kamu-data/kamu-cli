@@ -702,6 +702,7 @@ impl DependencyGraphHarness {
         .add::<DeleteDatasetUseCaseImpl>()
         .add::<FakeConnectingDatasetEntryWriter>()
         .add::<CreateDatasetUseCaseHelper>()
+        .add::<DatasetHeadCommitterImpl>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<InMemoryDatasetKeyBlockRepository>()

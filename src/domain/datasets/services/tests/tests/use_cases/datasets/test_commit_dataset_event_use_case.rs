@@ -13,7 +13,13 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu_core::MockDidGenerator;
-use kamu_datasets::{CommitDatasetEventUseCase, DatasetAction, MockDatasetActionAuthorizer};
+use kamu_datasets::{
+    CommitDatasetEventUseCase,
+    CreateDatasetResult,
+    DatasetAction,
+    DatasetReferenceRepository,
+    MockDatasetActionAuthorizer,
+};
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
@@ -23,6 +29,7 @@ use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
     DatasetBaseUseCaseHarnessOpts,
 };
+use super::racing_dataset_head_committer::RacingDatasetHeadCommitter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -297,10 +304,57 @@ async fn test_commit_event_with_new_dependencies() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_commit_dataset_event_head_moved_concurrently() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let mock_authorizer =
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
+
+    let harness = CommitDatasetEventUseCaseHarness::new(
+        mock_authorizer,
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    )
+    .await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+
+    let concurrent_head = harness
+        .append_unreferenced_block(&foo, &foo.head, "concurrent")
+        .await;
+    harness.move_head_before_next_commit(concurrent_head.clone());
+
+    assert_matches!(
+        harness
+            .use_case
+            .execute(
+                &foo.dataset_handle,
+                odf::MetadataEvent::SetInfo(
+                    MetadataFactory::set_info().description("test").build()
+                ),
+            )
+            .await,
+        Err(odf::dataset::CommitError::MetadataAppendError(
+            odf::dataset::AppendError::RefCASFailed(odf::dataset::RefCASError {
+                expected,
+                actual,
+                ..
+            })
+        )) if expected == Some(foo.head.clone()) && actual == Some(concurrent_head.clone())
+    );
+    assert_eq!(harness.stored_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct CommitDatasetEventUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CommitDatasetEventUseCase>,
+    racing_committer: Arc<RacingDatasetHeadCommitter>,
+    dataset_ref_repo: Arc<dyn DatasetReferenceRepository>,
     catalog: dill::Catalog,
 }
 
@@ -318,6 +372,7 @@ impl CommitDatasetEventUseCaseHarness {
                 ),
                 maybe_mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
                 maybe_mock_did_generator: Some(mock_did_generator),
+                racing_head_committer: true,
                 ..DatasetBaseUseCaseHarnessOpts::default()
             })
             .await;
@@ -330,8 +385,22 @@ impl CommitDatasetEventUseCaseHarness {
         Self {
             dataset_base_use_case_harness,
             use_case: catalog.get_one().unwrap(),
+            racing_committer: catalog.get_one().unwrap(),
+            dataset_ref_repo: catalog.get_one().unwrap(),
             catalog,
         }
+    }
+
+    fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
+        self.racing_committer
+            .move_head_before_next_commit(concurrent_head);
+    }
+
+    async fn stored_head(&self, dataset: &CreateDatasetResult) -> odf::Multihash {
+        self.dataset_ref_repo
+            .get_dataset_reference(&dataset.dataset_handle.id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
     }
 }
 

@@ -394,6 +394,7 @@ impl ServerHarness {
                 .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
+                .add::<DatasetHeadCommitterImpl>()
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DatasetEntryServiceImpl>()

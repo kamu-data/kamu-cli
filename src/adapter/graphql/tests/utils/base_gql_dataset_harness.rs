@@ -74,6 +74,7 @@ impl BaseGQLDatasetHarness {
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
+                .add::<DatasetHeadCommitterImpl>()
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()

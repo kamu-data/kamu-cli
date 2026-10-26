@@ -82,6 +82,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<CreateDatasetUseCaseHelper>()
+        .add::<DatasetHeadCommitterImpl>()
         .add::<DatasetReferenceServiceImpl>()
         .add::<InMemoryDatasetReferenceRepository>()
         .add::<DatasetEntryServiceImpl>()
