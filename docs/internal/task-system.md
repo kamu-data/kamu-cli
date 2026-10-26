@@ -408,7 +408,7 @@ failure.
   unprocessed slices and watermarks. `UpToDate` ends the task with an empty success. Otherwise
   `TransformExecutor::execute_transform` provisions the engine named by the transform — always a
   container engine, DataFusion included — runs the query and commits `ExecuteTransform`.
-  The runner passes `TransformOptions::default()`, so a diverged input is not repaired here:
+  The runner never resets the derivative, so a diverged input is not repaired here:
   `InvalidInputInterval` (the previously processed input block is no longer an ancestor, usually
   because the input was compacted) becomes `TaskErrorDatasetUpdate::InputDatasetCompacted`, and
   the transform flow controller decides what to do about it.
@@ -427,7 +427,7 @@ counts and the new watermark, which the flow controller uses for triggering down
 | Ingest: `CommitError`, `DataValidation`, other engine errors, `EngineProvisioningError`, `ImagePull`, `NotFound`, `PipeError`, `ProcessError`, `Unreachable`, `Internal` | yes |
 | Ingest or transform: `HEAD` moved after planning (the CAS fails when moving it) | yes, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
 | Transform elaboration: `InvalidInputInterval` | no, typed `InputDatasetCompacted` |
-| Transform elaboration: `InputSchemaNotDefined` | no (the elaboration service already turns it into `UpToDate`, so this arm is not reached) |
+| Transform elaboration: `InputNotPulled` | not an error: the task ends with an empty success, as when up to date |
 | Transform elaboration: `Internal` | yes |
 | Transform execution: invalid query | no |
 | Transform execution: commit, engine, provisioning, internal | yes |

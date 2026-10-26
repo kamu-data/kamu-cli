@@ -210,7 +210,7 @@ runs outside them.
 | Job | Runner | Moves `HEAD` |
 | --- | --- | --- |
 | Ingest | `ingest`: resolves the dataset's env vars if the options carry none and secrets encryption is enabled; then `ingest_loop` calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), merging results so the response spans the first old head to the last new head | after every ingest iteration that returns `Updated`, `commit_head_transactionally` (CAS) |
-| Transform | `transform`: elaborates in a transaction after `refresh_from_dataset_registry`, so it sees what earlier depths committed; then executes | after the commit, `commit_head_transactionally` (CAS) |
+| Transform | `transform`: elaborates in a transaction after `refresh_from_dataset_registry`, so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes | after the reset and after the transform, `commit_head_transactionally` (CAS) |
 | Sync | `sync`: `SyncService::sync`; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias | by `SyncService` itself |
 
 `commit_head_transactionally` moves `HEAD` through `DatasetHeadCommitter`, expecting the head the
@@ -224,7 +224,9 @@ for an ingest job, `TransformExecuteError::CommitError` for a transform job. A c
 
 `PullMultiListener` hands out one ingest, transform or sync listener per dataset.
 `PullDatasetUseCase::execute` wraps a single-dataset `PullListener` in `ListenerMultiAdapter`.
-Listeners only report progress; they cannot change the outcome.
+Listeners only report progress; they cannot change the outcome. A transform listener hears every outcome: the
+executor reports execution, and `transform` reports an up-to-date elaboration as success and a
+failed one through `elaborate_error`.
 
 ---
 

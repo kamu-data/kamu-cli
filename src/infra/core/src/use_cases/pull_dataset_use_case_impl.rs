@@ -27,6 +27,7 @@ use kamu_datasets::{
     DatasetEnvVarResolver,
     DatasetHeadCommitter,
     DatasetRegistry,
+    ResolvedDataset,
     SecretsEncryptionConfig,
 };
 
@@ -37,6 +38,8 @@ use kamu_datasets::{
 pub struct PullDatasetUseCaseImpl {
     transform_elaboration_svc: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
+    compaction_planner: Arc<dyn CompactionPlanner>,
+    compaction_executor: Arc<dyn CompactionExecutor>,
     tenancy_config: Arc<TenancyConfig>,
     polling_ingest_service: Arc<dyn PollingIngestService>,
     sync_svc: Arc<dyn SyncService>,
@@ -44,6 +47,15 @@ pub struct PullDatasetUseCaseImpl {
 }
 
 impl PullDatasetUseCaseImpl {
+    fn transform_services(&self) -> TransformServices {
+        TransformServices {
+            elaboration: self.transform_elaboration_svc.clone(),
+            executor: self.transform_executor.clone(),
+            compaction_planner: self.compaction_planner.clone(),
+            compaction_executor: self.compaction_executor.clone(),
+        }
+    }
+
     #[tracing::instrument(level = "info", skip_all)]
     async fn pull_by_plan(
         &self,
@@ -106,8 +118,7 @@ impl PullDatasetUseCaseImpl {
                         tasks.spawn(Self::transform(
                             pti,
                             options.transform_options,
-                            self.transform_elaboration_svc.clone(),
-                            self.transform_executor.clone(),
+                            self.transform_services(),
                             self.catalog.clone(),
                             maybe_listener,
                         ))
@@ -516,22 +527,15 @@ impl PullDatasetUseCaseImpl {
     #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn elaborate_transform(
         mut pti: PullTransformItem,
-        transform_options: TransformOptions,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         catalog: dill::Catalog,
-        maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformElaboration, TransformElaborateError> {
         pti.refresh_from_dataset_registry(&*dataset_registry)
             .await
             .int_err()?;
 
         let mut result = transform_elaboration_svc
-            .elaborate_transform(
-                pti.target.clone(),
-                pti.plan,
-                transform_options,
-                maybe_listener.clone(),
-            )
+            .elaborate_transform(pti.target, pti.plan)
             .await;
 
         if let Ok(TransformElaboration::Elaborated(elaborate_res)) = &mut result {
@@ -541,11 +545,87 @@ impl PullDatasetUseCaseImpl {
         result
     }
 
+    #[transactional_static_method2(dataset_registry: Arc<dyn DatasetRegistry>, transform_request_planner: Arc<dyn TransformRequestPlanner>)]
+    async fn replan_and_elaborate_transform(
+        target_handle: &odf::DatasetHandle,
+        transform_elaboration_svc: Arc<dyn TransformElaborationService>,
+        catalog: dill::Catalog,
+    ) -> Result<TransformElaboration, TransformError> {
+        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
+        let plan = transform_request_planner
+            .build_transform_preliminary_plan(target.clone())
+            .await?;
+
+        let mut elaboration = transform_elaboration_svc
+            .elaborate_transform(target, plan)
+            .await?;
+
+        if let TransformElaboration::Elaborated(elaborate_res) = &mut elaboration {
+            elaborate_res.datasets_map.detach_from_transaction();
+        }
+
+        Ok(elaboration)
+    }
+
+    #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn plan_reset_to_metadata(
+        target_handle: &odf::DatasetHandle,
+        compaction_planner: Arc<dyn CompactionPlanner>,
+        catalog: dill::Catalog,
+    ) -> Result<(ResolvedDataset, CompactionPlan), TransformError> {
+        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
+        let plan = compaction_planner
+            .plan_compaction(
+                target.clone(),
+                CompactionOptions {
+                    keep_metadata_only: true,
+                    ..Default::default()
+                },
+                None,
+            )
+            .await
+            .int_err()?;
+
+        target.detach_from_transaction();
+        Ok((target, plan))
+    }
+
+    /// Resets the derivative to metadata, returning the heads before and
+    /// after, or `None` when there was nothing to reset.
+    async fn reset_to_metadata(
+        target_handle: &odf::DatasetHandle,
+        services: &TransformServices,
+        catalog: dill::Catalog,
+    ) -> Result<Option<(odf::Multihash, odf::Multihash)>, TransformError> {
+        let (target, plan) = Self::plan_reset_to_metadata(
+            target_handle,
+            services.compaction_planner.clone(),
+            catalog.clone(),
+        )
+        .await?;
+
+        match services
+            .compaction_executor
+            .execute(target, plan, None)
+            .await
+            .int_err()?
+        {
+            CompactionResult::NothingToDo => Ok(None),
+            CompactionResult::Success {
+                old_head, new_head, ..
+            } => {
+                Self::commit_head_transactionally(catalog, target_handle, &old_head, &new_head)
+                    .await
+                    .map_err(|e| TransformExecuteError::CommitError(e.into()))?;
+                Ok(Some((old_head, new_head)))
+            }
+        }
+    }
+
     async fn transform(
         pti: PullTransformItem,
         transform_options: TransformOptions,
-        transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-        transform_executor: Arc<dyn TransformExecutor>,
+        services: TransformServices,
         catalog: dill::Catalog,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
@@ -553,53 +633,136 @@ impl PullDatasetUseCaseImpl {
         let maybe_original_request = pti.maybe_original_request.clone();
 
         // Remember original target
-        let pti_target = pti.target.clone();
+        let target_handle = pti.target.get_handle().clone();
 
-        let transform_result = match Self::elaborate_transform(
+        let transform_result = Self::elaborate_and_execute_transform(
             pti,
             transform_options,
-            transform_elaboration_svc,
-            catalog.clone(),
-            maybe_listener.clone(),
+            services,
+            catalog,
+            maybe_listener,
         )
-        .await
-        {
-            // Elaborate success
-            Ok(TransformElaboration::Elaborated(plan)) => {
-                // Execute phase
-                let (target, result) = transform_executor
-                    .execute_transform(pti_target.clone(), plan, maybe_listener)
-                    .await;
-                let result = match result {
-                    Ok(TransformResult::Updated { old_head, new_head }) => {
-                        Self::commit_head_transactionally(
-                            catalog.clone(),
-                            target.get_handle(),
-                            &old_head,
-                            &new_head,
-                        )
-                        .await
-                        .map(|()| TransformResult::Updated { old_head, new_head })
-                        .map_err(|e| TransformExecuteError::CommitError(e.into()))
-                    }
-                    Ok(TransformResult::UpToDate) => Ok(TransformResult::UpToDate),
-                    Err(e) => Err(e),
-                };
-                result.map_err(|e| PullError::TransformError(TransformError::Execute(e)))
-            }
-            // Already up-to-date
-            Ok(TransformElaboration::UpToDate) => Ok(TransformResult::UpToDate),
-            // Elaborate error
-            Err(e) => Err(PullError::TransformError(TransformError::Elaborate(e))),
-        };
+        .await;
 
         // Prepare response
         Ok(PullResponse {
             maybe_original_request,
-            maybe_local_ref: Some(pti_target.get_handle().as_local_ref()),
+            maybe_local_ref: Some(target_handle.as_local_ref()),
             maybe_remote_ref: None,
-            result: transform_result.map(Into::into),
+            result: transform_result
+                .map(Into::into)
+                .map_err(PullError::TransformError),
         })
+    }
+
+    async fn elaborate_and_execute_transform(
+        pti: PullTransformItem,
+        transform_options: TransformOptions,
+        services: TransformServices,
+        catalog: dill::Catalog,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
+    ) -> Result<TransformResult, TransformError> {
+        let listener = maybe_listener
+            .clone()
+            .unwrap_or_else(|| Arc::new(NullTransformListener));
+        let target = pti.target.clone();
+        let mut maybe_reset_heads = None;
+
+        let elaboration = match Self::elaborate_transform(
+            pti,
+            services.elaboration.clone(),
+            catalog.clone(),
+        )
+        .await
+        {
+            Err(TransformElaborateError::InvalidInputInterval(e))
+                if transform_options.reset_derivatives_on_diverged_input =>
+            {
+                tracing::warn!(error = %e, "Input diverged, resetting the derivative to metadata");
+
+                match Self::reset_to_metadata(target.get_handle(), &services, catalog.clone())
+                    .await?
+                {
+                    Some(reset_heads) => {
+                        maybe_reset_heads = Some(reset_heads);
+                        Self::replan_and_elaborate_transform(
+                            target.get_handle(),
+                            services.elaboration.clone(),
+                            catalog.clone(),
+                        )
+                        .await
+                    }
+                    None => Err(TransformElaborateError::InvalidInputInterval(e).into()),
+                }
+            }
+            Ok(elaboration) => Ok(elaboration),
+            Err(e) => Err(e.into()),
+        };
+
+        let (transform_result, elaborated_up_to_date) = match elaboration {
+            Ok(TransformElaboration::Elaborated(plan)) => (
+                Self::execute_transform_and_commit(
+                    target,
+                    plan,
+                    &services,
+                    catalog,
+                    maybe_listener,
+                )
+                .await?,
+                false,
+            ),
+            Ok(TransformElaboration::UpToDate) => (TransformResult::UpToDate, true),
+            Err(e) => {
+                if let TransformError::Elaborate(elaborate_error) = &e {
+                    listener.elaborate_error(elaborate_error);
+                }
+                return Err(e);
+            }
+        };
+
+        // A reset and the transform after it are reported as one update
+        let transform_result = match (maybe_reset_heads, transform_result) {
+            (Some((old_head, _)), TransformResult::Updated { new_head, .. })
+            | (Some((old_head, new_head)), TransformResult::UpToDate) => {
+                TransformResult::Updated { old_head, new_head }
+            }
+            (None, transform_result) => transform_result,
+        };
+
+        // The executor reports its own outcomes
+        if elaborated_up_to_date {
+            listener.success(&transform_result);
+        }
+
+        Ok(transform_result)
+    }
+
+    async fn execute_transform_and_commit(
+        target: ResolvedDataset,
+        plan: TransformPlan,
+        services: &TransformServices,
+        catalog: dill::Catalog,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
+    ) -> Result<TransformResult, TransformError> {
+        let (target, result) = services
+            .executor
+            .execute_transform(target, plan, maybe_listener)
+            .await;
+
+        match result? {
+            TransformResult::Updated { old_head, new_head } => {
+                Self::commit_head_transactionally(
+                    catalog,
+                    target.get_handle(),
+                    &old_head,
+                    &new_head,
+                )
+                .await
+                .map_err(|e| TransformExecuteError::CommitError(e.into()))?;
+                Ok(TransformResult::Updated { old_head, new_head })
+            }
+            TransformResult::UpToDate => Ok(TransformResult::UpToDate),
+        }
     }
 
     async fn sync(
@@ -831,6 +994,17 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
 
         self.pull_by_plan(plan, options, listener).await
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Services a spawned transform job needs, which outlive the use case borrow
+#[derive(Clone)]
+struct TransformServices {
+    elaboration: Arc<dyn TransformElaborationService>,
+    executor: Arc<dyn TransformExecutor>,
+    compaction_planner: Arc<dyn CompactionPlanner>,
+    compaction_executor: Arc<dyn CompactionExecutor>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

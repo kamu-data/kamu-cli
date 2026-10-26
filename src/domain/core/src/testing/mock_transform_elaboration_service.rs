@@ -19,9 +19,9 @@ use crate::*;
 impl MockTransformElaborationService {
     pub fn make_expect_elaborate_transform(mut self, target_alias: odf::DatasetAlias) -> Self {
         self.expect_elaborate_transform()
-            .withf(move |target, _, _, _| target.get_alias() == &target_alias)
+            .withf(move |target, _| target.get_alias() == &target_alias)
             .times(1)
-            .returning(|_, plan, _, _| {
+            .returning(|_, plan| {
                 Ok(TransformElaboration::Elaborated(TransformPlan {
                     request: TransformRequestExt {
                         operation_id: get_random_name(None, 10),
@@ -39,6 +39,41 @@ impl MockTransformElaborationService {
                     datasets_map: ResolvedDatasetsMap::default(),
                 }))
             });
+        self
+    }
+
+    pub fn make_expect_elaborate_transform_up_to_date(
+        mut self,
+        target_alias: odf::DatasetAlias,
+    ) -> Self {
+        self.expect_elaborate_transform()
+            .withf(move |target, _| target.get_alias() == &target_alias)
+            .times(1)
+            .returning(|_, _| Ok(TransformElaboration::UpToDate));
+        self
+    }
+
+    /// Reports an input whose history was rewritten
+    pub fn make_expect_elaborate_transform_diverged(self, target_alias: odf::DatasetAlias) -> Self {
+        self.make_expect_elaborate_transform_error(target_alias, || {
+            InvalidInputIntervalError {
+                input_dataset_id: odf::DatasetID::new_seeded_ed25519(b"input"),
+                head: odf::Multihash::from_digest_sha3_256(b"head"),
+                tail: odf::Multihash::from_digest_sha3_256(b"tail"),
+            }
+            .into()
+        })
+    }
+
+    pub fn make_expect_elaborate_transform_error(
+        mut self,
+        target_alias: odf::DatasetAlias,
+        make_error: impl Fn() -> TransformElaborateError + Send + 'static,
+    ) -> Self {
+        self.expect_elaborate_transform()
+            .withf(move |target, _| target.get_alias() == &target_alias)
+            .times(1)
+            .returning(move |_, _| Err(make_error()));
         self
     }
 }

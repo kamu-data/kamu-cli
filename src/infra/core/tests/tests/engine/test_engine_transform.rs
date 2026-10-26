@@ -852,14 +852,17 @@ async fn test_transform_empty_inputs() {
     // DatasetDataHelper::new(dataset);
 
     ///////////////////////////////////////////////////////////////////////////
-    // 1: Input doesn't have schema yet - skip update completely
+    // 1: Input doesn't have schema yet - elaboration reports the input
     ///////////////////////////////////////////////////////////////////////////
 
     let res = harness
         .transform_helper
-        .transform_dataset(deriv_target.clone())
+        .elaborate_transform(deriv_target.clone())
         .await;
-    assert_matches!(res, TransformResult::UpToDate);
+    assert_matches!(
+        res,
+        Err(TransformElaborateError::InputNotPulled(e)) if e.dataset_handle.alias == root_alias
+    );
 
     ///////////////////////////////////////////////////////////////////////////
     // 2: Input has schema, but no data - transorm will establish output schema

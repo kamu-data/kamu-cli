@@ -109,7 +109,7 @@ latest block. The ideas reset relies on:
 | `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain, in the use case | CAS on the planned head |
 | GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task | Maintain, checked by the mutation | CAS on the planned head |
 | `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as the system | CAS on the planned head |
-| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata during transform elaboration | Write, as for any pull job | CAS on the planned head |
+| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata by the pull use case when elaboration finds a diverged input, before elaborating again | Write, as for any pull job | CAS on the planned head |
 
 Reset flows run only when triggered, or (reset to metadata) when a sensor recovers from a breaking
 change. The GraphQL preconditions, configuration and trigger rules are owned by

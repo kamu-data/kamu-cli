@@ -12,13 +12,11 @@ use std::sync::Arc;
 use dill::Catalog;
 use kamu::{TransformElaborationServiceImpl, TransformExecutorImpl, TransformRequestPlannerImpl};
 use kamu_core::{
-    CompactionExecutor,
-    CompactionPlanner,
     EngineProvisioner,
+    TransformElaborateError,
     TransformElaboration,
     TransformElaborationService,
     TransformExecutor,
-    TransformOptions,
     TransformRequestPlanner,
     TransformResult,
     VerifyTransformError,
@@ -38,17 +36,11 @@ impl TransformTestHelper {
     pub fn build(
         dataset_registry: Arc<dyn DatasetRegistry>,
         system_time_source: Arc<dyn SystemTimeSource>,
-        compaction_planner: Arc<dyn CompactionPlanner>,
-        compaction_executor: Arc<dyn CompactionExecutor>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
             transform_request_planner: Arc::new(TransformRequestPlannerImpl::new(dataset_registry)),
-            transform_elab_svc: Arc::new(TransformElaborationServiceImpl::new(
-                compaction_planner,
-                compaction_executor,
-                system_time_source,
-            )),
+            transform_elab_svc: Arc::new(TransformElaborationServiceImpl::new(system_time_source)),
             transform_executor: Arc::new(TransformExecutorImpl::new(engine_provisioner)),
         }
     }
@@ -61,21 +53,24 @@ impl TransformTestHelper {
         }
     }
 
-    pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {
+    pub async fn elaborate_transform(
+        &self,
+        derived_target: ResolvedDataset,
+    ) -> Result<TransformElaboration, TransformElaborateError> {
         let plan = self
             .transform_request_planner
             .build_transform_preliminary_plan(derived_target.clone())
             .await
             .unwrap();
 
+        self.transform_elab_svc
+            .elaborate_transform(derived_target, plan)
+            .await
+    }
+
+    pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {
         let plan = match self
-            .transform_elab_svc
-            .elaborate_transform(
-                derived_target.clone(),
-                plan,
-                TransformOptions::default(),
-                None,
-            )
+            .elaborate_transform(derived_target.clone())
             .await
             .unwrap()
         {

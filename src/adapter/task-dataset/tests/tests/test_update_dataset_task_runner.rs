@@ -13,15 +13,17 @@ use kamu::TransformRequestPlannerImpl;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_adapter_task_dataset::{
     DatasetHeadMovedError,
+    InputDatasetCompactedError,
     TaskDefinitionDatasetUpdate,
     TaskErrorDatasetCommit,
+    TaskErrorDatasetUpdate,
     UpdateDatasetTaskRunner,
 };
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
-use kamu_task_system::{TaskDefinition, TaskOutcome, TaskRunner};
+use kamu_task_system::{TaskDefinition, TaskOutcome, TaskResult, TaskRunner};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +98,70 @@ async fn test_transform_head_moved_concurrently_fails_recoverably() {
         outcome,
     );
     assert_eq!(harness.get_head(&bar).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_input_not_pulled_succeeds_as_up_to_date() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let foo_handle = odf::DatasetHandle::new(
+        odf::DatasetID::new_seeded_ed25519(b"foo"),
+        alias_foo.clone(),
+        odf::DatasetKind::Root,
+    );
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_transform_elaboration_service: MockTransformElaborationService::new()
+            .make_expect_elaborate_transform_error(alias_bar.clone(), move || {
+                InputNotPulledError {
+                    dataset_handle: foo_handle.clone(),
+                }
+                .into()
+            }),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(TaskOutcome::Success(TaskResult::empty()), outcome);
+    assert_eq!(harness.get_head(&bar).await, bar.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_diverged_input_fails_as_input_compacted() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_transform_elaboration_service: MockTransformElaborationService::new()
+            .make_expect_elaborate_transform_diverged(alias_bar.clone()),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(
+            TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
+                dataset_id: odf::DatasetID::new_seeded_ed25519(b"input"),
+            })
+            .into_task_error()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&bar).await, bar.head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

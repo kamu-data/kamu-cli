@@ -82,13 +82,6 @@ async fn test_engine_io_common<
             Arc::new(TenancyConfig::SingleTenant),
         )),
         time_source.clone(),
-        Arc::new(CompactionPlannerImpl {}),
-        Arc::new(CompactionExecutorImpl::new(
-            object_store_registry.clone(),
-            time_source.clone(),
-            run_info_dir.clone(),
-            Arc::new(EngineConfigDatafusionEmbeddedCompaction::default()),
-        )),
         engine_provisioner.clone(),
     );
 

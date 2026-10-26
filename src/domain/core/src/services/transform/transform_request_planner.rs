@@ -183,10 +183,10 @@ pub enum VerifyTransformPlanError {
     ),
 
     #[error(transparent)]
-    InputSchemaNotDefined(
+    InputNotPulled(
         #[from]
         #[backtrace]
-        InputSchemaNotDefinedError,
+        InputNotPulledError,
     ),
 
     #[error(transparent)]

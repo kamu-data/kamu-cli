@@ -133,6 +133,38 @@ pub async fn test_pull_derivative_mt(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_of_never_pulled_root
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_of_never_pulled_root(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    let derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str();
+    let expected_error = format!(
+        "Failed to pull {derivative_name}: Input dataset {} has no data yet, pull it first",
+        DATASET_ROOT_PLAYER_NAME.as_str(),
+    );
+
+    kamu.assert_failure_command_execution(
+        ["pull", derivative_name],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            regex::escape(&expected_error).as_str(),
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

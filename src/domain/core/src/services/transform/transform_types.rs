@@ -91,8 +91,8 @@ pub enum VerifyTransformError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("Dataset {dataset_handle} has not defined a schema yet")]
-pub struct InputSchemaNotDefinedError {
+#[error("Input dataset {dataset_handle} has no data yet, pull it first")]
+pub struct InputNotPulledError {
     pub dataset_handle: odf::DatasetHandle,
 }
 

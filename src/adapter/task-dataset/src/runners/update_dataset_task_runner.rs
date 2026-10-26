@@ -176,16 +176,18 @@ impl UpdateDatasetTaskRunner {
     ) -> Result<TaskOutcome, InternalError> {
         let transform_elaboration = match self
             .transform_elaboration_service
-            .elaborate_transform(
-                transform_item.target.clone(),
-                transform_item.plan,
-                TransformOptions::default(),
-                None,
-            )
+            .elaborate_transform(transform_item.target.clone(), transform_item.plan)
             .await
         {
-            Ok(request) => Ok(request),
-            // Special case: input dataset compacted
+            Ok(transform_elaboration) => transform_elaboration,
+            // The derivative waits for its input, the same as when it is up to date
+            Err(TransformElaborateError::InputNotPulled(e)) => {
+                tracing::info!(
+                    input = %e.dataset_handle,
+                    "Not processing because one of the inputs has no data yet",
+                );
+                TransformElaboration::UpToDate
+            }
             Err(TransformElaborateError::InvalidInputInterval(e)) => {
                 return Ok(TaskOutcome::Failed(
                     TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
@@ -194,20 +196,11 @@ impl UpdateDatasetTaskRunner {
                     .into_task_error(),
                 ));
             }
-            Err(e) => {
+            Err(e @ TransformElaborateError::Internal(_)) => {
                 tracing::error!(error = ?e, "Transform elaboration failed");
-                match e {
-                    TransformElaborateError::InputSchemaNotDefined(_)
-                    | TransformElaborateError::InvalidInputInterval(_) => {
-                        return Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()));
-                    }
-
-                    TransformElaborateError::Internal(_) => {
-                        return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
-                    }
-                }
+                return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
             }
-        }?;
+        };
 
         match transform_elaboration {
             TransformElaboration::Elaborated(transform_plan) => {

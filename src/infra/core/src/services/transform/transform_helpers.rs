@@ -12,7 +12,7 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::engine::TransformRequestInputExt;
 use kamu_core::{
-    InputSchemaNotDefinedError,
+    InputNotPulledError,
     InvalidInputIntervalError,
     TransformElaborateError,
     TransformNotDefinedError,
@@ -238,7 +238,7 @@ pub(crate) async fn get_transform_input_from_query_input(
         .map(|e| e.schema_as_arrow(&odf::metadata::ToArrowSettings::default()))
         .transpose()
         .int_err()?
-        .ok_or_else(|| InputSchemaNotDefinedError {
+        .ok_or_else(|| InputNotPulledError {
             dataset_handle: resolved_input.get_handle().clone(),
         })?;
 
@@ -390,10 +390,10 @@ impl From<CollectUnprocessedInputBlocksError> for GetTransformInputError {
 #[derive(Debug, Error)]
 pub(crate) enum GetTransformInputError {
     #[error(transparent)]
-    InputSchemaNotDefined(
+    InputNotPulled(
         #[from]
         #[backtrace]
-        InputSchemaNotDefinedError,
+        InputNotPulledError,
     ),
     #[error(transparent)]
     InvalidInputInterval(
@@ -412,7 +412,7 @@ pub(crate) enum GetTransformInputError {
 impl From<GetTransformInputError> for TransformElaborateError {
     fn from(value: GetTransformInputError) -> Self {
         match value {
-            GetTransformInputError::InputSchemaNotDefined(e) => Self::InputSchemaNotDefined(e),
+            GetTransformInputError::InputNotPulled(e) => Self::InputNotPulled(e),
             GetTransformInputError::InvalidInputInterval(e) => Self::InvalidInputInterval(e),
             GetTransformInputError::Internal(e) => Self::Internal(e),
         }
@@ -422,7 +422,7 @@ impl From<GetTransformInputError> for TransformElaborateError {
 impl From<GetTransformInputError> for VerifyTransformPlanError {
     fn from(value: GetTransformInputError) -> Self {
         match value {
-            GetTransformInputError::InputSchemaNotDefined(e) => Self::InputSchemaNotDefined(e),
+            GetTransformInputError::InputNotPulled(e) => Self::InputNotPulled(e),
             GetTransformInputError::InvalidInputInterval(e) => Self::InvalidInputInterval(e),
             GetTransformInputError::Internal(e) => Self::Internal(e),
         }

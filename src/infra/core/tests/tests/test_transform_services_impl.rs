@@ -348,9 +348,7 @@ impl TransformTestHarness {
             )
             .await;
 
-        let transform_result = self
-            .transform(deriv_target.clone(), TransformOptions::default())
-            .await;
+        let transform_result = self.transform(deriv_target.clone()).await;
         assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 
         let status = self.evaluate_transform_status(deriv_target.clone()).await;
@@ -369,7 +367,6 @@ impl TransformTestHarness {
     async fn elaborate_transform(
         &self,
         target: ResolvedDataset,
-        options: TransformOptions,
     ) -> Result<TransformElaboration, TransformElaborateError> {
         self.transform_elab_svc
             .elaborate_transform(
@@ -378,19 +375,13 @@ impl TransformTestHarness {
                     .build_transform_preliminary_plan(target)
                     .await
                     .unwrap(),
-                options,
-                None,
             )
             .await
     }
 
-    async fn transform(
-        &self,
-        target: ResolvedDataset,
-        options: TransformOptions,
-    ) -> Result<TransformResult, TransformError> {
+    async fn transform(&self, target: ResolvedDataset) -> Result<TransformResult, TransformError> {
         let elaboration = self
-            .elaborate_transform(target.clone(), options)
+            .elaborate_transform(target.clone())
             .await
             .map_err(TransformError::Elaborate)?;
 
@@ -502,7 +493,7 @@ async fn test_get_next_operation() {
 
     // No data - no work
     let elaboration = harness
-        .elaborate_transform(bar_target.clone(), TransformOptions::default())
+        .elaborate_transform(bar_target.clone())
         .await
         .unwrap();
     assert_matches!(elaboration, TransformElaboration::UpToDate);
@@ -510,10 +501,7 @@ async fn test_get_next_operation() {
     let (foo_head, foo_block) = harness.append_data_block(foo_target.clone(), 10).await;
     let foo_slice = foo_block.event.new_data.as_ref().unwrap();
 
-    let elaboration = harness
-        .elaborate_transform(bar_target, TransformOptions::default())
-        .await
-        .unwrap();
+    let elaboration = harness.elaborate_transform(bar_target).await.unwrap();
     assert!(matches!(
         elaboration,
         TransformElaboration::Elaborated(TransformPlan { request: TransformRequestExt{ transform, inputs, .. }, datasets_map: _ } )
@@ -603,7 +591,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T2: Transform [SEED; T1]
     let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
     let deriv_req_t2 = match harness
-        .elaborate_transform(deriv_target.clone(), TransformOptions::default())
+        .elaborate_transform(deriv_target.clone())
         .await
         .unwrap()
     {
@@ -681,7 +669,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T4: Transform (T1; T3]
     let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();
     let deriv_req_t4 = match harness
-        .elaborate_transform(deriv_target.clone(), TransformOptions::default())
+        .elaborate_transform(deriv_target.clone())
         .await
         .unwrap()
     {
@@ -745,7 +733,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T6: Transform (T3; T5]
     let t6 = Utc.with_ymd_and_hms(2020, 1, 6, 12, 0, 0).unwrap();
     let deriv_req_t6 = match harness
-        .elaborate_transform(deriv_target.clone(), TransformOptions::default())
+        .elaborate_transform(deriv_target.clone())
         .await
         .unwrap()
     {
@@ -822,7 +810,30 @@ async fn test_get_verification_plan_one_to_one() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_transform_with_compaction_retry() {
+async fn test_transform_elaboration_reports_input_not_pulled() {
+    let harness = TransformTestHarness::new();
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    harness.new_root_with_push_source(&foo_alias).await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            std::slice::from_ref(&foo_alias),
+            harness.system_time_source.now(),
+        )
+        .await;
+
+    let elaboration = harness.elaborate_transform(bar_target).await;
+
+    assert_matches!(
+        elaboration,
+        Err(TransformElaborateError::InputNotPulled(e)) if e.dataset_handle.alias == foo_alias
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_fails_on_diverged_input() {
     let harness =
         TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
     let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
@@ -859,16 +870,12 @@ async fn test_transform_with_compaction_retry() {
         )
         .await;
 
-    let transform_result = harness
-        .transform(bar_target.clone(), TransformOptions::default())
-        .await;
+    let transform_result = harness.transform(bar_target.clone()).await;
     assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 
     harness.compact(foo_target).await;
 
-    let transform_result = harness
-        .transform(bar_target.clone(), TransformOptions::default())
-        .await;
+    let transform_result = harness.transform(bar_target.clone()).await;
 
     assert_matches!(
         transform_result,
@@ -876,16 +883,6 @@ async fn test_transform_with_compaction_retry() {
             TransformElaborateError::InvalidInputInterval(InvalidInputIntervalError { .. })
         ))
     );
-
-    let transform_result = harness
-        .transform(
-            bar_target,
-            TransformOptions {
-                reset_derivatives_on_diverged_input: true,
-            },
-        )
-        .await;
-    assert_matches!(transform_result, Ok(TransformResult::Updated { .. }));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -976,7 +973,7 @@ async fn test_transform_status() {
     // T2: Transform [SEED; T1]
     let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
     match harness
-        .elaborate_transform(deriv_target.clone(), TransformOptions::default())
+        .elaborate_transform(deriv_target.clone())
         .await
         .unwrap()
     {
@@ -1072,7 +1069,7 @@ async fn test_transform_status() {
     // T4: Transform (T1; T3]
     let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();
     match harness
-        .elaborate_transform(deriv_target.clone(), TransformOptions::default())
+        .elaborate_transform(deriv_target.clone())
         .await
         .unwrap()
     {

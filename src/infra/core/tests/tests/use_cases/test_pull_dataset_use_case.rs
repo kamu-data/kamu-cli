@@ -260,6 +260,164 @@ async fn test_pull_transform_head_moved_concurrently() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_pull_transform_diverged_input_fails_without_reset() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+            .with_transform_elaboration_mock(
+                MockTransformElaborationService::new()
+                    .make_expect_elaborate_transform_diverged(alias_bar.clone()),
+            ),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let pull_response = harness.pull_local(&alias_bar).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::TransformError(TransformError::Elaborate(
+            TransformElaborateError::InvalidInputInterval(_)
+        )))
+    );
+    assert_eq!(harness.get_head(&bar).await, bar.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_diverged_input_resets_and_retransforms() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reset_heads = ReportedHeads::default();
+    let transform_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+            .with_transform_elaboration_mock(
+                MockTransformElaborationService::new()
+                    .make_expect_elaborate_transform_diverged(alias_bar.clone())
+                    .make_expect_elaborate_transform(alias_bar.clone()),
+            )
+            .with_compaction_executor_mock(
+                MockCompactionExecutor::new()
+                    .make_expect_compaction_success(alias_bar.clone(), reset_heads.clone()),
+            )
+            .with_transform_execution_mock(
+                MockTransformExecutor::new()
+                    .make_expect_transform_updated(alias_bar.clone(), transform_heads.clone()),
+            ),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let reset_head = harness.append_unreferenced_block(&bar, "reset").await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    reset_heads.set(&bar.head, &reset_head);
+    transform_heads.set(&reset_head, &transformed_head);
+
+    let pull_response = harness
+        .pull_local_resetting_on_diverged_input(&alias_bar)
+        .await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: Some(old_head), new_head, .. })
+        if old_head == bar.head && new_head == transformed_head
+    );
+    assert_eq!(harness.get_head(&bar).await, transformed_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_reset_then_up_to_date_reports_updated() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reset_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+            .with_transform_elaboration_mock(
+                MockTransformElaborationService::new()
+                    .make_expect_elaborate_transform_diverged(alias_bar.clone())
+                    .make_expect_elaborate_transform_up_to_date(alias_bar.clone()),
+            )
+            .with_compaction_executor_mock(
+                MockCompactionExecutor::new()
+                    .make_expect_compaction_success(alias_bar.clone(), reset_heads.clone()),
+            ),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let reset_head = harness.append_unreferenced_block(&bar, "reset").await;
+    reset_heads.set(&bar.head, &reset_head);
+
+    let pull_response = harness
+        .pull_local_resetting_on_diverged_input(&alias_bar)
+        .await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: Some(old_head), new_head, .. })
+        if old_head == bar.head && new_head == reset_head
+    );
+    assert_eq!(harness.get_head(&bar).await, reset_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_input_not_pulled() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let foo_handle = odf::DatasetHandle::new(
+        odf::DatasetID::new_seeded_ed25519(b"foo"),
+        alias_foo.clone(),
+        odf::DatasetKind::Root,
+    );
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+            .with_transform_elaboration_mock(
+                MockTransformElaborationService::new().make_expect_elaborate_transform_error(
+                    alias_bar.clone(),
+                    move || {
+                        InputNotPulledError {
+                            dataset_handle: foo_handle.clone(),
+                        }
+                        .into()
+                    },
+                ),
+            ),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let pull_response = harness.pull_local(&alias_bar).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::TransformError(TransformError::Elaborate(
+            TransformElaborateError::InputNotPulled(e)
+        )))
+        if e.dataset_handle.alias == alias_foo
+    );
+    assert_eq!(harness.get_head(&bar).await, bar.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_pull_sync_success() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
@@ -817,6 +975,9 @@ impl PullUseCaseHarness {
             .bind::<dyn TransformElaborationService, MockTransformElaborationService>()
             .add_value(mocks.mock_transform_execution_service)
             .bind::<dyn TransformExecutor, MockTransformExecutor>()
+            .add::<CompactionPlannerImpl>()
+            .add_value(mocks.mock_compaction_executor)
+            .bind::<dyn CompactionExecutor, MockCompactionExecutor>()
             .add_value(mocks.mock_sync_service)
             .bind::<dyn SyncService, MockSyncService>()
             .add::<SyncRequestBuilder>()
@@ -855,12 +1016,32 @@ impl PullUseCaseHarness {
     }
 
     async fn pull_local(&self, alias: &odf::DatasetAlias) -> PullResponse {
+        self.pull_local_with(alias, PullOptions::default()).await
+    }
+
+    async fn pull_local_resetting_on_diverged_input(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> PullResponse {
+        self.pull_local_with(
+            alias,
+            PullOptions {
+                transform_options: TransformOptions {
+                    reset_derivatives_on_diverged_input: true,
+                },
+                ..PullOptions::default()
+            },
+        )
+        .await
+    }
+
+    async fn pull_local_with(
+        &self,
+        alias: &odf::DatasetAlias,
+        options: PullOptions,
+    ) -> PullResponse {
         self.use_case
-            .execute(
-                PullRequest::Local(alias.as_local_ref()),
-                PullOptions::default(),
-                None,
-            )
+            .execute(PullRequest::Local(alias.as_local_ref()), options, None)
             .await
             .unwrap()
     }
@@ -905,6 +1086,7 @@ struct PullUseCaseHarnessMocks {
     mock_polling_ingest_service: MockPollingIngestService,
     mock_transform_elaboration_service: MockTransformElaborationService,
     mock_transform_execution_service: MockTransformExecutor,
+    mock_compaction_executor: MockCompactionExecutor,
     mock_sync_service: MockSyncService,
 }
 
@@ -949,6 +1131,16 @@ impl PullUseCaseHarnessMocks {
         }
     }
 
+    fn with_compaction_executor_mock(
+        self,
+        mock_compaction_executor: MockCompactionExecutor,
+    ) -> Self {
+        Self {
+            mock_compaction_executor,
+            ..self
+        }
+    }
+
     /// Expects one ingest of `foo` that reports `reported_heads`.
     fn for_ingest_updated(alias_foo: &odf::DatasetAlias, reported_heads: &ReportedHeads) -> Self {
         Self::default()
@@ -972,20 +1164,7 @@ impl PullUseCaseHarnessMocks {
         alias_bar: &odf::DatasetAlias,
         reported_heads: &ReportedHeads,
     ) -> Self {
-        Self::default()
-            .with_authorizer_mock(
-                MockDatasetActionAuthorizer::new()
-                    .make_expect_classify_datasets_by_allowance(
-                        DatasetAction::Write,
-                        1,
-                        HashSet::from_iter([alias_bar.clone()]),
-                    )
-                    .make_expect_classify_datasets_by_allowance(
-                        DatasetAction::Read,
-                        1,
-                        HashSet::from_iter([alias_foo.clone()]),
-                    ),
-            )
+        Self::for_transform(alias_foo, alias_bar)
             .with_transform_elaboration_mock(
                 MockTransformElaborationService::new()
                     .make_expect_elaborate_transform(alias_bar.clone()),
@@ -994,6 +1173,23 @@ impl PullUseCaseHarnessMocks {
                 MockTransformExecutor::new()
                     .make_expect_transform_updated(alias_bar.clone(), reported_heads.clone()),
             )
+    }
+
+    /// Expects one pull of `bar` derived from `foo`, authorized
+    fn for_transform(alias_foo: &odf::DatasetAlias, alias_bar: &odf::DatasetAlias) -> Self {
+        Self::default().with_authorizer_mock(
+            MockDatasetActionAuthorizer::new()
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Write,
+                    1,
+                    HashSet::from_iter([alias_bar.clone()]),
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Read,
+                    1,
+                    HashSet::from_iter([alias_foo.clone()]),
+                ),
+        )
     }
 
     fn with_sync_mock(self, mock_sync_service: MockSyncService) -> Self {
@@ -1011,6 +1207,7 @@ impl Default for PullUseCaseHarnessMocks {
             mock_polling_ingest_service: MockPollingIngestService::new(),
             mock_transform_elaboration_service: MockTransformElaborationService::new(),
             mock_transform_execution_service: MockTransformExecutor::new(),
+            mock_compaction_executor: MockCompactionExecutor::new(),
             mock_sync_service: MockSyncService::new(),
         }
     }

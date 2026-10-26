@@ -33,6 +33,10 @@ Recommendation: for ease of reading, use the following format:
   compaction no longer blocks other writers. A dataset whose head moves meanwhile fails with the
   head-moved conflict. Each dataset is committed as soon as it is compacted, so a failure in one
   dataset no longer undoes the compaction of the others
+- `kamu pull` of a derivative fails with "Input dataset … has no data yet, pull it first" when an
+  input has never received data, instead of reporting the derivative as up to date
+- `kamu pull --reset-derivatives-on-diverged-input` reports a reset derivative as updated, even when
+  the transform that follows the reset has no new data to process
 ### Fixed
 - When `kamu pull` or `kamu system compact` fails for some datasets, the datasets that did update
   are now fully processed before the command exits, instead of on the next command

@@ -7,32 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use internal_error::InternalError;
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use thiserror::Error;
 
 use super::TransformPreliminaryPlan;
 use crate::engine::TransformRequestExt;
-use crate::{
-    InputSchemaNotDefinedError,
-    InvalidInputIntervalError,
-    TransformListener,
-    TransformOptions,
-};
+use crate::{InputNotPulledError, InvalidInputIntervalError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TransformElaborationService: Send + Sync {
+    /// Reads the inputs and builds the transform request. Writes nothing.
     async fn elaborate_transform(
         &self,
         target: ResolvedDataset,
         plan: TransformPreliminaryPlan,
-        transform_options: TransformOptions,
-        maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformElaboration, TransformElaborateError>;
 }
 
@@ -62,10 +54,10 @@ impl std::fmt::Debug for TransformPlan {
 #[derive(Debug, Error)]
 pub enum TransformElaborateError {
     #[error(transparent)]
-    InputSchemaNotDefined(
+    InputNotPulled(
         #[from]
         #[backtrace]
-        InputSchemaNotDefinedError,
+        InputNotPulledError,
     ),
     #[error(transparent)]
     InvalidInputInterval(

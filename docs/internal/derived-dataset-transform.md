@@ -139,14 +139,15 @@ fails with `TransformNotDefinedError`.
 
 ### 4.2 Elaborate
 
-`TransformElaborationService::elaborate_transform(target, plan, options, listener)` turns each
-input state into a `TransformRequestInputExt`:
+`TransformElaborationService::elaborate_transform(target, plan)` turns each input state into a
+`TransformRequestInputExt`. It only reads: it writes no blocks, moves no reference and reports to no
+listener.
 
 1. `get_transform_query_input` resolves the input's current `HEAD` and its last data offset. The
    consumed position is `prev_block_hash` / `prev_offset`; anything newer becomes
    `new_block_hash` / `new_offset`.
 2. It reads the input's schema from its latest `SetDataSchema`; an input with no schema fails with
-   `InputSchemaNotDefinedError` before any interval check.
+   `InputNotPulledError`, naming the input, before any interval check.
 3. `collect_unprocessed_input_blocks` iterates the input chain from the new head back to (but
    excluding) the consumed block. If the consumed block is not an ancestor of the new head, it
    fails with `InvalidInputIntervalError` ([§7](#7-diverged-inputs)).
@@ -155,8 +156,9 @@ input state into a `TransformRequestInputExt`:
 
 The result is `UpToDate` when every input has no new slices and no new watermarks **and** the
 derivative already has a schema. A derivative without a schema always runs, so that the engine can
-establish the output schema even from empty inputs. `InputSchemaNotDefinedError` is caught here
-and reported as up to date: a derivative of a never-ingested root silently waits.
+establish the output schema even from empty inputs. `InputNotPulledError` is returned to the
+caller: `kamu pull` reports it as the derivative's error, while the update task treats it as up to
+date ([§6](#6-entry-points)).
 
 Otherwise the request gets a fresh `operation_id` and `system_time`, which become the new block's
 system time.
@@ -259,7 +261,8 @@ live here:
   returns `UpToDate`, `NewInputDataAvailable` (inputs whose last data offset moved), or
   `InputBreakingChange` ([§7](#7-diverged-inputs)). The sensor uses it when it is activated.
 - The task planner builds the same pull plan as `kamu pull` for a single derivative with default
-  options. The runner elaborates with `TransformOptions::default()`, so it never resets on its own.
+  options. The runner never resets on its own: a diverged input fails the task, and an input
+  without data ends it as up to date.
 
 **Verify.** `build_transform_verification_plan` collects the `ExecuteTransform` blocks in the
 requested range and rebuilds a request for each from the block's own inputs, offsets, checkpoint
@@ -279,7 +282,7 @@ compared across the rewrite, so the derivative cannot continue.
 
 | Path | Detection | What happens |
 | --- | --- | --- |
-| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then the derivative is reset to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), `HEAD` is CAS-moved to the compacted head, and elaboration runs once more from scratch |
+| `kamu pull` | elaboration fails with `InvalidInputIntervalError` | error, unless `--reset-derivatives-on-diverged-input`: then `PullDatasetUseCaseImpl` resets the derivative to metadata ([dataset-reset.md](dataset-reset.md#6-reset-to-metadata)), moves `HEAD` to the reset head through `DatasetHeadCommitter` (CAS), re-plans and elaborates once more. The pull reports one update from the head before the reset to the final head |
 | Transform task | elaboration fails with `InvalidInputIntervalError` | task fails with `InputDatasetCompacted`, which is unrecoverable |
 | Flow sensor | `evaluate_transform_status` returns `InputBreakingChange` (checked before new data); or an upstream flow reports a `Breaking` change | with the `Recover` rule, a reset-to-metadata flow; with `NoAction`, a warning ([flow-system.md](flow-system.md#8-sensors-and-propagation)) |
 
@@ -312,7 +315,7 @@ Consequences specific to transforms:
 ## 9. Errors
 
 `TransformError` wraps `TransformPlanError` (`TransformNotDefined`), `TransformElaborateError`
-(`InputSchemaNotDefined`, `InvalidInputInterval`), `TransformExecuteError`
+(`InputNotPulled`, `InvalidInputInterval`), `TransformExecuteError`
 (`EngineProvisioningError`, `EngineError`, `CommitError`) and `Internal`. `EngineError` is
 `InvalidQuery` (the engine rejected the SQL), `ProcessError`, `ContractError` or `InternalError`,
 and carries engine log paths.
@@ -370,7 +373,8 @@ interval becomes `InputDatasetCompacted`) is owned by
 | Options, results, shared errors | [`transform_types.rs`](../../src/domain/core/src/services/transform/transform_types.rs) |
 | Preliminary request, input slicing | [`transform_helpers.rs`](../../src/infra/core/src/services/transform/transform_helpers.rs) |
 | Planner, status, verification plan | [`transform_request_planner_impl.rs`](../../src/infra/core/src/services/transform/transform_request_planner_impl.rs) |
-| Elaboration, reset on diverged input | [`transform_elaboration_service_impl.rs`](../../src/infra/core/src/services/transform/transform_elaboration_service_impl.rs) |
+| Elaboration | [`transform_elaboration_service_impl.rs`](../../src/infra/core/src/services/transform/transform_elaboration_service_impl.rs) |
+| Reset on diverged input during `kamu pull` | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
 | Executor, commit, verification replay | [`transform_executor_impl.rs`](../../src/infra/core/src/services/transform/transform_executor_impl.rs) |
 | Engine trait and request/response types | [`engine.rs`](../../src/domain/core/src/entities/engine.rs) |
 | Provisioner, concurrency, images | [`engine_provisioner_local.rs`](../../src/infra/core/src/engine/engine_provisioner_local.rs) |

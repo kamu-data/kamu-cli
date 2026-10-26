@@ -11,36 +11,25 @@ use std::sync::Arc;
 
 use dill::*;
 use engine::{TransformRequestExt, TransformRequestInputExt};
-use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 use super::get_transform_input_from_query_input;
-use crate::{build_preliminary_request_ext, get_transform_query_input};
+use crate::get_transform_query_input;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TransformElaborationServiceImpl {
-    compaction_planner: Arc<dyn CompactionPlanner>,
-    compaction_executor: Arc<dyn CompactionExecutor>,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[component(pub)]
 #[interface(dyn TransformElaborationService)]
 impl TransformElaborationServiceImpl {
-    pub fn new(
-        compaction_planner: Arc<dyn CompactionPlanner>,
-        compaction_executor: Arc<dyn CompactionExecutor>,
-        time_source: Arc<dyn SystemTimeSource>,
-    ) -> Self {
-        Self {
-            compaction_planner,
-            compaction_executor,
-            time_source,
-        }
+    pub fn new(time_source: Arc<dyn SystemTimeSource>) -> Self {
+        Self { time_source }
     }
 
     async fn elaborate_preliminary_request(
@@ -108,101 +97,21 @@ impl TransformElaborationServiceImpl {
 
 #[async_trait::async_trait]
 impl TransformElaborationService for TransformElaborationServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?options))]
+    #[tracing::instrument(level = "info", skip_all, fields(target=%plan.preliminary_request.dataset_handle))]
     async fn elaborate_transform(
         &self,
-        target: ResolvedDataset,
+        _target: ResolvedDataset,
         plan: TransformPreliminaryPlan,
-        options: TransformOptions,
-        maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformElaboration, TransformElaborateError> {
-        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
-
         match self
-            .elaborate_preliminary_request(plan.preliminary_request.clone(), &plan.datasets_map)
-            .await
+            .elaborate_preliminary_request(plan.preliminary_request, &plan.datasets_map)
+            .await?
         {
-            Ok(Some(request)) => Ok(TransformElaboration::Elaborated(TransformPlan {
+            Some(request) => Ok(TransformElaboration::Elaborated(TransformPlan {
                 request,
                 datasets_map: plan.datasets_map,
             })),
-            Ok(None) => Ok(TransformElaboration::UpToDate),
-            // TODO: Trapping the error to preserve old behavior - we should consider
-            // surfacing it and handling on upper layers
-            Err(TransformElaborateError::InputSchemaNotDefined(e)) => {
-                tracing::info!(
-                    input = %e.dataset_handle,
-                    "Not processing because one of the inputs was never pulled",
-                );
-                listener.begin();
-                listener.success(&TransformResult::UpToDate);
-                Ok(TransformElaboration::UpToDate)
-            }
-            Err(err @ TransformElaborateError::InvalidInputInterval(_))
-                if options.reset_derivatives_on_diverged_input =>
-            {
-                tracing::warn!(
-                    error = %err,
-                    "Interval error detected - resetting on diverged input",
-                );
-
-                let compaction_plan = self
-                    .compaction_planner
-                    .plan_compaction(
-                        target.clone(),
-                        CompactionOptions {
-                            keep_metadata_only: true,
-                            ..Default::default()
-                        },
-                        None,
-                    )
-                    .await
-                    .int_err()?;
-
-                let compaction_result = self
-                    .compaction_executor
-                    .execute(target.clone(), compaction_plan, None)
-                    .await
-                    .int_err()?;
-
-                if let CompactionResult::Success {
-                    old_head, new_head, ..
-                } = compaction_result
-                {
-                    // Set reference on the compacted dataset
-                    target
-                        .as_metadata_chain()
-                        .set_ref(
-                            &odf::BlockRef::Head,
-                            &new_head,
-                            odf::dataset::SetRefOpts {
-                                validate_block_present: true,
-                                check_ref_is: Some(Some(&old_head)),
-                            },
-                        )
-                        .await
-                        .int_err()?;
-
-                    // Recursing to try again after compaction
-                    self.elaborate_transform(
-                        target.clone(),
-                        TransformPreliminaryPlan {
-                            preliminary_request: build_preliminary_request_ext(target)
-                                .await
-                                .int_err()?,
-                            datasets_map: plan.datasets_map,
-                        },
-                        TransformOptions {
-                            reset_derivatives_on_diverged_input: false,
-                        },
-                        Some(listener),
-                    )
-                    .await
-                } else {
-                    Err(err)
-                }
-            }
-            Err(e) => Err(e),
+            None => Ok(TransformElaboration::UpToDate),
         }
     }
 }
