@@ -96,20 +96,25 @@ ignore = [
     # Unmaintained: proc-macro-error
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
-    # Unmaintained: proc-macro-error2
-    # https://rustsec.org/advisories/RUSTSEC-2026-0173.html
-    "RUSTSEC-2026-0173",
-    # Unmaintained: paste
-    # https://rustsec.org/advisories/RUSTSEC-2024-0436
-    "RUSTSEC-2024-0436",
-    # Unmaintained: backoff
-    # Used by async-openai; newer versions drop it but require reqwest 0.13
-    # https://rustsec.org/advisories/RUSTSEC-2025-0012
-    "RUSTSEC-2025-0012",
     # Unmaintained: instant
     # Dependency of `backoff`
     # https://rustsec.org/advisories/RUSTSEC-2024-0384
     "RUSTSEC-2024-0384",
+    # Unmaintained: paste
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436
+    "RUSTSEC-2024-0436",
+    # Unmaintained: unsafe-libyaml
+    # Used by serde_yaml_ng, both directly and via `setty` (fmt-yaml); migrating to
+    # serde-saphyr requires a `setty` release first
+    # https://rustsec.org/advisories/RUSTSEC-2024-0449
+    "RUSTSEC-2024-0449",
+    # Unmaintained: backoff
+    # Used by async-openai; newer versions drop it but require reqwest 0.13
+    # https://rustsec.org/advisories/RUSTSEC-2025-0012
+    "RUSTSEC-2025-0012",
+    # Unmaintained: proc-macro-error2
+    # https://rustsec.org/advisories/RUSTSEC-2026-0173.html
+    "RUSTSEC-2026-0173",
     # quick-xml: temporary ignore until upstream dependencies can move to >= 0.41.0
     # https://rustsec.org/advisories/RUSTSEC-2026-0194
     # https://rustsec.org/advisories/RUSTSEC-2026-0195
@@ -119,24 +124,29 @@ ignore = [
     # Waiting for upstream crates to migrate to other implementation
     # https://rustsec.org/advisories/RUSTSEC-2026-0215
     "RUSTSEC-2026-0215",
-    # Unmaintained: im
-    # https://rustsec.org/advisories/RUSTSEC-2026-0248
-    "RUSTSEC-2026-0248",
     # Unmaintained: bitmaps
     # Dependency of the unmaintained `im` crate
     # https://rustsec.org/advisories/RUSTSEC-2026-0247
     "RUSTSEC-2026-0247",
+    # Unmaintained: im
+    # https://rustsec.org/advisories/RUSTSEC-2026-0248
+    "RUSTSEC-2026-0248",
     # Unmaintained: sized-chunks
     # Dependency of the unmaintained `im` crate
     # https://rustsec.org/advisories/RUSTSEC-2026-0251
     "RUSTSEC-2026-0251",
-    # Unmaintained: unsafe-libyaml
-    # Used by serde_yaml_ng, both directly and via `setty` (fmt-yaml); migrating to
-    # serde-saphyr requires a `setty` release first
-    # https://rustsec.org/advisories/RUSTSEC-2024-0449
-    "RUSTSEC-2024-0449",
     # crypto-bigint 0.5: timing side channels, fixed only in 0.7.6+
     # Pulled via alloy -> k256 0.13 / elliptic-curve 0.13; no alloy release uses 0.14 yet
     # https://rustsec.org/advisories/RUSTSEC-2026-0387
     "RUSTSEC-2026-0387",
+    # zstd 0.13 / zstd-safe 7.x, used by Arrow, Parquet and DataFusion; fixed only in zstd 0.14
+    # and zstd-safe 8.2. Not reachable here: these crates use the bulk API and plain stream
+    # constructors, never `with_context`, and the `seekable` feature is off.
+    # Remove when the DataFusion stack moves to zstd 0.14
+    # https://rustsec.org/advisories/RUSTSEC-2026-0391
+    # https://rustsec.org/advisories/RUSTSEC-2026-0398
+    # https://rustsec.org/advisories/RUSTSEC-2026-0403
+    "RUSTSEC-2026-0391",
+    "RUSTSEC-2026-0398",
+    "RUSTSEC-2026-0403",
 ]
