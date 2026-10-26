@@ -293,6 +293,55 @@ pub struct DatasetPushCompleteConfirmed {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Push stage 4: response to the complete request.
+///
+/// A client that predates it reads `{"Ok": {}}` as a bare
+/// `DatasetPushCompleteConfirmed`, ignoring the unknown key.
+pub type DatasetPushCompleteResponse =
+    Result<DatasetPushCompleteConfirmed, DatasetPushCompleteError>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push stage 4: the pushed blocks could not be committed
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPushCompleteError {
+    Internal(TransferInternalError),
+    UpdatedConcurrently(DatasetPushUpdatedConcurrentlyError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The destination `HEAD` moved while the pushed blocks were being committed;
+/// nothing was committed.
+///
+/// It carries no heads: errors of this stage travel as the close frame reason,
+/// which is limited to 123 bytes. A text message would not do, since a client
+/// that predates `DatasetPushCompleteResponse` takes any text reply for a
+/// confirmation.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushUpdatedConcurrentlyError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push stage 4: the complete response as a client reads it, accepting the
+/// bare confirmation sent by a server that predates
+/// `DatasetPushCompleteResponse`
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(untagged)]
+pub enum DatasetPushCompleteReply {
+    Response(DatasetPushCompleteResponse),
+    Legacy(DatasetPushCompleteLegacyConfirmed),
+}
+
+/// The bare confirmation of a server that predates
+/// `DatasetPushCompleteResponse`. Only an empty object matches, so an error
+/// this client does not know is never taken for a confirmation.
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetPushCompleteLegacyConfirmed {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Packed metadata blocks batch
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct MetadataBlocksBatch {

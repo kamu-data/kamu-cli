@@ -18,7 +18,7 @@
 
 use std::assert_matches;
 
-use kamu::domain::PullResult;
+use kamu::domain::{PullError, PullResult, SyncError};
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
@@ -114,6 +114,59 @@ async fn test_smart_pull_incompatible_version_err() {
             connect_result,
             Err(msg)
                 if msg == r#"{"message":"Incompatible client version"}"#
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_head_moved_concurrently() {
+    let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+            base_catalog: None,
+        })
+        .await,
+    )
+    .await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let dataset_handle = &scenario.server_create_result.dataset_handle;
+        let concurrent_head = scenario
+            .client_harness
+            .append_unreferenced_block(dataset_handle)
+            .await;
+        scenario
+            .client_harness
+            .move_head_before_next_commit(concurrent_head.clone());
+
+        let pull_responses = scenario
+            .client_harness
+            .pull_datasets(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .await;
+
+        pretty_assertions::assert_eq!(pull_responses.len(), 1);
+        assert_matches!(
+            &pull_responses[0].result,
+            Err(PullError::SyncError(SyncError::UpdatedConcurrently(_)))
+        );
+        pretty_assertions::assert_eq!(
+            scenario
+                .client_harness
+                .stored_head(&dataset_handle.id)
+                .await,
+            concurrent_head
         );
     };
 

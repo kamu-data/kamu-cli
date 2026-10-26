@@ -13,6 +13,7 @@ mod fake_dataset_entry_service;
 mod fake_dataset_reference_service;
 mod fake_dependency_graph_indexer;
 mod owner_by_alias_dataset_action_authorizer;
+mod racing_dataset_head_committer;
 mod test_dataset_outbox_listener;
 
 pub use classify_by_allowance_ids_response_test_helper::*;
@@ -21,4 +22,5 @@ pub use fake_dataset_entry_service::*;
 pub use fake_dataset_reference_service::*;
 pub use fake_dependency_graph_indexer::*;
 pub use owner_by_alias_dataset_action_authorizer::*;
+pub use racing_dataset_head_committer::*;
 pub use test_dataset_outbox_listener::*;

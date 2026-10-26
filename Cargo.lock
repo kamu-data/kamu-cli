@@ -8989,6 +8989,7 @@ dependencies = [
  "kamu-core",
  "kamu-datasets",
  "kamu-datasets-inmem",
+ "kamu-datasets-services",
  "kamu-messaging-outbox-inmem",
  "kamu-search",
  "kamu-search-cache-inmem",

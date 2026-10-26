@@ -199,7 +199,26 @@ impl DatasetMut {
             ) => Ok(SetWatermarkResult::IsDerivative(SetWatermarkIsDerivative {
                 message: e.to_string(),
             })),
-            Err(e) => Err(e.int_err().into()),
+            Err(domain::SetWatermarkError::Execution(
+                domain::SetWatermarkExecutionError::RefCASFailed(e),
+            )) => Ok(SetWatermarkResult::CasFailed(SetWatermarkCasFailed {
+                expected_head: e
+                    .expected
+                    .expect("Watermark is always committed on top of an existing head")
+                    .into(),
+                actual_head: e.actual.map(Into::into),
+            })),
+            Err(
+                e @ (domain::SetWatermarkError::NotFound(_)
+                | domain::SetWatermarkError::Planning(
+                    SetWatermarkPlanningError::IsRemote | SetWatermarkPlanningError::Internal(_),
+                )
+                | domain::SetWatermarkError::Execution(
+                    domain::SetWatermarkExecutionError::Internal(_),
+                )
+                | domain::SetWatermarkError::Access(_)
+                | domain::SetWatermarkError::Internal(_)),
+            ) => Err(e.int_err().into()),
         }
     }
 
@@ -429,6 +448,7 @@ pub enum SetWatermarkResult<'a> {
     UpToDate(SetWatermarkUpToDate),
     Updated(SetWatermarkUpdated<'a>),
     IsDerivative(SetWatermarkIsDerivative),
+    CasFailed(SetWatermarkCasFailed),
 }
 
 /// Watermark already had the requested value
@@ -467,6 +487,25 @@ impl SetWatermarkUpdated<'_> {
 pub struct SetWatermarkIsDerivative {
     /// Human-readable error message
     pub message: String,
+}
+
+/// Dataset head moved while the watermark was being set, likely due to a
+/// concurrent update; nothing was committed
+#[derive(SimpleObject, Debug)]
+#[graphql(complex)]
+pub struct SetWatermarkCasFailed {
+    /// Head block hash the watermark was being set on top of
+    pub expected_head: Multihash<'static>,
+    /// Current head block hash of the dataset, null if it has none
+    pub actual_head: Option<Multihash<'static>>,
+}
+
+#[ComplexObject]
+impl SetWatermarkCasFailed {
+    /// Human-readable error message
+    async fn message(&self) -> String {
+        "Expected head didn't match, dataset was likely updated concurrently".to_string()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

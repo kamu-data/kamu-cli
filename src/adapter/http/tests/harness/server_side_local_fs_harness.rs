@@ -49,6 +49,7 @@ use kamu_datasets_inmem::{
     InMemoryDatasetReferenceRepository,
     InMemoryDatasetStatisticsRepository,
 };
+use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -63,6 +64,7 @@ use super::{
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
+    append_unreferenced_block,
     create_cli_user_catalog,
     create_web_user_catalog,
     make_server_account,
@@ -90,6 +92,22 @@ impl ServerSideLocalFsHarness {
 
     pub fn server_account(&self) -> &Account {
         &self.account
+    }
+
+    /// Arms the next `HEAD` commit on the server to first move `HEAD` to
+    /// `concurrent_head`, the way a concurrent writer would
+    pub fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
+        self.base_catalog
+            .get_one::<RacingDatasetHeadCommitter>()
+            .unwrap()
+            .move_head_before_next_commit(concurrent_head);
+    }
+
+    pub async fn append_unreferenced_block(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> odf::Multihash {
+        append_unreferenced_block(self.cli_dataset_registry().as_ref(), dataset_handle).await
     }
     pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
@@ -162,7 +180,8 @@ impl ServerSideLocalFsHarness {
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<RemoteRepositoryRegistryImpl>()
                 .add::<AppendDatasetMetadataBatchUseCaseImpl>()
-                .add::<DatasetHeadCommitterImpl>()
+                .add_value(RacingDatasetHeadCommitter::default())
+                .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CommitDatasetEventUseCaseImpl>()

@@ -18,6 +18,7 @@ use kamu::testing::ParquetWriterHelper;
 use kamu_datasets::DatasetRegistry;
 use odf::dataset::{AddDataParams, CheckpointRef};
 use odf::metadata::OffsetInterval;
+use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,6 +65,40 @@ fn create_random_parquet_file(path: PathBuf, offset_interval: &OffsetInterval) -
     ParquetWriterHelper::from_record_batch(&path, &record_batch).unwrap();
 
     OwnedFile::new(path)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends a `SetInfo` block after the current `HEAD` without moving any
+/// reference
+pub(crate) async fn append_unreferenced_block(
+    dataset_registry: &dyn DatasetRegistry,
+    dataset_handle: &odf::DatasetHandle,
+) -> odf::Multihash {
+    let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+    let chain = resolved_dataset.as_metadata_chain();
+
+    let head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
+    let head_block = chain.get_block(&head).await.unwrap();
+
+    let block = MetadataFactory::metadata_block(
+        MetadataFactory::set_info()
+            .description("concurrent")
+            .build(),
+    )
+    .prev(&head, head_block.sequence_number)
+    .build();
+
+    chain
+        .append(
+            block,
+            odf::dataset::AppendOpts {
+                update_ref: None,
+                ..odf::dataset::AppendOpts::default()
+            },
+        )
+        .await
+        .unwrap()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

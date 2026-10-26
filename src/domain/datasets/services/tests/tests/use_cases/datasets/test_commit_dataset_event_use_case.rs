@@ -21,6 +21,7 @@ use kamu_datasets::{
     MockDatasetActionAuthorizer,
 };
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
+use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
 use time_source::{SystemTimeSourceProvider, SystemTimeSourceStub};
@@ -29,7 +30,6 @@ use super::dataset_base_use_case_harness::{
     DatasetBaseUseCaseHarness,
     DatasetBaseUseCaseHarnessOpts,
 };
-use super::racing_dataset_head_committer::RacingDatasetHeadCommitter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

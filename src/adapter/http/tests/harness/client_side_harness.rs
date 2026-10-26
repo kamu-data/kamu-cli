@@ -41,6 +41,7 @@ use kamu_datasets_inmem::{
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
+use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -50,6 +51,8 @@ use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Error;
 use url::Url;
+
+use super::append_unreferenced_block;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,6 +66,7 @@ pub(crate) struct ClientSideHarness {
     pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
+    racing_committer: Arc<RacingDatasetHeadCommitter>,
     options: ClientSideHarnessOptions,
 }
 
@@ -188,7 +192,8 @@ impl ClientSideHarness {
         b.add::<PushDatasetUseCaseImpl>();
 
         b.add::<DatasetReferenceServiceImpl>();
-        b.add::<DatasetHeadCommitterImpl>();
+        b.add_value(RacingDatasetHeadCommitter::default())
+            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
         b.add::<InMemoryDatasetReferenceRepository>();
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
@@ -242,6 +247,7 @@ impl ClientSideHarness {
             pull_dataset_use_case: catalog.get_one().unwrap(),
             push_dataset_use_case: catalog.get_one().unwrap(),
             access_token_resolver: catalog.get_one().unwrap(),
+            racing_committer: catalog.get_one().unwrap(),
             catalog,
             options,
         }
@@ -297,6 +303,27 @@ impl ClientSideHarness {
 
     pub fn dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService> {
         self.catalog.get_one().unwrap()
+    }
+
+    /// Arms the next `HEAD` commit to first move `HEAD` to `concurrent_head`,
+    /// the way a concurrent writer would
+    pub fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
+        self.racing_committer
+            .move_head_before_next_commit(concurrent_head);
+    }
+
+    pub async fn append_unreferenced_block(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> odf::Multihash {
+        append_unreferenced_block(self.dataset_registry().as_ref(), dataset_handle).await
+    }
+
+    pub async fn stored_head(&self, dataset_id: &odf::DatasetID) -> odf::Multihash {
+        self.dataset_reference_service()
+            .get_reference(dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
     }
 
     // TODO: accept alias or handle

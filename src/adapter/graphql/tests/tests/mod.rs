@@ -18,6 +18,7 @@ mod test_gql_data;
 mod test_gql_dataset_adapter_collection;
 mod test_gql_dataset_adapter_versioned_file;
 mod test_gql_dataset_env_vars;
+mod test_gql_dataset_set_watermark;
 mod test_gql_datasets;
 mod test_gql_metadata;
 mod test_gql_metadata_chain;

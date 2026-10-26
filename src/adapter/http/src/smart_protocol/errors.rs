@@ -182,6 +182,10 @@ pub enum PushServerError {
     #[error(transparent)]
     NameCollision(NameCollisionError),
 
+    /// `HEAD` moved while the pushed blocks were being committed
+    #[error(transparent)]
+    UpdatedConcurrently(odf::dataset::RefCASError),
+
     #[error(transparent)]
     Internal(PhaseInternalError),
 }
@@ -209,12 +213,23 @@ pub enum PushClientError {
     NameCollision(NameCollisionError),
 
     #[error(transparent)]
+    UpdatedConcurrently(DestinationUpdatedConcurrentlyError),
+
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The destination `HEAD` moved while the pushed blocks were being committed;
+/// nothing was committed
+#[derive(Error, Debug)]
+#[error("Destination dataset head was updated concurrently, nothing was committed")]
+pub struct DestinationUpdatedConcurrentlyError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

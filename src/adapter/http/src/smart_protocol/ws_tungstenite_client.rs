@@ -488,7 +488,7 @@ impl WsSmartTransferProtocolClient {
     async fn push_send_complete_request(
         &self,
         socket: &mut TungsteniteStream,
-    ) -> Result<DatasetPushCompleteConfirmed, PushClientError> {
+    ) -> Result<(), PushClientError> {
         tracing::debug!("Sending push complete request");
 
         write_payload(socket, DatasetPushComplete {})
@@ -499,11 +499,28 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Reading push complete response");
 
-        read_payload::<DatasetPushCompleteConfirmed>(socket)
+        let reply = read_payload::<DatasetPushCompleteReply>(socket)
             .await
             .map_err(|e| {
                 PushClientError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
-            })
+            })?;
+
+        match reply {
+            DatasetPushCompleteReply::Response(Ok(DatasetPushCompleteConfirmed {}))
+            | DatasetPushCompleteReply::Legacy(DatasetPushCompleteLegacyConfirmed {}) => Ok(()),
+            DatasetPushCompleteReply::Response(Err(DatasetPushCompleteError::Internal(e))) => {
+                Err(PushClientError::Internal(InternalError::new(Box::new(
+                    ClientInternalError::new(e.error_message.as_str(), e.phase),
+                ))))
+            }
+            DatasetPushCompleteReply::Response(Err(
+                DatasetPushCompleteError::UpdatedConcurrently(
+                    DatasetPushUpdatedConcurrentlyError {},
+                ),
+            )) => Err(PushClientError::UpdatedConcurrently(
+                DestinationUpdatedConcurrentlyError,
+            )),
+        }
     }
 
     /// Compares the ID of a remote source with the local destination's.
@@ -1015,6 +1032,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     | PushClientError::InvalidHead(_)
                     | PushClientError::RefCollision(_)
                     | PushClientError::NameCollision(_)
+                    | PushClientError::UpdatedConcurrently(_)
                     | PushClientError::Internal(_)) => SyncError::Internal(e.int_err()),
                 });
             }
@@ -1050,6 +1068,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     | PushClientError::ReadFailed(_)
                     | PushClientError::WriteFailed(_)
                     | PushClientError::InvalidHead(_)
+                    | PushClientError::UpdatedConcurrently(_)
                     | PushClientError::Internal(_) => SyncError::Internal(e.int_err()),
                 });
             }
@@ -1064,10 +1083,21 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         .await?;
 
         match self.push_send_complete_request(&mut ws_stream).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
+                return Err(match e {
+                    PushClientError::UpdatedConcurrently(err) => {
+                        SyncError::UpdatedConcurrently(err.into())
+                    }
+                    e @ (PushClientError::OverwriteSeedBlock(_)
+                    | PushClientError::ReadFailed(_)
+                    | PushClientError::WriteFailed(_)
+                    | PushClientError::InvalidHead(_)
+                    | PushClientError::RefCollision(_)
+                    | PushClientError::NameCollision(_)
+                    | PushClientError::Internal(_)) => SyncError::Internal(e.int_err()),
+                });
             }
         }
 

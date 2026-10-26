@@ -302,8 +302,15 @@ sequenceDiagram
     C->>S: DatasetPushObjectsUploadProgressResponse { Complete }
     C->>S: DatasetPushComplete
     Note over S: append blocks, set HEAD (CAS),<br/>post DatasetExternallyChangedMessage
-    S-->>C: DatasetPushCompleteConfirmed
+    S-->>C: DatasetPushCompleteResponse
 ```
+
+`DatasetPushCompleteResponse` is `Ok(DatasetPushCompleteConfirmed)`, or an error sent as the close
+frame reason: `Internal`, or `UpdatedConcurrently` when the CAS on `HEAD` fails. The conflict
+carries no heads, since a close frame reason holds at most 123 bytes; the server logs them. The
+error stays in the close frame because a client that predates the typed response reads any text
+reply here as a bare confirmation, ignoring the `Ok` key; such a client fails at its next send
+instead. The client accepts the bare `{}` confirmation of a server that predates it.
 
 Server-side details:
 
@@ -407,8 +414,8 @@ once at the end, so readers see either the old or the new head. For a local dest
 posts `DatasetReferenceMessage`; the smart push server also posts `DatasetExternallyChangedMessage`.
 
 The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `UpdatedConcurrently`
-for the Simple protocol and the Smart pull client alike; on the Smart push server it is an internal
-failure. Two mappings are surprising: a Smart-protocol push
+for the Simple protocol, the Smart pull client and the Smart push alike; on push the server
+reports it in `DatasetPushCompleteResponse`. Two mappings are surprising: a Smart-protocol push
 onto a remote that is ahead or has diverged fails with `InvalidInterval`, not `DestinationAhead` or
 `DatasetsDiverged`; and server-side internal failures reach the client as `Internal` with the
 generic message "Internal error", the cause staying in the server log (the one exception is a

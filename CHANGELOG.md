@@ -17,10 +17,16 @@ Recommendation: for ease of reading, use the following format:
 ### Changed
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again
-- When a dataset's head moves while `kamu pull`, `kamu system compact` or `kamu reset` runs, or while an
-  update, compaction or reset task runs, the command or task now fails with a head-moved conflict that
-  names the expected and actual heads, instead of an internal error. Such tasks fail as recoverable
-- `kamu reset` and reset tasks no longer overwrite a head that moved after the reset was planned
+- When a dataset's head moves while `kamu pull` or `kamu system compact` runs, or while an update or
+  compaction task runs, the command or task now fails with a head-moved conflict that names the
+  expected and actual heads, instead of an internal error. Such tasks fail as recoverable
+- Reset tasks no longer overwrite a head that moved after the reset was planned; they fail with the
+  same recoverable head-moved conflict
+- `kamu push` over the smart protocol fails with "Dataset was updated concurrently" when the remote
+  dataset's head moves while the pushed blocks are being committed, instead of an unrelated
+  WebSocket error
+- GraphQL: `setWatermark` returns `SetWatermarkCasFailed` with the expected and actual heads when the
+  dataset's head moves concurrently, instead of an internal error
 - A forced pull or push (`--force`) no longer overwrites a head that another writer moved while the
   new blocks were being committed
 ### Fixed

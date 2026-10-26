@@ -8387,6 +8387,25 @@ type SetVocab {
 }
 
 """
+Dataset head moved while the watermark was being set, likely due to a
+concurrent update; nothing was committed
+"""
+type SetWatermarkCasFailed implements SetWatermarkResult {
+	"""
+	Head block hash the watermark was being set on top of
+	"""
+	expectedHead: Multihash!
+	"""
+	Current head block hash of the dataset, null if it has none
+	"""
+	actualHead: Multihash
+	"""
+	Human-readable error message
+	"""
+	message: String!
+}
+
+"""
 Watermark cannot be set manually on a derivative dataset
 """
 type SetWatermarkIsDerivative implements SetWatermarkResult {

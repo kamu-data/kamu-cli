@@ -19,14 +19,12 @@ use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
-use kamu_datasets_services::testing::TestDatasetOutboxListener;
+use kamu_datasets_services::testing::{RacingDatasetHeadCommitter, TestDatasetOutboxListener};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
 use odf::dataset::MetadataChainExt;
 use time_source::*;
-
-use super::racing_dataset_head_committer::RacingDatasetHeadCommitter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

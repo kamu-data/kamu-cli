@@ -18,6 +18,7 @@ use kamu_accounts::AuthenticationService;
 use kamu_core::{CorruptedSourceError, OverwriteSeedBlockError};
 use kamu_datasets::{
     AppendDatasetMetadataBatchUseCase,
+    AppendDatasetMetadataBatchUseCaseError,
     AppendDatasetMetadataBatchUseCaseOptions,
     CreateDatasetError,
     CreateDatasetUseCase,
@@ -156,6 +157,21 @@ impl AxumServerPushProtocolInstance {
                   error = ?err,
                   error_msg = %err,
                   "Push process aborted with error",
+                );
+            }
+            Err(PushServerError::UpdatedConcurrently(err)) => {
+                let payload = DatasetPushCompleteResponse::Err(
+                    DatasetPushCompleteError::UpdatedConcurrently(
+                        DatasetPushUpdatedConcurrentlyError {},
+                    ),
+                );
+                axum_write_close_payload::<DatasetPushCompleteResponse>(&mut self.socket, payload)
+                    .await;
+
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push process aborted: dataset head was updated concurrently",
                 );
             }
             Err(e) => tracing::error!(
@@ -506,7 +522,7 @@ impl AxumServerPushProtocolInstance {
                             set_ref_check_ref_mode: SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged),
                             ..Default::default()
                         })
-                        .await.int_err()?;
+                        .await?;
 
                     let new_head = resolved_dataset
                         .as_metadata_chain()
@@ -514,12 +530,25 @@ impl AxumServerPushProtocolInstance {
                         .await
                         .int_err()?;
 
-                    Ok::<(odf::DatasetID, Multihash), InternalError>((resolved_dataset.get_id().clone(), new_head))
+                    Ok::<(odf::DatasetID, Multihash), AppendDatasetMetadataBatchUseCaseError>((resolved_dataset.get_id().clone(), new_head))
                 },
             )
             .instrument(tracing::debug_span!("AxumServerPushProtocolInstance::try_handle_push_complete"))
             .await
-            .protocol_int_err(PushPhase::CompleteRequest)?;
+            .map_err(|e| match e {
+                AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                    odf::dataset::SetChainRefError::CASFailed(e),
+                ) => PushServerError::UpdatedConcurrently(e),
+                e @ (AppendDatasetMetadataBatchUseCaseError::BlockAppendError(_)
+                | AppendDatasetMetadataBatchUseCaseError::SetRefError(
+                    odf::dataset::SetChainRefError::BlockNotFound(_)
+                    | odf::dataset::SetChainRefError::Access(_)
+                    | odf::dataset::SetChainRefError::Internal(_),
+                )
+                | AppendDatasetMetadataBatchUseCaseError::Internal(_)) => {
+                    PushServerError::Internal(e.protocol_int_err(PushPhase::CompleteRequest))
+                }
+            })?;
 
         tracing::debug!("Push client sent a complete request. Send outbox message");
 
@@ -564,9 +593,9 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Sending completion confirmation");
 
-        axum_write_payload::<DatasetPushCompleteConfirmed>(
+        axum_write_payload::<DatasetPushCompleteResponse>(
             &mut self.socket,
-            DatasetPushCompleteConfirmed {},
+            Ok(DatasetPushCompleteConfirmed {}),
         )
         .await
         .map_err(|e| {

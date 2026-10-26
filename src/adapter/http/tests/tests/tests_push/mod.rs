@@ -9,6 +9,7 @@
 
 pub(crate) mod scenarios;
 
+mod test_smart_push_complete_reply;
 mod test_smart_push_local_fs;
 mod test_smart_push_s3;
 mod test_smart_push_shared;

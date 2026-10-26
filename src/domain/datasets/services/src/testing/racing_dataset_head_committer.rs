@@ -10,7 +10,8 @@
 use std::sync::Mutex;
 
 use kamu_datasets::{DatasetHeadCommitter, ResolvedDataset};
-use kamu_datasets_services::DatasetHeadCommitterImpl;
+
+use crate::DatasetHeadCommitterImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
