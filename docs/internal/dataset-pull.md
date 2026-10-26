@@ -224,9 +224,10 @@ for an ingest job, `TransformExecuteError::CommitError` for a transform job. A c
 
 `PullMultiListener` hands out one ingest, transform or sync listener per dataset.
 `PullDatasetUseCase::execute` wraps a single-dataset `PullListener` in `ListenerMultiAdapter`.
-Listeners only report progress; they cannot change the outcome. A transform listener hears every outcome: the
-executor reports execution, and `transform` reports an up-to-date elaboration as success and a
-failed one through `elaborate_error`.
+Listeners only report progress; they cannot change the outcome. A transform listener hears about
+execution from the executor, and from `transform` about elaboration: success when the dataset is up
+to date, `elaborate_error` when elaboration fails. A failed reset on a diverged input is not
+reported to it.
 
 ---
 

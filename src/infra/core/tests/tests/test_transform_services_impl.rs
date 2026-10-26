@@ -368,15 +368,13 @@ impl TransformTestHarness {
         &self,
         target: ResolvedDataset,
     ) -> Result<TransformElaboration, TransformElaborateError> {
-        self.transform_elab_svc
-            .elaborate_transform(
-                target.clone(),
-                self.transform_request_planner
-                    .build_transform_preliminary_plan(target)
-                    .await
-                    .unwrap(),
-            )
+        let plan = self
+            .transform_request_planner
+            .build_transform_preliminary_plan(target)
             .await
+            .unwrap();
+
+        self.transform_elab_svc.elaborate_transform(plan).await
     }
 
     async fn transform(&self, target: ResolvedDataset) -> Result<TransformResult, TransformError> {

@@ -176,7 +176,7 @@ impl UpdateDatasetTaskRunner {
     ) -> Result<TaskOutcome, InternalError> {
         let transform_elaboration = match self
             .transform_elaboration_service
-            .elaborate_transform(transform_item.target.clone(), transform_item.plan)
+            .elaborate_transform(transform_item.plan)
             .await
         {
             Ok(transform_elaboration) => transform_elaboration,

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::*;
 use engine::{TransformRequestExt, TransformRequestInputExt};
 use kamu_core::*;
-use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
+use kamu_datasets::ResolvedDatasetsMap;
 use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
@@ -100,7 +100,6 @@ impl TransformElaborationService for TransformElaborationServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(target=%plan.preliminary_request.dataset_handle))]
     async fn elaborate_transform(
         &self,
-        _target: ResolvedDataset,
         plan: TransformPreliminaryPlan,
     ) -> Result<TransformElaboration, TransformElaborateError> {
         match self

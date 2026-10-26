@@ -139,7 +139,7 @@ fails with `TransformNotDefinedError`.
 
 ### 4.2 Elaborate
 
-`TransformElaborationService::elaborate_transform(target, plan)` turns each input state into a
+`TransformElaborationService::elaborate_transform(plan)` turns each input state into a
 `TransformRequestInputExt`. It only reads: it writes no blocks, moves no reference and reports to no
 listener.
 

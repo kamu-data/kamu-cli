@@ -63,9 +63,7 @@ impl TransformTestHelper {
             .await
             .unwrap();
 
-        self.transform_elab_svc
-            .elaborate_transform(derived_target, plan)
-            .await
+        self.transform_elab_svc.elaborate_transform(plan).await
     }
 
     pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {

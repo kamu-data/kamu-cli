@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
+use kamu_datasets::ResolvedDatasetsMap;
 use thiserror::Error;
 
 use super::TransformPreliminaryPlan;
@@ -23,7 +23,6 @@ pub trait TransformElaborationService: Send + Sync {
     /// Reads the inputs and builds the transform request. Writes nothing.
     async fn elaborate_transform(
         &self,
-        target: ResolvedDataset,
         plan: TransformPreliminaryPlan,
     ) -> Result<TransformElaboration, TransformElaborateError>;
 }

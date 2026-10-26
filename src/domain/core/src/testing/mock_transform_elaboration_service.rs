@@ -19,9 +19,9 @@ use crate::*;
 impl MockTransformElaborationService {
     pub fn make_expect_elaborate_transform(mut self, target_alias: odf::DatasetAlias) -> Self {
         self.expect_elaborate_transform()
-            .withf(move |target, _| target.get_alias() == &target_alias)
+            .withf(move |plan| plan.preliminary_request.dataset_handle.alias == target_alias)
             .times(1)
-            .returning(|_, plan| {
+            .returning(|plan| {
                 Ok(TransformElaboration::Elaborated(TransformPlan {
                     request: TransformRequestExt {
                         operation_id: get_random_name(None, 10),
@@ -47,9 +47,9 @@ impl MockTransformElaborationService {
         target_alias: odf::DatasetAlias,
     ) -> Self {
         self.expect_elaborate_transform()
-            .withf(move |target, _| target.get_alias() == &target_alias)
+            .withf(move |plan| plan.preliminary_request.dataset_handle.alias == target_alias)
             .times(1)
-            .returning(|_, _| Ok(TransformElaboration::UpToDate));
+            .returning(|_| Ok(TransformElaboration::UpToDate));
         self
     }
 
@@ -71,9 +71,9 @@ impl MockTransformElaborationService {
         make_error: impl Fn() -> TransformElaborateError + Send + 'static,
     ) -> Self {
         self.expect_elaborate_transform()
-            .withf(move |target, _| target.get_alias() == &target_alias)
+            .withf(move |plan| plan.preliminary_request.dataset_handle.alias == target_alias)
             .times(1)
-            .returning(move |_, _| Err(make_error()));
+            .returning(move |_| Err(make_error()));
         self
     }
 }

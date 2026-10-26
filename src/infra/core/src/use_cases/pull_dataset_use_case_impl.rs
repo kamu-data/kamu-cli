@@ -535,7 +535,7 @@ impl PullDatasetUseCaseImpl {
             .int_err()?;
 
         let mut result = transform_elaboration_svc
-            .elaborate_transform(pti.target, pti.plan)
+            .elaborate_transform(pti.plan)
             .await;
 
         if let Ok(TransformElaboration::Elaborated(elaborate_res)) = &mut result {
@@ -553,12 +553,10 @@ impl PullDatasetUseCaseImpl {
     ) -> Result<TransformElaboration, TransformError> {
         let target = dataset_registry.get_dataset_by_handle(target_handle).await;
         let plan = transform_request_planner
-            .build_transform_preliminary_plan(target.clone())
+            .build_transform_preliminary_plan(target)
             .await?;
 
-        let mut elaboration = transform_elaboration_svc
-            .elaborate_transform(target, plan)
-            .await?;
+        let mut elaboration = transform_elaboration_svc.elaborate_transform(plan).await?;
 
         if let TransformElaboration::Elaborated(elaborate_res) = &mut elaboration {
             elaborate_res.datasets_map.detach_from_transaction();
@@ -998,7 +996,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Services a spawned transform job needs, which outlive the use case borrow
+/// Services a transform job needs, cloned into each spawned job
 #[derive(Clone)]
 struct TransformServices {
     elaboration: Arc<dyn TransformElaborationService>,
