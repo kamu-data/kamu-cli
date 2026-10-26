@@ -10,6 +10,8 @@
 use std::assert_matches;
 
 use kamu_cli_e2e_common::{
+    DATASET_DERIVATIVE_LEADERBOARD_NAME,
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
@@ -158,6 +160,66 @@ pub async fn test_compact_verify(kamu: KamuCliPuppet) {
     assert_matches!(
         blocks_after_compacting.first().unwrap().block.event,
         odf::MetadataEvent::AddData(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_compact_partial_failure_keeps_storage_in_sync(kamu: KamuCliPuppet) {
+    let root_name = DATASET_ROOT_PLAYER_NAME.clone();
+    let derivative_name = DATASET_DERIVATIVE_LEADERBOARD_NAME.clone();
+
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.ingest_data(
+        &root_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+    kamu.ingest_data(
+        &root_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
+
+    // Hard compaction accepts root datasets only, so the derivative fails after
+    // the root was compacted and committed
+    kamu.assert_failure_command_execution(
+        [
+            "--yes",
+            "system",
+            "compact",
+            root_name.as_str(),
+            derivative_name.as_str(),
+            "--hard",
+        ],
+        None,
+        Some([r#"Failed to compact 1/2 dataset\(s\)"#]),
+    )
+    .await;
+
+    // Read before any other command runs, since every command processes the
+    // Outbox when it ends
+    let storage_heads = kamu.list_storage_heads();
+
+    let root_head = kamu
+        .list_blocks(&root_name)
+        .await
+        .first()
+        .unwrap()
+        .block_hash
+        .clone();
+    assert!(
+        storage_heads.contains(&root_head),
+        "Storage HEAD of {root_name} lags its compacted HEAD {root_head}",
     );
 }
 

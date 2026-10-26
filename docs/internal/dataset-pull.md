@@ -277,9 +277,8 @@ pull rather than becoming a per-dataset error; a failure to move `HEAD` is a per
 ([§6.2](#62-per-job-runners)). A job that panics re-raises the panic in the command (`JoinSet::join_all`), aborting the
 other jobs of its iteration.
 
-Any failed dataset makes the command return an error, and then the CLI skips its final outbox
-processing: deferred consumers of messages already posted (for datasets that did update) run on
-the next command that processes the outbox.
+Any failed dataset makes the command return an error. The CLI still processes the outbox before
+reporting it, so the deferred consumers of the datasets that did update run in the same command.
 
 ---
 

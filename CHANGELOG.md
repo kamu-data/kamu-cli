@@ -34,6 +34,8 @@ Recommendation: for ease of reading, use the following format:
   head-moved conflict. Each dataset is committed as soon as it is compacted, so a failure in one
   dataset no longer undoes the compaction of the others
 ### Fixed
+- When `kamu pull` or `kamu system compact` fails for some datasets, the datasets that did update
+  are now fully processed before the command exits, instead of on the next command
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key
 

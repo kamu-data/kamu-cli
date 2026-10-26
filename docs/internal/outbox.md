@@ -289,7 +289,8 @@ run_while_has_tasks(): loop { held = has_held_back_messages(); drain; if !held b
 
 Waking is described in [wakeup-listeners.md](wakeup-listeners.md) (channel
 `outbox_messages_ready`). The same drain is callable as `run_while_has_tasks()`: the CLI calls it
-after commands that need it, and the HTTP E2E middleware after every successful mutating request,
+after commands that need it, also after one that failed, since it may have committed some work in
+transactions of its own, and the HTTP E2E middleware after every successful mutating request,
 so E2E tests observe consumers' effects synchronously. A `run_lock` keeps these entrances from
 overlapping with the main loop.
 
