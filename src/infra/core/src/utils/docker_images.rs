@@ -19,6 +19,3 @@ pub const BUSYBOX: &str = "docker.io/busybox:latest";
 
 #[cfg(feature = "ingest-mqtt")]
 pub const RUMQTTD: &str = "docker.io/bytebeamio/rumqttd:0.19.0";
-
-#[cfg(feature = "ingest-ftp")]
-pub const FTP: &str = "docker.io/bogem/ftp";

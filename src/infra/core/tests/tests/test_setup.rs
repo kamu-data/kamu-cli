@@ -53,10 +53,4 @@ async fn test_setup_pull_images() {
                 .unwrap();
         }
     }
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "ingest-ftp")] {
-            container_runtime.ensure_image(docker_images::FTP, None).await.unwrap();
-        }
-    }
 }
