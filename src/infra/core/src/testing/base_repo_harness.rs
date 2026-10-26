@@ -190,6 +190,67 @@ impl BaseRepoHarness {
         CreateDatasetResult::from_stored(store_result, alias.clone())
     }
 
+    /// Appends a `SetInfo` block after the current `HEAD` without moving any
+    /// reference.
+    pub async fn append_unreferenced_block(
+        &self,
+        created: &CreateDatasetResult,
+        description: &str,
+    ) -> odf::Multihash {
+        let chain = created.dataset.as_metadata_chain();
+        let head = self.get_head(created).await;
+        let head_block = chain.get_block(&head).await.unwrap();
+
+        let block = MetadataFactory::metadata_block(
+            MetadataFactory::set_info().description(description).build(),
+        )
+        .prev(&head, head_block.sequence_number)
+        .system_time(self.system_time_source.now())
+        .build();
+
+        chain
+            .append(
+                block,
+                odf::dataset::AppendOpts {
+                    update_ref: None,
+                    ..odf::dataset::AppendOpts::default()
+                },
+            )
+            .await
+            .unwrap()
+    }
+
+    /// Moves `HEAD` the way a concurrent writer would.
+    pub async fn move_head(
+        &self,
+        created: &CreateDatasetResult,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) {
+        created
+            .dataset
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(old_head)),
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    pub async fn get_head(&self, created: &CreateDatasetResult) -> odf::Multihash {
+        created
+            .dataset
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap()
+    }
+
     pub async fn num_blocks(&self, target: ResolvedDataset) -> usize {
         use futures::StreamExt;
         use odf::dataset::MetadataChainExt;

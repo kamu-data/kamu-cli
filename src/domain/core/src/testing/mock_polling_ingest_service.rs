@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::ReportedHeads;
 use crate::{MockPollingIngestService, PollingIngestResponse, PollingIngestResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,6 +24,31 @@ impl MockPollingIngestService {
                         uncacheable: false,
                     },
                     metadata_state: None,
+                })
+            });
+        self
+    }
+
+    /// Reports `HEAD` moved between the `heads` set by the time of ingest,
+    /// without moving any reference.
+    pub fn make_expect_ingest_updated(
+        mut self,
+        dataset_alias: odf::DatasetAlias,
+        heads: ReportedHeads,
+    ) -> Self {
+        self.expect_ingest()
+            .withf(move |target, _, _, _| target.get_alias() == &dataset_alias)
+            .times(1)
+            .returning(move |_, metadata_state, _, _| {
+                let (old_head, new_head) = heads.get();
+                Ok(PollingIngestResponse {
+                    result: PollingIngestResult::Updated {
+                        old_head,
+                        new_head,
+                        has_more: false,
+                        uncacheable: false,
+                    },
+                    metadata_state: Some(metadata_state),
                 })
             });
         self

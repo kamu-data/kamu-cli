@@ -22,7 +22,7 @@ use odf_storage::*;
 use thiserror::Error;
 use url::Url;
 
-use crate::{AppendError, BlockRef, MetadataChain};
+use crate::{AppendError, BlockRef, MetadataChain, SetChainRefError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -155,6 +155,19 @@ pub enum CommitError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<SetChainRefError> for CommitError {
+    fn from(v: SetChainRefError) -> Self {
+        match v {
+            SetChainRefError::BlockNotFound(e) => Self::Internal(e.int_err()),
+            SetChainRefError::CASFailed(e) => {
+                Self::MetadataAppendError(AppendError::RefCASFailed(e))
+            }
+            SetChainRefError::Access(e) => Self::Access(e),
+            SetChainRefError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

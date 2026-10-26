@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod task_error_dataset_commit;
 mod task_error_dataset_reset;
 mod task_error_dataset_update;
 
+pub use task_error_dataset_commit::*;
 pub use task_error_dataset_reset::*;
 pub use task_error_dataset_update::*;

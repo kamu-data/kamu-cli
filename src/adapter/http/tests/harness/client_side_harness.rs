@@ -188,6 +188,7 @@ impl ClientSideHarness {
         b.add::<PushDatasetUseCaseImpl>();
 
         b.add::<DatasetReferenceServiceImpl>();
+        b.add::<DatasetHeadCommitterImpl>();
         b.add::<InMemoryDatasetReferenceRepository>();
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();

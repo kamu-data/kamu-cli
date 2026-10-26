@@ -13,10 +13,15 @@ use std::sync::Arc;
 
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
+use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, DatasetAction, MockDatasetActionAuthorizer};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
-use kamu_datasets_services::{DependencyGraphIndexer, DependencyGraphServiceImpl};
+use kamu_datasets_services::{
+    DatasetHeadCommitterImpl,
+    DependencyGraphIndexer,
+    DependencyGraphServiceImpl,
+};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
@@ -128,6 +133,128 @@ async fn test_pull_transform_success() {
 
     let aliases = harness.get_remote_aliases(&bar).await;
     assert!(aliases.is_empty(RemoteAliasKind::Pull));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_commits_head() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_updated(
+        &alias_foo,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    reported_heads.set(&foo.head, &ingested_head);
+
+    let pull_response = harness.pull_local(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: Some(old_head), new_head, .. })
+        if old_head == foo.head && new_head == ingested_head
+    );
+    assert_eq!(harness.get_head(&foo).await, ingested_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_head_moved_concurrently() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_updated(
+        &alias_foo,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    reported_heads.set(&foo.head, &ingested_head);
+    harness.move_head(&foo, &foo.head, &concurrent_head).await;
+
+    let pull_response = harness.pull_local(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::PollingIngestError(PollingIngestError::CommitError(
+            odf::dataset::CommitError::MetadataAppendError(
+                odf::dataset::AppendError::RefCASFailed(e)
+            )
+        )))
+        if e.expected == Some(foo.head.clone()) && e.actual == Some(concurrent_head.clone())
+    );
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_commits_head() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_transform_updated(
+        &alias_foo,
+        &alias_bar,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    reported_heads.set(&bar.head, &transformed_head);
+
+    let pull_response = harness.pull_local(&alias_bar).await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: Some(old_head), new_head, .. })
+        if old_head == bar.head && new_head == transformed_head
+    );
+    assert_eq!(harness.get_head(&bar).await, transformed_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_head_moved_concurrently() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_transform_updated(
+        &alias_foo,
+        &alias_bar,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
+    reported_heads.set(&bar.head, &transformed_head);
+    harness.move_head(&bar, &bar.head, &concurrent_head).await;
+
+    let pull_response = harness.pull_local(&alias_bar).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::TransformError(TransformError::Execute(
+            TransformExecuteError::CommitError(odf::dataset::CommitError::MetadataAppendError(
+                odf::dataset::AppendError::RefCASFailed(e)
+            ))
+        )))
+        if e.expected == Some(bar.head.clone()) && e.actual == Some(concurrent_head.clone())
+    );
+    assert_eq!(harness.get_head(&bar).await, concurrent_head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -681,6 +808,7 @@ impl PullUseCaseHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<PullDatasetUseCaseImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<TransformRequestPlannerImpl>()
             .add_value(mocks.mock_polling_ingest_service)
@@ -724,6 +852,17 @@ impl PullUseCaseHarness {
             remote_repo_name,
             remote_tmp_dir,
         }
+    }
+
+    async fn pull_local(&self, alias: &odf::DatasetAlias) -> PullResponse {
+        self.use_case
+            .execute(
+                PullRequest::Local(alias.as_local_ref()),
+                PullOptions::default(),
+                None,
+            )
+            .await
+            .unwrap()
     }
 
     async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
@@ -808,6 +947,53 @@ impl PullUseCaseHarnessMocks {
             mock_transform_execution_service,
             ..self
         }
+    }
+
+    /// Expects one ingest of `foo` that reports `reported_heads`.
+    fn for_ingest_updated(alias_foo: &odf::DatasetAlias, reported_heads: &ReportedHeads) -> Self {
+        Self::default()
+            .with_authorizer_mock(
+                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Write,
+                    1,
+                    HashSet::from_iter([alias_foo.clone()]),
+                ),
+            )
+            .with_polling_ingest_mock(
+                MockPollingIngestService::new()
+                    .make_expect_ingest_updated(alias_foo.clone(), reported_heads.clone()),
+            )
+    }
+
+    /// Expects one transform of `bar` from `foo` that reports
+    /// `reported_heads`.
+    fn for_transform_updated(
+        alias_foo: &odf::DatasetAlias,
+        alias_bar: &odf::DatasetAlias,
+        reported_heads: &ReportedHeads,
+    ) -> Self {
+        Self::default()
+            .with_authorizer_mock(
+                MockDatasetActionAuthorizer::new()
+                    .make_expect_classify_datasets_by_allowance(
+                        DatasetAction::Write,
+                        1,
+                        HashSet::from_iter([alias_bar.clone()]),
+                    )
+                    .make_expect_classify_datasets_by_allowance(
+                        DatasetAction::Read,
+                        1,
+                        HashSet::from_iter([alias_foo.clone()]),
+                    ),
+            )
+            .with_transform_elaboration_mock(
+                MockTransformElaborationService::new()
+                    .make_expect_elaborate_transform(alias_bar.clone()),
+            )
+            .with_transform_execution_mock(
+                MockTransformExecutor::new()
+                    .make_expect_transform_updated(alias_bar.clone(), reported_heads.clone()),
+            )
     }
 
     fn with_sync_mock(self, mock_sync_service: MockSyncService) -> Self {

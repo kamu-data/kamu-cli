@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_adapter_task_dataset::{TaskErrorDatasetReset, TaskErrorDatasetUpdate};
+use kamu_adapter_task_dataset::{
+    TaskErrorDatasetCommit,
+    TaskErrorDatasetReset,
+    TaskErrorDatasetUpdate,
+};
 use kamu_adapter_task_webhook::TaskErrorWebhookDelivery;
 use kamu_datasets::DatasetRegistry;
 use kamu_task_system as ts;
@@ -144,6 +148,18 @@ impl TaskFailureReason {
                                 input_dataset: dataset,
                             },
                         )
+                    }
+                }
+            }
+
+            TaskErrorDatasetCommit::TYPE_ID => {
+                let commit_error = TaskErrorDatasetCommit::from_task_error(e)?;
+                match commit_error {
+                    TaskErrorDatasetCommit::HeadMoved(_) => {
+                        TaskFailureReason::General(TaskFailureReasonGeneral {
+                            message: "Dataset head was moved by a concurrent update".to_owned(),
+                            recoverable: e.recoverable,
+                        })
                     }
                 }
             }

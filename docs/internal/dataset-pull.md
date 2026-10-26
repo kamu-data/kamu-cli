@@ -209,16 +209,16 @@ runs outside them.
 
 | Job | Runner | Moves `HEAD` |
 | --- | --- | --- |
-| Ingest | `ingest`: resolves the dataset's env vars if the options carry none and secrets encryption is enabled; then `ingest_loop` calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), merging results so the response spans the first old head to the last new head | after every ingest iteration that returns `Updated`, `update_ref_transactionally` (CAS) |
-| Transform | `transform`: elaborates in a transaction after `refresh_from_dataset_registry`, so it sees what earlier depths committed; then executes | after the commit, `update_ref_transactionally` (CAS) |
+| Ingest | `ingest`: resolves the dataset's env vars if the options carry none and secrets encryption is enabled; then `ingest_loop` calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), merging results so the response spans the first old head to the last new head | after every ingest iteration that returns `Updated`, `commit_head_transactionally` (CAS) |
+| Transform | `transform`: elaborates in a transaction after `refresh_from_dataset_registry`, so it sees what earlier depths committed; then executes | after the commit, `commit_head_transactionally` (CAS) |
 | Sync | `sync`: `SyncService::sync`; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias | by `SyncService` itself |
 
-`update_ref_transactionally` sets `HEAD` with `validate_block_present` and `check_ref_is` set to the
-head the job started from, which posts
+`commit_head_transactionally` moves `HEAD` through `DatasetHeadCommitter`, expecting the head the
+job started from, which posts
 `DatasetReferenceMessage` ([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)).
-A CAS failure is an `InternalError`: for an ingest job it becomes that dataset's
-`PollingIngestError::Internal`, for a transform job it aborts the whole pull
-([§9](#9-results-and-errors)).
+Any failure there, a CAS conflict included, is that dataset's error: `PollingIngestError::CommitError`
+for an ingest job, `TransformExecuteError::CommitError` for a transform job. A conflict arrives as
+`CommitError::MetadataAppendError(AppendError::RefCASFailed)` with the expected and actual heads.
 
 ### 6.3 Listeners
 
@@ -272,9 +272,9 @@ sync — or `Updated { old_head, new_head, has_more }`. `PullError` wraps the pe
 `AmbiguousSource`, `SaveUnderDifferentAlias`, `InvalidOperation`, `ScanMetadata`), `Access` and
 `Internal`.
 
-An `InternalError` returned by a job runner itself (a failed transaction, a transform's `HEAD`
-CAS failure, an env-var lookup failure) aborts the whole pull rather than becoming a per-dataset
-error. A job that panics re-raises the panic in the command (`JoinSet::join_all`), aborting the
+An `InternalError` returned by a job runner itself (an env-var lookup failure) aborts the whole
+pull rather than becoming a per-dataset error; a failure to move `HEAD` is a per-dataset error
+([§6.2](#62-per-job-runners)). A job that panics re-raises the panic in the command (`JoinSet::join_all`), aborting the
 other jobs of its iteration.
 
 Any failed dataset makes the command return an error, and then the CLI skips its final outbox

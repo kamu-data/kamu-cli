@@ -327,7 +327,7 @@ task is `Running` if and only if its `Running` message exists, and likewise for 
 A dataset planner resolves a `ResolvedDataset` inside its transaction and calls
 `detach_from_transaction()` before returning, so the definition can outlive that transaction and
 be used by the runner. A runner that needs the database again opens a new transaction and
-re-resolves what it needs (`update_dataset_head`, `combine_task_result`).
+re-resolves what it needs (`commit_dataset_head`, `combine_task_result`).
 
 `TaskSchedulerImpl` itself opens no transactions: `create_task`, `cancel_task` and `try_take` run in
 the caller's, which is how the flow system creates a task atomically with the flow event that
@@ -354,8 +354,10 @@ before touching them.
 
 Ingest, transform and compaction share one shape: **the core service writes new blocks with
 `update_block_ref: false` outside any transaction, and the runner then moves `HEAD` in a short
-transaction with compare-and-swap** — `update_dataset_head` re-resolves the dataset through
-`DatasetRegistry` and calls `set_ref(Head, new_head, check_ref_is: Some(old_head))`. Blocks
+transaction with compare-and-swap** — the runner re-resolves the dataset through
+`DatasetRegistry` and moves `HEAD` from `old_head` to `new_head`: the update runner through
+`DatasetHeadCommitter` (`commit_dataset_head`), the compaction runners through
+`set_ref(Head, new_head, check_ref_is: Some(old_head))` (`update_dataset_head`). Blocks
 written by an attempt that never reaches that step stay unreferenced, so a re-run after a crash,
 or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and reset differ:
 
@@ -424,6 +426,7 @@ counts and the new watermark, which the flow controller uses for triggering down
 | --- | --- |
 | Ingest: `ParameterNotFound`, `ReadError`, invalid query, `BadInputSchema`, `IncompatibleSchema`, `InvalidParameterFormat`, `MergeError`, `ExecutionError`, `TemplateError` | no |
 | Ingest: `CommitError`, `DataValidation`, other engine errors, `EngineProvisioningError`, `ImagePull`, `NotFound`, `PipeError`, `ProcessError`, `Unreachable`, `Internal` | yes |
+| Ingest or transform: `HEAD` moved after planning (the CAS fails when moving it) | yes, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
 | Transform elaboration: `InvalidInputInterval` | no, typed `InputDatasetCompacted` |
 | Transform elaboration: `InputSchemaNotDefined` | no (the elaboration service already turns it into `UpToDate`, so this arm is not reached) |
 | Transform elaboration: `Internal` | yes |
@@ -633,6 +636,7 @@ straight from `TaskEventStore` (`utils::get_task`), not through `TaskScheduler`.
 | --- | --- |
 | `Empty` | `TaskFailureReasonGeneral { message: "FAILED", recoverable }` |
 | `UpdateDatasetError` → `InputDatasetCompacted` | `TaskFailureReasonInputDatasetCompacted { inputDataset: Dataset, message }` — resolves the input dataset and its owner |
+| `DatasetCommitError` → `HeadMoved` | `TaskFailureReasonGeneral { message: "Dataset head was moved by a concurrent update", recoverable }` |
 | `ResetDatasetError` → `ResetHeadNotFound` | `TaskFailureReasonGeneral { message: "New head hash to reset not found" }` |
 | `WebhookDeliveryError` | `TaskFailureReasonWebhookDeliveryProblem { targetUrl, message }` — timeout, connection failure, or the HTTP status and reason |
 | anything else | `TaskFailureReasonGeneral { message: "Unexpected task error type" }`, logged as an error |

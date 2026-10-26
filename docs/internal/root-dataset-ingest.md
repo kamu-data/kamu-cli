@@ -403,9 +403,10 @@ planning fails separately with `PushIngestPlanningError` (`SourceNotFound`, `Hea
 `UnsupportedMediaType`, `CommitError`, `Internal`).
 
 How each `PollingIngestError` becomes a recoverable or unrecoverable task outcome is in
-[task-system.md](task-system.md#71-update-dataset). A failure to move `HEAD` after a successful
-ingest (a CAS conflict included) is returned from the runner as an internal error, which the task
-agent records as a recoverable failure. The retry plans from the new head. It reuses the fetch
+[task-system.md](task-system.md#71-update-dataset). A CAS conflict when moving `HEAD` after a
+successful ingest becomes the recoverable task error `DatasetCommitError` → `HeadMoved`; any other
+failure to move `HEAD` is returned from the runner as an internal error, which the task agent also
+records as a recoverable failure. The retry plans from the new head. It reuses the fetch
 savepoint only if the winning commit left the source state unchanged; if the winner was a push or
 `set-watermark`, which write no source state, the source now looks uncacheable and the retry is
 skipped as up to date unless `fetch_uncacheable` is set.

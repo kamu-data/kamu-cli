@@ -25,6 +25,7 @@ use kamu_datasets::{
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetEnvVarResolver,
+    DatasetHeadCommitter,
     DatasetRegistry,
     SecretsEncryptionConfig,
 };
@@ -368,13 +369,14 @@ impl PullDatasetUseCaseImpl {
                         old_head, new_head, ..
                     } = &ingest_res.result
                     {
-                        Self::update_ref_transactionally(
+                        Self::commit_head_transactionally(
                             catalog.clone(),
                             pii.target.get_handle(),
-                            new_head,
                             old_head,
+                            new_head,
                         )
-                        .await?;
+                        .await
+                        .map_err(|e| PollingIngestError::CommitError(e.into()))?;
                         latest_metadata_state = ingest_res.metadata_state.unwrap();
                     }
 
@@ -497,28 +499,18 @@ impl PullDatasetUseCaseImpl {
         resolver.resolve_effective_env_vars(dataset_id).await
     }
 
-    #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn update_ref_transactionally(
+    #[transactional_static_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
+    async fn commit_head_transactionally(
         catalog: dill::Catalog,
         target_handle: &odf::DatasetHandle,
-        new_head: &odf::Multihash,
         old_head: &odf::Multihash,
-    ) -> Result<(), InternalError> {
+        new_head: &odf::Multihash,
+    ) -> Result<(), odf::dataset::SetChainRefError> {
         let transactional_target = dataset_registry.get_dataset_by_handle(target_handle).await;
 
-        // ToDo: Handle concurrent `HEAD` updates
-        transactional_target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(Some(old_head)),
-                },
-            )
+        dataset_head_committer
+            .commit_head(&transactional_target, Some(old_head), new_head)
             .await
-            .int_err()
     }
 
     #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
@@ -578,18 +570,21 @@ impl PullDatasetUseCaseImpl {
                 let (target, result) = transform_executor
                     .execute_transform(pti_target.clone(), plan, maybe_listener)
                     .await;
-                if let Ok(TransformResult::Updated {
-                    old_head, new_head, ..
-                }) = &result
-                {
-                    Self::update_ref_transactionally(
-                        catalog.clone(),
-                        target.get_handle(),
-                        new_head,
-                        old_head,
-                    )
-                    .await?;
-                }
+                let result = match result {
+                    Ok(TransformResult::Updated { old_head, new_head }) => {
+                        Self::commit_head_transactionally(
+                            catalog.clone(),
+                            target.get_handle(),
+                            &old_head,
+                            &new_head,
+                        )
+                        .await
+                        .map(|()| TransformResult::Updated { old_head, new_head })
+                        .map_err(|e| TransformExecuteError::CommitError(e.into()))
+                    }
+                    Ok(TransformResult::UpToDate) => Ok(TransformResult::UpToDate),
+                    Err(e) => Err(e),
+                };
                 result.map_err(|e| PullError::TransformError(TransformError::Execute(e)))
             }
             // Already up-to-date

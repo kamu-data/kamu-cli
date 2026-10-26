@@ -9,16 +9,18 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::InternalError;
 use kamu_core::engine::EngineError;
 use kamu_core::*;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetRegistry};
+use kamu_datasets::{DatasetHeadCommitter, DatasetIncrementQueryService, DatasetRegistry};
 use kamu_task_system::*;
 
 use crate::{
+    DatasetHeadMovedError,
     InputDatasetCompactedError,
     TaskDefinitionDatasetUpdate,
+    TaskErrorDatasetCommit,
     TaskErrorDatasetUpdate,
     TaskResultDatasetUpdate,
 };
@@ -127,14 +129,11 @@ impl UpdateDatasetTaskRunner {
                 if let PollingIngestResult::Updated {
                     old_head, new_head, ..
                 } = &ingest_res.result
+                    && let Some(failed) = self
+                        .commit_dataset_head(ingest_item.target.get_handle(), old_head, new_head)
+                        .await?
                 {
-                    // Update the reference transactionally
-                    self.update_dataset_head(
-                        ingest_item.target.get_handle(),
-                        Some(old_head),
-                        new_head,
-                    )
-                    .await?;
+                    return Ok(failed);
                 }
 
                 self.combine_task_result(
@@ -220,14 +219,16 @@ impl UpdateDatasetTaskRunner {
 
                 match execution_result {
                     Ok(transform_result) => {
-                        if let TransformResult::Updated { old_head, new_head } = &transform_result {
-                            // Update the reference transactionally
-                            self.update_dataset_head(
-                                transform_item.target.get_handle(),
-                                Some(old_head),
-                                new_head,
-                            )
-                            .await?;
+                        if let TransformResult::Updated { old_head, new_head } = &transform_result
+                            && let Some(failed) = self
+                                .commit_dataset_head(
+                                    transform_item.target.get_handle(),
+                                    old_head,
+                                    new_head,
+                                )
+                                .await?
+                        {
+                            return Ok(failed);
                         }
 
                         self.combine_task_result(
@@ -274,28 +275,46 @@ impl UpdateDatasetTaskRunner {
         Ok(TaskOutcome::Success(task_result.into_task_result()))
     }
 
-    #[tracing::instrument(name = UpdateDatasetTaskRunner_update_dataset_head, level = "debug", skip_all, fields(%dataset_handle, %new_head))]
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn update_dataset_head(
+    /// Returns the failed outcome when `HEAD` was moved concurrently.
+    #[tracing::instrument(name = UpdateDatasetTaskRunner_commit_dataset_head, level = "debug", skip_all, fields(%dataset_handle, %new_head))]
+    async fn commit_dataset_head(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        old_head: Option<&odf::Multihash>,
+        old_head: &odf::Multihash,
         new_head: &odf::Multihash,
-    ) -> Result<(), InternalError> {
+    ) -> Result<Option<TaskOutcome>, InternalError> {
+        match self
+            .commit_dataset_head_transactionally(dataset_handle, old_head, new_head)
+            .await
+        {
+            Ok(()) => Ok(None),
+            Err(odf::dataset::SetChainRefError::CASFailed(e)) => Ok(Some(TaskOutcome::Failed(
+                TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError::new(
+                    dataset_handle.id.clone(),
+                    e,
+                ))
+                .into_task_error(),
+            ))),
+            Err(
+                e @ (odf::dataset::SetChainRefError::BlockNotFound(_)
+                | odf::dataset::SetChainRefError::Access(_)
+                | odf::dataset::SetChainRefError::Internal(_)),
+            ) => Err(e.int_err()),
+        }
+    }
+
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
+    async fn commit_dataset_head_transactionally(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) -> Result<(), odf::dataset::SetChainRefError> {
         let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(old_head),
-                },
-            )
+        dataset_head_committer
+            .commit_head(&target, Some(old_head), new_head)
             .await
-            .int_err()
     }
 }
 

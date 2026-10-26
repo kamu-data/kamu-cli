@@ -8118,12 +8118,17 @@ dependencies = [
  "database-common-macros",
  "dill",
  "internal-error",
+ "kamu",
  "kamu-core",
  "kamu-datasets",
+ "kamu-datasets-services",
  "kamu-task-system",
+ "oop",
  "opendatafabric",
+ "pretty_assertions",
  "serde",
  "serde_json",
+ "tokio",
  "tracing",
 ]
 
