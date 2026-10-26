@@ -94,7 +94,7 @@ latest block. The ideas reset relies on:
 | Services | `kamu` — [`src/infra/core/src/services/reset/`](../../src/infra/core/src/services/reset) | `ResetPlannerImpl`, `ResetExecutorImpl` |
 | Reset to metadata | `kamu` — compaction services | see [dataset-hard-compaction.md](dataset-hard-compaction.md#3-layers-and-crates) |
 | CLI | `kamu-cli` — [`reset_command.rs`](../../src/app/cli/src/commands/reset_command.rs) | `kamu reset` |
-| Task adapter | `kamu-adapter-task-dataset` | `ResetDatasetTaskPlanner` / `ResetDatasetTaskRunner`, `ResetToMetadataDatasetTaskPlanner` / `ResetDatasetToMetadataTaskRunner` |
+| Task adapter | `kamu-adapter-task-dataset` | `ResetDatasetTaskPlanner` / `ResetDatasetTaskRunner`, `ResetToMetadataDatasetTaskPlanner` / `CompactionDatasetTaskRunner` (shared with hard compaction) |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerReset`, `FlowControllerResetToMetadata`, `FlowConfigRuleReset`, `DerivedDatasetFlowSensor` |
 | Read models that follow `HEAD` | `kamu-datasets-services` | `DatasetBlockUpdateHandler`, `DatasetStatisticsUpdateHandler`, `DatasetSearchUpdater`, `DependencyGraphImmediateListener` |
 

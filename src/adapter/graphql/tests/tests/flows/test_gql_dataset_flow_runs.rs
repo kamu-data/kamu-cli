@@ -1116,6 +1116,7 @@ async fn test_trigger_compaction_root_dataset() {
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
+                        breaking: true,
                     },
                 }
                 .into_task_result(),
@@ -1445,6 +1446,7 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
+                        breaking: true,
                     },
                 }
                 .into_task_result(),
@@ -3585,6 +3587,7 @@ async fn test_execute_transform_flow_error_after_compaction() {
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
+                        breaking: true,
                     },
                 }
                 .into_task_result(),

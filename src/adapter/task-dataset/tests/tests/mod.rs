@@ -10,4 +10,5 @@
 mod test_compaction_task_runners;
 mod test_reset_dataset_task_runner;
 mod test_task_error_dataset_commit;
+mod test_task_result_compaction;
 mod test_update_dataset_task_runner;

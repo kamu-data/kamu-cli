@@ -125,7 +125,8 @@ async fn test_dataset_compact() {
             new_head,
             old_head,
             new_num_blocks: 5,
-            old_num_blocks: 6
+            old_num_blocks: 6,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -259,7 +260,8 @@ async fn test_dataset_compact_s3() {
             new_head,
             old_head,
             new_num_blocks: 5,
-            old_num_blocks: 6
+            old_num_blocks: 6,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -545,7 +547,8 @@ async fn test_dataset_compaction_limits() {
             new_head,
             old_head,
             new_num_blocks: 7,
-            old_num_blocks: 9
+            old_num_blocks: 9,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);
@@ -699,7 +702,8 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
             new_head,
             old_head,
             new_num_blocks: 7,
-            old_num_blocks: 9
+            old_num_blocks: 9,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);
@@ -856,7 +860,8 @@ async fn test_large_dataset_compact() {
             new_head,
             old_head,
             new_num_blocks: 24,
-            old_num_blocks: 104
+            old_num_blocks: 104,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);
@@ -951,7 +956,8 @@ async fn test_compact_offsets_are_sequential_impl() {
             new_head,
             old_head,
             new_num_blocks: 5,
-            old_num_blocks: 14
+            old_num_blocks: 14,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -1061,7 +1067,8 @@ async fn test_dataset_keep_metadata_only_compact() {
             new_head,
             old_head,
             new_num_blocks: 2,
-            old_num_blocks: 3
+            old_num_blocks: 3,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -1106,7 +1113,8 @@ async fn test_dataset_keep_metadata_only_compact() {
             new_head,
             old_head,
             new_num_blocks: 4,
-            old_num_blocks: 6
+            old_num_blocks: 6,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -1267,7 +1275,8 @@ async fn test_hard_compaction_with_schema_migration() {
             new_head,
             old_head,
             new_num_blocks: 8,
-            old_num_blocks: 10
+            old_num_blocks: 10,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);

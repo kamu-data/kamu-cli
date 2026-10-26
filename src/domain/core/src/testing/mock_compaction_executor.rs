@@ -30,6 +30,7 @@ impl MockCompactionExecutor {
                     new_head,
                     old_num_blocks: 2,
                     new_num_blocks: 1,
+                    breaking: true,
                 })
             });
         self

@@ -340,9 +340,9 @@ records it.
 | Logical plan (`plan_type`) | Definition (`task_type`) | Planner → Runner | Created by flow controller |
 | --- | --- | --- | --- |
 | `LogicalPlanDatasetUpdate` (`UpdateDataset`) | `dev.kamu.tasks.dataset.update` | `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` | ingest and transform |
-| `LogicalPlanDatasetHardCompact` (`HardCompactDataset`) | `dev.kamu.tasks.dataset.hard_compact` | `HardCompactDatasetTaskPlanner` → `HardCompactDatasetTaskRunner` | compact |
+| `LogicalPlanDatasetHardCompact` (`HardCompactDataset`) | `dev.kamu.tasks.dataset.hard_compact` | `HardCompactDatasetTaskPlanner` → `CompactionDatasetTaskRunner` | compact |
 | `LogicalPlanDatasetReset` (`ResetDataset`) | `dev.kamu.tasks.dataset.reset` | `ResetDatasetTaskPlanner` → `ResetDatasetTaskRunner` | reset |
-| `LogicalPlanDatasetResetToMetadata` (`ResetDatasetToMetadata`) | `dev.kamu.tasks.dataset.reset_to_metadata` | `ResetToMetadataDatasetTaskPlanner` → `ResetDatasetToMetadataTaskRunner` | reset to metadata |
+| `LogicalPlanDatasetResetToMetadata` (`ResetDatasetToMetadata`) | `dev.kamu.tasks.dataset.reset_to_metadata` | `ResetToMetadataDatasetTaskPlanner` → `CompactionDatasetTaskRunner` | reset to metadata |
 | `LogicalPlanWebhookDeliver` (`DeliverWebhook`) | `dev.kamu.tasks.webhook.deliver` | `DeliverWebhookTaskPlanner` → `DeliverWebhookTaskRunner` | webhook deliver |
 | `LogicalPlanProbe` (`Probe`) | `dev.kamu.tasks.probe` | `ProbeTaskPlanner` → `ProbeTaskRunner` | system GC (a no-op placeholder), tests |
 
@@ -447,10 +447,13 @@ the logical plan (planner defaults when absent; reset to metadata passes none, a
 matter when no data is kept), and stores the detached dataset and the `CompactionPlan` in the
 definition. A planning error, `InvalidDatasetKind` included, becomes an internal error.
 
-**Running**: `CompactionExecutor::execute` runs outside any transaction. On `Success` the runner
-moves `HEAD` by CAS and returns `TaskResultDatasetHardCompact` / `TaskResultDatasetResetToMetadata`
-carrying the `CompactionResult` (`Success { old_head, new_head, old_num_blocks, new_num_blocks }`
-or `NothingToDo`). Any executor error is a recoverable empty failure; a lost `HEAD` CAS is the
+**Running**: one runner, `CompactionDatasetTaskRunner`, is registered for both task types and
+picks the definition and the result type by `task_type`. `CompactionExecutor::execute` runs outside
+any transaction. On `Success` the runner moves `HEAD` by CAS and returns
+`TaskResultDatasetHardCompact` / `TaskResultDatasetResetToMetadata` carrying the `CompactionResult`
+(`Success { old_head, new_head, old_num_blocks, new_num_blocks, breaking }` or `NothingToDo`).
+The executor sets `breaking` in both modes, and a stored result without the field reads as
+breaking. Any executor error is a recoverable empty failure; a lost `HEAD` CAS is the
 recoverable typed `DatasetCommitError` → `HeadMoved`, as in [§7.1](#71-update-dataset).
 
 Compaction rewrites history, so derivative datasets that consumed the old blocks can no longer

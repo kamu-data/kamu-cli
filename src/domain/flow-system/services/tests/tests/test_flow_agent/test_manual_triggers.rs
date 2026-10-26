@@ -695,6 +695,7 @@ async fn test_manual_trigger_reset_to_metadata() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                                 new_num_blocks: 3,
                                 old_num_blocks: 7,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),
@@ -906,6 +907,7 @@ async fn test_reset_trigger_derivatives_reactively() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                                 old_num_blocks: 5,
                                 new_num_blocks: 4,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),
@@ -1206,6 +1208,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                                 old_num_blocks: 5,
                                 new_num_blocks: 4,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),
@@ -1235,6 +1238,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                                 old_num_blocks: 8,
                                 new_num_blocks: 3,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),
@@ -1418,6 +1422,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                                 old_num_blocks: 5,
                                 new_num_blocks: 4,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),
@@ -1445,6 +1450,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-2"),
                                 old_num_blocks: 5,
                                 new_num_blocks: 4,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),
@@ -1472,6 +1478,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice-3"),
                                 old_num_blocks: 8,
                                 new_num_blocks: 3,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),
@@ -1659,6 +1666,7 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                                 old_num_blocks: 5,
                                 new_num_blocks: 4,
+                                breaking: true,
                             },
                         }
                         .into_task_result(),

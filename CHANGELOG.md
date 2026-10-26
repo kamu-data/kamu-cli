@@ -29,6 +29,10 @@ Recommendation: for ease of reading, use the following format:
   dataset's head moves concurrently, instead of an internal error
 - A forced pull or push (`--force`) no longer overwrites a head that another writer moved while the
   new blocks were being committed
+- `kamu system compact` no longer holds a database transaction while it merges data, so a long
+  compaction no longer blocks other writers. A dataset whose head moves meanwhile fails with the
+  head-moved conflict. Each dataset is committed as soon as it is compacted, so a failure in one
+  dataset no longer undoes the compaction of the others
 ### Fixed
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key

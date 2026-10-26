@@ -348,6 +348,7 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 ref new_head,
                                 old_num_blocks,
                                 new_num_blocks,
+                                breaking: _,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
                                 original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
                                 resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),
@@ -367,6 +368,7 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 ref new_head,
                                 old_num_blocks,
                                 new_num_blocks,
+                                breaking: _,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
                                 original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
                                 resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),

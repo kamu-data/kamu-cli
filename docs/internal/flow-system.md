@@ -494,9 +494,9 @@ source is `UpstreamFlow` and dispatch it with their own binding as input:
 | --- | --- |
 | Ingest | `Updated` → `NewData` from `DatasetIncrementQueryService`; first, if `has_more` and the configuration sets `fetch_next_iteration`, runs the same binding again with `IterationFinished`. `UpToDate` → nothing |
 | Transform | `Updated` → `NewData`; `UpToDate` → nothing |
-| Compact | `Success` → `Breaking`; `NothingToDo` → nothing |
+| Compact | `Success` with `breaking` → `Breaking`; `NothingToDo`, or a `Success` that is not breaking → nothing |
 | Reset | head changed → `Breaking` |
-| Reset to metadata | `Success` → `Breaking`, then re-activates the dataset's own sensor, so a derivative with a reactive trigger schedules its rebuild from its inputs immediately, under that trigger's batching rule, instead of waiting for the next input change |
+| Reset to metadata | `Success` with `breaking` → `Breaking`, then re-activates the dataset's own sensor, so a derivative with a reactive trigger schedules its rebuild from its inputs immediately, under that trigger's batching rule, instead of waiting for the next input change |
 
 Breaking changes therefore cascade: with `Recover`, each downstream dataset resets to metadata in
 turn, which dispatches `Breaking` again. With `NoAction`, the downstream transform will next fail

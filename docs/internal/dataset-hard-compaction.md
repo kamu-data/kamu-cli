@@ -90,11 +90,11 @@ history and treats the metadata chain as append-only. The pieces compaction work
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
 | Domain interfaces | `kamu-core` — [`src/domain/core/src/services/compaction/`](../../src/domain/core/src/services/compaction) | `CompactionPlanner`, `CompactionExecutor`, `CompactionOptions`, `CompactionPlan`, `CompactionResult`, listeners, errors |
-| Use case | `kamu` — [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) | `CompactDatasetUseCaseImpl`: authorization, plan, execute, move `HEAD` |
+| Use case | `kamu` — [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) | `CompactDatasetUseCaseImpl`: authorization and plan, execute, move `HEAD`, each step in its own transaction or none |
 | Services | `kamu` — [`src/infra/core/src/services/compaction/`](../../src/infra/core/src/services/compaction) | `CompactionPlannerImpl`, `CompactionExecutorImpl` |
 | DataFusion session config | `kamu` — [`engine_config_embedded.rs`](../../src/infra/core/src/engine/engine_config_embedded.rs) | `EngineConfigDatafusionEmbeddedCompaction` |
 | CLI | `kamu-cli` — [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs) | `kamu system compact` |
-| Task adapter | `kamu-adapter-task-dataset` | `HardCompactDatasetTaskPlanner`, `HardCompactDatasetTaskRunner` |
+| Task adapter | `kamu-adapter-task-dataset` | `HardCompactDatasetTaskPlanner`, `CompactionDatasetTaskRunner` (shared with reset to metadata) |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerCompact`, `FlowConfigRuleCompact` |
 
 ---
@@ -112,14 +112,23 @@ compactions are not yet supported". It expands local patterns, asks for confirma
 verifies every dataset first (`--verify`, stopping at the first failure), then compacts the
 datasets one after another. `--max-slice-size` (bytes, default 300 MB) and `--max-slice-records`
 (default 10 000) bound each merged file. `--keep-metadata-only` turns the run into a reset to
-metadata. The command runs in a single database transaction, merges included, and processes the
-outbox afterwards. If any dataset fails, the command returns an error and the transaction rolls
-back the `HEAD` updates of every dataset, including those reported as compacted.
+metadata. The command holds no database transaction of its own: listing the datasets and each
+verification run in short transactions, and the use case opens its own around each dataset's
+compaction. The outbox is processed afterwards. Each dataset commits on its own, so when one fails
+the command returns an error, but the datasets reported as compacted stay compacted.
 
-**Use case.** `CompactDatasetUseCaseImpl::execute` resolves the dataset with
-`DatasetAction::Maintain`, plans, executes, and on `Success` moves `HEAD`
-from `old_head` through `DatasetHeadCommitter`, in the command's transaction. `execute_multi` calls `execute` per
-dataset and returns one `CompactionResponse` each; one failure does not stop the others.
+**Use case.** `CompactDatasetUseCaseImpl::execute` works in three steps, so that no transaction is
+open during the merge:
+
+| Step | Transaction | Does |
+| --- | --- | --- |
+| Plan | a short one | resolves the dataset with `DatasetAction::Maintain`, plans, detaches the dataset from the transaction |
+| Execute | none | `CompactionExecutor::execute`, which writes only blocks and files that no reference points to yet |
+| Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetHeadCommitter` |
+
+A `HEAD` moved by another writer during the merge fails the commit with `RefCASFailed`, and nothing
+is committed. `execute_multi` calls `execute` per dataset and returns one `CompactionResponse`
+each; one failure does not stop the others.
 
 **Flow.** The flow's preconditions, configuration and logical plan are owned by
 [flow-system.md](flow-system.md#10-flow-types); how the task plans, runs and moves `HEAD`, by
