@@ -383,9 +383,13 @@ Consequences specific to transforms:
 `TransformRebuildError` ([§4.5](#45-rebuilding-a-stored-plan)), and `evaluate_transform_status`
 its own `TransformStatusError`.
 
-How the update task turns these into recoverable or unrecoverable outcomes (an invalid input
-interval becomes `InputDatasetCompacted`; a broken transform, an incompatible schema and an
-unsupported engine are unrecoverable) is owned by
+`TransformElaborateError::is_recoverable` and `TransformExecuteError::is_recoverable` say whether
+a retry could succeed. A missing or changed transform, a diverged input (`InvalidInputInterval`),
+an incompatible schema, an invalid query and an unsupported engine are not recoverable: they need a
+change of metadata first. An input without data yet, commit, engine, provisioning and internal
+errors are recoverable. The engine part comes from `EngineError::is_recoverable` and
+`EngineProvisioningError::is_recoverable`, which ingest shares. The outcomes the update task
+decides itself, such as `InputDatasetCompacted`, are in
 [task-system.md](task-system.md#71-update-dataset).
 
 ---

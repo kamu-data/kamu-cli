@@ -382,26 +382,27 @@ fetch_uncacheable }`. The dataset decides what "update" means.
 
 **Planning** (`UpdateDatasetTaskPlanner`, one transaction):
 
-1. `DatasetEnvVarResolver::resolve_effective_env_vars` merges the variable and secret sets
-   targeting the dataset into one map for the ingest.
-2. `PullRequestPlanner::build_pull_plan(PullRequest::local(id), non-recursive)` builds a
+1. `PullRequestPlanner::build_pull_plan(PullRequest::local(id), non-recursive)` builds a
    single-node pull plan and yields one `PullPlanIterationJob`: `Ingest`, `Transform` or `Sync`,
    chosen as described in [dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs).
-
-3. The job is detached from the transaction and stored in `TaskDefinitionDatasetUpdate` as a
-   `DatasetUpdateJob`, with the `PullOptions`. A transform job keeps only the target's handle: the
-   runner plans the transform itself.
+2. The job is detached from the transaction and stored in `TaskDefinitionDatasetUpdate` as a
+   `DatasetUpdateJob`, with the `PullOptions`. Ingest and transform jobs keep only the target's
+   handle: the runner plans them itself, so the definition holds no writer state and no
+   environment variable values.
 
 A planning error is logged and returned as `Err`, which the agent turns into a recoverable
 failure.
 
 **Running** (`UpdateDatasetTaskRunner`), by job:
 
-- **Ingest** — `PollingIngestService::ingest` runs one iteration: check cache, fetch (resuming from
+- **Ingest** — in one transaction `PollingIngestPlanner` plans the ingest from the target's
+  current `HEAD` and resolves the dataset's environment variables
+  ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)). Then
+  `PollingIngestService::ingest` runs one iteration: check cache, fetch (resuming from
   a savepoint), prepare, read, preprocess, merge and commit `SetDataSchema` / `AddData` blocks.
   Reading and merging run on embedded DataFusion in-process; a container is provisioned only for a
-  `container` fetch step or a `preprocess` step on a non-DataFusion engine. A source with no
-  `SetPollingSource` yields `UpToDate`; an uncacheable source that already has data yields
+  `container` fetch step or a `preprocess` step on a non-DataFusion engine. A dataset with no
+  `SetPollingSource` fails unrecoverably; an uncacheable source that already has data yields
   `UpToDate { uncacheable }` unless `fetch_uncacheable` is set. `Updated { has_more }` means the
   source has more to fetch: the task does not loop, and the ingest flow controller schedules the
   next iteration if its config sets `fetch_next_iteration`.
@@ -421,21 +422,24 @@ failure.
 
 On success the `PullResult` is wrapped in `TaskResultDatasetUpdate` with `data_increment`: block
 and record counts and the new watermark, which the flow controllers use to trigger downstream
-flows. A transform takes it from the executor's result. Ingest and sync query it with
+flows. Ingest and transform take it from the operation's result. Sync queries it with
 `DatasetIncrementQueryService::get_increment_between(old_head, new_head)` in `combine_task_result`,
 a short transaction.
 
 | Error | Recoverable |
 | --- | --- |
-| Ingest: `ParameterNotFound`, `ReadError`, invalid query, `BadInputSchema`, `IncompatibleSchema`, `InvalidParameterFormat`, `MergeError`, `ExecutionError`, `TemplateError`, unsupported engine | no |
-| Ingest: `CommitError`, `DataValidation`, other engine and provisioning errors, `ImagePull`, `NotFound`, `PipeError`, `ProcessError`, `Unreachable`, `Internal` | yes |
-| Ingest or transform: `HEAD` moved after planning (the CAS fails when moving it) | yes, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
-| Transform elaboration: `InvalidInputInterval` | no, typed `InputDatasetCompacted` |
-| Transform elaboration: `TransformNotDefined`, `InputsChanged` | no |
+Planning and execution errors classify themselves with `is_recoverable()`, and the runner turns
+the flag into an empty recoverable or unrecoverable failure. The classification of each error is
+owned by its domain doc: ingest in
+[root-dataset-ingest.md](root-dataset-ingest.md#9-errors), transform in
+[derived-dataset-transform.md](derived-dataset-transform.md#9-errors). Outcomes the runner decides
+itself:
+
+| Error | Outcome |
+| --- | --- |
+| Ingest or transform: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
+| Transform elaboration: `InvalidInputInterval` | unrecoverable, typed `InputDatasetCompacted` |
 | Transform elaboration: `InputNotPulled` | not an error: the task ends with an empty success, as when up to date |
-| Transform elaboration: `Internal` | yes |
-| Transform execution: invalid query, `IncompatibleSchema`, unsupported engine | no |
-| Transform execution: commit, engine, provisioning, internal | yes |
 | Sync: any | yes (not yet classified) |
 
 ### 7.2 Hard compaction and reset to metadata

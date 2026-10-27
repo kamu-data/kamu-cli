@@ -492,7 +492,7 @@ source is `UpstreamFlow` and dispatch it with their own binding as input:
 
 | Controller | Result → cause |
 | --- | --- |
-| Ingest | `Updated` → `NewData` from `DatasetIncrementQueryService`; first, if `has_more` and the configuration sets `fetch_next_iteration`, runs the same binding again with `IterationFinished`. `UpToDate` → nothing |
+| Ingest | `Updated` → `NewData` from the result's `data_increment`, which the task computed; a result without one is an error. First, if `has_more` and the configuration sets `fetch_next_iteration`, runs the same binding again with `IterationFinished`. `UpToDate` → nothing |
 | Transform | `Updated` → `NewData` from the result's `data_increment`, which the task computed; a result without one is an error. `UpToDate` → nothing |
 | Compact | `Success` with `breaking` → `Breaking`; `NothingToDo`, or a `Success` that is not breaking → nothing |
 | Reset | head changed → `Breaking` |
