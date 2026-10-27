@@ -14,17 +14,20 @@ use chrono::{Duration, TimeZone, Utc};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT,
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_CITY_POPULATION_SNAPSHOT,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
     FlowDownstreamSummary,
     FlowSummary,
     FlowTriggerResponse,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 
@@ -1497,6 +1500,263 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_of_single_record_input(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse { dataset_alias, .. } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &dataset_alias,
+            RequestBody::NdJson(
+                r#"{"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}"#
+                    .into(),
+            ),
+        )
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        Some("FlowDescriptionUpdateResultSuccess"),
+        flow.transform_result.as_deref()
+    );
+    pretty_assertions::assert_eq!(Some(1), flow.transformed_records);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_after_input_watermark_advanced(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+    advance_time(&kamu_api_server_client, 1).await;
+
+    let watermark = Utc.with_ymd_and_hms(2000, 1, 5, 0, 0, 0).unwrap();
+    kamu_api_server_client
+        .dataset()
+        .set_watermark(&root_dataset_id, watermark)
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        Some("FlowDescriptionUpdateResultSuccess"),
+        flow.transform_result.as_deref()
+    );
+    pretty_assertions::assert_eq!(Some(0), flow.transformed_records);
+    pretty_assertions::assert_eq!(Some(watermark), flow.updated_watermark);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_of_never_ingested_input(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowSuccessResult"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(
+        "",
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&derivative_dataset_id)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_after_inputs_changed_fails(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+    advance_time(&kamu_api_server_client, 1).await;
+
+    let CreateDatasetResponse {
+        dataset_id: other_dataset_id,
+        dataset_alias: other_dataset_alias,
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(
+            &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
+                .replace("name: player-scores", "name: other-scores")
+                .escape_default()
+                .to_string(),
+        )
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &other_dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
+        )
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .commit_event(
+            &derivative_dataset_id,
+            &leaderboard_set_transform_event(&other_dataset_id, LEADERBOARD_QUERY),
+        )
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_with_incompatible_schema_fails(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        dataset_alias: root_dataset_alias,
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+    advance_time(&kamu_api_server_client, 1).await;
+
+    kamu_api_server_client
+        .dataset()
+        .commit_event(
+            &derivative_dataset_id,
+            &leaderboard_set_transform_event(
+                &root_dataset_id,
+                "SELECT match_time, CAST(score AS STRING) AS score FROM player_scores",
+            ),
+        )
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &root_dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
+        )
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_with_unknown_engine_fails(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(
+            &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+                .replace("engine: datafusion", "engine: no-such-engine")
+                .escape_default()
+                .to_string(),
+        )
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The leaderboard's own query, on one line
+const LEADERBOARD_QUERY: &str = "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS \
+                                 place, match_time, match_id, player_id, score FROM player_scores \
+                                 LIMIT 2";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Triggers a transform flow and waits for it to finish
+async fn run_transform_flow(
+    kamu_api_server_client: &KamuApiServerClient,
+    dataset_id: &odf::DatasetID,
+) -> FlowSummary {
+    let FlowTriggerResponse::Success(flow_id) = kamu_api_server_client
+        .flow()
+        .trigger_transform(dataset_id)
+        .await
+    else {
+        panic!("Transform flow was not triggered");
+    };
+    let flow_id = flow_id.to_string();
+
+    kamu_api_server_client
+        .flow()
+        .wait_for_flow(dataset_id, |flow| {
+            flow.flow_id == flow_id && flow.status == "FINISHED"
+        })
+        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

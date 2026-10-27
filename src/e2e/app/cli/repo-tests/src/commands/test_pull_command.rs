@@ -16,9 +16,12 @@ use kamu_cli_e2e_common::{
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+
+use crate::utils::{commit_event, dataset_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -599,6 +602,181 @@ pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
         ["pull", "test.pull-uncacheable", "--fetch-uncacheable"],
         None,
         Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_with_engine_name_in_any_case
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_with_engine_name_in_any_case(kamu: KamuCliPuppet) {
+    add_player_scores_with_derivative(
+        &kamu,
+        &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .replace("engine: datafusion", "engine: DataFusion"),
+    )
+    .await;
+
+    kamu.assert_success_command_execution(
+        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_with_unknown_engine_fails
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_with_unknown_engine_fails(kamu: KamuCliPuppet) {
+    add_player_scores_with_derivative(
+        &kamu,
+        &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .replace("engine: datafusion", "engine: no-such-engine"),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some(["Failed to pull leaderboard: Unsupported engine no-such-engine"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_after_inputs_changed_fails
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_after_inputs_changed_fails(kamu: KamuCliPuppet) {
+    add_player_scores_with_derivative(&kamu, DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR).await;
+    kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
+        .await
+        .success();
+
+    let other_name = odf::DatasetName::new_unchecked("other-scores");
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
+            .replace("name: player-scores", "name: other-scores"),
+    )
+    .await
+    .success();
+    kamu.ingest_data(
+        &other_name,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
+    commit_event(
+        &kamu,
+        &DATASET_DERIVATIVE_LEADERBOARD_NAME,
+        &leaderboard_set_transform_event(
+            &dataset_id(&kamu, &other_name).await,
+            "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS place, match_time, \
+             match_id, player_id, score FROM player_scores LIMIT 2",
+        ),
+    )
+    .await;
+
+    kamu.assert_failure_command_execution(
+        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([
+            "Failed to pull leaderboard: Transform of leaderboard changed its inputs since it \
+             last ran, which is not supported yet",
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_reset_derivative_without_new_input_data
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_reset_derivative_without_new_input_data(kamu: KamuCliPuppet) {
+    add_player_scores_with_derivative(&kamu, DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR).await;
+    kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
+        .await
+        .success();
+    kamu.execute([
+        "--yes",
+        "system",
+        "compact",
+        DATASET_ROOT_PLAYER_NAME.as_str(),
+        "--hard",
+        "--keep-metadata-only",
+    ])
+    .await
+    .success();
+
+    kamu.assert_failure_command_execution(
+        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([r#"Failed to pull leaderboard: Invalid block interval .* in input dataset player-scores"#]),
+    )
+    .await;
+
+    // The reset leaves the derivative without data, as its input has none
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str(),
+            "--reset-derivatives-on-diverged-input",
+        ],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+    pretty_assertions::assert_eq!(
+        0,
+        kamu.list_datasets()
+            .await
+            .into_iter()
+            .find(|dataset| dataset.name == *DATASET_DERIVATIVE_LEADERBOARD_NAME)
+            .unwrap()
+            .records
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_leaves_no_working_files
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_leaves_no_working_files(kamu: KamuCliPuppet) {
+    add_player_scores_with_derivative(&kamu, DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR).await;
+
+    kamu.assert_success_command_execution(
+        ["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+
+    let run_dir = kamu.workspace_path().join(".kamu").join("run");
+    pretty_assertions::assert_eq!(
+        Vec::<std::path::PathBuf>::new(),
+        std::fs::read_dir(run_dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Adds the root with its first chunk of data, and a derivative of it
+async fn add_player_scores_with_derivative(kamu: &KamuCliPuppet, derivative_snapshot: &str) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(["add", "--stdin"], derivative_snapshot)
+        .await
+        .success();
+    kamu.ingest_data(
+        &DATASET_ROOT_PLAYER_NAME,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     )
     .await;
 }

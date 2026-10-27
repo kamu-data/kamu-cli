@@ -12,10 +12,14 @@ use kamu_cli_e2e_common::{
     DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+
+use crate::utils::{commit_event, dataset_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -101,6 +105,55 @@ pub async fn test_verify_integrity(kamu: KamuCliPuppet) {
 
     kamu.assert_success_command_execution(
         ["verify", dataset_name.as_str(), "--integrity"],
+        None,
+        Some([r#"1 dataset\(s\) are valid"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_verify_derivative_after_query_change(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+    kamu.ingest_data(
+        &DATASET_ROOT_PLAYER_NAME,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+    kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
+        .await
+        .success();
+
+    commit_event(
+        &kamu,
+        &DATASET_DERIVATIVE_LEADERBOARD_NAME,
+        &leaderboard_set_transform_event(
+            &dataset_id(&kamu, &DATASET_ROOT_PLAYER_NAME).await,
+            "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score ASC) AS place, match_time, \
+             match_id, player_id, score FROM player_scores",
+        ),
+    )
+    .await;
+    kamu.ingest_data(
+        &DATASET_ROOT_PLAYER_NAME,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
+    )
+    .await;
+    kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
+        .await
+        .success();
+
+    // Each block is replayed with the query that produced it
+    kamu.assert_success_command_execution(
+        ["verify", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
         None,
         Some([r#"1 dataset\(s\) are valid"#]),
     )

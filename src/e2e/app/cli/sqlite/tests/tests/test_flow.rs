@@ -132,6 +132,64 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform_of_single_record_input,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform_after_input_watermark_advanced,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform_of_never_ingested_input,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform_after_inputs_changed_fails,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform_with_incompatible_schema_fails,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform_with_unknown_engine_fails,
+    options = Options::default().with_frozen_system_time(),
+    extra_test_groups = "containerized, engine, transform, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_hard_compaction,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, datafusion"

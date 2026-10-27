@@ -423,7 +423,11 @@ reuses an ID fails instead of mixing its output with an earlier one.
   `MockEngineProvisioner` (its engine stub can return a chosen response);
   `MockTransformFlowEvaluator` (flow-dataset `testing` feature) for sensor tests.
 - CLI scenarios: `src/e2e/app/cli/repo-tests/src/commands/test_pull_command.rs`,
-  `test_verify_command.rs`.
+  `test_verify_command.rs`, on SQLite only. They change a transform by committing a `SetTransform`
+  through the workspace's GraphQL API.
+- Server flow scenarios: `src/e2e/app/cli/repo-tests/src/test_flow.rs`, on SQLite and Postgres.
+  A transform flow's failure message is generic, so they check its recoverability instead. System
+  time is frozen, so a second transform flow needs the time advanced past its throttling period.
 - Engine tests need Podman or Docker and pull the engine images; see
   [`DEVELOPER.md`](../../DEVELOPER.md).
 

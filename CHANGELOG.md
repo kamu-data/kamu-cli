@@ -48,6 +48,8 @@ Recommendation: for ease of reading, use the following format:
   an error that names the dataset, instead of crashing the process
 - `kamu verify` of a derivative whose query was changed no longer reports the blocks produced by
   the earlier query as not reproducible
+- `kamu verify` of a derivative that ran its transform more than once no longer fails with an
+  internal engine error: the input data of later transforms was skipped when they were replayed
 - A transform whose output schema is incompatible with the dataset's schema fails without retries
 - Engine names in a transform are case-insensitive (`Spark` works like `spark`); an unknown engine
   fails without retries
