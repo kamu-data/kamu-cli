@@ -91,7 +91,9 @@ impl PollingIngestServiceImpl {
         let response = self.ingest_iteration(iteration_args).await?;
 
         // A failed attempt keeps its directory: errors point at the logs in it
-        std::fs::remove_dir_all(&operation_dir).int_err()?;
+        if let Err(err) = std::fs::remove_dir_all(&operation_dir) {
+            tracing::warn!(error = %err, ?operation_dir, "Failed to remove the ingest directory");
+        }
 
         Ok(response)
     }
@@ -172,11 +174,10 @@ impl PollingIngestServiceImpl {
         // Clean up intermediate files
         // Note that we are leaving the fetch data and savepoint intact
         // in case user wants to iterate on the dataset.
-        if prepare_result.data != savepoint.data {
-            prepare_result
-                .data
-                .remove_owned(&self.cache_dir)
-                .int_err()?;
+        if prepare_result.data != savepoint.data
+            && let Err(err) = prepare_result.data.remove_owned(&self.cache_dir)
+        {
+            tracing::warn!(error = %err, "Failed to remove the prepared data");
         }
 
         match stage_result? {
