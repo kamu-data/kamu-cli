@@ -133,9 +133,11 @@ that transaction ([§4.4](#44-transactions)):
 
 ### 4.1 Plan
 
-Every method except `describe_transform`, which reads only the `SetTransform` in effect, starts
-from a preliminary request: `build_preliminary_request_ext` walks the derivative's chain once,
-from `HEAD` or from a given block when rebuilding, and collects the fields below.
+`elaborate_transform`, `rebuild_transform` and `evaluate_transform_status` start from a
+preliminary request: `build_preliminary_request_ext` walks the derivative's chain once, from
+`HEAD` or from a given block when rebuilding, and collects the fields below. `describe_transform`
+reads only the `SetTransform` in effect; the verification plan reads its own history
+([§6](#6-entry-points)).
 
 | Field | From |
 | --- | --- |
@@ -397,10 +399,10 @@ unsupported engine are unrecoverable) is owned by
 | `RunInfoDir/transform-<operation_id>/logs/` | engine stdout and stderr; on failure, the demultiplexed adapter logs | after a successful commit, or when the process starts |
 
 The executor removes the operation directory once a transform has committed; a failed run keeps
-it, because the `EngineError` points at its log files. The executor's caller chooses `operation_id`, one per execution attempt, so two attempts of one
-plan never share staged output; it also names the engine container. The directory is created with
-`create_dir`, so an attempt that reuses an ID fails instead of mixing its output with an earlier
-one.
+it, because the `EngineError` points at its log files. The executor's caller chooses
+`operation_id`, one per execution attempt, so two attempts of one plan never share staged output;
+it also names the engine container. The directory is created with `create_dir`, so an attempt that
+reuses an ID fails instead of mixing its output with an earlier one.
 
 ---
 
