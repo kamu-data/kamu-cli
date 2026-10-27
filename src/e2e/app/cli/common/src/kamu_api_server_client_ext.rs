@@ -941,6 +941,41 @@ impl DatasetApi<'_> {
             .await;
     }
 
+    /// Advances the watermark without data; the new block records no source
+    /// state
+    pub async fn set_watermark(&self, dataset_id: &odf::DatasetID, watermark: DateTime<Utc>) {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          setWatermark(watermark: "<watermark>") {
+                            __typename
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .replace("<watermark>", &watermark.to_rfc3339())
+                .as_str(),
+                None,
+            )
+            .await
+            .data();
+
+        pretty_assertions::assert_eq!(
+            "SetWatermarkUpdated",
+            response["datasets"]["byId"]["setWatermark"]["__typename"]
+                .as_str()
+                .unwrap()
+        );
+    }
+
     pub async fn tail_data(&self, dataset_id: &odf::DatasetID) -> String {
         let tail_response = self
             .client
@@ -1642,6 +1677,17 @@ impl FlowApi<'_> {
         dataset_id: &odf::DatasetID,
         mutation_name: &str,
     ) -> FlowTriggerResponse {
+        self.trigger_flow_with(dataset_id, mutation_name, "").await
+    }
+
+    /// `arguments` is the mutation's argument list with its parentheses, or
+    /// empty
+    async fn trigger_flow_with(
+        &self,
+        dataset_id: &odf::DatasetID,
+        mutation_name: &str,
+        arguments: &str,
+    ) -> FlowTriggerResponse {
         let mutation = format!(
             r#"
             mutation {{
@@ -1649,7 +1695,7 @@ impl FlowApi<'_> {
                 byId(datasetId: "<dataset_id>") {{
                   flows {{
                     runs {{
-                      {mutation_name} {{
+                      {mutation_name}{arguments} {{
                         message
                         ... on TriggerFlowSuccess {{
                           flow {{
@@ -1682,6 +1728,19 @@ impl FlowApi<'_> {
 
     pub async fn trigger_ingest(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerIngestFlow").await
+    }
+
+    /// Triggers an ingest that fetches even a source without source state
+    pub async fn trigger_ingest_fetching_uncacheable(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> FlowTriggerResponse {
+        self.trigger_flow_with(
+            dataset_id,
+            "triggerIngestFlow",
+            "(ingestConfigInput: { fetchUncacheable: true, fetchNextIteration: false })",
+        )
+        .await
     }
 
     pub async fn trigger_transform(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
@@ -1802,6 +1861,7 @@ impl FlowApi<'_> {
         &self,
         dataset_id: &odf::DatasetID,
         fetch_uncacheable: bool,
+        fetch_next_iteration: bool,
         retry_max_attempts: u32,
     ) {
         let mutation = indoc::indoc!(
@@ -1814,7 +1874,7 @@ impl FlowApi<'_> {
                       setIngestConfig(
                         ingestConfigInput: {
                           fetchUncacheable: <fetch_uncacheable>,
-                          fetchNextIteration: false
+                          fetchNextIteration: <fetch_next_iteration>
                         },
                         retryPolicyInput: {
                           maxAttempts: <retry_max_attempts>,
@@ -1833,6 +1893,7 @@ impl FlowApi<'_> {
         )
         .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
         .replace("<fetch_uncacheable>", &fetch_uncacheable.to_string())
+        .replace("<fetch_next_iteration>", &fetch_next_iteration.to_string())
         .replace("<retry_max_attempts>", &retry_max_attempts.to_string());
 
         let response = self.client.graphql_api_call(&mutation, None).await.data();
@@ -1843,6 +1904,25 @@ impl FlowApi<'_> {
                 .as_str()
                 .unwrap()
         );
+    }
+
+    /// Waits until the dataset has a flow that satisfies the condition
+    pub async fn wait_for_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        condition: impl Fn(&FlowSummary) -> bool,
+    ) -> FlowSummary {
+        let retry_strategy = FixedInterval::from_millis(500).take(60); // 30s
+
+        Retry::start(retry_strategy, || async {
+            self.list_flows(dataset_id)
+                .await
+                .into_iter()
+                .find(&condition)
+                .ok_or(())
+        })
+        .await
+        .unwrap()
     }
 
     /// Waits until the dataset has a waiting flow that satisfies the

@@ -448,7 +448,7 @@ and internal errors are recoverable. The update task maps the flag to its outcom
 ([task-system.md](task-system.md#71-update-dataset)).
 
 The writer reports a value that does not parse or cast to its column's type as `ExecutionError`,
-including values a CSV reader parses only when the data is written. A CAS conflict when moving `HEAD` after a
+including CSV and JSON values the readers decode only when the data is written. A CAS conflict when moving `HEAD` after a
 successful ingest becomes the recoverable task error `DatasetCommitError` → `HeadMoved`; any other
 failure to move `HEAD` is returned from the runner as an internal error, which the task agent also
 records as a recoverable failure. The retry plans from the new head. It reuses the fetch
@@ -481,7 +481,12 @@ hours. A long-running server does not evict while it runs.
 
 - Writer and merge strategy tests live in `src/infra/ingest-datafusion/tests/`; polling planner,
   polling and push service tests in `src/infra/core/tests/tests/ingest/`; CLI scenarios in
-  `src/e2e/app/cli/repo-tests/src/commands/` (`test_ingest_command.rs`, `test_pull_command.rs`).
+  `src/e2e/app/cli/repo-tests/src/commands/` (`test_ingest_command.rs`, `test_pull_command.rs`),
+  wired for SQLite only when they check only CLI output.
+- Server-side ingest flows run end to end in `src/e2e/app/cli/repo-tests/src/test_flow.rs` on
+  SQLite and Postgres: env vars from a `VariableSet`, failure without and with retries,
+  `fetchNextIteration`, and a manual trigger forcing `fetchUncacheable`. With the system time frozen,
+  a follow-up flow waits out its throttling period only when the test advances the time.
 - The pull loop (`exhaust_sources`, `IngestStopped`, head moved) is tested in
   `test_pull_dataset_use_case.rs`; the update task runner in
   `src/adapter/task-dataset/tests/`, including a real planner and service over a `file://` source

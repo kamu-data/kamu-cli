@@ -41,6 +41,24 @@ pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
     "#
 );
 
+/// [`SECRETS_ENCRYPTION_KAMU_CONFIG`] for an API server whose flows, including
+/// reactive downstream ones, finish within seconds
+pub const SECRETS_ENCRYPTION_WITH_FAST_FLOW_SYSTEM_KAMU_CONFIG: &str = indoc::indoc!(
+    r#"
+    kind: CLIConfig
+    version: 1
+    content:
+      secretsEncryption:
+        enabled: true
+        encryptionKey: QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC
+      flowSystem:
+        awaitingStepSecs: 1
+        mandatoryThrottlingPeriodSecs: 5
+      backgroundAgents:
+        maxListeningTimeout: 1s
+    "#
+);
+
 /// Default `description` annotation for warning-free fixtures.
 pub const DEFAULT_DESCRIPTION: &str = "e2e test fixture resource";
 

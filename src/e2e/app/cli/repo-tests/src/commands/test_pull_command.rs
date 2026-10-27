@@ -531,3 +531,76 @@ async fn test_pull_set_watermark(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_uncacheable_source
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_uncacheable_source(kamu: KamuCliPuppet) {
+    let data_path = kamu.workspace_path().join("data.csv");
+    let snapshot = indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: test.pull-uncacheable
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch:
+                kind: Url
+                url: file://{data_path}
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  fields:
+                    - name: city
+                      type: String
+                    - name: population
+                      type: Int64
+              merge:
+                kind: append
+        "#,
+        data_path = data_path.display(),
+    );
+    kamu.execute_with_input(["add", "--stdin"], snapshot)
+        .await
+        .success();
+
+    std::fs::write(&data_path, "city,population\nA,1000\n").unwrap();
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+
+    // The watermark block records no source state, so the source becomes
+    // uncacheable
+    kamu.assert_success_command_execution(
+        [
+            "pull",
+            "test.pull-uncacheable",
+            "--set-watermark",
+            "2050-01-01T00:00:00Z",
+        ],
+        None,
+        Some(["Committed new block"]),
+    )
+    .await;
+
+    std::fs::write(&data_path, "city,population\nB,2000\n").unwrap();
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) up-to-date"#]),
+    )
+    .await;
+    kamu.assert_success_command_execution(
+        ["pull", "test.pull-uncacheable", "--fetch-uncacheable"],
+        None,
+        Some([r#"1 dataset\(s\) updated"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

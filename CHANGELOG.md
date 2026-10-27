@@ -57,7 +57,8 @@ Recommendation: for ease of reading, use the following format:
 - An ingest flow of a root dataset without a polling source fails instead of reporting success on
   every run
 - An ingest whose data fails validation or does not parse as its column's type fails without
-  retries; `kamu pull` reports such data as an execution error instead of an internal error
+  retries; `kamu pull` and `kamu ingest` report a CSV or JSON value that does not parse with its
+  own message instead of an internal error
 - When `kamu pull` fails part-way through a source that yields several batches, it reports how many
   blocks and records it ingested before the failure, along with the actual error
 - Ingest flows no longer fail after their data was committed, which left downstream flows

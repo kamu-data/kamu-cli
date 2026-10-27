@@ -60,6 +60,62 @@ kamu_cli_run_api_server_e2e_test!(
 
 kamu_cli_run_api_server_e2e_test!(
     storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_with_env_var_from_variable_set,
+    options = Options::default().with_multi_tenant().with_kamu_config(
+        kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_WITH_FAST_FLOW_SYSTEM_KAMU_CONFIG
+    ),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture =
+        kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_of_unparsable_data_fails_without_retries,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_from_unreachable_source_retries,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_fetches_next_iterations,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
+    fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_ingest_fetching_uncacheable,
+    options = Options::default()
+        .with_frozen_system_time()
+        .with_kamu_config(KAMU_CONFIG_WITH_FAST_FLOW_SYSTEM),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_run_api_server_e2e_test!(
+    storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::test_trigger_flow_execute_transform,
     options = Options::default().with_frozen_system_time(),
     extra_test_groups = "containerized, engine, transform, datafusion"

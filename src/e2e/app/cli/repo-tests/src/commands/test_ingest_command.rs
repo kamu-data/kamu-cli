@@ -441,3 +441,86 @@ async fn assert_ingest_data_to_player_scores_from_stdio<I, S, T>(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_into_derivative_fails(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.assert_failure_command_execution_with_input(
+        ["ingest", "leaderboard", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        None,
+        Some(["Ingesting data available for root datasets only"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_without_files_or_stdin_fails(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.assert_failure_command_execution(
+        ["ingest", "player-scores"],
+        None,
+        Some(["Specify a list of files or pass --stdin"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_with_unknown_source_name_fails(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    kamu.assert_failure_command_execution_with_input(
+        [
+            "ingest",
+            "player-scores",
+            "--stdin",
+            "--source-name",
+            "unknown",
+        ],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        None,
+        Some(["Source 'unknown' not found"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_ingest_of_unparsable_value_fails(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+
+    let result = kamu
+        .execute_with_input(
+            ["ingest", "player-scores", "--stdin"],
+            r#"{"match_time": "2000-01-01", "match_id": "not-a-number", "player_id": "Alice", "score": 100}"#,
+        )
+        .await
+        .failure();
+    let stderr = String::from_utf8_lossy(&result.get_output().stderr).into_owned();
+
+    // The data is at fault, so it is not reported as an internal error
+    assert!(
+        stderr.contains(r#"failed to parse "not-a-number" as Int64"#),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("Internal error"), "{stderr}");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
