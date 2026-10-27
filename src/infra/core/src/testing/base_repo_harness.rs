@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use bon::bon;
+use chrono::{DateTime, Utc};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGenerator, DidGeneratorDefault, MockDidGenerator, RunInfoDir, TenancyConfig};
 use kamu_datasets::{CreateDatasetResult, DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
@@ -232,6 +233,38 @@ impl BaseRepoHarness {
     }
 
     /// Moves `HEAD` the way a concurrent writer would.
+    /// Gives a root dataset a schema and a block that only advances its
+    /// watermark to `watermark`, so a derivative of it has something to
+    /// transform without data files
+    pub async fn append_schema_and_watermark(
+        &self,
+        created: &CreateDatasetResult,
+        watermark: DateTime<Utc>,
+    ) {
+        let chain = created.dataset.as_metadata_chain();
+        for event in [
+            odf::MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            odf::MetadataEvent::AddData(
+                MetadataFactory::add_data()
+                    .new_watermark(Some(watermark))
+                    .build(),
+            ),
+        ] {
+            let head = self.get_head(created).await;
+            let head_block = chain.get_block(&head).await.unwrap();
+            chain
+                .append(
+                    MetadataFactory::metadata_block(event)
+                        .prev(&head, head_block.sequence_number)
+                        .system_time(self.system_time_source.now())
+                        .build(),
+                    odf::dataset::AppendOpts::default(),
+                )
+                .await
+                .unwrap();
+        }
+    }
+
     pub async fn move_head(
         &self,
         created: &CreateDatasetResult,
