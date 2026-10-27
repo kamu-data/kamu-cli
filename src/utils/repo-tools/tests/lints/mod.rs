@@ -10,3 +10,4 @@
 mod agent_harness;
 mod dividing_lines;
 mod license_header;
+mod reference_writes;

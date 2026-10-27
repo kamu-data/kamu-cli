@@ -12,6 +12,9 @@ use crate::ResolvedDataset;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// The single way to move a dataset's `HEAD` reference.
+///
+/// The `reference_writes` lint in `kamu-repo-tools` rejects direct reference
+/// writes elsewhere and lists the allowed exceptions.
 #[async_trait::async_trait]
 pub trait DatasetHeadCommitter: Sync + Send {
     /// Moves `HEAD` of `target` from `expected_head` to `new_head`, as part of
