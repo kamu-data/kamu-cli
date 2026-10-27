@@ -21,10 +21,18 @@ use odf::dataset::MetadataChainExt as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AppendDatasetMetadataBatchUseCase)]
 pub struct AppendDatasetMetadataBatchUseCaseImpl {
     dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+}
+
+#[component(pub)]
+#[interface(dyn AppendDatasetMetadataBatchUseCase)]
+impl AppendDatasetMetadataBatchUseCaseImpl {
+    pub fn new(dataset_head_committer: Arc<dyn DatasetHeadCommitter>) -> Self {
+        Self {
+            dataset_head_committer,
+        }
+    }
 }
 
 #[common_macros::method_names_consts]

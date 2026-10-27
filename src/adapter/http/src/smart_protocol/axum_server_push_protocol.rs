@@ -200,6 +200,8 @@ impl AxumServerPushProtocolInstance {
         let force_update_if_diverged = push_request.force_update_if_diverged;
         let visibility_for_created_dataset = push_request.visibility_for_created_dataset;
         let old_head_maybe = push_request.current_head.clone();
+        // A forced commit replaces history only from the head the client observed
+        let mut expected_head = push_request.current_head.clone();
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
         if !new_blocks.is_empty() {
@@ -250,6 +252,8 @@ impl AxumServerPushProtocolInstance {
                 match create_result {
                     Ok(res) => {
                         assert_eq!(res.head, first_block_hash);
+                        // The remaining blocks build on the Seed just committed
+                        expected_head = Some(first_block_hash);
                         self.maybe_dataset_handle = Some(res.dataset_handle);
                     }
                     Err(CreateDatasetError::RefCollision(err)) => {
@@ -277,8 +281,13 @@ impl AxumServerPushProtocolInstance {
             }
         }
 
-        self.try_handle_push_complete(new_blocks, force_update_if_diverged, old_head_maybe)
-            .await?;
+        self.try_handle_push_complete(
+            new_blocks,
+            expected_head,
+            force_update_if_diverged,
+            old_head_maybe,
+        )
+        .await?;
 
         Ok(())
     }
@@ -500,6 +509,7 @@ impl AxumServerPushProtocolInstance {
     async fn try_handle_push_complete(
         &mut self,
         new_blocks: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+        expected_head: Option<Multihash>,
         force_update_if_diverged: bool,
         old_head_maybe: Option<Multihash>,
     ) -> Result<(), PushServerError> {
@@ -512,6 +522,14 @@ impl AxumServerPushProtocolInstance {
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
         let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
+        // Without `force` the batch must extend `HEAD`, so the commit expects the
+        // block the batch is appended to. With `force` the batch may replace a
+        // divergent history, so it expects the head the client observed instead
+        let set_ref_check_ref_mode = if force_update_if_diverged {
+            SetRefCheckRefMode::Explicit(expected_head)
+        } else {
+            SetRefCheckRefMode::ForceUpdateIfDiverged(false)
+        };
         let (dataset_id, new_head) = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with2(
                 |dataset_registry: Arc<dyn DatasetRegistry>, append_dataset_metadata_batch: Arc<dyn AppendDatasetMetadataBatchUseCase>| async move {
@@ -519,7 +537,7 @@ impl AxumServerPushProtocolInstance {
 
                     append_dataset_metadata_batch
                         .execute(&resolved_dataset, Box::new(new_blocks.into_iter()), AppendDatasetMetadataBatchUseCaseOptions {
-                            set_ref_check_ref_mode: SetRefCheckRefMode::ForceUpdateIfDiverged(force_update_if_diverged),
+                            set_ref_check_ref_mode,
                             ..Default::default()
                         })
                         .await?;

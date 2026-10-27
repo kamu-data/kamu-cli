@@ -348,13 +348,23 @@ impl SimpleTransferProtocol {
         dst: &dyn odf::Dataset,
         dst_alias: Option<&odf::DatasetAlias>,
         new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
-        options: AppendDatasetMetadataBatchUseCaseOptions,
+        dst_head: Option<odf::Multihash>,
+        append_opts: odf::dataset::AppendBatchOpts,
+        on_append_metadata_block_callback: Option<Box<dyn Fn() + Send>>,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
         if let Some(alias) = dst_alias {
-            self.append_metadata_transactional(alias, new_blocks, options)
-                .await
+            self.append_metadata_transactional(
+                alias,
+                new_blocks,
+                AppendDatasetMetadataBatchUseCaseOptions {
+                    set_ref_check_ref_mode: SetRefCheckRefMode::Explicit(dst_head),
+                    append_opts,
+                    on_append_metadata_block_callback,
+                },
+            )
+            .await
         } else {
-            Self::append_metadata_to_remote(dst, new_blocks, options).await
+            Self::append_metadata_to_remote(dst, new_blocks, append_opts, dst_head.as_ref()).await
         }
     }
 
@@ -376,39 +386,23 @@ impl SimpleTransferProtocol {
     }
 
     /// The `HEAD` of a remote repository is not a dataset reference of this
-    /// node, so it is moved directly rather than through
-    /// `DatasetHeadCommitter`
+    /// node, so the chain moves it by its own compare-and-set rather than
+    /// through `DatasetHeadCommitter`
     async fn append_metadata_to_remote(
         dst: &dyn odf::Dataset,
         new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
-        options: AppendDatasetMetadataBatchUseCaseOptions,
+        append_opts: odf::dataset::AppendBatchOpts,
+        expected_head: Option<&odf::Multihash>,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
-        let dst_chain = dst.as_metadata_chain();
+        use odf::dataset::AppendBatchAndSetHeadError as E;
 
-        let Some(appended) = dst_chain
-            .append_batch(new_blocks, options.append_opts)
-            .await?
-        else {
-            return Ok(None);
-        };
-
-        let expected_head = options
-            .set_ref_check_ref_mode
-            .expected_head(dst_chain, appended.base_head)
-            .await?;
-
-        dst_chain
-            .set_ref(
-                &odf::BlockRef::Head,
-                &appended.new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: false,
-                    check_ref_is: Some(expected_head.as_ref()),
-                },
-            )
-            .await?;
-
-        Ok(Some(appended.new_head))
+        dst.as_metadata_chain()
+            .append_batch_and_set_head(new_blocks, append_opts, expected_head)
+            .await
+            .map_err(|e| match e {
+                E::Append(e) => AppendDatasetMetadataBatchUseCaseError::BlockAppendError(e),
+                E::SetHead(e) => AppendDatasetMetadataBatchUseCaseError::SetRefError(e),
+            })
     }
 
     async fn download_block_data<'a>(
@@ -650,14 +644,12 @@ impl SimpleTransferProtocol {
             dst,
             dst_alias,
             Box::new(blocks_desc_ordered.into_iter().rev()),
-            AppendDatasetMetadataBatchUseCaseOptions {
-                set_ref_check_ref_mode: SetRefCheckRefMode::Explicit(dst_head),
-                append_opts: odf::dataset::AppendBatchOpts {
-                    validation,
-                    trust_hashes: trust_source_hashes,
-                },
-                on_append_metadata_block_callback,
+            dst_head,
+            odf::dataset::AppendBatchOpts {
+                validation,
+                trust_hashes: trust_source_hashes,
             },
+            on_append_metadata_block_callback,
         )
         .await
         .map_err(|use_case_error| {

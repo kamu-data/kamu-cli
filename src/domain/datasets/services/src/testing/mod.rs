@@ -13,6 +13,7 @@ mod fake_dataset_entry_service;
 mod fake_dataset_reference_service;
 mod fake_dependency_graph_indexer;
 mod owner_by_alias_dataset_action_authorizer;
+mod racing_append_dataset_metadata_batch_use_case;
 mod racing_dataset_head_committer;
 mod test_dataset_outbox_listener;
 
@@ -22,5 +23,6 @@ pub use fake_dataset_entry_service::*;
 pub use fake_dataset_reference_service::*;
 pub use fake_dependency_graph_indexer::*;
 pub use owner_by_alias_dataset_action_authorizer::*;
+pub use racing_append_dataset_metadata_batch_use_case::*;
 pub use racing_dataset_head_committer::*;
 pub use test_dataset_outbox_listener::*;

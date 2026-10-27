@@ -191,6 +191,34 @@ pub trait MetadataChainExt: MetadataChain {
         }))
     }
 
+    /// Appends the blocks like `append_batch`, then moves `HEAD` once to the
+    /// last one by compare-and-set from `expected_head`. For a chain whose
+    /// `HEAD` is written directly, such as a dataset in a remote repository; a
+    /// node moves the `HEAD` of its own datasets through its commit primitive.
+    /// Returns `None` for an empty batch.
+    async fn append_batch_and_set_head(
+        &self,
+        new_blocks: Box<dyn Iterator<Item = HashedMetadataBlockBytesDecoded> + Send>,
+        opts: AppendBatchOpts,
+        expected_head: Option<&Multihash>,
+    ) -> Result<Option<Multihash>, AppendBatchAndSetHeadError> {
+        let Some(appended) = self.append_batch(new_blocks, opts).await? else {
+            return Ok(None);
+        };
+
+        self.set_ref(
+            &BlockRef::Head,
+            &appended.new_head,
+            SetRefOpts {
+                validate_block_present: false,
+                check_ref_is: Some(expected_head),
+            },
+        )
+        .await?;
+
+        Ok(Some(appended.new_head))
+    }
+
     /// Convenience function to iterate blocks starting with the `head`
     /// reference
     ///
@@ -978,6 +1006,14 @@ pub struct AppendResult {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AppendBatchAndSetHeadError {
+    #[error(transparent)]
+    Append(#[from] AppendBatchError),
+    #[error(transparent)]
+    SetHead(#[from] SetChainRefError),
+}
 
 #[derive(Error, Debug)]
 #[error("Failed to append block {block_sequence_number} ({block_hash}): {append_error}")]

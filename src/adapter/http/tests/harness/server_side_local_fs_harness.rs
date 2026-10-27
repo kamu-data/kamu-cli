@@ -49,7 +49,10 @@ use kamu_datasets_inmem::{
     InMemoryDatasetReferenceRepository,
     InMemoryDatasetStatisticsRepository,
 };
-use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::testing::{
+    RacingAppendDatasetMetadataBatchUseCase,
+    RacingDatasetHeadCommitter,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -101,6 +104,15 @@ impl ServerSideLocalFsHarness {
             .get_one::<RacingDatasetHeadCommitter>()
             .unwrap()
             .move_head_before_next_commit(concurrent_head);
+    }
+
+    /// Arms the next metadata batch append on the server to first move `HEAD`
+    /// to `concurrent_head`, before the commit decides which head it expects
+    pub fn move_head_before_next_append(&self, concurrent_head: odf::Multihash) {
+        self.base_catalog
+            .get_one::<RacingAppendDatasetMetadataBatchUseCase>()
+            .unwrap()
+            .move_head_before_next_append(concurrent_head);
     }
 
     pub async fn append_unreferenced_block(
@@ -179,7 +191,7 @@ impl ServerSideLocalFsHarness {
                 .add::<ObjectStoreRegistryImpl>()
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<RemoteRepositoryRegistryImpl>()
-                .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+                .add::<RacingAppendDatasetMetadataBatchUseCase>()
                 .add_value(RacingDatasetHeadCommitter::default())
                 .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
                 .add::<CreateDatasetUseCaseImpl>()

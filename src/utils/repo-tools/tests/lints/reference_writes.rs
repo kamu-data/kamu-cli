@@ -53,12 +53,10 @@ const ALLOWED_REFERENCE_WRITES: &[AllowedReferenceWrite] = &[
         method: "set_dataset_reference",
         reason: "the reference service writing its own repository",
     },
-    // Temporary: goes away once the storage layer offers a compare-and-set
-    // reference write for pushes to a remote repository
     AllowedReferenceWrite {
-        path: "src/infra/core/src/utils/simple_transfer_protocol.rs",
+        path: "src/odf/dataset/",
         method: "set_ref",
-        reason: "HEAD of a remote repository, not a dataset reference of this node",
+        reason: "ODF layer: appending a batch to a chain whose HEAD is written directly",
     },
     AllowedReferenceWrite {
         path: "src/odf/dataset-impl/",

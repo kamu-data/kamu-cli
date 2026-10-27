@@ -28,7 +28,11 @@ Recommendation: for ease of reading, use the following format:
 - GraphQL: `setWatermark` returns `SetWatermarkCasFailed` with the expected and actual heads when the
   dataset's head moves concurrently, instead of an internal error
 - A forced pull or push (`--force`) no longer overwrites a head that another writer moved while the
-  new blocks were being committed
+  new blocks were being committed. `kamu push --force` over the smart protocol also fails with
+  "Dataset was updated concurrently" when the remote head moved at any point after the push
+  started, and pushes to S3 and local file system repositories fail the same way when the remote
+  head moves during the push. A server that predates this, and storage without conditional writes,
+  still overwrite such a change
 - `kamu system compact` no longer holds a database transaction while it merges data, so a long
   compaction no longer blocks other writers. A dataset whose head moves meanwhile fails with the
   head-moved conflict. Each dataset is committed as soon as it is compacted, so a failure in one

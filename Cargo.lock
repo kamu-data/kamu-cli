@@ -11642,6 +11642,7 @@ dependencies = [
  "bytes",
  "chrono",
  "dashmap",
+ "futures",
  "http",
  "internal-error",
  "mockall",

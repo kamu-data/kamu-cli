@@ -349,3 +349,67 @@ async fn test_smart_push_head_moved_concurrently() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_forced_head_moved_after_initiation() {
+    let scenario = SmartPushExistingDivergedDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            base_catalog: None,
+        })
+        .await,
+    )
+    .await;
+
+    let server_dataset_handle = scenario
+        .server_harness
+        .cli_dataset_registry()
+        .resolve_dataset_handle_by_ref(&scenario.client_dataset_handle.as_local_ref())
+        .await
+        .unwrap();
+    let concurrent_head = scenario
+        .server_harness
+        .append_unreferenced_block(&server_dataset_handle)
+        .await;
+    scenario
+        .server_harness
+        .move_head_before_next_append(concurrent_head.clone());
+    let server_dataset_reference_service = scenario.server_harness.cli_dataset_reference_service();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_responses = scenario
+            .client_harness
+            .push_dataset(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
+                true, /* diverged! */
+                odf::DatasetVisibility::Private,
+            )
+            .await;
+
+        pretty_assertions::assert_eq!(push_responses.len(), 1);
+        assert_matches!(
+            &push_responses[0].result,
+            Err(PushError::SyncError(SyncError::UpdatedConcurrently(_)))
+        );
+        pretty_assertions::assert_eq!(
+            server_dataset_reference_service
+                .get_reference(&server_dataset_handle.id, &odf::BlockRef::Head)
+                .await
+                .unwrap(),
+            concurrent_head
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

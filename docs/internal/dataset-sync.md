@@ -197,11 +197,17 @@ sequenceDiagram
    a precomputed hash (it panics without one), so a sync into S3 storage works only from a trusted
    source, and then stores the stream without checking it.
 4. **Blocks.** All new blocks are appended at once, and then `HEAD` is moved once with a CAS on
-   `dst_head`, as `SetRefCheckRefMode::Explicit(dst_head)`. A local destination goes through
-   `AppendDatasetMetadataBatchUseCase` in a transaction, which commits through
-   `DatasetHeadCommitter`. A remote destination is written with `MetadataChainExt::append_batch` and
-   a CAS `set_ref` on its storage, since its `HEAD` is not a dataset reference of this node. A
-   destination that moved since step 1 fails with `UpdatedConcurrently`.
+   `dst_head`. A local destination goes through `AppendDatasetMetadataBatchUseCase` in a
+   transaction, with `SetRefCheckRefMode::Explicit(dst_head)`, which commits through
+   `DatasetHeadCommitter`. A remote destination is written with
+   `MetadataChainExt::append_batch_and_set_head`, which appends the blocks and moves `HEAD` by a
+   CAS on its storage, since its `HEAD` is not a dataset reference of this node. That CAS is the
+   storage's conditional write (`NamedObjectRepository::compare_and_set`): a conditional `PUT` on
+   S3; on the local file system, a `head.lock` file created exclusively, then renamed over `head`
+   (a lock left by an interrupted writer fails later pushes until it is removed). Storage without
+   conditional writes re-reads the head just before an unconditional write, so a change landing in
+   between is lost. A destination that moved since step 1 fails with `UpdatedConcurrently`, also
+   with `force`.
 
 Objects land before the blocks that reference them, so a failure leaves at most unreferenced
 objects, never a block with a missing object. A failure after step 2 leaves a destination that
@@ -317,8 +323,14 @@ Server-side details:
 - The upgrade requires a logged-in caller. For a dataset that does not exist yet, the account in
   the URL must be the caller's; the dataset is created when the first metadata arrives.
 - Blocks are held in memory from the metadata request until completion, then appended in one
-  `AppendDatasetMetadataBatchUseCase` call with full validation and
-  `SetRefCheckRefMode::ForceUpdateIfDiverged(force)`.
+  `AppendDatasetMetadataBatchUseCase` call with full validation. Without `force` the batch must
+  extend `HEAD`: the commit expects the block the batch is appended to
+  (`SetRefCheckRefMode::ForceUpdateIfDiverged(false)`), which initiation checked against
+  `current_head`. With `force` the batch may replace a divergent history, so the commit expects
+  the request's `current_head` instead, or the `Seed` when the push created the dataset
+  (`SetRefCheckRefMode::Explicit`). Either way a head moved after initiation fails the push with
+  `UpdatedConcurrently`. A server that predates this expects whatever `HEAD` is at commit time
+  under `force`.
 - Completion posts `DatasetExternallyChangedMessage::smart_transfer_protocol_sync` in a separate
   transaction, which is how flows learn about a push
   ([flow-system.md](flow-system.md#changes-made-outside-flows)).
@@ -405,7 +417,7 @@ nothing themselves; callers own authorization.
 | Simple protocol, local source | none (trusted), hashes not recomputed | CAS on the destination head read at the start |
 | Simple protocol, remote source | full, hashes recomputed | as above |
 | Smart pull client | full | CAS on the first new block's `prevBlockHash`; with `force`, on the head read in the committing transaction |
-| Smart push server | full | as above |
+| Smart push server | full | CAS on the first new block's `prevBlockHash`; with `force`, on the request's `current_head` (the `Seed` for a dataset the push created) |
 
 Every block except the `Seed` of a newly created dataset is appended by
 `MetadataChainExt::append_batch` (IPFS publishing aside), which moves no reference; `HEAD` is set
@@ -445,7 +457,7 @@ and `NameCollision` keep their meaning; `InvalidHead` becomes `Internal`.
 | Remote to remote | Only `odf+` → `odf+` and remote → `ipns://` are rejected; any other remote-to-remote pair runs through the Simple protocol, and an `odf+` source with a remote destination fails late with `Internal`. `kamu pull` and `kamu push` never build such a request |
 | Created destination | Created in its own transaction before objects and blocks; a failed sync can leave a dataset holding only its `Seed`, and the next sync continues from it |
 | Unreferenced objects | A failed or concurrent sync can leave uploaded objects that no block references |
-| `force` | Replaces the destination's history from the source. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol does not check |
+| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `UpdatedConcurrently`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol does not check |
 | Trusted local source | Local-to-local copies skip validation and hash recomputation |
 
 ---

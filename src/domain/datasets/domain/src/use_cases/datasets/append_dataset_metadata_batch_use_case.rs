@@ -39,6 +39,8 @@ pub trait AppendDatasetMetadataBatchUseCase: Send + Sync {
 pub enum SetRefCheckRefMode {
     /// `false`: the block the batch is appended to. `true`: whatever `HEAD`
     /// is in the current transaction, so a diverged chain is overwritten.
+    /// With `true` the commit does not check a head the caller observed
+    /// earlier; use `Explicit` for that.
     ForceUpdateIfDiverged(bool),
     /// The given head; `None` means the dataset has no `HEAD` yet
     Explicit(Option<odf::Multihash>),
