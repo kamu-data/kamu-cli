@@ -511,8 +511,8 @@ async fn test_flow_duration_starts_at_manual_activation_before_schedule() {
 async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
     let mut seq_dataset_changes = mockall::Sequence::new();
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // foo: reading after task 0, then task 1, then bar after task 2
-    for num_records in [5, 7, 12] {
+    // foo: reading after task 0, then task 1
+    for num_records in [5, 7] {
         mock_dataset_changes
             .expect_get_increment_between()
             .times(1)
@@ -657,7 +657,11 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 12,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),

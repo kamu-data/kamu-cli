@@ -352,12 +352,10 @@ impl Engine for ODFEngine {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
-        let operation_id = request.operation_id.clone();
-        let operation_dir = self
-            .run_info_dir
-            .join(format!("transform-{}", request.operation_id));
+        let operation_dir = self.run_info_dir.join(format!("transform-{operation_id}"));
         let logs_dir = operation_dir.join("logs");
         std::fs::create_dir(&operation_dir).int_err()?;
         std::fs::create_dir(&logs_dir).int_err()?;
@@ -376,7 +374,7 @@ impl Engine for ODFEngine {
             LogsConfig::new(&logs_dir),
             &self.image,
             materialized_request.volumes,
-            &operation_id,
+            operation_id,
         )
         .await?;
 

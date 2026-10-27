@@ -37,6 +37,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-task-system = { workspace = true }
 odf = { workspace = true }
+random-strings = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.17", default-features = false }
@@ -54,7 +55,9 @@ kamu = { workspace = true, features = [
 kamu-core = { workspace = true, features = [
     "testing",
 ] }
-kamu-datasets-services = { workspace = true }
+kamu-datasets-services = { workspace = true, features = [
+    "testing",
+] }
 
 oop = "0.0.2"
 pretty_assertions = { version = "1" }

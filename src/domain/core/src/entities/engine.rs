@@ -30,9 +30,12 @@ pub trait Engine: Send + Sync {
         request: RawQueryRequestExt,
     ) -> Result<RawQueryResponseExt, EngineError>;
 
+    /// `operation_id` names the run directory and the engine container, so it
+    /// must be unique per execution attempt.
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError>;
 }
@@ -70,8 +73,6 @@ pub struct RawQueryResponseExt {
 /// locations before passing it to the engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequestExt {
-    /// Randomly assigned value that identifies this specific engine operation
-    pub operation_id: String,
     /// Identifies the output dataset
     pub dataset_handle: odf::DatasetHandle,
     /// Block reference to advance upon commit
@@ -80,6 +81,8 @@ pub struct TransformRequestExt {
     pub head: odf::Multihash,
     /// Transformation that will be applied to produce new data
     pub transform: odf::metadata::Transform,
+    /// Hash of the `SetTransform` block that defines the transformation
+    pub transform_block: odf::Multihash,
     /// System time to use for new records
     pub system_time: DateTime<Utc>,
     /// Expected data schema (if already defined)

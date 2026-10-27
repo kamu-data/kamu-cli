@@ -13,18 +13,20 @@ use kamu::TransformRequestPlannerImpl;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_adapter_task_dataset::{
     DatasetHeadMovedError,
+    DatasetUpdateJob,
     InputDatasetCompactedError,
     TaskDefinitionDatasetUpdate,
     TaskErrorDatasetCommit,
     TaskErrorDatasetUpdate,
+    TaskResultDatasetUpdate,
     UpdateDatasetTaskRunner,
 };
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
-use kamu_datasets_services::DatasetHeadCommitterImpl;
+use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
+use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_task_system::{TaskDefinition, TaskOutcome, TaskResult, TaskRunner};
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,13 +70,7 @@ async fn test_transform_head_moved_concurrently_fails_recoverably() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let reported_heads = ReportedHeads::default();
 
-    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-        mock_transform_elaboration_service: MockTransformElaborationService::new()
-            .make_expect_elaborate_transform(alias_bar.clone()),
-        mock_transform_executor: MockTransformExecutor::new()
-            .make_expect_transform_updated(alias_bar.clone(), reported_heads.clone()),
-        ..UpdateDatasetTaskRunnerMocks::default()
-    });
+    let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
@@ -82,7 +78,7 @@ async fn test_transform_head_moved_concurrently_fails_recoverably() {
     let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
     let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
     reported_heads.set(&bar.head, &transformed_head);
-    harness.move_head(&bar, &bar.head, &concurrent_head).await;
+    harness.move_head_before_next_commit(concurrent_head.clone());
 
     let outcome = harness.run_transform_update(&bar).await;
 
@@ -166,11 +162,71 @@ async fn test_transform_diverged_input_fails_as_input_compacted() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_transform_success_carries_increment_from_executor() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    reported_heads.set(&bar.head, &transformed_head);
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate {
+                pull_result: PullResult::Updated {
+                    old_head: Some(bar.head.clone()),
+                    new_head: transformed_head.clone(),
+                    has_more: false,
+                },
+                data_increment: Some(MockTransformExecutor::REPORTED_INCREMENT),
+            }
+            .into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&bar).await, transformed_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_plans_at_run_time_head() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    // Another writer commits after the flow queued the task
+    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
+    harness.move_head(&bar, &bar.head, &concurrent_head).await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    reported_heads.set(&concurrent_head, &transformed_head);
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_matches!(outcome, TaskOutcome::Success(_));
+    assert_eq!(harness.get_head(&bar).await, transformed_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
     runner: Arc<dyn TaskRunner>,
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    racing_committer: Arc<RacingDatasetHeadCommitter>,
 }
 
 impl UpdateDatasetTaskRunnerHarness {
@@ -179,7 +235,8 @@ impl UpdateDatasetTaskRunnerHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<UpdateDatasetTaskRunner>()
-            .add::<DatasetHeadCommitterImpl>()
+            .add_value(RacingDatasetHeadCommitter::default())
+            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
             .add::<TransformRequestPlannerImpl>()
             .add_value(mocks.mock_polling_ingest_service)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
@@ -197,8 +254,25 @@ impl UpdateDatasetTaskRunnerHarness {
         Self {
             base_use_case_harness,
             runner: catalog.get_one::<UpdateDatasetTaskRunner>().unwrap(),
-            transform_request_planner: catalog.get_one().unwrap(),
+            racing_committer: catalog.get_one().unwrap(),
         }
+    }
+
+    /// Elaborates and transforms `alias` once, expecting the transform to be
+    /// elaborated at the old head set in `heads` and reporting the new one
+    fn new_transforming(alias: &odf::DatasetAlias, heads: &ReportedHeads) -> Self {
+        Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_transform_elaboration_service: MockTransformElaborationService::new()
+                .make_expect_elaborate_transform(alias.clone()),
+            mock_transform_executor: MockTransformExecutor::new()
+                .make_expect_transform_updated_at_plan_head(alias.clone(), heads.clone()),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        })
+    }
+
+    fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
+        self.racing_committer
+            .move_head_before_next_commit(concurrent_head);
     }
 
     async fn run_ingest_update(&self, created: &CreateDatasetResult) -> TaskOutcome {
@@ -211,7 +285,7 @@ impl UpdateDatasetTaskRunnerHarness {
         .await
         .unwrap();
 
-        self.run_update(PullPlanIterationJob::Ingest(PullIngestItem {
+        self.run_update(DatasetUpdateJob::Ingest(PullIngestItem {
             depth: 0,
             target: ResolvedDataset::from_created(created),
             metadata_state: Box::new(metadata_state),
@@ -221,26 +295,15 @@ impl UpdateDatasetTaskRunnerHarness {
     }
 
     async fn run_transform_update(&self, created: &CreateDatasetResult) -> TaskOutcome {
-        let plan = self
-            .transform_request_planner
-            .build_transform_preliminary_plan(ResolvedDataset::from_created(created))
+        self.run_update(DatasetUpdateJob::Transform(created.dataset_handle.clone()))
             .await
-            .unwrap();
-
-        self.run_update(PullPlanIterationJob::Transform(PullTransformItem {
-            depth: 0,
-            target: ResolvedDataset::from_created(created),
-            maybe_original_request: None,
-            plan,
-        }))
-        .await
     }
 
-    async fn run_update(&self, pull_job: PullPlanIterationJob) -> TaskOutcome {
+    async fn run_update(&self, job: DatasetUpdateJob) -> TaskOutcome {
         self.runner
             .run_task(TaskDefinition::new(TaskDefinitionDatasetUpdate {
                 pull_options: PullOptions::default(),
-                pull_job,
+                job,
             }))
             .await
             .unwrap()

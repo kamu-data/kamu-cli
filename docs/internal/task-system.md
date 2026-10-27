@@ -193,7 +193,7 @@ Why the split:
   `LogicalPlan::dataset_id()` reads a `dataset_id` field from any payload for the store's
   per-dataset index.
 - **The definition is computed at run time.** It holds live objects — `ResolvedDataset`, a
-  `PullPlanIterationJob`, a `CompactionPlan` — reflecting the dataset as it is when the task runs,
+  `DatasetUpdateJob`, a `CompactionPlan` — reflecting the dataset as it is when the task runs,
   not when it was queued. It is never serialized.
 - **The outcome is typed but opaque to the task system.** `TaskResult::empty()` and
   `TaskError::empty_recoverable()` / `empty_unrecoverable()` exist for outcomes with nothing to
@@ -388,8 +388,9 @@ fetch_uncacheable }`. The dataset decides what "update" means.
    single-node pull plan and yields one `PullPlanIterationJob`: `Ingest`, `Transform` or `Sync`,
    chosen as described in [dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs).
 
-3. The job is detached from the transaction and stored in `TaskDefinitionDatasetUpdate` with the
-   `PullOptions`.
+3. The job is detached from the transaction and stored in `TaskDefinitionDatasetUpdate` as a
+   `DatasetUpdateJob`, with the `PullOptions`. A transform job keeps only the target's handle: the
+   runner plans the transform itself.
 
 A planning error is logged and returned as `Err`, which the agent turns into a recoverable
 failure.
@@ -404,8 +405,10 @@ failure.
   `UpToDate { uncacheable }` unless `fetch_uncacheable` is set. `Updated { has_more }` means the
   source has more to fetch: the task does not loop, and the ingest flow controller schedules the
   next iteration if its config sets `fetch_next_iteration`.
-- **Transform** — `TransformElaborationService::elaborate_transform` computes each input's
-  unprocessed slices and watermarks. `UpToDate` ends the task with an empty success. Otherwise
+- **Transform** — in one transaction the runner plans the transform from the target's current
+  `HEAD` and `TransformElaborationService::elaborate_transform` computes each input's unprocessed
+  slices and watermarks ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)).
+  `UpToDate` ends the task with an empty success. Otherwise
   `TransformExecutor::execute_transform` provisions the engine named by the transform — always a
   container engine, DataFusion included — runs the query and commits `ExecuteTransform`.
   The runner never resets the derivative, so a diverged input is not repaired here:
@@ -416,10 +419,11 @@ failure.
   which copies blocks and objects from the remote (smart transfer protocol for `odf+http(s)://`,
   simple protocol otherwise) and appends them, moving `HEAD` itself.
 
-On success, `combine_task_result` (a short transaction) wraps the `PullResult` in
-`TaskResultDatasetUpdate`, adding `data_increment` from
-`DatasetIncrementQueryService::get_increment_between(old_head, new_head)` — block and record
-counts and the new watermark, which the flow controller uses for triggering downstream flows.
+On success the `PullResult` is wrapped in `TaskResultDatasetUpdate` with `data_increment`: block
+and record counts and the new watermark, which the flow controllers use to trigger downstream
+flows. A transform takes it from the executor's result. Ingest and sync query it with
+`DatasetIncrementQueryService::get_increment_between(old_head, new_head)` in `combine_task_result`,
+a short transaction.
 
 | Error | Recoverable |
 | --- | --- |

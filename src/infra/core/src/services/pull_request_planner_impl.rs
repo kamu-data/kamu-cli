@@ -192,6 +192,8 @@ impl PullRequestPlannerImpl {
 
         let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
+        // Planned here to fail a pull with a broken transform before any job runs,
+        // and to learn the inputs. The job plans again when it runs.
         match self
             .transform_request_planner
             .build_transform_preliminary_plan(target.clone())
@@ -199,9 +201,14 @@ impl PullRequestPlannerImpl {
         {
             Ok(plan) => Ok(PullTransformItem {
                 depth: pi.depth,
+                input_handles: plan
+                    .datasets_map
+                    .iterate_all_handles()
+                    .filter(|hdl| *hdl != target.get_handle())
+                    .cloned()
+                    .collect(),
                 target,
                 maybe_original_request: pi.maybe_original_request,
-                plan,
             }),
             Err(e) => Err(Box::new(PullResponse {
                 maybe_original_request: pi.maybe_original_request,

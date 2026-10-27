@@ -41,14 +41,16 @@ use kamu_datasets_services::{
 use messaging_outbox::DummyOutboxImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
+use random_strings::get_random_name;
 use tempfile::TempDir;
-use time_source::{SystemTimeSource, SystemTimeSourceDefault};
+use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct TransformTestHarness {
     _tempdir: TempDir,
     system_time_source: Arc<dyn SystemTimeSource>,
+    system_time_stub: Arc<SystemTimeSourceStub>,
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
@@ -81,7 +83,7 @@ impl TransformTestHarness {
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add::<AlwaysHappyDatasetActionAuthorizer>()
-            .add::<SystemTimeSourceDefault>()
+            .add::<SystemTimeSourceStub>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
@@ -117,6 +119,7 @@ impl TransformTestHarness {
         Self {
             _tempdir: tempdir,
             system_time_source: catalog.get_one().unwrap(),
+            system_time_stub: catalog.get_one().unwrap(),
             did_generator: catalog.get_one().unwrap(),
             dataset_registry: catalog.get_one().unwrap(),
             dataset_storage_unit_writer: catalog.get_one().unwrap(),
@@ -306,6 +309,11 @@ impl TransformTestHarness {
             .unwrap()
     }
 
+    async fn ingest_rows(&self, target: ResolvedDataset, rows: &str) {
+        self.ingest_data(format!("date,city,population\n{rows}\n"), target)
+            .await;
+    }
+
     async fn ingest_data(&self, data_str: String, target: ResolvedDataset) {
         let data = std::io::Cursor::new(data_str);
 
@@ -377,6 +385,39 @@ impl TransformTestHarness {
         self.transform_elab_svc.elaborate_transform(plan).await
     }
 
+    async fn elaborated_request(&self, target: ResolvedDataset) -> TransformRequestExt {
+        match self.elaborate_transform(target).await.unwrap() {
+            TransformElaboration::Elaborated(plan) => plan.request,
+            TransformElaboration::UpToDate => panic!("Expected the transform to be elaborated"),
+        }
+    }
+
+    /// Rebuilds `stored` from a plan built at its expected head
+    async fn rebuild_transform(
+        &self,
+        target: ResolvedDataset,
+        stored: &TransformPlanPayload,
+    ) -> Result<TransformRequestExt, TransformRebuildError> {
+        let plan = self
+            .transform_request_planner
+            .build_transform_preliminary_plan_at(target, &stored.expected_head)
+            .await
+            .unwrap();
+
+        self.rebuild_transform_from_plan(plan, stored).await
+    }
+
+    async fn rebuild_transform_from_plan(
+        &self,
+        plan: TransformPreliminaryPlan,
+        stored: &TransformPlanPayload,
+    ) -> Result<TransformRequestExt, TransformRebuildError> {
+        self.transform_elab_svc
+            .rebuild_transform(plan, stored)
+            .await
+            .map(|plan| plan.request)
+    }
+
     async fn transform(&self, target: ResolvedDataset) -> Result<TransformResult, TransformError> {
         let elaboration = self
             .elaborate_transform(target.clone())
@@ -388,12 +429,15 @@ impl TransformTestHarness {
             TransformElaboration::Elaborated(plan) => {
                 let transform_result = self
                     .transform_executor
-                    .execute_transform(target.clone(), plan, None)
+                    .execute_transform(target.clone(), plan, &get_random_name(None, 10), None)
                     .await
                     .1
                     .map_err(TransformError::Execute)?;
 
-                if let TransformResult::Updated { old_head, new_head } = &transform_result {
+                if let TransformResult::Updated {
+                    old_head, new_head, ..
+                } = &transform_result
+                {
                     target
                         .as_metadata_chain()
                         .set_ref(
@@ -461,14 +505,6 @@ impl TransformTestHarness {
                 .await
                 .unwrap();
         }
-    }
-
-    fn assert_requests_equivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
-        // Operation IDs are randomly generated, so ignoring them for this check
-        rhs.operation_id.clone_from(&lhs.operation_id);
-
-        assert_eq!(lhs.inputs, rhs.inputs);
-        assert_eq!(*lhs, rhs);
     }
 }
 
@@ -800,9 +836,9 @@ async fn test_get_verification_plan_one_to_one() {
         deriv_chain.get_block(&deriv_head_t6).await.unwrap()
     );
 
-    TransformTestHarness::assert_requests_equivalent(&operation.steps[0].request, deriv_req_t2);
-    TransformTestHarness::assert_requests_equivalent(&operation.steps[1].request, deriv_req_t4);
-    TransformTestHarness::assert_requests_equivalent(&operation.steps[2].request, deriv_req_t6);
+    assert_eq!(operation.steps[0].request, deriv_req_t2);
+    assert_eq!(operation.steps[1].request, deriv_req_t4);
+    assert_eq!(operation.steps[2].request, deriv_req_t6);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -880,6 +916,134 @@ async fn test_transform_fails_on_diverged_input() {
         Err(TransformError::Elaborate(
             TransformElaborateError::InvalidInputInterval(InvalidInputIntervalError { .. })
         ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_rebuild_at_pinned_heads_is_identical() {
+    let harness = TransformTestHarness::new();
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_target = harness.new_root_with_push_source(&foo_alias).await;
+    harness
+        .ingest_rows(foo_target.clone(), "2020-01-01,A,1000")
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            std::slice::from_ref(&foo_alias),
+            harness.system_time_source.now(),
+        )
+        .await;
+
+    harness
+        .system_time_stub
+        .set(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
+    let request = harness.elaborated_request(bar_target.clone()).await;
+    let stored = TransformPlanPayload::from_request(&request);
+
+    // The input advances and the clock moves on after the plan was stored
+    harness.ingest_rows(foo_target, "2020-01-02,B,2000").await;
+    harness
+        .system_time_stub
+        .set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
+    assert_ne!(
+        harness.elaborated_request(bar_target.clone()).await,
+        request
+    );
+
+    let rebuilt = harness
+        .rebuild_transform(bar_target, &stored)
+        .await
+        .unwrap();
+
+    assert_eq!(rebuilt, request);
+    assert_eq!(TransformPlanPayload::from_request(&rebuilt), stored);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_rebuild_detects_mismatch() {
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_target = harness.new_root_with_push_source(&foo_alias).await;
+    harness.ingest_rows(foo_target, "2020-01-01,A,1000").await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            std::slice::from_ref(&foo_alias),
+            harness.system_time_source.now(),
+        )
+        .await;
+    let stored =
+        TransformPlanPayload::from_request(&harness.elaborated_request(bar_target.clone()).await);
+
+    // A stored plan that does not describe what its pins produce
+    let mut tampered = stored.clone();
+    tampered.query_inputs[0].offset_interval = None;
+    assert_matches!(
+        harness
+            .rebuild_transform(bar_target.clone(), &tampered)
+            .await,
+        Err(TransformRebuildError::Mismatch(_))
+    );
+
+    // A plan built at a head other than the stored one
+    harness.transform(bar_target.clone()).await.unwrap();
+    let plan_at_new_head = harness
+        .transform_request_planner
+        .build_transform_preliminary_plan(bar_target)
+        .await
+        .unwrap();
+    assert_matches!(
+        harness
+            .rebuild_transform_from_plan(plan_at_new_head, &stored)
+            .await,
+        Err(TransformRebuildError::Mismatch(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_transform_plan_payload_json_shape() {
+    let payload = TransformPlanPayload {
+        dataset_id: odf::DatasetID::new_seeded_ed25519(b"bar"),
+        system_time: Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+        expected_head: odf::Multihash::from_digest_sha3_256(b"head"),
+        transform_block: odf::Multihash::from_digest_sha3_256(b"transform"),
+        query_inputs: vec![TransformPlanPayloadInput {
+            dataset_id: odf::DatasetID::new_seeded_ed25519(b"foo"),
+            planned_head: odf::Multihash::from_digest_sha3_256(b"foo-head"),
+            offset_interval: Some(TransformPlanOffsetInterval { start: 10, end: 19 }),
+            watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()),
+        }],
+    };
+
+    let json = serde_json::to_value(&payload).unwrap();
+
+    assert_eq!(
+        json,
+        serde_json::json!({
+            "kind": "TransformPlan",
+            "datasetId": payload.dataset_id.to_string(),
+            "systemTime": "2050-01-01T12:00:00Z",
+            "expectedHead": payload.expected_head.to_string(),
+            "transformBlock": payload.transform_block.to_string(),
+            "queryInputs": [{
+                "datasetId": payload.query_inputs[0].dataset_id.to_string(),
+                "plannedHead": payload.query_inputs[0].planned_head.to_string(),
+                "offsetInterval": { "start": 10, "end": 19 },
+                "watermark": "2020-01-01T00:00:00Z",
+            }],
+        })
+    );
+    assert_eq!(
+        serde_json::from_value::<TransformPlanPayload>(json).unwrap(),
+        payload
     );
 }
 

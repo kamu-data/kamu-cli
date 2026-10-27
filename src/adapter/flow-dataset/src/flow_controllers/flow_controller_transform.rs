@@ -10,10 +10,9 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_adapter_task_dataset as ats;
 use kamu_core::PullResult;
-use kamu_datasets::DatasetIncrementQueryService;
 use kamu_flow_system as fs;
 use kamu_task_system as ts;
 
@@ -36,7 +35,6 @@ use crate::{
 pub struct FlowControllerTransform {
     catalog: dill::Catalog,
     flow_sensor_dispatcher: Arc<dyn fs::FlowSensorDispatcher>,
-    dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>,
 }
 
 #[async_trait::async_trait]
@@ -107,7 +105,12 @@ impl fs::FlowController for FlowControllerTransform {
         let task_result_update =
             ats::TaskResultDatasetUpdate::from_task_result(task_result).int_err()?;
 
-        match task_result_update.pull_result {
+        let ats::TaskResultDatasetUpdate {
+            pull_result,
+            data_increment,
+        } = task_result_update;
+
+        match pull_result {
             PullResult::UpToDate(_) => {
                 tracing::debug!(flow_id = %success_flow_state.flow_id, "Transform up-to-date, skipping propagation");
                 return Ok(());
@@ -121,11 +124,9 @@ impl fs::FlowController for FlowControllerTransform {
 
                 tracing::debug!(flow_id = %success_flow_state.flow_id, %dataset_id, "Transformed new data, propagating changes");
 
-                let dataset_increment = self
-                    .dataset_increment_query_service
-                    .get_increment_between(&dataset_id, old_head.as_ref(), &new_head)
-                    .await
-                    .int_err()?;
+                let dataset_increment = data_increment.ok_or_else(|| {
+                    format!("Transform result for {dataset_id} carries no data increment").int_err()
+                })?;
 
                 let activation_cause = fs::FlowActivationCause::ResourceUpdate(
                     fs::FlowActivationCauseResourceUpdate {

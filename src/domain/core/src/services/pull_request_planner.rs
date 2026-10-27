@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
 use crate::*;
@@ -83,10 +83,7 @@ impl PullPlanIterationJob {
     pub fn detach_from_transaction(&self) {
         match self {
             Self::Ingest(pii) => pii.target.detach_from_transaction(),
-            Self::Transform(pti) => {
-                pti.target.detach_from_transaction();
-                pti.plan.datasets_map.detach_from_transaction();
-            }
+            Self::Transform(pti) => pti.target.detach_from_transaction(),
             Self::Sync(psi) => {
                 psi.sync_request.src.detach_from_transaction();
                 psi.sync_request.dst.detach_from_transaction();
@@ -107,28 +104,15 @@ pub struct PullIngestItem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A derivative to transform. The transform itself is planned when the job
+/// runs, in the transaction that elaborates it.
 #[derive(Debug)]
 pub struct PullTransformItem {
     pub depth: i32,
     pub target: ResolvedDataset,
     pub maybe_original_request: Option<PullRequest>,
-    pub plan: TransformPreliminaryPlan,
-}
-
-impl PullTransformItem {
-    pub async fn refresh_from_dataset_registry(
-        &mut self,
-        dataset_registry: &dyn DatasetRegistry,
-    ) -> Result<(), InternalError> {
-        self.target = dataset_registry
-            .get_dataset_by_handle(self.target.get_handle())
-            .await;
-        self.plan
-            .datasets_map
-            .refresh_datasets_from_registry(dataset_registry)
-            .await;
-        Ok(())
-    }
+    /// Inputs of the transform, which the pull reads
+    pub input_handles: Vec<odf::DatasetHandle>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,13 +248,7 @@ impl PullItemCommon for PullTransformItem {
     }
 
     fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
-        let mut read_handles = Vec::new();
-        for hdl in self.plan.datasets_map.iterate_all_handles() {
-            if hdl != self.target.get_handle() {
-                read_handles.push(hdl);
-            }
-        }
-        read_handles
+        self.input_handles.iter().collect()
     }
 }
 
@@ -399,7 +377,9 @@ impl From<TransformResult> for PullResult {
     fn from(other: TransformResult) -> Self {
         match other {
             TransformResult::UpToDate => PullResult::UpToDate(PullResultUpToDate::Transform),
-            TransformResult::Updated { old_head, new_head } => PullResult::Updated {
+            TransformResult::Updated {
+                old_head, new_head, ..
+            } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 has_more: false,

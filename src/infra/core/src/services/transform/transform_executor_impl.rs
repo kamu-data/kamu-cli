@@ -15,6 +15,7 @@ use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use kamu_ingest_datafusion::DataWriterDataFusion;
+use random_strings::get_random_name;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,10 +31,11 @@ impl TransformExecutorImpl {
     }
 
     // Note: Can be called from multiple threads
-    #[tracing::instrument(level = "info", skip_all, fields(operation_id = %request.operation_id))]
+    #[tracing::instrument(level = "info", skip_all, fields(%operation_id))]
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
@@ -49,6 +51,7 @@ impl TransformExecutorImpl {
         match Self::do_transform_inner(
             engine_provisioner,
             request,
+            operation_id,
             datasets_map,
             commit_fn,
             listener.clone(),
@@ -72,6 +75,7 @@ impl TransformExecutorImpl {
     async fn do_transform_inner<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
@@ -90,7 +94,7 @@ impl TransformExecutorImpl {
             .await?;
 
         let response = engine
-            .execute_transform(request.clone(), datasets_map)
+            .execute_transform(request.clone(), operation_id, datasets_map)
             .await?;
         assert_eq!(
             response.new_offset_interval.is_some(),
@@ -187,7 +191,20 @@ impl TransformExecutorImpl {
             "Commit did not update neither schema nor data"
         );
 
-        Ok(TransformResult::Updated { old_head, new_head })
+        // Computed here, where the appended blocks are known, so that callers
+        // need not query the chain again
+        use odf::dataset::MetadataChainExt;
+        let increment = resolved_dataset
+            .as_metadata_chain()
+            .get_increment_for_interval(Some(&old_head), &new_head)
+            .await
+            .int_err()?;
+
+        Ok(TransformResult::Updated {
+            old_head,
+            new_head,
+            increment,
+        })
     }
 }
 
@@ -200,6 +217,7 @@ impl TransformExecutor for TransformExecutorImpl {
         &self,
         target: ResolvedDataset,
         plan: TransformPlan,
+        operation_id: &str,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> (
         ResolvedDataset,
@@ -212,6 +230,7 @@ impl TransformExecutor for TransformExecutorImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 plan.request,
+                operation_id,
                 &plan.datasets_map,
                 |request, response| async move {
                     Self::commit_execute_transform(target, request, response).await
@@ -271,11 +290,13 @@ impl TransformExecutor for TransformExecutorImpl {
             let result = TransformResult::Updated {
                 old_head: expected_block.prev_block_hash.clone().unwrap(),
                 new_head: block_hash.clone(),
+                increment: odf::dataset::MetadataChainIncrementInterval::default(),
             };
 
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 request,
+                &get_random_name(None, 10),
                 &verification_operation.datasets_map,
                 |request, response| async move {
                     let params = odf::dataset::ExecuteTransformParams {

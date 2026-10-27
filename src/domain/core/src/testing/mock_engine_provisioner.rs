@@ -47,6 +47,7 @@ impl Engine for EngineStub {
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,
+        _operation_id: &str,
         _datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
         // Note: At least 1 output field must be present, watermark is easy to mimic

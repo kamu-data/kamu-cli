@@ -28,6 +28,9 @@ pub enum TransformResult {
     Updated {
         old_head: odf::Multihash,
         new_head: odf::Multihash,
+        /// Blocks and records the transform appended, and the new watermark
+        /// when it changed
+        increment: odf::dataset::MetadataChainIncrementInterval,
     },
 }
 
