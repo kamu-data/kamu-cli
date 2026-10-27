@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::engine::TransformResponseExt;
@@ -20,8 +21,12 @@ use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetResult,
     DatasetAction,
+    DatasetEnvVar,
+    DatasetEnvVarResolver,
+    GetDatasetEnvVarError,
     MockDatasetActionAuthorizer,
     ResolvedDataset,
+    SecretsEncryptionConfig,
 };
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
@@ -449,6 +454,25 @@ async fn test_pull_ingest_without_polling_source_is_up_to_date() {
         pull_response.result,
         Ok(PullResult::UpToDate(PullResultUpToDate::PollingIngest(_)))
     );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_planning_failure_notifies_listener() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_ingest_iterations(&alias_foo, vec![])
+            .with_failing_env_var_resolution(),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let (pull_response, ingest_events) = harness.pull_local_recording_ingest(&alias_foo).await;
+
+    assert_matches!(pull_response.result, Err(PullError::Internal(_)));
+    assert_eq!(ingest_events, vec!["begin", "plan_error"]);
     assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
@@ -1277,6 +1301,11 @@ impl PullUseCaseHarness {
             .bind::<dyn TransformExecutor, MockTransformExecutor>();
         }
 
+        if mocks.failing_env_var_resolution {
+            b.add_value(SecretsEncryptionConfig::sample())
+                .add::<FailingDatasetEnvVarResolver>();
+        }
+
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         let catalog = b.build();
@@ -1358,6 +1387,24 @@ impl PullUseCaseHarness {
             .execute(PullRequest::Local(alias.as_local_ref()), options, None)
             .await
             .unwrap()
+    }
+
+    /// Pulls with a listener and returns the ingest events it received
+    async fn pull_local_recording_ingest(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> (PullResponse, Vec<&'static str>) {
+        let listener = Arc::new(RecordingIngestListener::default());
+        let pull_response = self
+            .use_case
+            .execute(
+                PullRequest::Local(alias.as_local_ref()),
+                PullOptions::default(),
+                Some(listener.clone()),
+            )
+            .await
+            .unwrap();
+        (pull_response, listener.events())
     }
 
     async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
@@ -1456,9 +1503,18 @@ struct PullUseCaseHarnessMocks {
     /// Transforms with the real planner and executor, through an engine that
     /// only advances the watermark to this value
     real_transform_watermark: Option<DateTime<Utc>>,
+    /// Enables dataset environment variables with a resolver that fails
+    failing_env_var_resolution: bool,
 }
 
 impl PullUseCaseHarnessMocks {
+    fn with_failing_env_var_resolution(self) -> Self {
+        Self {
+            failing_env_var_resolution: true,
+            ..self
+        }
+    }
+
     fn with_authorizer_mock(
         self,
         mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
@@ -1602,7 +1658,86 @@ impl Default for PullUseCaseHarnessMocks {
             mock_compaction_executor: MockCompactionExecutor::new(),
             mock_sync_service: MockSyncService::new(),
             real_transform_watermark: None,
+            failing_env_var_resolution: false,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[dill::component]
+#[dill::interface(dyn DatasetEnvVarResolver)]
+struct FailingDatasetEnvVarResolver {}
+
+#[async_trait::async_trait]
+impl DatasetEnvVarResolver for FailingDatasetEnvVarResolver {
+    async fn resolve_effective_env_vars(
+        &self,
+        _dataset_id: &odf::DatasetID,
+    ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
+        Err("Cannot decrypt the dataset's secrets".int_err())
+    }
+
+    async fn get_env_var_by_entry_key(
+        &self,
+        _dataset_id: &odf::DatasetID,
+        _entry_key: &str,
+    ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
+        Err("Cannot decrypt the dataset's secrets".int_err().into())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Records the ingest listener calls of a pull, in order
+#[derive(Default)]
+struct RecordingIngestListener {
+    events: std::sync::Mutex<Vec<&'static str>>,
+}
+
+impl RecordingIngestListener {
+    fn events(&self) -> Vec<&'static str> {
+        self.events.lock().unwrap().clone()
+    }
+
+    fn record(&self, event: &'static str) {
+        self.events.lock().unwrap().push(event);
+    }
+}
+
+impl PullListener for RecordingIngestListener {
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestListener>> {
+        Some(self)
+    }
+
+    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>> {
+        None
+    }
+
+    fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncListener>> {
+        None
+    }
+}
+
+impl PollingIngestListener for RecordingIngestListener {
+    fn begin(&self) {
+        self.record("begin");
+    }
+
+    fn success(&self, _result: &PollingIngestResult) {
+        self.record("success");
+    }
+
+    fn error(&self, _error: &PollingIngestError) {
+        self.record("error");
+    }
+
+    fn no_polling_source(&self) {
+        self.record("no_polling_source");
+    }
+
+    fn plan_error(&self, _error: &PollingIngestPlanError) {
+        self.record("plan_error");
     }
 }
 
