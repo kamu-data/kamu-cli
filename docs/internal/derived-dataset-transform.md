@@ -413,7 +413,8 @@ reuses an ID fails instead of mixing its output with an earlier one.
 - Service tests: `src/infra/core/tests/tests/test_transform_services_impl.rs`,
   `test_verification_service_impl.rs`; engine tests that run real containers:
   `src/infra/core/tests/tests/engine/` (`test_engine_transform.rs`, `test_engine_io.rs`,
-  `test_engine_provisioner.rs`); the response contract checks are unit tests in `engine_odf.rs`.
+  `test_engine_provisioner.rs`), and `test_engine_transform_output.rs` for the response contract
+  checks, which need no container.
 - Mocks in `src/domain/core/src/testing/`: `MockTransformPlanner`, `MockTransformExecutor`,
   `MockEngineProvisioner` (its engine stub can return a chosen response);
   `MockTransformFlowEvaluator` (flow-dataset `testing` feature) for sensor tests.
@@ -452,6 +453,7 @@ reuses an ID fails instead of mixing its output with an earlier one.
 | Engine trait and request/response types | [`engine.rs`](../../src/domain/core/src/entities/engine.rs) |
 | Provisioner, concurrency, images | [`engine_provisioner_local.rs`](../../src/infra/core/src/engine/engine_provisioner_local.rs) |
 | `ODFEngine` (host-side engine client) | [`engine_odf.rs`](../../src/infra/core/src/engine/engine_odf.rs) |
+| Engine output checked against the response | [`engine_transform_output.rs`](../../src/infra/core/src/engine/engine_transform_output.rs) |
 | Container lifecycle and logs | [`engine_container.rs`](../../src/infra/core/src/engine/engine_container.rs) |
 | Input materialization | [`engine_io_strategy.rs`](../../src/infra/core/src/engine/engine_io_strategy.rs) |
 | Chain validators | [`metadata_chain_validators.rs`](../../src/odf/dataset-impl/src/entities/metadata_chain_validators.rs) |
