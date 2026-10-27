@@ -37,6 +37,7 @@ use kamu_datasets_services::{
     QuotaDefaultsConfig,
 };
 use messaging_outbox::{DummyOutboxImpl, register_message_dispatcher};
+use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -370,6 +371,122 @@ async fn test_push_ingest_data_execute_multi_head_moved_concurrently() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_named_source() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+    let foo = harness
+        .create_root_dataset_with_push_sources(&alias_foo, &["csv", "json"])
+        .await;
+
+    let ambiguous = harness.ingest_csv(&foo, None).await;
+    let named = harness.ingest_csv(&foo, Some("csv")).await;
+    let unknown = harness.ingest_csv(&foo, Some("xml")).await;
+
+    assert_matches!(
+        ambiguous,
+        Err(PushIngestDataError::Planning(
+            PushIngestPlanningError::SourceNotFound(_)
+        ))
+    );
+    assert_matches!(named, Ok(PushIngestResult::Updated { .. }));
+    assert_matches!(
+        unknown,
+        Err(PushIngestDataError::Planning(
+            PushIngestPlanningError::SourceNotFound(_)
+        ))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_empty_input_into_source_with_schema() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+    let foo = harness
+        .create_root_dataset_with_push_sources(&alias_foo, &["csv"])
+        .await;
+
+    let first = harness.ingest_empty(&foo).await;
+    let second = harness.ingest_empty(&foo).await;
+
+    // The first push only records the schema the source declares
+    assert_matches!(first, Ok(PushIngestResult::Updated { .. }));
+    assert_matches!(second, Ok(PushIngestResult::UpToDate));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_empty_input_into_source_without_schema() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+    let foo = harness
+        .create_root_dataset_with_push_source(&alias_foo)
+        .await;
+
+    let res = harness.ingest_empty(&foo).await;
+
+    assert_matches!(res, Ok(PushIngestResult::UpToDate));
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_push_ingest_data_unsupported_media_type() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+    let foo = harness
+        .create_root_dataset_with_push_source(&alias_foo)
+        .await;
+
+    let res = harness
+        .ingest_data(
+            ResolvedDataset::from_created(&foo),
+            PushIngestDataUseCaseHarness::ndjson_source(),
+            PushIngestDataUseCaseOptions {
+                media_type: Some(MediaType("application/x-unknown".to_string())),
+                ..PushIngestDataUseCaseHarness::ndjson_options(None, false)
+            },
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(PushIngestDataError::Execution(
+            PushIngestError::UnsupportedMediaType(_)
+        ))
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -477,6 +594,66 @@ impl PushIngestDataUseCaseHarness {
             expected_head,
             skip_quota_check: false,
         }
+    }
+
+    /// A root dataset with a CSV push source per name, each with `city` and
+    /// `population` columns and a header row
+    async fn create_root_dataset_with_push_sources(
+        &self,
+        alias: &odf::DatasetAlias,
+        source_names: &[&str],
+    ) -> CreateDatasetResult {
+        let events = source_names
+            .iter()
+            .map(|name| {
+                MetadataFactory::add_push_source()
+                    .source_name(*name)
+                    .read(odf::metadata::ReadStepCsv {
+                        header: Some(true),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
+                        ..odf::metadata::ReadStepCsv::default()
+                    })
+                    .build()
+                    .into()
+            })
+            .collect();
+        self.create_root_dataset_with_events(alias, events).await
+    }
+
+    async fn ingest_csv(
+        &self,
+        created: &CreateDatasetResult,
+        source_name: Option<&str>,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.ingest_data(
+            ResolvedDataset::from_created(created),
+            DataSource::Stream(Box::new(std::io::Cursor::new("city,population\nfoo,100\n"))),
+            PushIngestDataUseCaseOptions {
+                source_name: source_name.map(str::to_string),
+                media_type: Some(MediaType::CSV.to_owned()),
+                ..Self::ndjson_options(None, false)
+            },
+        )
+        .await
+    }
+
+    /// Pushes a zero-length input without naming a source
+    async fn ingest_empty(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.ingest_data(
+            ResolvedDataset::from_created(created),
+            DataSource::Stream(Box::new(std::io::Cursor::new(""))),
+            PushIngestDataUseCaseOptions {
+                media_type: None,
+                ..Self::ndjson_options(None, false)
+            },
+        )
+        .await
     }
 
     async fn ingest_multi_data(

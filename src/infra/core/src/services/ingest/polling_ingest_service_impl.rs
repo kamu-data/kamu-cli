@@ -322,6 +322,9 @@ impl PollingIngestServiceImpl {
                     "Ignoring savepoint due to --fetch-uncacheable"
                 );
             } else if let odf::metadata::FetchStep::Mqtt(_) = fetch_step {
+            } else if let SavepointData::Ref { .. } = savepoint.data {
+                // The referenced file may have changed since the savepoint was written
+                tracing::info!(?savepoint_path, "Ignoring savepoint of a zero-copy fetch");
             } else if !savepoint.data.path(&self.cache_dir).exists() {
                 // Resuming would commit the savepoint's source state without its data
                 tracing::warn!(?savepoint_path, "Ignoring savepoint whose data is gone");
@@ -365,13 +368,14 @@ impl PollingIngestServiceImpl {
                 Ok(FetchStepResult::UpToDate)
             }
             Ok(FetchResult::Updated(upd)) => {
-                let data = if let Some(path) = upd.zero_copy_path {
+                let (data, keep_savepoint) = if let Some(path) = upd.zero_copy_path {
                     Self::discard_fetch_target(&target_path);
-                    SavepointData::Ref { path }
+                    (SavepointData::Ref { path }, false)
                 } else {
-                    SavepointData::Owned {
+                    let data = SavepointData::Owned {
                         cache_key: data_cache_key,
-                    }
+                    };
+                    (data, true)
                 };
 
                 let savepoint = FetchSavepoint {
@@ -381,7 +385,12 @@ impl PollingIngestServiceImpl {
                     data,
                     has_more: upd.has_more,
                 };
-                self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
+                // A zero-copy fetch is free to repeat, and resuming one would
+                // pair the source state it recorded with whatever the file
+                // holds by then
+                if keep_savepoint {
+                    self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
+                }
                 Ok(FetchStepResult::Updated(savepoint))
             }
         }

@@ -66,8 +66,11 @@ Recommendation: for ease of reading, use the following format:
   cannot be decrypted, are reported instead of being treated as a missing value
 - Polling ingest runs no longer leave their working files behind after success, and a failed fetch
   no longer leaves its partial download in the cache
-- Re-running an ingest after its cached fetch data was deleted, or after a `FilesGlob` source file
-  was moved, fetches again instead of recording the source as ingested without its data
+- Re-running an ingest after its downloaded data was deleted from the cache downloads it again
+  instead of recording the source as ingested without its data
+- After a local source file (`file://` or `FilesGlob`) that failed to ingest is fixed, its data is
+  ingested once instead of again on the next poll
+- A preprocess step that names an unsupported engine fails without retries
 - A fetch savepoint left truncated by a crash or a full disk is fetched again instead of failing
   every later run until the cache is cleared
 

@@ -608,6 +608,47 @@ async fn test_data_push_ingest_upload_token_actual_file_different_size() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_unsupported_media_type() {
+    let harness = DataIngestHarness::new().await;
+    let create_result = harness.create_population_dataset(true).await;
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+
+    let client = async move {
+        let res = DataIngestHarness::push(&ingest_url, "application/x-unknown", "A,100").await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::UNSUPPORTED_MEDIA_TYPE, res.status());
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_push_ingest_into_dataset_without_push_source() {
+    let harness = DataIngestHarness::new().await;
+    let create_result = harness.create_population_dataset(false).await;
+    let ingest_url = harness.ingest_url(&create_result.dataset_handle.alias);
+
+    let client = async move {
+        let res = DataIngestHarness::push(
+            &ingest_url,
+            "application/x-ndjson",
+            r#"{"event_time": "2020-01-01T00:00:00", "city": "A", "population": 100}"#,
+        )
+        .await;
+
+        pretty_assertions::assert_eq!(http::StatusCode::BAD_REQUEST, res.status());
+    };
+
+    await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct DataIngestHarness {
     pub server_harness: ServerSideLocalFsHarness,
     pub system_time: DateTime<Utc>,
@@ -693,6 +734,25 @@ impl DataIngestHarness {
 
     fn dataset_http_url(&self, alias: &odf::DatasetAlias) -> Url {
         self.server_harness.dataset_url_with_scheme(alias, "http")
+    }
+
+    fn ingest_url(&self, alias: &odf::DatasetAlias) -> String {
+        format!("{}/ingest", self.dataset_http_url(alias))
+    }
+
+    /// Pushes a raw `body` as `content_type` without naming a source
+    async fn push(ingest_url: &str, content_type: &str, body: &'static str) -> reqwest::Response {
+        let cl = reqwest::Client::new();
+        cl.execute(
+            cl.post(ingest_url)
+                .bearer_auth(odf::dataset::DUMMY_ODF_ACCESS_TOKEN)
+                .header("Content-Type", content_type)
+                .body(body)
+                .build()
+                .unwrap(),
+        )
+        .await
+        .unwrap()
     }
 
     async fn upload_file(&self, upload_id: &str, file_name: &str, file_content: &str) {

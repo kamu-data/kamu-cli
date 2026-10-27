@@ -23,6 +23,7 @@ use kamu_datasets::{
     DatasetAction,
     DatasetEnvVar,
     DatasetEnvVarResolver,
+    DatasetEnvVarValue,
     GetDatasetEnvVarError,
     MockDatasetActionAuthorizer,
     ResolvedDataset,
@@ -448,13 +449,102 @@ async fn test_pull_ingest_without_polling_source_is_up_to_date() {
     ));
     let foo = harness.create_root_dataset_without_source(&alias_foo).await;
 
+    let (pull_response, ingest_events) = harness.pull_local_recording_ingest(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::UpToDate(PullResultUpToDate::PollingIngest(_)))
+    );
+    assert_eq!(ingest_events, vec!["begin", "no_polling_source"]);
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_head_moved_after_committed_iterations_reports_progress() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let heads = [(); 2].map(|()| ReportedHeads::default());
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![
+            MockIngestIteration::updated(&heads[0], true, 2),
+            MockIngestIteration::updated(&heads[1], false, 3),
+        ],
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let last_head = harness.chain_reported_heads(&foo, &heads).await;
+    let (committed_head, _) = heads[1].get();
+    // The second iteration expects the head the first one started from
+    heads[1].set(&foo.head, &last_head);
+
+    let pull_response = harness.pull_local_exhausting_sources(&alias_foo).await;
+
+    let Err(PullError::IngestStopped(stopped)) = pull_response.result else {
+        panic!(
+            "Expected the ingest to stop, got {:?}",
+            pull_response.result
+        );
+    };
+    assert_matches!(
+        *stopped,
+        IngestStoppedError {
+            old_head,
+            new_head,
+            increment: odf::dataset::MetadataChainIncrementInterval { num_records: 2, .. },
+            source: PollingIngestError::CommitError(_),
+        }
+        if old_head == foo.head && new_head == committed_head
+    );
+    assert_eq!(harness.get_head(&foo).await, committed_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_more_data_then_nothing_new_is_updated() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let heads = [ReportedHeads::default()];
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![
+            MockIngestIteration::updated(&heads[0], true, 2),
+            MockIngestIteration::UpToDate,
+        ],
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let last_head = harness.chain_reported_heads(&foo, &heads).await;
+
+    let pull_response = harness.pull_local_exhausting_sources(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: Some(old_head), new_head, has_more: false })
+        if old_head == foo.head && new_head == last_head
+    );
+    assert_eq!(harness.get_head(&foo).await, last_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_passes_resolved_env_vars_to_the_ingest() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_expecting_env_var(
+        &alias_foo,
+        ConstDatasetEnvVarResolver::KEY,
+    ));
+    harness.create_root_dataset(&alias_foo).await;
+
     let pull_response = harness.pull_local(&alias_foo).await;
 
     assert_matches!(
         pull_response.result,
         Ok(PullResult::UpToDate(PullResultUpToDate::PollingIngest(_)))
     );
-    assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1301,9 +1391,16 @@ impl PullUseCaseHarness {
             .bind::<dyn TransformExecutor, MockTransformExecutor>();
         }
 
-        if mocks.failing_env_var_resolution {
-            b.add_value(SecretsEncryptionConfig::sample())
-                .add::<FailingDatasetEnvVarResolver>();
+        match mocks.env_var_resolution {
+            None => {}
+            Some(EnvVarResolution::Failing) => {
+                b.add_value(SecretsEncryptionConfig::sample())
+                    .add::<FailingDatasetEnvVarResolver>();
+            }
+            Some(EnvVarResolution::Const) => {
+                b.add_value(SecretsEncryptionConfig::sample())
+                    .add::<ConstDatasetEnvVarResolver>();
+            }
         }
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -1503,16 +1600,44 @@ struct PullUseCaseHarnessMocks {
     /// Transforms with the real planner and executor, through an engine that
     /// only advances the watermark to this value
     real_transform_watermark: Option<DateTime<Utc>>,
-    /// Enables dataset environment variables with a resolver that fails
-    failing_env_var_resolution: bool,
+    /// Enables dataset environment variables with this resolver
+    env_var_resolution: Option<EnvVarResolution>,
 }
 
 impl PullUseCaseHarnessMocks {
     fn with_failing_env_var_resolution(self) -> Self {
         Self {
-            failing_env_var_resolution: true,
+            env_var_resolution: Some(EnvVarResolution::Failing),
             ..self
         }
+    }
+
+    /// Expects one up-to-date ingest of `foo` that receives `env_var_key`,
+    /// resolved by [`ConstDatasetEnvVarResolver`]
+    fn for_ingest_expecting_env_var(
+        alias_foo: &odf::DatasetAlias,
+        env_var_key: &'static str,
+    ) -> Self {
+        let mut mock_polling_ingest_service = MockPollingIngestService::new();
+        let alias = alias_foo.clone();
+        mock_polling_ingest_service
+            .expect_ingest()
+            .withf(move |target, _, _, env_vars, _, _| {
+                target.get_alias() == &alias && env_vars.as_map().contains_key(env_var_key)
+            })
+            .times(1)
+            .returning(|_, _, _, _, _, _| {
+                Ok(PollingIngestResponse {
+                    result: PollingIngestResult::UpToDate { uncacheable: false },
+                    metadata_state: None,
+                })
+            });
+
+        Self {
+            env_var_resolution: Some(EnvVarResolution::Const),
+            ..Self::for_ingest_iterations(alias_foo, vec![])
+        }
+        .with_polling_ingest_mock(mock_polling_ingest_service)
     }
 
     fn with_authorizer_mock(
@@ -1658,9 +1783,17 @@ impl Default for PullUseCaseHarnessMocks {
             mock_compaction_executor: MockCompactionExecutor::new(),
             mock_sync_service: MockSyncService::new(),
             real_transform_watermark: None,
-            failing_env_var_resolution: false,
+            env_var_resolution: None,
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which [`DatasetEnvVarResolver`] the harness registers
+enum EnvVarResolution {
+    Failing,
+    Const,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1684,6 +1817,49 @@ impl DatasetEnvVarResolver for FailingDatasetEnvVarResolver {
         _entry_key: &str,
     ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
         Err("Cannot decrypt the dataset's secrets".int_err().into())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Resolves one plain variable for every dataset
+#[dill::component]
+#[dill::interface(dyn DatasetEnvVarResolver)]
+struct ConstDatasetEnvVarResolver {}
+
+impl ConstDatasetEnvVarResolver {
+    const KEY: &'static str = "API_KEY";
+
+    fn env_var(dataset_id: &odf::DatasetID) -> DatasetEnvVar {
+        DatasetEnvVar::new(
+            Self::KEY,
+            Utc::now(),
+            &DatasetEnvVarValue::Regular("value".to_string()),
+            dataset_id,
+            "",
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetEnvVarResolver for ConstDatasetEnvVarResolver {
+    async fn resolve_effective_env_vars(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
+        Ok(HashMap::from([(
+            Self::KEY.to_string(),
+            Self::env_var(dataset_id),
+        )]))
+    }
+
+    async fn get_env_var_by_entry_key(
+        &self,
+        dataset_id: &odf::DatasetID,
+        _entry_key: &str,
+    ) -> Result<DatasetEnvVar, GetDatasetEnvVarError> {
+        Ok(Self::env_var(dataset_id))
     }
 }
 
