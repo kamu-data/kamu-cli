@@ -834,6 +834,68 @@ async fn test_sync_from_same_url_different_accounts() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_pull_dataset_with_several_pull_aliases_is_ambiguous() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![(n!("a"), names![])],
+    )
+    .await;
+
+    let mut aliases = harness.get_remote_aliases(&rl!("a")).await;
+    for remote_ref in ["kamu.dev/a", "other.dev/a"] {
+        aliases
+            .add(&rr!(remote_ref), RemoteAliasKind::Pull)
+            .await
+            .unwrap();
+    }
+
+    let responses = harness
+        .pull(refs!["a"], PullOptions::default())
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(responses[0].result, Err(PullError::AmbiguousSource));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_derivative_without_transform_with_dependencies_fails_planning() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    create_graph(
+        harness.dataset_registry(),
+        harness.dataset_storage_unit_writer(),
+        vec![(n!("a"), names![])],
+    )
+    .await;
+    harness.create_derivative_without_transform(&n!("d")).await;
+
+    harness.index_dataset_dependencies().await;
+
+    // Pulling several datasets traverses dependencies, where a derivative without
+    // inputs has the same depth as a root
+    let responses = harness
+        .pull(refs!["d", "a"], PullOptions::default())
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(
+        responses[0].result,
+        Err(PullError::TransformError(TransformError::Plan(
+            TransformPlanError::TransformNotDefined(_)
+        )))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct PullTestHarness {
     base_repo_harness: BaseRepoHarness,
@@ -866,6 +928,7 @@ impl PullTestHarness {
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
+            .add::<DatasetUpdateKindResolverImpl>()
             .add::<TransformPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
@@ -985,6 +1048,21 @@ impl PullTestHarness {
             .get_remote_aliases(&hdl)
             .await
             .unwrap()
+    }
+
+    async fn create_derivative_without_transform(&self, alias: &odf::DatasetAlias) {
+        create_test_dataset_from_snapshot(
+            self.dataset_registry(),
+            self.dataset_storage_unit_writer(),
+            MetadataFactory::dataset_snapshot()
+                .name(alias.clone())
+                .kind(odf::DatasetKind::Derivative)
+                .build(),
+            odf::DatasetID::new_generated_ed25519().1,
+            Utc::now(),
+        )
+        .await
+        .unwrap();
     }
 
     async fn index_dataset_dependencies(&self) {

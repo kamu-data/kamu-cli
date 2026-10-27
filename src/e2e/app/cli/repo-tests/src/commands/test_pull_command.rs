@@ -647,6 +647,38 @@ pub async fn test_pull_derivative_with_unknown_engine_fails(kamu: KamuCliPuppet)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_derivative_without_transform_with_other_datasets_fails
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_derivative_without_transform_with_other_datasets_fails(kamu: KamuCliPuppet) {
+    kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        indoc::indoc!(
+            r#"
+            kind: DatasetSnapshot
+            version: 1
+            content:
+              name: no-transform
+              kind: Derivative
+              metadata: []
+            "#
+        ),
+    )
+    .await
+    .success();
+
+    kamu.assert_failure_command_execution(
+        ["pull", "no-transform", DATASET_ROOT_PLAYER_NAME.as_str()],
+        None,
+        Some(["Failed to pull no-transform: Dataset does not define a transform"]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // test_pull_derivative_after_inputs_changed_fails
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -87,6 +87,7 @@ Out of scope, each with its own owner:
 | --- | --- | --- |
 | Domain types | `kamu-core` — [`pull_request_planner.rs`](../../src/domain/core/src/services/pull_request_planner.rs) | `PullRequestPlanner`, `PullRequest`, `PullOptions`, plan and job types, `PullResponse`, `PullResult`, `PullError`, listeners |
 | Use case trait | `kamu-core` — [`pull_dataset_use_case.rs`](../../src/domain/core/src/use_cases/pull_dataset_use_case.rs) | `PullDatasetUseCase::{execute, execute_multi, execute_all_owned}` |
+| Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync), shared with flows |
 | Planner | `kamu` — [`pull_request_planner_impl.rs`](../../src/infra/core/src/services/pull_request_planner_impl.rs) | `PullRequestPlannerImpl`, `PullGraphDepthFirstTraversal` |
 | Use case | `kamu` — [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) | `PullDatasetUseCaseImpl`: authorization, iteration loop, per-job runners, `HEAD` updates |
 | CLI | `kamu-cli` — [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) | `PullCommand`, progress listeners, result summary |
@@ -149,11 +150,12 @@ detached from it so later transactions can use them.
 3. **Local alias.** The existing alias, the caller's alias, or one inferred from the remote ref:
    its dataset name, or for a URL the last path segment, then the host name. Remote refs by ID without
    a local alias are not supported and panic (`unimplemented!`).
-4. **Remote ref.** A `Remote` request's own ref; otherwise the dataset's single pull alias. Two or
-   more pull aliases fail with `AmbiguousSource`.
-5. **Depth.** With a remote ref the item is a depth-0 sync. Otherwise its depth is one more than
-   the deepest upstream dependency (`DependencyGraphService::get_upstream_dependencies`, visited
-   recursively), so a root is 0.
+4. **Kind.** A `Remote` request, or a target still to be created, is a sync from the request's
+   ref. An existing dataset gets its kind from `DatasetUpdateKindResolver`, which owns the rule:
+   its single pull alias makes it a sync, otherwise a root is ingested and a derivative
+   transformed. Two or more pull aliases fail with `AmbiguousSource`.
+5. **Depth.** Syncs and ingests are depth 0. A transform is one more than its deepest upstream
+   dependency (`DependencyGraphService::get_upstream_dependencies`, visited recursively).
 
 Items are keyed by local alias, so a dataset reached twice is planned once; if a later visit is
 explicit, the item becomes explicit.
@@ -172,13 +174,13 @@ order.
 ### 5.3 Turning items into jobs
 
 Items are sorted by depth, then sync targets before local ones, then by alias, and sliced into one
-iteration per depth:
+iteration per depth. The job follows the item's kind:
 
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
-| depth 0, no remote ref | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
-| depth 0, remote ref | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder` | local target (existing or to create), remote ref, `SyncRequest` |
-| depth > 0 | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
+| ingest | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
+| sync | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder` | local target (existing or to create), remote ref, `SyncRequest` |
+| transform | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
 remote is copied, never transformed locally.
@@ -303,7 +305,7 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 | --- | --- |
 | Stop on error | The first depth with an error is the last one run; later depths, including datasets unrelated to the failure, are not attempted |
 | Planning errors | One unresolvable reference fails the whole command before anything runs |
-| Pull aliases | A dataset with a pull alias is synced, never ingested or transformed, even when it has a source or a transform |
+| Pull aliases | A dataset with a pull alias is synced, never ingested or transformed, even when it has a source or a transform ([`DatasetUpdateKindResolver`](#51-resolving-each-request)) |
 | Non-recursive multi-pull | Upstreams are traversed for ordering only; they are not pulled |
 | Hidden datasets | The CLI reports an unauthorized dataset as not found |
 
@@ -315,6 +317,7 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 | --- | --- |
 | Planner trait, requests, options, plan, results, errors | [`pull_request_planner.rs`](../../src/domain/core/src/services/pull_request_planner.rs) |
 | Use case trait | [`pull_dataset_use_case.rs`](../../src/domain/core/src/use_cases/pull_dataset_use_case.rs) |
+| Update kind of one dataset | [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) |
 | Planner: resolution, traversal, depths, job building | [`pull_request_planner_impl.rs`](../../src/infra/core/src/services/pull_request_planner_impl.rs) |
 | Use case: authorization, iteration loop, runners, `HEAD` updates | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
 | Polling ingest loop of an ingest job | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |

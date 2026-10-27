@@ -29,6 +29,7 @@ pub use transform::*;
 pub use watermark::*;
 
 mod dataset_registry_solo_unit_bridge;
+mod dataset_update_kind_resolver_impl;
 mod export_service_impl;
 mod metadata_query_service_impl;
 mod provenance_service_impl;
@@ -40,6 +41,7 @@ mod session_context_builder;
 mod verification_service_impl;
 
 pub use dataset_registry_solo_unit_bridge::*;
+pub use dataset_update_kind_resolver_impl::*;
 pub use export_service_impl::*;
 pub use metadata_query_service_impl::*;
 pub use provenance_service_impl::*;

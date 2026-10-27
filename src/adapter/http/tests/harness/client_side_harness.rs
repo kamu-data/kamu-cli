@@ -179,6 +179,7 @@ impl ClientSideHarness {
         b.add::<CompactionExecutorImpl>();
 
         b.add::<PullRequestPlannerImpl>();
+        b.add::<DatasetUpdateKindResolverImpl>();
 
         b.add::<PushRequestPlannerImpl>();
 

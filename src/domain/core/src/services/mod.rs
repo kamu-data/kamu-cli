@@ -22,6 +22,7 @@ pub use reset::*;
 pub use transform::*;
 pub use watermark::*;
 
+mod dataset_update_kind_resolver;
 mod did_generator;
 pub mod engine_provisioner;
 pub mod export_service;
@@ -43,6 +44,7 @@ pub mod sync_service;
 pub mod upload_service;
 pub mod verification_service;
 
+pub use dataset_update_kind_resolver::*;
 pub use did_generator::*;
 pub use engine_provisioner::*;
 pub use export_service::*;

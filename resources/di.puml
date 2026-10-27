@@ -63,6 +63,7 @@ interface "DatasetStatisticsRepository" <<i>>
 interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
+interface "DatasetUpdateKindResolver" <<i>>
 interface "DeleteAccountUseCase" <<i>>
 interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
 interface "DeleteDatasetUseCase" <<i>>
@@ -256,6 +257,7 @@ class "DatasetStatisticsIndexer"
 class "DatasetStatisticsServiceImpl"
 class "DatasetStatisticsUpdateHandler"
 class "DatasetStorageUnitLocalFs"
+class "DatasetUpdateKindResolverImpl"
 class "DeleteAccountUseCaseImpl"
 class "DeleteDatasetRebacPropertiesUseCaseImpl"
 class "DeleteDatasetUseCaseImpl"
@@ -521,6 +523,8 @@ class "WsSmartTransferProtocolClient"
 "CompactionExecutorImpl"  --> "EngineConfigDatafusionEmbeddedCompaction"
 "CompactionExecutorImpl"  --> "RunInfoDir"
 "CompactionPlanner" <|-- "CompactionPlannerImpl"
+"DatasetUpdateKindResolver" <|-- "DatasetUpdateKindResolverImpl"
+"DatasetUpdateKindResolverImpl"  --> "RemoteAliasesRegistry"
 "ExportService" <|-- "ExportServiceImpl"
 "DataFormatRegistry" <|-- "DataFormatRegistryImpl"
 "FetchService"  --> "ContainerRuntime"
@@ -562,6 +566,7 @@ class "WsSmartTransferProtocolClient"
 "ProvenanceServiceImpl"  --> "DatasetRegistry"
 "ProvenanceServiceImpl"  --> "DependencyGraphService"
 "PullRequestPlanner" <|-- "PullRequestPlannerImpl"
+"PullRequestPlannerImpl"  --> "DatasetUpdateKindResolver"
 "PullRequestPlannerImpl"  --> "RemoteAliasesRegistry"
 "PullRequestPlannerImpl"  --> "TransformPlanner"
 "PullRequestPlannerImpl"  --> "DatasetRegistry"

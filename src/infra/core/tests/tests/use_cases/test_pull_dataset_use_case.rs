@@ -1342,6 +1342,7 @@ impl PullUseCaseHarness {
         b.add::<PullDatasetUseCaseImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
+            .add::<DatasetUpdateKindResolverImpl>()
             .add::<PollingIngestPlannerImpl>()
             .add_value(mocks.mock_polling_ingest_service)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()

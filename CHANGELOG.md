@@ -44,6 +44,8 @@ Recommendation: for ease of reading, use the following format:
   Only queries that request a `Proof` need the key
 - Transform flows now run for a derivative whose input has a single record, or whose input only
   advanced its watermark; before, the flow treated them as up to date
+- `kamu pull` of a derivative that defines no transform, together with other datasets or with
+  `--recursive` or `--all`, fails with "Dataset does not define a transform" instead of crashing
 - Changing the inputs of a derivative's transform makes its pulls, flows and verification fail with
   an error that names the dataset, instead of crashing the process
 - `kamu verify` of a derivative whose query was changed no longer reports the blocks produced by

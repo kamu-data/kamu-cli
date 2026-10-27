@@ -26,6 +26,7 @@ pub struct PullRequestPlannerImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+    update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
     transform_planner: Arc<dyn TransformPlanner>,
     sync_request_builder: Arc<SyncRequestBuilder>,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -38,6 +39,7 @@ impl PullRequestPlannerImpl {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+        update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
         transform_planner: Arc<dyn TransformPlanner>,
         sync_request_builder: Arc<SyncRequestBuilder>,
         current_account_subject: Arc<CurrentAccountSubject>,
@@ -46,6 +48,7 @@ impl PullRequestPlannerImpl {
             dataset_registry,
             dependency_graph_service,
             remote_alias_registry,
+            update_kind_resolver,
             transform_planner,
             sync_request_builder,
             current_account_subject,
@@ -69,6 +72,7 @@ impl PullRequestPlannerImpl {
             self.dataset_registry.clone(),
             self.dependency_graph_service.clone(),
             self.remote_alias_registry.clone(),
+            self.update_kind_resolver.clone(),
             self.current_account_subject.clone(),
             options,
             tenancy_config,
@@ -111,6 +115,7 @@ impl PullRequestPlannerImpl {
             self.dataset_registry.clone(),
             self.dependency_graph_service.clone(),
             self.remote_alias_registry.clone(),
+            self.update_kind_resolver.clone(),
             self.current_account_subject.clone(),
             options,
             tenancy_config,
@@ -148,8 +153,6 @@ impl PullRequestPlannerImpl {
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
     async fn build_ingest_item(&self, pi: PullItem) -> PullIngestItem {
-        assert!(pi.maybe_remote_ref.is_none());
-
         let hdl = match pi.local_target {
             PullLocalTarget::Existing(local_handle) => local_handle,
             PullLocalTarget::ToCreate(_) => {
@@ -171,8 +174,6 @@ impl PullRequestPlannerImpl {
         &self,
         pi: PullItem,
     ) -> Result<PullTransformItem, Box<PullResponse>> {
-        assert!(pi.maybe_remote_ref.is_none());
-
         let hdl = match pi.local_target {
             PullLocalTarget::Existing(local_handle) => local_handle,
             PullLocalTarget::ToCreate(_) => {
@@ -208,12 +209,9 @@ impl PullRequestPlannerImpl {
     async fn build_sync_item(
         &self,
         pi: PullItem,
+        remote_ref: odf::DatasetRefRemote,
         sync_options: SyncOptions,
     ) -> Result<PullSyncItem, Box<PullResponse>> {
-        assert!(pi.maybe_remote_ref.is_some());
-
-        let remote_ref = pi.maybe_remote_ref.unwrap();
-
         match self
             .sync_request_builder
             .build_sync_request(
@@ -319,27 +317,27 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
 
             let mut jobs = Vec::new();
             for item in batch {
-                // Ingest?
-                if depth == 0 && item.maybe_remote_ref.is_none() {
-                    let pii = self.build_ingest_item(item).await;
-                    tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
-                    jobs.push(PullPlanIterationJob::Ingest(pii));
-
-                // Sync?
-                } else if depth == 0 && item.maybe_remote_ref.is_some() {
-                    match self.build_sync_item(item, options.sync_options).await {
-                        Ok(psi) => {
-                            tracing::debug!(depth, ?psi, "Added sync item to pull plan");
-                            jobs.push(PullPlanIterationJob::Sync(psi));
-                        }
-                        Err(sync_error) => {
-                            errors.push(*sync_error);
+                match item.kind.clone() {
+                    DatasetUpdateKind::PollingIngest => {
+                        let pii = self.build_ingest_item(item).await;
+                        tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
+                        jobs.push(PullPlanIterationJob::Ingest(pii));
+                    }
+                    DatasetUpdateKind::SyncFrom { remote_ref } => {
+                        match self
+                            .build_sync_item(item, remote_ref, options.sync_options)
+                            .await
+                        {
+                            Ok(psi) => {
+                                tracing::debug!(depth, ?psi, "Added sync item to pull plan");
+                                jobs.push(PullPlanIterationJob::Sync(psi));
+                            }
+                            Err(sync_error) => {
+                                errors.push(*sync_error);
+                            }
                         }
                     }
-                }
-                // Transform otherwise
-                else {
-                    match self.build_transform_item(item).await {
+                    DatasetUpdateKind::Transform => match self.build_transform_item(item).await {
                         Ok(pti) => {
                             tracing::debug!(depth, ?pti, "Added transform item to pull plan");
                             jobs.push(PullPlanIterationJob::Transform(pti));
@@ -347,7 +345,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
                         Err(transform_error) => {
                             errors.push(*transform_error);
                         }
-                    }
+                    },
                 }
             }
 
@@ -385,6 +383,7 @@ struct PullGraphDepthFirstTraversal<'a> {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+    update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
     current_account_subject: Arc<CurrentAccountSubject>,
     options: &'a PullOptions,
     tenancy_config: TenancyConfig,
@@ -396,6 +395,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+        update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
         current_account_subject: Arc<CurrentAccountSubject>,
         options: &'a PullOptions,
         tenancy_config: TenancyConfig,
@@ -404,6 +404,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             dataset_registry,
             dependency_graph_service,
             remote_alias_registry,
+            update_kind_resolver,
             current_account_subject,
             options,
             tenancy_config,
@@ -444,54 +445,36 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             return Ok(pi.depth);
         }
 
-        // Resolve remote alias, if any
-        let maybe_remote_ref = self
-            .resolve_remote_ref(request, maybe_local_handle.as_ref())
+        let kind = self
+            .resolve_item_kind(request, maybe_local_handle.as_ref())
             .await?;
 
-        let mut pull_item = if maybe_remote_ref.is_some() {
-            // Datasets synced from remotes are depth 0
-            let local_target = if let Some(local_handle) = maybe_local_handle {
-                PullLocalTarget::existing(local_handle)
-            } else {
-                PullLocalTarget::to_create(local_alias.clone())
-            };
-            PullItem {
-                maybe_original_request: None, // May be set below
-                depth: 0,
-                local_target,
-                maybe_remote_ref,
-            }
-        } else {
-            // Pulling an existing local root or derivative dataset
-            let local_handle = maybe_local_handle.unwrap();
-
-            // Resolve dataset
-            let target = self
-                .dataset_registry
-                .get_dataset_by_handle(&local_handle)
-                .await;
-
-            // Plan up-stream dependencies first
-            let max_dep_depth = if traverse_dependencies {
-                self.traverse_upstream_datasets(&local_handle.id).await?
-            } else {
-                // Without scanning upstreams, decide on depth based on Root/Derived kind.
-                // The exact depth is not important, as long as we keep `depth=>0` for derived
-                // datasets.
-                match target.get_kind() {
-                    odf::DatasetKind::Root => -1,
-                    odf::DatasetKind::Derivative => 0,
+        let depth = match &kind {
+            // Synced datasets and roots do not depend on other local datasets
+            DatasetUpdateKind::SyncFrom { .. } | DatasetUpdateKind::PollingIngest => 0,
+            DatasetUpdateKind::Transform => {
+                if traverse_dependencies {
+                    let local_handle = maybe_local_handle.as_ref().unwrap();
+                    self.traverse_upstream_datasets(&local_handle.id).await? + 1
+                } else {
+                    // Without scanning upstreams the exact depth is not important, as long as
+                    // derivatives come after roots
+                    1
                 }
-            };
-
-            // Plan the current dataset as last
-            PullItem {
-                maybe_original_request: None, // May be set below
-                depth: max_dep_depth + 1,
-                local_target: PullLocalTarget::existing(local_handle),
-                maybe_remote_ref: None,
             }
+        };
+
+        let local_target = if let Some(local_handle) = maybe_local_handle {
+            PullLocalTarget::existing(local_handle)
+        } else {
+            PullLocalTarget::to_create(local_alias.clone())
+        };
+
+        let mut pull_item = PullItem {
+            maybe_original_request: None, // May be set below
+            depth,
+            local_target,
+            kind,
         };
 
         if referenced_explicitly {
@@ -700,39 +683,24 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         ))
     }
 
-    async fn resolve_remote_ref(
+    async fn resolve_item_kind(
         &self,
         request: &PullRequest,
         maybe_local_handle: Option<&odf::DatasetHandle>,
-    ) -> Result<Option<odf::DatasetRefRemote>, PullError> {
-        let remote_ref = if let PullRequest::Remote(remote) = request {
-            Ok(Some(remote.remote_ref.clone()))
-        } else if let Some(hdl) = &maybe_local_handle {
-            self.resolve_pull_alias(hdl).await
-        } else {
-            Ok(None)
-        }?;
-
-        Ok(remote_ref)
-    }
-
-    async fn resolve_pull_alias(
-        &self,
-        hdl: &odf::DatasetHandle,
-    ) -> Result<Option<odf::DatasetRefRemote>, PullError> {
-        let remote_aliases = match self.remote_alias_registry.get_remote_aliases(hdl).await {
-            Ok(v) => Ok(v),
-            Err(e) => match e {
-                GetAliasesError::Internal(e) => Err(PullError::Internal(e)),
-            },
-        }?;
-
-        let mut pull_aliases: Vec<_> = remote_aliases.get_by_kind(RemoteAliasKind::Pull).collect();
-
-        match pull_aliases.len() {
-            0 => Ok(None),
-            1 => Ok(Some(pull_aliases.remove(0).clone())),
-            _ => Err(PullError::AmbiguousSource),
+    ) -> Result<DatasetUpdateKind, PullError> {
+        match request {
+            PullRequest::Remote(remote) => Ok(DatasetUpdateKind::SyncFrom {
+                remote_ref: remote.remote_ref.clone(),
+            }),
+            PullRequest::Local(_) => {
+                let Some(local_handle) = maybe_local_handle else {
+                    unreachable!("Local pull requests are resolved to existing datasets")
+                };
+                Ok(self
+                    .update_kind_resolver
+                    .resolve_update_kind(local_handle)
+                    .await?)
+            }
         }
     }
 
@@ -775,7 +743,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 struct PullItem {
     depth: i32,
     local_target: PullLocalTarget,
-    maybe_remote_ref: Option<odf::DatasetRefRemote>,
+    kind: DatasetUpdateKind,
     maybe_original_request: Option<PullRequest>,
 }
 
@@ -792,8 +760,8 @@ impl Ord for PullItem {
             return depth_ord;
         }
 
-        if self.maybe_remote_ref.is_some() != other.maybe_remote_ref.is_some() {
-            return if self.maybe_remote_ref.is_some() {
+        if self.kind.is_sync_from() != other.kind.is_sync_from() {
+            return if self.kind.is_sync_from() {
                 Ordering::Less
             } else {
                 Ordering::Greater

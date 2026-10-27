@@ -518,6 +518,7 @@ pub fn configure_base_catalog(
     b.add::<SyncRequestBuilder>();
 
     b.add::<PullRequestPlannerImpl>();
+    b.add::<DatasetUpdateKindResolverImpl>();
 
     b.add::<PushRequestPlannerImpl>();
 

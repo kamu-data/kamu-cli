@@ -349,6 +349,7 @@ impl TaskAgentHarness {
             .bind::<dyn Outbox, MockOutbox>()
             .add::<SystemTimeSourceDefault>()
             .add::<PullRequestPlannerImpl>()
+            .add::<DatasetUpdateKindResolverImpl>()
             .add::<CompactionPlannerImpl>()
             .add::<ResetPlannerImpl>()
             .add::<TransformPlannerImpl>()
