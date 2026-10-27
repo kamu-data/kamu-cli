@@ -59,6 +59,7 @@ kamu-datasets-services = { workspace = true, features = [
     "testing",
 ] }
 
+datafusion = { version = "55", default-features = false }
 oop = "0.0.2"
 pretty_assertions = { version = "1" }
 tokio = { version = "1", default-features = false, features = [

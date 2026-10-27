@@ -198,15 +198,28 @@ impl TransformTestHarness {
         inputs: &[odf::DatasetAlias],
         system_time: DateTime<Utc>,
     ) -> (ResolvedDataset, odf::metadata::SetTransform) {
+        self.new_deriv_with_schema(name, inputs, system_time, true)
+            .await
+    }
+
+    async fn new_deriv_with_schema(
+        &self,
+        name: &str,
+        inputs: &[odf::DatasetAlias],
+        system_time: DateTime<Utc>,
+        with_schema: bool,
+    ) -> (ResolvedDataset, odf::metadata::SetTransform) {
         let transform = MetadataFactory::set_transform()
             .inputs_from_refs(inputs)
             .build();
-        let snapshot = MetadataFactory::dataset_snapshot()
+        let mut snapshot = MetadataFactory::dataset_snapshot()
             .name(name)
             .kind(odf::DatasetKind::Derivative)
-            .push_event(transform.clone())
-            .push_event(MetadataFactory::set_data_schema().build())
-            .build();
+            .push_event(transform.clone());
+        if with_schema {
+            snapshot = snapshot.push_event(MetadataFactory::set_data_schema().build());
+        }
+        let snapshot = snapshot.build();
 
         let dataset_alias = snapshot.name.clone();
 
@@ -1649,6 +1662,79 @@ async fn test_transform_describe() {
             .describe_transform(foo_target)
             .await,
         Err(TransformPlanError::TransformNotDefined(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_producing_nothing_is_up_to_date() {
+    let harness = TransformTestHarness::new_custom(
+        MockEngineProvisioner::new().always_provision_engine_responding(|| TransformResponseExt {
+            new_offset_interval: None,
+            new_watermark: None,
+            output_schema: None,
+            new_checkpoint: None,
+            new_data: None,
+            run_dir: None,
+        }),
+    );
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv_with_schema(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+            false,
+        )
+        .await;
+
+    // Without an output schema the transform runs, and the engine has nothing to append
+    assert_matches!(
+        harness.transform(bar_target).await,
+        Ok(TransformResult::UpToDate)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_incompatible_output_schema() {
+    let harness = TransformTestHarness::new_custom(
+        MockEngineProvisioner::new().always_provision_engine_responding(|| TransformResponseExt {
+            new_offset_interval: None,
+            new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()),
+            output_schema: Some(Arc::new(datafusion::arrow::datatypes::Schema::new(vec![
+                datafusion::arrow::datatypes::Field::new(
+                    "unexpected",
+                    datafusion::arrow::datatypes::DataType::Utf8,
+                    false,
+                ),
+            ]))),
+            new_checkpoint: None,
+            new_data: None,
+            run_dir: None,
+        }),
+    );
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
+    harness.append_data_block(foo_target, 3).await;
+
+    assert_matches!(
+        harness.transform(bar_target).await,
+        Err(TransformError::Execute(
+            TransformExecuteError::IncompatibleSchema(_)
+        ))
     );
 }
 

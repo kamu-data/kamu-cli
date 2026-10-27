@@ -8116,6 +8116,7 @@ dependencies = [
  "common-macros",
  "database-common",
  "database-common-macros",
+ "datafusion",
  "dill",
  "internal-error",
  "kamu",

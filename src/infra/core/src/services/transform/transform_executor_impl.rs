@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use engine::{TransformRequestExt, TransformResponseExt};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use kamu_ingest_datafusion::DataWriterDataFusion;
@@ -101,7 +101,17 @@ impl TransformExecutorImpl {
             response.new_data.is_some()
         );
 
-        commit_fn(request, response).await
+        let maybe_run_dir = response.run_dir.clone();
+        let result = commit_fn(request, response).await?;
+
+        // A failed run keeps its directory, which holds the engine logs its error points at
+        if let Some(run_dir) = maybe_run_dir
+            && let Err(err) = std::fs::remove_dir_all(&run_dir)
+        {
+            tracing::warn!(error = %err, ?run_dir, "Failed to remove the engine run directory");
+        }
+
+        Ok(result)
     }
 
     async fn commit_execute_transform(
@@ -119,8 +129,7 @@ impl TransformExecutorImpl {
         if let Some(orig_schema) = request.schema {
             // Validate schema
             if let Some(new_schema) = response.output_schema {
-                DataWriterDataFusion::validate_schema_compatible(&orig_schema, &new_schema)
-                    .int_err()?;
+                DataWriterDataFusion::validate_schema_compatible(&orig_schema, &new_schema)?;
             }
         } else {
             // Set schema upon first transform
@@ -149,6 +158,7 @@ impl TransformExecutorImpl {
             }
         }
 
+        let new_offset_interval = response.new_offset_interval.clone();
         let params = odf::dataset::ExecuteTransformParams {
             query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
             prev_checkpoint: request.prev_checkpoint,
@@ -186,10 +196,10 @@ impl TransformExecutorImpl {
             Err(err) => Err(err),
         }?;
 
-        assert_ne!(
-            old_head, new_head,
-            "Commit did not update neither schema nor data"
-        );
+        // The engine produced nothing that advances the chain
+        if new_head == old_head {
+            return Ok(TransformResult::UpToDate);
+        }
 
         // Computed here, where the appended blocks are known, so that callers
         // need not query the chain again
@@ -203,6 +213,7 @@ impl TransformExecutorImpl {
         Ok(TransformResult::Updated {
             old_head,
             new_head,
+            new_offset_interval,
             increment,
         })
     }
@@ -290,6 +301,7 @@ impl TransformExecutor for TransformExecutorImpl {
             let result = TransformResult::Updated {
                 old_head: expected_block.prev_block_hash.clone().unwrap(),
                 new_head: block_hash.clone(),
+                new_offset_interval: None,
                 increment: odf::dataset::MetadataChainIncrementInterval::default(),
             };
 
@@ -335,6 +347,10 @@ impl TransformExecutor for TransformExecutorImpl {
                     VerifyTransformExecuteError::EngineError(e)
                 }
                 TransformExecuteError::CommitError(_) => unreachable!(),
+                // Replay builds the event without checking it against the schema
+                TransformExecuteError::IncompatibleSchema(e) => {
+                    VerifyTransformExecuteError::Internal(e.int_err())
+                }
                 TransformExecuteError::Internal(e) => VerifyTransformExecuteError::Internal(e),
             })?;
 

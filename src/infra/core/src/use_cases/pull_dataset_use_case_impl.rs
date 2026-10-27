@@ -681,24 +681,27 @@ impl PullDatasetUseCaseImpl {
         };
 
         // A reset and the transform after it are reported as one update. The
-        // increment stays the transform's own: the reset rewrote history, so
-        // no interval spans both
+        // offsets and the increment stay the transform's own: the reset
+        // rewrote history, so no interval spans both
         let transform_result = match (maybe_reset_heads, transform_result) {
             (
                 Some((old_head, _)),
                 TransformResult::Updated {
                     new_head,
+                    new_offset_interval,
                     increment,
                     ..
                 },
             ) => TransformResult::Updated {
                 old_head,
                 new_head,
+                new_offset_interval,
                 increment,
             },
             (Some((old_head, new_head)), TransformResult::UpToDate) => TransformResult::Updated {
                 old_head,
                 new_head,
+                new_offset_interval: None,
                 increment: odf::dataset::MetadataChainIncrementInterval::default(),
             },
             (None, transform_result) => transform_result,
@@ -724,28 +727,17 @@ impl PullDatasetUseCaseImpl {
             .execute_transform(target, plan, &get_random_name(None, 10), maybe_listener)
             .await;
 
-        match result? {
-            TransformResult::Updated {
-                old_head,
-                new_head,
-                increment,
-            } => {
-                Self::commit_head_transactionally(
-                    catalog,
-                    target.get_handle(),
-                    &old_head,
-                    &new_head,
-                )
+        let result = result?;
+        if let TransformResult::Updated {
+            old_head, new_head, ..
+        } = &result
+        {
+            Self::commit_head_transactionally(catalog, target.get_handle(), old_head, new_head)
                 .await
                 .map_err(|e| TransformExecuteError::CommitError(e.into()))?;
-                Ok(TransformResult::Updated {
-                    old_head,
-                    new_head,
-                    increment,
-                })
-            }
-            TransformResult::UpToDate => Ok(TransformResult::UpToDate),
         }
+
+        Ok(result)
     }
 
     async fn sync(

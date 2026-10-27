@@ -151,14 +151,17 @@ impl UpdateDatasetTaskRunner {
                 | PollingIngestError::InvalidParameterFormat(_)
                 | PollingIngestError::MergeError(_)
                 | PollingIngestError::ExecutionError(_)
-                | PollingIngestError::TemplateError(_) => {
-                    Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
-                }
+                | PollingIngestError::TemplateError(_)
+                | PollingIngestError::EngineProvisioningError(
+                    EngineProvisioningError::UnsupportedEngine(_),
+                ) => Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable())),
 
                 PollingIngestError::CommitError(_)
                 | PollingIngestError::DataValidation(_)
                 | PollingIngestError::EngineError(_)
-                | PollingIngestError::EngineProvisioningError(_)
+                | PollingIngestError::EngineProvisioningError(
+                    EngineProvisioningError::ImagePull(_) | EngineProvisioningError::Internal(_),
+                )
                 | PollingIngestError::ImagePull(_)
                 | PollingIngestError::Internal(_)
                 | PollingIngestError::NotFound { .. }
@@ -247,6 +250,7 @@ impl UpdateDatasetTaskRunner {
                 old_head,
                 new_head,
                 increment,
+                ..
             }) => {
                 if let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
                     .commit(target.get_handle(), &old_head, &new_head)
@@ -271,13 +275,18 @@ impl UpdateDatasetTaskRunner {
             Err(e) => {
                 tracing::error!(error = ?e, "Transform execution failed");
                 match e {
-                    TransformExecuteError::EngineError(EngineError::InvalidQuery(_)) => {
-                        Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
-                    }
+                    TransformExecuteError::EngineError(EngineError::InvalidQuery(_))
+                    | TransformExecuteError::IncompatibleSchema(_)
+                    | TransformExecuteError::EngineProvisioningError(
+                        EngineProvisioningError::UnsupportedEngine(_),
+                    ) => Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable())),
 
                     TransformExecuteError::CommitError(_)
                     | TransformExecuteError::EngineError(_)
-                    | TransformExecuteError::EngineProvisioningError(_)
+                    | TransformExecuteError::EngineProvisioningError(
+                        EngineProvisioningError::ImagePull(_)
+                        | EngineProvisioningError::Internal(_),
+                    )
                     | TransformExecuteError::Internal(_) => {
                         Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
                     }

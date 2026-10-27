@@ -15,6 +15,7 @@ use kamu_core::{
     EngineProvisioner,
     TransformElaborateError,
     TransformElaboration,
+    TransformExecuteError,
     TransformExecutionPlan,
     TransformExecutor,
     TransformPlanner,
@@ -70,11 +71,21 @@ impl TransformTestHelper {
         plan: TransformExecutionPlan,
         operation_id: &str,
     ) -> TransformResult {
+        self.try_execute_transform(derived_target, plan, operation_id)
+            .await
+            .unwrap()
+    }
+
+    pub async fn try_execute_transform(
+        &self,
+        derived_target: ResolvedDataset,
+        plan: TransformExecutionPlan,
+        operation_id: &str,
+    ) -> Result<TransformResult, TransformExecuteError> {
         self.transform_executor
             .execute_transform(derived_target, plan, operation_id, None)
             .await
             .1
-            .unwrap()
     }
 
     pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {

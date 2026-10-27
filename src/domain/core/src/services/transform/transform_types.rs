@@ -28,6 +28,8 @@ pub enum TransformResult {
     Updated {
         old_head: odf::Multihash,
         new_head: odf::Multihash,
+        /// Offsets of the records the transform appended, if any
+        new_offset_interval: Option<odf::metadata::OffsetInterval>,
         /// Blocks and records the transform appended, and the new watermark
         /// when it changed
         increment: odf::dataset::MetadataChainIncrementInterval,

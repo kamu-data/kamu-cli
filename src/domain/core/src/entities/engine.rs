@@ -156,6 +156,9 @@ pub struct TransformResponseExt {
     /// Data produced by the operation, if any. Must be `None` if offset
     /// interval is empty.
     pub new_data: Option<OwnedFile>,
+    /// Directory the engine ran in, if it used one. The caller removes it
+    /// once the response is committed.
+    pub run_dir: Option<PathBuf>,
 }
 
 impl From<TransformRequestInputExt> for odf::metadata::ExecuteTransformInput {
@@ -294,11 +297,13 @@ pub struct InternalEngineError {
 
 impl std::fmt::Display for InternalEngineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if !self.log_files.is_empty() {
-            write!(f, "Internal engine error, see log files for details:")?;
-            for path in &self.log_files {
-                write!(f, "\n- {}", path.display())?;
-            }
+        if self.log_files.is_empty() {
+            return write!(f, "Internal engine error");
+        }
+
+        write!(f, "Internal engine error, see log files for details:")?;
+        for path in &self.log_files {
+            write!(f, "\n- {}", path.display())?;
         }
 
         Ok(())
