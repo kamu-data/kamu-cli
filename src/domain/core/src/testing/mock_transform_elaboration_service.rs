@@ -9,7 +9,6 @@
 
 use chrono::Utc;
 use kamu_datasets::ResolvedDatasetsMap;
-use random_strings::get_random_name;
 
 use crate::engine::TransformRequestExt;
 use crate::*;
@@ -24,11 +23,11 @@ impl MockTransformElaborationService {
             .returning(|plan| {
                 Ok(TransformElaboration::Elaborated(TransformPlan {
                     request: TransformRequestExt {
-                        operation_id: get_random_name(None, 10),
                         dataset_handle: plan.preliminary_request.dataset_handle,
                         block_ref: plan.preliminary_request.block_ref,
                         head: plan.preliminary_request.head,
                         transform: plan.preliminary_request.transform,
+                        transform_block: plan.preliminary_request.transform_block,
                         system_time: Utc::now(),
                         schema: plan.preliminary_request.schema,
                         prev_offset: plan.preliminary_request.prev_offset,

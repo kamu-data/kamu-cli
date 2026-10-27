@@ -1245,18 +1245,6 @@ async fn test_batching_condition_records_reached() {
                 updated_watermark: None,
             })
         });
-    // bar: reading after task 2
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 12,
-                updated_watermark: None,
-            })
-        });
 
     // foo: reading after task 3
     mock_dataset_changes
@@ -1279,18 +1267,6 @@ async fn test_batching_condition_records_reached() {
             Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 5,
-                updated_watermark: None,
-            })
-        });
-    // bar: reading after task 5
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 10,
                 updated_watermark: None,
             })
         });
@@ -1434,7 +1410,11 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 12,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),
@@ -1524,7 +1504,11 @@ async fn test_batching_condition_records_reached() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 10,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),
@@ -1856,18 +1840,6 @@ async fn test_batching_condition_timeout() {
                 updated_watermark: None,
             })
         });
-    // bar: reading after task 3
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 8,
-                updated_watermark: None,
-            })
-        });
 
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
 
@@ -2010,7 +1982,11 @@ async fn test_batching_condition_timeout() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 8,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),
@@ -2187,18 +2163,6 @@ async fn test_batching_condition_watermark() {
                 updated_watermark: Some(Utc::now()),
             })
         });
-    // bar: reading after task 3
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 0, // no records, just watermark
-                updated_watermark: Some(Utc::now()),
-            })
-        });
 
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     // bar: evaluated after enabling trigger
@@ -2340,7 +2304,11 @@ async fn test_batching_condition_watermark() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 0,
+                                updated_watermark: Some(Utc::now()),
+                            }),
                         }
                         .into_task_result(),
                     ),
@@ -2550,18 +2518,6 @@ async fn test_batching_condition_with_2_inputs() {
             Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
                 num_records: 7,
-                updated_watermark: None,
-            })
-        });
-    // 'baz' : reading after task 5
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 32,
                 updated_watermark: None,
             })
         });
@@ -2811,7 +2767,11 @@ async fn test_batching_condition_with_2_inputs() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 32,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),
@@ -3611,18 +3571,6 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 updated_watermark: None,
             })
         });
-    // bar: checked after task 1
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut sequence_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
 
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     // bar: checked initially
@@ -3752,7 +3700,11 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),

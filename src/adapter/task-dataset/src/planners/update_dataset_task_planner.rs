@@ -72,7 +72,7 @@ impl UpdateDatasetTaskPlanner {
 
                 Ok(TaskDefinition::new(TaskDefinitionDatasetUpdate {
                     pull_options,
-                    pull_job,
+                    job: pull_job.into(),
                 }))
             }
             Err(e) => {

@@ -26,8 +26,10 @@ use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tracing::instrument(level = "info", skip_all)]
+/// Builds the request as of `maybe_head`, or as of the current head
 pub async fn build_preliminary_request_ext(
     target: ResolvedDataset,
+    maybe_head: Option<&odf::Multihash>,
 ) -> Result<TransformPreliminaryRequestExt, BuildPreliminaryTransformRequestError> {
     let dataset_kind = target.get_kind();
     if dataset_kind != odf::DatasetKind::Derivative {
@@ -36,9 +38,11 @@ pub async fn build_preliminary_request_ext(
 
     let output_chain = target.as_metadata_chain();
 
-    // TODO: externalize
     let block_ref = odf::BlockRef::Head;
-    let head = output_chain.resolve_ref(&block_ref).await.int_err()?;
+    let head = match maybe_head {
+        Some(head) => head.clone(),
+        None => output_chain.resolve_ref(&block_ref).await.int_err()?,
+    };
 
     // TODO: PERF: Search for source, vocab, and data schema result in full scan
     let (source, schema, set_vocab, prev_query) = {
@@ -65,7 +69,7 @@ pub async fn build_preliminary_request_ext(
             .int_err()?;
 
         (
-            set_transform_visitor.into_inner().into_event(),
+            set_transform_visitor.into_inner().into_hashed_block(),
             set_data_schema_visitor
                 .into_event()
                 .as_ref()
@@ -78,7 +82,7 @@ pub async fn build_preliminary_request_ext(
         )
     };
 
-    let Some(source) = source else {
+    let Some((transform_block, source)) = source.map(|(hash, block)| (hash, block.event)) else {
         return Err(TransformNotDefinedError {}.into());
     };
     tracing::debug!(?source, "Transforming using source");
@@ -105,6 +109,7 @@ pub async fn build_preliminary_request_ext(
         block_ref,
         head,
         transform: source.transform,
+        transform_block,
         schema,
         prev_offset: prev_query
             .as_ref()
@@ -117,9 +122,12 @@ pub async fn build_preliminary_request_ext(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Computes the input interval up to `maybe_input_head`, or up to the input's
+/// current head
 pub(crate) async fn get_transform_query_input(
     input_decl: odf::metadata::TransformInput,
     input_state: Option<odf::metadata::ExecuteTransformInput>,
+    maybe_input_head: Option<&odf::Multihash>,
     datasets_map: &ResolvedDatasetsMap,
 ) -> Result<odf::metadata::ExecuteTransformInput, GetTransformQueryInputError> {
     let dataset_id = input_decl.dataset_ref.id().unwrap();
@@ -137,10 +145,13 @@ pub(crate) async fn get_transform_query_input(
         .and_then(odf::metadata::ExecuteTransformInput::last_offset);
 
     // Determine unprocessed block and offset range
-    let last_unprocessed_block = input_chain
-        .resolve_ref(&odf::BlockRef::Head)
-        .await
-        .int_err()?;
+    let last_unprocessed_block = match maybe_input_head {
+        Some(input_head) => input_head.clone(),
+        None => input_chain
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?,
+    };
 
     use odf::dataset::MetadataChainExt;
     let last_unprocessed_offset = input_chain
@@ -226,12 +237,28 @@ pub(crate) async fn get_transform_input_from_query_input(
     let resolved_input = datasets_map.get_by_id(&query_input.dataset_id);
     let input_chain = resolved_input.as_metadata_chain();
 
+    // Schema and vocabulary are read as of the last consumed block, so that a
+    // request rebuilt later does not see metadata the input gained since
+    let consumed_head = match query_input
+        .new_block_hash
+        .as_ref()
+        .or(query_input.prev_block_hash.as_ref())
+    {
+        Some(consumed_head) => consumed_head.clone(),
+        None => input_chain
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .int_err()?,
+    };
+
     // Find schema
     // TODO: PERF: Make single-pass via multi-visitor
     use odf::dataset::MetadataChainExt;
-    let schema = resolved_input
-        .as_metadata_chain()
-        .accept_one(odf::dataset::SearchSetDataSchemaVisitor::new())
+    let schema = input_chain
+        .accept_one_by_hash(
+            &consumed_head,
+            odf::dataset::SearchSetDataSchemaVisitor::new(),
+        )
         .await
         .int_err()?
         .into_event()
@@ -267,7 +294,7 @@ pub(crate) async fn get_transform_input_from_query_input(
 
     let vocab = match vocab_hint {
         Some(v) => v,
-        None => get_vocab(resolved_input.as_ref()).await?,
+        None => get_vocab(input_chain, &consumed_head).await?,
     };
 
     let is_empty = data_slices.is_empty() && explicit_watermarks.is_empty();
@@ -294,12 +321,12 @@ pub(crate) async fn get_transform_input_from_query_input(
 
 // TODO: Avoid iterating through output chain multiple times
 async fn get_vocab(
-    dataset: &dyn odf::Dataset,
+    chain: &dyn odf::MetadataChain,
+    head: &odf::Multihash,
 ) -> Result<odf::metadata::DatasetVocabulary, InternalError> {
     use odf::dataset::MetadataChainExt;
-    Ok(dataset
-        .as_metadata_chain()
-        .accept_one(odf::dataset::SearchSetVocabVisitor::new())
+    Ok(chain
+        .accept_one_by_hash(head, odf::dataset::SearchSetVocabVisitor::new())
         .await
         .int_err()?
         .into_event()

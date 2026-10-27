@@ -305,9 +305,12 @@ impl Engine for EngineHandle {
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
-        self.engine.execute_transform(request, datasets_map).await
+        self.engine
+            .execute_transform(request, operation_id, datasets_map)
+            .await
     }
 }
 

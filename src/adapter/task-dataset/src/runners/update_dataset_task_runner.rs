@@ -9,15 +9,17 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::InternalError;
 use kamu_core::engine::EngineError;
 use kamu_core::*;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetRegistry};
+use kamu_datasets::{DatasetIncrementQueryService, DatasetRegistry, ResolvedDataset};
 use kamu_task_system::*;
+use random_strings::get_random_name;
 
 use super::task_dataset_head_committer::TaskDatasetHeadCommitter;
 use crate::{
+    DatasetUpdateJob,
     InputDatasetCompactedError,
     TaskDefinitionDatasetUpdate,
     TaskErrorDatasetUpdate,
@@ -48,15 +50,15 @@ impl UpdateDatasetTaskRunner {
     ) -> Result<TaskOutcome, InternalError> {
         tracing::debug!(?task_update, "Running update task");
 
-        match task_update.pull_job {
-            PullPlanIterationJob::Ingest(ingest_item) => {
+        match task_update.job {
+            DatasetUpdateJob::Ingest(ingest_item) => {
                 self.run_ingest_update(ingest_item, task_update.pull_options.ingest_options)
                     .await
             }
-            PullPlanIterationJob::Transform(transform_item) => {
-                self.run_transform_update(transform_item).await
+            DatasetUpdateJob::Transform(target_handle) => {
+                self.run_transform_update(&target_handle).await
             }
-            PullPlanIterationJob::Sync(sync_item) => {
+            DatasetUpdateJob::Sync(sync_item) => {
                 self.run_sync_update(
                     *sync_item.sync_request,
                     task_update.pull_options.sync_options,
@@ -170,25 +172,52 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
+    /// Plans and elaborates in one transaction, then detaches the plan for
+    /// execution
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, transform_request_planner: Arc<dyn TransformRequestPlanner>)]
+    async fn plan_and_elaborate_transform(
+        &self,
+        target_handle: &odf::DatasetHandle,
+    ) -> Result<(ResolvedDataset, TransformElaboration), TransformError> {
+        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
+        let plan = transform_request_planner
+            .build_transform_preliminary_plan(target.clone())
+            .await?;
+
+        let mut elaboration = self
+            .transform_elaboration_service
+            .elaborate_transform(plan)
+            .await?;
+
+        target.detach_from_transaction();
+        if let TransformElaboration::Elaborated(plan) = &mut elaboration {
+            plan.datasets_map.detach_from_transaction();
+        }
+
+        Ok((target, elaboration))
+    }
+
     async fn run_transform_update(
         &self,
-        transform_item: PullTransformItem,
+        target_handle: &odf::DatasetHandle,
     ) -> Result<TaskOutcome, InternalError> {
-        let transform_elaboration = match self
-            .transform_elaboration_service
-            .elaborate_transform(transform_item.plan)
-            .await
+        let (target, transform_plan) = match self.plan_and_elaborate_transform(target_handle).await
         {
-            Ok(transform_elaboration) => transform_elaboration,
+            Ok((target, TransformElaboration::Elaborated(transform_plan))) => {
+                (target, transform_plan)
+            }
+            Ok((_, TransformElaboration::UpToDate)) => {
+                return Ok(TaskOutcome::Success(TaskResult::empty()));
+            }
             // The derivative waits for its input, the same as when it is up to date
-            Err(TransformElaborateError::InputNotPulled(e)) => {
+            Err(TransformError::Elaborate(TransformElaborateError::InputNotPulled(e))) => {
                 tracing::info!(
                     input = %e.dataset_handle,
                     "Not processing because one of the inputs has no data yet",
                 );
-                TransformElaboration::UpToDate
+                return Ok(TaskOutcome::Success(TaskResult::empty()));
             }
-            Err(TransformElaborateError::InvalidInputInterval(e)) => {
+            Err(TransformError::Elaborate(TransformElaborateError::InvalidInputInterval(e))) => {
                 return Ok(TaskOutcome::Failed(
                     TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
                         dataset_id: e.input_dataset_id,
@@ -196,53 +225,68 @@ impl UpdateDatasetTaskRunner {
                     .into_task_error(),
                 ));
             }
-            Err(e @ TransformElaborateError::Internal(_)) => {
-                tracing::error!(error = ?e, "Transform elaboration failed");
+            Err(
+                e @ (TransformError::Plan(_)
+                | TransformError::Elaborate(TransformElaborateError::Internal(_))
+                | TransformError::Execute(_)
+                | TransformError::Internal(_)),
+            ) => {
+                tracing::error!(error = ?e, "Transform planning or elaboration failed");
                 return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
             }
         };
 
-        match transform_elaboration {
-            TransformElaboration::Elaborated(transform_plan) => {
-                let (_, execution_result) = self
-                    .transform_executor
-                    .execute_transform(transform_item.target.clone(), transform_plan, None)
-                    .await;
+        let (_, execution_result) = self
+            .transform_executor
+            .execute_transform(
+                target.clone(),
+                transform_plan,
+                &get_random_name(None, 10),
+                None,
+            )
+            .await;
 
-                match execution_result {
-                    Ok(transform_result) => {
-                        if let TransformResult::Updated { old_head, new_head } = &transform_result
-                            && let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
-                                .commit(transform_item.target.get_handle(), old_head, new_head)
-                                .await?
-                        {
-                            return Ok(failed);
-                        }
+        match execution_result {
+            Ok(TransformResult::Updated {
+                old_head,
+                new_head,
+                increment,
+            }) => {
+                if let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
+                    .commit(target.get_handle(), &old_head, &new_head)
+                    .await?
+                {
+                    return Ok(failed);
+                }
 
-                        self.combine_task_result(
-                            transform_result.into(),
-                            &transform_item.target.get_handle().id,
-                        )
-                        .await
+                Ok(TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
+                        pull_result: PullResult::Updated {
+                            old_head: Some(old_head),
+                            new_head,
+                            has_more: false,
+                        },
+                        data_increment: Some(increment),
                     }
-                    Err(e) => {
-                        tracing::error!(error = ?e, "Transform execution failed");
-                        match e {
-                            TransformExecuteError::EngineError(EngineError::InvalidQuery(_)) => {
-                                Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
-                            }
+                    .into_task_result(),
+                ))
+            }
+            Ok(TransformResult::UpToDate) => Ok(TaskOutcome::Success(TaskResult::empty())),
+            Err(e) => {
+                tracing::error!(error = ?e, "Transform execution failed");
+                match e {
+                    TransformExecuteError::EngineError(EngineError::InvalidQuery(_)) => {
+                        Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
+                    }
 
-                            TransformExecuteError::CommitError(_)
-                            | TransformExecuteError::EngineError(_)
-                            | TransformExecuteError::EngineProvisioningError(_)
-                            | TransformExecuteError::Internal(_) => {
-                                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
-                            }
-                        }
+                    TransformExecuteError::CommitError(_)
+                    | TransformExecuteError::EngineError(_)
+                    | TransformExecuteError::EngineProvisioningError(_)
+                    | TransformExecuteError::Internal(_) => {
+                        Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
                     }
                 }
             }
-            TransformElaboration::UpToDate => Ok(TaskOutcome::Success(TaskResult::empty())),
         }
     }
 

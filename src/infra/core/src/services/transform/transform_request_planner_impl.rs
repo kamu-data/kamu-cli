@@ -15,7 +15,6 @@ use engine::TransformRequestExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, ResolvedDataset, ResolvedDatasetsMap};
-use random_strings::get_random_name;
 
 use super::build_preliminary_request_ext;
 use crate::{
@@ -40,9 +39,10 @@ impl TransformRequestPlannerImpl {
     async fn get_next_operation(
         &self,
         target: ResolvedDataset,
+        maybe_head: Option<&odf::Multihash>,
     ) -> Result<TransformPreliminaryPlan, TransformPlanError> {
         // Build preliminary request
-        let preliminary_request = build_preliminary_request_ext(target.clone()).await?;
+        let preliminary_request = build_preliminary_request_ext(target.clone(), maybe_head).await?;
 
         // Pre-fill datasets that are used in the operation
         let mut datasets_map = ResolvedDatasetsMap::default();
@@ -90,7 +90,16 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         target: ResolvedDataset,
     ) -> Result<TransformPreliminaryPlan, TransformPlanError> {
         // TODO: There might be more operations to do
-        self.get_next_operation(target.clone()).await
+        self.get_next_operation(target, None).await
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), %head))]
+    async fn build_transform_preliminary_plan_at(
+        &self,
+        target: ResolvedDataset,
+        head: &odf::Multihash,
+    ) -> Result<TransformPreliminaryPlan, TransformPlanError> {
+        self.get_next_operation(target, Some(head)).await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(target=%target.get_handle(), ?block_range))]
@@ -179,7 +188,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             } = execute_transform_collector_visitor.into_state();
 
             (
-                set_transform_visitor.into_inner().into_event(),
+                set_transform_visitor.into_inner().into_hashed_block(),
                 set_vocab_visitor.into_event(),
                 set_data_schema_visitor
                     .into_event()
@@ -200,7 +209,7 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
             return Err(odf::dataset::InvalidIntervalError { head, tail }.into());
         }
 
-        let source = source.ok_or(
+        let (transform_block, source) = source.map(|(hash, block)| (hash, block.event)).ok_or(
             "Expected a derivative dataset but SetTransform block was not found".int_err(),
         )?;
 
@@ -268,11 +277,11 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
 
             let step = VerifyTransformStep {
                 request: TransformRequestExt {
-                    operation_id: get_random_name(None, 10),
                     dataset_handle: target.get_handle().clone(),
                     block_ref: odf::BlockRef::Head,
                     head: block_t.prev_block_hash.unwrap().clone(),
                     transform: source.transform.clone(),
+                    transform_block: transform_block.clone(),
                     system_time: block.system_time,
                     schema: schema.clone(),
                     prev_offset: block_t.event.prev_offset,
@@ -299,13 +308,13 @@ impl TransformRequestPlanner for TransformRequestPlannerImpl {
         target: ResolvedDataset,
     ) -> Result<TransformStatus, TransformStatusError> {
         // Build a plan
-        let plan = self.get_next_operation(target.clone()).await?;
+        let plan = self.get_next_operation(target, None).await?;
 
         // Resolve query inputs
         use futures::{StreamExt, TryStreamExt};
         let query_inputs: Vec<_> = futures::stream::iter(plan.preliminary_request.input_states)
             .then(|(input_decl, input_state)| {
-                get_transform_query_input(input_decl, input_state, &plan.datasets_map)
+                get_transform_query_input(input_decl, input_state, None, &plan.datasets_map)
             })
             .try_collect()
             .await

@@ -20,9 +20,21 @@ use crate::*;
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait TransformRequestPlanner: Send + Sync {
+    /// Plans the next transform of `target` at its current head, resolving
+    /// the inputs through the dataset registry. See
+    /// [`TransformElaborationService::elaborate_transform`] for the
+    /// transaction the plan belongs to.
     async fn build_transform_preliminary_plan(
         &self,
         target: ResolvedDataset,
+    ) -> Result<TransformPreliminaryPlan, TransformPlanError>;
+
+    /// Plans the transform of `target` as of its block `head`, which a stored
+    /// plan names as its expected head
+    async fn build_transform_preliminary_plan_at(
+        &self,
+        target: ResolvedDataset,
+        head: &odf::Multihash,
     ) -> Result<TransformPreliminaryPlan, TransformPlanError>;
 
     async fn build_transform_verification_plan(
@@ -60,6 +72,8 @@ pub struct TransformPreliminaryRequestExt {
     pub head: odf::Multihash,
     /// Transformation that will be applied to produce new data
     pub transform: odf::metadata::Transform,
+    /// Hash of the `SetTransform` block that defines the transformation
+    pub transform_block: odf::Multihash,
     /// Expected data schema (if already defined)
     pub schema: Option<SchemaRef>,
     /// Preceding record offset, if any

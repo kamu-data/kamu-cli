@@ -115,6 +115,7 @@ impl Engine for EngineDatafusionInproc {
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,
+        _operation_id: &str,
         _datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
         unimplemented!(

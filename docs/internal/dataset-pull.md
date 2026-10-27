@@ -179,7 +179,7 @@ iteration per depth:
 | --- | --- | --- | --- |
 | depth 0, no remote ref | `Ingest(PullIngestItem)` | `build_ingest_item` | target and `DataWriterMetadataState` read from `HEAD` |
 | depth 0, remote ref | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder` | local target (existing or to create), remote ref, `SyncRequest` |
-| depth > 0 | `Transform(PullTransformItem)` | `build_transform_item` → `TransformRequestPlanner::build_transform_preliminary_plan` | target and preliminary transform plan with resolved inputs |
+| depth > 0 | `Transform(PullTransformItem)` | `build_transform_item` → `TransformRequestPlanner::build_transform_preliminary_plan`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is planned again when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
 remote is copied, never transformed locally.
@@ -210,7 +210,7 @@ runs outside them.
 | Job | Runner | Moves `HEAD` |
 | --- | --- | --- |
 | Ingest | `ingest`: resolves the dataset's env vars if the options carry none and secrets encryption is enabled; then `ingest_loop` calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), merging results so the response spans the first old head to the last new head | after every ingest iteration that returns `Updated`, `commit_head_transactionally` (CAS) |
-| Transform | `transform`: elaborates in a transaction after `refresh_from_dataset_registry`, so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes | after the reset and after the transform, `commit_head_transactionally` (CAS) |
+| Transform | `transform`: plans and elaborates in one transaction ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes | after the reset and after the transform, `commit_head_transactionally` (CAS) |
 | Sync | `sync`: `SyncService::sync`; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias | by `SyncService` itself |
 
 `commit_head_transactionally` moves `HEAD` through `DatasetHeadCommitter`, expecting the head the
@@ -239,7 +239,7 @@ reported to it.
 | Check | Datasets |
 | --- | --- |
 | Write | every job's written dataset: the ingest or transform target, or a sync target that already exists |
-| Read | every transform input (the preliminary plan's resolved datasets other than the target) |
+| Read | every transform input (`PullTransformItem::input_handles`) |
 
 A sync target that does not exist yet has nothing to check; creating it is governed by the sync.
 `--all` only plans datasets the current account owns. Planning itself resolves datasets without

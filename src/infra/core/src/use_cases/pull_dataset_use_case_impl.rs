@@ -30,6 +30,7 @@ use kamu_datasets::{
     ResolvedDataset,
     SecretsEncryptionConfig,
 };
+use random_strings::get_random_name;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -524,29 +525,10 @@ impl PullDatasetUseCaseImpl {
             .await
     }
 
-    #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn elaborate_transform(
-        mut pti: PullTransformItem,
-        transform_elaboration_svc: Arc<dyn TransformElaborationService>,
-        catalog: dill::Catalog,
-    ) -> Result<TransformElaboration, TransformElaborateError> {
-        pti.refresh_from_dataset_registry(&*dataset_registry)
-            .await
-            .int_err()?;
-
-        let mut result = transform_elaboration_svc
-            .elaborate_transform(pti.plan)
-            .await;
-
-        if let Ok(TransformElaboration::Elaborated(elaborate_res)) = &mut result {
-            elaborate_res.datasets_map.detach_from_transaction();
-        }
-
-        result
-    }
-
+    /// Plans and elaborates in one transaction, then detaches the plan for
+    /// execution
     #[transactional_static_method2(dataset_registry: Arc<dyn DatasetRegistry>, transform_request_planner: Arc<dyn TransformRequestPlanner>)]
-    async fn replan_and_elaborate_transform(
+    async fn plan_and_elaborate_transform(
         target_handle: &odf::DatasetHandle,
         transform_elaboration_svc: Arc<dyn TransformElaborationService>,
         catalog: dill::Catalog,
@@ -666,14 +648,14 @@ impl PullDatasetUseCaseImpl {
         let target = pti.target.clone();
         let mut maybe_reset_heads = None;
 
-        let elaboration = match Self::elaborate_transform(
-            pti,
+        let elaboration = match Self::plan_and_elaborate_transform(
+            target.get_handle(),
             services.elaboration.clone(),
             catalog.clone(),
         )
         .await
         {
-            Err(TransformElaborateError::InvalidInputInterval(e))
+            Err(TransformError::Elaborate(TransformElaborateError::InvalidInputInterval(e)))
                 if transform_options.reset_derivatives_on_diverged_input =>
             {
                 tracing::warn!(error = %e, "Input diverged, resetting the derivative to metadata");
@@ -683,7 +665,7 @@ impl PullDatasetUseCaseImpl {
                 {
                     Some(reset_heads) => {
                         maybe_reset_heads = Some(reset_heads);
-                        Self::replan_and_elaborate_transform(
+                        Self::plan_and_elaborate_transform(
                             target.get_handle(),
                             services.elaboration.clone(),
                             catalog.clone(),
@@ -693,8 +675,7 @@ impl PullDatasetUseCaseImpl {
                     None => Err(TransformElaborateError::InvalidInputInterval(e).into()),
                 }
             }
-            Ok(elaboration) => Ok(elaboration),
-            Err(e) => Err(e.into()),
+            result => result,
         };
 
         let (transform_result, elaborated_up_to_date) = match elaboration {
@@ -718,12 +699,27 @@ impl PullDatasetUseCaseImpl {
             }
         };
 
-        // A reset and the transform after it are reported as one update
+        // A reset and the transform after it are reported as one update. The
+        // increment stays the transform's own: the reset rewrote history, so
+        // no interval spans both
         let transform_result = match (maybe_reset_heads, transform_result) {
-            (Some((old_head, _)), TransformResult::Updated { new_head, .. })
-            | (Some((old_head, new_head)), TransformResult::UpToDate) => {
-                TransformResult::Updated { old_head, new_head }
-            }
+            (
+                Some((old_head, _)),
+                TransformResult::Updated {
+                    new_head,
+                    increment,
+                    ..
+                },
+            ) => TransformResult::Updated {
+                old_head,
+                new_head,
+                increment,
+            },
+            (Some((old_head, new_head)), TransformResult::UpToDate) => TransformResult::Updated {
+                old_head,
+                new_head,
+                increment: odf::dataset::MetadataChainIncrementInterval::default(),
+            },
             (None, transform_result) => transform_result,
         };
 
@@ -744,11 +740,15 @@ impl PullDatasetUseCaseImpl {
     ) -> Result<TransformResult, TransformError> {
         let (target, result) = services
             .executor
-            .execute_transform(target, plan, maybe_listener)
+            .execute_transform(target, plan, &get_random_name(None, 10), maybe_listener)
             .await;
 
         match result? {
-            TransformResult::Updated { old_head, new_head } => {
+            TransformResult::Updated {
+                old_head,
+                new_head,
+                increment,
+            } => {
                 Self::commit_head_transactionally(
                     catalog,
                     target.get_handle(),
@@ -757,7 +757,11 @@ impl PullDatasetUseCaseImpl {
                 )
                 .await
                 .map_err(|e| TransformExecuteError::CommitError(e.into()))?;
-                Ok(TransformResult::Updated { old_head, new_head })
+                Ok(TransformResult::Updated {
+                    old_head,
+                    new_head,
+                    increment,
+                })
             }
             TransformResult::UpToDate => Ok(TransformResult::UpToDate),
         }

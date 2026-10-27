@@ -17,11 +17,13 @@ use kamu_core::{
     TransformElaboration,
     TransformElaborationService,
     TransformExecutor,
+    TransformPlan,
     TransformRequestPlanner,
     TransformResult,
     VerifyTransformError,
 };
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,6 +68,20 @@ impl TransformTestHelper {
         self.transform_elab_svc.elaborate_transform(plan).await
     }
 
+    /// Runs the engine and appends the blocks, without moving `HEAD`
+    pub async fn execute_transform(
+        &self,
+        derived_target: ResolvedDataset,
+        plan: TransformPlan,
+        operation_id: &str,
+    ) -> TransformResult {
+        self.transform_executor
+            .execute_transform(derived_target, plan, operation_id, None)
+            .await
+            .1
+            .unwrap()
+    }
+
     pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {
         let plan = match self
             .elaborate_transform(derived_target.clone())
@@ -77,13 +93,13 @@ impl TransformTestHelper {
         };
 
         let transform_result = self
-            .transform_executor
-            .execute_transform(derived_target.clone(), plan, None)
-            .await
-            .1
-            .unwrap();
+            .execute_transform(derived_target.clone(), plan, &get_random_name(None, 10))
+            .await;
 
-        if let TransformResult::Updated { old_head, new_head } = &transform_result {
+        if let TransformResult::Updated {
+            old_head, new_head, ..
+        } = &transform_result
+        {
             derived_target
                 .as_metadata_chain()
                 .set_ref(
