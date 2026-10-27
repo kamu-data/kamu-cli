@@ -46,10 +46,26 @@ impl MockTransformExecutor {
                     Ok(TransformResult::Updated {
                         old_head,
                         new_head,
+                        new_offset_interval: Some(odf::metadata::OffsetInterval {
+                            start: 0,
+                            end: Self::REPORTED_INCREMENT.num_records - 1,
+                        }),
                         increment: Self::REPORTED_INCREMENT,
                     }),
                 )
             });
+        self
+    }
+
+    pub fn make_expect_transform_error(
+        mut self,
+        target_alias: odf::DatasetAlias,
+        make_error: impl Fn() -> TransformExecuteError + Send + 'static,
+    ) -> Self {
+        self.expect_execute_transform()
+            .withf(move |target, _, _, _| target.get_alias() == &target_alias)
+            .times(1)
+            .returning(move |target, _, _, _| (target, Err(make_error())));
         self
     }
 }

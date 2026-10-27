@@ -52,7 +52,16 @@ impl EngineProvisioningListener for NullEngineProvisioningListener {}
 #[derive(Debug, Error)]
 pub enum EngineProvisioningError {
     #[error(transparent)]
+    UnsupportedEngine(#[from] UnsupportedEngineError),
+    #[error(transparent)]
     ImagePull(#[from] ImagePullError),
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+/// No engine with this name is configured
+#[derive(Debug, Error)]
+#[error("Unsupported engine {engine_id}")]
+pub struct UnsupportedEngineError {
+    pub engine_id: String,
 }

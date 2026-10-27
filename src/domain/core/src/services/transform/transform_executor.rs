@@ -18,6 +18,7 @@ use crate::engine::EngineError;
 use crate::{
     DataNotReproducible,
     EngineProvisioningError,
+    IncompatibleSchemaError,
     TransformListener,
     TransformResult,
     VerificationListener,
@@ -32,6 +33,9 @@ pub trait TransformExecutor: Send + Sync {
     /// Runs the engine and appends the resulting blocks without moving
     /// `HEAD`. Needs no transaction: `target` and the datasets of `plan` are
     /// expected to be detached. The caller commits `HEAD` afterwards.
+    ///
+    /// Returns `UpToDate` when the engine produced nothing that would advance
+    /// the dataset.
     ///
     /// `operation_id` identifies this execution attempt: it names the engine
     /// run directory and container, so every attempt needs its own.
@@ -69,6 +73,13 @@ pub enum TransformExecuteError {
         #[from]
         #[backtrace]
         EngineError,
+    ),
+    /// The engine's output does not fit the schema the dataset already has
+    #[error(transparent)]
+    IncompatibleSchema(
+        #[from]
+        #[backtrace]
+        IncompatibleSchemaError,
     ),
     #[error(transparent)]
     CommitError(

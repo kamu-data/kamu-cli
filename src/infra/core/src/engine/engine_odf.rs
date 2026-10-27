@@ -179,14 +179,29 @@ impl ODFEngine {
             }
 
             // Read output schema
-            let output_schema =
+            let data_metadata =
                 datafusion::parquet::arrow::arrow_reader::ArrowReaderMetadata::load(
                     &std::fs::File::open(&new_data_path).int_err()?,
                     Default::default(),
                 )
-                .int_err()?
-                .schema()
-                .clone();
+                .int_err()?;
+            let output_schema = data_metadata.schema().clone();
+
+            // The offsets the engine claims become the dataset's record offsets
+            let num_rows =
+                u64::try_from(data_metadata.metadata().file_metadata().num_rows()).int_err()?;
+            let claimed_rows = engine_response
+                .new_offset_interval
+                .as_ref()
+                .map_or(0, |interval| interval.end - interval.start + 1);
+            if num_rows != claimed_rows {
+                return Err(EngineError::contract_error(
+                    &format!(
+                        "Engine wrote {num_rows} records but claimed offsets for {claimed_rows}"
+                    ),
+                    Vec::new(),
+                ));
+            }
 
             let new_data = OwnedFile::new(new_data_path);
 
@@ -233,6 +248,7 @@ impl ODFEngine {
             output_schema,
             new_checkpoint,
             new_data,
+            run_dir: None,
         })
     }
 }
@@ -390,10 +406,123 @@ impl Engine for ODFEngine {
 
         engine_container.terminate().await?;
 
-        self.materialize_response(
+        let mut response = self.materialize_response(
             engine_response?,
             materialized_request.out_data_path,
             materialized_request.out_checkpoint_path,
-        )
+        )?;
+        response.run_dir = Some(operation_dir);
+        Ok(response)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use container_runtime::ContainerRuntimeConfig;
+    use datafusion::arrow::array::{ArrayRef, Int64Array};
+    use datafusion::arrow::record_batch::RecordBatch;
+    use datafusion::parquet::arrow::ArrowWriter;
+
+    use super::*;
+
+    #[test]
+    fn test_response_with_claimed_records() {
+        let harness = MaterializeResponseHarness::new();
+        let data_path = harness.write_data_file(3);
+
+        let response = harness.materialize_response(Some((10, 12)), data_path);
+
+        assert_matches!(
+            response,
+            Ok(TransformResponseExt {
+                new_data: Some(_),
+                ..
+            })
+        );
+    }
+
+    #[test]
+    fn test_response_with_more_records_than_claimed() {
+        let harness = MaterializeResponseHarness::new();
+        let data_path = harness.write_data_file(5);
+
+        let response = harness.materialize_response(Some((10, 12)), data_path);
+
+        assert_matches!(response, Err(EngineError::ContractError(_)));
+    }
+
+    #[test]
+    fn test_response_with_claimed_records_but_empty_file() {
+        let harness = MaterializeResponseHarness::new();
+        let data_path = harness.write_data_file(0);
+
+        let response = harness.materialize_response(Some((0, 99)), data_path);
+
+        assert_matches!(response, Err(EngineError::ContractError(_)));
+    }
+
+    #[test]
+    fn test_response_with_records_but_no_claimed_offsets() {
+        let harness = MaterializeResponseHarness::new();
+        let data_path = harness.write_data_file(2);
+
+        let response = harness.materialize_response(None, data_path);
+
+        assert_matches!(response, Err(EngineError::ContractError(_)));
+    }
+
+    struct MaterializeResponseHarness {
+        tempdir: tempfile::TempDir,
+        engine: ODFEngine,
+    }
+
+    impl MaterializeResponseHarness {
+        fn new() -> Self {
+            let tempdir = tempfile::tempdir().unwrap();
+            let engine = ODFEngine::new(
+                Arc::new(ContainerRuntime::new(ContainerRuntimeConfig::default())),
+                ODFEngineConfig {
+                    start_timeout: std::time::Duration::from_secs(1),
+                    shutdown_timeout: std::time::Duration::from_secs(1),
+                },
+                "engine-image",
+                Arc::new(RunInfoDir::new(tempdir.path().join("run"))),
+            );
+            Self { tempdir, engine }
+        }
+
+        /// Writes a data file with `num_records` records, as an engine would
+        fn write_data_file(&self, num_records: i64) -> PathBuf {
+            let path = self.tempdir.path().join("data.parquet");
+            let offsets: ArrayRef = Arc::new(Int64Array::from_iter_values(0..num_records));
+            let batch = RecordBatch::try_from_iter([("offset", offsets)]).unwrap();
+
+            let mut writer =
+                ArrowWriter::try_new(std::fs::File::create(&path).unwrap(), batch.schema(), None)
+                    .unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+            path
+        }
+
+        fn materialize_response(
+            &self,
+            claimed_offsets: Option<(u64, u64)>,
+            data_path: PathBuf,
+        ) -> Result<TransformResponseExt, EngineError> {
+            self.engine.materialize_response(
+                odf::metadata::TransformResponseSuccess {
+                    new_offset_interval: claimed_offsets
+                        .map(|(start, end)| odf::metadata::OffsetInterval { start, end }),
+                    new_watermark: None,
+                },
+                data_path,
+                self.tempdir.path().join("checkpoint"),
+            )
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

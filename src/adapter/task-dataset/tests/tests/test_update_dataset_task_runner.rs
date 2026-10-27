@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use datafusion::arrow::datatypes::Schema;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_adapter_task_dataset::{
     DatasetHeadMovedError,
@@ -24,7 +25,7 @@ use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
-use kamu_task_system::{TaskDefinition, TaskOutcome, TaskResult, TaskRunner};
+use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskResult, TaskRunner};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -197,6 +198,44 @@ async fn test_transform_success_carries_increment_from_executor() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_transform_incompatible_schema_fails_unrecoverably() {
+    let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(|| {
+        IncompatibleSchemaError::new(
+            "Schema of the new slice is not compatible",
+            Arc::new(Schema::empty()),
+            Arc::new(Schema::empty()),
+        )
+        .into()
+    })
+    .await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_unsupported_engine_fails_unrecoverably() {
+    let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(|| {
+        EngineProvisioningError::from(UnsupportedEngineError {
+            engine_id: "cobol".to_string(),
+        })
+        .into()
+    })
+    .await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -242,6 +281,28 @@ impl UpdateDatasetTaskRunnerHarness {
                 .make_expect_transform_updated(alias.clone(), heads.clone()),
             ..UpdateDatasetTaskRunnerMocks::default()
         })
+    }
+
+    /// Runs the transform of a fresh derivative whose execution fails with
+    /// `make_error()`
+    async fn run_transform_failing_with(
+        make_error: impl Fn() -> TransformExecuteError + Send + 'static,
+    ) -> TaskOutcome {
+        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+        let harness = Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_transform_planner: MockTransformPlanner::new()
+                .make_expect_elaborate_transform(alias_bar.clone()),
+            mock_transform_executor: MockTransformExecutor::new()
+                .make_expect_transform_error(alias_bar.clone(), make_error),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        });
+        let foo = harness.create_root_dataset(&alias_foo).await;
+        let bar = harness
+            .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+            .await;
+
+        harness.run_transform_update(&bar).await
     }
 
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {

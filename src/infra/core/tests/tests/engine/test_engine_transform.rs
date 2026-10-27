@@ -322,6 +322,18 @@ impl TestHarness {
         }
     }
 
+    async fn elaborated_plan(&self, target: ResolvedDataset) -> TransformExecutionPlan {
+        match self
+            .transform_helper
+            .elaborate_transform(target)
+            .await
+            .unwrap()
+        {
+            TransformElaboration::Elaborated(plan) => plan,
+            TransformElaboration::UpToDate => panic!("Expected the transform to be elaborated"),
+        }
+    }
+
     async fn build_metadata_state(&self, target: ResolvedDataset) -> DataWriterMetadataState {
         DataWriterMetadataState::build(target, &odf::BlockRef::Head, None, None)
             .await
@@ -511,6 +523,7 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
     let TransformResult::Updated {
         old_head,
         new_head,
+        new_offset_interval,
         increment,
     } = res
     else {
@@ -521,6 +534,10 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
     assert_eq!(deriv_helper.block_count().await, 4);
     assert_eq!(increment.num_blocks, 2);
     assert_eq!(increment.num_records, 3);
+    assert_eq!(
+        new_offset_interval,
+        Some(odf::metadata::OffsetInterval { start: 0, end: 2 })
+    );
     use odf::dataset::MetadataChainExt;
     assert_eq!(
         increment,
@@ -756,28 +773,25 @@ async fn test_transform_attempts_use_own_locations() {
                 .build(),
         )
         .await;
-
-    // Two attempts of the same plan, each elaborated again as a restarted worker would
-    for operation_id in ["attempt-a", "attempt-b"] {
-        let TransformElaboration::Elaborated(plan) = harness
-            .transform_helper
-            .elaborate_transform(deriv_target.clone())
-            .await
-            .unwrap()
-        else {
-            panic!("Expected the transform to be elaborated");
-        };
-
-        let res = harness
-            .transform_helper
-            .execute_transform(deriv_target.clone(), plan, operation_id)
-            .await;
-        assert_matches!(res, TransformResult::Updated { .. });
-    }
-
     let run_dir = harness.tempdir.path().join("run");
-    assert!(run_dir.join("transform-attempt-a").is_dir());
-    assert!(run_dir.join("transform-attempt-b").is_dir());
+
+    // An attempt never writes into a directory another attempt left behind
+    std::fs::create_dir(run_dir.join("transform-attempt-a")).unwrap();
+    let plan = harness.elaborated_plan(deriv_target.clone()).await;
+    let res = harness
+        .transform_helper
+        .try_execute_transform(deriv_target.clone(), plan, "attempt-a")
+        .await;
+    assert_matches!(res, Err(_));
+
+    // A successful attempt removes its directory
+    let plan = harness.elaborated_plan(deriv_target.clone()).await;
+    let res = harness
+        .transform_helper
+        .execute_transform(deriv_target, plan, "attempt-b")
+        .await;
+    assert_matches!(res, TransformResult::Updated { .. });
+    assert!(!run_dir.join("transform-attempt-b").exists());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
