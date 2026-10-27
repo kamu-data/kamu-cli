@@ -127,6 +127,8 @@ pub trait PollingIngestListener: Send + Sync {
     fn error(&self, _error: &PollingIngestError) {}
     /// The dataset defines no polling source, so there is nothing to ingest
     fn no_polling_source(&self) {}
+    /// Planning the ingest failed before any iteration began
+    fn plan_error(&self, _error: &PollingIngestPlanError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None

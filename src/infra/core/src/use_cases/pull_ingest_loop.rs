@@ -48,15 +48,23 @@ impl PullIngestLoop {
     ) -> Result<PollingIngestResult, PullError> {
         let (target, mut plan, env_vars) = match self.plan(target_handle).await {
             Ok(planned) => planned,
-            Err(PollingIngestPlanError::SourceNotDefined(_)) => {
+            Err(e) => {
                 if let Some(listener) = &maybe_listener {
                     listener.begin();
-                    listener.no_polling_source();
+                    if let PollingIngestPlanError::SourceNotDefined(_) = e {
+                        listener.no_polling_source();
+                    } else {
+                        listener.plan_error(&e);
+                    }
                 }
-                return Ok(PollingIngestResult::UpToDate { uncacheable: false });
+                return match e {
+                    PollingIngestPlanError::SourceNotDefined(_) => {
+                        Ok(PollingIngestResult::UpToDate { uncacheable: false })
+                    }
+                    PollingIngestPlanError::ScanMetadata(e) => Err(e.into()),
+                    PollingIngestPlanError::Internal(e) => Err(e.into()),
+                };
             }
-            Err(PollingIngestPlanError::ScanMetadata(e)) => return Err(e.into()),
-            Err(PollingIngestPlanError::Internal(e)) => return Err(e.into()),
         };
 
         let mut combined: Option<PollingIngestResult> = None;

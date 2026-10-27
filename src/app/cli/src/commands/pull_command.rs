@@ -472,6 +472,17 @@ impl PrettyIngestProgress {
         };
         Self::spinner_message(&self.dataset_handle, stage as u32, msg)
     }
+
+    fn finish_failed(&self) {
+        let state = self.state.lock().unwrap();
+        state
+            .curr_progress
+            .finish_with_message(Self::spinner_message(
+                &self.dataset_handle,
+                state.stage as u32,
+                console::style("Failed to update root dataset").red(),
+            ));
+    }
 }
 
 impl PollingIngestListener for PrettyIngestProgress {
@@ -592,14 +603,11 @@ impl PollingIngestListener for PrettyIngestProgress {
     }
 
     fn error(&self, _error: &PollingIngestError) {
-        let state = self.state.lock().unwrap();
-        state
-            .curr_progress
-            .finish_with_message(Self::spinner_message(
-                &self.dataset_handle,
-                state.stage as u32,
-                console::style("Failed to update root dataset").red(),
-            ));
+        self.finish_failed();
+    }
+
+    fn plan_error(&self, _error: &PollingIngestPlanError) {
+        self.finish_failed();
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
