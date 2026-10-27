@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use database_common_macros::{
     transactional_method1,
-    transactional_static_method,
     transactional_static_method1,
     transactional_static_method2,
 };
@@ -24,13 +23,13 @@ use kamu_datasets::{
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
-    DatasetEnvVarResolver,
     DatasetHeadCommitter,
     DatasetRegistry,
     ResolvedDataset,
-    SecretsEncryptionConfig,
 };
 use random_strings::get_random_name;
+
+use super::pull_ingest_loop::PullIngestLoop;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -99,13 +98,14 @@ impl PullDatasetUseCaseImpl {
                         let maybe_listener = maybe_ingest_multi_listener
                             .as_ref()
                             .and_then(|l| l.begin_ingest(pii.target.get_handle()));
-                        let ingest_options = options.ingest_options.clone();
-
                         tasks.spawn(Self::ingest(
                             pii,
-                            ingest_options,
-                            self.catalog.clone(),
-                            self.polling_ingest_service.clone(),
+                            options.ingest_options.clone(),
+                            options.exhaust_sources,
+                            PullIngestLoop::new(
+                                self.catalog.clone(),
+                                self.polling_ingest_service.clone(),
+                            ),
                             maybe_listener,
                         ))
                     }
@@ -354,159 +354,31 @@ impl PullDatasetUseCaseImpl {
         ))
     }
 
-    async fn ingest_loop(
-        pii: PullIngestItem,
-        ingest_options: PollingIngestOptions,
-        catalog: dill::Catalog,
-        polling_ingest_svc: Arc<dyn PollingIngestService>,
-        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
-        let mut combined_result = None;
-        let mut latest_metadata_state = pii.metadata_state;
-
-        loop {
-            match polling_ingest_svc
-                .ingest(
-                    pii.target.clone(),
-                    latest_metadata_state.clone(),
-                    ingest_options.clone(),
-                    maybe_listener.clone(),
-                )
-                .await
-            {
-                Ok(ingest_res) => {
-                    if let PollingIngestResult::Updated {
-                        old_head, new_head, ..
-                    } = &ingest_res.result
-                    {
-                        Self::commit_head_transactionally(
-                            catalog.clone(),
-                            pii.target.get_handle(),
-                            old_head,
-                            new_head,
-                        )
-                        .await
-                        .map_err(|e| PollingIngestError::CommitError(e.into()))?;
-                        latest_metadata_state = ingest_res.metadata_state.unwrap();
-                    }
-
-                    combined_result = Some(Self::merge_results(combined_result, ingest_res.result));
-
-                    let has_more = match combined_result {
-                        Some(PollingIngestResult::UpToDate { .. }) => false,
-                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
-                        None => unreachable!(),
-                    };
-
-                    if !has_more || !ingest_options.exhaust_sources {
-                        break;
-                    }
-                }
-                Err(e) => return Err(e),
-            }
-        }
-
-        Ok(combined_result.unwrap())
-    }
-
     async fn ingest(
         pii: PullIngestItem,
         ingest_options: PollingIngestOptions,
-        catalog: dill::Catalog,
-        polling_ingest_svc: Arc<dyn PollingIngestService>,
+        exhaust_sources: bool,
+        ingest_loop: PullIngestLoop,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let local_target = pii.target.get_handle().as_local_ref();
-        let original_request = pii.maybe_original_request.clone();
+        let target_handle = pii.target.get_handle();
 
-        // Env vars are per-dataset, but `PollingIngestOptions` is call-level:
-        // one `PullOptions` may cover many datasets, and `execute_all_owned`
-        // has no dataset list at all for a caller to pre-resolve from. So they
-        // are resolved here, at the per-dataset fan-out, rather than being
-        // filled in by each caller -- which is how `kamu pull` came to ingest
-        // with an empty map while the server task path resolved correctly.
-        //
-        // A caller that already resolved them (the update task planner) keeps
-        // its own map, but only when it is non-empty: an empty map is
-        // indistinguishable from an unresolved one, so it is re-resolved. That
-        // costs a redundant lookup for a dataset that genuinely has no env
-        // vars, and yields the same empty result.
-        let ingest_options = if ingest_options.dataset_env_vars.is_empty() {
-            let dataset_id = pii.target.get_handle().id.clone();
-            let dataset_env_vars =
-                Self::resolve_dataset_env_vars(catalog.clone(), &dataset_id).await?;
-            PollingIngestOptions {
-                dataset_env_vars,
-                ..ingest_options
-            }
-        } else {
-            ingest_options
-        };
-
-        let ingest_response = Self::ingest_loop(
-            pii,
-            ingest_options,
-            catalog,
-            polling_ingest_svc,
-            maybe_listener,
-        )
-        .await;
+        let result = ingest_loop
+            .run(
+                target_handle,
+                ingest_options,
+                exhaust_sources,
+                maybe_listener,
+            )
+            .await
+            .map(Into::into);
 
         Ok(PullResponse {
-            maybe_original_request: original_request,
-            maybe_local_ref: Some(local_target),
+            maybe_original_request: pii.maybe_original_request,
+            maybe_local_ref: Some(target_handle.as_local_ref()),
             maybe_remote_ref: None,
-            result: match ingest_response {
-                Ok(r) => Ok(r.into()),
-                Err(e) => Err(e.into()),
-            },
+            result,
         })
-    }
-
-    /// Resolves the dataset's effective env vars, honoring the same feature
-    /// gate the CLI applies when registering env-var services: the feature is
-    /// on only when secrets encryption is both configured and enabled. With it
-    /// off this returns an empty map without touching the database, so a plain
-    /// `kamu pull` in a workspace with no encryption key does no extra lookups.
-    ///
-    /// Both dependencies are resolved leniently rather than injected: this use
-    /// case is embedded in contexts that never register them (tests, and any
-    /// embedder not wiring the configuration domain), and an absent dependency
-    /// means exactly the same thing as a disabled feature. Requiring them would
-    /// turn an optional feature into a hard wiring obligation for every caller.
-    ///
-    /// Deliberately goes through `DatasetEnvVarResolver` and not
-    /// `DatasetEnvVarService`, whose null implementation has `unreachable!()`
-    /// bodies.
-    async fn resolve_dataset_env_vars(
-        catalog: dill::Catalog,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<HashMap<String, kamu_datasets::DatasetEnvVar>, InternalError> {
-        let feature_enabled = catalog
-            .get_one::<SecretsEncryptionConfig>()
-            .is_ok_and(|config| config.is_enabled());
-
-        if !feature_enabled {
-            return Ok(HashMap::new());
-        }
-
-        Self::resolve_dataset_env_vars_transactionally(catalog, dataset_id).await
-    }
-
-    /// Split from [`Self::resolve_dataset_env_vars`] so the transaction is only
-    /// opened once the feature is known to be on. The resolver is fetched from
-    /// the *transaction* catalog, since it depends on transaction-scoped
-    /// repositories.
-    #[transactional_static_method()]
-    async fn resolve_dataset_env_vars_transactionally(
-        catalog: dill::Catalog,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<HashMap<String, kamu_datasets::DatasetEnvVar>, InternalError> {
-        let Ok(resolver) = transaction_catalog.get_one::<dyn DatasetEnvVarResolver>() else {
-            return Ok(HashMap::new());
-        };
-
-        resolver.resolve_effective_env_vars(dataset_id).await
     }
 
     #[transactional_static_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
@@ -818,44 +690,6 @@ impl PullDatasetUseCaseImpl {
                 Err(e) => Err(e.into()),
             },
         })
-    }
-
-    // TODO: Introduce intermediate structs to avoid full unpacking
-    fn merge_results(
-        combined_result: Option<PollingIngestResult>,
-        new_result: PollingIngestResult,
-    ) -> PollingIngestResult {
-        match (combined_result, new_result) {
-            (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
-            (
-                Some(PollingIngestResult::Updated {
-                    old_head, new_head, ..
-                }),
-                PollingIngestResult::UpToDate { uncacheable, .. },
-            ) => PollingIngestResult::Updated {
-                old_head,
-                new_head,
-                has_more: false,
-                uncacheable,
-            },
-            (
-                Some(PollingIngestResult::Updated {
-                    old_head: prev_old_head,
-                    ..
-                }),
-                PollingIngestResult::Updated {
-                    new_head,
-                    has_more,
-                    uncacheable,
-                    ..
-                },
-            ) => PollingIngestResult::Updated {
-                old_head: prev_old_head,
-                new_head,
-                has_more,
-                uncacheable,
-            },
-        }
     }
 
     #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]

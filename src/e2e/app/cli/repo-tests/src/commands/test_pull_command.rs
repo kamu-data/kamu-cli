@@ -165,6 +165,60 @@ pub async fn test_pull_derivative_of_never_pulled_root(kamu: KamuCliPuppet) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_reports_progress_before_failed_iteration
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_reports_progress_before_failed_iteration(kamu: KamuCliPuppet) {
+    let snapshot = format!(
+        indoc::indoc!(
+            r#"
+            kind: DatasetSnapshot
+            version: 1
+            content:
+              name: test.pull-from-files
+              kind: Root
+              metadata:
+                - kind: SetPollingSource
+                  fetch:
+                    kind: FilesGlob
+                    path: {}/data-*.csv
+                  read:
+                    kind: Csv
+                    header: true
+                    schema:
+                      fields:
+                        - name: city
+                          type: String
+                        - name: population
+                          type: Int64
+                  merge:
+                    kind: append
+            "#
+        ),
+        kamu.workspace_path().display(),
+    );
+    kamu.execute_with_input(["add", "--stdin"], snapshot)
+        .await
+        .success();
+
+    // One file per iteration; the third does not parse
+    for (i, row) in ["A,1000", "B,2000", "C,not-a-number"].iter().enumerate() {
+        let path = kamu.workspace_path().join(format!("data-{}.csv", i + 1));
+        std::fs::write(path, format!("city,population\n{row}\n")).unwrap();
+    }
+
+    kamu.assert_failure_command_execution(
+        ["pull", "test.pull-from-files"],
+        None,
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Ingested 3 block\(s\) with 2 record\(s\) before failing"#,
+        ]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

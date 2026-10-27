@@ -160,6 +160,7 @@ impl ClientSideHarness {
         b.add::<FetchService>();
 
         b.add_value(EngineConfigDatafusionEmbeddedIngest::default());
+        b.add::<PollingIngestPlannerImpl>();
         b.add::<PollingIngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>();

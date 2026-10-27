@@ -106,6 +106,7 @@ interface "OdfServerAccessTokenResolver" <<i>>
 interface "OutboxAgent" <<i>>
 interface "OutboxMessageBridge" <<i>>
 interface "PasswordHashRepository" <<i>>
+interface "PollingIngestPlanner" <<i>>
 interface "PollingIngestService" <<i>>
 interface "ProvenanceService" <<i>>
 interface "PullDatasetUseCase" <<i>>
@@ -337,6 +338,7 @@ class "OutboxTransactionalImpl"
 class "OutputConfig" <<singleton>>
 class "PasswordHashingMode" <<singleton>>
 class "PasswordPolicyConfig" <<singleton>>
+class "PollingIngestPlannerImpl"
 class "PollingIngestServiceImpl"
 class "Pool" <<singleton>>
 class "PredefinedAccountsConfig" <<singleton>>
@@ -528,6 +530,8 @@ class "WsSmartTransferProtocolClient"
 "FetchService" "?" --> "MqttSourceConfig"
 "FetchService" "?" --> "SourceConfig"
 "FetchService"  --> "RunInfoDir"
+"PollingIngestPlanner" <|-- "PollingIngestPlannerImpl"
+"PollingIngestPlannerImpl"  --> "Catalog"
 "PollingIngestService" <|-- "PollingIngestServiceImpl"
 "PollingIngestServiceImpl"  --> "EngineProvisioner"
 "PollingIngestServiceImpl"  --> "DataFormatRegistry"

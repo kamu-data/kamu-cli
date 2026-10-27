@@ -94,11 +94,11 @@ impl PullPlanIterationJob {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A root dataset to ingest. The ingest itself is planned when the job runs.
 #[derive(Debug)]
 pub struct PullIngestItem {
     pub depth: i32,
     pub target: ResolvedDataset,
-    pub metadata_state: Box<DataWriterMetadataState>,
     pub maybe_original_request: Option<PullRequest>,
 }
 
@@ -291,6 +291,8 @@ pub struct PullOptions {
     pub add_aliases: bool,
     /// Ingest-specific options
     pub ingest_options: PollingIngestOptions,
+    /// Repeat polling ingest while the source reports more data
+    pub exhaust_sources: bool,
     /// Sync-specific options,
     pub sync_options: SyncOptions,
     /// Transform-specific options,
@@ -303,6 +305,7 @@ impl Default for PullOptions {
             recursive: false,
             add_aliases: true,
             ingest_options: PollingIngestOptions::default(),
+            exhaust_sources: false,
             sync_options: SyncOptions::default(),
             transform_options: TransformOptions::default(),
         }
@@ -440,6 +443,9 @@ pub enum PullError {
     ),
 
     #[error(transparent)]
+    IngestStopped(Box<IngestStoppedError>),
+
+    #[error(transparent)]
     TransformError(
         #[from]
         #[backtrace]
@@ -466,6 +472,23 @@ pub enum PullError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A polling ingest iteration failed after earlier iterations of the same pull
+/// had already committed. `HEAD` stays at `new_head`.
+#[derive(Debug, Error)]
+#[error(
+    "Ingested {} block(s) with {} record(s) before failing: {source}",
+    increment.num_blocks,
+    increment.num_records
+)]
+pub struct IngestStoppedError {
+    pub old_head: odf::Multihash,
+    pub new_head: odf::Multihash,
+    pub increment: odf::dataset::MetadataChainIncrementInterval,
+    pub source: PollingIngestError,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

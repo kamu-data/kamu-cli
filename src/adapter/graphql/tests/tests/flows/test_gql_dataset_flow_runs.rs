@@ -308,7 +308,11 @@ async fn test_trigger_ingest_root_dataset() {
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         has_more: false,
                     },
-                    data_increment: None,
+                    data_increment: Some(MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 12,
+                        updated_watermark: None,
+                    }),
                 }
                 .into_task_result(),
             ),
@@ -4266,7 +4270,11 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
                         new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
                         has_more: false,
                     },
-                    data_increment: None,
+                    data_increment: Some(MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 12,
+                        updated_watermark: None,
+                    }),
                 }
                 .into_task_result(),
             ),

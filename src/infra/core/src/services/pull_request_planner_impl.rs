@@ -147,7 +147,7 @@ impl PullRequestPlannerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
-    async fn build_ingest_item(&self, pi: PullItem) -> Result<PullIngestItem, Box<PullResponse>> {
+    async fn build_ingest_item(&self, pi: PullItem) -> PullIngestItem {
         assert!(pi.maybe_remote_ref.is_none());
 
         let hdl = match pi.local_target {
@@ -159,20 +159,10 @@ impl PullRequestPlannerImpl {
 
         let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
-        match DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None, None).await
-        {
-            Ok(metadata_state) => Ok(PullIngestItem {
-                depth: pi.depth,
-                target,
-                metadata_state: Box::new(metadata_state),
-                maybe_original_request: pi.maybe_original_request,
-            }),
-            Err(e) => Err(Box::new(PullResponse {
-                maybe_original_request: pi.maybe_original_request,
-                maybe_local_ref: Some(hdl.as_local_ref()),
-                maybe_remote_ref: None,
-                result: Err(PullError::ScanMetadata(e)),
-            })),
+        PullIngestItem {
+            depth: pi.depth,
+            target,
+            maybe_original_request: pi.maybe_original_request,
         }
     }
 
@@ -331,15 +321,9 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             for item in batch {
                 // Ingest?
                 if depth == 0 && item.maybe_remote_ref.is_none() {
-                    match self.build_ingest_item(item).await {
-                        Ok(pii) => {
-                            tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
-                            jobs.push(PullPlanIterationJob::Ingest(pii));
-                        }
-                        Err(ingest_error) => {
-                            errors.push(*ingest_error);
-                        }
-                    }
+                    let pii = self.build_ingest_item(item).await;
+                    tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
+                    jobs.push(PullPlanIterationJob::Ingest(pii));
 
                 // Sync?
                 } else if depth == 0 && item.maybe_remote_ref.is_some() {

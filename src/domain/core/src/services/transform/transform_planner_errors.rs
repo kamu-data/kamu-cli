@@ -67,6 +67,20 @@ pub enum TransformElaborateError {
     ),
 }
 
+impl TransformElaborateError {
+    /// Whether elaborating again could succeed. A missing or changed transform
+    /// and a rewritten input history need a change of metadata first; an
+    /// input without data can still receive it.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::TransformNotDefined(_)
+            | Self::InputsChanged(_)
+            | Self::InvalidInputInterval(_) => false,
+            Self::InputNotPulled(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]

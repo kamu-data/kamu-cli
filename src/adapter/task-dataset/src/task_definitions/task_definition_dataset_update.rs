@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{PullIngestItem, PullOptions, PullPlanIterationJob, PullSyncItem};
+use kamu_core::{PullOptions, PullPlanIterationJob, PullSyncItem};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,9 @@ kamu_task_system::task_definition_struct! {
 
 #[derive(Debug)]
 pub enum DatasetUpdateJob {
-    Ingest(PullIngestItem),
+    /// The root dataset to ingest. The ingest is planned when the task runs,
+    /// in the transaction that also resolves its environment variables.
+    Ingest(odf::DatasetHandle),
     /// The derivative to transform. The transform is planned when the task
     /// runs, in the transaction that elaborates it.
     Transform(odf::DatasetHandle),
@@ -33,7 +35,7 @@ pub enum DatasetUpdateJob {
 impl From<PullPlanIterationJob> for DatasetUpdateJob {
     fn from(pull_job: PullPlanIterationJob) -> Self {
         match pull_job {
-            PullPlanIterationJob::Ingest(pii) => Self::Ingest(pii),
+            PullPlanIterationJob::Ingest(pii) => Self::Ingest(pii.target.take_handle()),
             PullPlanIterationJob::Transform(pti) => Self::Transform(pti.target.take_handle()),
             PullPlanIterationJob::Sync(psi) => Self::Sync(psi),
         }

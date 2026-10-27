@@ -7,12 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use datafusion::arrow::datatypes::Schema;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
-use kamu::{TransformExecutorImpl, TransformPlannerImpl};
+use kamu::{
+    DataFormatRegistryImpl,
+    EngineConfigDatafusionEmbeddedIngest,
+    EngineProvisionerNull,
+    FetchService,
+    ObjectStoreBuilderLocalFs,
+    ObjectStoreRegistryImpl,
+    PollingIngestPlannerImpl,
+    PollingIngestServiceImpl,
+    TransformExecutorImpl,
+    TransformPlannerImpl,
+};
 use kamu_adapter_task_dataset::{
     DatasetHeadMovedError,
     DatasetUpdateJob,
@@ -24,9 +38,10 @@ use kamu_adapter_task_dataset::{
     UpdateDatasetTaskRunner,
 };
 use kamu_core::engine::TransformResponseExt;
-use kamu_core::testing::ReportedHeads;
+use kamu_core::testing::{MockIngestIteration, ReportedHeads};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
+use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter};
+use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskResult, TaskRunner};
 use pretty_assertions::assert_eq;
@@ -63,6 +78,133 @@ async fn test_ingest_head_moved_concurrently_fails_recoverably() {
         outcome,
     );
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_reports_increment_from_its_result() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_polling_ingest_service: MockPollingIngestService::new().make_expect_ingest_iterations(
+            &alias_foo,
+            vec![MockIngestIteration::updated(&reported_heads, true, 7)],
+        ),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    reported_heads.set(&foo.head, &ingested_head);
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate {
+                pull_result: PullResult::Updated {
+                    old_head: Some(foo.head.clone()),
+                    new_head: ingested_head.clone(),
+                    has_more: true,
+                },
+                data_increment: Some(odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 7,
+                    updated_watermark: None,
+                }),
+            }
+            .into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&foo).await, ingested_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_without_polling_source_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
+    let foo = harness.create_root_dataset_without_source(&alias_foo).await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_from_unreachable_source_fails_recoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_polling_ingest_service: MockPollingIngestService::new()
+            .make_expect_ingest_iterations(&alias_foo, vec![MockIngestIteration::Unreachable]),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_with_real_planner_and_service_commits_and_reports_increment() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_with_real_ingest();
+    let src_path = harness.write_source_file("city,population\nA,1000\nB,2000\nC,3000\n");
+    let foo = harness
+        .create_root_dataset_polling_csv(&alias_foo, &src_path)
+        .await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    let new_head = harness.get_head(&foo).await;
+    assert_ne!(new_head, foo.head);
+    assert_matches!(
+        harness.task_result_update(outcome),
+        TaskResultDatasetUpdate {
+            pull_result: PullResult::Updated { old_head: Some(old_head), new_head: reported_head, has_more: false },
+            data_increment: Some(odf::dataset::MetadataChainIncrementInterval {
+                num_blocks: 2,
+                num_records: 3,
+                ..
+            }),
+        } if old_head == foo.head && reported_head == new_head
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_with_real_service_of_unreadable_data_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_with_real_ingest();
+    let src_path = harness.write_source_file("city,population\nA,not-a-number\n");
+    let foo = harness
+        .create_root_dataset_polling_csv(&alias_foo, &src_path)
+        .await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -346,8 +488,10 @@ struct UpdateDatasetTaskRunnerHarness {
 
 impl UpdateDatasetTaskRunnerHarness {
     fn new(mocks: UpdateDatasetTaskRunnerMocks) -> Self {
-        Self::build(mocks.mock_polling_ingest_service, |b| {
-            b.add_value(mocks.mock_transform_planner)
+        Self::build(|b, _| {
+            b.add_value(mocks.mock_polling_ingest_service)
+                .bind::<dyn PollingIngestService, MockPollingIngestService>()
+                .add_value(mocks.mock_transform_planner)
                 .bind::<dyn TransformPlanner, MockTransformPlanner>()
                 .add_value(mocks.mock_transform_executor)
                 .bind::<dyn TransformExecutor, MockTransformExecutor>();
@@ -357,8 +501,10 @@ impl UpdateDatasetTaskRunnerHarness {
     /// Transforms with the real planner and executor, through an engine that
     /// only advances the watermark to `watermark`
     fn new_with_real_transform(watermark: DateTime<Utc>) -> Self {
-        Self::build(MockPollingIngestService::new(), |b| {
-            b.add::<TransformPlannerImpl>()
+        Self::build(|b, _| {
+            b.add_value(MockPollingIngestService::new())
+                .bind::<dyn PollingIngestService, MockPollingIngestService>()
+                .add::<TransformPlannerImpl>()
                 .add::<TransformExecutorImpl>()
                 .add_value(
                     MockEngineProvisioner::new().always_provision_engine_responding(move || {
@@ -376,21 +522,44 @@ impl UpdateDatasetTaskRunnerHarness {
         })
     }
 
-    fn build(
-        mock_polling_ingest_service: MockPollingIngestService,
-        register_transform: impl FnOnce(&mut dill::CatalogBuilder),
-    ) -> Self {
+    /// Ingests with the real planner and service, and the default transform
+    /// mocks
+    fn new_with_real_ingest() -> Self {
+        Self::build(|b, temp_dir| {
+            let cache_dir = temp_dir.join("cache");
+            std::fs::create_dir(&cache_dir).unwrap();
+
+            b.add::<PollingIngestServiceImpl>()
+                .add::<FetchService>()
+                .add_value(CacheDir::new(cache_dir))
+                .add_value(ContainerRuntimeConfig::default())
+                .add::<ContainerRuntime>()
+                .add::<DatasetKeyValueServiceSysEnv>()
+                .add::<ObjectStoreRegistryImpl>()
+                .add::<ObjectStoreBuilderLocalFs>()
+                .add::<DataFormatRegistryImpl>()
+                .add_value(EngineConfigDatafusionEmbeddedIngest::default())
+                .add::<EngineProvisionerNull>()
+                .add_value(MockTransformPlanner::new())
+                .bind::<dyn TransformPlanner, MockTransformPlanner>()
+                .add_value(MockTransformExecutor::new())
+                .bind::<dyn TransformExecutor, MockTransformExecutor>();
+        })
+    }
+
+    /// `register_operations` registers the ingest and transform services; it
+    /// gets the harness's temporary directory
+    fn build(register_operations: impl FnOnce(&mut dill::CatalogBuilder, &Path)) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(BaseUseCaseHarnessOptions::new());
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<UpdateDatasetTaskRunner>()
+            .add::<PollingIngestPlannerImpl>()
             .add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
-            .add_value(mock_polling_ingest_service)
-            .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add_value(MockSyncService::new())
             .bind::<dyn SyncService, MockSyncService>();
-        register_transform(&mut b);
+        register_operations(&mut b, base_use_case_harness.temp_dir_path());
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -466,23 +635,23 @@ impl UpdateDatasetTaskRunnerHarness {
             .move_head_before_next_commit(concurrent_head);
     }
 
-    async fn run_ingest_update(&self, created: &CreateDatasetResult) -> TaskOutcome {
-        let metadata_state = DataWriterMetadataState::build(
-            ResolvedDataset::from_created(created),
-            &odf::BlockRef::Head,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+    /// Writes the file a polling source reads, in the harness's directory
+    fn write_source_file(&self, contents: &str) -> PathBuf {
+        let path = self.temp_dir_path().join("data.csv");
+        std::fs::write(&path, contents).unwrap();
+        path
+    }
 
-        self.run_update(DatasetUpdateJob::Ingest(PullIngestItem {
-            depth: 0,
-            target: ResolvedDataset::from_created(created),
-            metadata_state: Box::new(metadata_state),
-            maybe_original_request: None,
-        }))
-        .await
+    fn task_result_update(&self, outcome: TaskOutcome) -> TaskResultDatasetUpdate {
+        let TaskOutcome::Success(task_result) = outcome else {
+            panic!("Expected a success, got {outcome:?}");
+        };
+        TaskResultDatasetUpdate::from_task_result(&task_result).unwrap()
+    }
+
+    async fn run_ingest_update(&self, created: &CreateDatasetResult) -> TaskOutcome {
+        self.run_update(DatasetUpdateJob::Ingest(created.dataset_handle.clone()))
+            .await
     }
 
     async fn run_transform_update(&self, created: &CreateDatasetResult) -> TaskOutcome {

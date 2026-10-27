@@ -15,7 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::engine::TransformResponseExt;
-use kamu_core::testing::ReportedHeads;
+use kamu_core::testing::{MockIngestIteration, ReportedHeads};
 use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetResult,
@@ -311,6 +311,145 @@ async fn test_pull_ingest_head_moved_concurrently() {
         if e.expected == Some(foo.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_exhausts_source() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let heads = [(); 3].map(|()| ReportedHeads::default());
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![
+            MockIngestIteration::updated(&heads[0], true, 2),
+            MockIngestIteration::updated(&heads[1], true, 3),
+            MockIngestIteration::updated(&heads[2], false, 4),
+        ],
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let last_head = harness.chain_reported_heads(&foo, &heads).await;
+
+    let pull_response = harness.pull_local_exhausting_sources(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: Some(old_head), new_head, has_more: false })
+        if old_head == foo.head && new_head == last_head
+    );
+    assert_eq!(harness.get_head(&foo).await, last_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_without_exhausting_runs_one_iteration() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let heads = [ReportedHeads::default()];
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![MockIngestIteration::updated(&heads[0], true, 2)],
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.chain_reported_heads(&foo, &heads).await;
+
+    let pull_response = harness.pull_local(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated { old_head: Some(old_head), new_head, has_more: true })
+        if old_head == foo.head && new_head == ingested_head
+    );
+    assert_eq!(harness.get_head(&foo).await, ingested_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_failure_after_committed_iterations_reports_progress() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let heads = [(); 2].map(|()| ReportedHeads::default());
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![
+            MockIngestIteration::updated(&heads[0], true, 2),
+            MockIngestIteration::updated(&heads[1], true, 3),
+            MockIngestIteration::Unreachable,
+        ],
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let committed_head = harness.chain_reported_heads(&foo, &heads).await;
+
+    let pull_response = harness.pull_local_exhausting_sources(&alias_foo).await;
+
+    let Err(PullError::IngestStopped(stopped)) = pull_response.result else {
+        panic!(
+            "Expected the ingest to stop, got {:?}",
+            pull_response.result
+        );
+    };
+    assert_matches!(
+        *stopped,
+        IngestStoppedError {
+            old_head,
+            new_head,
+            increment: odf::dataset::MetadataChainIncrementInterval {
+                num_blocks: 2,
+                num_records: 5,
+                ..
+            },
+            source: PollingIngestError::Unreachable { .. },
+        }
+        if old_head == foo.head && new_head == committed_head
+    );
+    assert_eq!(harness.get_head(&foo).await, committed_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_first_iteration_failure_is_not_progress() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![MockIngestIteration::Unreachable],
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let pull_response = harness.pull_local_exhausting_sources(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::PollingIngestError(
+            PollingIngestError::Unreachable { .. }
+        ))
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_without_polling_source_is_up_to_date() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_iterations(
+        &alias_foo,
+        vec![],
+    ));
+    let foo = harness.create_root_dataset_without_source(&alias_foo).await;
+
+    let pull_response = harness.pull_local(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::UpToDate(PullResultUpToDate::PollingIngest(_)))
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1089,6 +1228,7 @@ impl PullUseCaseHarness {
         b.add::<PullDatasetUseCaseImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
+            .add::<PollingIngestPlannerImpl>()
             .add_value(mocks.mock_polling_ingest_service)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<CompactionPlannerImpl>()
@@ -1162,6 +1302,35 @@ impl PullUseCaseHarness {
 
     async fn pull_local(&self, alias: &odf::DatasetAlias) -> PullResponse {
         self.pull_local_with(alias, PullOptions::default()).await
+    }
+
+    async fn pull_local_exhausting_sources(&self, alias: &odf::DatasetAlias) -> PullResponse {
+        self.pull_local_with(
+            alias,
+            PullOptions {
+                exhaust_sources: true,
+                ..PullOptions::default()
+            },
+        )
+        .await
+    }
+
+    /// Chains one unreferenced block per entry after the current `HEAD`, sets
+    /// each entry to report the step onto its block, and returns the last one
+    async fn chain_reported_heads(
+        &self,
+        created: &CreateDatasetResult,
+        heads: &[ReportedHeads],
+    ) -> odf::Multihash {
+        let mut prev = created.head.clone();
+        for (i, reported) in heads.iter().enumerate() {
+            let next = self
+                .append_unreferenced_block_after(created, &prev, &format!("iteration {i}"))
+                .await;
+            reported.set(&prev, &next);
+            prev = next;
+        }
+        prev
     }
 
     async fn pull_local_resetting_on_diverged_input(
@@ -1348,6 +1517,24 @@ impl PullUseCaseHarnessMocks {
     }
 
     /// Expects one ingest of `foo` that reports `reported_heads`.
+    fn for_ingest_iterations(
+        alias_foo: &odf::DatasetAlias,
+        iterations: Vec<MockIngestIteration>,
+    ) -> Self {
+        Self::default()
+            .with_authorizer_mock(
+                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Write,
+                    1,
+                    HashSet::from_iter([alias_foo.clone()]),
+                ),
+            )
+            .with_polling_ingest_mock(
+                MockPollingIngestService::new()
+                    .make_expect_ingest_iterations(alias_foo, iterations),
+            )
+    }
+
     fn for_ingest_updated(alias_foo: &odf::DatasetAlias, reported_heads: &ReportedHeads) -> Self {
         Self::default()
             .with_authorizer_mock(

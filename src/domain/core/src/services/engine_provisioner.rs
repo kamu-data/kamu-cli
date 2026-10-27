@@ -59,6 +59,17 @@ pub enum EngineProvisioningError {
     Internal(#[from] InternalError),
 }
 
+impl EngineProvisioningError {
+    /// Whether provisioning again could succeed. An engine name no node
+    /// configures fails the same way until the dataset's metadata changes.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::UnsupportedEngine(_) => false,
+            Self::ImagePull(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
 /// No engine with this name is configured
 #[derive(Debug, Error)]
 #[error("Unsupported engine {engine_id}")]

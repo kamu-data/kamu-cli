@@ -1332,6 +1332,50 @@ async fn test_ingest_polling_deprecated_ddl_schema() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_polling_reports_increment_and_removes_its_directory() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+    let target = harness.create_csv_polling_dataset(&src_path).await;
+    std::fs::write(&src_path, "city,population\nA,1000\nB,2000\nC,3000\n").unwrap();
+
+    let res = harness.ingest(target).await.unwrap();
+
+    assert_matches!(
+        res.result,
+        PollingIngestResult::Updated {
+            increment: odf::dataset::MetadataChainIncrementInterval {
+                num_blocks: 2,
+                num_records: 3,
+                ..
+            },
+            new_source_state: Some(odf::metadata::SourceState { kind, .. }),
+            has_more: false,
+            ..
+        } if kind == odf::metadata::SourceState::KIND_LAST_MODIFIED
+    );
+    assert_eq!(harness.ingest_dirs_left(), Vec::<String>::new());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_polling_failure_keeps_its_directory() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+    let target = harness.create_csv_polling_dataset(&src_path).await;
+    std::fs::write(&src_path, "city,population\nA,not-a-number\n").unwrap();
+
+    let res = harness.ingest(target).await;
+
+    assert_matches!(res, Err(e) if !e.is_recoverable());
+    assert_eq!(harness.ingest_dirs_left().len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -1409,6 +1453,48 @@ impl IngestTestHarness {
         .unwrap()
     }
 
+    /// A root dataset polling a CSV file with `city` and `population`
+    async fn create_csv_polling_dataset(&self, src_path: &std::path::Path) -> ResolvedDataset {
+        let dataset_snapshot = MetadataFactory::dataset_snapshot()
+            .name("foo")
+            .kind(odf::DatasetKind::Root)
+            .push_event(
+                MetadataFactory::set_polling_source()
+                    .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+                        url: url::Url::from_file_path(src_path)
+                            .unwrap()
+                            .as_str()
+                            .to_owned(),
+                        event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+                        cache: None,
+                        headers: None,
+                    }))
+                    .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
+                        header: Some(true),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
+                        ..odf::metadata::ReadStepCsv::default()
+                    }))
+                    .build(),
+            )
+            .build();
+
+        let dataset_alias = dataset_snapshot.name.clone();
+        let stored = self.create_dataset(dataset_snapshot).await;
+        ResolvedDataset::from_stored(&stored, &dataset_alias)
+    }
+
+    /// Ingest operation directories left in the run directory
+    fn ingest_dirs_left(&self) -> Vec<String> {
+        std::fs::read_dir(self.temp_dir.path().join("run"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with("ingest-"))
+            .collect()
+    }
+
     async fn ingest(
         &self,
         target: ResolvedDataset,
@@ -1422,8 +1508,10 @@ impl IngestTestHarness {
             .ingest_svc
             .ingest(
                 target.clone(),
-                Box::new(metadata_state),
+                PollingIngestPlan::new(target.get_handle(), Box::new(metadata_state)).unwrap(),
                 PollingIngestOptions::default(),
+                &IngestEnvVars::default(),
+                &random_strings::get_random_name(None, 10),
                 None,
             )
             .await;
