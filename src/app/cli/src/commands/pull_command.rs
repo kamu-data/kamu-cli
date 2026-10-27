@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -123,13 +122,9 @@ impl PullCommand {
             add_aliases: self.add_aliases,
             ingest_options: PollingIngestOptions {
                 fetch_uncacheable: self.fetch_uncacheable,
-                exhaust_sources: true,
-                // Left empty deliberately: env vars are per-dataset, and one
-                // `PullOptions` may cover many. `PullDatasetUseCaseImpl`
-                // resolves them per dataset at the ingest fan-out.
-                dataset_env_vars: HashMap::new(),
                 schema_inference: SchemaInferenceOpts::default(),
             },
+            exhaust_sources: true,
             transform_options: TransformOptions {
                 reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
             },
@@ -533,23 +528,29 @@ impl PollingIngestListener for PrettyIngestProgress {
         }
     }
 
+    fn no_polling_source(&self) {
+        let state = self.state.lock().unwrap();
+
+        state
+            .curr_progress
+            .finish_with_message(Self::spinner_message(
+                &self.dataset_handle,
+                PollingIngestStage::Commit as u32,
+                console::style("Dataset does not specify a polling source".to_owned()).yellow(),
+            ));
+    }
+
     fn success(&self, result: &PollingIngestResult) {
         let mut state = self.state.lock().unwrap();
 
         match result {
-            PollingIngestResult::UpToDate {
-                no_source_defined,
-                uncacheable,
-            } => {
+            PollingIngestResult::UpToDate { uncacheable } => {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
                         PollingIngestStage::Commit as u32,
-                        if *no_source_defined {
-                            console::style("Dataset does not specify a polling source".to_owned())
-                                .yellow()
-                        } else if *uncacheable && !self.fetch_uncacheable {
+                        if *uncacheable && !self.fetch_uncacheable {
                             console::style(
                                 "Dataset is uncacheable (use --fetch-uncacheable to update)"
                                     .to_owned(),

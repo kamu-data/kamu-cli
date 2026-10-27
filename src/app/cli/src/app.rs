@@ -498,6 +498,7 @@ pub fn configure_base_catalog(
 
     b.add::<FetchService>();
 
+    b.add::<PollingIngestPlannerImpl>();
     b.add::<PollingIngestServiceImpl>();
 
     b.add::<PushIngestExecutorImpl>();

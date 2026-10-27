@@ -49,6 +49,7 @@ tracing = "0.1"
 
 
 [dev-dependencies]
+container-runtime = { workspace = true }
 kamu = { workspace = true, features = [
     "testing",
 ] }

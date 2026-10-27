@@ -15,7 +15,7 @@ use chrono::{DateTime, Utc};
 use container_runtime::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService};
+use kamu_datasets::{DatasetEnvVar, DatasetKeyValueService, FindDatasetEnvVarError};
 use odf::metadata::FetchStep;
 use url::Url;
 
@@ -212,13 +212,17 @@ impl FetchService {
         s: &'a str,
         dataset_env_vars: &'a HashMap<String, DatasetEnvVar>,
     ) -> Result<String, PollingIngestError> {
-        let lookup_fn = |env_name: &str| -> Option<String> {
-            self.dataset_key_value_svc
+        let lookup_fn = |env_name: &str| -> Result<Option<String>, PollingIngestError> {
+            match self
+                .dataset_key_value_svc
                 .find_dataset_env_var_value_by_key(env_name, dataset_env_vars)
-                .ok()
-                .map(|v| v.get_exposed_value().to_string())
+            {
+                Ok(value) => Ok(Some(value.get_exposed_value().to_string())),
+                Err(FindDatasetEnvVarError::NotFound(_)) => Ok(None),
+                Err(FindDatasetEnvVarError::Internal(e)) => Err(e.into()),
+            }
         };
-        template_string(s, &lookup_fn).map_err(PollingIngestError::TemplateError)
+        template_string(s, &lookup_fn)
     }
 }
 

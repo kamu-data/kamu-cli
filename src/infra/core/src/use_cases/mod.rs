@@ -12,6 +12,7 @@ pub use queries::*;
 
 mod compact_dataset_use_case_impl;
 mod pull_dataset_use_case_impl;
+mod pull_ingest_loop;
 mod push_dataset_use_case_impl;
 mod push_ingest_data_use_case_impl;
 mod reset_dataset_use_case_impl;

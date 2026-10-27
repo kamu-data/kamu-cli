@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::InternalError;
-use kamu_core::engine::EngineError;
 use kamu_core::*;
 use kamu_datasets::{DatasetIncrementQueryService, DatasetRegistry, ResolvedDataset};
 use kamu_task_system::*;
@@ -50,8 +49,8 @@ impl UpdateDatasetTaskRunner {
         tracing::debug!(?task_update, "Running update task");
 
         match task_update.job {
-            DatasetUpdateJob::Ingest(ingest_item) => {
-                self.run_ingest_update(ingest_item, task_update.pull_options.ingest_options)
+            DatasetUpdateJob::Ingest(target_handle) => {
+                self.run_ingest_update(&target_handle, task_update.pull_options.ingest_options)
                     .await
             }
             DatasetUpdateJob::Transform(target_handle) => {
@@ -109,69 +108,104 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
+    /// Plans the ingest and resolves its environment variables in one
+    /// transaction, then detaches the target for execution
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>)]
+    async fn plan_ingest(
+        &self,
+        target_handle: &odf::DatasetHandle,
+    ) -> Result<(ResolvedDataset, PollingIngestPlan, IngestEnvVars), PollingIngestPlanError> {
+        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
+
+        let plan = polling_ingest_planner.plan_ingest(target.clone()).await?;
+        let env_vars = polling_ingest_planner
+            .resolve_env_vars(&target_handle.id)
+            .await?;
+
+        target.detach_from_transaction();
+
+        Ok((target, plan, env_vars))
+    }
+
     async fn run_ingest_update(
         &self,
-        ingest_item: PullIngestItem,
+        target_handle: &odf::DatasetHandle,
         ingest_options: PollingIngestOptions,
     ) -> Result<TaskOutcome, InternalError> {
+        let (target, plan, env_vars) = match self.plan_ingest(target_handle).await {
+            Ok(planned) => planned,
+            Err(e) => {
+                tracing::error!(error = ?e, error_msg = %e, "Ingest planning failed");
+                return Ok(Self::failed(e.is_recoverable()));
+            }
+        };
+
         let ingest_response = self
             .polling_ingest_service
             .ingest(
-                ingest_item.target.clone(),
-                ingest_item.metadata_state,
+                target.clone(),
+                plan,
                 ingest_options,
+                &env_vars,
+                &get_random_name(None, 10),
                 None,
             )
             .await;
+
         match ingest_response {
-            Ok(ingest_res) => {
-                // Do we have a new HEAD suggestion?
-                if let PollingIngestResult::Updated {
-                    old_head, new_head, ..
-                } = &ingest_res.result
-                    && let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
-                        .commit(ingest_item.target.get_handle(), old_head, new_head)
-                        .await?
+            Ok(PollingIngestResponse {
+                result:
+                    PollingIngestResult::Updated {
+                        old_head,
+                        new_head,
+                        has_more,
+                        increment,
+                        ..
+                    },
+                ..
+            }) => {
+                if let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
+                    .commit(target.get_handle(), &old_head, &new_head)
+                    .await?
                 {
                     return Ok(failed);
                 }
 
-                self.combine_task_result(
-                    ingest_res.result.into(),
-                    &ingest_item.target.get_handle().id,
-                )
-                .await
+                Ok(TaskOutcome::Success(
+                    TaskResultDatasetUpdate {
+                        pull_result: PullResult::Updated {
+                            old_head: Some(old_head),
+                            new_head,
+                            has_more,
+                        },
+                        data_increment: Some(increment),
+                    }
+                    .into_task_result(),
+                ))
             }
-            Err(e) => match e {
-                PollingIngestError::ParameterNotFound(_)
-                | PollingIngestError::ReadError(_)
-                | PollingIngestError::EngineError(EngineError::InvalidQuery(_))
-                | PollingIngestError::BadInputSchema(_)
-                | PollingIngestError::IncompatibleSchema(_)
-                | PollingIngestError::InvalidParameterFormat(_)
-                | PollingIngestError::MergeError(_)
-                | PollingIngestError::ExecutionError(_)
-                | PollingIngestError::TemplateError(_)
-                | PollingIngestError::EngineProvisioningError(
-                    EngineProvisioningError::UnsupportedEngine(_),
-                ) => Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable())),
-
-                PollingIngestError::CommitError(_)
-                | PollingIngestError::DataValidation(_)
-                | PollingIngestError::EngineError(_)
-                | PollingIngestError::EngineProvisioningError(
-                    EngineProvisioningError::ImagePull(_) | EngineProvisioningError::Internal(_),
-                )
-                | PollingIngestError::ImagePull(_)
-                | PollingIngestError::Internal(_)
-                | PollingIngestError::NotFound { .. }
-                | PollingIngestError::PipeError(_)
-                | PollingIngestError::ProcessError(_)
-                | PollingIngestError::Unreachable { .. } => {
-                    Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+            Ok(PollingIngestResponse {
+                result: result @ PollingIngestResult::UpToDate { .. },
+                ..
+            }) => Ok(TaskOutcome::Success(
+                TaskResultDatasetUpdate {
+                    pull_result: result.into(),
+                    data_increment: None,
                 }
-            },
+                .into_task_result(),
+            )),
+            Err(e) => {
+                tracing::error!(error = ?e, error_msg = %e, "Ingest failed");
+                Ok(Self::failed(e.is_recoverable()))
+            }
         }
+    }
+
+    fn failed(recoverable: bool) -> TaskOutcome {
+        TaskOutcome::Failed(if recoverable {
+            TaskError::empty_recoverable()
+        } else {
+            TaskError::empty_unrecoverable()
+        })
     }
 
     /// Elaborates in one transaction, then detaches the plan for execution
@@ -221,17 +255,13 @@ impl UpdateDatasetTaskRunner {
                     .into_task_error(),
                 ));
             }
-            // The dataset's metadata must change before a retry could succeed
             Err(
                 e @ (TransformElaborateError::TransformNotDefined(_)
-                | TransformElaborateError::InputsChanged(_)),
+                | TransformElaborateError::InputsChanged(_)
+                | TransformElaborateError::Internal(_)),
             ) => {
-                tracing::error!(error = ?e, error_msg = %e, "Transform cannot be planned");
-                return Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()));
-            }
-            Err(e @ TransformElaborateError::Internal(_)) => {
-                tracing::error!(error = ?e, "Transform elaboration failed");
-                return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
+                tracing::error!(error = ?e, error_msg = %e, "Transform elaboration failed");
+                return Ok(Self::failed(e.is_recoverable()));
             }
         };
 
@@ -273,24 +303,8 @@ impl UpdateDatasetTaskRunner {
             }
             Ok(TransformResult::UpToDate) => Ok(TaskOutcome::Success(TaskResult::empty())),
             Err(e) => {
-                tracing::error!(error = ?e, "Transform execution failed");
-                match e {
-                    TransformExecuteError::EngineError(EngineError::InvalidQuery(_))
-                    | TransformExecuteError::IncompatibleSchema(_)
-                    | TransformExecuteError::EngineProvisioningError(
-                        EngineProvisioningError::UnsupportedEngine(_),
-                    ) => Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable())),
-
-                    TransformExecuteError::CommitError(_)
-                    | TransformExecuteError::EngineError(_)
-                    | TransformExecuteError::EngineProvisioningError(
-                        EngineProvisioningError::ImagePull(_)
-                        | EngineProvisioningError::Internal(_),
-                    )
-                    | TransformExecuteError::Internal(_) => {
-                        Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
-                    }
-                }
+                tracing::error!(error = ?e, error_msg = %e, "Transform execution failed");
+                Ok(Self::failed(e.is_recoverable()))
             }
         }
     }

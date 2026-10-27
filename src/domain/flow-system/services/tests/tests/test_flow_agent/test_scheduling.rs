@@ -13,7 +13,6 @@ use chrono::{Duration, DurationRound};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
 use kamu_core::{PullResult, TransformStatus};
-use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
@@ -664,13 +663,6 @@ async fn test_ingest_flow_with_multiple_iterations() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 3,
-                updated_watermark: None,
-            },
-        )),
         ..Default::default()
     });
 
@@ -740,7 +732,11 @@ async fn test_ingest_flow_with_multiple_iterations() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
                                 has_more: true,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),
@@ -771,7 +767,11 @@ async fn test_ingest_flow_with_multiple_iterations() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice-1"),
                                 has_more: true,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),

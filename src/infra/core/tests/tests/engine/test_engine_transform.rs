@@ -439,8 +439,10 @@ impl TestHarness {
             .polling_ingest_svc
             .ingest(
                 target.clone(),
-                metadata_state,
+                PollingIngestPlan::new(target.get_handle(), metadata_state).unwrap(),
                 PollingIngestOptions::default(),
+                &IngestEnvVars::default(),
+                &random_strings::get_random_name(None, 10),
                 None,
             )
             .await

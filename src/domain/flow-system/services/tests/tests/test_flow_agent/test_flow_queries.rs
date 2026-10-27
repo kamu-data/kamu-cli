@@ -13,7 +13,7 @@ use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
 use kamu_core::{PullResult, TransformStatus};
-use kamu_datasets::{DatasetEntryServiceExt, MockDatasetIncrementQueryService};
+use kamu_datasets::DatasetEntryServiceExt;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
@@ -509,23 +509,6 @@ async fn test_flow_duration_starts_at_manual_activation_before_schedule() {
 
 #[test_log::test(tokio::test)]
 async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
-    let mut seq_dataset_changes = mockall::Sequence::new();
-    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // foo: reading after task 0, then task 1
-    for num_records in [5, 7] {
-        mock_dataset_changes
-            .expect_get_increment_between()
-            .times(1)
-            .in_sequence(&mut seq_dataset_changes)
-            .returning(move |_, _, _| {
-                Ok(MetadataChainIncrementInterval {
-                    num_blocks: 1,
-                    num_records,
-                    updated_watermark: None,
-                })
-            });
-    }
-
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     mock_transform_flow_evaluator
         .expect_evaluate_transform_status()
@@ -533,7 +516,6 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(mock_dataset_changes),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -597,7 +579,11 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),
@@ -627,7 +613,11 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                                 new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
                                 has_more: false,
                             },
-                            data_increment: None,
+                            data_increment: Some(MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 7,
+                                updated_watermark: None,
+                            }),
                         }
                         .into_task_result(),
                     ),

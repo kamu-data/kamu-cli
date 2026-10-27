@@ -189,6 +189,17 @@ pub enum EngineError {
     InternalError(#[from] InternalEngineError),
 }
 
+impl EngineError {
+    /// Whether running the engine again on the same input could succeed. An
+    /// invalid query fails the same way until the dataset's metadata changes.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::InvalidQuery(_) => false,
+            Self::ProcessError(_) | Self::ContractError(_) | Self::InternalError(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]

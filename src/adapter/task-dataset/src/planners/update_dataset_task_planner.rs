@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
+use database_common_macros::transactional_method1;
 use internal_error::InternalError;
 use kamu_core::{
     PollingIngestOptions,
@@ -18,7 +18,6 @@ use kamu_core::{
     PullRequestPlanner,
     TenancyConfig,
 };
-use kamu_datasets::DatasetEnvVarResolver;
 use kamu_task_system::*;
 
 use crate::{LogicalPlanDatasetUpdate, TaskDefinitionDatasetUpdate};
@@ -36,22 +35,14 @@ pub struct UpdateDatasetTaskPlanner {
 }
 
 impl UpdateDatasetTaskPlanner {
-    #[transactional_method2(
-        pull_request_planner: Arc<dyn PullRequestPlanner>,
-        dataset_env_var_resolver: Arc<dyn DatasetEnvVarResolver>
-    )]
+    #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn plan_update(
         &self,
         args: &LogicalPlanDatasetUpdate,
     ) -> Result<TaskDefinition, InternalError> {
-        let dataset_env_vars = dataset_env_var_resolver
-            .resolve_effective_env_vars(&args.dataset_id)
-            .await?;
-
         let pull_options = PullOptions {
             ingest_options: PollingIngestOptions {
-                dataset_env_vars,
                 fetch_uncacheable: args.fetch_uncacheable,
                 ..Default::default()
             },

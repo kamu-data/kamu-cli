@@ -141,6 +141,34 @@ impl BaseRepoHarness {
         .await
     }
 
+    /// A root dataset polling the CSV file at `src_path`, with `city` and
+    /// `population` columns and a header row
+    pub async fn create_root_dataset_polling_csv(
+        &self,
+        alias: &odf::DatasetAlias,
+        src_path: &Path,
+    ) -> CreateDatasetResult {
+        let source = MetadataFactory::set_polling_source()
+            .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
+                url: url::Url::from_file_path(src_path).unwrap().to_string(),
+                event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+                cache: None,
+                headers: None,
+            }))
+            .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
+                header: Some(true),
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::string("city"),
+                    odf::schema::DataField::i64("population"),
+                ])),
+                ..odf::metadata::ReadStepCsv::default()
+            }))
+            .build();
+
+        self.create_root_dataset_with_events(alias, vec![source.into()])
+            .await
+    }
+
     pub async fn create_root_dataset_without_source(
         &self,
         alias: &odf::DatasetAlias,
@@ -209,14 +237,25 @@ impl BaseRepoHarness {
         created: &CreateDatasetResult,
         description: &str,
     ) -> odf::Multihash {
-        let chain = created.dataset.as_metadata_chain();
         let head = self.get_head(created).await;
-        let head_block = chain.get_block(&head).await.unwrap();
+        self.append_unreferenced_block_after(created, &head, description)
+            .await
+    }
+
+    /// Appends a `SetInfo` block after `prev` without moving any reference
+    pub async fn append_unreferenced_block_after(
+        &self,
+        created: &CreateDatasetResult,
+        prev: &odf::Multihash,
+        description: &str,
+    ) -> odf::Multihash {
+        let chain = created.dataset.as_metadata_chain();
+        let prev_block = chain.get_block(prev).await.unwrap();
 
         let block = MetadataFactory::metadata_block(
             MetadataFactory::set_info().description(description).build(),
         )
-        .prev(&head, head_block.sequence_number)
+        .prev(prev, prev_block.sequence_number)
         .system_time(self.system_time_source.now())
         .build();
 
@@ -232,7 +271,6 @@ impl BaseRepoHarness {
             .unwrap()
     }
 
-    /// Moves `HEAD` the way a concurrent writer would.
     /// Gives a root dataset a schema and a block that only advances its
     /// watermark to `watermark`, so a derivative of it has something to
     /// transform without data files
@@ -265,6 +303,7 @@ impl BaseRepoHarness {
         }
     }
 
+    /// Moves `HEAD` the way a concurrent writer would
     pub async fn move_head(
         &self,
         created: &CreateDatasetResult,

@@ -95,6 +95,18 @@ pub enum TransformExecuteError {
     ),
 }
 
+impl TransformExecuteError {
+    /// Whether executing the same plan again could succeed
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::EngineProvisioningError(e) => e.is_recoverable(),
+            Self::EngineError(e) => e.is_recoverable(),
+            Self::IncompatibleSchema(_) => false,
+            Self::CommitError(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
