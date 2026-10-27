@@ -11,8 +11,8 @@ mod mock_compaction_executor;
 mod mock_engine_provisioner;
 mod mock_polling_ingest_service;
 mod mock_sync_service;
-mod mock_transform_elaboration_service;
 mod mock_transform_executor;
+mod mock_transform_planner;
 mod reported_heads;
 
 pub use reported_heads::*;

@@ -503,8 +503,7 @@ pub fn configure_base_catalog(
     b.add::<PushIngestExecutorImpl>();
     b.add::<PushIngestPlannerImpl>();
 
-    b.add::<TransformRequestPlannerImpl>();
-    b.add::<TransformElaborationServiceImpl>();
+    b.add::<TransformPlannerImpl>();
     b.add::<TransformExecutorImpl>();
 
     b.add::<VerificationServiceImpl>();

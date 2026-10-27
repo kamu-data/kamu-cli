@@ -351,7 +351,7 @@ impl TaskAgentHarness {
             .add::<PullRequestPlannerImpl>()
             .add::<CompactionPlannerImpl>()
             .add::<ResetPlannerImpl>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasesRegistryImpl>()

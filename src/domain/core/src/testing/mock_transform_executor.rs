@@ -52,34 +52,6 @@ impl MockTransformExecutor {
             });
         self
     }
-
-    /// Like [`Self::make_expect_transform_updated`], and also checks that the
-    /// plan was elaborated at the old head set in `heads`.
-    pub fn make_expect_transform_updated_at_plan_head(
-        mut self,
-        target_alias: odf::DatasetAlias,
-        heads: ReportedHeads,
-    ) -> Self {
-        self.expect_execute_transform()
-            .withf(move |target, _, _, _| target.get_alias() == &target_alias)
-            .times(1)
-            .returning(move |target, plan, _, _| {
-                let (old_head, new_head) = heads.get();
-                assert_eq!(
-                    plan.request.head, old_head,
-                    "Transform was elaborated at an unexpected head"
-                );
-                (
-                    target,
-                    Ok(TransformResult::Updated {
-                        old_head,
-                        new_head,
-                        increment: Self::REPORTED_INCREMENT,
-                    }),
-                )
-            });
-        self
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

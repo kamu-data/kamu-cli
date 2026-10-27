@@ -15,25 +15,33 @@ use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MockTransformElaborationService {
+impl MockTransformPlanner {
+    /// Elaborates a transform without inputs. The request's head is a fixed
+    /// placeholder: the mocked executors report the heads they commit.
     pub fn make_expect_elaborate_transform(mut self, target_alias: odf::DatasetAlias) -> Self {
         self.expect_elaborate_transform()
-            .withf(move |plan| plan.preliminary_request.dataset_handle.alias == target_alias)
+            .withf(move |target| target.get_alias() == &target_alias)
             .times(1)
-            .returning(|plan| {
-                Ok(TransformElaboration::Elaborated(TransformPlan {
+            .returning(|target| {
+                Ok(TransformElaboration::Elaborated(TransformExecutionPlan {
                     request: TransformRequestExt {
-                        dataset_handle: plan.preliminary_request.dataset_handle,
-                        block_ref: plan.preliminary_request.block_ref,
-                        head: plan.preliminary_request.head,
-                        transform: plan.preliminary_request.transform,
-                        transform_block: plan.preliminary_request.transform_block,
+                        dataset_handle: target.get_handle().clone(),
+                        block_ref: odf::BlockRef::Head,
+                        head: odf::Multihash::from_digest_sha3_256(b"elaborated-head"),
+                        transform: odf::metadata::Transform::Sql(odf::metadata::TransformSql {
+                            engine: "mock".to_string(),
+                            version: None,
+                            query: None,
+                            queries: Some(Vec::new()),
+                            temporal_tables: None,
+                        }),
+                        transform_block: odf::Multihash::from_digest_sha3_256(b"set-transform"),
                         system_time: Utc::now(),
-                        schema: plan.preliminary_request.schema,
-                        prev_offset: plan.preliminary_request.prev_offset,
-                        vocab: plan.preliminary_request.vocab,
+                        schema: None,
+                        prev_offset: None,
+                        vocab: odf::metadata::DatasetVocabulary::default(),
                         inputs: vec![],
-                        prev_checkpoint: plan.preliminary_request.prev_checkpoint,
+                        prev_checkpoint: None,
                     },
                     datasets_map: ResolvedDatasetsMap::default(),
                 }))
@@ -46,7 +54,7 @@ impl MockTransformElaborationService {
         target_alias: odf::DatasetAlias,
     ) -> Self {
         self.expect_elaborate_transform()
-            .withf(move |plan| plan.preliminary_request.dataset_handle.alias == target_alias)
+            .withf(move |target| target.get_alias() == &target_alias)
             .times(1)
             .returning(|_| Ok(TransformElaboration::UpToDate));
         self
@@ -56,7 +64,11 @@ impl MockTransformElaborationService {
     pub fn make_expect_elaborate_transform_diverged(self, target_alias: odf::DatasetAlias) -> Self {
         self.make_expect_elaborate_transform_error(target_alias, || {
             InvalidInputIntervalError {
-                input_dataset_id: odf::DatasetID::new_seeded_ed25519(b"input"),
+                input_dataset: odf::DatasetHandle::new(
+                    odf::DatasetID::new_seeded_ed25519(b"input"),
+                    odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("input")),
+                    odf::DatasetKind::Root,
+                ),
                 head: odf::Multihash::from_digest_sha3_256(b"head"),
                 tail: odf::Multihash::from_digest_sha3_256(b"tail"),
             }
@@ -70,7 +82,7 @@ impl MockTransformElaborationService {
         make_error: impl Fn() -> TransformElaborateError + Send + 'static,
     ) -> Self {
         self.expect_elaborate_transform()
-            .withf(move |plan| plan.preliminary_request.dataset_handle.alias == target_alias)
+            .withf(move |target| target.get_alias() == &target_alias)
             .times(1)
             .returning(move |_| Err(make_error()));
         self

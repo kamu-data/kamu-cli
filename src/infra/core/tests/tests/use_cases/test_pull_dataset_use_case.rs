@@ -15,7 +15,12 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetAction, MockDatasetActionAuthorizer};
+use kamu_datasets::{
+    CreateDatasetResult,
+    DatasetAction,
+    MockDatasetActionAuthorizer,
+    ResolvedDataset,
+};
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     DatasetHeadCommitterImpl,
@@ -95,8 +100,7 @@ async fn test_pull_transform_success() {
                 ),
         )
         .with_transform_elaboration_mock(
-            MockTransformElaborationService::new()
-                .make_expect_elaborate_transform(alias_bar.clone()),
+            MockTransformPlanner::new().make_expect_elaborate_transform(alias_bar.clone()),
         )
         .with_transform_execution_mock(
             MockTransformExecutor::new().make_expect_transform(alias_bar.clone()),
@@ -267,7 +271,7 @@ async fn test_pull_transform_diverged_input_fails_without_reset() {
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
             .with_transform_elaboration_mock(
-                MockTransformElaborationService::new()
+                MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone()),
             ),
     );
@@ -299,7 +303,7 @@ async fn test_pull_transform_diverged_input_resets_and_retransforms() {
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
             .with_transform_elaboration_mock(
-                MockTransformElaborationService::new()
+                MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
                     .make_expect_elaborate_transform(alias_bar.clone()),
             )
@@ -344,7 +348,7 @@ async fn test_pull_transform_reset_then_up_to_date_reports_updated() {
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
             .with_transform_elaboration_mock(
-                MockTransformElaborationService::new()
+                MockTransformPlanner::new()
                     .make_expect_elaborate_transform_diverged(alias_bar.clone())
                     .make_expect_elaborate_transform_up_to_date(alias_bar.clone()),
             )
@@ -387,7 +391,7 @@ async fn test_pull_transform_input_not_pulled() {
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
             .with_transform_elaboration_mock(
-                MockTransformElaborationService::new().make_expect_elaborate_transform_error(
+                MockTransformPlanner::new().make_expect_elaborate_transform_error(
                     alias_bar.clone(),
                     move || {
                         InputNotPulledError {
@@ -612,8 +616,7 @@ async fn test_pull_multi_recursive() {
                 .make_expect_ingest(alias_baz.clone()),
         )
         .with_transform_elaboration_mock(
-            MockTransformElaborationService::new()
-                .make_expect_elaborate_transform(alias_foo_bar.clone()),
+            MockTransformPlanner::new().make_expect_elaborate_transform(alias_foo_bar.clone()),
         )
         .with_transform_execution_mock(
             MockTransformExecutor::new().make_expect_transform(alias_foo_bar.clone()),
@@ -766,7 +769,7 @@ async fn test_pull_all_owned() {
             ),
         )
         .with_transform_elaboration_mock(
-            MockTransformElaborationService::new()
+            MockTransformPlanner::new()
                 .make_expect_elaborate_transform(alias_foo_bar.clone())
                 .make_expect_elaborate_transform(alias_foo_baz.clone()),
         )
@@ -968,11 +971,16 @@ impl PullUseCaseHarness {
         b.add::<PullDatasetUseCaseImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
-            .add::<TransformRequestPlannerImpl>()
+            .add_value(TransformPlannerWithMockedElaboration {
+                real: TransformPlannerImpl::new(
+                    base_use_case_harness.catalog().get_one().unwrap(),
+                    base_use_case_harness.catalog().get_one().unwrap(),
+                ),
+                mock: mocks.mock_transform_elaboration,
+            })
+            .bind::<dyn TransformPlanner, TransformPlannerWithMockedElaboration>()
             .add_value(mocks.mock_polling_ingest_service)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
-            .add_value(mocks.mock_transform_elaboration_service)
-            .bind::<dyn TransformElaborationService, MockTransformElaborationService>()
             .add_value(mocks.mock_transform_execution_service)
             .bind::<dyn TransformExecutor, MockTransformExecutor>()
             .add::<CompactionPlannerImpl>()
@@ -1081,10 +1089,61 @@ impl PullUseCaseHarness {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Plans for real, so that pull planning sees the inputs it authorizes, while
+/// elaboration follows the test's expectations
+struct TransformPlannerWithMockedElaboration {
+    real: TransformPlannerImpl,
+    mock: MockTransformPlanner,
+}
+
+#[async_trait::async_trait]
+impl TransformPlanner for TransformPlannerWithMockedElaboration {
+    async fn describe_transform(
+        &self,
+        target: ResolvedDataset,
+    ) -> Result<TransformDescription, TransformPlanError> {
+        self.real.describe_transform(target).await
+    }
+
+    async fn elaborate_transform(
+        &self,
+        target: ResolvedDataset,
+    ) -> Result<TransformElaboration, TransformElaborateError> {
+        self.mock.elaborate_transform(target).await
+    }
+
+    async fn rebuild_transform(
+        &self,
+        target: ResolvedDataset,
+        stored: &TransformPlanPayload,
+    ) -> Result<TransformExecutionPlan, TransformRebuildError> {
+        self.mock.rebuild_transform(target, stored).await
+    }
+
+    async fn evaluate_transform_status(
+        &self,
+        target: ResolvedDataset,
+    ) -> Result<TransformStatus, TransformStatusError> {
+        self.real.evaluate_transform_status(target).await
+    }
+
+    async fn build_transform_verification_plan(
+        &self,
+        target: ResolvedDataset,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
+    ) -> Result<VerifyTransformOperation, VerifyTransformPlanError> {
+        self.real
+            .build_transform_verification_plan(target, block_range)
+            .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PullUseCaseHarnessMocks {
     mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
     mock_polling_ingest_service: MockPollingIngestService,
-    mock_transform_elaboration_service: MockTransformElaborationService,
+    mock_transform_elaboration: MockTransformPlanner,
     mock_transform_execution_service: MockTransformExecutor,
     mock_compaction_executor: MockCompactionExecutor,
     mock_sync_service: MockSyncService,
@@ -1113,10 +1172,10 @@ impl PullUseCaseHarnessMocks {
 
     fn with_transform_elaboration_mock(
         self,
-        mock_transform_elaboration_service: MockTransformElaborationService,
+        mock_transform_elaboration: MockTransformPlanner,
     ) -> Self {
         Self {
-            mock_transform_elaboration_service,
+            mock_transform_elaboration,
             ..self
         }
     }
@@ -1166,8 +1225,7 @@ impl PullUseCaseHarnessMocks {
     ) -> Self {
         Self::for_transform(alias_foo, alias_bar)
             .with_transform_elaboration_mock(
-                MockTransformElaborationService::new()
-                    .make_expect_elaborate_transform(alias_bar.clone()),
+                MockTransformPlanner::new().make_expect_elaborate_transform(alias_bar.clone()),
             )
             .with_transform_execution_mock(
                 MockTransformExecutor::new()
@@ -1205,7 +1263,7 @@ impl Default for PullUseCaseHarnessMocks {
         Self {
             mock_dataset_action_authorizer: MockDatasetActionAuthorizer::new(),
             mock_polling_ingest_service: MockPollingIngestService::new(),
-            mock_transform_elaboration_service: MockTransformElaborationService::new(),
+            mock_transform_elaboration: MockTransformPlanner::new(),
             mock_transform_execution_service: MockTransformExecutor::new(),
             mock_compaction_executor: MockCompactionExecutor::new(),
             mock_sync_service: MockSyncService::new(),

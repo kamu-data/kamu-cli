@@ -216,7 +216,7 @@ impl TransformExecutor for TransformExecutorImpl {
     async fn execute_transform(
         &self,
         target: ResolvedDataset,
-        plan: TransformPlan,
+        plan: TransformExecutionPlan,
         operation_id: &str,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> (

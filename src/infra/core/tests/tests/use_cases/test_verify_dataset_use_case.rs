@@ -195,7 +195,7 @@ impl VerifyUseCaseHarness {
         let catalog = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog())
             .add::<VerifyDatasetUseCaseImpl>()
             .add::<VerificationServiceImpl>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<TransformExecutorImpl>()
             .add::<EngineProvisionerNull>()
             .build();

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu_core::{TransformRequestPlanner, TransformStatus, TransformStatusError};
+use kamu_core::{TransformPlanner, TransformStatus, TransformStatusError};
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
 use crate::TransformFlowEvaluator;
@@ -21,7 +21,7 @@ use crate::TransformFlowEvaluator;
 #[dill::interface(dyn TransformFlowEvaluator)]
 pub struct TransformFlowEvaluatorImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    transform_planner: Arc<dyn TransformPlanner>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,13 +38,20 @@ impl TransformFlowEvaluator for TransformFlowEvaluatorImpl {
             .await
             .int_err()?;
 
-        self.transform_request_planner
+        match self
+            .transform_planner
             .evaluate_transform_status(target)
             .await
-            .map_err(|e| match e {
-                TransformStatusError::TransformNotDefined(e) => e.int_err(),
-                TransformStatusError::Internal(e) => e,
-            })
+        {
+            Ok(status) => Ok(status),
+            // Waits for the metadata to change, without failing the sensor
+            Err(TransformStatusError::InputsChanged(e)) => {
+                tracing::warn!(error = %e, "Transform cannot run until its inputs are restored");
+                Ok(TransformStatus::UpToDate)
+            }
+            Err(TransformStatusError::TransformNotDefined(e)) => Err(e.int_err()),
+            Err(TransformStatusError::Internal(e)) => Err(e),
+        }
     }
 }
 

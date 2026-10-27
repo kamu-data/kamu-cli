@@ -174,9 +174,8 @@ interface "SyncService" <<i>>
 interface "SystemTimeSource" <<i>>
 interface "TaskEventStore" <<i>>
 interface "TaskQueueWakeupSource" <<i>>
-interface "TransformElaborationService" <<i>>
 interface "TransformExecutor" <<i>>
-interface "TransformRequestPlanner" <<i>>
+interface "TransformPlanner" <<i>>
 interface "TypedResourceQueryService" <<i>>
 interface "UnsetDatasetAccountsRelationsUseCase" <<i>>
 interface "UpdateAccountUseCase" <<i>>
@@ -476,9 +475,8 @@ class "SystemTimeSourceDefault" <<agnostic>>
 class "TenancyConfig" <<singleton>>
 class "TransactionRef" <<singleton>>
 class "TransactionRefT" <<singleton>>
-class "TransformElaborationServiceImpl"
 class "TransformExecutorImpl"
-class "TransformRequestPlannerImpl"
+class "TransformPlannerImpl"
 class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
@@ -561,7 +559,7 @@ class "WsSmartTransferProtocolClient"
 "ProvenanceServiceImpl"  --> "DependencyGraphService"
 "PullRequestPlanner" <|-- "PullRequestPlannerImpl"
 "PullRequestPlannerImpl"  --> "RemoteAliasesRegistry"
-"PullRequestPlannerImpl"  --> "TransformRequestPlanner"
+"PullRequestPlannerImpl"  --> "TransformPlanner"
 "PullRequestPlannerImpl"  --> "DatasetRegistry"
 "PullRequestPlannerImpl"  --> "DependencyGraphService"
 "PullRequestPlannerImpl"  --> "SyncRequestBuilder"
@@ -606,15 +604,14 @@ class "WsSmartTransferProtocolClient"
 "SyncServiceImpl"  --> "DatasetFactory"
 "SyncServiceImpl"  --> "IpfsClient"
 "SyncServiceImpl"  --> "SimpleTransferProtocol"
-"TransformElaborationService" <|-- "TransformElaborationServiceImpl"
-"TransformElaborationServiceImpl"  --> "SystemTimeSource"
 "TransformExecutor" <|-- "TransformExecutorImpl"
 "TransformExecutorImpl"  --> "EngineProvisioner"
-"TransformRequestPlanner" <|-- "TransformRequestPlannerImpl"
-"TransformRequestPlannerImpl"  --> "DatasetRegistry"
+"TransformPlanner" <|-- "TransformPlannerImpl"
+"TransformPlannerImpl"  --> "DatasetRegistry"
+"TransformPlannerImpl"  --> "SystemTimeSource"
 "VerificationService" <|-- "VerificationServiceImpl"
 "VerificationServiceImpl"  --> "TransformExecutor"
-"VerificationServiceImpl"  --> "TransformRequestPlanner"
+"VerificationServiceImpl"  --> "TransformPlanner"
 "SetWatermarkExecutor" <|-- "SetWatermarkExecutorImpl"
 "SetWatermarkExecutorImpl"  --> "DatasetHeadCommitter"
 "SetWatermarkPlanner" <|-- "SetWatermarkPlannerImpl"
@@ -629,7 +626,6 @@ class "WsSmartTransferProtocolClient"
 "PullDatasetUseCaseImpl"  --> "CompactionPlanner"
 "PullDatasetUseCaseImpl"  --> "PollingIngestService"
 "PullDatasetUseCaseImpl"  --> "SyncService"
-"PullDatasetUseCaseImpl"  --> "TransformElaborationService"
 "PullDatasetUseCaseImpl"  --> "TransformExecutor"
 "PullDatasetUseCaseImpl"  --> "TenancyConfig"
 "PushDatasetUseCase" <|-- "PushDatasetUseCaseImpl"

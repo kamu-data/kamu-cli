@@ -13,7 +13,7 @@ use internal_error::InternalError;
 use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 
-use super::TransformPlan;
+use super::TransformExecutionPlan;
 use crate::engine::EngineError;
 use crate::{
     DataNotReproducible,
@@ -38,7 +38,7 @@ pub trait TransformExecutor: Send + Sync {
     async fn execute_transform(
         &self,
         target: ResolvedDataset,
-        plan: TransformPlan,
+        plan: TransformExecutionPlan,
         operation_id: &str,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> (

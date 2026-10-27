@@ -101,10 +101,12 @@ pub struct InputNotPulledError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The block the last transform consumed is no longer an ancestor of the
+/// input's head: the input's history was rewritten
 #[derive(Error, Debug)]
-#[error("Invalid block interval [{head}, {tail}) in input dataset '{input_dataset_id}'")]
+#[error("Invalid block interval [{head}, {tail}) in input dataset {input_dataset}")]
 pub struct InvalidInputIntervalError {
-    pub input_dataset_id: odf::DatasetID,
+    pub input_dataset: odf::DatasetHandle,
     pub head: odf::Multihash,
     pub tail: odf::Multihash,
 }
