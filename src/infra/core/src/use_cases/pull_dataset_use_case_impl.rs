@@ -621,10 +621,49 @@ impl PullDatasetUseCaseImpl {
             maybe_original_request,
             maybe_local_ref: Some(target_handle.as_local_ref()),
             maybe_remote_ref: None,
-            result: transform_result
-                .map(Into::into)
-                .map_err(PullError::TransformError),
+            result: transform_result.map(Into::into),
         })
+    }
+
+    /// The pull authorized reading the inputs of the transform it planned.
+    /// Another writer may change the transform before the job elaborates it,
+    /// so inputs the pull did not plan are authorized here, before any is read
+    #[transactional_static_method1(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>)]
+    async fn authorize_unplanned_inputs(
+        plan: &TransformExecutionPlan,
+        planned_inputs: &[odf::DatasetHandle],
+        catalog: dill::Catalog,
+    ) -> Result<(), PullError> {
+        let unplanned_inputs: Vec<_> = plan
+            .request
+            .inputs
+            .iter()
+            .map(|input| &input.dataset_handle)
+            .filter(|handle| !planned_inputs.iter().any(|planned| planned.id == handle.id))
+            .cloned()
+            .collect();
+        if unplanned_inputs.is_empty() {
+            return Ok(());
+        }
+
+        let ClassifyByAllowanceResponse {
+            authorized_handles: _,
+            unauthorized_handles_with_errors,
+        } = dataset_action_authorizer
+            .classify_dataset_handles_by_allowance(unplanned_inputs, DatasetAction::Read)
+            .await?;
+
+        match unauthorized_handles_with_errors.into_iter().next() {
+            None => Ok(()),
+            Some((_, error)) => {
+                use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+                Err(match error {
+                    E::NotFound(e) => PullError::NotFound(e),
+                    E::Access(e) => PullError::Access(e),
+                    E::Internal(e) => PullError::Internal(e),
+                })
+            }
+        }
     }
 
     async fn elaborate_and_execute_transform(
@@ -633,7 +672,7 @@ impl PullDatasetUseCaseImpl {
         services: TransformServices,
         catalog: dill::Catalog,
         maybe_listener: Option<Arc<dyn TransformListener>>,
-    ) -> Result<TransformResult, TransformError> {
+    ) -> Result<TransformResult, PullError> {
         let listener = maybe_listener
             .clone()
             .unwrap_or_else(|| Arc::new(NullTransformListener));
@@ -649,7 +688,8 @@ impl PullDatasetUseCaseImpl {
                 tracing::warn!(error = %e, "Input diverged, resetting the derivative to metadata");
 
                 match Self::reset_to_metadata(target.get_handle(), &services, catalog.clone())
-                    .await?
+                    .await
+                    .map_err(PullError::TransformError)?
                 {
                     Some(reset_heads) => {
                         maybe_reset_heads = Some(reset_heads);
@@ -662,21 +702,25 @@ impl PullDatasetUseCaseImpl {
         };
 
         let (transform_result, elaborated_up_to_date) = match elaboration {
-            Ok(TransformElaboration::Elaborated(plan)) => (
-                Self::execute_transform_and_commit(
-                    target,
-                    plan,
-                    &services,
-                    catalog,
-                    maybe_listener,
+            Ok(TransformElaboration::Elaborated(plan)) => {
+                Self::authorize_unplanned_inputs(&plan, &pti.input_handles, catalog.clone())
+                    .await?;
+                (
+                    Self::execute_transform_and_commit(
+                        target,
+                        plan,
+                        &services,
+                        catalog,
+                        maybe_listener,
+                    )
+                    .await?,
+                    false,
                 )
-                .await?,
-                false,
-            ),
+            }
             Ok(TransformElaboration::UpToDate) => (TransformResult::UpToDate, true),
             Err(e) => {
                 listener.elaborate_error(&e);
-                return Err(e.into());
+                return Err(TransformError::from(e).into());
             }
         };
 
