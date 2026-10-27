@@ -405,10 +405,10 @@ failure.
   `UpToDate { uncacheable }` unless `fetch_uncacheable` is set. `Updated { has_more }` means the
   source has more to fetch: the task does not loop, and the ingest flow controller schedules the
   next iteration if its config sets `fetch_next_iteration`.
-- **Transform** — in one transaction the runner plans the transform from the target's current
-  `HEAD` and `TransformElaborationService::elaborate_transform` computes each input's unprocessed
-  slices and watermarks ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)).
-  `UpToDate` ends the task with an empty success. Otherwise
+- **Transform** — in one transaction `TransformPlanner::elaborate_transform` plans the transform
+  from the target's current `HEAD` and computes each input's unprocessed slices and watermarks ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)).
+  `UpToDate` ends the task with an empty success, as does an executor run that appends nothing.
+  Otherwise
   `TransformExecutor::execute_transform` provisions the engine named by the transform — always a
   container engine, DataFusion included — runs the query and commits `ExecuteTransform`.
   The runner never resets the derivative, so a diverged input is not repaired here:
@@ -427,13 +427,14 @@ a short transaction.
 
 | Error | Recoverable |
 | --- | --- |
-| Ingest: `ParameterNotFound`, `ReadError`, invalid query, `BadInputSchema`, `IncompatibleSchema`, `InvalidParameterFormat`, `MergeError`, `ExecutionError`, `TemplateError` | no |
-| Ingest: `CommitError`, `DataValidation`, other engine errors, `EngineProvisioningError`, `ImagePull`, `NotFound`, `PipeError`, `ProcessError`, `Unreachable`, `Internal` | yes |
+| Ingest: `ParameterNotFound`, `ReadError`, invalid query, `BadInputSchema`, `IncompatibleSchema`, `InvalidParameterFormat`, `MergeError`, `ExecutionError`, `TemplateError`, unsupported engine | no |
+| Ingest: `CommitError`, `DataValidation`, other engine and provisioning errors, `ImagePull`, `NotFound`, `PipeError`, `ProcessError`, `Unreachable`, `Internal` | yes |
 | Ingest or transform: `HEAD` moved after planning (the CAS fails when moving it) | yes, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
 | Transform elaboration: `InvalidInputInterval` | no, typed `InputDatasetCompacted` |
+| Transform elaboration: `TransformNotDefined`, `InputsChanged` | no |
 | Transform elaboration: `InputNotPulled` | not an error: the task ends with an empty success, as when up to date |
 | Transform elaboration: `Internal` | yes |
-| Transform execution: invalid query | no |
+| Transform execution: invalid query, `IncompatibleSchema`, unsupported engine | no |
 | Transform execution: commit, engine, provisioning, internal | yes |
 | Sync: any | yes (not yet classified) |
 
