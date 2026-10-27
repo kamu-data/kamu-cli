@@ -54,6 +54,17 @@ Recommendation: for ease of reading, use the following format:
 - A transform whose engine output adds nothing no longer crashes the process; it is reported as up
   to date
 - Transform runs no longer leave their working files behind after a successful commit
+- An ingest flow of a root dataset without a polling source fails instead of reporting success on
+  every run
+- An ingest whose data fails validation or does not parse as its column's type fails without
+  retries; `kamu pull` reports such data as an execution error instead of an internal error
+- When `kamu pull` fails part-way through a source that yields several batches, it reports how many
+  blocks and records it ingested before the failure, along with the actual error
+- Ingest flows no longer fail after their data was committed, which left downstream flows
+  untriggered
+- Failures to read a dataset environment variable used in a fetch step, such as a secret that
+  cannot be decrypted, are reported instead of being treated as a missing value
+- Polling ingest runs no longer leave their working files behind after success
 
 ## [0.271.0] - 2026-10-21
 ### Added

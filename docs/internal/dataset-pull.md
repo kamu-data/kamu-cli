@@ -113,9 +113,8 @@ ones), and the CLI processes outbox messages after it succeeds.
 | `--visibility` | visibility of datasets created by sync |
 | `--reset-derivatives-on-diverged-input` | `TransformOptions::reset_derivatives_on_diverged_input` ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)) |
 
-The command always sets `exhaust_sources: true`, so a polling source is ingested until it has no
-more data. It leaves `dataset_env_vars` empty; the use case resolves them per dataset
-([§6.2](#62-per-job-runners)).
+The command always sets `PullOptions::exhaust_sources`, so a polling source is ingested until it
+has no more data ([§6.2](#62-per-job-runners)).
 
 Reference interpretation depends on tenancy: in a single-tenant workspace a repo-like reference
 (`repo/name`) is a remote repository; in a multi-tenant workspace it is `account/name`, and
@@ -177,7 +176,7 @@ iteration per depth:
 
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
-| depth 0, no remote ref | `Ingest(PullIngestItem)` | `build_ingest_item` | target and `DataWriterMetadataState` read from `HEAD` |
+| depth 0, no remote ref | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
 | depth 0, remote ref | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder` | local target (existing or to create), remote ref, `SyncRequest` |
 | depth > 0 | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
@@ -209,12 +208,12 @@ runs outside them.
 
 | Job | Runner | Moves `HEAD` |
 | --- | --- | --- |
-| Ingest | `ingest`: resolves the dataset's env vars if the options carry none and secrets encryption is enabled; then `ingest_loop` calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), merging results so the response spans the first old head to the last new head | after every ingest iteration that returns `Updated`, `commit_head_transactionally` (CAS) |
+| Ingest | `PullIngestLoop::run`: plans the ingest and resolves the dataset's env vars in one transaction ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)); then calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), adding up the results so the response spans the first old head to the last new head. A dataset without a polling source is up to date. A failure after earlier iterations committed is `PullError::IngestStopped`, carrying the committed heads and increment and the iteration's error | after every ingest iteration that returns `Updated`, `PullIngestLoop::commit_head` (CAS) |
 | Transform | `transform`: plans and elaborates in one transaction ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes | after the reset and after the transform, `commit_head_transactionally` (CAS) |
 | Sync | `sync`: `SyncService::sync`; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias | by `SyncService` itself |
 
-`commit_head_transactionally` moves `HEAD` through `DatasetHeadCommitter`, expecting the head the
-job started from, which posts
+`commit_head_transactionally` and `PullIngestLoop::commit_head` move `HEAD` through
+`DatasetHeadCommitter`, expecting the head the iteration started from, which posts
 `DatasetReferenceMessage` ([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)).
 Any failure there, a CAS conflict included, is that dataset's error: `PollingIngestError::CommitError`
 for an ingest job, `TransformExecuteError::CommitError` for a transform job. A conflict arrives as
@@ -275,12 +274,13 @@ the local and remote refs if resolved, and `Result<PullResult, PullError>`.
 
 `PullResult` is `UpToDate(kind)` — polling ingest (with `uncacheable`), push ingest, transform or
 sync — or `Updated { old_head, new_head, has_more }`. `PullError` wraps the per-job errors
-(`PollingIngestError`, `TransformError`, `SyncError`) plus planning errors (`NotFound`,
+(`PollingIngestError`, `IngestStopped`, `TransformError`, `SyncError`) plus planning errors (`NotFound`,
 `AmbiguousSource`, `SaveUnderDifferentAlias`, `InvalidOperation`, `ScanMetadata`), `Access` and
 `Internal`.
 
-An `InternalError` returned by a job runner itself (an env-var lookup failure) aborts the whole
-pull rather than becoming a per-dataset error; a failure to move `HEAD` is a per-dataset error
+An `InternalError` returned by a job runner itself aborts the whole pull rather than becoming a
+per-dataset error; a failure to plan an ingest, resolve its env vars or move `HEAD` is a
+per-dataset error
 ([§6.2](#62-per-job-runners)). A job that panics re-raises the panic in the command (`JoinSet::join_all`), aborting the
 other jobs of its iteration.
 
@@ -317,6 +317,7 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 | Use case trait | [`pull_dataset_use_case.rs`](../../src/domain/core/src/use_cases/pull_dataset_use_case.rs) |
 | Planner: resolution, traversal, depths, job building | [`pull_request_planner_impl.rs`](../../src/infra/core/src/services/pull_request_planner_impl.rs) |
 | Use case: authorization, iteration loop, runners, `HEAD` updates | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Polling ingest loop of an ingest job | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |
 | CLI command, progress, error display | [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) |
 | CLI flags and dispatch | [`cli.rs`](../../src/app/cli/src/cli.rs), [`cli_commands.rs`](../../src/app/cli/src/cli_commands.rs) |
 | Server update task | [`update_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/update_dataset_task_planner.rs), [`update_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/update_dataset_task_runner.rs) |
