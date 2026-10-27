@@ -42,6 +42,18 @@ Recommendation: for ease of reading, use the following format:
   are now fully processed before the command exits, instead of on the next command
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key
+- Transform flows now run for a derivative whose input has a single record, or whose input only
+  advanced its watermark; before, the flow treated them as up to date
+- Changing the inputs of a derivative's transform makes its pulls, flows and verification fail with
+  an error that names the dataset, instead of crashing the process
+- `kamu verify` of a derivative whose query was changed no longer reports the blocks produced by
+  the earlier query as not reproducible
+- A transform whose output schema is incompatible with the dataset's schema fails without retries
+- Engine names in a transform are case-insensitive (`Spark` works like `spark`); an unknown engine
+  fails without retries
+- A transform whose engine output adds nothing no longer crashes the process; it is reported as up
+  to date
+- Transform runs no longer leave their working files behind after a successful commit
 
 ## [0.271.0] - 2026-10-21
 ### Added

@@ -179,7 +179,7 @@ iteration per depth:
 | --- | --- | --- | --- |
 | depth 0, no remote ref | `Ingest(PullIngestItem)` | `build_ingest_item` | target and `DataWriterMetadataState` read from `HEAD` |
 | depth 0, remote ref | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder` | local target (existing or to create), remote ref, `SyncRequest` |
-| depth > 0 | `Transform(PullTransformItem)` | `build_transform_item` → `TransformRequestPlanner::build_transform_preliminary_plan`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is planned again when the job runs |
+| depth > 0 | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
 remote is copied, never transformed locally.
