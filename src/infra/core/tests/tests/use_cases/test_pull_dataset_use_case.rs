@@ -11,8 +11,10 @@ use std::assert_matches;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use chrono::{DateTime, TimeZone, Utc};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
+use kamu_core::engine::TransformResponseExt;
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
 use kamu_datasets::{
@@ -197,6 +199,61 @@ async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
             result: Err(PullError::Access(_)),
             ..
         } if a_local_ref == bar.dataset_handle.as_local_ref()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_with_real_planner_and_executor_commits_head() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let watermark = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+
+    let mocks = PullUseCaseHarnessMocks::default()
+        .with_authorizer_mock(
+            MockDatasetActionAuthorizer::new()
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Write,
+                    1,
+                    HashSet::from_iter([alias_bar.clone()]),
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Read,
+                    1,
+                    HashSet::from_iter([alias_foo.clone()]),
+                ),
+        )
+        .with_real_transform(watermark);
+    let harness = PullUseCaseHarness::new(mocks);
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    harness
+        .append_schema_and_watermark(&foo, Utc.with_ymd_and_hms(2050, 1, 1, 0, 0, 0).unwrap())
+        .await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let pull_response = harness
+        .use_case
+        .execute(
+            PullRequest::Local(alias_bar.as_local_ref()),
+            PullOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    let new_head = harness.get_head(&bar).await;
+    assert_ne!(new_head, bar.head);
+    assert_matches!(
+        pull_response.result,
+        Ok(PullResult::Updated {
+            old_head: Some(old_head),
+            new_head: reported_head,
+            has_more: false,
+        }) if old_head == bar.head && reported_head == new_head
     );
 }
 
@@ -1032,18 +1089,8 @@ impl PullUseCaseHarness {
         b.add::<PullDatasetUseCaseImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
-            .add_value(TransformPlannerWithMockedElaboration {
-                real: TransformPlannerImpl::new(
-                    base_use_case_harness.catalog().get_one().unwrap(),
-                    base_use_case_harness.catalog().get_one().unwrap(),
-                ),
-                mock: mocks.mock_transform_elaboration,
-            })
-            .bind::<dyn TransformPlanner, TransformPlannerWithMockedElaboration>()
             .add_value(mocks.mock_polling_ingest_service)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
-            .add_value(mocks.mock_transform_execution_service)
-            .bind::<dyn TransformExecutor, MockTransformExecutor>()
             .add::<CompactionPlannerImpl>()
             .add_value(mocks.mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>()
@@ -1060,6 +1107,35 @@ impl PullUseCaseHarness {
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<DependencyGraphIndexer>();
+
+        if let Some(watermark) = mocks.real_transform_watermark {
+            b.add::<TransformPlannerImpl>()
+                .add::<TransformExecutorImpl>()
+                .add_value(
+                    MockEngineProvisioner::new().always_provision_engine_responding(move || {
+                        TransformResponseExt {
+                            new_offset_interval: None,
+                            new_watermark: Some(watermark),
+                            output_schema: None,
+                            new_checkpoint: None,
+                            new_data: None,
+                            run_dir: None,
+                        }
+                    }),
+                )
+                .bind::<dyn EngineProvisioner, MockEngineProvisioner>();
+        } else {
+            b.add_value(TransformPlannerWithMockedElaboration {
+                real: TransformPlannerImpl::new(
+                    base_use_case_harness.catalog().get_one().unwrap(),
+                    base_use_case_harness.catalog().get_one().unwrap(),
+                ),
+                mock: mocks.mock_transform_elaboration,
+            })
+            .bind::<dyn TransformPlanner, TransformPlannerWithMockedElaboration>()
+            .add_value(mocks.mock_transform_execution_service)
+            .bind::<dyn TransformExecutor, MockTransformExecutor>();
+        }
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -1208,6 +1284,9 @@ struct PullUseCaseHarnessMocks {
     mock_transform_execution_service: MockTransformExecutor,
     mock_compaction_executor: MockCompactionExecutor,
     mock_sync_service: MockSyncService,
+    /// Transforms with the real planner and executor, through an engine that
+    /// only advances the watermark to this value
+    real_transform_watermark: Option<DateTime<Utc>>,
 }
 
 impl PullUseCaseHarnessMocks {
@@ -1237,6 +1316,13 @@ impl PullUseCaseHarnessMocks {
     ) -> Self {
         Self {
             mock_transform_elaboration,
+            ..self
+        }
+    }
+
+    fn with_real_transform(self, watermark: DateTime<Utc>) -> Self {
+        Self {
+            real_transform_watermark: Some(watermark),
             ..self
         }
     }
@@ -1328,6 +1414,7 @@ impl Default for PullUseCaseHarnessMocks {
             mock_transform_execution_service: MockTransformExecutor::new(),
             mock_compaction_executor: MockCompactionExecutor::new(),
             mock_sync_service: MockSyncService::new(),
+            real_transform_watermark: None,
         }
     }
 }
