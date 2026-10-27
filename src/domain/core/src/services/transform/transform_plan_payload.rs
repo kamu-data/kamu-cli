@@ -75,7 +75,7 @@ pub struct TransformPlanPayloadInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offset_interval: Option<TransformPlanOffsetInterval>,
     /// Last watermark among the consumed input blocks, if any
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub watermark: Option<DateTime<Utc>>,
 }
 

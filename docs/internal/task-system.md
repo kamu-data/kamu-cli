@@ -406,9 +406,9 @@ failure.
   source has more to fetch: the task does not loop, and the ingest flow controller schedules the
   next iteration if its config sets `fetch_next_iteration`.
 - **Transform** — in one transaction `TransformPlanner::elaborate_transform` plans the transform
-  from the target's current `HEAD` and computes each input's unprocessed slices and watermarks ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)).
-  `UpToDate` ends the task with an empty success, as does an executor run that appends nothing.
-  Otherwise
+  from the target's current `HEAD` and computes each input's unprocessed slices and watermarks
+  ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)). `UpToDate` ends
+  the task with an empty success, as does an executor run that appends nothing. Otherwise
   `TransformExecutor::execute_transform` provisions the engine named by the transform — always a
   container engine, DataFusion included — runs the query and commits `ExecuteTransform`.
   The runner never resets the derivative, so a diverged input is not repaired here:

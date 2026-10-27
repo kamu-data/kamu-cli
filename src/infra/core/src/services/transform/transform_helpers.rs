@@ -62,8 +62,8 @@ pub(crate) struct TransformPreliminaryRequestExt {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tracing::instrument(level = "info", skip_all)]
 /// Builds the request as of `maybe_head`, or as of the current head
+#[tracing::instrument(level = "info", skip_all)]
 pub(crate) async fn build_preliminary_request_ext(
     target: ResolvedDataset,
     maybe_head: Option<&odf::Multihash>,

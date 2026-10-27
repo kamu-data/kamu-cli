@@ -190,14 +190,17 @@ impl ODFEngine {
             // The offsets the engine claims become the dataset's record offsets
             let num_rows =
                 u64::try_from(data_metadata.metadata().file_metadata().num_rows()).int_err()?;
-            let claimed_rows = engine_response
-                .new_offset_interval
-                .as_ref()
-                .map_or(0, |interval| interval.end - interval.start + 1);
-            if num_rows != claimed_rows {
+            let claimed_interval = &engine_response.new_offset_interval;
+            let claimed_rows = claimed_interval.as_ref().map_or(Some(0), |interval| {
+                interval
+                    .end
+                    .checked_sub(interval.start)
+                    .map(|span| span + 1)
+            });
+            if claimed_rows != Some(num_rows) {
                 return Err(EngineError::contract_error(
                     &format!(
-                        "Engine wrote {num_rows} records but claimed offsets for {claimed_rows}"
+                        "Engine wrote {num_rows} records but claimed offsets {claimed_interval:?}"
                     ),
                     Vec::new(),
                 ));
@@ -459,6 +462,16 @@ mod tests {
         let data_path = harness.write_data_file(0);
 
         let response = harness.materialize_response(Some((0, 99)), data_path);
+
+        assert_matches!(response, Err(EngineError::ContractError(_)));
+    }
+
+    #[test]
+    fn test_response_with_inverted_claimed_offsets() {
+        let harness = MaterializeResponseHarness::new();
+        let data_path = harness.write_data_file(3);
+
+        let response = harness.materialize_response(Some((12, 10)), data_path);
 
         assert_matches!(response, Err(EngineError::ContractError(_)));
     }
