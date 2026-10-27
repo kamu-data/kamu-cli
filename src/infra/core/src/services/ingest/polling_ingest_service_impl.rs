@@ -322,6 +322,9 @@ impl PollingIngestServiceImpl {
                     "Ignoring savepoint due to --fetch-uncacheable"
                 );
             } else if let odf::metadata::FetchStep::Mqtt(_) = fetch_step {
+            } else if !savepoint.data.path(&self.cache_dir).exists() {
+                // Resuming would commit the savepoint's source state without its data
+                tracing::warn!(?savepoint_path, "Ignoring savepoint whose data is gone");
             } else {
                 tracing::info!(?savepoint_path, "Resuming from savepoint");
                 args.listener.on_cache_hit(&savepoint.created_at);
@@ -350,12 +353,20 @@ impl PollingIngestServiceImpl {
                 args.listener.clone(),
             ))),
         ))
-        .await?;
+        .await;
 
         match fetch_result {
-            FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
-            FetchResult::Updated(upd) => {
+            Err(e) => {
+                Self::discard_fetch_target(&target_path);
+                Err(e)
+            }
+            Ok(FetchResult::UpToDate) => {
+                Self::discard_fetch_target(&target_path);
+                Ok(FetchStepResult::UpToDate)
+            }
+            Ok(FetchResult::Updated(upd)) => {
                 let data = if let Some(path) = upd.zero_copy_path {
+                    Self::discard_fetch_target(&target_path);
                     SavepointData::Ref { path }
                 } else {
                     SavepointData::Owned {
@@ -407,6 +418,17 @@ impl PollingIngestServiceImpl {
         self.cache_dir.join(format!("fetch-savepoint-{hash}"))
     }
 
+    /// Removes a fetch target that no savepoint refers to
+    fn discard_fetch_target(target_path: &Path) {
+        if target_path.exists()
+            && let Err(err) = std::fs::remove_file(target_path)
+        {
+            tracing::warn!(error = %err, ?target_path, "Failed to remove the fetch target");
+        }
+    }
+
+    /// A savepoint that does not parse is ignored, so the source is fetched
+    /// again instead of failing every run until the cache is cleared
     fn read_fetch_savepoint(
         &self,
         savepoint_path: &Path,
@@ -415,12 +437,18 @@ impl PollingIngestServiceImpl {
             return Ok(None);
         }
 
-        let manifest: Manifest<FetchSavepoint> =
-            serde_yaml::from_reader(std::fs::File::open(savepoint_path).int_err()?).int_err()?;
-
-        Ok(Some(manifest.content))
+        let file = std::fs::File::open(savepoint_path).int_err()?;
+        match serde_yaml::from_reader::<_, Manifest<FetchSavepoint>>(file) {
+            Ok(manifest) => Ok(Some(manifest.content)),
+            Err(err) => {
+                tracing::warn!(error = %err, ?savepoint_path, "Ignoring unreadable savepoint");
+                Ok(None)
+            }
+        }
     }
 
+    /// Writes to a temporary file first, so a failed write never leaves a
+    /// truncated savepoint behind
     fn write_fetch_savepoint(
         &self,
         savepoint_path: &Path,
@@ -432,8 +460,13 @@ impl PollingIngestServiceImpl {
             content: savepoint.clone(),
         };
 
-        serde_yaml::to_writer(std::fs::File::create(savepoint_path).int_err()?, &manifest)
-            .int_err()?;
+        let tmp_path = self
+            .cache_dir
+            .join(get_random_name(Some("fetch-savepoint-tmp-"), 10));
+        let file = std::fs::File::create(&tmp_path).int_err()?;
+        serde_yaml::to_writer(&file, &manifest).int_err()?;
+        file.sync_all().int_err()?;
+        std::fs::rename(&tmp_path, savepoint_path).int_err()?;
 
         Ok(())
     }

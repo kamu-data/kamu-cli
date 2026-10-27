@@ -304,6 +304,11 @@ fetch step and the same committed state resumes from the savepoint instead of fe
 
 - A savepoint is ignored when the dataset has no source state and `fetch_uncacheable` is set, and
   always for MQTT.
+- A savepoint is also ignored when its data is gone — a cache file deleted, or a zero-copy source
+  file moved — since resuming would commit its source state without the data, and when it does not
+  parse. The source is fetched again in both cases.
+- A savepoint is written to a temporary file and renamed into place, so a failed write leaves no
+  truncated savepoint.
 - Changing the fetch step or committing a new source state changes the hash, so stale savepoints
   are never matched — they are left behind and removed by cache eviction ([§10](#10-local-files)).
 - Prepared files are deleted after staging; the fetched file and savepoint are kept on purpose so a
@@ -459,7 +464,7 @@ unsupported media type → 415, `QuotaExceeded` → 403, the rest → 500.
 | --- | --- | --- |
 | `RunInfoDir/ingest-<operation_id>/` | push input copies, reader temp files, `out/data.parquet` before commit | the staged Parquet file moves into the data repo on commit; a polling iteration removes the directory on success, and push leaves it; any left are cleared when the process starts |
 | `RunInfoDir/fetch-<operation_id>/`, `RunInfoDir/raw-query-<operation_id>/` | container fetch output and logs; preprocess engine I/O and logs | cleared when the process starts |
-| `CacheDir/fetch-*`, `prepare-*` | fetched and prepared input | prepared files after staging, or when reading or preprocessing fails; fetched files by eviction |
+| `CacheDir/fetch-*`, `prepare-*` | fetched and prepared input | prepared files after staging, or when reading or preprocessing fails; a fetch target no savepoint refers to (failed, up-to-date or zero-copy fetch) right away; other fetched files by eviction |
 | `CacheDir/fetch-savepoint-<hash>` | savepoints | by eviction |
 
 Eviction (`GcService::evict_cache`) runs at process start and removes cache entries older than 24

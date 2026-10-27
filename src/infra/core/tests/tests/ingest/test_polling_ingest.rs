@@ -1376,6 +1376,59 @@ async fn test_ingest_polling_failure_keeps_its_directory() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_polling_savepoint_without_its_data_fetches_again() {
+    let harness = IngestTestHarness::new();
+    let target = harness.create_csv_glob_polling_dataset("data-*.csv").await;
+
+    // The failed run leaves a savepoint that refers to the source file itself
+    harness.write_source_file("data-1.csv", "city,population\nA,not-a-number\n");
+    assert_matches!(harness.ingest(target.clone()).await, Err(_));
+    assert_eq!(harness.savepoints_left(), 1);
+
+    harness.remove_source_file("data-1.csv");
+    harness.write_source_file("data-2.csv", "city,population\nB,2000\n");
+
+    let res = harness.ingest(target).await.unwrap();
+
+    assert_matches!(
+        res.result,
+        PollingIngestResult::Updated {
+            increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
+            ..
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_polling_unreadable_savepoint_fetches_again() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+    let target = harness.create_csv_polling_dataset(&src_path).await;
+
+    std::fs::write(&src_path, "city,population\nA,not-a-number\n").unwrap();
+    assert_matches!(harness.ingest(target.clone()).await, Err(_));
+    assert_eq!(harness.savepoints_left(), 1);
+    harness.truncate_savepoints();
+
+    std::fs::write(&src_path, "city,population\nA,1000\n").unwrap();
+    let res = harness.ingest(target).await.unwrap();
+
+    assert_matches!(
+        res.result,
+        PollingIngestResult::Updated {
+            increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
+            ..
+        }
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_registry: Arc<dyn DatasetRegistry>,
@@ -1455,20 +1508,49 @@ impl IngestTestHarness {
 
     /// A root dataset polling a CSV file with `city` and `population`
     async fn create_csv_polling_dataset(&self, src_path: &std::path::Path) -> ResolvedDataset {
+        self.create_csv_dataset_fetching(odf::metadata::FetchStep::Url(
+            odf::metadata::FetchStepUrl {
+                url: url::Url::from_file_path(src_path)
+                    .unwrap()
+                    .as_str()
+                    .to_owned(),
+                event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+                cache: None,
+                headers: None,
+            },
+        ))
+        .await
+    }
+
+    /// A root dataset polling CSV files with `city` and `population` that
+    /// match `glob` in the temporary directory, one file per iteration
+    async fn create_csv_glob_polling_dataset(&self, glob: &str) -> ResolvedDataset {
+        self.create_csv_dataset_fetching(odf::metadata::FetchStep::FilesGlob(
+            odf::metadata::FetchStepFilesGlob {
+                path: self
+                    .temp_dir
+                    .path()
+                    .join(glob)
+                    .to_string_lossy()
+                    .into_owned(),
+                event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
+                cache: None,
+                order: None,
+            },
+        ))
+        .await
+    }
+
+    async fn create_csv_dataset_fetching(
+        &self,
+        fetch_step: odf::metadata::FetchStep,
+    ) -> ResolvedDataset {
         let dataset_snapshot = MetadataFactory::dataset_snapshot()
             .name("foo")
             .kind(odf::DatasetKind::Root)
             .push_event(
                 MetadataFactory::set_polling_source()
-                    .fetch(odf::metadata::FetchStep::Url(odf::metadata::FetchStepUrl {
-                        url: url::Url::from_file_path(src_path)
-                            .unwrap()
-                            .as_str()
-                            .to_owned(),
-                        event_time: Some(odf::metadata::EventTimeSourceFromSystemTime {}.into()),
-                        cache: None,
-                        headers: None,
-                    }))
+                    .fetch(fetch_step)
                     .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
                         header: Some(true),
                         schema: Some(odf::schema::DataSchema::new(vec![
@@ -1484,6 +1566,42 @@ impl IngestTestHarness {
         let dataset_alias = dataset_snapshot.name.clone();
         let stored = self.create_dataset(dataset_snapshot).await;
         ResolvedDataset::from_stored(&stored, &dataset_alias)
+    }
+
+    fn write_source_file(&self, name: &str, contents: &str) {
+        std::fs::write(self.temp_dir.path().join(name), contents).unwrap();
+    }
+
+    fn remove_source_file(&self, name: &str) {
+        std::fs::remove_file(self.temp_dir.path().join(name)).unwrap();
+    }
+
+    fn savepoint_paths(&self) -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(self.temp_dir.path().join("cache"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("fetch-savepoint-")
+            })
+            .collect()
+    }
+
+    fn savepoints_left(&self) -> usize {
+        self.savepoint_paths().len()
+    }
+
+    /// Cuts every savepoint short, as a write interrupted by a crash would
+    fn truncate_savepoints(&self) {
+        for path in self.savepoint_paths() {
+            std::fs::write(
+                path,
+                "kind: FetchSavepoint\nversion: 1\ncontent:\n  createdAt: 20",
+            )
+            .unwrap();
+        }
     }
 
     /// Ingest operation directories left in the run directory

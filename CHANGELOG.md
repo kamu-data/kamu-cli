@@ -64,7 +64,12 @@ Recommendation: for ease of reading, use the following format:
   untriggered
 - Failures to read a dataset environment variable used in a fetch step, such as a secret that
   cannot be decrypted, are reported instead of being treated as a missing value
-- Polling ingest runs no longer leave their working files behind after success
+- Polling ingest runs no longer leave their working files behind after success, and a failed fetch
+  no longer leaves its partial download in the cache
+- Re-running an ingest after its cached fetch data was deleted, or after a `FilesGlob` source file
+  was moved, fetches again instead of recording the source as ingested without its data
+- A fetch savepoint left truncated by a crash or a full disk is fetched again instead of failing
+  every later run until the cache is cleared
 
 ## [0.271.0] - 2026-10-21
 ### Added
