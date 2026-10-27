@@ -7,10 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use chrono::Utc;
+use datafusion::arrow::datatypes::Schema;
 use kamu_datasets::ResolvedDatasetsMap;
 
-use crate::engine::TransformRequestExt;
+use crate::engine::{TransformRequestExt, TransformRequestInputExt};
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,11 +21,20 @@ use crate::*;
 impl MockTransformPlanner {
     /// Elaborates a transform without inputs. The request's head is a fixed
     /// placeholder: the mocked executors report the heads they commit.
-    pub fn make_expect_elaborate_transform(mut self, target_alias: odf::DatasetAlias) -> Self {
+    pub fn make_expect_elaborate_transform(self, target_alias: odf::DatasetAlias) -> Self {
+        self.make_expect_elaborate_transform_reading(target_alias, Vec::new())
+    }
+
+    /// Elaborates a transform that reads `inputs`, without new data in them
+    pub fn make_expect_elaborate_transform_reading(
+        mut self,
+        target_alias: odf::DatasetAlias,
+        inputs: Vec<odf::DatasetHandle>,
+    ) -> Self {
         self.expect_elaborate_transform()
             .withf(move |target| target.get_alias() == &target_alias)
             .times(1)
-            .returning(|target| {
+            .returning(move |target| {
                 Ok(TransformElaboration::Elaborated(TransformExecutionPlan {
                     request: TransformRequestExt {
                         dataset_handle: target.get_handle().clone(),
@@ -40,7 +52,7 @@ impl MockTransformPlanner {
                         schema: None,
                         prev_offset: None,
                         vocab: odf::metadata::DatasetVocabulary::default(),
-                        inputs: vec![],
+                        inputs: inputs.iter().map(unchanged_input).collect(),
                         prev_checkpoint: None,
                     },
                     datasets_map: ResolvedDatasetsMap::default(),
@@ -86,6 +98,23 @@ impl MockTransformPlanner {
             .times(1)
             .returning(move |_| Err(make_error()));
         self
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn unchanged_input(handle: &odf::DatasetHandle) -> TransformRequestInputExt {
+    TransformRequestInputExt {
+        dataset_handle: handle.clone(),
+        alias: handle.alias.dataset_name.to_string(),
+        vocab: odf::metadata::DatasetVocabulary::default(),
+        prev_block_hash: None,
+        new_block_hash: None,
+        prev_offset: None,
+        new_offset: None,
+        schema: Arc::new(Schema::empty()),
+        data_slices: Vec::new(),
+        explicit_watermarks: Vec::new(),
     }
 }
 

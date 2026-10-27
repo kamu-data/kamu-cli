@@ -241,6 +241,10 @@ reported to it.
 | Write | every job's written dataset: the ingest or transform target, or a sync target that already exists |
 | Read | every transform input (`PullTransformItem::input_handles`) |
 
+A transform job elaborates its transform again when it runs, and another writer may have changed
+the inputs meanwhile. Before executing, the job checks Read on any input the iteration did not
+check, and fails with `PullError::Access` if one is denied.
+
 A sync target that does not exist yet has nothing to check; creating it is governed by the sync.
 `--all` only plans datasets the current account owns. Planning itself resolves datasets without
 access checks; nothing runs before the iteration's checks pass.

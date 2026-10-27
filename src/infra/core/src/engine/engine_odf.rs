@@ -195,7 +195,7 @@ impl ODFEngine {
                 interval
                     .end
                     .checked_sub(interval.start)
-                    .map(|span| span + 1)
+                    .and_then(|span| span.checked_add(1))
             });
             if claimed_rows != Some(num_rows) {
                 return Err(EngineError::contract_error(
@@ -472,6 +472,16 @@ mod tests {
         let data_path = harness.write_data_file(3);
 
         let response = harness.materialize_response(Some((12, 10)), data_path);
+
+        assert_matches!(response, Err(EngineError::ContractError(_)));
+    }
+
+    #[test]
+    fn test_response_with_unrepresentable_claimed_offsets() {
+        let harness = MaterializeResponseHarness::new();
+        let data_path = harness.write_data_file(0);
+
+        let response = harness.materialize_response(Some((0, u64::MAX)), data_path);
 
         assert_matches!(response, Err(EngineError::ContractError(_)));
     }

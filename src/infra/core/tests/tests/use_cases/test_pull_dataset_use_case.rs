@@ -142,6 +142,67 @@ async fn test_pull_transform_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
+
+    let baz_handle = odf::DatasetHandle::new(
+        odf::DatasetID::new_seeded_ed25519(b"baz"),
+        alias_baz.clone(),
+        odf::DatasetKind::Root,
+    );
+
+    // The pull authorizes `foo`, but elaboration finds a transform reading `baz`
+    let mocks = PullUseCaseHarnessMocks::default()
+        .with_authorizer_mock(
+            MockDatasetActionAuthorizer::new()
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Write,
+                    1,
+                    HashSet::from_iter([alias_bar.clone()]),
+                )
+                .make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Read,
+                    2,
+                    HashSet::from_iter([alias_foo.clone()]),
+                ),
+        )
+        .with_transform_elaboration_mock(
+            MockTransformPlanner::new()
+                .make_expect_elaborate_transform_reading(alias_bar.clone(), vec![baz_handle]),
+        );
+
+    let harness = PullUseCaseHarness::new(mocks);
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+
+    let pull_response = harness
+        .use_case
+        .execute(
+            PullRequest::Local(alias_bar.as_local_ref()),
+            PullOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(
+        pull_response,
+        PullResponse {
+            maybe_local_ref: Some(a_local_ref),
+            result: Err(PullError::Access(_)),
+            ..
+        } if a_local_ref == bar.dataset_handle.as_local_ref()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_pull_ingest_commits_head() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let reported_heads = ReportedHeads::default();
