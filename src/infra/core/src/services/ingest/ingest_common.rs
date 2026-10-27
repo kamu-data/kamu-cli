@@ -28,13 +28,14 @@ pub(crate) async fn preprocess(
     transform: &odf::metadata::Transform,
     input_data: DataFrameExt,
     maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-) -> Result<Option<DataFrameExt>, EngineError> {
+) -> Result<Option<DataFrameExt>, PreprocessError> {
     let engine = match transform.engine().to_lowercase().as_str() {
         "datafusion" => Arc::new(EngineDatafusionInproc::new()),
-        engine_id => engine_provisioner
-            .provision_engine(engine_id, maybe_listener)
-            .await
-            .int_err()?,
+        engine_id => {
+            engine_provisioner
+                .provision_engine(engine_id, maybe_listener)
+                .await?
+        }
     };
 
     let response = engine
@@ -47,6 +48,34 @@ pub(crate) async fn preprocess(
         .await?;
 
     Ok(response.output_data)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum PreprocessError {
+    #[error(transparent)]
+    EngineProvisioning(#[from] EngineProvisioningError),
+    #[error(transparent)]
+    Engine(#[from] EngineError),
+}
+
+impl From<PreprocessError> for PollingIngestError {
+    fn from(e: PreprocessError) -> Self {
+        match e {
+            PreprocessError::EngineProvisioning(e) => Self::EngineProvisioningError(e),
+            PreprocessError::Engine(e) => Self::EngineError(e),
+        }
+    }
+}
+
+impl From<PreprocessError> for PushIngestError {
+    fn from(e: PreprocessError) -> Self {
+        match e {
+            PreprocessError::EngineProvisioning(e) => Self::EngineError(e.int_err().into()),
+            PreprocessError::Engine(e) => Self::EngineError(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

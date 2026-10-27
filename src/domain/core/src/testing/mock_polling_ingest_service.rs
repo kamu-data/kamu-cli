@@ -61,6 +61,30 @@ impl MockPollingIngestService {
             });
         self
     }
+    /// Expects one ingest asked to `fetch_uncacheable` or not, and reports it
+    /// up to date with `uncacheable`
+    pub fn make_expect_ingest_up_to_date(
+        mut self,
+        dataset_alias: &odf::DatasetAlias,
+        fetch_uncacheable: bool,
+        uncacheable: bool,
+    ) -> Self {
+        let dataset_alias = dataset_alias.clone();
+        self.expect_ingest()
+            .withf(move |target, _, options, _, _, _| {
+                target.get_alias() == &dataset_alias
+                    && options.fetch_uncacheable == fetch_uncacheable
+            })
+            .times(1)
+            .returning(move |_, _, _, _, _, _| {
+                Ok(PollingIngestResponse {
+                    result: PollingIngestResult::UpToDate { uncacheable },
+                    metadata_state: None,
+                })
+            });
+        self
+    }
+
     /// Reports `iterations` in order, one per call
     pub fn make_expect_ingest_iterations(
         mut self,
@@ -97,6 +121,10 @@ impl MockPollingIngestService {
                             metadata_state: Some(plan.into_metadata_state()),
                         })
                     }
+                    MockIngestIteration::UpToDate => Ok(PollingIngestResponse {
+                        result: PollingIngestResult::UpToDate { uncacheable: false },
+                        metadata_state: None,
+                    }),
                     MockIngestIteration::Unreachable => {
                         Err(PollingIngestError::unreachable("http://example.com", None))
                     }
@@ -115,6 +143,7 @@ pub enum MockIngestIteration {
         has_more: bool,
         num_records: u64,
     },
+    UpToDate,
     Unreachable,
 }
 

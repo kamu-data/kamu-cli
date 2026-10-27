@@ -279,7 +279,7 @@ environment, since no dataset env var service is wired in that mode.
 
 | Fetch step | Source state written | `has_more` | Notes |
 | --- | --- | --- | --- |
-| `Url` `file://` | `LastModified` (file mtime) | never | Zero-copy: the savepoint references the original file |
+| `Url` `file://` | `LastModified` (file mtime) | never | Zero-copy: the original file is read in place, and no savepoint is kept |
 | `Url` `http(s)://` | `ETag` or `LastModified` from response headers, else none | never | Sends `If-None-Match` / `If-Modified-Since`; `304` is up to date |
 | `Url` `ftp(s)://` | none | never | Uncacheable after the first ingest; behind the `ingest-ftp` feature |
 | `FilesGlob` | `ETag` = name of the file just ingested | when more files sort after it | One file per iteration, ordered by name; event time from system time or the file path |
@@ -304,9 +304,12 @@ fetch step and the same committed state resumes from the savepoint instead of fe
 
 - A savepoint is ignored when the dataset has no source state and `fetch_uncacheable` is set, and
   always for MQTT.
-- A savepoint is also ignored when its data is gone — a cache file deleted, or a zero-copy source
-  file moved — since resuming would commit its source state without the data, and when it does not
-  parse. The source is fetched again in both cases.
+- Zero-copy fetches (`file://`, `FilesGlob`) keep no savepoint: fetching again costs nothing, and
+  resuming would pair the source state recorded then with whatever the file holds now, so a fixed
+  file would be ingested a second time on the next poll.
+- A savepoint is also ignored when its downloaded data was deleted from the cache, since resuming
+  would commit its source state without the data, and when it does not parse. The source is
+  fetched again in both cases.
 - A savepoint is written to a temporary file and renamed into place, so a failed write leaves no
   truncated savepoint.
 - Changing the fetch step or committing a new source state changes the hash, so stale savepoints
@@ -486,6 +489,9 @@ hours. A long-running server does not evict while it runs.
 - `MockPollingIngestService` (helpers in `src/domain/core/src/testing/mock_polling_ingest_service.rs`)
   stands in for the polling service where a test needs no fetching;
   `make_expect_ingest_iterations` reports a sequence of `MockIngestIteration`s.
+- `file://` and `FilesGlob` sources are zero-copy and keep no savepoints. Tests of downloaded data
+  and savepoints serve files over HTTP in-process with `test_utils::HttpFileServer`, which sends
+  `Last-Modified` but no `ETag`.
 - Containerized fetch and preprocess tests need Podman or Docker and are grouped separately; see
   [`DEVELOPER.md`](../../DEVELOPER.md).
 - Changing what `stage` considers an empty commit changes which runs produce blocks — and so which

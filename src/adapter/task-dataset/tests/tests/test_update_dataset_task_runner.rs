@@ -124,6 +124,54 @@ async fn test_ingest_reports_increment_from_its_result() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_ingest_of_uncacheable_source_succeeds_up_to_date_without_increment() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_polling_ingest_service: MockPollingIngestService::new()
+            .make_expect_ingest_up_to_date(&alias_foo, false, true),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate {
+                pull_result: PullResult::UpToDate(PullResultUpToDate::PollingIngest(
+                    PollingIngestResultUpToDate { uncacheable: true }
+                )),
+                data_increment: None,
+            }
+            .into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_passes_fetch_uncacheable_to_the_ingest() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_polling_ingest_service: MockPollingIngestService::new()
+            .make_expect_ingest_up_to_date(&alias_foo, true, false),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_ingest_update_fetching_uncacheable(&foo).await;
+
+    assert_matches!(outcome, TaskOutcome::Success(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_ingest_without_polling_source_fails_unrecoverably() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
@@ -654,15 +702,40 @@ impl UpdateDatasetTaskRunnerHarness {
             .await
     }
 
+    async fn run_ingest_update_fetching_uncacheable(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> TaskOutcome {
+        self.run_update_with(
+            DatasetUpdateJob::Ingest(created.dataset_handle.clone()),
+            PullOptions {
+                ingest_options: PollingIngestOptions {
+                    fetch_uncacheable: true,
+                    ..PollingIngestOptions::default()
+                },
+                ..PullOptions::default()
+            },
+        )
+        .await
+    }
+
     async fn run_transform_update(&self, created: &CreateDatasetResult) -> TaskOutcome {
         self.run_update(DatasetUpdateJob::Transform(created.dataset_handle.clone()))
             .await
     }
 
     async fn run_update(&self, job: DatasetUpdateJob) -> TaskOutcome {
+        self.run_update_with(job, PullOptions::default()).await
+    }
+
+    async fn run_update_with(
+        &self,
+        job: DatasetUpdateJob,
+        pull_options: PullOptions,
+    ) -> TaskOutcome {
         self.runner
             .run_task(TaskDefinition::new(TaskDefinitionDatasetUpdate {
-                pull_options: PullOptions::default(),
+                pull_options,
                 job,
             }))
             .await

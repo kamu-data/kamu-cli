@@ -94,6 +94,8 @@ impl TryFrom<&odf::metadata::SourceState> for PollingIngestPlanSourceState {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PollingIngestPlanSourceStateKind {
     ETag,

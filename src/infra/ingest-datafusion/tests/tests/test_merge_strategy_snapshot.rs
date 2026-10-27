@@ -380,6 +380,99 @@ async fn test_snapshot_merge_mix_of_changes() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_snapshot_merge_empty_input_retracts_all() {
+    test_snapshot_merge(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+        ],
+        [],
+        [
+            (Op::Retract, Some(2020), "seattle", 2),
+            (Op::Retract, Some(2020), "vancouver", 1),
+        ],
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `year` is a regular column here, not the event time, so a change in it is a change in a
+// non-compared column
+async fn test_snapshot_merge_compare_population<L, I, E, S>(ledger: L, input: I, expected: E)
+where
+    L: IntoIterator<Item = (odf::metadata::OperationType, i32, S, i64)>,
+    I: IntoIterator<Item = (i32, S, i64)>,
+    E: IntoIterator<Item = (odf::metadata::OperationType, Option<i32>, S, i64)>,
+    S: Into<String>,
+{
+    let ctx = SessionContext::new();
+
+    let strat = MergeStrategySnapshot::new(
+        odf::metadata::DatasetVocabulary::default(),
+        odf::metadata::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string()],
+            compare_columns: Some(vec!["population".to_string()]),
+        },
+    );
+
+    let prev = make_ledger(&ctx, ledger);
+    let new = make_output(
+        &ctx,
+        input
+            .into_iter()
+            .map(|(y, c, p)| (Op::Append, Some(y), c, p)),
+    )
+    .without_columns(&["op"])
+    .unwrap();
+    let expected = make_output(&ctx, expected);
+
+    let actual = strat.merge(Some(prev), new).unwrap();
+    let actual = actual.sort(strat.sort_order()).unwrap();
+
+    // `year` stays non-null in the output, as it is not the event time column
+    testing::assert_dfs_equivalent(expected, actual, false, true, true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_compare_columns_change_in_compared_column() {
+    test_snapshot_merge_compare_population(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+        ],
+        [(2020, "vancouver", 1), (2020, "seattle", 3)],
+        [
+            (Op::CorrectFrom, Some(2020), "seattle", 2),
+            (Op::CorrectTo, Some(2020), "seattle", 3),
+        ],
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_compare_columns_change_in_other_column() {
+    test_snapshot_merge_compare_population(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+        ],
+        [(2021, "vancouver", 1), (2021, "seattle", 2)],
+        [],
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_snapshot_merge_invalid_pk() {
     let ctx = SessionContext::new();
     let strat = MergeStrategySnapshot::new(

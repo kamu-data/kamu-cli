@@ -955,6 +955,66 @@ async fn test_data_writer_ledger_orders_by_event_time() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_data_writer_watermark_does_not_regress() {
+    let mut harness = Harness::new(vec![
+        MetadataFactory::set_polling_source()
+            .merge(odf::metadata::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build()
+            .into(),
+    ])
+    .await;
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2023-01-01,A,1000
+                "#
+            ),
+            "event_time DATE, city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let first_watermark = res.add_data_block.unwrap().event.new_watermark;
+    assert_eq!(
+        first_watermark.as_ref().map(DateTime::to_rfc3339),
+        Some("2023-01-01T00:00:00+00:00".to_string())
+    );
+
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2021-01-01,B,2000
+                2022-01-01,C,3000
+                "#
+            ),
+            "event_time DATE, city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let new_block = res.add_data_block.unwrap();
+
+    // Late data is still written
+    assert_eq!(
+        new_block.event.new_data.unwrap().offset_interval,
+        odf::metadata::OffsetInterval { start: 1, end: 2 }
+    );
+    assert_eq!(new_block.event.new_watermark, first_watermark);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     let mut harness = Harness::new(vec![
         MetadataFactory::set_polling_source()

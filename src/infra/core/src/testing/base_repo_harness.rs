@@ -176,7 +176,7 @@ impl BaseRepoHarness {
         self.create_root_dataset_with_events(alias, vec![]).await
     }
 
-    async fn create_root_dataset_with_events(
+    pub async fn create_root_dataset_with_events(
         &self,
         alias: &odf::DatasetAlias,
         events: Vec<odf::MetadataEvent>,
