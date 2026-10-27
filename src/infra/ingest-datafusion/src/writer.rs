@@ -592,7 +592,7 @@ impl DataWriterDataFusion {
         } else if let DataFusionError::ArrowError(arrow_err, _) = root
             && matches!(
                 arrow_err.as_ref(),
-                ArrowError::ParseError(_) | ArrowError::CastError(_)
+                ArrowError::ParseError(_) | ArrowError::CastError(_) | ArrowError::JsonError(_)
             )
         {
             Some(arrow_err.to_string())
