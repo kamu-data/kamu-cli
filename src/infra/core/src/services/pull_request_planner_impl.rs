@@ -26,7 +26,7 @@ pub struct PullRequestPlannerImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    transform_planner: Arc<dyn TransformPlanner>,
     sync_request_builder: Arc<SyncRequestBuilder>,
     current_account_subject: Arc<CurrentAccountSubject>,
 }
@@ -38,7 +38,7 @@ impl PullRequestPlannerImpl {
         dataset_registry: Arc<dyn DatasetRegistry>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-        transform_request_planner: Arc<dyn TransformRequestPlanner>,
+        transform_planner: Arc<dyn TransformPlanner>,
         sync_request_builder: Arc<SyncRequestBuilder>,
         current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
@@ -46,7 +46,7 @@ impl PullRequestPlannerImpl {
             dataset_registry,
             dependency_graph_service,
             remote_alias_registry,
-            transform_request_planner,
+            transform_planner,
             sync_request_builder,
             current_account_subject,
         }
@@ -192,21 +192,16 @@ impl PullRequestPlannerImpl {
 
         let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
-        // Planned here to fail a pull with a broken transform before any job runs,
-        // and to learn the inputs. The job plans again when it runs.
+        // Fails a pull with a broken transform before any job runs, and learns the
+        // inputs the pull reads
         match self
-            .transform_request_planner
-            .build_transform_preliminary_plan(target.clone())
+            .transform_planner
+            .describe_transform(target.clone())
             .await
         {
-            Ok(plan) => Ok(PullTransformItem {
+            Ok(description) => Ok(PullTransformItem {
                 depth: pi.depth,
-                input_handles: plan
-                    .datasets_map
-                    .iterate_all_handles()
-                    .filter(|hdl| *hdl != target.get_handle())
-                    .cloned()
-                    .collect(),
+                input_handles: description.inputs,
                 target,
                 maybe_original_request: pi.maybe_original_request,
             }),

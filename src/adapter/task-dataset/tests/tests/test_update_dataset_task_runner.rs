@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use kamu::TransformRequestPlannerImpl;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_adapter_task_dataset::{
     DatasetHeadMovedError,
@@ -26,7 +25,7 @@ use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_task_system::{TaskDefinition, TaskOutcome, TaskResult, TaskRunner};
-use pretty_assertions::{assert_eq, assert_matches};
+use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,16 +107,17 @@ async fn test_transform_input_not_pulled_succeeds_as_up_to_date() {
         odf::DatasetKind::Root,
     );
 
-    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-        mock_transform_elaboration_service: MockTransformElaborationService::new()
-            .make_expect_elaborate_transform_error(alias_bar.clone(), move || {
-                InputNotPulledError {
-                    dataset_handle: foo_handle.clone(),
-                }
-                .into()
-            }),
-        ..UpdateDatasetTaskRunnerMocks::default()
-    });
+    let harness =
+        UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+            mock_transform_planner: MockTransformPlanner::new()
+                .make_expect_elaborate_transform_error(alias_bar.clone(), move || {
+                    InputNotPulledError {
+                        dataset_handle: foo_handle.clone(),
+                    }
+                    .into()
+                }),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        });
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
@@ -137,7 +137,7 @@ async fn test_transform_diverged_input_fails_as_input_compacted() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
-        mock_transform_elaboration_service: MockTransformElaborationService::new()
+        mock_transform_planner: MockTransformPlanner::new()
             .make_expect_elaborate_transform_diverged(alias_bar.clone()),
         ..UpdateDatasetTaskRunnerMocks::default()
     });
@@ -197,31 +197,6 @@ async fn test_transform_success_carries_increment_from_executor() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tokio::test]
-async fn test_transform_plans_at_run_time_head() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
-    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let reported_heads = ReportedHeads::default();
-
-    let harness = UpdateDatasetTaskRunnerHarness::new_transforming(&alias_bar, &reported_heads);
-    let foo = harness.create_root_dataset(&alias_foo).await;
-    let bar = harness
-        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
-        .await;
-    // Another writer commits after the flow queued the task
-    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
-    harness.move_head(&bar, &bar.head, &concurrent_head).await;
-    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
-    reported_heads.set(&concurrent_head, &transformed_head);
-
-    let outcome = harness.run_transform_update(&bar).await;
-
-    assert_matches!(outcome, TaskOutcome::Success(_));
-    assert_eq!(harness.get_head(&bar).await, transformed_head);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -237,11 +212,10 @@ impl UpdateDatasetTaskRunnerHarness {
         b.add::<UpdateDatasetTaskRunner>()
             .add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
-            .add::<TransformRequestPlannerImpl>()
             .add_value(mocks.mock_polling_ingest_service)
             .bind::<dyn PollingIngestService, MockPollingIngestService>()
-            .add_value(mocks.mock_transform_elaboration_service)
-            .bind::<dyn TransformElaborationService, MockTransformElaborationService>()
+            .add_value(mocks.mock_transform_planner)
+            .bind::<dyn TransformPlanner, MockTransformPlanner>()
             .add_value(mocks.mock_transform_executor)
             .bind::<dyn TransformExecutor, MockTransformExecutor>()
             .add_value(MockSyncService::new())
@@ -258,14 +232,14 @@ impl UpdateDatasetTaskRunnerHarness {
         }
     }
 
-    /// Elaborates and transforms `alias` once, expecting the transform to be
-    /// elaborated at the old head set in `heads` and reporting the new one
+    /// Elaborates and transforms `alias` once, from the old to the new head set
+    /// in `heads`
     fn new_transforming(alias: &odf::DatasetAlias, heads: &ReportedHeads) -> Self {
         Self::new(UpdateDatasetTaskRunnerMocks {
-            mock_transform_elaboration_service: MockTransformElaborationService::new()
+            mock_transform_planner: MockTransformPlanner::new()
                 .make_expect_elaborate_transform(alias.clone()),
             mock_transform_executor: MockTransformExecutor::new()
-                .make_expect_transform_updated_at_plan_head(alias.clone(), heads.clone()),
+                .make_expect_transform_updated(alias.clone(), heads.clone()),
             ..UpdateDatasetTaskRunnerMocks::default()
         })
     }
@@ -315,7 +289,7 @@ impl UpdateDatasetTaskRunnerHarness {
 #[derive(Default)]
 struct UpdateDatasetTaskRunnerMocks {
     mock_polling_ingest_service: MockPollingIngestService,
-    mock_transform_elaboration_service: MockTransformElaborationService,
+    mock_transform_planner: MockTransformPlanner,
     mock_transform_executor: MockTransformExecutor,
 }
 

@@ -866,7 +866,7 @@ impl PullTestHarness {
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
             .add::<RemoteAliasResolverImpl>()

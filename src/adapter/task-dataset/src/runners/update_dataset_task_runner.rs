@@ -36,7 +36,6 @@ use crate::{
 pub struct UpdateDatasetTaskRunner {
     catalog: dill::Catalog,
     polling_ingest_service: Arc<dyn PollingIngestService>,
-    transform_elaboration_service: Arc<dyn TransformElaborationService>,
     transform_executor: Arc<dyn TransformExecutor>,
     sync_service: Arc<dyn SyncService>,
 }
@@ -172,25 +171,20 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
-    /// Plans and elaborates in one transaction, then detaches the plan for
-    /// execution
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, transform_request_planner: Arc<dyn TransformRequestPlanner>)]
-    async fn plan_and_elaborate_transform(
+    /// Elaborates in one transaction, then detaches the plan for execution
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, transform_planner: Arc<dyn TransformPlanner>)]
+    async fn elaborate_transform(
         &self,
         target_handle: &odf::DatasetHandle,
-    ) -> Result<(ResolvedDataset, TransformElaboration), TransformError> {
+    ) -> Result<(ResolvedDataset, TransformElaboration), TransformElaborateError> {
         let target = dataset_registry.get_dataset_by_handle(target_handle).await;
-        let plan = transform_request_planner
-            .build_transform_preliminary_plan(target.clone())
-            .await?;
 
-        let mut elaboration = self
-            .transform_elaboration_service
-            .elaborate_transform(plan)
+        let elaboration = transform_planner
+            .elaborate_transform(target.clone())
             .await?;
 
         target.detach_from_transaction();
-        if let TransformElaboration::Elaborated(plan) = &mut elaboration {
+        if let TransformElaboration::Elaborated(plan) = &elaboration {
             plan.datasets_map.detach_from_transaction();
         }
 
@@ -201,8 +195,7 @@ impl UpdateDatasetTaskRunner {
         &self,
         target_handle: &odf::DatasetHandle,
     ) -> Result<TaskOutcome, InternalError> {
-        let (target, transform_plan) = match self.plan_and_elaborate_transform(target_handle).await
-        {
+        let (target, transform_plan) = match self.elaborate_transform(target_handle).await {
             Ok((target, TransformElaboration::Elaborated(transform_plan))) => {
                 (target, transform_plan)
             }
@@ -210,28 +203,31 @@ impl UpdateDatasetTaskRunner {
                 return Ok(TaskOutcome::Success(TaskResult::empty()));
             }
             // The derivative waits for its input, the same as when it is up to date
-            Err(TransformError::Elaborate(TransformElaborateError::InputNotPulled(e))) => {
+            Err(TransformElaborateError::InputNotPulled(e)) => {
                 tracing::info!(
                     input = %e.dataset_handle,
                     "Not processing because one of the inputs has no data yet",
                 );
                 return Ok(TaskOutcome::Success(TaskResult::empty()));
             }
-            Err(TransformError::Elaborate(TransformElaborateError::InvalidInputInterval(e))) => {
+            Err(TransformElaborateError::InvalidInputInterval(e)) => {
                 return Ok(TaskOutcome::Failed(
                     TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
-                        dataset_id: e.input_dataset_id,
+                        dataset_id: e.input_dataset.id,
                     })
                     .into_task_error(),
                 ));
             }
+            // The dataset's metadata must change before a retry could succeed
             Err(
-                e @ (TransformError::Plan(_)
-                | TransformError::Elaborate(TransformElaborateError::Internal(_))
-                | TransformError::Execute(_)
-                | TransformError::Internal(_)),
+                e @ (TransformElaborateError::TransformNotDefined(_)
+                | TransformElaborateError::InputsChanged(_)),
             ) => {
-                tracing::error!(error = ?e, "Transform planning or elaboration failed");
+                tracing::error!(error = ?e, error_msg = %e, "Transform cannot be planned");
+                return Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()));
+            }
+            Err(e @ TransformElaborateError::Internal(_)) => {
+                tracing::error!(error = ?e, "Transform elaboration failed");
                 return Ok(TaskOutcome::Failed(TaskError::empty_recoverable()));
             }
         };

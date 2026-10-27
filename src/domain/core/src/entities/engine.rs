@@ -135,6 +135,13 @@ pub struct TransformRequestInputExt {
     pub explicit_watermarks: Vec<odf::metadata::Watermark>,
 }
 
+impl TransformRequestInputExt {
+    /// Whether the transform consumes anything from this input
+    pub fn has_new_data_or_watermarks(&self) -> bool {
+        !self.data_slices.is_empty() || !self.explicit_watermarks.is_empty()
+    }
+}
+
 #[derive(Debug)]
 pub struct TransformResponseExt {
     /// Data slice produced by the transaction, if any

@@ -54,8 +54,7 @@ struct TransformTestHarness {
     did_generator: Arc<dyn DidGenerator>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
-    transform_elab_svc: Arc<dyn TransformElaborationService>,
+    transform_planner: Arc<dyn TransformPlanner>,
     transform_executor: Arc<dyn TransformExecutor>,
     compaction_planner: Arc<dyn CompactionPlanner>,
     compaction_executor: Arc<dyn CompactionExecutor>,
@@ -110,8 +109,7 @@ impl TransformTestHarness {
             .add::<DummyOutboxImpl>()
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
-            .add::<TransformRequestPlannerImpl>()
-            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<TransformExecutorImpl>()
             .add::<VerificationServiceImpl>()
             .build();
@@ -126,8 +124,7 @@ impl TransformTestHarness {
             compaction_planner: catalog.get_one().unwrap(),
             compaction_executor: catalog.get_one().unwrap(),
             ingest_data_use_case: catalog.get_one().unwrap(),
-            transform_request_planner: catalog.get_one().unwrap(),
-            transform_elab_svc: catalog.get_one().unwrap(),
+            transform_planner: catalog.get_one().unwrap(),
             transform_executor: catalog.get_one().unwrap(),
         }
     }
@@ -290,21 +287,38 @@ impl TransformTestHarness {
     }
 
     async fn append_info_block(&self, target: ResolvedDataset) -> odf::Multihash {
+        self.append_event(
+            target,
+            MetadataFactory::set_info()
+                .description("Updated description")
+                .build(),
+        )
+        .await
+    }
+
+    async fn append_event(
+        &self,
+        target: ResolvedDataset,
+        event: impl Into<odf::MetadataEvent>,
+    ) -> odf::Multihash {
         let chain = target.as_metadata_chain();
         let head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
         let head_block = chain.get_block(&head).await.unwrap();
 
         chain
             .append(
-                MetadataFactory::metadata_block(
-                    MetadataFactory::set_info()
-                        .description("Updated description")
-                        .build(),
-                )
-                .prev(&head, head_block.sequence_number)
-                .build(),
+                MetadataFactory::metadata_block(event)
+                    .prev(&head, head_block.sequence_number)
+                    .build(),
                 odf::dataset::AppendOpts::default(),
             )
+            .await
+            .unwrap()
+    }
+
+    async fn describe_transform(&self, target: ResolvedDataset) -> TransformDescription {
+        self.transform_planner
+            .describe_transform(target)
             .await
             .unwrap()
     }
@@ -366,7 +380,7 @@ impl TransformTestHarness {
     }
 
     async fn evaluate_transform_status(&self, target: ResolvedDataset) -> TransformStatus {
-        self.transform_request_planner
+        self.transform_planner
             .evaluate_transform_status(target)
             .await
             .unwrap()
@@ -376,13 +390,7 @@ impl TransformTestHarness {
         &self,
         target: ResolvedDataset,
     ) -> Result<TransformElaboration, TransformElaborateError> {
-        let plan = self
-            .transform_request_planner
-            .build_transform_preliminary_plan(target)
-            .await
-            .unwrap();
-
-        self.transform_elab_svc.elaborate_transform(plan).await
+        self.transform_planner.elaborate_transform(target).await
     }
 
     async fn elaborated_request(&self, target: ResolvedDataset) -> TransformRequestExt {
@@ -392,28 +400,13 @@ impl TransformTestHarness {
         }
     }
 
-    /// Rebuilds `stored` from a plan built at its expected head
     async fn rebuild_transform(
         &self,
         target: ResolvedDataset,
         stored: &TransformPlanPayload,
     ) -> Result<TransformRequestExt, TransformRebuildError> {
-        let plan = self
-            .transform_request_planner
-            .build_transform_preliminary_plan_at(target, &stored.expected_head)
-            .await
-            .unwrap();
-
-        self.rebuild_transform_from_plan(plan, stored).await
-    }
-
-    async fn rebuild_transform_from_plan(
-        &self,
-        plan: TransformPreliminaryPlan,
-        stored: &TransformPlanPayload,
-    ) -> Result<TransformRequestExt, TransformRebuildError> {
-        self.transform_elab_svc
-            .rebuild_transform(plan, stored)
+        self.transform_planner
+            .rebuild_transform(target, stored)
             .await
             .map(|plan| plan.request)
     }
@@ -538,7 +531,7 @@ async fn test_get_next_operation() {
     let elaboration = harness.elaborate_transform(bar_target).await.unwrap();
     assert!(matches!(
         elaboration,
-        TransformElaboration::Elaborated(TransformPlan { request: TransformRequestExt{ transform, inputs, .. }, datasets_map: _ } )
+        TransformElaboration::Elaborated(TransformExecutionPlan { request: TransformRequestExt{ transform, inputs, .. }, datasets_map: _ } )
         if transform == bar_source.transform &&
         inputs == vec![TransformRequestInputExt {
             dataset_handle: foo_target.get_handle().clone(),
@@ -809,7 +802,7 @@ async fn test_get_verification_plan_one_to_one() {
         .await;
 
     let operation: VerifyTransformOperation = harness
-        .transform_request_planner
+        .transform_planner
         .build_transform_verification_plan(deriv_target.clone(), (None, None))
         .await
         .unwrap();
@@ -991,18 +984,41 @@ async fn test_transform_rebuild_detects_mismatch() {
         Err(TransformRebuildError::Mismatch(_))
     );
 
-    // A plan built at a head other than the stored one
-    harness.transform(bar_target.clone()).await.unwrap();
-    let plan_at_new_head = harness
-        .transform_request_planner
-        .build_transform_preliminary_plan(bar_target)
-        .await
-        .unwrap();
+    // A plan for another dataset
+    let mut other_dataset = stored.clone();
+    other_dataset.dataset_id = odf::DatasetID::new_seeded_ed25519(b"other");
     assert_matches!(
-        harness
-            .rebuild_transform_from_plan(plan_at_new_head, &stored)
-            .await,
+        harness.rebuild_transform(bar_target, &other_dataset).await,
         Err(TransformRebuildError::Mismatch(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_rebuild_after_head_moved() {
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
+    let foo_alias = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let foo_target = harness.new_root_with_push_source(&foo_alias).await;
+    harness.ingest_rows(foo_target, "2020-01-01,A,1000").await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            std::slice::from_ref(&foo_alias),
+            harness.system_time_source.now(),
+        )
+        .await;
+    let stored =
+        TransformPlanPayload::from_request(&harness.elaborated_request(bar_target.clone()).await);
+
+    // Another writer transforms the dataset after the plan was stored
+    harness.transform(bar_target.clone()).await.unwrap();
+
+    assert_matches!(
+        harness.rebuild_transform(bar_target, &stored).await,
+        Err(TransformRebuildError::HeadMoved(TransformHeadMovedError { expected_head, .. }))
+            if expected_head == stored.expected_head
     );
 }
 
@@ -1441,6 +1457,199 @@ async fn test_transform_status_input_metadata_only_advance() {
 
     let status = harness.evaluate_transform_status(deriv_target).await;
     assert_matches!(status, TransformStatus::UpToDate);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_status_input_first_record_at_offset_zero() {
+    let harness = TransformTestHarness::new();
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
+
+    harness.append_data_block(foo_target, 1).await;
+
+    let status = harness.evaluate_transform_status(bar_target).await;
+    assert_matches!(
+        status,
+        TransformStatus::NewInputDataAvailable { input_advancements }
+            if input_advancements.len() == 1 && input_advancements[0].new_offset == Some(0)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_status_input_watermark_only_advance() {
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, _) = harness
+        .new_deriv(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
+    harness.append_data_block(foo_target.clone(), 3).await;
+    harness.transform(bar_target.clone()).await.unwrap();
+    assert_matches!(
+        harness.evaluate_transform_status(bar_target.clone()).await,
+        TransformStatus::UpToDate
+    );
+
+    // The input only moves its watermark forward
+    let watermark_head = harness
+        .append_event(
+            foo_target,
+            MetadataFactory::add_data()
+                .prev_offset(Some(2))
+                .new_watermark(Some(Utc.with_ymd_and_hms(2020, 1, 2, 0, 0, 0).unwrap()))
+                .build(),
+        )
+        .await;
+
+    let status = harness.evaluate_transform_status(bar_target).await;
+    assert_matches!(
+        status,
+        TransformStatus::NewInputDataAvailable { input_advancements }
+            if input_advancements.len() == 1
+                && input_advancements[0].new_block_hash == Some(watermark_head)
+                && input_advancements[0].new_offset.is_none()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_inputs_changed_is_an_error() {
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
+    let data_str = "date,city,population\n2020-01-01,A,1000\n";
+    let (foo_target, bar_target) = harness.new_root_and_synced_deriv(&[data_str]).await;
+    let baz_target = harness
+        .new_root("baz", harness.system_time_source.now())
+        .await;
+
+    // A later transform adds an input the last transform did not consume
+    harness
+        .append_event(
+            bar_target.clone(),
+            MetadataFactory::set_transform()
+                .inputs_from_refs_and_aliases([
+                    (foo_target.get_id().clone(), "foo"),
+                    (baz_target.get_id().clone(), "baz"),
+                ])
+                .build(),
+        )
+        .await;
+
+    assert_matches!(
+        harness.elaborate_transform(bar_target.clone()).await,
+        Err(TransformElaborateError::InputsChanged(_))
+    );
+    assert_matches!(
+        harness
+            .transform_planner
+            .evaluate_transform_status(bar_target.clone())
+            .await,
+        Err(TransformStatusError::InputsChanged(_))
+    );
+
+    // Recorded transforms are still replayed with the inputs they consumed
+    let operation = harness
+        .transform_planner
+        .build_transform_verification_plan(bar_target, (None, None))
+        .await
+        .unwrap();
+    assert_eq!(operation.steps.len(), 1);
+    assert_eq!(operation.steps[0].request.inputs.len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_verification_plan_uses_transform_in_effect() {
+    let harness =
+        TransformTestHarness::new_custom(MockEngineProvisioner::new().always_provision_engine());
+    let data_str = "date,city,population\n2020-01-01,A,1000\n";
+    let (foo_target, bar_target) = harness.new_root_and_synced_deriv(&[data_str]).await;
+    let original = harness.describe_transform(bar_target.clone()).await;
+
+    // The query changes after the first transform
+    harness
+        .append_event(
+            bar_target.clone(),
+            MetadataFactory::set_transform()
+                .inputs_from_refs_and_aliases([(foo_target.get_id().clone(), "foo")])
+                .transform(
+                    MetadataFactory::transform()
+                        .engine("datafusion")
+                        .query("SELECT * FROM foo WHERE population > 0")
+                        .build(),
+                )
+                .build(),
+        )
+        .await;
+    assert_ne!(
+        harness
+            .describe_transform(bar_target.clone())
+            .await
+            .transform,
+        original.transform
+    );
+
+    let operation = harness
+        .transform_planner
+        .build_transform_verification_plan(bar_target, (None, None))
+        .await
+        .unwrap();
+
+    assert_eq!(operation.steps.len(), 1);
+    assert_eq!(operation.steps[0].request.transform, original.transform);
+    assert_eq!(
+        operation.steps[0].request.transform_block,
+        original.transform_block
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transform_describe() {
+    let harness = TransformTestHarness::new();
+    let foo_target = harness
+        .new_root("foo", harness.system_time_source.now())
+        .await;
+    let (bar_target, bar_source) = harness
+        .new_deriv(
+            "bar",
+            &[foo_target.get_alias().clone()],
+            harness.system_time_source.now(),
+        )
+        .await;
+
+    let description = harness.describe_transform(bar_target).await;
+    assert_eq!(description.inputs, vec![foo_target.get_handle().clone()]);
+    assert_eq!(description.transform, bar_source.transform);
+
+    assert_matches!(
+        harness
+            .transform_planner
+            .describe_transform(foo_target)
+            .await,
+        Err(TransformPlanError::TransformNotDefined(_))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

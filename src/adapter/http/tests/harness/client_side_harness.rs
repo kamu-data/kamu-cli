@@ -170,8 +170,7 @@ impl ClientSideHarness {
         b.add::<SyncServiceImpl>();
         b.add::<SyncRequestBuilder>();
 
-        b.add::<TransformRequestPlannerImpl>();
-        b.add::<TransformElaborationServiceImpl>();
+        b.add::<TransformPlannerImpl>();
         b.add::<TransformExecutorImpl>();
 
         b.add_value(EngineConfigDatafusionEmbeddedCompaction::default());
