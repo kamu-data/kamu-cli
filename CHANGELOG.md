@@ -53,6 +53,8 @@ Recommendation: for ease of reading, use the following format:
   records it added
 - GraphQL: a transform flow that found nothing to do reports `FlowDescriptionUpdateResultUpToDate`,
   as ingest flows do, instead of no result
+- Update and compaction tasks no longer retry a commit the account is not allowed to make, and
+  update tasks no longer retry a pull whose server sends metadata that cannot be read
 ### Fixed
 - `kamu pull` no longer shows an ingest or a transform as successful when its commit then fails
   because the dataset's head moved
@@ -72,6 +74,8 @@ Recommendation: for ease of reading, use the following format:
   that has the same pull alias, which failed the pull and revealed that dataset's name
 - `kamu pull` of a remote dataset by ID without a local name fails with an error asking for the
   destination instead of crashing
+- Update and compaction tasks of a dataset deleted after they were scheduled fail without retries
+  instead of crashing
 - When `kamu pull` or `kamu system compact` fails for some datasets, the datasets that did update
   are now fully processed before the command exits, instead of on the next command
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.

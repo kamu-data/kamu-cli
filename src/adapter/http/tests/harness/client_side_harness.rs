@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
+use futures::{SinkExt, StreamExt};
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
@@ -25,6 +26,11 @@ use kamu_accounts_inmem::{
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
+use kamu_adapter_http::smart_protocol::messages::{
+    DatasetPushRequest,
+    DatasetPushResponse,
+    SMART_TRANSFER_PROTOCOL_VERSION,
+};
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
@@ -49,7 +55,8 @@ use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::Error;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::{Error, Message};
 use url::Url;
 
 use super::append_unreferenced_block;
@@ -455,8 +462,52 @@ impl ClientSideHarness {
         self.tempdir.path().join("datasets")
     }
 
+    /// Connects with an unsupported protocol version, returning the server's
+    /// refusal
     pub async fn try_connect_to_websocket(&self, url: &Url, method: &str) -> Result<(), String> {
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        match connect_async(self.websocket_request(url, method, 0)).await {
+            Ok(_) => Ok(()),
+            Err(ref _err @ Error::Http(ref http_err)) => {
+                Err(std::str::from_utf8(http_err.body().as_ref().unwrap())
+                    .unwrap()
+                    .to_owned())
+            }
+            Err(_err) => Err("dummy".to_string()),
+        }
+    }
+
+    /// Sends a push request as it is, bypassing the client's own checks, and
+    /// returns the server's reply, which must be a message
+    pub async fn send_raw_push_request(
+        &self,
+        url: &Url,
+        request: &DatasetPushRequest,
+    ) -> DatasetPushResponse {
+        let (mut socket, _) =
+            connect_async(self.websocket_request(url, "push", SMART_TRANSFER_PROTOCOL_VERSION))
+                .await
+                .unwrap();
+
+        socket
+            .send(Message::Text(
+                serde_json::to_string(request).unwrap().into(),
+            ))
+            .await
+            .unwrap();
+
+        let reply = socket.next().await;
+        let Some(Ok(Message::Text(reply))) = reply else {
+            panic!("The server must reply with a message, got {reply:?}");
+        };
+        serde_json::from_str(&reply).unwrap()
+    }
+
+    fn websocket_request(
+        &self,
+        url: &Url,
+        method: &str,
+        protocol_version: i32,
+    ) -> http::Request<()> {
         let mut ws_url = url.odf_to_transport_protocol().unwrap();
         ws_url.ensure_trailing_slash();
         let maybe_access_token = self
@@ -466,25 +517,17 @@ impl ClientSideHarness {
         ws_url = ws_url.join(method).unwrap();
         ws_url.set_scheme("ws").unwrap();
         let mut request = ws_url.into_client_request().unwrap();
-        request
-            .headers_mut()
-            .append(OdfSmtpVersion::name(), http::HeaderValue::from(0));
+        request.headers_mut().append(
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(protocol_version),
+        );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
                 http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
         }
-
-        match connect_async(request).await {
-            Ok(_) => Ok(()),
-            Err(ref _err @ Error::Http(ref http_err)) => {
-                Err(std::str::from_utf8(http_err.body().as_ref().unwrap())
-                    .unwrap()
-                    .to_owned())
-            }
-            Err(_err) => Err("dummy".to_string()),
-        }
+        request
     }
 }
 

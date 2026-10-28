@@ -414,6 +414,18 @@ async fn test_transform_incompatible_schema_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_transform_engine_crash_fails_recoverably() {
+    let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(|| {
+        TransformExecuteError::Internal("Engine container exited unexpectedly".int_err())
+    })
+    .await;
+
+    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_transform_unsupported_engine_fails_unrecoverably() {
     let outcome = UpdateDatasetTaskRunnerHarness::run_transform_failing_with(|| {
         EngineProvisioningError::from(UnsupportedEngineError {
@@ -685,6 +697,61 @@ async fn test_sync_from_unreachable_source_fails_recoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_ingest_of_deleted_dataset_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    harness.delete_dataset(&foo).await;
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_transform_of_deleted_dataset_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    harness.delete_dataset(&bar).await;
+
+    let outcome = harness.run_transform_update(&bar).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_into_deleted_dataset_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    harness.delete_dataset(&foo).await;
+
+    let outcome = harness.run_sync_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -877,6 +944,15 @@ impl UpdateDatasetTaskRunnerHarness {
         harness.run_transform_update(&bar).await
     }
 
+    /// Deletes the dataset's storage, as if it was deleted after the task was
+    /// scheduled
+    async fn delete_dataset(&self, created: &CreateDatasetResult) {
+        self.dataset_storage_unit_writer()
+            .delete_dataset(&created.dataset_handle.id)
+            .await
+            .unwrap();
+    }
+
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
             .move_head_before_next_commit(concurrent_head);
@@ -967,7 +1043,6 @@ impl UpdateDatasetTaskRunnerHarness {
         };
 
         DatasetUpdateJob::Sync(PullSyncItem {
-            depth: 0,
             local_target,
             remote_ref: remote_ref.clone(),
             maybe_original_request: None,

@@ -59,7 +59,7 @@ impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
         match pull_aliases.len() {
             0 => Ok(None),
             1 => Ok(Some(pull_aliases.remove(0).clone())),
-            _ => Err(FindPullAliasError::AmbiguousSource),
+            _ => Err(AmbiguousPullSourceError.into()),
         }
     }
 

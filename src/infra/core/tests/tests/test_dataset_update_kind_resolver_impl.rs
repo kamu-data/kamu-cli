@@ -93,7 +93,7 @@ async fn test_several_pull_aliases_are_ambiguous() {
 
     assert_matches!(
         harness.resolve(&root).await,
-        Err(ResolveDatasetUpdateKindError::AmbiguousSource)
+        Err(ResolveDatasetUpdateKindError::AmbiguousSource(_))
     );
 }
 

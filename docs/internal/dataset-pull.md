@@ -87,7 +87,8 @@ Out of scope, each with its own owner:
 | --- | --- | --- |
 | Domain types | `kamu-core` — [`pull_request_planner.rs`](../../src/domain/core/src/services/pull_request_planner.rs) | `PullRequestPlanner`, `PullRequest`, `PullOptions`, plan and job types, `PullResponse`, `PullResult`, `PullError`, listeners |
 | Use case trait | `kamu-core` — [`pull_dataset_use_case.rs`](../../src/domain/core/src/use_cases/pull_dataset_use_case.rs) | `PullDatasetUseCase::{execute, execute_multi, execute_all_owned}` |
-| Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync), shared with flows |
+| Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync); the planner's only production consumer |
+| Pull source | `kamu-core` — [`dataset_pull_source_resolver.rs`](../../src/domain/core/src/services/dataset_pull_source_resolver.rs); `kamu` — [`dataset_pull_source_resolver_impl.rs`](../../src/infra/core/src/services/remote/dataset_pull_source_resolver_impl.rs) | `DatasetPullSourceResolver`: a dataset's pull alias and its URL, and the inverse lookup ([dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)) |
 | Planner | `kamu` — [`pull_request_planner_impl.rs`](../../src/infra/core/src/services/pull_request_planner_impl.rs) | `PullRequestPlannerImpl`, `PullGraphDepthFirstTraversal` |
 | Use case | `kamu` — [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) | `PullDatasetUseCaseImpl`: authorization, iteration loop, per-job runners, `HEAD` updates |
 | CLI | `kamu-cli` — [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) | `PullCommand`, progress listeners, result summary |
@@ -146,10 +147,11 @@ detached from it so later transactions can use them.
    [dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)), among the current
    account's datasets only. A dataset found this way must match any alias the caller gave, or the
    result is `SaveUnderDifferentAlias`.
-2. **Missing target.** With no local dataset and `create_if_not_exists` off, the request fails.
+2. **Missing target.** With no local dataset and `create_if_not_exists` off, the request fails
+   with `AutoCreateDisabled`.
 3. **Local alias.** The existing alias, the caller's alias, or one inferred from the remote ref:
-   its dataset name, or for a URL the last path segment, then the host name. A remote ref by ID
-   without a local alias fails with `InvalidOperation`.
+   its dataset name, or for a URL the last path segment, then the host name. A ref none of these
+   apply to, such as a remote ref by ID, fails with `CannotInferLocalName`.
 4. **Kind.** A `Remote` request, or a target still to be created, is a sync from the request's
    ref. An existing dataset gets its kind from `DatasetUpdateKindResolver`: its pull alias
    (`DatasetPullSourceResolver::find_pull_alias`) makes it a sync, otherwise a root is ingested
@@ -179,7 +181,7 @@ iteration per depth. The job follows the item's kind:
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
 | ingest | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
-| sync | `Sync(PullSyncItem)` | `build_sync_item` → `DatasetPullSourceResolver::resolve_remote_source`, then `SyncRequestBuilder::build_local_sync_request_from_source`, which reads the target's `HEAD` in the planning transaction | local target (existing or to create), remote ref, `LocalSyncRequest` with the expected head ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
+| sync | `Sync(PullSyncItem)` | `build_sync_item` → `DatasetPullSourceResolver::resolve_remote_source`, then `SyncRequestBuilder::build_local_sync_request_from_source`, which reads the target's `HEAD` in the planning transaction; an update task reads it again when it runs | local target (existing or to create), remote ref, `LocalSyncRequest` with the expected head ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
 | transform | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
@@ -267,7 +269,9 @@ The server never calls `PullDatasetUseCase`: the update task builds a single-nod
 | Polling loop | until `has_more` is false | one iteration; the flow decides whether to continue |
 | Env vars | resolved per dataset by the use case | resolved by the task planner |
 | Diverged-input reset | optional flag | never |
-| Planning to running | immediate | separated by the task queue; the job's plan is from planning time |
+| Planning to running | immediate | separated by the task queue; planning fixes the job kind and, for a sync, the source. Ingest and transform are planned when the task runs, and a sync re-reads the destination's `HEAD` then |
+| Root dataset without a polling source | up to date | unrecoverable failure: a flow that keeps polling such a dataset is misconfigured |
+| Dataset deleted before it runs | not applicable | unrecoverable failure |
 
 ---
 
@@ -279,8 +283,8 @@ the local and remote refs if resolved, and `Result<PullResult, PullError>`.
 `PullResult` is `UpToDate(kind)` — polling ingest (with `uncacheable`), push ingest, transform or
 sync — or `Updated { old_head, new_head, has_more }`. `PullError` wraps the per-job errors
 (`PollingIngestError`, `IngestStopped`, `TransformError`, `TransformStopped`, `SyncError`) plus
-planning errors (`NotFound`, `AmbiguousSource`, `SaveUnderDifferentAlias`, `InvalidOperation`,
-`ScanMetadata`), `Access` and `Internal`.
+planning errors (`NotFound`, `AmbiguousSource`, `SaveUnderDifferentAlias`, `AutoCreateDisabled`,
+`CannotInferLocalName`, `ScanMetadata`), `Access` and `Internal`.
 
 An `InternalError` returned by a job runner itself aborts the whole pull rather than becoming a
 per-dataset error; a failure to plan an ingest, resolve its env vars or move `HEAD` is a

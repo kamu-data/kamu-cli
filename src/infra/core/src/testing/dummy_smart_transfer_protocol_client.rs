@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{LocalSyncTarget, SyncError, SyncListener, SyncResult, SyncTransfer};
+use kamu_core::{LocalSyncTarget, SyncError, SyncResult, SyncTransfer};
 use url::Url;
 
 use crate::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
@@ -36,7 +36,6 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
         _src: Arc<dyn odf::Dataset>,
         _http_dst_url: &Url,
         _dst_head: Option<&odf::Multihash>,
-        _listener: Arc<dyn SyncListener>,
         _transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {
         unimplemented!("Not supported yet")

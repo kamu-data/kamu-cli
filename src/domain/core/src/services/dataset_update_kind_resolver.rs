@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{FindPullAliasError, PullError};
+use crate::{AmbiguousPullSourceError, FindPullAliasError, PullError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,8 +50,8 @@ impl DatasetUpdateKind {
 
 #[derive(Debug, Error)]
 pub enum ResolveDatasetUpdateKindError {
-    #[error("Cannot choose between multiple pull aliases")]
-    AmbiguousSource,
+    #[error(transparent)]
+    AmbiguousSource(#[from] AmbiguousPullSourceError),
 
     #[error(transparent)]
     Internal(
@@ -64,7 +64,7 @@ pub enum ResolveDatasetUpdateKindError {
 impl From<FindPullAliasError> for ResolveDatasetUpdateKindError {
     fn from(value: FindPullAliasError) -> Self {
         match value {
-            FindPullAliasError::AmbiguousSource => Self::AmbiguousSource,
+            FindPullAliasError::AmbiguousSource(e) => Self::AmbiguousSource(e),
             FindPullAliasError::Internal(e) => Self::Internal(e),
         }
     }
@@ -73,7 +73,7 @@ impl From<FindPullAliasError> for ResolveDatasetUpdateKindError {
 impl From<ResolveDatasetUpdateKindError> for PullError {
     fn from(value: ResolveDatasetUpdateKindError) -> Self {
         match value {
-            ResolveDatasetUpdateKindError::AmbiguousSource => Self::AmbiguousSource,
+            ResolveDatasetUpdateKindError::AmbiguousSource(e) => Self::AmbiguousSource(e),
             ResolveDatasetUpdateKindError::Internal(e) => Self::Internal(e),
         }
     }

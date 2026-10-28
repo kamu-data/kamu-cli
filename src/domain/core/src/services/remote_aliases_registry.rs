@@ -50,10 +50,12 @@ pub trait RemoteAliasResolver: Send + Sync {
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError>;
 
+    /// The URL a remote dataset is pulled from; for an `odf+` repository it
+    /// may ask the server for the account
     async fn resolve_pull_url(
         &self,
         remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<url::Url, ResolveAliasError>;
+    ) -> Result<url::Url, ResolveRemoteSourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

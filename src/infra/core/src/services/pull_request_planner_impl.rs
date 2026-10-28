@@ -152,7 +152,7 @@ impl PullRequestPlannerImpl {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
-    async fn build_ingest_item(&self, pi: PullItem) -> PullIngestItem {
+    fn build_ingest_item(pi: PullItem) -> PullIngestItem {
         let hdl = match pi.local_target {
             PullLocalTarget::Existing(local_handle) => local_handle,
             PullLocalTarget::ToCreate(_) => {
@@ -160,11 +160,8 @@ impl PullRequestPlannerImpl {
             }
         };
 
-        let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
-
         PullIngestItem {
-            depth: pi.depth,
-            target,
+            target: hdl,
             maybe_original_request: pi.maybe_original_request,
         }
     }
@@ -191,7 +188,6 @@ impl PullRequestPlannerImpl {
             .await
         {
             Ok(description) => Ok(PullTransformItem {
-                depth: pi.depth,
                 input_handles: description.inputs,
                 target,
                 maybe_original_request: pi.maybe_original_request,
@@ -217,7 +213,6 @@ impl PullRequestPlannerImpl {
             .await
         {
             Ok(sync_request) => Ok(PullSyncItem {
-                depth: pi.depth,
                 local_target: pi.local_target,
                 remote_ref,
                 maybe_original_request: pi.maybe_original_request,
@@ -333,7 +328,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             for item in batch {
                 match item.kind.clone() {
                     DatasetUpdateKind::PollingIngest => {
-                        let pii = self.build_ingest_item(item).await;
+                        let pii = Self::build_ingest_item(item);
                         tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
                         jobs.push(PullPlanIterationJob::Ingest(pii));
                     }
@@ -440,9 +435,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
 
         // If dataset is not found, and auto-create is disabled, it's en error
         if maybe_local_handle.is_none() && !self.options.sync_options.create_if_not_exists {
-            return Err(PullError::InvalidOperation(
-                "Dataset does not exist and auto-create is switched off".to_owned(),
-            ));
+            return Err(PullError::AutoCreateDisabled);
         }
 
         // Resolve the name of a local dataset if it exists
@@ -593,14 +586,12 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         &self,
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<odf::DatasetAlias, PullError> {
+        let cannot_infer = || CannotInferLocalNameError {
+            remote_ref: remote_ref.clone(),
+        };
+
         Ok(match &remote_ref {
-            odf::DatasetRefRemote::ID(_, _) => {
-                return Err(PullError::InvalidOperation(
-                    "Unable to infer local name from remote dataset ID, please specify the \
-                     destination explicitly"
-                        .to_owned(),
-                ));
-            }
+            odf::DatasetRefRemote::ID(_, _) => return Err(cannot_infer().into()),
 
             odf::DatasetRefRemote::Alias(alias)
             | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
@@ -613,29 +604,26 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 } else {
                     None
                 },
-                self.infer_local_name_from_url(url)?,
+                Self::infer_local_name_from_url(url).ok_or_else(cannot_infer)?,
             ),
         })
     }
 
-    fn infer_local_name_from_url(&self, url: &Url) -> Result<odf::DatasetName, PullError> {
+    fn infer_local_name_from_url(url: &Url) -> Option<odf::DatasetName> {
         // Try to use last path segment for a name (ignoring the trailing slash)
         if let Some(path) = url.path_segments()
             && let Some(last_segment) = path.rev().find(|s| !s.is_empty())
             && let Ok(name) = odf::DatasetName::try_from(last_segment)
         {
-            return Ok(name);
+            return Some(name);
         }
         // Fall back to using domain name
         if let Some(url::Host::Domain(host)) = url.host()
             && let Ok(name) = odf::DatasetName::try_from(host)
         {
-            return Ok(name);
+            return Some(name);
         }
-        Err(PullError::InvalidOperation(
-            "Unable to infer local name from remote URL, please specify the destination explicitly"
-                .to_owned(),
-        ))
+        None
     }
 
     async fn resolve_item_kind(

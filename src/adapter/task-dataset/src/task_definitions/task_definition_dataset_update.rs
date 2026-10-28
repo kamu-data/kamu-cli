@@ -35,7 +35,7 @@ pub enum DatasetUpdateJob {
 impl From<PullPlanIterationJob> for DatasetUpdateJob {
     fn from(pull_job: PullPlanIterationJob) -> Self {
         match pull_job {
-            PullPlanIterationJob::Ingest(pii) => Self::Ingest(pii.target.take_handle()),
+            PullPlanIterationJob::Ingest(pii) => Self::Ingest(pii.target),
             PullPlanIterationJob::Transform(pti) => Self::Transform(pti.target.take_handle()),
             PullPlanIterationJob::Sync(psi) => Self::Sync(psi),
         }

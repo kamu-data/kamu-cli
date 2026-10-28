@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::{RepositoryNotFoundError, ResolveAliasError, SyncError};
+use crate::{GetRepoError, RepositoryNotFoundError, SyncError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -68,10 +68,17 @@ impl DatasetPullSource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A dataset has several pull aliases, so its pull source cannot be chosen
+#[derive(Debug, Error)]
+#[error("Cannot choose between multiple pull aliases")]
+pub struct AmbiguousPullSourceError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 pub enum FindPullAliasError {
-    #[error("Cannot choose between multiple pull aliases")]
-    AmbiguousSource,
+    #[error(transparent)]
+    AmbiguousSource(#[from] AmbiguousPullSourceError),
 
     #[error(transparent)]
     Internal(
@@ -100,14 +107,11 @@ pub enum ResolveRemoteSourceError {
     ),
 }
 
-impl From<ResolveAliasError> for ResolveRemoteSourceError {
-    fn from(value: ResolveAliasError) -> Self {
+impl From<GetRepoError> for ResolveRemoteSourceError {
+    fn from(value: GetRepoError) -> Self {
         match value {
-            ResolveAliasError::RepositoryNotFound(e) => Self::RepositoryNotFound(e),
-            e @ (ResolveAliasError::AmbiguousRepository
-            | ResolveAliasError::AmbiguousAlias
-            | ResolveAliasError::EmptyRepositoryList) => Self::Internal(e.int_err()),
-            ResolveAliasError::Internal(e) => Self::Internal(e),
+            GetRepoError::NotFound(e) => Self::RepositoryNotFound(e),
+            GetRepoError::Internal(e) => Self::Internal(e),
         }
     }
 }
@@ -125,8 +129,8 @@ impl From<ResolveRemoteSourceError> for SyncError {
 
 #[derive(Debug, Error)]
 pub enum ResolvePullSourceError {
-    #[error("Cannot choose between multiple pull aliases")]
-    AmbiguousSource,
+    #[error(transparent)]
+    AmbiguousSource(#[from] AmbiguousPullSourceError),
 
     #[error(transparent)]
     RepositoryNotFound(
@@ -146,7 +150,7 @@ pub enum ResolvePullSourceError {
 impl From<FindPullAliasError> for ResolvePullSourceError {
     fn from(value: FindPullAliasError) -> Self {
         match value {
-            FindPullAliasError::AmbiguousSource => Self::AmbiguousSource,
+            FindPullAliasError::AmbiguousSource(e) => Self::AmbiguousSource(e),
             FindPullAliasError::Internal(e) => Self::Internal(e),
         }
     }

@@ -7,10 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
-use futures::{Future, StreamExt, TryStreamExt, stream};
+use futures::{StreamExt, TryStreamExt, stream};
 use internal_error::ErrorIntoInternal;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
@@ -80,7 +79,7 @@ impl SimpleTransferProtocol {
         transfer_options: SimpleProtocolTransferOptions,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncResult, SyncError> {
-        let dst_head = Self::get_dest_head(dst.as_metadata_chain()).await?;
+        let dst_head = try_resolve_head(dst.as_metadata_chain()).await?;
 
         let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
         let Some((src_head, blocks_desc_ordered)) = Self::collect_new_blocks(
@@ -179,36 +178,14 @@ impl SimpleTransferProtocol {
 
         let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
 
-        let (dst_dataset, target) = match dst {
-            LocalSyncTarget::Existing {
-                dataset,
-                expected_head,
-            } => (
-                (**dataset).clone(),
-                TransferredSyncTarget::Existing {
-                    dataset: dataset.clone(),
-                    expected_head: expected_head.clone(),
-                },
-            ),
-            LocalSyncTarget::New(alias) => {
-                // Safety: there are blocks
-                let seed = blocks_desc_ordered.pop().unwrap();
-                let StoredSeed {
-                    dataset,
-                    seed_block,
-                    seed_block_bytes,
-                } = StoredSeed::store(&self.catalog, seed).await?;
-                (
-                    dataset,
-                    TransferredSyncTarget::New {
-                        alias: alias.clone(),
-                        seed_block,
-                        seed_block_bytes,
-                        visibility: transfer_options.visibility_for_created_dataset,
-                    },
-                )
-            }
-        };
+        // Safety: there are blocks, oldest last
+        let (dst_dataset, target) = prepare_transfer_target(
+            &self.catalog,
+            dst,
+            transfer_options.visibility_for_created_dataset,
+            || blocks_desc_ordered.pop().unwrap(),
+        )
+        .await?;
 
         let stats = self
             .transfer_objects(
@@ -365,18 +342,8 @@ impl SimpleTransferProtocol {
         }
     }
 
-    async fn get_dest_head(
-        dst_chain: &dyn odf::MetadataChain,
-    ) -> Result<Option<odf::Multihash>, SyncError> {
-        match dst_chain.resolve_ref(&odf::BlockRef::Head).await {
-            Ok(h) => Ok(Some(h)),
-            Err(odf::GetRefError::NotFound(_)) => Ok(None),
-            Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }
-    }
-
-    fn map_block_iteration_error(e: odf::IterBlocksError) -> SyncError {
+    /// A source chain that cannot be read through is corrupted
+    pub(crate) fn map_block_iteration_error(e: odf::IterBlocksError) -> SyncError {
         const METADATA_CHAIN_BROKEN_MESSAGE: &str = "Source metadata chain is broken";
 
         match e {
@@ -439,25 +406,22 @@ impl SimpleTransferProtocol {
         listener.on_status(SyncStage::CommitBlocks, &stats);
     }
 
-    async fn download_block_data<'a>(
-        &'a self,
-        src: &'a dyn odf::Dataset,
-        dst: &'a dyn odf::Dataset,
-        data_slice: &odf::DataSlice,
+    async fn copy_object(
+        &self,
+        src: &dyn odf::Dataset,
+        dst: &dyn odf::Dataset,
+        object: BlockObject<'_>,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
         arc_stats: Arc<Mutex<SyncStats>>,
     ) -> Result<(), SyncError> {
-        tracing::info!(hash = ?data_slice.physical_hash, "Transferring data file");
+        let hash = object.physical_hash();
+        tracing::info!(?hash, "Transferring {} file", object.name());
 
-        let stream = match src
-            .as_data_repo()
-            .get_stream(&data_slice.physical_hash)
-            .await
-        {
+        let stream = match object.repo(src).get_stream(hash).await {
             Ok(s) => Ok(s),
             Err(odf::storage::GetError::NotFound(e)) => Err(CorruptedSourceError {
-                message: "Source data file is missing".to_owned(),
+                message: format!("Source {} file is missing", object.name()),
                 source: Some(e.into()),
             }
             .into()),
@@ -465,30 +429,26 @@ impl SimpleTransferProtocol {
             Err(odf::storage::GetError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
-        match dst
-            .as_data_repo()
+        match object
+            .repo(dst)
             .insert_stream(
                 stream,
                 odf::storage::InsertOpts {
-                    precomputed_hash: if !trust_source_hashes {
-                        None
-                    } else {
-                        Some(&data_slice.physical_hash)
-                    },
-                    expected_hash: Some(&data_slice.physical_hash),
-                    size_hint: Some(data_slice.size),
+                    precomputed_hash: trust_source_hashes.then_some(hash),
+                    expected_hash: Some(hash),
+                    // S3 cannot stream an upload without knowing its length
+                    size_hint: Some(object.size()),
                 },
             )
             .await
         {
             Ok(_) => Ok(()),
             Err(odf::storage::InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                message: concat!(
-                    "Data file hash declared by the source didn't match ",
-                    "the computed - this may be an indication of hashing ",
-                    "algorithm mismatch or an attempted tampering",
-                )
-                .to_owned(),
+                message: format!(
+                    "Source {} file hash didn't match the computed - this may be an indication of \
+                     hashing algorithm mismatch or an attempted tampering",
+                    object.name()
+                ),
                 source: Some(e.into()),
             }
             .into()),
@@ -497,86 +457,7 @@ impl SimpleTransferProtocol {
         }?;
 
         let mut stats = arc_stats.lock().unwrap();
-
-        stats.src.data_slices_read += 1;
-        stats.dst.data_slices_written += 1;
-        stats.src.data_records_read += data_slice.num_records();
-        stats.dst.data_records_written += data_slice.num_records();
-        stats.src.bytes_read += data_slice.size;
-        stats.dst.bytes_written += data_slice.size;
-
-        listener.on_status(SyncStage::TransferData, &stats);
-
-        Ok(())
-    }
-
-    async fn download_block_checkpoint<'a>(
-        &'a self,
-        src: &'a dyn odf::Dataset,
-        dst: &'a dyn odf::Dataset,
-        checkpoint: &odf::Checkpoint,
-        trust_source_hashes: bool,
-        listener: Arc<dyn SyncListener>,
-        arc_stats: Arc<Mutex<SyncStats>>,
-    ) -> Result<(), SyncError> {
-        tracing::info!(hash = ?checkpoint.physical_hash, "Transferring checkpoint file");
-
-        let stream = match src
-            .as_checkpoint_repo()
-            .get_stream(&checkpoint.physical_hash)
-            .await
-        {
-            Ok(s) => Ok(s),
-            Err(odf::storage::GetError::NotFound(e)) => Err(CorruptedSourceError {
-                message: "Source checkpoint file is missing".to_owned(),
-                source: Some(e.into()),
-            }
-            .into()),
-            Err(odf::storage::GetError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::storage::GetError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
-
-        match dst
-            .as_checkpoint_repo()
-            .insert_stream(
-                stream,
-                odf::storage::InsertOpts {
-                    precomputed_hash: if !trust_source_hashes {
-                        None
-                    } else {
-                        Some(&checkpoint.physical_hash)
-                    },
-                    expected_hash: Some(&checkpoint.physical_hash),
-                    // This hint is necessary only for S3 implementation that does not
-                    // currently support streaming uploads
-                    // without knowing Content-Length. We should remove it in the future.
-                    size_hint: Some(checkpoint.size),
-                },
-            )
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(odf::storage::InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                message: concat!(
-                    "Checkpoint file hash declared by the source didn't ",
-                    "match the computed - this may be an indication of hashing ",
-                    "algorithm mismatch or an attempted tampering",
-                )
-                .to_owned(),
-                source: Some(e.into()),
-            }
-            .into()),
-            Err(odf::storage::InsertError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::storage::InsertError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
-
-        let mut stats = arc_stats.lock().unwrap();
-
-        stats.src.checkpoints_read += 1;
-        stats.dst.checkpoints_written += 1;
-        stats.src.bytes_read += checkpoint.size;
-        stats.dst.bytes_written += checkpoint.size;
-
+        object.count(&mut stats);
         listener.on_status(SyncStage::TransferData, &stats);
 
         Ok(())
@@ -633,28 +514,22 @@ impl SimpleTransferProtocol {
         let mut block_download_tasks = vec![];
         blocks_desc_ordered.iter().rev().for_each(|(_, b, _)| {
             if let Some(block_stream) = b.as_data_stream_block() {
-                if let Some(data_slice) = block_stream.event.new_data {
-                    // Each function return unique future
-                    // cast future to next type to allow storing them in vector
-                    block_download_tasks.push(Box::pin(self.download_block_data(
+                let objects = [
+                    block_stream.event.new_data.map(BlockObject::Data),
+                    block_stream
+                        .event
+                        .new_checkpoint
+                        .map(BlockObject::Checkpoint),
+                ];
+                for object in objects.into_iter().flatten() {
+                    block_download_tasks.push(self.copy_object(
                         src,
                         dst,
-                        data_slice,
+                        object,
                         trust_source_hashes,
                         listener.clone(),
                         arc_stats.clone(),
-                    ))
-                        as Pin<Box<dyn Future<Output = Result<(), SyncError>> + Send>>);
-                }
-                if let Some(checkpoint) = block_stream.event.new_checkpoint {
-                    block_download_tasks.push(Box::pin(self.download_block_checkpoint(
-                        src,
-                        dst,
-                        checkpoint,
-                        trust_source_hashes,
-                        listener.clone(),
-                        arc_stats.clone(),
-                    )));
+                    ));
                 }
             }
         });
@@ -713,3 +588,59 @@ impl CompareChainsListener for CompareChainsListenerAdapter {
         self.l.on_status(SyncStage::ReadMetadata, &s);
     }
 }
+
+/// An object a block refers to, copied along with it
+#[derive(Clone, Copy)]
+enum BlockObject<'a> {
+    Data(&'a odf::DataSlice),
+    Checkpoint(&'a odf::Checkpoint),
+}
+
+impl<'a> BlockObject<'a> {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Data(_) => "data",
+            Self::Checkpoint(_) => "checkpoint",
+        }
+    }
+
+    fn physical_hash(self) -> &'a odf::Multihash {
+        match self {
+            Self::Data(data_slice) => &data_slice.physical_hash,
+            Self::Checkpoint(checkpoint) => &checkpoint.physical_hash,
+        }
+    }
+
+    fn size(self) -> u64 {
+        match self {
+            Self::Data(data_slice) => data_slice.size,
+            Self::Checkpoint(checkpoint) => checkpoint.size,
+        }
+    }
+
+    fn repo(self, dataset: &dyn odf::Dataset) -> &dyn odf::storage::ObjectRepository {
+        match self {
+            Self::Data(_) => dataset.as_data_repo(),
+            Self::Checkpoint(_) => dataset.as_checkpoint_repo(),
+        }
+    }
+
+    fn count(self, stats: &mut SyncStats) {
+        match self {
+            Self::Data(data_slice) => {
+                stats.src.data_slices_read += 1;
+                stats.dst.data_slices_written += 1;
+                stats.src.data_records_read += data_slice.num_records();
+                stats.dst.data_records_written += data_slice.num_records();
+            }
+            Self::Checkpoint(_) => {
+                stats.src.checkpoints_read += 1;
+                stats.dst.checkpoints_written += 1;
+            }
+        }
+        stats.src.bytes_read += self.size();
+        stats.dst.bytes_written += self.size();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

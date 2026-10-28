@@ -106,7 +106,7 @@ impl RemoteAliasResolverImpl {
         &self,
         alias: &odf::DatasetAliasRemote,
         odf_transfer_url: &Url,
-    ) -> Result<url::Url, ResolveAliasError> {
+    ) -> Result<url::Url, ResolveRemoteSourceError> {
         let account_name = if alias.account_name.is_some() {
             alias.account_name.clone()
         } else {
@@ -216,11 +216,11 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
     async fn resolve_pull_url(
         &self,
         remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<url::Url, ResolveAliasError> {
+    ) -> Result<url::Url, ResolveRemoteSourceError> {
         match remote_ref {
             // TODO: the reference can be resolved if using ODF protocol.
             // However, it is still difficult with simple folder repositories without index.
-            odf::DatasetRefRemote::ID(_, _) => Err(ResolveAliasError::Internal(
+            odf::DatasetRefRemote::ID(_, _) => Err(ResolveRemoteSourceError::Internal(
                 "Syncing remote dataset by ID is not yet supported".int_err(),
             )),
             odf::DatasetRefRemote::Url(url) => {

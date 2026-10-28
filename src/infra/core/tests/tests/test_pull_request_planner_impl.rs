@@ -855,7 +855,7 @@ async fn test_pull_dataset_with_several_pull_aliases_is_ambiguous() {
         .unwrap_err();
 
     assert_eq!(1, responses.len());
-    assert_matches!(responses[0].result, Err(PullError::AmbiguousSource));
+    assert_matches!(responses[0].result, Err(PullError::AmbiguousSource(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -903,7 +903,7 @@ async fn test_sync_from_remote_id_without_local_alias_fails_planning() {
         .unwrap_err();
 
     assert_eq!(1, responses.len());
-    assert_matches!(responses[0].result, Err(PullError::InvalidOperation(_)));
+    assert_matches!(responses[0].result, Err(PullError::CannotInferLocalName(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1060,7 +1060,7 @@ impl PullTestHarness {
             for job in iteration.jobs {
                 match job {
                     PullPlanIterationJob::Ingest(pii) => {
-                        jobs.push(PullJob::Ingest(pii.target.get_handle().as_any_ref()));
+                        jobs.push(PullJob::Ingest(pii.target.as_any_ref()));
                     }
                     PullPlanIterationJob::Transform(pti) => {
                         jobs.push(PullJob::Transform(pti.target.get_handle().as_any_ref()));

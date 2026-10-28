@@ -165,6 +165,78 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_ingest_propagate_success_with_more_data_runs_next_iteration() {
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::new();
+    mock_flow_sensor_dispatcher
+        .expect_dispatch_input_flow_success()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    mock_flow_run_service
+        .expect_run_flow_automatically()
+        .withf(|_, flow_binding, activation_causes, _, maybe_config| {
+            flow_binding.flow_type == FLOW_TYPE_DATASET_INGEST
+                && matches!(
+                    activation_causes.as_slice(),
+                    [FlowActivationCause::IterationFinished(_)]
+                )
+                && maybe_config.is_some()
+        })
+        .times(1)
+        .returning(
+            |activation_time, flow_binding, activation_causes, _, maybe_config| {
+                Ok(Flow::new(
+                    activation_time,
+                    FlowID::new(2),
+                    flow_binding.clone(),
+                    activation_causes[0].clone(),
+                    maybe_config,
+                    None,
+                )
+                .into())
+            },
+        );
+
+    let harness =
+        FlowControllerIngestHarness::with_mocks(mock_flow_sensor_dispatcher, mock_flow_run_service);
+
+    let ingest_flow = harness
+        .make_ingest_flow(
+            FlowID::new(1),
+            &foo_dataset_id,
+            Some(
+                FlowConfigRuleIngest {
+                    fetch_uncacheable: false,
+                    fetch_next_iteration: true,
+                }
+                .into_flow_config(),
+            ),
+        )
+        .await;
+
+    harness
+        .propagate_success(
+            &ingest_flow,
+            TaskResultDatasetUpdate::Updated {
+                old_head: None,
+                new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
+                has_more: true,
+                increment: MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 5,
+                    updated_watermark: None,
+                },
+            },
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct FlowControllerIngestHarness {
     controller: Arc<FlowControllerIngest>,
     flow_event_store: Arc<dyn FlowEventStore>,
@@ -176,8 +248,13 @@ impl FlowControllerIngestHarness {
     }
 
     fn with_overrides(mock_flow_sensor_dispatcher: MockFlowSensorDispatcher) -> Self {
-        let mock_flow_run_service = MockFlowRunService::new();
+        Self::with_mocks(mock_flow_sensor_dispatcher, MockFlowRunService::new())
+    }
 
+    fn with_mocks(
+        mock_flow_sensor_dispatcher: MockFlowSensorDispatcher,
+        mock_flow_run_service: MockFlowRunService,
+    ) -> Self {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerIngest>()
             .add::<InMemoryFlowEventStore>()

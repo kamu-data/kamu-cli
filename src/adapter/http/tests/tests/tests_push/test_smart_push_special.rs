@@ -10,6 +10,11 @@
 use std::assert_matches;
 
 use kamu::domain::{PushError, SyncError};
+use kamu_adapter_http::smart_protocol::messages::{
+    DatasetPushRequest,
+    DatasetPushRequestError,
+    TransferPlan,
+};
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
@@ -342,6 +347,76 @@ async fn test_smart_push_head_moved_concurrently() {
                 .await
                 .unwrap(),
             concurrent_head
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
+    let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            base_catalog: None,
+        })
+        .await,
+    )
+    .await;
+
+    let server_dataset_handle = scenario
+        .server_harness
+        .cli_dataset_registry()
+        .resolve_dataset_handle_by_ref(&scenario.client_create_result.dataset_handle.as_local_ref())
+        .await
+        .unwrap();
+    let server_dataset_reference_service = scenario.server_harness.cli_dataset_reference_service();
+    let server_head = server_dataset_reference_service
+        .get_reference(&server_dataset_handle.id, &odf::BlockRef::Head)
+        .await
+        .unwrap();
+    let stale_head = odf::Multihash::from_digest_sha3_256(b"stale");
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let request = DatasetPushRequest {
+            current_head: Some(stale_head.clone()),
+            transfer_plan: TransferPlan {
+                num_blocks: 1,
+                num_objects: 0,
+                num_records: 0,
+                bytes_in_raw_blocks: 0,
+                bytes_in_raw_objects: 0,
+            },
+            force_update_if_diverged: false,
+            visibility_for_created_dataset: odf::DatasetVisibility::Private,
+        };
+        let reply = scenario
+            .client_harness
+            .send_raw_push_request(scenario.server_dataset_ref.url().unwrap(), &request)
+            .await;
+
+        assert_matches!(
+            reply,
+            Err(DatasetPushRequestError::InvalidHead(e))
+                if e.actual_head.as_ref() == Some(&server_head)
+                    && e.expected_head.as_ref() == Some(&stale_head)
+        );
+        pretty_assertions::assert_eq!(
+            server_dataset_reference_service
+                .get_reference(&server_dataset_handle.id, &odf::BlockRef::Head)
+                .await
+                .unwrap(),
+            server_head
         );
     };
 

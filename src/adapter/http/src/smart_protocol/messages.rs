@@ -45,6 +45,8 @@ pub struct DatasetPullSuccessResponse {
 /// Unsuccessful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
+    /// Servers do not send it, since the client checks the `Seed` itself; it
+    /// stays so that a reply from an older server can still be read
     SeedBlockOverwriteRestricted(DatasetPushMetadataSeedBlockOverwriteRestrictedError),
     Internal(TransferInternalError),
     InvalidInterval(DatasetPullInvalidIntervalError),
