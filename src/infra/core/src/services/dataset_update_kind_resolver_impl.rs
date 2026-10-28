@@ -17,7 +17,7 @@ use kamu_core::*;
 #[component(pub)]
 #[interface(dyn DatasetUpdateKindResolver)]
 pub struct DatasetUpdateKindResolverImpl {
-    remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+    pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
 }
 
 #[async_trait::async_trait]
@@ -27,23 +27,14 @@ impl DatasetUpdateKindResolver for DatasetUpdateKindResolverImpl {
         &self,
         target: &odf::DatasetHandle,
     ) -> Result<DatasetUpdateKind, ResolveDatasetUpdateKindError> {
-        let remote_aliases = match self.remote_alias_registry.get_remote_aliases(target).await {
-            Ok(remote_aliases) => remote_aliases,
-            Err(GetAliasesError::Internal(e)) => return Err(e.into()),
-        };
-
-        let mut pull_aliases: Vec<_> = remote_aliases.get_by_kind(RemoteAliasKind::Pull).collect();
-
-        match pull_aliases.len() {
-            0 => Ok(match target.kind {
-                odf::DatasetKind::Root => DatasetUpdateKind::PollingIngest,
-                odf::DatasetKind::Derivative => DatasetUpdateKind::Transform,
-            }),
-            1 => Ok(DatasetUpdateKind::SyncFrom {
-                remote_ref: pull_aliases.remove(0).clone(),
-            }),
-            _ => Err(ResolveDatasetUpdateKindError::AmbiguousSource),
+        if let Some(remote_ref) = self.pull_source_resolver.find_pull_alias(target).await? {
+            return Ok(DatasetUpdateKind::SyncFrom { remote_ref });
         }
+
+        Ok(match target.kind {
+            odf::DatasetKind::Root => DatasetUpdateKind::PollingIngest,
+            odf::DatasetKind::Derivative => DatasetUpdateKind::Transform,
+        })
     }
 }
 

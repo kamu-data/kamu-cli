@@ -350,6 +350,7 @@ impl TaskAgentHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
             .add::<CompactionPlannerImpl>()
             .add::<ResetPlannerImpl>()
             .add::<TransformPlannerImpl>()

@@ -55,6 +55,7 @@ interface "DatasetIncrementQueryService" <<i>>
 interface "DatasetKeyBlockRepository" <<i>>
 interface "DatasetKeyValueService" <<i>>
 interface "DatasetLfsBuilder" <<i>>
+interface "DatasetPullSourceResolver" <<i>>
 interface "DatasetReferenceRepository" <<i>>
 interface "DatasetReferenceService" <<i>>
 interface "DatasetRegistry" <<i>>
@@ -249,6 +250,7 @@ class "DatasetIncrementQueryServiceImpl"
 class "DatasetKeyValueServiceSysEnv"
 class "DatasetLfsBuilderDatabaseBackedImpl"
 class "DatasetProperties" <<singleton>>
+class "DatasetPullSourceResolverImpl"
 class "DatasetReferenceIndexer"
 class "DatasetReferenceServiceImpl"
 class "DatasetSearchSchemaProvider"
@@ -526,7 +528,7 @@ class "WsSmartTransferProtocolClient"
 "CompactionExecutorImpl"  --> "RunInfoDir"
 "CompactionPlanner" <|-- "CompactionPlannerImpl"
 "DatasetUpdateKindResolver" <|-- "DatasetUpdateKindResolverImpl"
-"DatasetUpdateKindResolverImpl"  --> "RemoteAliasesRegistry"
+"DatasetUpdateKindResolverImpl"  --> "DatasetPullSourceResolver"
 "ExportService" <|-- "ExportServiceImpl"
 "DataFormatRegistry" <|-- "DataFormatRegistryImpl"
 "FetchService"  --> "ContainerRuntime"
@@ -568,8 +570,8 @@ class "WsSmartTransferProtocolClient"
 "ProvenanceServiceImpl"  --> "DatasetRegistry"
 "ProvenanceServiceImpl"  --> "DependencyGraphService"
 "PullRequestPlanner" <|-- "PullRequestPlannerImpl"
+"PullRequestPlannerImpl"  --> "DatasetPullSourceResolver"
 "PullRequestPlannerImpl"  --> "DatasetUpdateKindResolver"
-"PullRequestPlannerImpl"  --> "RemoteAliasesRegistry"
 "PullRequestPlannerImpl"  --> "TransformPlanner"
 "PullRequestPlannerImpl"  --> "DatasetRegistry"
 "PullRequestPlannerImpl"  --> "DependencyGraphService"
@@ -581,6 +583,10 @@ class "WsSmartTransferProtocolClient"
 "QueryServiceImpl"  --> "DatasetActionAuthorizer"
 "QueryServiceImpl"  --> "DatasetRegistry"
 "QueryServiceImpl"  --> "SessionContextBuilder"
+"DatasetPullSourceResolver" <|-- "DatasetPullSourceResolverImpl"
+"DatasetPullSourceResolverImpl"  --> "RemoteAliasResolver"
+"DatasetPullSourceResolverImpl"  --> "RemoteAliasesRegistry"
+"DatasetPullSourceResolverImpl"  --> "DatasetRegistry"
 "RemoteAliasResolver" <|-- "RemoteAliasResolverImpl"
 "RemoteAliasResolverImpl"  --> "RemoteAliasesRegistry"
 "RemoteAliasResolverImpl"  --> "RemoteRepositoryRegistry"

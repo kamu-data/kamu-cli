@@ -11,6 +11,7 @@ mod engine;
 mod ingest;
 mod queries;
 mod test_compaction_services_impl;
+mod test_dataset_pull_source_resolver_impl;
 mod test_dataset_update_kind_resolver_impl;
 mod test_datasets_filtering;
 mod test_metadata_chain_comparator;

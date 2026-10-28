@@ -142,8 +142,8 @@ detached from it so later transactions can use them.
 
 1. **Local handle.** A `Local` ref must resolve, or the result is `NotFound`. A `Remote` request
    first tries its local alias, then searches for a local dataset whose pull aliases contain the
-   remote ref (`try_inverse_lookup_dataset_by_pull_alias`: a quick check by name, then a scan of
-   all datasets). In a multi-tenant workspace a dataset found this way must belong to the current
+   remote ref (`DatasetPullSourceResolver::find_dataset_by_pull_alias`,
+   [dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)). In a multi-tenant workspace a dataset found this way must belong to the current
    account; in any workspace it must match any alias the caller gave, or the result is
    `SaveUnderDifferentAlias`.
 2. **Missing target.** With no local dataset and `create_if_not_exists` off, the request fails.
@@ -151,9 +151,9 @@ detached from it so later transactions can use them.
    its dataset name, or for a URL the last path segment, then the host name. Remote refs by ID without
    a local alias are not supported and panic (`unimplemented!`).
 4. **Kind.** A `Remote` request, or a target still to be created, is a sync from the request's
-   ref. An existing dataset gets its kind from `DatasetUpdateKindResolver`, which owns the rule:
-   its single pull alias makes it a sync, otherwise a root is ingested and a derivative
-   transformed. Two or more pull aliases fail with `AmbiguousSource`.
+   ref. An existing dataset gets its kind from `DatasetUpdateKindResolver`: its pull alias
+   (`DatasetPullSourceResolver::find_pull_alias`) makes it a sync, otherwise a root is ingested
+   and a derivative transformed. Two or more pull aliases fail with `AmbiguousSource`.
 5. **Depth.** Syncs and ingests are depth 0. A transform is one more than its deepest upstream
    dependency (`DependencyGraphService::get_upstream_dependencies`, visited recursively).
 
@@ -179,7 +179,7 @@ iteration per depth. The job follows the item's kind:
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
 | ingest | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
-| sync | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder::build_local_sync_request`, which reads the target's `HEAD` in the planning transaction | local target (existing or to create), remote ref, `LocalSyncRequest` with the expected head ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
+| sync | `Sync(PullSyncItem)` | `build_sync_item` → `DatasetPullSourceResolver::resolve_remote_source`, then `SyncRequestBuilder::build_local_sync_request_from_source`, which reads the target's `HEAD` in the planning transaction | local target (existing or to create), remote ref, `LocalSyncRequest` with the expected head ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
 | transform | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
@@ -319,6 +319,7 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 | Planner trait, requests, options, plan, results, errors | [`pull_request_planner.rs`](../../src/domain/core/src/services/pull_request_planner.rs) |
 | Use case trait | [`pull_dataset_use_case.rs`](../../src/domain/core/src/use_cases/pull_dataset_use_case.rs) |
 | Update kind of one dataset | [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) |
+| Pull source of one dataset, inverse lookup by pull alias | [`dataset_pull_source_resolver_impl.rs`](../../src/infra/core/src/services/remote/dataset_pull_source_resolver_impl.rs) |
 | Planner: resolution, traversal, depths, job building | [`pull_request_planner_impl.rs`](../../src/infra/core/src/services/pull_request_planner_impl.rs) |
 | Use case: authorization, iteration loop, runners, `HEAD` updates | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
 | Polling ingest loop of an ingest job | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |

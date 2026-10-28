@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, DependencyGraphService};
@@ -25,7 +25,7 @@ use crate::SyncRequestBuilder;
 pub struct PullRequestPlannerImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+    pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
     transform_planner: Arc<dyn TransformPlanner>,
     sync_request_builder: Arc<SyncRequestBuilder>,
@@ -38,7 +38,7 @@ impl PullRequestPlannerImpl {
     pub fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
-        remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+        pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
         update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
         transform_planner: Arc<dyn TransformPlanner>,
         sync_request_builder: Arc<SyncRequestBuilder>,
@@ -47,7 +47,7 @@ impl PullRequestPlannerImpl {
         Self {
             dataset_registry,
             dependency_graph_service,
-            remote_alias_registry,
+            pull_source_resolver,
             update_kind_resolver,
             transform_planner,
             sync_request_builder,
@@ -71,7 +71,7 @@ impl PullRequestPlannerImpl {
         let mut depth_first_traversal = PullGraphDepthFirstTraversal::new(
             self.dataset_registry.clone(),
             self.dependency_graph_service.clone(),
-            self.remote_alias_registry.clone(),
+            self.pull_source_resolver.clone(),
             self.update_kind_resolver.clone(),
             self.current_account_subject.clone(),
             options,
@@ -114,7 +114,7 @@ impl PullRequestPlannerImpl {
         let mut depth_first_traversal = PullGraphDepthFirstTraversal::new(
             self.dataset_registry.clone(),
             self.dependency_graph_service.clone(),
-            self.remote_alias_registry.clone(),
+            self.pull_source_resolver.clone(),
             self.update_kind_resolver.clone(),
             self.current_account_subject.clone(),
             options,
@@ -213,12 +213,7 @@ impl PullRequestPlannerImpl {
         sync_options: SyncOptions,
     ) -> Result<PullSyncItem, Box<PullResponse>> {
         match self
-            .sync_request_builder
-            .build_local_sync_request(
-                remote_ref.as_any_ref(),
-                pi.local_target.as_local_ref(),
-                sync_options.create_if_not_exists,
-            )
+            .build_sync_request(&remote_ref, &pi.local_target, sync_options)
             .await
         {
             Ok(sync_request) => Ok(PullSyncItem {
@@ -235,6 +230,25 @@ impl PullRequestPlannerImpl {
                 result: Err(PullError::SyncError(e)),
             })),
         }
+    }
+
+    async fn build_sync_request(
+        &self,
+        remote_ref: &odf::DatasetRefRemote,
+        local_target: &PullLocalTarget,
+        sync_options: SyncOptions,
+    ) -> Result<LocalSyncRequest, SyncError> {
+        let source = self
+            .pull_source_resolver
+            .resolve_remote_source(remote_ref)
+            .await?;
+        self.sync_request_builder
+            .build_local_sync_request_from_source(
+                source,
+                local_target.as_local_ref(),
+                sync_options.create_if_not_exists,
+            )
+            .await
     }
 }
 
@@ -382,7 +396,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
 struct PullGraphDepthFirstTraversal<'a> {
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+    pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
     current_account_subject: Arc<CurrentAccountSubject>,
     options: &'a PullOptions,
@@ -394,7 +408,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     fn new(
         dataset_registry: Arc<dyn DatasetRegistry>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
-        remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
+        pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
         update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
         current_account_subject: Arc<CurrentAccountSubject>,
         options: &'a PullOptions,
@@ -403,7 +417,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         Self {
             dataset_registry,
             dependency_graph_service,
-            remote_alias_registry,
+            pull_source_resolver,
             update_kind_resolver,
             current_account_subject,
             options,
@@ -517,7 +531,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                 };
                 if maybe_local_handle.is_none() {
                     let maybe_resolved_local_handle = self
-                        .try_inverse_lookup_dataset_by_pull_alias(&remote.remote_ref)
+                        .pull_source_resolver
+                        .find_dataset_by_pull_alias(&remote.remote_ref)
                         .await?;
                     if let Some(resolved_local_handle) = &maybe_resolved_local_handle {
                         // Ensure the alias belongs to same account
@@ -556,53 +571,6 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         };
 
         Ok(maybe_local_handle)
-    }
-
-    // TODO: avoid traversing all datasets for every alias
-    async fn try_inverse_lookup_dataset_by_pull_alias(
-        &self,
-        remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<Option<odf::DatasetHandle>, InternalError> {
-        // Do a quick check when remote and local names match
-        if let Some(remote_name) = remote_ref.dataset_name()
-            && let Some(local_handle) = self
-                .dataset_registry
-                .try_resolve_dataset_handle_by_ref(
-                    &odf::DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
-                )
-                .await?
-            && self
-                .remote_alias_registry
-                .get_remote_aliases(&local_handle)
-                .await
-                .int_err()?
-                .contains(remote_ref, RemoteAliasKind::Pull)
-        {
-            return Ok(Some(local_handle));
-        }
-
-        // No luck - now have to search through aliases of all users
-        // TODO: implement effecient resolution of aliases
-        if let CurrentAccountSubject::Logged(_) = self.current_account_subject.as_ref() {
-            use tokio_stream::StreamExt;
-            let mut datasets = self.dataset_registry.all_dataset_handles();
-            while let Some(dataset_handle) = datasets.next().await {
-                let dataset_handle = dataset_handle?;
-                if self
-                    .remote_alias_registry
-                    .get_remote_aliases(&dataset_handle)
-                    .await
-                    .int_err()?
-                    .contains(remote_ref, RemoteAliasKind::Pull)
-                {
-                    return Ok(Some(dataset_handle));
-                }
-            }
-        } else {
-            unreachable!("User must be logged by this moment")
-        }
-
-        Ok(None)
     }
 
     fn form_local_alias(

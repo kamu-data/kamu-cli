@@ -103,7 +103,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Committing a pull | `kamu-core` — [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs); `kamu` — [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs), [`local_sync_writes.rs`](../../src/infra/core/src/utils/local_sync_writes.rs) | `LocalSyncCommitter`: `HEAD` CAS through `DatasetHeadCommitter`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
 | Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`; `odf` — `MetadataChainExt::append_batch` | block validation, `HEAD` update on the smart push server |
 | Push | `kamu` — [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs); CLI [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) | `kamu push` |
-| Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteAliasResolverImpl` |
+| Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteAliasResolverImpl`, `DatasetPullSourceResolverImpl` |
 
 ---
 
@@ -132,12 +132,15 @@ is read as an account); otherwise it is resolved to a URL by `RemoteAliasResolve
   which can lag behind the database. A dataset entry left without `HEAD` by an interrupted
   creation is `Existing` with no expected head. A missing destination becomes `New` when creation
   is allowed and the reference carries an alias.
+- `build_local_sync_request_from_source(source, dst, create_dst_if_not_exists)` does the same from a
+  source the planner resolved with `DatasetPullSourceResolver`
+  ([§9](#9-remote-repositories-and-aliases)), without resolving its URL again.
 
 **Pull into a local dataset** plans, transfers, then commits:
 
 | Step | Transaction | Does |
 | --- | --- | --- |
-| Plan | the caller's | `build_local_sync_request`: resolve the source, read `expected_head` |
+| Plan | the caller's | `build_local_sync_request_from_source` or `build_local_sync_request`: resolve the source, read `expected_head` |
 | Transfer | none held across it | `transfer_into_local`: compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
 | Commit | the caller's | `LocalSyncCommitter::commit`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
 
@@ -423,6 +426,18 @@ to `SyncOptions`.
 | Pull URL of a URL | the URL itself, with a trailing `/` |
 | Pull URL of an ID | not supported |
 | Push target | `--to` URL as given; otherwise the dataset's single push alias, if it is a URL alias (a `repo/name` push alias is skipped; several aliases are `AmbiguousAlias`); otherwise the only configured repository (none is `EmptyRepositoryList`, several are `AmbiguousRepository`). For a repository, the account comes from the server as above, and the remote dataset name from a lookup of the dataset ID on the server, falling back to the local name |
+
+`DatasetPullSourceResolverImpl` owns what a pull alias means:
+
+| Method | Answer |
+| --- | --- |
+| `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousSource` with several; reads the alias registry only |
+| `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteAliasResolver::resolve_pull_url`; an unknown repository is `RepositoryNotFound` |
+| `resolve_pull_source` | both of the above for one dataset |
+| `find_dataset_by_pull_alias` | the local dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of all datasets |
+
+`DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` of a sync task, without
+credentials.
 
 How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 [dataset-pull.md](dataset-pull.md#51-resolving-each-request).
