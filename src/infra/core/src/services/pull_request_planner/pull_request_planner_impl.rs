@@ -216,7 +216,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         request: PullRequest,
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> Result<PullPlanIterationJob, PullResponse> {
+    ) -> Result<PullPlanIterationJob, PullError> {
         assert!(!options.recursive);
 
         let (mut plan, mut errors) = self
@@ -224,7 +224,9 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             .await;
         assert!(plan.len() == 1 && errors.is_empty() || plan.is_empty() && errors.len() == 1);
         if plan.is_empty() {
-            let the_error = errors.remove(0);
+            let Err(the_error) = errors.remove(0).result else {
+                unreachable!("Planning reports only failed responses")
+            };
             Err(the_error)
         } else {
             let mut the_iteration = plan.remove(0).jobs;

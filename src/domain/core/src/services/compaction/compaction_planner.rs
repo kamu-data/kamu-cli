@@ -126,6 +126,17 @@ pub enum CompactionPlanningError {
     Internal(#[from] InternalError),
 }
 
+impl CompactionPlanningError {
+    /// Whether planning the same compaction again could succeed. Only a
+    /// root dataset can be compacted, and access is not gained by retrying.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::InvalidDatasetKind(_) | Self::Access(_) => false,
+            Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]

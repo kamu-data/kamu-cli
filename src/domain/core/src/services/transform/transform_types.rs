@@ -75,6 +75,18 @@ pub enum TransformError {
     ),
 }
 
+impl TransformError {
+    /// Whether running the same transform again could succeed
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::Plan(e) => e.is_recoverable(),
+            Self::Elaborate(e) => e.is_recoverable(),
+            Self::Execute(e) => e.is_recoverable(),
+            Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]

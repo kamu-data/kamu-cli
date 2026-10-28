@@ -209,11 +209,7 @@ impl UpdateDatasetTaskRunner {
     }
 
     fn failed(recoverable: bool) -> TaskOutcome {
-        TaskOutcome::Failed(if recoverable {
-            TaskError::empty_recoverable()
-        } else {
-            TaskError::empty_unrecoverable()
-        })
+        TaskOutcome::Failed(TaskError::empty(recoverable))
     }
 
     async fn run_transform_update(

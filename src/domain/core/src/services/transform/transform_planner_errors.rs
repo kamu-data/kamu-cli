@@ -31,6 +31,17 @@ pub enum TransformPlanError {
     ),
 }
 
+impl TransformPlanError {
+    /// Whether reading the transform again could succeed. A dataset without
+    /// a transform needs a change of metadata first.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::TransformNotDefined(_) => false,
+            Self::Internal(_) => true,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]

@@ -10,11 +10,11 @@
 use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
-use internal_error::InternalError;
 use kamu_core::{CompactionOptions, CompactionPlanner};
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::DatasetRegistry;
 use kamu_task_system::*;
 
+use super::task_planning::{planning_failed, resolve_task_dataset};
 use crate::{LogicalPlanDatasetHardCompact, TaskDefinitionDatasetHardCompact};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,11 +34,8 @@ impl HardCompactDatasetTaskPlanner {
     async fn plan_hard_compaction(
         &self,
         args: &LogicalPlanDatasetHardCompact,
-    ) -> Result<TaskDefinition, InternalError> {
-        let target = dataset_registry
-            .get_dataset_by_ref(&args.dataset_id.as_local_ref())
-            .await
-            .int_err()?;
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
+        let target = resolve_task_dataset(dataset_registry.as_ref(), &args.dataset_id).await?;
 
         let compaction_options = CompactionOptions {
             max_slice_size: args.max_slice_size,
@@ -49,7 +46,7 @@ impl HardCompactDatasetTaskPlanner {
         let compaction_plan = compaction_planner
             .plan_compaction(target.clone(), compaction_options, None)
             .await
-            .int_err()?;
+            .map_err(|e| planning_failed(&e, e.is_recoverable()))?;
 
         target.detach_from_transaction();
 
@@ -68,7 +65,7 @@ impl TaskDefinitionPlanner for HardCompactDatasetTaskPlanner {
         &self,
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError> {
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
         assert_eq!(
             logical_plan.plan_type,
             LogicalPlanDatasetHardCompact::TYPE_ID,
