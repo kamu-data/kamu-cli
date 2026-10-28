@@ -367,6 +367,7 @@ impl PushUseCaseHarness {
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteRepositoryRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))

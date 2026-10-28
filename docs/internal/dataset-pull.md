@@ -135,7 +135,9 @@ shown as they are.
 `PullRequestPlannerImpl::build_pull_multi_plan(requests, options, tenancy)` runs in one
 transaction (`PullDatasetUseCaseImpl::build_plan_for_requests`, or
 `build_plan_for_all_owned_datasets` for `--all`), and its resolved datasets are
-detached from it so later transactions can use them.
+detached from it so later transactions can use them. Planning reads only this node's database and
+contacts no remote: a sync job's source is resolved by its transfer, so the transaction never waits
+on the network.
 
 ### 5.1 Resolving each request
 
@@ -181,14 +183,15 @@ iteration per depth. The job follows the item's kind:
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
 | ingest | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
-| sync | `Sync(PullSyncItem)` | `build_sync_item` → `DatasetPullSourceResolver::resolve_remote_source`, then `SyncRequestBuilder::build_local_sync_request_from_source`, which reads the target's `HEAD` in the planning transaction; an update task reads it again when it runs | local target (existing or to create), remote ref, `LocalSyncRequest` with the expected head ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
+| sync | `Sync(PullSyncItem)` | `build_sync_item`, which only records the remote ref | local target (existing or to create) and remote ref; the job reads the target's `HEAD` and the transfer resolves the source when it runs ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
 | transform | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
 remote is copied, never transformed locally.
 
 If any request fails to resolve, or any item fails to become a job, `execute_multi` returns only
-those errors and runs nothing.
+those errors and runs nothing. A sync source that is unknown or cannot be reached is not a planning
+error: it fails only its own job.
 
 ---
 
@@ -214,7 +217,7 @@ runs outside them.
 | --- | --- | --- |
 | Ingest | `PullIngestLoop::run`: plans the ingest and resolves the dataset's env vars in one transaction ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)); then calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), adding up the results so the response spans the first old head to the last new head. A dataset without a polling source is up to date. A failure after earlier iterations committed is `PullError::IngestStopped`, carrying the committed heads and increment and the iteration's error | after every ingest iteration that returns `Updated`, `PullIngestLoop::commit_head` (CAS) |
 | Transform | `transform`: plans and elaborates in one transaction ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes. A failure after the reset committed is `PullError::TransformStopped`, carrying the reset's heads and the error | after the reset and after the transform, `commit_head_transactionally` (CAS) |
-| Sync | `sync`: `SyncService::transfer_into_local` with no transaction open; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias in the commit's transaction, so the dataset never exists without it | after the transfer, `commit_sync_transactionally`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
+| Sync | `sync`: reads the target's `HEAD` in a transaction of its own (`PullLocalTarget::resolve_sync_target`), then `SyncService::transfer_into_local` with no transaction open, which resolves and opens the source; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias in the commit's transaction, so the dataset never exists without it | after the transfer, `commit_sync_transactionally`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
 
 `commit_head_transactionally` and `PullIngestLoop::commit_head` move `HEAD` through
 `DatasetHeadCommitter`, expecting the head the iteration started from, which posts
@@ -269,7 +272,7 @@ The server never calls `PullDatasetUseCase`: the update task builds a single-nod
 | Polling loop | until `has_more` is false | one iteration; the flow decides whether to continue |
 | Env vars | resolved per dataset by the use case | resolved by the task planner |
 | Diverged-input reset | optional flag | never |
-| Planning to running | immediate | separated by the task queue; planning fixes the job kind and, for a sync, the source. Ingest and transform are planned when the task runs, and a sync re-reads the destination's `HEAD` then |
+| Planning to running | immediate | separated by the task queue; planning fixes the job kind and, for a sync, the remote ref. Ingest and transform are planned when the task runs, and a sync reads the destination's `HEAD` and resolves its source then |
 | Root dataset without a polling source | up to date | unrecoverable failure: a flow that keeps polling such a dataset is misconfigured |
 | Dataset deleted before it runs | not applicable | unrecoverable failure |
 

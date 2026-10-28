@@ -226,7 +226,7 @@ async fn create_graph_remote(
         harness
             .local_sync_helper
             .pull(
-                remote_alias.as_any_ref(),
+                remote_alias.as_remote_ref(),
                 import_alias.as_local_ref(),
                 SyncOptions::default(),
             )
@@ -861,24 +861,24 @@ async fn test_pull_dataset_with_several_pull_aliases_is_ambiguous() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_sync_from_unknown_repository_fails_planning() {
+async fn test_sync_from_unknown_repository_is_planned_without_resolving_it() {
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
-    let responses = harness
-        .pull_with_requests(
-            vec![PullRequest::Remote(PullRequestRemote {
-                maybe_local_alias: Some(n!("bar")),
-                remote_ref: rr!("missing/foo"),
-            })],
-            PullOptions::default(),
-        )
-        .await
-        .unwrap_err();
-
-    assert_eq!(1, responses.len());
-    assert_matches!(
-        responses[0].result,
-        Err(PullError::SyncError(SyncError::RepositoryNotFound(_)))
+    assert_eq!(
+        harness
+            .pull_with_requests(
+                vec![PullRequest::Remote(PullRequestRemote {
+                    maybe_local_alias: Some(n!("bar")),
+                    remote_ref: rr!("missing/foo"),
+                })],
+                PullOptions::default(),
+            )
+            .await
+            .unwrap(),
+        vec![vec![PullJob::Sync((
+            rr!("missing/foo").into(),
+            n!("bar").into()
+        ))]],
     );
 }
 
@@ -978,6 +978,7 @@ impl PullTestHarness {
             .add::<SyncServiceImpl>()
             .add::<LocalSyncCommitterImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<SyncRequestBuilder>()
             .add::<odf::dataset::DatasetFactoryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
@@ -1067,8 +1068,8 @@ impl PullTestHarness {
                     }
                     PullPlanIterationJob::Sync(psi) => {
                         jobs.push(PullJob::Sync((
-                            psi.sync_request.src.as_user_friendly_any_ref(),
-                            psi.sync_request.dst.as_any_ref(),
+                            psi.remote_ref.as_any_ref(),
+                            psi.local_target.as_local_ref().as_any_ref(),
                         )));
                     }
                 }

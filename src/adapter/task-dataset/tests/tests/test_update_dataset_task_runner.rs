@@ -42,7 +42,7 @@ use kamu_adapter_task_dataset::{
 use kamu_core::engine::TransformResponseExt;
 use kamu_core::testing::{MockIngestIteration, ReportedHeads};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
+use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
@@ -599,16 +599,12 @@ async fn test_sync_expects_head_read_when_it_runs() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[tokio::test]
-async fn test_sync_into_missing_dataset_is_an_internal_error() {
-    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+#[test]
+fn test_sync_into_missing_dataset_is_not_an_update_task_job() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
-    let foo = harness.create_root_dataset(&alias_foo).await;
-
     assert_matches!(
-        harness.try_run_sync_update_into_new(&foo, &alias_bar).await,
+        UpdateDatasetTaskRunnerHarness::sync_job_into_new(&alias_bar),
         Err(_)
     );
 }
@@ -983,12 +979,9 @@ impl UpdateDatasetTaskRunnerHarness {
     ) -> TaskOutcome {
         self.run_update_with(
             DatasetUpdateJob::Ingest(created.dataset_handle.clone()),
-            PullOptions {
-                ingest_options: PollingIngestOptions {
-                    fetch_uncacheable: true,
-                    ..PollingIngestOptions::default()
-                },
-                ..PullOptions::default()
+            PollingIngestOptions {
+                fetch_uncacheable: true,
+                ..PollingIngestOptions::default()
             },
         )
         .await
@@ -999,87 +992,44 @@ impl UpdateDatasetTaskRunnerHarness {
             .await
     }
 
-    /// Syncs `created` from its remote, planned when `created` was at its
-    /// creation head; the mocked transfer ignores the source
+    /// Syncs `created` from its remote; the mocked transfer ignores the
+    /// source
     async fn run_sync_update(&self, created: &CreateDatasetResult) -> TaskOutcome {
-        let dataset = ResolvedDataset::from_created(created);
-        self.run_update(Self::sync_job(
-            created,
-            PullLocalTarget::existing(created.dataset_handle.clone()),
-            LocalSyncTarget::Existing {
-                dataset,
-                expected_head: Some(created.head.clone()),
-            },
-        ))
-        .await
-    }
-
-    /// Syncs into a dataset `alias` that does not exist yet, using `source`
-    /// as the remote's storage
-    async fn try_run_sync_update_into_new(
-        &self,
-        source: &CreateDatasetResult,
-        alias: &odf::DatasetAlias,
-    ) -> Result<TaskOutcome, InternalError> {
-        self.try_run_update(
-            Self::sync_job(
-                source,
-                PullLocalTarget::to_create(alias.clone()),
-                LocalSyncTarget::New(alias.clone()),
-            ),
-            PullOptions::default(),
-        )
-        .await
-    }
-
-    fn sync_job(
-        source: &CreateDatasetResult,
-        local_target: PullLocalTarget,
-        dst: LocalSyncTarget,
-    ) -> DatasetUpdateJob {
-        let remote_ref = Self::sync_remote_ref(local_target.alias());
-        let odf::DatasetRefRemote::Url(url) = &remote_ref else {
-            unreachable!()
-        };
-
-        DatasetUpdateJob::Sync(PullSyncItem {
-            local_target,
-            remote_ref: remote_ref.clone(),
-            maybe_original_request: None,
-            sync_request: Box::new(LocalSyncRequest {
-                src: SyncRef::Remote(SyncRefRemote {
-                    url: url.clone(),
-                    dataset: source.dataset.clone(),
-                    original_remote_ref: remote_ref.clone(),
-                }),
-                dst,
-            }),
+        self.run_update(DatasetUpdateJob::Sync {
+            target: created.dataset_handle.clone(),
+            remote_ref: Self::sync_remote_ref(&created.dataset_handle.alias),
         })
+        .await
+    }
+
+    /// Converts a planned sync into a dataset `alias` that does not exist yet
+    /// into an update task job
+    fn sync_job_into_new(alias: &odf::DatasetAlias) -> Result<DatasetUpdateJob, InternalError> {
+        DatasetUpdateJob::try_from(PullPlanIterationJob::Sync(PullSyncItem {
+            local_target: PullLocalTarget::to_create(alias.clone()),
+            remote_ref: Self::sync_remote_ref(alias),
+            maybe_original_request: None,
+        }))
     }
 
     async fn run_update(&self, job: DatasetUpdateJob) -> TaskOutcome {
-        self.run_update_with(job, PullOptions::default()).await
+        self.run_update_with(job, PollingIngestOptions::default())
+            .await
     }
 
     async fn run_update_with(
         &self,
         job: DatasetUpdateJob,
-        pull_options: PullOptions,
+        ingest_options: PollingIngestOptions,
     ) -> TaskOutcome {
-        self.try_run_update(job, pull_options).await.unwrap()
-    }
-
-    async fn try_run_update(
-        &self,
-        job: DatasetUpdateJob,
-        pull_options: PullOptions,
-    ) -> Result<TaskOutcome, InternalError> {
         self.runner
             .run_task(TaskDefinition::new(TaskDefinitionDatasetUpdate {
-                pull_options,
+                ingest_options,
+                sync_options: SyncOptions::default(),
                 job,
             }))
             .await
+            .unwrap()
     }
 }
 

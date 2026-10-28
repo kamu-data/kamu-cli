@@ -7,13 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{PullOptions, PullPlanIterationJob, PullSyncItem};
+use internal_error::InternalError;
+use kamu_core::{PollingIngestOptions, PullLocalTarget, PullPlanIterationJob, SyncOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_task_system::task_definition_struct! {
     pub struct TaskDefinitionDatasetUpdate {
-        pub pull_options: PullOptions,
+        pub ingest_options: PollingIngestOptions,
+        pub sync_options: SyncOptions,
         pub job: DatasetUpdateJob,
     }
     => "dev.kamu.tasks.dataset.update"
@@ -29,15 +31,30 @@ pub enum DatasetUpdateJob {
     /// The derivative to transform. The transform is planned when the task
     /// runs, in the transaction that elaborates it.
     Transform(odf::DatasetHandle),
-    Sync(PullSyncItem),
+    /// The dataset to sync from a remote source. Its `HEAD` is read when the
+    /// task runs, and the transfer resolves and opens the source.
+    Sync {
+        target: odf::DatasetHandle,
+        remote_ref: odf::DatasetRefRemote,
+    },
 }
 
-impl From<PullPlanIterationJob> for DatasetUpdateJob {
-    fn from(pull_job: PullPlanIterationJob) -> Self {
+impl TryFrom<PullPlanIterationJob> for DatasetUpdateJob {
+    type Error = InternalError;
+
+    fn try_from(pull_job: PullPlanIterationJob) -> Result<Self, Self::Error> {
         match pull_job {
-            PullPlanIterationJob::Ingest(pii) => Self::Ingest(pii.target),
-            PullPlanIterationJob::Transform(pti) => Self::Transform(pti.target.take_handle()),
-            PullPlanIterationJob::Sync(psi) => Self::Sync(psi),
+            PullPlanIterationJob::Ingest(pii) => Ok(Self::Ingest(pii.target)),
+            PullPlanIterationJob::Transform(pti) => Ok(Self::Transform(pti.target.take_handle())),
+            PullPlanIterationJob::Sync(psi) => match psi.local_target {
+                PullLocalTarget::Existing(target) => Ok(Self::Sync {
+                    target,
+                    remote_ref: psi.remote_ref,
+                }),
+                PullLocalTarget::ToCreate(alias) => InternalError::bail(format!(
+                    "An update task syncs into an existing dataset, but {alias} does not exist"
+                )),
+            },
         }
     }
 }

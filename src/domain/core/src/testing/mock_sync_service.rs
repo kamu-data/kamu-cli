@@ -31,19 +31,12 @@ impl MockSyncService {
     ) -> Self {
         self.expect_transfer_into_local()
             .withf(move |request, _, _| {
-                matches!(
-                    &(request.src),
-                    SyncRef::Remote(SyncRefRemote {
-                        url: _,
-                        dataset: _,
-                        original_remote_ref,
-                    })
-                    if original_remote_ref == &src_remote_ref
-                ) && matches!(
-                    &(request.dst),
-                    LocalSyncTarget::Existing { dataset, .. }
-                    if dataset.get_alias() == &target_alias
-                )
+                request.src == src_remote_ref
+                    && matches!(
+                        &(request.dst),
+                        LocalSyncTarget::Existing { dataset, .. }
+                        if dataset.get_alias() == &target_alias
+                    )
             })
             .times(1)
             .returning(move |request, _, _| {

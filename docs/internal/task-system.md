@@ -386,9 +386,10 @@ fetch_uncacheable }`. The dataset decides what "update" means.
    single-node pull plan and yields one `PullPlanIterationJob`: `Ingest`, `Transform` or `Sync`,
    chosen as described in [dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs).
 2. The job is detached from the transaction and stored in `TaskDefinitionDatasetUpdate` as a
-   `DatasetUpdateJob`, with the `PullOptions`. Ingest and transform jobs keep only the target's
-   handle: the runner plans them itself, so the definition holds no writer state and no
-   environment variable values.
+   `DatasetUpdateJob`, with the ingest and sync options. Every job keeps only the target's handle,
+   and a sync job also the remote ref: the runner plans them itself, so the definition holds no
+   writer state, no environment variable values and nothing read from a remote. A planned sync
+   into a dataset that does not exist is a planning error.
 
 A planning error is logged and returned as `Err`, which the agent turns into a recoverable
 failure.
@@ -417,10 +418,9 @@ failure.
   because the input was compacted) becomes `TaskErrorDatasetUpdate::InputDatasetCompacted`, and
   the transform flow controller decides what to do about it.
 - **Sync** — in one transaction re-resolves the destination and reads its `HEAD`; then
-  `SyncService::transfer_into_local` copies blocks and objects from the remote (smart transfer
-  protocol for `odf+http(s)://`, simple protocol otherwise) without moving `HEAD`; then
-  `LocalSyncCommitter` moves `HEAD` in a transaction of its own. An update task syncs only into an
-  existing dataset.
+  `SyncService::transfer_into_local` resolves and opens the remote, and copies blocks and objects
+  from it (smart transfer protocol for `odf+http(s)://`, simple protocol otherwise) without moving
+  `HEAD`; then `LocalSyncCommitter` moves `HEAD` in a transaction of its own.
 
 On success the result is `TaskResultDatasetUpdate::Updated` with the old and new heads and the
 `increment`: block and record counts and the new watermark, which the flow controllers use to

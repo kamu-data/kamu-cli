@@ -157,6 +157,7 @@ impl ClientSideHarness {
 
         b.add::<RemoteAliasesRegistryImpl>();
         b.add::<RemoteAliasResolverImpl>();
+        b.add::<RemoteDatasetUrlResolverImpl>();
 
         b.add::<EngineProvisionerNull>();
 

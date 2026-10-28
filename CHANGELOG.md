@@ -55,6 +55,10 @@ Recommendation: for ease of reading, use the following format:
   as ingest flows do, instead of no result
 - Update and compaction tasks no longer retry a commit the account is not allowed to make, and
   update tasks no longer retry a pull whose server sends metadata that cannot be read
+- `kamu pull` of several datasets no longer pulls none of them when the remote of one is unknown
+  or cannot be reached; that dataset fails on its own
+- Planning a pull or an update task no longer holds a database transaction while it contacts a
+  remote repository
 ### Fixed
 - `kamu pull` no longer shows an ingest or a transform as successful when its commit then fails
   because the dataset's head moved

@@ -24,7 +24,7 @@ pub struct DatasetPullSourceResolverImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     remote_alias_registry: Arc<dyn RemoteAliasesRegistry>,
-    remote_alias_resolver: Arc<dyn RemoteAliasResolver>,
+    remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
 }
 
 impl DatasetPullSourceResolverImpl {
@@ -80,8 +80,8 @@ impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<DatasetPullSource, ResolveRemoteSourceError> {
         let url = self
-            .remote_alias_resolver
-            .resolve_pull_url(remote_ref)
+            .remote_dataset_url_resolver
+            .resolve_dataset_url(remote_ref)
             .await?;
         Ok(DatasetPullSource {
             remote_ref: remote_ref.clone(),

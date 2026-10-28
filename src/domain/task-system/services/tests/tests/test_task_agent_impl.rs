@@ -360,6 +360,7 @@ impl TaskAgentHarness {
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteRepositoryRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()

@@ -19,6 +19,7 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
     RemoteAliasResolverImpl,
     RemoteAliasesRegistryImpl,
+    RemoteDatasetUrlResolverImpl,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
     RemoteStatusServiceImpl,
@@ -255,6 +256,7 @@ impl RemoteStatusTestHarness {
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(IpfsGateway::default())

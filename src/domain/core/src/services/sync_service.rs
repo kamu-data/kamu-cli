@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::ResolvedDataset;
 use thiserror::Error;
 use url::Url;
 
@@ -35,9 +35,10 @@ pub trait SyncService: Send + Sync {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
-    /// Writes the blocks, data and checkpoints a local dataset lacks as
-    /// unreferenced objects. Holds no transaction across the transfer and
-    /// moves no reference: the caller commits it with
+    /// Resolves the remote source, opens it and checks it has a `HEAD`, then
+    /// writes the blocks, data and checkpoints a local dataset lacks as
+    /// unreferenced objects. All network access of a pull happens here, with
+    /// no transaction held; no reference moves: the caller commits it with
     /// [`LocalSyncCommitter`]. The listener gets `begin` and progress;
     /// reporting the outcome is up to the caller, since only the commit
     /// decides it
@@ -62,10 +63,11 @@ pub struct SyncRequest {
     pub dst: SyncRefRemote,
 }
 
-/// A sync into a dataset of this node
+/// A pull from a remote dataset into a dataset of this node. The source is
+/// only a reference: the transfer resolves and opens it
 #[derive(Debug, Clone)]
 pub struct LocalSyncRequest {
-    pub src: SyncRef,
+    pub src: odf::DatasetRefRemote,
     pub dst: LocalSyncTarget,
 }
 
@@ -102,13 +104,6 @@ impl SyncRef {
     pub fn detach_from_transaction(&self) {
         match self {
             Self::Local(r) => r.detach_from_transaction(),
-            Self::Remote(_) => {}
-        }
-    }
-
-    pub async fn refresh_dataset_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
-        match self {
-            Self::Local(r) => *r = dataset_registry.get_dataset_by_handle(r.get_handle()).await,
             Self::Remote(_) => {}
         }
     }

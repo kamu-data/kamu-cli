@@ -90,6 +90,7 @@ impl RemotePushHarness {
             .add::<SyncServiceImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()

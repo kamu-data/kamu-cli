@@ -50,49 +50,42 @@ impl UpdateDatasetTaskRunner {
 
         match task_update.job {
             DatasetUpdateJob::Ingest(target_handle) => {
-                self.run_ingest_update(&target_handle, task_update.pull_options.ingest_options)
+                self.run_ingest_update(&target_handle, task_update.ingest_options)
                     .await
             }
             DatasetUpdateJob::Transform(target_handle) => {
                 self.run_transform_update(&target_handle).await
             }
-            DatasetUpdateJob::Sync(sync_item) => {
-                self.run_sync_update(
-                    *sync_item.sync_request,
-                    task_update.pull_options.sync_options,
-                )
-                .await
+            DatasetUpdateJob::Sync { target, remote_ref } => {
+                self.run_sync_update(&target, remote_ref, task_update.sync_options)
+                    .await
             }
         }
     }
 
-    /// Re-reads the destination's `HEAD` in a transaction of its own,
-    /// transfers with none open, and commits in another
+    /// Reads the target's `HEAD` in a transaction of its own, transfers with
+    /// none open, and commits in another
     async fn run_sync_update(
         &self,
-        sync_request: LocalSyncRequest,
+        target_handle: &odf::DatasetHandle,
+        remote_ref: odf::DatasetRefRemote,
         sync_opts: SyncOptions,
     ) -> Result<TaskOutcome, InternalError> {
-        let dst_handle = match &sync_request.dst {
-            LocalSyncTarget::Existing { dataset, .. } => dataset.get_handle().clone(),
-            LocalSyncTarget::New(alias) => {
-                return InternalError::bail(format!(
-                    "An update task syncs into an existing dataset, but {alias} does not exist"
-                ));
-            }
-        };
-
-        let sync_request = match self.plan_sync(sync_request).await {
-            Ok(Some(sync_request)) => sync_request,
+        let dst = match self.resolve_sync_target(target_handle).await {
+            Ok(Some(dst)) => dst,
             Ok(None) => {
                 return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
-                    &dst_handle,
+                    target_handle,
                 ));
             }
             Err(e) => {
-                tracing::error!(error = ?e, error_msg = %e, "Sync planning failed");
+                tracing::error!(error = ?e, error_msg = %e, "Reading the sync target failed");
                 return Ok(Self::failed(e.is_recoverable()));
             }
+        };
+        let sync_request = LocalSyncRequest {
+            src: remote_ref,
+            dst,
         };
 
         let transfer = self
@@ -125,7 +118,7 @@ impl UpdateDatasetTaskRunner {
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
             )),
             Err(SyncError::HeadMoved(e)) => Ok(TaskDatasetHeadCommitter::head_moved_outcome(
-                dst_handle.id,
+                target_handle.id.clone(),
                 e,
             )),
             Err(e) => {
@@ -135,36 +128,19 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
-    /// Returns `None` when the destination was deleted
+    /// Returns `None` when the target was deleted
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn plan_sync(
+    async fn resolve_sync_target(
         &self,
-        sync_request: LocalSyncRequest,
-    ) -> Result<Option<LocalSyncRequest>, SyncError> {
-        let LocalSyncRequest { mut src, dst } = sync_request;
-
-        src.refresh_dataset_from_registry(dataset_registry.as_ref())
-            .await;
-        src.detach_from_transaction();
-
-        let dst = match dst {
-            LocalSyncTarget::Existing { dataset, .. } => {
-                let Some(dataset) = dataset_registry
-                    .try_get_dataset_by_ref(&dataset.get_id().as_local_ref())
-                    .await?
-                else {
-                    return Ok(None);
-                };
-                let target = LocalSyncTarget::existing(dataset).await?;
-                target.detach_from_transaction();
-                target
-            }
-            LocalSyncTarget::New(alias) => {
-                unreachable!("{alias}: the caller syncs only into an existing dataset")
-            }
-        };
-
-        Ok(Some(LocalSyncRequest { src, dst }))
+        target_handle: &odf::DatasetHandle,
+    ) -> Result<Option<LocalSyncTarget>, SyncError> {
+        let target = PullLocalTarget::Existing(target_handle.clone())
+            .resolve_sync_target(dataset_registry.as_ref())
+            .await?;
+        if let Some(target) = &target {
+            target.detach_from_transaction();
+        }
+        Ok(target)
     }
 
     #[transactional_method1(local_sync_committer: Arc<dyn LocalSyncCommitter>)]
