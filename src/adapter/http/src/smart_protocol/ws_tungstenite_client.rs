@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use futures::SinkExt;
 use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu::utils::local_sync_writes::{StoredSeed, append_transferred_blocks};
+use kamu::utils::local_sync_writes::{append_transferred_blocks, prepare_transfer_target};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
@@ -21,6 +21,7 @@ use kamu_datasets::{NameCollisionError, ResolvedDataset};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::net::TcpStream;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
@@ -556,6 +557,38 @@ impl WsSmartTransferProtocolClient {
         })
     }
 
+    /// Opens the protocol's web socket at `flow` ("pull" or "push") of the
+    /// dataset endpoint
+    async fn connect(
+        http_dataset_url: &Url,
+        flow: &str,
+        maybe_access_token: Option<&str>,
+    ) -> Result<TungsteniteStream, SyncError> {
+        let ws_url = Self::generate_ws_url(http_dataset_url, flow);
+
+        tracing::debug!(%ws_url, flow, "Connecting smart protocol web socket");
+
+        let mut request = ws_url.into_client_request().int_err()?;
+        request.headers_mut().append(
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
+        );
+        if let Some(access_token) = maybe_access_token {
+            request.headers_mut().append(
+                http::header::AUTHORIZATION,
+                http::HeaderValue::from_str(&format!("Bearer {access_token}")).int_err()?,
+            );
+        }
+
+        match connect_async(request).await {
+            Ok((ws_stream, _)) => Ok(ws_stream),
+            Err(e) => {
+                tracing::debug!(error = %e, flow, "Failed to connect the web socket");
+                Err(map_tungstenite_error(e, http_dataset_url))
+            }
+        }
+    }
+
     fn generate_ws_url(http_base_url: &Url, additional_path_segment: &str) -> Url {
         let mut url = http_base_url.join(additional_path_segment).unwrap();
         let new_scheme = if url.scheme() == "https" { "wss" } else { "ws" };
@@ -602,30 +635,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             return Err(mismatch.into());
         }
 
-        let pull_url = Self::generate_ws_url(http_src_url, "pull");
-
-        tracing::debug!(%pull_url, "Connecting smart pull protocol web socket");
-
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-        let mut request = pull_url.into_client_request().int_err()?;
-        request.headers_mut().append(
-            OdfSmtpVersion::name(),
-            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
-        );
-        if let Some(access_token) = &maybe_access_token {
-            request.headers_mut().append(
-                http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
-            );
-        }
-
-        let mut ws_stream = match connect_async(request).await {
-            Ok((ws_stream, _)) => ws_stream,
-            Err(e) => {
-                tracing::debug!("Failed to connect to pull URL: {}", e);
-                return Err(map_tungstenite_error(e, http_src_url));
-            }
-        };
+        let mut ws_stream =
+            Self::connect(http_src_url, "pull", maybe_access_token.as_deref()).await?;
 
         let dataset_pull_result = match self
             .pull_send_request(
@@ -678,51 +689,37 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     }
                 }?;
 
-            let mut new_blocks =
-                decode_metadata_batch(&dataset_pull_metadata_response.blocks).int_err()?;
+            // A retry would receive the same blocks, so a batch that cannot be read is
+            // a corrupted source, not a transient failure
+            let mut new_blocks = decode_metadata_batch(&dataset_pull_metadata_response.blocks)
+                .map_err(|e| CorruptedSourceError {
+                    message: "Server sent a metadata batch that cannot be read".to_owned(),
+                    source: Some(e.into()),
+                })?;
 
             let new_head = new_blocks
                 .back()
                 .map(|(hash, _, _)| hash.clone())
-                .ok_or_else(|| "Server sent no blocks for a non-empty transfer plan".int_err())?;
+                .ok_or_else(|| CorruptedSourceError {
+                    message: "Server sent no blocks for a non-empty transfer plan".to_owned(),
+                    source: None,
+                })?;
 
-            // A new destination is stored from the source Seed, for the commit to create
-            let (dst_storage, target) = match dst {
-                LocalSyncTarget::Existing {
-                    dataset,
-                    expected_head,
-                } => {
-                    if transfer_options.force_update_if_diverged
-                        && !ensure_seed_not_in_conflict(new_blocks.front(), dataset.get_handle())
-                    {
-                        return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
-                    }
-                    (
-                        (**dataset).clone(),
-                        TransferredSyncTarget::Existing {
-                            dataset: dataset.clone(),
-                            expected_head: expected_head.clone(),
-                        },
-                    )
-                }
-                LocalSyncTarget::New(alias) => {
-                    let seed = new_blocks.pop_front().unwrap();
-                    let StoredSeed {
-                        dataset,
-                        seed_block,
-                        seed_block_bytes,
-                    } = StoredSeed::store(&self.catalog, seed).await?;
-                    (
-                        dataset,
-                        TransferredSyncTarget::New {
-                            alias: alias.clone(),
-                            seed_block,
-                            seed_block_bytes,
-                            visibility: transfer_options.visibility_for_created_dataset,
-                        },
-                    )
-                }
-            };
+            if let LocalSyncTarget::Existing { dataset, .. } = dst
+                && transfer_options.force_update_if_diverged
+                && !ensure_seed_not_in_conflict(new_blocks.front(), dataset.get_handle())
+            {
+                return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
+            }
+
+            // Safety: there are blocks, oldest first
+            let (dst_storage, target) = prepare_transfer_target(
+                &self.catalog,
+                dst,
+                transfer_options.visibility_for_created_dataset,
+                || new_blocks.pop_front().unwrap(),
+            )
+            .await?;
 
             let object_files =
                 collect_object_references_from_metadata(dst_storage.as_ref(), &new_blocks, true)
@@ -813,11 +810,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         src: Arc<dyn odf::Dataset>,
         http_dst_url: &Url,
         dst_head: Option<&odf::Multihash>,
-        listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError> {
-        listener.begin();
-
         let src_head = src
             .as_metadata_chain()
             .resolve_ref(&odf::BlockRef::Head)
@@ -877,30 +871,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         let maybe_access_token = self
             .dataset_credential_resolver
             .resolve_odf_dataset_access_token(http_dst_url);
-        let push_url = Self::generate_ws_url(http_dst_url, "push");
-
-        tracing::debug!(%push_url, "Connecting smart push protocol web socket");
-
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-        let mut request = push_url.into_client_request().int_err()?;
-        request.headers_mut().append(
-            OdfSmtpVersion::name(),
-            http::HeaderValue::from(SMART_TRANSFER_PROTOCOL_VERSION),
-        );
-        if let Some(access_token) = maybe_access_token {
-            request.headers_mut().append(
-                http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
-            );
-        }
-
-        let mut ws_stream = match connect_async(request).await {
-            Ok((ws_stream, _)) => ws_stream,
-            Err(e) => {
-                tracing::debug!("Failed to connect to push URL: {}", e);
-                return Err(map_tungstenite_error(e, http_dst_url));
-            }
-        };
+        let mut ws_stream =
+            Self::connect(http_dst_url, "push", maybe_access_token.as_deref()).await?;
 
         match self
             .push_send_request(

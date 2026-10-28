@@ -38,7 +38,4 @@ pub trait TransformMultiListener: Send + Sync {
     }
 }
 
-pub struct NullTransformMultiListener;
-impl TransformMultiListener for NullTransformMultiListener {}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

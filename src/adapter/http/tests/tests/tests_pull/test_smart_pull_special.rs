@@ -123,6 +123,46 @@ async fn test_smart_pull_incompatible_version_err() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_smart_pull_of_missing_dataset_fails() {
+    let scenario = SmartPullNewDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            base_catalog: None,
+        })
+        .await,
+    )
+    .await;
+    let missing_dataset_url = scenario.server_harness.dataset_url(&odf::DatasetAlias::new(
+        Some(scenario.server_harness.api_server_account().account_name),
+        odf::DatasetName::new_unchecked("missing"),
+    ));
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let pull_responses = scenario
+            .client_harness
+            .pull_datasets(odf::DatasetRefAny::from(missing_dataset_url), false)
+            .await;
+
+        assert_matches!(
+            &pull_responses[0].result,
+            Err(PullError::SyncError(SyncError::DatasetNotFound(_)))
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_smart_pull_head_moved_concurrently() {
     assert_smart_pull_fails_when_head_moved_concurrently(false).await;
 }

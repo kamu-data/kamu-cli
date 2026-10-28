@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{LocalSyncTarget, SyncError, SyncListener, SyncResult, SyncTransfer};
+use kamu_core::{LocalSyncTarget, SyncError, SyncResult, SyncTransfer};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +58,6 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         src: Arc<dyn odf::Dataset>,
         http_dst_url: &Url,
         dst_head: Option<&odf::Multihash>,
-        listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError>;
 }

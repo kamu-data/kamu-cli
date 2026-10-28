@@ -10,9 +10,9 @@
 use std::sync::Arc;
 
 use database_common_macros::{transactional_method1, transactional_method2};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_task_system::*;
 use random_strings::get_random_name;
 
@@ -73,14 +73,25 @@ impl UpdateDatasetTaskRunner {
         sync_request: LocalSyncRequest,
         sync_opts: SyncOptions,
     ) -> Result<TaskOutcome, InternalError> {
-        let sync_request = self.plan_sync(sync_request).await?;
-
-        let dst_id = match &sync_request.dst {
-            LocalSyncTarget::Existing { dataset, .. } => dataset.get_id().clone(),
+        let dst_handle = match &sync_request.dst {
+            LocalSyncTarget::Existing { dataset, .. } => dataset.get_handle().clone(),
             LocalSyncTarget::New(alias) => {
                 return InternalError::bail(format!(
                     "An update task syncs into an existing dataset, but {alias} does not exist"
                 ));
+            }
+        };
+
+        let sync_request = match self.plan_sync(sync_request).await {
+            Ok(Some(sync_request)) => sync_request,
+            Ok(None) => {
+                return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
+                    &dst_handle,
+                ));
+            }
+            Err(e) => {
+                tracing::error!(error = ?e, error_msg = %e, "Sync planning failed");
+                return Ok(Self::failed(e.is_recoverable()));
             }
         };
 
@@ -113,9 +124,10 @@ impl UpdateDatasetTaskRunner {
             Ok(SyncResult::UpToDate) => Ok(TaskOutcome::Success(
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
             )),
-            Err(SyncError::HeadMoved(e)) => {
-                Ok(TaskDatasetHeadCommitter::head_moved_outcome(dst_id, e))
-            }
+            Err(SyncError::HeadMoved(e)) => Ok(TaskDatasetHeadCommitter::head_moved_outcome(
+                dst_handle.id,
+                e,
+            )),
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Sync failed");
                 Ok(Self::failed(e.is_recoverable()))
@@ -123,11 +135,12 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
+    /// Returns `None` when the destination was deleted
     #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
     async fn plan_sync(
         &self,
         sync_request: LocalSyncRequest,
-    ) -> Result<LocalSyncRequest, InternalError> {
+    ) -> Result<Option<LocalSyncRequest>, SyncError> {
         let LocalSyncRequest { mut src, dst } = sync_request;
 
         src.refresh_dataset_from_registry(dataset_registry.as_ref())
@@ -136,17 +149,22 @@ impl UpdateDatasetTaskRunner {
 
         let dst = match dst {
             LocalSyncTarget::Existing { dataset, .. } => {
-                let dataset = dataset_registry
-                    .get_dataset_by_handle(dataset.get_handle())
-                    .await;
-                let target = LocalSyncTarget::existing(dataset).await.int_err()?;
+                let Some(dataset) = dataset_registry
+                    .try_get_dataset_by_ref(&dataset.get_id().as_local_ref())
+                    .await?
+                else {
+                    return Ok(None);
+                };
+                let target = LocalSyncTarget::existing(dataset).await?;
                 target.detach_from_transaction();
                 target
             }
-            new @ LocalSyncTarget::New(_) => new,
+            LocalSyncTarget::New(alias) => {
+                unreachable!("{alias}: the caller syncs only into an existing dataset")
+            }
         };
 
-        Ok(LocalSyncRequest { src, dst })
+        Ok(Some(LocalSyncRequest { src, dst }))
     }
 
     #[transactional_method1(local_sync_committer: Arc<dyn LocalSyncCommitter>)]
@@ -155,13 +173,20 @@ impl UpdateDatasetTaskRunner {
     }
 
     /// Plans the ingest and resolves its environment variables in one
-    /// transaction, then detaches the target for execution
+    /// transaction, then detaches the target for execution. Returns `None`
+    /// when the target was deleted
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>)]
     async fn plan_ingest(
         &self,
         target_handle: &odf::DatasetHandle,
-    ) -> Result<(ResolvedDataset, PollingIngestPlan, IngestEnvVars), PollingIngestPlanError> {
-        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
+    ) -> Result<Option<(ResolvedDataset, PollingIngestPlan, IngestEnvVars)>, PollingIngestPlanError>
+    {
+        let Some(target) = dataset_registry
+            .try_get_dataset_by_ref(&target_handle.id.as_local_ref())
+            .await?
+        else {
+            return Ok(None);
+        };
 
         let plan = polling_ingest_planner.plan_ingest(target.clone()).await?;
         let env_vars = polling_ingest_planner
@@ -170,7 +195,7 @@ impl UpdateDatasetTaskRunner {
 
         target.detach_from_transaction();
 
-        Ok((target, plan, env_vars))
+        Ok(Some((target, plan, env_vars)))
     }
 
     async fn run_ingest_update(
@@ -179,7 +204,12 @@ impl UpdateDatasetTaskRunner {
         ingest_options: PollingIngestOptions,
     ) -> Result<TaskOutcome, InternalError> {
         let (target, plan, env_vars) = match self.plan_ingest(target_handle).await {
-            Ok(planned) => planned,
+            Ok(Some(planned)) => planned,
+            Ok(None) => {
+                return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
+                    target_handle,
+                ));
+            }
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Ingest planning failed");
                 return Ok(Self::failed(e.is_recoverable()));
@@ -257,13 +287,19 @@ impl UpdateDatasetTaskRunner {
         })
     }
 
-    /// Elaborates in one transaction, then detaches the plan for execution
+    /// Elaborates in one transaction, then detaches the plan for execution.
+    /// Returns `None` when the target was deleted
     #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, transform_planner: Arc<dyn TransformPlanner>)]
     async fn elaborate_transform(
         &self,
         target_handle: &odf::DatasetHandle,
-    ) -> Result<(ResolvedDataset, TransformElaboration), TransformElaborateError> {
-        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
+    ) -> Result<Option<(ResolvedDataset, TransformElaboration)>, TransformElaborateError> {
+        let Some(target) = dataset_registry
+            .try_get_dataset_by_ref(&target_handle.id.as_local_ref())
+            .await?
+        else {
+            return Ok(None);
+        };
 
         let elaboration = transform_planner
             .elaborate_transform(target.clone())
@@ -274,7 +310,7 @@ impl UpdateDatasetTaskRunner {
             plan.datasets_map.detach_from_transaction();
         }
 
-        Ok((target, elaboration))
+        Ok(Some((target, elaboration)))
     }
 
     async fn run_transform_update(
@@ -282,10 +318,15 @@ impl UpdateDatasetTaskRunner {
         target_handle: &odf::DatasetHandle,
     ) -> Result<TaskOutcome, InternalError> {
         let (target, transform_plan) = match self.elaborate_transform(target_handle).await {
-            Ok((target, TransformElaboration::Elaborated(transform_plan))) => {
+            Ok(Some((target, TransformElaboration::Elaborated(transform_plan)))) => {
                 (target, transform_plan)
             }
-            Ok((_, TransformElaboration::UpToDate)) => {
+            Ok(None) => {
+                return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
+                    target_handle,
+                ));
+            }
+            Ok(Some((_, TransformElaboration::UpToDate))) => {
                 return Ok(Self::transform_up_to_date());
             }
             // The derivative waits for its input, the same as when it is up to date

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{ClassifyByAllowanceDatasetActionUnauthorizedError, ResolvedDataset};
 use thiserror::Error;
 
 use crate::*;
@@ -56,6 +56,14 @@ pub struct PullPlanIteration {
     pub jobs: Vec<PullPlanIterationJob>,
 }
 
+impl PullPlanIteration {
+    pub fn detach_from_transaction(&self) {
+        for job in &self.jobs {
+            job.detach_from_transaction();
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum PullPlanIterationJob {
     Ingest(PullIngestItem),
@@ -82,7 +90,7 @@ impl PullPlanIterationJob {
 
     pub fn detach_from_transaction(&self) {
         match self {
-            Self::Ingest(pii) => pii.target.detach_from_transaction(),
+            Self::Ingest(_) => {}
             Self::Transform(pti) => pti.target.detach_from_transaction(),
             Self::Sync(psi) => {
                 psi.sync_request.src.detach_from_transaction();
@@ -97,8 +105,7 @@ impl PullPlanIterationJob {
 /// A root dataset to ingest. The ingest itself is planned when the job runs.
 #[derive(Debug)]
 pub struct PullIngestItem {
-    pub depth: i32,
-    pub target: ResolvedDataset,
+    pub target: odf::DatasetHandle,
     pub maybe_original_request: Option<PullRequest>,
 }
 
@@ -108,7 +115,6 @@ pub struct PullIngestItem {
 /// runs, in the transaction that elaborates it.
 #[derive(Debug)]
 pub struct PullTransformItem {
-    pub depth: i32,
     pub target: ResolvedDataset,
     pub maybe_original_request: Option<PullRequest>,
     /// Inputs of the transform, which the pull reads
@@ -119,7 +125,6 @@ pub struct PullTransformItem {
 
 #[derive(Debug)]
 pub struct PullSyncItem {
-    pub depth: i32,
     pub local_target: PullLocalTarget,
     pub remote_ref: odf::DatasetRefRemote,
     pub maybe_original_request: Option<PullRequest>,
@@ -154,13 +159,6 @@ impl PullLocalTarget {
         match self {
             Self::Existing(hdl) => hdl.as_local_ref(),
             Self::ToCreate(alias) => alias.as_local_ref(),
-        }
-    }
-
-    pub fn as_any_ref(&self) -> odf::DatasetRefAny {
-        match self {
-            Self::Existing(hdl) => hdl.as_any_ref(),
-            Self::ToCreate(alias) => alias.as_any_ref(),
         }
     }
 }
@@ -234,7 +232,7 @@ pub trait PullItemCommon {
 
 impl PullItemCommon for PullIngestItem {
     fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        Some(self.target.get_handle())
+        Some(&self.target)
     }
 
     fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
@@ -419,14 +417,17 @@ pub enum PullError {
         odf::DatasetNotFoundError,
     ),
 
-    #[error("Cannot choose between multiple pull aliases")]
-    AmbiguousSource,
+    #[error(transparent)]
+    AmbiguousSource(#[from] AmbiguousPullSourceError),
 
     #[error("The dataset was previously saved via '{0}' alias")]
     SaveUnderDifferentAlias(String),
 
-    #[error("{0}")]
-    InvalidOperation(String),
+    #[error("Dataset does not exist and auto-create is switched off")]
+    AutoCreateDisabled,
+
+    #[error(transparent)]
+    CannotInferLocalName(#[from] CannotInferLocalNameError),
 
     #[error(transparent)]
     ScanMetadata(
@@ -475,6 +476,30 @@ pub enum PullError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<ClassifyByAllowanceDatasetActionUnauthorizedError> for PullError {
+    fn from(value: ClassifyByAllowanceDatasetActionUnauthorizedError) -> Self {
+        use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+
+        match value {
+            E::NotFound(e) => Self::NotFound(e),
+            E::Access(e) => Self::Access(e),
+            E::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A remote dataset is pulled without a local name, and its reference gives
+/// none
+#[derive(Debug, Error)]
+#[error(
+    "Unable to infer a local name from {remote_ref}, please specify the destination explicitly"
+)]
+pub struct CannotInferLocalNameError {
+    pub remote_ref: odf::DatasetRefRemote,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

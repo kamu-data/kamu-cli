@@ -132,28 +132,12 @@ pub enum LocalSyncTarget {
 impl LocalSyncTarget {
     /// Targets an existing dataset, expecting its current `HEAD`
     pub async fn existing(dataset: ResolvedDataset) -> Result<Self, SyncError> {
-        let expected_head = match dataset
-            .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
-            .await
-        {
-            Ok(head) => Some(head),
-            Err(odf::GetRefError::NotFound(_)) => None,
-            Err(odf::GetRefError::Access(e)) => return Err(SyncError::Access(e)),
-            Err(odf::GetRefError::Internal(e)) => return Err(SyncError::Internal(e)),
-        };
+        let expected_head = try_resolve_head(dataset.as_metadata_chain()).await?;
 
         Ok(Self::Existing {
             dataset,
             expected_head,
         })
-    }
-
-    pub fn alias(&self) -> &odf::DatasetAlias {
-        match self {
-            Self::Existing { dataset, .. } => dataset.get_alias(),
-            Self::New(alias) => alias,
-        }
     }
 
     pub fn as_any_ref(&self) -> odf::DatasetRefAny {
@@ -333,6 +317,22 @@ pub struct SyncPartyStats {
 pub struct NullSyncListener;
 impl SyncListener for NullSyncListener {}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A sync side's `HEAD`, `None` when it has none yet
+pub async fn try_resolve_head(
+    chain: &dyn odf::MetadataChain,
+) -> Result<Option<odf::Multihash>, SyncError> {
+    match chain.resolve_ref(&odf::BlockRef::Head).await {
+        Ok(head) => Ok(Some(head)),
+        Err(odf::GetRefError::NotFound(_)) => Ok(None),
+        Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
+        Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub trait SyncMultiListener: Send + Sync {
     fn begin_sync(
         &self,
@@ -342,9 +342,6 @@ pub trait SyncMultiListener: Send + Sync {
         None
     }
 }
-
-pub struct NullSyncMultiListener;
-impl SyncMultiListener for NullSyncMultiListener {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Errors

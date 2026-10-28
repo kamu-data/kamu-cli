@@ -17,7 +17,7 @@ use database_common_macros::{
     transactional_static_method3,
 };
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{
     ClassifyByAllowanceDatasetActionUnauthorizedError,
@@ -98,7 +98,7 @@ impl PullDatasetUseCaseImpl {
                     PullPlanIterationJob::Ingest(pii) => {
                         let maybe_listener = maybe_ingest_multi_listener
                             .as_ref()
-                            .and_then(|l| l.begin_ingest(pii.target.get_handle()));
+                            .and_then(|l| l.begin_ingest(&pii.target));
                         tasks.spawn(Self::ingest(
                             pii,
                             options.ingest_options.clone(),
@@ -231,15 +231,7 @@ impl PullDatasetUseCaseImpl {
                     maybe_local_ref: Some(hdl.as_local_ref()),
                     maybe_remote_ref: None,
                     maybe_original_request: job.into_original_pull_request(),
-                    result: Err({
-                        use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
-
-                        match auth_error {
-                            E::NotFound(e) => PullError::NotFound(e),
-                            E::Access(e) => PullError::Access(e),
-                            E::Internal(e) => PullError::Internal(e),
-                        }
-                    }),
+                    result: Err(auth_error.into()),
                 }
             })
             .collect();
@@ -318,15 +310,7 @@ impl PullDatasetUseCaseImpl {
             let mut maybe_error = None;
             for read_hdl in read_handles {
                 if let Some(auth_error) = unauthorized_handles_to_errors.remove(read_hdl) {
-                    maybe_error = Some({
-                        use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
-
-                        match auth_error {
-                            E::NotFound(e) => PullError::NotFound(e),
-                            E::Access(e) => PullError::Access(e),
-                            E::Internal(e) => PullError::Internal(e),
-                        }
-                    });
+                    maybe_error = Some(PullError::from(auth_error));
                     break;
                 }
             }
@@ -362,7 +346,7 @@ impl PullDatasetUseCaseImpl {
         ingest_loop: PullIngestLoop,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let target_handle = pii.target.get_handle();
+        let target_handle = &pii.target;
 
         let result = ingest_loop
             .run(
@@ -417,7 +401,7 @@ impl PullDatasetUseCaseImpl {
         target_handle: &odf::DatasetHandle,
         compaction_planner: Arc<dyn CompactionPlanner>,
         catalog: dill::Catalog,
-    ) -> Result<(ResolvedDataset, CompactionPlan), TransformError> {
+    ) -> Result<(ResolvedDataset, CompactionPlan), PullError> {
         let target = dataset_registry.get_dataset_by_handle(target_handle).await;
         let plan = compaction_planner
             .plan_compaction(
@@ -429,7 +413,11 @@ impl PullDatasetUseCaseImpl {
                 None,
             )
             .await
-            .int_err()?;
+            .map_err(|e| match e {
+                CompactionPlanningError::Access(e) => PullError::Access(e),
+                e @ (CompactionPlanningError::InvalidDatasetKind(_)
+                | CompactionPlanningError::Internal(_)) => PullError::Internal(e.int_err()),
+            })?;
 
         target.detach_from_transaction();
         Ok((target, plan))
@@ -441,7 +429,7 @@ impl PullDatasetUseCaseImpl {
         target_handle: &odf::DatasetHandle,
         services: &TransformServices,
         catalog: dill::Catalog,
-    ) -> Result<Option<(odf::Multihash, odf::Multihash)>, TransformError> {
+    ) -> Result<Option<(odf::Multihash, odf::Multihash)>, PullError> {
         let (target, plan) = Self::plan_reset_to_metadata(
             target_handle,
             services.compaction_planner.clone(),
@@ -461,7 +449,9 @@ impl PullDatasetUseCaseImpl {
             } => {
                 Self::commit_head_transactionally(catalog, target_handle, &old_head, &new_head)
                     .await
-                    .map_err(|e| TransformExecuteError::CommitError(e.into()))?;
+                    .map_err(|e| {
+                        TransformError::from(TransformExecuteError::CommitError(e.into()))
+                    })?;
                 Ok(Some((old_head, new_head)))
             }
         }
@@ -528,14 +518,7 @@ impl PullDatasetUseCaseImpl {
 
         match unauthorized_handles_with_errors.into_iter().next() {
             None => Ok(()),
-            Some((_, error)) => {
-                use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
-                Err(match error {
-                    E::NotFound(e) => PullError::NotFound(e),
-                    E::Access(e) => PullError::Access(e),
-                    E::Internal(e) => PullError::Internal(e),
-                })
-            }
+            Some((_, error)) => Err(error.into()),
         }
     }
 
@@ -559,8 +542,7 @@ impl PullDatasetUseCaseImpl {
                 tracing::warn!(error = %e, "Input diverged, resetting the derivative to metadata");
 
                 match Self::reset_to_metadata(target.get_handle(), &services, catalog.clone())
-                    .await
-                    .map_err(PullError::TransformError)?
+                    .await?
                 {
                     Some(reset_heads) => {
                         maybe_reset_heads = Some(reset_heads);
@@ -797,9 +779,7 @@ impl PullDatasetUseCaseImpl {
         // Detach plan entities from current transaction
         // to be able to commit it and manage them in iterations separately
         for iteration in &res.0 {
-            for job in &iteration.jobs {
-                job.detach_from_transaction();
-            }
+            iteration.detach_from_transaction();
         }
         Ok(res)
     }
@@ -822,9 +802,7 @@ impl PullDatasetUseCaseImpl {
         // Detach plan entities from current transaction
         // to be able to commit it and manage them in iterations separately
         for iteration in &res.0 {
-            for job in &iteration.jobs {
-                job.detach_from_transaction();
-            }
+            iteration.detach_from_transaction();
         }
 
         Ok(res)

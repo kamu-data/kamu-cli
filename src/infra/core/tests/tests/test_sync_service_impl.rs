@@ -59,7 +59,7 @@ async fn do_test_sync(
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let dataset_alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
-    let is_ipfs = ipfs.is_none();
+    let not_ipfs = ipfs.is_none();
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
@@ -647,7 +647,7 @@ async fn do_test_sync(
     }
 
     // Datasets corrupted transfer flow /////////////////////////////////////////
-    if is_ipfs {
+    if not_ipfs {
         let _b6 = DatasetTestHelper::append_random_data(
             dataset_registry_foo.as_ref(),
             &dataset_alias_foo,

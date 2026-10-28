@@ -440,6 +440,8 @@ itself:
 | Ingest, transform or sync: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
 | Transform elaboration: `InvalidInputInterval` | unrecoverable, typed `InputDatasetCompacted` |
 | Transform elaboration: `InputNotPulled` | not an error: the task ends with an `UpToDate` result |
+| The dataset was deleted after the task was scheduled | unrecoverable |
+| Moving `HEAD` is not allowed (`Access`) | unrecoverable, as for a sync that is denied access |
 
 ### 7.2 Hard compaction and reset to metadata
 
@@ -462,7 +464,8 @@ any transaction. On `Success` the runner moves `HEAD` by CAS and returns
 (`Success { old_head, new_head, old_num_blocks, new_num_blocks, breaking }` or `NothingToDo`).
 The executor sets `breaking` in both modes, and a stored result without the field reads as
 breaking. Any executor error is a recoverable empty failure; a lost `HEAD` CAS is the
-recoverable typed `DatasetCommitError` → `HeadMoved`, as in [§7.1](#71-update-dataset).
+recoverable typed `DatasetCommitError` → `HeadMoved`, as in [§7.1](#71-update-dataset). A commit
+that is not allowed, or into a dataset deleted since planning, fails unrecoverably.
 
 Compaction rewrites history, so derivative datasets that consumed the old blocks can no longer
 continue incrementally; that is what `InputDatasetCompacted` in [§7.1](#71-update-dataset)

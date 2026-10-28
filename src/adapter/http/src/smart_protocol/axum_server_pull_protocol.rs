@@ -70,7 +70,7 @@ impl AxumServerPullProtocolInstance {
                 tracing::error!(
                   error = ?e,
                   error_msg = %e,
-                  "Push process aborted with internal error",
+                  "Pull process aborted with internal error",
                 );
             }
             Err(PullServerError::ReadFailed(err)) => {
@@ -84,11 +84,17 @@ impl AxumServerPullProtocolInstance {
                     )
                     .await;
                 }
+
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Pull process aborted: reading from the client failed",
+                );
             }
-            Err(e) => tracing::error!(
-              error = ?e,
-              error_msg = %e,
-              "Push process aborted with error",
+            Err(PullServerError::WriteFailed(err)) => tracing::warn!(
+              error = ?err,
+              error_msg = %err,
+              "Pull process aborted: writing to the client failed",
             ),
         }
 

@@ -103,7 +103,18 @@ impl AxumServerPushProtocolInstance {
                     axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload)
                         .await;
                 }
+
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push process aborted: reading from the client failed",
+                );
             }
+            Err(PushServerError::WriteFailed(err)) => tracing::warn!(
+              error = ?err,
+              error_msg = %err,
+              "Push process aborted: writing to the client failed",
+            ),
             Err(PushServerError::OverwriteSeedBlock(err)) => {
                 let payload = DatasetPushMetadataResponse::Err(
                     DatasetPushMetadataError::SeedBlockOverwriteRestricted(
@@ -159,10 +170,8 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with error",
                 );
             }
+            // The reply was sent as a message: both heads do not fit a close frame
             Err(PushServerError::InvalidHead(err)) => {
-                let payload = Err(DatasetPushRequestError::InvalidHead((&err).into()));
-                axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload).await;
-
                 tracing::warn!(
                   error = ?err,
                   error_msg = %err,
@@ -184,11 +193,6 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted: dataset head was updated concurrently",
                 );
             }
-            Err(e) => tracing::error!(
-              error = ?e,
-              error_msg = %e,
-              "Push process aborted with error",
-            ),
         }
 
         // After we finish processing to ensure graceful closing
@@ -349,24 +353,27 @@ impl AxumServerPushProtocolInstance {
         }
         .protocol_int_err(PushPhase::InitialRequest)?;
 
-        if push_request.current_head != actual_head {
-            return Err(PushServerError::InvalidHead(odf::dataset::RefCASError {
+        let invalid_head =
+            (push_request.current_head != actual_head).then(|| odf::dataset::RefCASError {
                 reference: odf::BlockRef::Head,
-                expected: push_request.current_head,
+                expected: push_request.current_head.clone(),
                 actual: actual_head,
-            }));
+            });
+        let response = match &invalid_head {
+            None => Ok(DatasetPushRequestAccepted {}),
+            Some(e) => Err(DatasetPushRequestError::InvalidHead(e.into())),
+        };
+
+        axum_write_payload::<DatasetPushResponse>(&mut self.socket, response)
+            .await
+            .map_err(|e| {
+                PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
+            })?;
+
+        match invalid_head {
+            None => Ok(push_request),
+            Some(e) => Err(PushServerError::InvalidHead(e)),
         }
-
-        axum_write_payload::<DatasetPushResponse>(
-            &mut self.socket,
-            Ok(DatasetPushRequestAccepted {}),
-        )
-        .await
-        .map_err(|e| {
-            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
-        })?;
-
-        Ok(push_request)
     }
 
     async fn try_handle_push_metadata_request(

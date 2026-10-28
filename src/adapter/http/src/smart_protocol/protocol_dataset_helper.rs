@@ -700,12 +700,14 @@ pub async fn dataset_import_object_file(
     match res {
         Ok(_) => Ok(()),
         Err(odf::storage::InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-            message: concat!(
-                "Data file hash declared by the source didn't match ",
-                "the computed - this may be an indication of hashing ",
-                "algorithm mismatch or an attempted tampering",
-            )
-            .to_owned(),
+            message: format!(
+                "Source {} file hash didn't match the computed - this may be an indication of \
+                 hashing algorithm mismatch or an attempted tampering",
+                match object_file_reference.object_type {
+                    ObjectType::DataSlice => "data",
+                    ObjectType::Checkpoint => "checkpoint",
+                }
+            ),
             source: Some(e.into()),
         }
         .into()),

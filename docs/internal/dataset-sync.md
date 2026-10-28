@@ -93,7 +93,7 @@ the repository model and both protocols. This page does not restate them; read t
 
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
-| Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncRequest`, `SyncRef`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
+| Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncRequest`, `LocalSyncRequest`, `LocalSyncTarget`, `SyncRef`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
 | Chain comparison | `kamu-core` — [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) | `MetadataChainComparator::compare_chains` → equal / ahead / behind / diverged |
 | Sync service and request builder | `kamu` — [`src/infra/core/src/services/sync/`](../../src/infra/core/src/services/sync) | `SyncServiceImpl` (protocol dispatch, IPFS), `SyncRequestBuilder` |
 | Simple protocol client | `kamu` — [`simple_transfer_protocol.rs`](../../src/infra/core/src/utils/simple_transfer_protocol.rs) | `SimpleTransferProtocol` |
@@ -127,20 +127,21 @@ is read as an account); otherwise it is resolved to a URL by `RemoteAliasResolve
 ([§9](#9-remote-repositories-and-aliases)). The source must have a `HEAD`.
 
 - `build_sync_request(src, dst, create_dst_if_not_exists)` refuses a local destination.
-- `build_local_sync_request(src, dst, create_dst_if_not_exists)` reads the destination's `HEAD` as
+- `build_local_sync_request_from_source(source, dst, create_dst_if_not_exists)` builds a pull from a
+  source the planner resolved with `DatasetPullSourceResolver`
+  ([§9](#9-remote-repositories-and-aliases)). It reads the destination's `HEAD` as
   `expected_head`, so it runs inside a transaction: a detached dataset reads the storage `HEAD`,
   which can lag behind the database. A dataset entry left without `HEAD` by an interrupted
   creation is `Existing` with no expected head. A missing destination becomes `New` when creation
   is allowed and the reference carries an alias.
-- `build_local_sync_request_from_source(source, dst, create_dst_if_not_exists)` does the same from a
-  source the planner resolved with `DatasetPullSourceResolver`
-  ([§9](#9-remote-repositories-and-aliases)), without resolving its URL again.
+- `build_local_sync_request(src, dst, create_dst_if_not_exists)` does the same from a reference,
+  local or remote. Only tests and benchmarks use it, through `LocalSyncHelper`.
 
 **Pull into a local dataset** plans, transfers, then commits:
 
 | Step | Transaction | Does |
 | --- | --- | --- |
-| Plan | the caller's | `build_local_sync_request_from_source` or `build_local_sync_request`: resolve the source, read `expected_head` |
+| Plan | the caller's | `build_local_sync_request_from_source`: resolve the source, read `expected_head` |
 | Transfer | none held across it | `transfer_into_local`: compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
 | Commit | the caller's | `LocalSyncCommitter::commit`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
 
@@ -434,13 +435,13 @@ to `SyncOptions`.
 
 | Method | Answer |
 | --- | --- |
-| `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousSource` with several; reads the alias registry only |
+| `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousPullSourceError` with several; reads the alias registry only |
 | `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteAliasResolver::resolve_pull_url`; an unknown repository is `RepositoryNotFound` |
-| `resolve_pull_source` | both of the above for one dataset |
+| `resolve_pull_source` | both of the above for one dataset; no production caller yet, kept for the flow that builds sync tasks |
 | `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
 
-`DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` of a sync task, without
-credentials.
+`DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` a sync task will read, without
+credentials. Nothing builds such tasks yet.
 
 How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 [dataset-pull.md](dataset-pull.md#51-resolving-each-request).

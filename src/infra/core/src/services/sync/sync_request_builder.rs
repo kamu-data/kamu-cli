@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::component;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_core::{
     DatasetAnyRefUnresolvedError,
     DatasetPullSource,
@@ -18,7 +18,6 @@ use kamu_core::{
     LocalSyncTarget,
     RemoteAliasResolver,
     RemoteRepositoryRegistry,
-    ResolveRemoteSourceError,
     SyncError,
     SyncRef,
     SyncRefRemote,
@@ -26,8 +25,6 @@ use kamu_core::{
 };
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use url::Url;
-
-use crate::UrlExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -137,8 +134,7 @@ impl SyncRequestBuilder {
                 let url = self
                     .remote_alias_resolver
                     .resolve_pull_url(&remote_ref)
-                    .await
-                    .map_err(ResolveRemoteSourceError::from)?;
+                    .await?;
                 self.remote_source_sync_ref(remote_ref, url).await
             }
         }
@@ -171,8 +167,7 @@ impl SyncRequestBuilder {
         let remote_dataset_url = self
             .remote_alias_resolver
             .resolve_pull_url(&remote_ref)
-            .await
-            .int_err()?;
+            .await?;
 
         let dataset = self
             .dataset_factory
@@ -207,32 +202,6 @@ impl SyncRequestBuilder {
             }
             Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn resolve_remote_dataset_url(
-    remote_repo_registry: &dyn RemoteRepositoryRegistry,
-    remote_ref: &odf::DatasetRefRemote,
-) -> Result<Url, SyncError> {
-    // TODO: REMOTE ID
-    match remote_ref {
-        odf::DatasetRefRemote::ID(_, _) => Err(SyncError::Internal(
-            "Syncing remote dataset by ID is not yet supported".int_err(),
-        )),
-        odf::DatasetRefRemote::Alias(alias)
-        | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
-            let mut repo = remote_repo_registry.get_repository(&alias.repo_name)?;
-
-            repo.url.ensure_trailing_slash();
-            Ok(repo.url.join(&format!("{}/", alias.local_alias())).unwrap())
-        }
-        odf::DatasetRefRemote::Url(url) => {
-            let mut dataset_url = url.as_ref().clone();
-            dataset_url.ensure_trailing_slash();
-            Ok(dataset_url)
         }
     }
 }

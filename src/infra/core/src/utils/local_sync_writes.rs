@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use database_common::DatabaseTransactionRunner;
 use internal_error::ErrorIntoInternal;
-use kamu_core::{CorruptedSourceError, SyncError};
+use kamu_core::{CorruptedSourceError, LocalSyncTarget, SyncError, TransferredSyncTarget};
 use odf::dataset::MetadataChainExt as _;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,6 +87,47 @@ impl StoredSeed {
             seed_block,
             seed_block_bytes,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The dataset the transferred blocks go into, and the target the commit
+/// moves: an existing dataset as is, a new one stored from the `Seed` that
+/// `take_seed` removes from the transferred blocks
+pub async fn prepare_transfer_target(
+    catalog: &dill::Catalog,
+    dst: &LocalSyncTarget,
+    visibility_for_created_dataset: odf::DatasetVisibility,
+    take_seed: impl FnOnce() -> odf::dataset::HashedMetadataBlockBytesDecoded,
+) -> Result<(Arc<dyn odf::Dataset>, TransferredSyncTarget), SyncError> {
+    match dst {
+        LocalSyncTarget::Existing {
+            dataset,
+            expected_head,
+        } => Ok((
+            (**dataset).clone(),
+            TransferredSyncTarget::Existing {
+                dataset: dataset.clone(),
+                expected_head: expected_head.clone(),
+            },
+        )),
+        LocalSyncTarget::New(alias) => {
+            let StoredSeed {
+                dataset,
+                seed_block,
+                seed_block_bytes,
+            } = StoredSeed::store(catalog, take_seed()).await?;
+            Ok((
+                dataset,
+                TransferredSyncTarget::New {
+                    alias: alias.clone(),
+                    seed_block,
+                    seed_block_bytes,
+                    visibility: visibility_for_created_dataset,
+                },
+            ))
+        }
     }
 }
 

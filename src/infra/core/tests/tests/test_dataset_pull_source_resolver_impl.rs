@@ -104,11 +104,11 @@ async fn test_several_pull_aliases_are_ambiguous() {
 
     assert_matches!(
         harness.find_pull_alias(&foo).await,
-        Err(FindPullAliasError::AmbiguousSource)
+        Err(FindPullAliasError::AmbiguousSource(_))
     );
     assert_matches!(
         harness.resolve_pull_source(&foo).await,
-        Err(ResolvePullSourceError::AmbiguousSource)
+        Err(ResolvePullSourceError::AmbiguousSource(_))
     );
 }
 

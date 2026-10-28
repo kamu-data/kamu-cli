@@ -42,7 +42,7 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_ingest_success() {
+async fn test_pull_ingest_up_to_date_keeps_pull_aliases() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mocks = PullUseCaseHarnessMocks::default()
@@ -89,7 +89,7 @@ async fn test_pull_ingest_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_pull_transform_success() {
+async fn test_pull_transform_up_to_date_keeps_pull_aliases() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
@@ -1128,6 +1128,66 @@ async fn test_pull_sync_head_moved_is_a_conflict() {
 
     let aliases = harness.get_remote_aliases(&foo).await;
     assert!(aliases.is_empty(RemoteAliasKind::Pull));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_sync_transfer_failure_is_reported_and_commits_nothing() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let remote_ref = odf::DatasetRefRemote::Alias(odf::DatasetAliasRemote {
+        repo_name: odf::RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
+        account_name: None,
+        dataset_name: alias_foo.dataset_name.clone(),
+    });
+
+    let mocks = PullUseCaseHarnessMocks::default()
+        .with_authorizer_mock(
+            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                DatasetAction::Write,
+                1,
+                HashSet::from_iter([alias_foo.clone()]),
+            ),
+        )
+        .with_sync_mock(MockSyncService::new().make_expect_transfer_error(
+            alias_foo.clone(),
+            || {
+                DatasetsDivergedError {
+                    src_head: odf::Multihash::from_digest_sha3_256(b"remote"),
+                    dst_head: odf::Multihash::from_digest_sha3_256(b"local"),
+                    detail: None,
+                }
+                .into()
+            },
+        ));
+
+    let harness = PullUseCaseHarness::new(mocks);
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    harness
+        .copy_dataset_to_remote_repo(&foo.dataset_handle.id, &alias_foo.dataset_name)
+        .await;
+
+    let pull_response = harness
+        .use_case
+        .execute(
+            PullRequest::Remote(PullRequestRemote {
+                remote_ref,
+                maybe_local_alias: Some(alias_foo),
+            }),
+            PullOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::SyncError(SyncError::DatasetsDiverged(_)))
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

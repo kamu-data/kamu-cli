@@ -170,7 +170,17 @@ async fn test_forced_pull_replaces_diverged_history() {
 async fn test_pull_with_head_moved_during_transfer_local_fs() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
-        .assert_pull_keeps_head_moved_during_transfer()
+        .assert_pull_keeps_head_moved_during_transfer(true)
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_unforced_pull_with_head_moved_during_transfer_local_fs() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+        .assert_pull_keeps_head_moved_during_transfer(false)
         .await;
 }
 
@@ -183,8 +193,24 @@ async fn test_pull_with_head_moved_during_transfer_s3() {
     s3.set_credentials_env_vars();
 
     LocalPullHarness::new(s3.url.clone())
-        .assert_pull_keeps_head_moved_during_transfer()
+        .assert_pull_keeps_head_moved_during_transfer(true)
         .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pull_from_unreachable_repository_fails_recoverably() {
+    // A port that was free a moment ago refuses connections
+    let closed_addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
+    let harness = LocalPullHarness::new(Url::parse(&format!("http://{closed_addr}/")).unwrap());
+
+    let result = harness.pull(SyncOptions::default(), None).await;
+
+    assert_matches!(result, Err(e @ SyncError::Internal(_)) if e.is_recoverable());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -312,9 +338,10 @@ impl LocalPullHarness {
         assert_eq!(self.destination_head().await, Some(source_head));
     }
 
-    /// Another writer moves the destination `HEAD` while a forced pull
-    /// transfers. The commit must fail and leave the other writer's `HEAD`
-    async fn assert_pull_keeps_head_moved_during_transfer(&self) {
+    /// Another writer moves the destination `HEAD` while a pull transfers.
+    /// The commit must fail and leave the other writer's `HEAD`, with or
+    /// without `force`
+    async fn assert_pull_keeps_head_moved_during_transfer(&self, force: bool) {
         self.create_source_dataset().await;
         self.push_source().await;
         self.pull(SyncOptions::default(), None).await.unwrap();
@@ -331,7 +358,7 @@ impl LocalPullHarness {
         let result = self
             .pull(
                 SyncOptions {
-                    force: true,
+                    force,
                     ..SyncOptions::default()
                 },
                 Some(listener.clone()),
