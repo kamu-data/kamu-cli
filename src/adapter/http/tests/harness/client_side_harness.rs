@@ -181,6 +181,7 @@ impl ClientSideHarness {
 
         b.add::<PullRequestPlannerImpl>();
         b.add::<DatasetUpdateKindResolverImpl>();
+        b.add::<DatasetPullSourceResolverImpl>();
 
         b.add::<PushRequestPlannerImpl>();
 

@@ -861,6 +861,30 @@ async fn test_pull_dataset_with_several_pull_aliases_is_ambiguous() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_sync_from_unknown_repository_fails_planning() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let responses = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: Some(n!("bar")),
+                remote_ref: rr!("missing/foo"),
+            })],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(
+        responses[0].result,
+        Err(PullError::SyncError(SyncError::RepositoryNotFound(_)))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_pull_derivative_without_transform_with_dependencies_fails_planning() {
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 
@@ -924,6 +948,7 @@ impl PullTestHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
             .add::<TransformPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()

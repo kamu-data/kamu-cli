@@ -10,14 +10,15 @@
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::PullError;
+use crate::{FindPullAliasError, PullError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Decides how a local dataset is brought up to date.
 ///
-/// A dataset with one pull alias is synced from it, whatever its kind. Otherwise a root dataset is
-/// updated by polling ingest and a derivative by transform. Several pull aliases are ambiguous.
+/// A dataset with a pull source is synced from it, whatever its kind (see
+/// [`crate::DatasetPullSourceResolver`]). Otherwise a root dataset is updated by polling ingest
+/// and a derivative by transform.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetUpdateKindResolver: Send + Sync {
@@ -58,6 +59,15 @@ pub enum ResolveDatasetUpdateKindError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<FindPullAliasError> for ResolveDatasetUpdateKindError {
+    fn from(value: FindPullAliasError) -> Self {
+        match value {
+            FindPullAliasError::AmbiguousSource => Self::AmbiguousSource,
+            FindPullAliasError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 impl From<ResolveDatasetUpdateKindError> for PullError {
