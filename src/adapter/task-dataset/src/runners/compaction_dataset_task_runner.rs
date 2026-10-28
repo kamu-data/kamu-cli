@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu_core::{CompactionExecutor, CompactionPlan, CompactionResult};
+use kamu_core::{CompactionExecutor, CompactionPlan, CompactionResult, DatasetUpdateSteps};
 use kamu_datasets::ResolvedDataset;
 use kamu_task_system::*;
 
@@ -35,8 +35,8 @@ use crate::{
     task_type: TaskDefinitionDatasetResetToMetadata::TASK_TYPE,
 })]
 pub struct CompactionDatasetTaskRunner {
-    catalog: dill::Catalog,
     compaction_executor: Arc<dyn CompactionExecutor>,
+    update_steps: Arc<dyn DatasetUpdateSteps>,
 }
 
 #[common_macros::method_names_consts]
@@ -71,7 +71,7 @@ impl CompactionDatasetTaskRunner {
         if let CompactionResult::Success {
             old_head, new_head, ..
         } = &compaction_result
-            && let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
+            && let Some(failed) = TaskDatasetHeadCommitter::new(self.update_steps.as_ref())
                 .commit(target.get_handle(), old_head, new_head)
                 .await?
         {

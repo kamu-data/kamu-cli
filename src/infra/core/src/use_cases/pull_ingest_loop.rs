@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
 use internal_error::ResultIntoInternal;
 use kamu_core::*;
-use kamu_datasets::{DatasetHeadCommitter, DatasetRegistry, ResolvedDataset};
 use random_strings::get_random_name;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,17 +18,17 @@ use random_strings::get_random_name;
 /// Repeats polling ingest iterations of one dataset for `kamu pull`,
 /// committing `HEAD` after each of them
 pub(crate) struct PullIngestLoop {
-    catalog: dill::Catalog,
+    update_steps: Arc<dyn DatasetUpdateSteps>,
     polling_ingest_service: Arc<dyn PollingIngestService>,
 }
 
 impl PullIngestLoop {
     pub(crate) fn new(
-        catalog: dill::Catalog,
+        update_steps: Arc<dyn DatasetUpdateSteps>,
         polling_ingest_service: Arc<dyn PollingIngestService>,
     ) -> Self {
         Self {
-            catalog,
+            update_steps,
             polling_ingest_service,
         }
     }
@@ -46,8 +44,17 @@ impl PullIngestLoop {
         exhaust_sources: bool,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PullError> {
-        let (target, mut plan, env_vars) = match self.plan(target_handle).await {
-            Ok(planned) => planned,
+        let PlannedIngest {
+            target,
+            mut plan,
+            env_vars,
+        } = match self.update_steps.plan_ingest(target_handle).await {
+            Ok(Some(planned)) => planned,
+            Ok(None) => {
+                return Err(PullError::NotFound(odf::DatasetNotFoundError::new(
+                    target_handle.as_local_ref(),
+                )));
+            }
             Err(e) => {
                 if let Some(listener) = &maybe_listener {
                     listener.begin();
@@ -93,10 +100,11 @@ impl PullIngestLoop {
                     has_more,
                     ..
                 } => {
-                    if let Err(e) = self
-                        .commit_head(target.get_handle(), old_head, new_head)
-                        .await
-                    {
+                    if let Err(e) = HeadCommit::into_set_ref_result(
+                        self.update_steps
+                            .commit_head(target.get_handle(), old_head, new_head)
+                            .await,
+                    ) {
                         let e = PollingIngestError::CommitError(e.into());
                         return Err(Self::stopped(combined, e, maybe_listener.as_ref()));
                     }
@@ -121,39 +129,6 @@ impl PullIngestLoop {
         }
 
         Ok(combined.expect("The loop runs at least once"))
-    }
-
-    /// Plans the first iteration and resolves the environment variables in one
-    /// transaction, and returns the target detached from it
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>)]
-    async fn plan(
-        &self,
-        target_handle: &odf::DatasetHandle,
-    ) -> Result<(ResolvedDataset, PollingIngestPlan, IngestEnvVars), PollingIngestPlanError> {
-        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
-
-        let plan = polling_ingest_planner.plan_ingest(target.clone()).await?;
-        let env_vars = polling_ingest_planner
-            .resolve_env_vars(&target_handle.id)
-            .await?;
-
-        target.detach_from_transaction();
-
-        Ok((target, plan, env_vars))
-    }
-
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
-    async fn commit_head(
-        &self,
-        target_handle: &odf::DatasetHandle,
-        old_head: &odf::Multihash,
-        new_head: &odf::Multihash,
-    ) -> Result<(), odf::dataset::SetChainRefError> {
-        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
-
-        dataset_head_committer
-            .commit_head(&target, Some(old_head), new_head)
-            .await
     }
 
     /// Reports the failed iteration and turns its error into the pull's

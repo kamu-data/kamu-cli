@@ -18,6 +18,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
+    DatasetUpdateStepsImpl,
     EngineConfigDatafusionEmbeddedIngest,
     EngineProvisionerNull,
     FetchService,
@@ -829,6 +830,7 @@ impl UpdateDatasetTaskRunnerHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<UpdateDatasetTaskRunner>()
+            .add::<DatasetUpdateStepsImpl>()
             .add::<PollingIngestPlannerImpl>()
             .add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()

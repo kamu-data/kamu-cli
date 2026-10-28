@@ -10,6 +10,7 @@
 use std::any::TypeId;
 use std::sync::Arc;
 
+use kamu::DatasetUpdateStepsImpl;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu_adapter_task_dataset::{
     CompactionDatasetTaskRunner,
@@ -189,6 +190,7 @@ impl CompactionTaskRunnersHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<CompactionDatasetTaskRunner>()
+            .add::<DatasetUpdateStepsImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add_value(mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>();

@@ -327,7 +327,7 @@ task is `Running` if and only if its `Running` message exists, and likewise for 
 A dataset planner resolves a `ResolvedDataset` inside its transaction and calls
 `detach_from_transaction()` before returning, so the definition can outlive that transaction and
 be used by the runner. A runner that needs the database again opens a new transaction and
-re-resolves what it needs (`TaskDatasetHeadCommitter`, `LocalSyncCommitter`).
+re-resolves what it needs (`DatasetUpdateSteps`, `LocalSyncCommitter`).
 
 `TaskSchedulerImpl` itself opens no transactions: `create_task`, `cancel_task` and `try_take` run in
 the caller's, which is how the flow system creates a task atomically with the flow event that
@@ -356,9 +356,11 @@ Ingest, transform and compaction share one shape: **the core service writes new 
 `update_block_ref: false` outside any transaction, and the runner then moves `HEAD` in a short
 transaction with compare-and-swap** — the runner re-resolves the dataset through
 `DatasetRegistry` and moves `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter`
-(`TaskDatasetHeadCommitter`, shared by the update and compaction runners). Blocks
-written by an attempt that never reaches that step stay unreferenced, so a re-run after a crash,
-or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and reset differ:
+(`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses; `TaskDatasetHeadCommitter`,
+shared by the update and compaction runners, turns a commit that did not happen into the task's
+outcome). Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run
+after a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and
+reset differ:
 
 | Task / job | Writes blocks | Moves `HEAD` | Transaction around the work |
 | --- | --- | --- | --- |
