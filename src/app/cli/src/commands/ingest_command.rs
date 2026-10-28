@@ -323,7 +323,7 @@ impl PushIngestListener for PushIngestProgress {
         }
     }
 
-    fn error(&self, _error: &PushIngestError) {
+    fn error(&self, _error: &PushIngestDataError) {
         let state = self.state.lock().unwrap();
         state
             .curr_progress

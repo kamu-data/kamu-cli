@@ -602,11 +602,7 @@ impl PollingIngestListener for PrettyIngestProgress {
         }
     }
 
-    fn error(&self, _error: &PollingIngestError) {
-        self.finish_failed();
-    }
-
-    fn plan_error(&self, _error: &PollingIngestPlanError) {
+    fn error(&self, _error: &PullError) {
         self.finish_failed();
     }
 
@@ -732,25 +728,14 @@ impl TransformListener for PrettyTransformProgress {
             .finish_with_message(Self::spinner_message(&self.dataset_handle, 0, msg));
     }
 
-    fn elaborate_error(&self, _error: &TransformElaborateError) {
+    fn error(&self, _error: &PullError) {
         self.curr_progress
             .lock()
             .unwrap()
             .finish_with_message(Self::spinner_message(
                 &self.dataset_handle,
                 0,
-                console::style("Failed to update derivative dataset (elaborate phase)").red(),
-            ));
-    }
-
-    fn execute_error(&self, _error: &TransformExecuteError) {
-        self.curr_progress
-            .lock()
-            .unwrap()
-            .finish_with_message(Self::spinner_message(
-                &self.dataset_handle,
-                0,
-                console::style("Failed to update derivative dataset (execute phase)").red(),
+                console::style("Failed to update derivative dataset").red(),
             ));
     }
 

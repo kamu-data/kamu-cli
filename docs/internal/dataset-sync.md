@@ -154,7 +154,8 @@ earlier failed pull, so the next pull continues into it.
 `kamu pull` commits in a short transaction of its own after each transfer
 ([dataset-pull.md](dataset-pull.md#62-per-job-runners)); the update task does the same
 ([task-system.md](task-system.md#71-update-dataset)). The listener given to the transfer hears
-`begin` and progress; the caller reports `success` or `error` once the commit decides.
+`begin` and progress; the caller reports `success` or `error` once the commit decides, and a push
+reports them once the sync returns ([dataset-pull.md](dataset-pull.md#63-listeners)).
 
 `SyncOptions`:
 

@@ -487,6 +487,60 @@ async fn test_push_ingest_data_unsupported_media_type() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_reports_success_after_commit() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness
+        .create_root_dataset_with_push_source(&alias_foo)
+        .await;
+
+    let (result, events) = harness.ingest_ndjson_recording(&foo).await;
+
+    assert_matches!(result, Ok(PushIngestResult::Updated { .. }));
+    assert_eq!(events, vec!["begin", "success"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[test_group::group(engine, ingest, datafusion)]
+async fn test_push_ingest_data_head_moved_before_commit_reports_error_not_success() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new(),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness
+        .create_root_dataset_with_push_source(&alias_foo)
+        .await;
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    harness.move_head_before_next_commit(concurrent_head.clone());
+
+    let (result, events) = harness.ingest_ndjson_recording(&foo).await;
+
+    assert_matches!(
+        result,
+        Err(PushIngestDataError::Execution(
+            PushIngestError::CommitError(_)
+        ))
+    );
+    assert_eq!(events, vec!["begin", "error"]);
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushIngestDataUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -574,6 +628,26 @@ impl PushIngestDataUseCaseHarness {
             Self::ndjson_options(expected_head, is_ingest_from_upload),
         )
         .await
+    }
+
+    async fn ingest_ndjson_recording(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> (
+        Result<PushIngestResult, PushIngestDataError>,
+        Vec<&'static str>,
+    ) {
+        let listener = Arc::new(RecordingPushIngestListener::default());
+        let result = self
+            .use_case
+            .execute(
+                ResolvedDataset::from_created(created),
+                Self::ndjson_source(),
+                Self::ndjson_options(None, false),
+                Some(listener.clone()),
+            )
+            .await;
+        (result, listener.events())
     }
 
     fn ndjson_source() -> DataSource {
@@ -665,6 +739,37 @@ impl PushIngestDataUseCaseHarness {
         self.use_case
             .execute_multi(target, data_sources, options, None)
             .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct RecordingPushIngestListener {
+    events: std::sync::Mutex<Vec<&'static str>>,
+}
+
+impl RecordingPushIngestListener {
+    fn events(&self) -> Vec<&'static str> {
+        self.events.lock().unwrap().clone()
+    }
+
+    fn record(&self, event: &'static str) {
+        self.events.lock().unwrap().push(event);
+    }
+}
+
+impl PushIngestListener for RecordingPushIngestListener {
+    fn begin(&self) {
+        self.record("begin");
+    }
+
+    fn success(&self, _result: &PushIngestResult) {
+        self.record("success");
+    }
+
+    fn error(&self, _error: &PushIngestDataError) {
+        self.record("error");
     }
 }
 

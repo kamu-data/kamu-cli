@@ -22,9 +22,11 @@ use kamu_core::{
     RemoteAliasKind,
     RemoteAliasesRegistry,
     SyncError,
+    SyncListener,
     SyncMultiListener,
     SyncOptions,
     SyncRequest,
+    SyncResult,
     SyncService,
 };
 use kamu_datasets::{ClassifyByAllowanceResponse, DatasetAction, DatasetActionAuthorizer};
@@ -137,6 +139,27 @@ impl PushDatasetUseCaseImpl {
             .collect_plan(authorized_handles, remote_target)
             .await)
     }
+
+    /// Syncs, then reports the result to the listener: a push to a remote
+    /// commits there, so the result is final when the sync returns
+    async fn sync_and_report(
+        &self,
+        sync_request: SyncRequest,
+        sync_options: SyncOptions,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError> {
+        let result = self
+            .sync_service
+            .sync(sync_request, sync_options, listener.clone())
+            .await;
+        if let Some(listener) = &listener {
+            match &result {
+                Ok(sync_result) => listener.success(sync_result),
+                Err(e) => listener.error(e),
+            }
+        }
+        result
+    }
 }
 
 #[async_trait::async_trait]
@@ -200,8 +223,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
                         &sync_request.dst.as_user_friendly_any_ref(),
                     )
                 });
-                self.sync_service
-                    .sync(sync_request, options.sync_options, listener)
+                self.sync_and_report(sync_request, options.sync_options, listener)
             })
             .collect();
         // TODO: PERF: use tokio-tasks?

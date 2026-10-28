@@ -59,10 +59,16 @@ impl PullTransformJob {
     ) -> Result<PullResponse, InternalError> {
         let maybe_original_request = pti.maybe_original_request.clone();
         let target_handle = pti.target.get_handle().clone();
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
 
         let transform_result = self
-            .elaborate_and_execute(pti, transform_options, maybe_listener)
+            .elaborate_and_execute(pti, transform_options, listener.clone())
             .await;
+
+        match &transform_result {
+            Ok(result) => listener.success(result),
+            Err(e) => listener.error(e),
+        }
 
         Ok(PullResponse {
             maybe_original_request,
@@ -76,13 +82,12 @@ impl PullTransformJob {
         &self,
         pti: PullTransformItem,
         transform_options: TransformOptions,
-        maybe_listener: Option<Arc<dyn TransformListener>>,
+        listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, PullError> {
-        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
         let target_handle = pti.target.get_handle();
         let mut maybe_reset_heads = None;
 
-        let elaboration = match self.elaborate(target_handle).await {
+        let elaboration = match self.update_steps.elaborate_transform(target_handle).await {
             Err(TransformElaborateError::InvalidInputInterval(e))
                 if transform_options.reset_derivatives_on_diverged_input =>
             {
@@ -91,7 +96,7 @@ impl PullTransformJob {
                 match self.reset_to_metadata(target_handle).await? {
                     Some(reset_heads) => {
                         maybe_reset_heads = Some(reset_heads);
-                        self.elaborate(target_handle).await
+                        self.update_steps.elaborate_transform(target_handle).await
                     }
                     None => Err(TransformElaborateError::InvalidInputInterval(e)),
                 }
@@ -100,76 +105,50 @@ impl PullTransformJob {
         };
 
         let result = self
-            .execute_elaborated(elaboration, &pti.input_handles, listener.clone())
+            .execute_elaborated(elaboration, target_handle, &pti.input_handles, listener)
             .await;
 
-        let transform_result = match (maybe_reset_heads, result) {
-            (maybe_reset_heads, Ok(transform_result)) => {
-                Self::combine_with_reset(maybe_reset_heads, transform_result)
-            }
-            (Some((old_head, new_head)), Err(source)) => {
-                return Err(PullError::TransformStopped(Box::new(
-                    TransformStoppedError {
-                        old_head,
-                        new_head,
-                        source,
-                    },
-                )));
-            }
-            (None, Err(e)) => return Err(e),
-        };
-
-        listener.success(&transform_result);
-
-        Ok(transform_result)
+        match (maybe_reset_heads, result) {
+            (maybe_reset_heads, Ok(transform_result)) => Ok(Self::combine_with_reset(
+                maybe_reset_heads,
+                transform_result,
+            )),
+            (Some((old_head, new_head)), Err(source)) => Err(PullError::TransformStopped(
+                Box::new(TransformStoppedError {
+                    old_head,
+                    new_head,
+                    source,
+                }),
+            )),
+            (None, Err(e)) => Err(e),
+        }
     }
 
-    /// Elaborates the transform on the dataset as it is now. A dataset
-    /// deleted since planning is an internal error: nothing writes it again
-    async fn elaborate(
-        &self,
-        target_handle: &odf::DatasetHandle,
-    ) -> Result<ElaboratedTransform, TransformElaborateError> {
-        self.update_steps
-            .elaborate_transform(target_handle)
-            .await?
-            .ok_or_else(|| {
-                odf::DatasetNotFoundError::new(target_handle.as_local_ref())
-                    .int_err()
-                    .into()
-            })
-    }
-
-    /// Authorizes, executes and commits an elaborated transform, reporting a
-    /// failure to the listener
+    /// Authorizes, executes and commits an elaborated transform
     async fn execute_elaborated(
         &self,
-        elaboration: Result<ElaboratedTransform, TransformElaborateError>,
+        elaboration: Result<Option<ElaboratedTransform>, TransformElaborateError>,
+        target_handle: &odf::DatasetHandle,
         planned_inputs: &[odf::DatasetHandle],
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, PullError> {
         match elaboration {
-            Ok(ElaboratedTransform {
+            Ok(Some(ElaboratedTransform {
                 target,
                 elaboration: TransformElaboration::Elaborated(plan),
-            }) => {
+            })) => {
                 self.authorize_unplanned_inputs(&plan, planned_inputs)
                     .await?;
-                self.execute_and_commit(target, plan, listener.clone())
-                    .await
-                    .map_err(|e| {
-                        listener.execute_error(&e);
-                        TransformError::from(e).into()
-                    })
+                self.execute_and_commit(target, plan, listener).await
             }
-            Ok(ElaboratedTransform {
+            Ok(Some(ElaboratedTransform {
                 elaboration: TransformElaboration::UpToDate,
                 ..
-            }) => Ok(TransformResult::UpToDate),
-            Err(e) => {
-                listener.elaborate_error(&e);
-                Err(TransformError::from(e).into())
-            }
+            })) => Ok(TransformResult::UpToDate),
+            Ok(None) => Err(PullError::NotFound(odf::DatasetNotFoundError::new(
+                target_handle.as_local_ref(),
+            ))),
+            Err(e) => Err(TransformError::from(e).into()),
         }
     }
 
@@ -212,20 +191,19 @@ impl PullTransformJob {
         target: ResolvedDataset,
         plan: TransformExecutionPlan,
         listener: Arc<dyn TransformListener>,
-    ) -> Result<TransformResult, TransformExecuteError> {
+    ) -> Result<TransformResult, PullError> {
         let (target, result) = self
             .transform_executor
             .execute_transform(target, plan, &get_random_name(None, 10), Some(listener))
             .await;
 
-        let result = result?;
+        let result = result.map_err(TransformError::from)?;
         if let TransformResult::Updated {
             old_head, new_head, ..
         } = &result
         {
             self.commit_head(target.get_handle(), old_head, new_head)
-                .await
-                .map_err(|e| TransformExecuteError::CommitError(e.into()))?;
+                .await?;
         }
 
         Ok(result)
@@ -236,11 +214,12 @@ impl PullTransformJob {
         target_handle: &odf::DatasetHandle,
         old_head: &odf::Multihash,
         new_head: &odf::Multihash,
-    ) -> Result<(), odf::dataset::SetChainRefError> {
-        HeadCommit::into_set_ref_result(
+    ) -> Result<(), PullError> {
+        HeadCommit::into_pull_result(
             self.update_steps
                 .commit_head(target_handle, old_head, new_head)
                 .await,
+            target_handle,
         )
     }
 
@@ -290,10 +269,7 @@ impl PullTransformJob {
                 old_head, new_head, ..
             } => {
                 self.commit_head(target_handle, &old_head, &new_head)
-                    .await
-                    .map_err(|e| {
-                        TransformError::from(TransformExecuteError::CommitError(e.into()))
-                    })?;
+                    .await?;
                 Ok(Some((old_head, new_head)))
             }
         }

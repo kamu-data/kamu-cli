@@ -46,11 +46,18 @@ impl PullSyncJob {
             maybe_original_request: psi.maybe_original_request,
             maybe_local_ref: Some(psi.local_target.as_local_ref()), // TODO: multi-tenancy
             maybe_remote_ref: Some(psi.remote_ref),
-            result: match sync_result {
-                Ok(response) => Ok(response.into()),
-                Err(e) => Err(e.into()),
-            },
+            result: sync_result.map(Into::into).map_err(Self::into_pull_error),
         })
+    }
+
+    /// A lost commit race is the pull's [`PullError::HeadMoved`], the same as
+    /// for an ingest or a transform
+    fn into_pull_error(error: SyncError) -> PullError {
+        if let SyncError::HeadMoved(e) = error {
+            PullError::HeadMoved(e)
+        } else {
+            error.into()
+        }
     }
 
     async fn transfer_and_commit(

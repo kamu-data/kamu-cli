@@ -358,6 +358,9 @@ A lost CAS in step 1 or 4 is
 `PushIngestError::CommitError(CommitError::MetadataAppendError(AppendError::RefCASFailed))` with
 the expected and actual heads; nothing is committed.
 
+The executor reports `begin` and progress to the listener; the use case reports `success` or `error`
+once, after step 4 or the failure ([dataset-pull.md](dataset-pull.md#63-listeners)).
+
 `execute_multi` runs steps 1 to 3 for each data source in turn, threading the new head through
 `expected_head`, and moves `HEAD` once at the end from the first `old_head` to the last `new_head`.
 

@@ -36,8 +36,32 @@ impl PullIngestLoop {
     /// Ingests until the source reports no more data, or once when
     /// `exhaust_sources` is off. The result spans all committed iterations. An
     /// iteration that fails after others committed is
-    /// [`PullError::IngestStopped`].
+    /// [`PullError::IngestStopped`]. The listener learns of each committed
+    /// iteration, and of the failure that ends the ingest
     pub(crate) async fn run(
+        &self,
+        target_handle: &odf::DatasetHandle,
+        options: PollingIngestOptions,
+        exhaust_sources: bool,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PullError> {
+        let result = self
+            .plan_and_ingest(
+                target_handle,
+                options,
+                exhaust_sources,
+                maybe_listener.clone(),
+            )
+            .await;
+
+        if let (Some(listener), Err(e)) = (&maybe_listener, &result) {
+            listener.error(e);
+        }
+
+        result
+    }
+
+    async fn plan_and_ingest(
         &self,
         target_handle: &odf::DatasetHandle,
         options: PollingIngestOptions,
@@ -55,23 +79,14 @@ impl PullIngestLoop {
                     target_handle.as_local_ref(),
                 )));
             }
-            Err(e) => {
+            Err(PollingIngestPlanError::SourceNotDefined(_)) => {
                 if let Some(listener) = &maybe_listener {
-                    listener.begin();
-                    if let PollingIngestPlanError::SourceNotDefined(_) = e {
-                        listener.no_polling_source();
-                    } else {
-                        listener.plan_error(&e);
-                    }
+                    listener.no_polling_source();
                 }
-                return match e {
-                    PollingIngestPlanError::SourceNotDefined(_) => {
-                        Ok(PollingIngestResult::UpToDate { uncacheable: false })
-                    }
-                    PollingIngestPlanError::ScanMetadata(e) => Err(e.into()),
-                    PollingIngestPlanError::Internal(e) => Err(e.into()),
-                };
+                return Ok(PollingIngestResult::UpToDate { uncacheable: false });
             }
+            Err(PollingIngestPlanError::ScanMetadata(e)) => return Err(e.into()),
+            Err(PollingIngestPlanError::Internal(e)) => return Err(e.into()),
         };
 
         let mut combined: Option<PollingIngestResult> = None;
@@ -89,7 +104,7 @@ impl PullIngestLoop {
                 .await
             {
                 Ok(response) => response,
-                Err(e) => return Err(Self::stopped(combined, e, maybe_listener.as_ref())),
+                Err(e) => return Err(Self::stopped(combined, e.into())),
             };
 
             let has_more = match &response.result {
@@ -100,13 +115,13 @@ impl PullIngestLoop {
                     has_more,
                     ..
                 } => {
-                    if let Err(e) = HeadCommit::into_set_ref_result(
+                    if let Err(e) = HeadCommit::into_pull_result(
                         self.update_steps
                             .commit_head(target.get_handle(), old_head, new_head)
                             .await,
+                        target.get_handle(),
                     ) {
-                        let e = PollingIngestError::CommitError(e.into());
-                        return Err(Self::stopped(combined, e, maybe_listener.as_ref()));
+                        return Err(Self::stopped(combined, e));
                     }
                     *has_more
                 }
@@ -131,16 +146,9 @@ impl PullIngestLoop {
         Ok(combined.expect("The loop runs at least once"))
     }
 
-    /// Reports the failed iteration and turns its error into the pull's
-    fn stopped(
-        combined: Option<PollingIngestResult>,
-        error: PollingIngestError,
-        maybe_listener: Option<&Arc<dyn PollingIngestListener>>,
-    ) -> PullError {
-        if let Some(listener) = maybe_listener {
-            listener.error(&error);
-        }
-
+    /// The error of an iteration, as [`PullError::IngestStopped`] when earlier
+    /// iterations committed
+    fn stopped(combined: Option<PollingIngestResult>, error: PullError) -> PullError {
         match combined {
             Some(PollingIngestResult::Updated {
                 old_head,
@@ -153,7 +161,7 @@ impl PullIngestLoop {
                 increment,
                 source: error,
             })),
-            None | Some(PollingIngestResult::UpToDate { .. }) => error.into(),
+            None | Some(PollingIngestResult::UpToDate { .. }) => error,
         }
     }
 

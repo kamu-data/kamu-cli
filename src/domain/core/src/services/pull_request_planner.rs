@@ -485,6 +485,11 @@ pub enum PullError {
         SyncError,
     ),
 
+    /// Another writer moved `HEAD` while the dataset was updated, so the
+    /// update was not committed
+    #[error("Dataset head was moved concurrently: {0}")]
+    HeadMoved(odf::dataset::RefCASError),
+
     #[error(transparent)]
     Access(
         #[from]
@@ -538,7 +543,7 @@ pub struct IngestStoppedError {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
     pub increment: odf::dataset::MetadataChainIncrementInterval,
-    pub source: PollingIngestError,
+    pub source: PullError,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

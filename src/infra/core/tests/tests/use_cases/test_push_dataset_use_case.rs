@@ -339,6 +339,34 @@ async fn test_push_multiple_mixed_authorization_issues() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_push_reports_success_to_the_listener_once() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let mock_authorizer = MockDatasetActionAuthorizer::new()
+        .make_expect_classify_datasets_by_allowance(
+            DatasetAction::Read,
+            1,
+            HashSet::from_iter([alias_foo.clone()]),
+        );
+
+    let harness = PushUseCaseHarness::new(mock_authorizer);
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let (responses, events) = harness.push_to_remote_repo_recording(&foo).await;
+
+    assert_matches!(
+        responses.as_slice(),
+        [PushResponse {
+            result: Ok(SyncResult::Updated { .. }),
+            ..
+        }]
+    );
+    assert_eq!(events, vec!["begin", "success"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -406,11 +434,76 @@ impl PushUseCaseHarness {
         }
     }
 
+    async fn push_to_remote_repo_recording(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> (Vec<PushResponse>, Vec<&'static str>) {
+        let listener = Arc::new(RecordingSyncListener::default());
+        let responses = self
+            .use_case
+            .execute_multi(
+                vec![created.dataset_handle.clone()],
+                PushMultiOptions {
+                    remote_target: Some(odf::DatasetPushTarget::Repository(
+                        self.remote_repo_name.clone(),
+                    )),
+                    ..Default::default()
+                },
+                Some(Arc::new(RecordingSyncMultiListener(listener.clone()))),
+            )
+            .await
+            .unwrap();
+        (responses, listener.events())
+    }
+
     async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
         self.remote_aliases_registry
             .get_remote_aliases(&created.dataset_handle)
             .await
             .unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct RecordingSyncListener {
+    events: std::sync::Mutex<Vec<&'static str>>,
+}
+
+impl RecordingSyncListener {
+    fn events(&self) -> Vec<&'static str> {
+        self.events.lock().unwrap().clone()
+    }
+
+    fn record(&self, event: &'static str) {
+        self.events.lock().unwrap().push(event);
+    }
+}
+
+struct RecordingSyncMultiListener(Arc<RecordingSyncListener>);
+
+impl SyncMultiListener for RecordingSyncMultiListener {
+    fn begin_sync(
+        &self,
+        _src: &odf::DatasetRefAny,
+        _dst: &odf::DatasetRefAny,
+    ) -> Option<Arc<dyn SyncListener>> {
+        Some(self.0.clone())
+    }
+}
+
+impl SyncListener for RecordingSyncListener {
+    fn begin(&self) {
+        self.record("begin");
+    }
+
+    fn success(&self, _result: &SyncResult) {
+        self.record("success");
+    }
+
+    fn error(&self, _error: &SyncError) {
+        self.record("error");
     }
 }
 
