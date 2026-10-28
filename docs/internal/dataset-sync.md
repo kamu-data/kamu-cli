@@ -96,7 +96,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncRequest`, `LocalSyncRequest`, `LocalSyncTarget`, `SyncRef`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
 | Chain comparison | `kamu-core` — [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) | `MetadataChainComparator::compare_chains` → equal / ahead / behind / diverged |
 | Sync service and request builder | `kamu` — [`src/infra/core/src/services/sync/`](../../src/infra/core/src/services/sync) | `SyncServiceImpl` (protocol dispatch, IPFS), `SyncRequestBuilder` |
-| Simple protocol client | `kamu` — [`simple_transfer_protocol.rs`](../../src/infra/core/src/utils/simple_transfer_protocol.rs) | `SimpleTransferProtocol` |
+| Simple protocol client | `kamu` — [`simple_transfer_protocol/`](../../src/infra/core/src/utils/simple_transfer_protocol) | `SimpleTransferProtocol` |
 | Smart protocol client trait | `kamu` — [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) | `SmartTransferProtocolClient`, `TransferOptions` |
 | Smart protocol client and server | `kamu-adapter-http` — [`src/adapter/http/src/smart_protocol/`](../../src/adapter/http/src/smart_protocol) | `WsSmartTransferProtocolClient`, `AxumServerPullProtocolInstance`, `AxumServerPushProtocolInstance`, messages, `protocol_dataset_helper` |
 | Server HTTP endpoints | `kamu-adapter-http` — [`simple_protocol/handlers.rs`](../../src/adapter/http/src/simple_protocol/handlers.rs), [`http_server_dataset_router.rs`](../../src/adapter/http/src/http_server_dataset_router.rs) | `refs`, `blocks`, `data`, `checkpoints` (GET and PUT), `pull` and `push` WebSocket upgrades |
@@ -539,10 +539,10 @@ into the recoverability of the failed task.
 | Protocol dispatch, IPFS, URL helpers | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
 | Sync ref resolution | [`sync_request_builder.rs`](../../src/infra/core/src/services/sync/sync_request_builder.rs) |
 | Chain comparison | [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) |
-| Simple protocol client | [`simple_transfer_protocol.rs`](../../src/infra/core/src/utils/simple_transfer_protocol.rs) |
-| Smart protocol client | [`ws_tungstenite_client.rs`](../../src/adapter/http/src/smart_protocol/ws_tungstenite_client.rs), [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) |
+| Simple protocol client | [`simple_transfer_protocol/`](../../src/infra/core/src/utils/simple_transfer_protocol) |
+| Smart protocol client | [`ws_tungstenite_client/`](../../src/adapter/http/src/smart_protocol/ws_tungstenite_client), [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) |
 | Smart protocol server | [`axum_server_pull_protocol.rs`](../../src/adapter/http/src/smart_protocol/axum_server_pull_protocol.rs), [`axum_server_push_protocol.rs`](../../src/adapter/http/src/smart_protocol/axum_server_push_protocol.rs) |
-| Messages, phases, transfer plans, tarballs, object URLs | [`messages.rs`](../../src/adapter/http/src/smart_protocol/messages.rs), [`phases.rs`](../../src/adapter/http/src/smart_protocol/phases.rs), [`protocol_dataset_helper.rs`](../../src/adapter/http/src/smart_protocol/protocol_dataset_helper.rs) |
+| Messages, phases, transfer plans, tarballs, object URLs | [`messages.rs`](../../src/adapter/http/src/smart_protocol/messages.rs), [`phases.rs`](../../src/adapter/http/src/smart_protocol/phases.rs), [`protocol_dataset_helper/`](../../src/adapter/http/src/smart_protocol/protocol_dataset_helper) |
 | Server endpoints and routing | [`handlers.rs`](../../src/adapter/http/src/simple_protocol/handlers.rs), [`http_server_dataset_router.rs`](../../src/adapter/http/src/http_server_dataset_router.rs), [`dataset_authorization_layer.rs`](../../src/adapter/http/src/middleware/dataset_authorization_layer.rs) |
 | Push | [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs), [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) |
 | Remote repositories, aliases, URL resolution | [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) |

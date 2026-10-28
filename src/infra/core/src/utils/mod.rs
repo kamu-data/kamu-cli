@@ -15,3 +15,4 @@ pub mod local_sync_writes;
 pub mod simple_transfer_protocol;
 pub mod smart_transfer_protocol;
 pub mod sync_increment;
+pub mod url_ext;
