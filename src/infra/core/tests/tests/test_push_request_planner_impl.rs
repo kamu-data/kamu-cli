@@ -311,6 +311,7 @@ impl PushTestHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<PushRequestPlannerImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .build();
 

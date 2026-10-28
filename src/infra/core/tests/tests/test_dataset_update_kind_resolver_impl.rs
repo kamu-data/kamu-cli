@@ -145,6 +145,7 @@ impl UpdateKindHarness {
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add_value(RemoteRepositoryRegistryNull)
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryNull>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()

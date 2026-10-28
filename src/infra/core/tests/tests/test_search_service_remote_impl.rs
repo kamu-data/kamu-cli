@@ -61,6 +61,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<SyncServiceImpl>()
         .add::<RemoteAliasesRegistryImpl>()
         .add::<RemoteAliasResolverImpl>()
+        .add::<RemoteDatasetUrlResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()

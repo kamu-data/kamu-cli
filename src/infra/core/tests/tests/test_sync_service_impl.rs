@@ -91,6 +91,7 @@ async fn do_test_sync(
         .add::<LocalSyncCommitterImpl>()
         .add::<RemoteAliasesRegistryImpl>()
         .add::<RemoteAliasResolverImpl>()
+        .add::<RemoteDatasetUrlResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
@@ -150,6 +151,7 @@ async fn do_test_sync(
         .add::<LocalSyncCommitterImpl>()
         .add::<RemoteAliasesRegistryImpl>()
         .add::<RemoteAliasResolverImpl>()
+        .add::<RemoteDatasetUrlResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
@@ -205,8 +207,12 @@ async fn do_test_sync(
     );
 
     assert_matches!(
-        sync_request_builder_bar
-            .build_local_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_local_ref(), true)
+        LocalSyncHelper::new(catalog_bar.clone())
+            .pull(
+                pull_ref.clone(),
+                dataset_alias_bar.as_local_ref(),
+                SyncOptions::default(),
+            )
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == pull_ref.as_any_ref()
     );
@@ -260,7 +266,7 @@ async fn do_test_sync(
 
     let sync_result = LocalSyncHelper::new(catalog_bar.clone())
         .pull(
-            pull_ref.as_any_ref(),
+            pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
             SyncOptions::default(),
         )
@@ -295,7 +301,7 @@ async fn do_test_sync(
 
     let sync_err = LocalSyncHelper::new(catalog_foo.clone())
         .pull(
-            pull_ref.as_any_ref(),
+            pull_ref.clone(),
             dataset_alias_foo.as_local_ref(),
             SyncOptions {
                 create_if_not_exists: false,
@@ -337,7 +343,7 @@ async fn do_test_sync(
 
     let sync_result = LocalSyncHelper::new(catalog_bar.clone())
         .pull(
-            pull_ref.as_any_ref(),
+            pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
             SyncOptions {
                 create_if_not_exists: false,
@@ -374,7 +380,7 @@ async fn do_test_sync(
 
     let sync_result = LocalSyncHelper::new(catalog_bar.clone())
         .pull(
-            pull_ref.as_any_ref(),
+            pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
             SyncOptions {
                 create_if_not_exists: false,
@@ -467,7 +473,7 @@ async fn do_test_sync(
     // Try pulling dataset_bar: should fail, destination is ahead
     let sync_err = LocalSyncHelper::new(catalog_bar.clone())
         .pull(
-            pull_ref.as_any_ref(),
+            pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
             SyncOptions {
                 create_if_not_exists: false,
@@ -488,7 +494,7 @@ async fn do_test_sync(
     // Try pulling dataset_bar with --force: should abandon diverged_head
     let sync_result = LocalSyncHelper::new(catalog_bar.clone())
         .pull(
-            pull_ref.as_any_ref(),
+            pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
             SyncOptions {
                 create_if_not_exists: false,
@@ -625,7 +631,7 @@ async fn do_test_sync(
 
         let sync_err = LocalSyncHelper::new(catalog_foo.clone())
             .pull(
-                pull_ref.as_any_ref(),
+                pull_ref.clone(),
                 dataset_alias_baz.as_local_ref(),
                 SyncOptions {
                     create_if_not_exists: false,

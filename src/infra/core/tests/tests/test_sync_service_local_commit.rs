@@ -214,6 +214,38 @@ async fn test_pull_from_unreachable_repository_fails_recoverably() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pull_request_is_built_without_contacting_the_source() {
+    // A port that was free a moment ago refuses connections
+    let closed_addr = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap();
+    let harness = LocalPullHarness::new(Url::parse(&format!("http://{closed_addr}/")).unwrap());
+
+    assert_matches!(
+        harness.build_request(harness.remote_ref()).await,
+        Ok(LocalSyncRequest {
+            dst: LocalSyncTarget::New(_),
+            ..
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pull_from_unknown_repository_fails_in_transfer_unrecoverably() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+
+    let result = harness.pull_from("missing/foo".parse().unwrap()).await;
+
+    assert_matches!(result, Err(e @ SyncError::RepositoryNotFound(_)) if !e.is_recoverable());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -271,6 +303,7 @@ impl LocalPullHarness {
             .add::<LocalSyncCommitterImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DummySmartTransferProtocolClient>()
             .add::<SimpleTransferProtocol>()
@@ -450,28 +483,31 @@ impl LocalPullHarness {
         options: SyncOptions,
         maybe_listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        let helper = LocalSyncHelper::new(self.destination_catalog.clone());
-        let request = helper
-            .build_request(
-                self.remote_ref().as_any_ref(),
-                self.dataset_alias.as_local_ref(),
-                true,
-            )
-            .await?;
-        helper
+        let request = self.build_request(self.remote_ref()).await?;
+        LocalSyncHelper::new(self.destination_catalog.clone())
             .transfer_and_commit(request, options, maybe_listener)
             .await
     }
 
-    async fn transfer(&self) -> TransferredSync {
-        let request = LocalSyncHelper::new(self.destination_catalog.clone())
-            .build_request(
-                self.remote_ref().as_any_ref(),
-                self.dataset_alias.as_local_ref(),
-                true,
-            )
+    /// Pulls from `remote_ref` instead of the harness's own remote
+    async fn pull_from(&self, remote_ref: odf::DatasetRefRemote) -> Result<SyncResult, SyncError> {
+        let request = self.build_request(remote_ref).await?;
+        LocalSyncHelper::new(self.destination_catalog.clone())
+            .transfer_and_commit(request, SyncOptions::default(), None)
             .await
-            .unwrap();
+    }
+
+    async fn build_request(
+        &self,
+        remote_ref: odf::DatasetRefRemote,
+    ) -> Result<LocalSyncRequest, SyncError> {
+        LocalSyncHelper::new(self.destination_catalog.clone())
+            .build_request(remote_ref, self.dataset_alias.as_local_ref(), true)
+            .await
+    }
+
+    async fn transfer(&self) -> TransferredSync {
+        let request = self.build_request(self.remote_ref()).await.unwrap();
 
         let transfer = self
             .destination_catalog

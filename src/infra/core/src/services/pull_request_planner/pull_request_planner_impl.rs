@@ -17,7 +17,6 @@ use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 
 use super::pull_graph_traversal::PullGraphDepthFirstTraversal;
 use super::pull_item::PullItem;
-use crate::SyncRequestBuilder;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +26,6 @@ pub struct PullRequestPlannerImpl {
     pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
     transform_planner: Arc<dyn TransformPlanner>,
-    sync_request_builder: Arc<SyncRequestBuilder>,
     current_account_subject: Arc<CurrentAccountSubject>,
 }
 
@@ -40,7 +38,6 @@ impl PullRequestPlannerImpl {
         pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
         update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
         transform_planner: Arc<dyn TransformPlanner>,
-        sync_request_builder: Arc<SyncRequestBuilder>,
         current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
@@ -49,7 +46,6 @@ impl PullRequestPlannerImpl {
             pull_source_resolver,
             update_kind_resolver,
             transform_planner,
-            sync_request_builder,
             current_account_subject,
         }
     }
@@ -200,49 +196,13 @@ impl PullRequestPlannerImpl {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?pi, ?sync_options))]
-    async fn build_sync_item(
-        &self,
-        pi: PullItem,
-        remote_ref: odf::DatasetRefRemote,
-        sync_options: SyncOptions,
-    ) -> Result<PullSyncItem, Box<PullResponse>> {
-        match self
-            .build_sync_request(&remote_ref, &pi.local_target, sync_options)
-            .await
-        {
-            Ok(sync_request) => Ok(PullSyncItem {
-                local_target: pi.local_target,
-                remote_ref,
-                maybe_original_request: pi.maybe_original_request,
-                sync_request: Box::new(sync_request),
-            }),
-            Err(e) => Err(Box::new(PullResponse {
-                maybe_original_request: pi.maybe_original_request,
-                maybe_local_ref: Some(pi.local_target.as_local_ref()),
-                maybe_remote_ref: Some(remote_ref),
-                result: Err(PullError::SyncError(e)),
-            })),
+    #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
+    fn build_sync_item(pi: PullItem, remote_ref: odf::DatasetRefRemote) -> PullSyncItem {
+        PullSyncItem {
+            local_target: pi.local_target,
+            remote_ref,
+            maybe_original_request: pi.maybe_original_request,
         }
-    }
-
-    async fn build_sync_request(
-        &self,
-        remote_ref: &odf::DatasetRefRemote,
-        local_target: &PullLocalTarget,
-        sync_options: SyncOptions,
-    ) -> Result<LocalSyncRequest, SyncError> {
-        let source = self
-            .pull_source_resolver
-            .resolve_remote_source(remote_ref)
-            .await?;
-        self.sync_request_builder
-            .build_local_sync_request_from_source(
-                source,
-                local_target.as_local_ref(),
-                sync_options.create_if_not_exists,
-            )
-            .await
     }
 }
 
@@ -332,18 +292,9 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
                         jobs.push(PullPlanIterationJob::Ingest(pii));
                     }
                     DatasetUpdateKind::SyncFrom { remote_ref } => {
-                        match self
-                            .build_sync_item(item, remote_ref, options.sync_options)
-                            .await
-                        {
-                            Ok(psi) => {
-                                tracing::debug!(depth, ?psi, "Added sync item to pull plan");
-                                jobs.push(PullPlanIterationJob::Sync(psi));
-                            }
-                            Err(sync_error) => {
-                                errors.push(*sync_error);
-                            }
-                        }
+                        let psi = Self::build_sync_item(item, remote_ref);
+                        tracing::debug!(depth, ?psi, "Added sync item to pull plan");
+                        jobs.push(PullPlanIterationJob::Sync(psi));
                     }
                     DatasetUpdateKind::Transform => match self.build_transform_item(item).await {
                         Ok(pti) => {

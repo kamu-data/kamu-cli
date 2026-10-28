@@ -62,8 +62,9 @@ impl UpdateDatasetTaskPlanner {
                 pull_job.detach_from_transaction();
 
                 Ok(TaskDefinition::new(TaskDefinitionDatasetUpdate {
-                    pull_options,
-                    job: pull_job.into(),
+                    ingest_options: pull_options.ingest_options,
+                    sync_options: pull_options.sync_options,
+                    job: pull_job.try_into()?,
                 }))
             }
             Err(e) => {

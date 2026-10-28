@@ -11,8 +11,7 @@ use std::sync::Arc;
 
 use database_common::DatabaseTransactionRunner;
 use kamu_core::*;
-
-use crate::SyncRequestBuilder;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +29,7 @@ impl LocalSyncHelper {
 
     pub async fn pull(
         &self,
-        src_ref: odf::DatasetRefAny,
+        src_ref: odf::DatasetRefRemote,
         dst_ref: odf::DatasetRef,
         options: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
@@ -42,18 +41,24 @@ impl LocalSyncHelper {
 
     pub async fn build_request(
         &self,
-        src_ref: odf::DatasetRefAny,
+        src_ref: odf::DatasetRefRemote,
         dst_ref: odf::DatasetRef,
         create_if_not_exists: bool,
     ) -> Result<LocalSyncRequest, SyncError> {
         DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(|sync_request_builder: Arc<SyncRequestBuilder>| async move {
-                let request = sync_request_builder
-                    .build_local_sync_request(src_ref, dst_ref, create_if_not_exists)
-                    .await?;
-                request.src.detach_from_transaction();
-                request.dst.detach_from_transaction();
-                Ok(request)
+            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+                let dst = match dataset_registry.get_dataset_by_ref(&dst_ref).await {
+                    Ok(dataset) => LocalSyncTarget::existing(dataset).await?,
+                    Err(odf::DatasetRefUnresolvedError::NotFound(_)) if create_if_not_exists => {
+                        match dst_ref.alias() {
+                            Some(alias) => LocalSyncTarget::New(alias.clone()),
+                            None => return Err(DatasetAnyRefUnresolvedError::new(dst_ref).into()),
+                        }
+                    }
+                    Err(err) => return Err(err.into()),
+                };
+                dst.detach_from_transaction();
+                Ok(LocalSyncRequest { src: src_ref, dst })
             })
             .await
     }

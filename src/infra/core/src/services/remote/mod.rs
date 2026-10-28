@@ -10,6 +10,7 @@
 mod dataset_pull_source_resolver_impl;
 mod remote_alias_resolver_impl;
 mod remote_aliases_registry_impl;
+mod remote_dataset_url_resolver_impl;
 mod remote_repository_registry_impl;
 mod remote_status_service_impl;
 mod resource_loader_impl;
@@ -17,6 +18,7 @@ mod resource_loader_impl;
 pub use dataset_pull_source_resolver_impl::*;
 pub use remote_alias_resolver_impl::*;
 pub use remote_aliases_registry_impl::*;
+pub use remote_dataset_url_resolver_impl::*;
 pub use remote_repository_registry_impl::*;
 pub use remote_status_service_impl::*;
 pub use resource_loader_impl::*;

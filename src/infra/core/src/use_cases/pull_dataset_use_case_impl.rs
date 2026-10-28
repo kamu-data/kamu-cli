@@ -126,8 +126,8 @@ impl PullDatasetUseCaseImpl {
                     PullPlanIterationJob::Sync(psi) => {
                         let maybe_listener = maybe_sync_multi_listener.as_ref().and_then(|l| {
                             l.begin_sync(
-                                &psi.sync_request.src.as_user_friendly_any_ref(),
-                                &psi.sync_request.dst.as_any_ref(),
+                                &psi.remote_ref.as_any_ref(),
+                                &psi.local_target.as_local_ref().as_any_ref(),
                             )
                         });
                         let sync_options = options.clone();
@@ -684,14 +684,21 @@ impl PullDatasetUseCaseImpl {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
         let local_ref = psi.local_target.as_local_ref();
-        let sync_result = Self::transfer_and_commit(
-            *psi.sync_request,
-            options.sync_options,
-            sync_svc,
-            catalog,
-            listener.clone(),
-            options.add_aliases.then_some((&local_ref, &psi.remote_ref)),
-        )
+        let sync_result = async {
+            let dst = Self::resolve_sync_target(catalog.clone(), &psi.local_target).await?;
+            Self::transfer_and_commit(
+                LocalSyncRequest {
+                    src: psi.remote_ref.clone(),
+                    dst,
+                },
+                options.sync_options,
+                sync_svc,
+                catalog,
+                listener.clone(),
+                options.add_aliases.then_some((&local_ref, &psi.remote_ref)),
+            )
+            .await
+        }
         .await;
 
         if let Some(listener) = &listener {
@@ -711,6 +718,23 @@ impl PullDatasetUseCaseImpl {
                 Err(e) => Err(e.into()),
             },
         })
+    }
+
+    /// Reads the target's `HEAD` in a transaction of its own and detaches the
+    /// target for the transfer
+    #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn resolve_sync_target(
+        catalog: dill::Catalog,
+        local_target: &PullLocalTarget,
+    ) -> Result<LocalSyncTarget, SyncError> {
+        let Some(target) = local_target
+            .resolve_sync_target(dataset_registry.as_ref())
+            .await?
+        else {
+            return Err(DatasetAnyRefUnresolvedError::new(local_target.as_local_ref()).into());
+        };
+        target.detach_from_transaction();
+        Ok(target)
     }
 
     /// Transfers with no transaction open, then commits in a transaction of

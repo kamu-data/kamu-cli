@@ -103,7 +103,7 @@ the repository model and both protocols. This page does not restate them; read t
 | Committing a pull | `kamu-core` — [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs); `kamu` — [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs), [`local_sync_writes.rs`](../../src/infra/core/src/utils/local_sync_writes.rs) | `LocalSyncCommitter`: `HEAD` CAS through `DatasetHeadCommitter`, or creation through `CreateDatasetUseCase`; the `Seed` store and block append both protocols share |
 | Appending incoming blocks | `kamu-datasets-services` — `AppendDatasetMetadataBatchUseCaseImpl`; `odf` — `MetadataChainExt::append_batch` | block validation, `HEAD` update on the smart push server |
 | Push | `kamu` — [`push_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/push_dataset_use_case_impl.rs), [`push_request_planner_impl.rs`](../../src/infra/core/src/services/push_request_planner_impl.rs); CLI [`push_command.rs`](../../src/app/cli/src/commands/push_command.rs) | `kamu push` |
-| Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteAliasResolverImpl`, `DatasetPullSourceResolverImpl` |
+| Remotes | `kamu` — [`src/infra/core/src/services/remote/`](../../src/infra/core/src/services/remote) | `RemoteRepositoryRegistryImpl`, `RemoteAliasesRegistryImpl`, `RemoteDatasetUrlResolverImpl`, `RemoteAliasResolverImpl`, `DatasetPullSourceResolverImpl` |
 
 ---
 
@@ -119,30 +119,31 @@ A sync has a source `SyncRef` and a destination:
 | Request | Destination | Run by |
 | --- | --- | --- |
 | `SyncRequest` | `SyncRefRemote`: a dataset that is not a dataset reference of this node | `SyncService::sync`, which also moves the destination's `HEAD` |
-| `LocalSyncRequest` | `LocalSyncTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates from the source's `Seed` | `SyncService::transfer_into_local`, then `LocalSyncCommitter::commit` |
+| `LocalSyncRequest` | `LocalSyncTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates from the source's `Seed`. Its source is a `DatasetRefRemote`, not a `SyncRef`: the transfer resolves and opens it | `SyncService::transfer_into_local`, then `LocalSyncCommitter::commit` |
 
-`SyncRequestBuilder` turns `DatasetRefAny`s into either request. A reference counts as local when
-`DatasetRefAny::as_local_ref` accepts it (a repo-like prefix that is not a registered repository
-is read as an account); otherwise it is resolved to a URL by `RemoteAliasResolver::resolve_pull_url`
-([§9](#9-remote-repositories-and-aliases)). The source must have a `HEAD`.
+A pull's destination is read from the database and its source from the network, so the two are
+resolved at different steps. The destination is read as a `LocalSyncTarget`, inside a transaction,
+because it reads `HEAD` as `expected_head`: a detached dataset reads the storage `HEAD`, which can
+lag behind the database. A dataset entry left without `HEAD` by an interrupted creation is
+`Existing` with no expected head. A missing destination becomes `New` when creation is allowed and
+the reference carries an alias.
 
-- `build_sync_request(src, dst, create_dst_if_not_exists)` refuses a local destination.
-- `build_local_sync_request_from_source(source, dst, create_dst_if_not_exists)` builds a pull from a
-  source the planner resolved with `DatasetPullSourceResolver`
-  ([§9](#9-remote-repositories-and-aliases)). It reads the destination's `HEAD` as
-  `expected_head`, so it runs inside a transaction: a detached dataset reads the storage `HEAD`,
-  which can lag behind the database. A dataset entry left without `HEAD` by an interrupted
-  creation is `Existing` with no expected head. A missing destination becomes `New` when creation
-  is allowed and the reference carries an alias.
-- `build_local_sync_request(src, dst, create_dst_if_not_exists)` does the same from a reference,
-  local or remote. Only tests and benchmarks use it, through `LocalSyncHelper`.
+- `PullLocalTarget::resolve_sync_target` reads the destination of a planned pull; it is `None` for
+  an existing dataset deleted since planning.
+- `LocalSyncHelper::build_request` (`kamu::testing`) does the same from a local reference, for
+  tests; it never opens the source.
+- `SyncRequestBuilder::build_sync_request(src, dst, create_dst_if_not_exists)` builds a push and
+  refuses a local destination. A reference counts as local when `DatasetRefAny::as_local_ref`
+  accepts it (a repo-like prefix that is not a registered repository is read as an account);
+  otherwise it is resolved to a URL by `RemoteDatasetUrlResolver`
+  ([§9](#9-remote-repositories-and-aliases)). The source must have a `HEAD`.
 
-**Pull into a local dataset** plans, transfers, then commits:
+**Pull into a local dataset** reads the target, transfers, then commits:
 
 | Step | Transaction | Does |
 | --- | --- | --- |
-| Plan | the caller's | `build_local_sync_request_from_source`: resolve the source, read `expected_head` |
-| Transfer | none held across it | `transfer_into_local`: compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
+| Target | the caller's | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
+| Transfer | none held across it | `transfer_into_local`: resolve the source's URL with `RemoteDatasetUrlResolver`, open it and check it has a `HEAD` (an unknown repository is `RepositoryNotFound`, a source without `HEAD` is `DatasetNotFound`), compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
 | Commit | the caller's | `LocalSyncCommitter::commit`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
 
 The `Seed` of a new dataset is stored through `DatasetStorageUnitWriter` in a short transaction that
@@ -422,7 +423,9 @@ to `SyncOptions`.
 | `RemoteRepositoryRegistryImpl` | named repositories (`kamu repo add <name> <url>`), URL normalized to end with `/` | one YAML manifest per repository in the workspace `repos` directory |
 | `RemoteAliasesRegistryImpl` | per-dataset pull and push aliases (`kamu repo alias add`) | the dataset's `info` storage |
 
-`RemoteAliasResolverImpl` turns references into URLs:
+`RemoteDatasetUrlResolverImpl` turns remote references into dataset URLs, and
+`RemoteAliasResolverImpl` finds push targets. The URL resolver reads no database, so a transfer
+calls it with no transaction held:
 
 | Resolution | Rule |
 | --- | --- |
@@ -436,7 +439,7 @@ to `SyncOptions`.
 | Method | Answer |
 | --- | --- |
 | `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousPullSourceError` with several; reads the alias registry only |
-| `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteAliasResolver::resolve_pull_url`; an unknown repository is `RepositoryNotFound` |
+| `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`; an unknown repository is `RepositoryNotFound` |
 | `resolve_pull_source` | both of the above for one dataset; no production caller yet, kept for the flow that builds sync tasks |
 | `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
 

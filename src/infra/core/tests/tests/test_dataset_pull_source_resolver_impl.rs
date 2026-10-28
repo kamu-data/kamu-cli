@@ -248,6 +248,7 @@ impl PullSourceHarness {
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetPullSourceResolverImpl>()
             .build();

@@ -32,6 +32,7 @@ use crate::utils::url_ext::UrlExt;
 
 pub struct SyncServiceImpl {
     dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
+    remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     simple_transfer_protocol: Arc<SimpleTransferProtocol>,
     ipfs_client: Arc<IpfsClient>,
@@ -44,12 +45,14 @@ pub struct SyncServiceImpl {
 impl SyncServiceImpl {
     pub fn new(
         dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
+        remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         simple_transfer_protocol: Arc<SimpleTransferProtocol>,
         ipfs_client: Arc<IpfsClient>,
     ) -> Self {
         Self {
             dataset_factory,
+            remote_dataset_url_resolver,
             smart_transfer_protocol,
             simple_transfer_protocol,
             ipfs_client,
@@ -487,22 +490,49 @@ impl SyncServiceImpl {
         }
     }
 
-    #[tracing::instrument(level = "info", name = "transfer_into_local", skip_all, fields(src=?src, dst=?dst))]
+    /// Resolves a pull source's URL and opens it. The source must have a
+    /// `HEAD`
+    async fn open_remote_source(
+        &self,
+        remote_ref: odf::DatasetRefRemote,
+    ) -> Result<SyncRefRemote, SyncError> {
+        let url = Arc::new(
+            self.remote_dataset_url_resolver
+                .resolve_dataset_url(&remote_ref)
+                .await?,
+        );
+        let dataset = self.dataset_factory.get_dataset(&url, false).await?;
+
+        if try_resolve_head(dataset.as_metadata_chain())
+            .await?
+            .is_none()
+        {
+            return Err(DatasetAnyRefUnresolvedError::new(odf::DatasetRefAny::Url(url)).into());
+        }
+
+        Ok(SyncRefRemote {
+            url,
+            dataset,
+            original_remote_ref: remote_ref,
+        })
+    }
+
+    #[tracing::instrument(level = "info", name = "transfer_into_local", skip_all, fields(src=?src_ref, dst=?dst))]
     async fn transfer_into_local_impl(
         &self,
-        src: SyncRef,
+        src_ref: odf::DatasetRefRemote,
         dst: &LocalSyncTarget,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncTransfer, SyncError> {
-        match &src {
-            SyncRef::Remote(src_remote) if src_remote.url.is_odf_protocol() => {
-                let src_url = src_remote.url.clone();
-                self.transfer_smart_pull(src_url.as_ref(), dst, opts).await
-            }
-            SyncRef::Remote(_) | SyncRef::Local(_) => {
-                self.transfer_generic(src, dst, opts, listener).await
-            }
+        let src = self.open_remote_source(src_ref).await?;
+
+        if src.url.is_odf_protocol() {
+            let src_url = src.url.clone();
+            self.transfer_smart_pull(src_url.as_ref(), dst, opts).await
+        } else {
+            self.transfer_generic(SyncRef::Remote(src), dst, opts, listener)
+                .await
         }
     }
 }

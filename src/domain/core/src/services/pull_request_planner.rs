@@ -12,7 +12,12 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
-use kamu_datasets::{ClassifyByAllowanceDatasetActionUnauthorizedError, ResolvedDataset};
+use kamu_datasets::{
+    ClassifyByAllowanceDatasetActionUnauthorizedError,
+    DatasetRegistry,
+    DatasetRegistryExt,
+    ResolvedDataset,
+};
 use thiserror::Error;
 
 use crate::*;
@@ -90,12 +95,8 @@ impl PullPlanIterationJob {
 
     pub fn detach_from_transaction(&self) {
         match self {
-            Self::Ingest(_) => {}
+            Self::Ingest(_) | Self::Sync(_) => {}
             Self::Transform(pti) => pti.target.detach_from_transaction(),
-            Self::Sync(psi) => {
-                psi.sync_request.src.detach_from_transaction();
-                psi.sync_request.dst.detach_from_transaction();
-            }
         }
     }
 }
@@ -123,12 +124,14 @@ pub struct PullTransformItem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A dataset to sync from a remote source. Planning reads no remote and no
+/// `HEAD`: the job reads the target's `HEAD` when it runs, and the transfer
+/// resolves and opens the source.
 #[derive(Debug)]
 pub struct PullSyncItem {
     pub local_target: PullLocalTarget,
     pub remote_ref: odf::DatasetRefRemote,
     pub maybe_original_request: Option<PullRequest>,
-    pub sync_request: Box<LocalSyncRequest>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -159,6 +162,25 @@ impl PullLocalTarget {
         match self {
             Self::Existing(hdl) => hdl.as_local_ref(),
             Self::ToCreate(alias) => alias.as_local_ref(),
+        }
+    }
+
+    /// The sync target as it is now, with the `HEAD` the commit will expect.
+    /// Reads `HEAD`, so call it inside a transaction. A dataset to create that
+    /// appeared since planning is synced as an existing one. `None` when an
+    /// existing dataset was deleted since planning
+    pub async fn resolve_sync_target(
+        &self,
+        dataset_registry: &dyn DatasetRegistry,
+    ) -> Result<Option<LocalSyncTarget>, SyncError> {
+        let (local_ref, new_target) = match self {
+            Self::Existing(hdl) => (hdl.id.as_local_ref(), None),
+            Self::ToCreate(alias) => (alias.as_local_ref(), Some(alias)),
+        };
+
+        match dataset_registry.try_get_dataset_by_ref(&local_ref).await? {
+            Some(dataset) => Ok(Some(LocalSyncTarget::existing(dataset).await?)),
+            None => Ok(new_target.map(|alias| LocalSyncTarget::New(alias.clone()))),
         }
     }
 }
