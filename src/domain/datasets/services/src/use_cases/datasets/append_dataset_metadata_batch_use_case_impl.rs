@@ -62,8 +62,7 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         let expected_head = options
             .set_ref_check_ref_mode
-            .expected_head(target.as_metadata_chain(), appended.base_head)
-            .await?;
+            .expected_head(appended.base_head);
 
         self.dataset_head_committer
             .commit_head(target, expected_head.as_ref(), &appended.new_head)

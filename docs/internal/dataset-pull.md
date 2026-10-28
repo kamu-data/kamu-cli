@@ -179,7 +179,7 @@ iteration per depth. The job follows the item's kind:
 | Item | Job | Built by | Holds |
 | --- | --- | --- | --- |
 | ingest | `Ingest(PullIngestItem)` | `build_ingest_item` | target; the ingest itself is planned when the job runs |
-| sync | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder` | local target (existing or to create), remote ref, `SyncRequest` |
+| sync | `Sync(PullSyncItem)` | `build_sync_item` → `SyncRequestBuilder::build_local_sync_request`, which reads the target's `HEAD` in the planning transaction | local target (existing or to create), remote ref, `LocalSyncRequest` with the expected head ([dataset-sync.md](dataset-sync.md#4-sync-requests)) |
 | transform | `Transform(PullTransformItem)` | `build_transform_item` → `TransformPlanner::describe_transform`, which fails a broken transform before any job runs | target and the handles of its inputs; the transform itself is elaborated when the job runs |
 
 A dataset with a pull alias is always synced, whatever its kind: a derivative pulled from a
@@ -212,13 +212,14 @@ runs outside them.
 | --- | --- | --- |
 | Ingest | `PullIngestLoop::run`: plans the ingest and resolves the dataset's env vars in one transaction ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)); then calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), adding up the results so the response spans the first old head to the last new head. A dataset without a polling source is up to date. A failure after earlier iterations committed is `PullError::IngestStopped`, carrying the committed heads and increment and the iteration's error | after every ingest iteration that returns `Updated`, `PullIngestLoop::commit_head` (CAS) |
 | Transform | `transform`: plans and elaborates in one transaction ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes | after the reset and after the transform, `commit_head_transactionally` (CAS) |
-| Sync | `sync`: `SyncService::sync`; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias | by `SyncService` itself |
+| Sync | `sync`: `SyncService::transfer_into_local` with no transaction open; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias | after the transfer, `commit_sync_transactionally`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
 
 `commit_head_transactionally` and `PullIngestLoop::commit_head` move `HEAD` through
 `DatasetHeadCommitter`, expecting the head the iteration started from, which posts
 `DatasetReferenceMessage` ([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)).
 Any failure there, a CAS conflict included, is that dataset's error: `PollingIngestError::CommitError`
-for an ingest job, `TransformExecuteError::CommitError` for a transform job. A conflict arrives as
+for an ingest job, `TransformExecuteError::CommitError` for a transform job, `SyncError::HeadMoved`
+for a sync job. A conflict arrives as
 `CommitError::MetadataAppendError(AppendError::RefCASFailed)` with the expected and actual heads.
 
 ### 6.3 Listeners

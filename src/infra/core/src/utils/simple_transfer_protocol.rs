@@ -10,22 +10,10 @@
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 
-use database_common_macros::{transactional_method1, transactional_method2};
 use futures::{Future, StreamExt, TryStreamExt, stream};
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
-use kamu_datasets::{
-    AppendDatasetMetadataBatchUseCase,
-    AppendDatasetMetadataBatchUseCaseError,
-    AppendDatasetMetadataBatchUseCaseOptions,
-    CreateDatasetResult,
-    CreateDatasetUseCase,
-    CreateDatasetUseCaseOptions,
-    DatasetRegistry,
-    DatasetRegistryExt,
-    SetRefCheckRefMode,
-};
 use odf::dataset::{
     MetadataChainExt as _,
     MetadataChainImpl,
@@ -33,6 +21,8 @@ use odf::dataset::{
 };
 use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
+
+use super::local_sync_writes::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,20 +65,82 @@ pub struct SimpleTransferProtocol {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SimpleTransferProtocol {
-    pub async fn sync(
+    /// Pushes into a dataset that is not a dataset of this node.
+    /// Moves its `HEAD` by the storage's own compare-and-swap from the head
+    /// read at the start
+    pub async fn push(
         &self,
         src_ref: &odf::DatasetRefAny,
         src: Arc<dyn odf::Dataset>,
-        maybe_dst: Option<Arc<dyn odf::Dataset>>,
-        dst_alias: Option<&odf::DatasetAlias>,
+        dst: Arc<dyn odf::Dataset>,
         validation: odf::dataset::AppendValidation,
         trust_source_hashes: bool,
         force: bool,
         transfer_options: SimpleProtocolTransferOptions,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncResult, SyncError> {
-        listener.begin();
+        let dst_head = Self::get_dest_head(dst.as_metadata_chain()).await?;
 
+        let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
+        let Some((src_head, blocks_desc_ordered)) = Self::collect_new_blocks(
+            src_ref,
+            src.as_metadata_chain(),
+            dst.as_metadata_chain(),
+            dst_head.as_ref(),
+            force,
+            &listener_adapter,
+        )
+        .await?
+        else {
+            return Ok(SyncResult::UpToDate);
+        };
+
+        let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
+        let stats = self
+            .transfer_objects(
+                &blocks_desc_ordered,
+                src.as_ref(),
+                dst.as_ref(),
+                trust_source_hashes,
+                listener.clone(),
+                &transfer_options,
+                listener_adapter.into_status(),
+            )
+            .await?;
+
+        Self::append_to_remote(
+            dst.as_ref(),
+            blocks_desc_ordered,
+            odf::dataset::AppendBatchOpts {
+                validation,
+                trust_hashes: trust_source_hashes,
+            },
+            dst_head.as_ref(),
+        )
+        .await?;
+        Self::report_blocks_written(listener.as_ref(), stats, num_blocks);
+
+        Ok(SyncResult::Updated {
+            old_head: dst_head,
+            new_head: src_head,
+            num_blocks,
+        })
+    }
+
+    /// Writes the blocks and objects a local dataset lacks without moving its
+    /// `HEAD`. A new dataset is stored from the source's `Seed`, without an
+    /// entry or `HEAD`, for the commit to create
+    pub async fn transfer_into_local(
+        &self,
+        src_ref: &odf::DatasetRefAny,
+        src: Arc<dyn odf::Dataset>,
+        dst: &LocalSyncTarget,
+        validation: odf::dataset::AppendValidation,
+        trust_source_hashes: bool,
+        force: bool,
+        transfer_options: SimpleProtocolTransferOptions,
+        listener: Arc<dyn SyncListener + 'static>,
+    ) -> Result<SyncTransfer, SyncError> {
         let empty_chain = MetadataChainImpl::new(
             MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
             MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
@@ -96,43 +148,136 @@ impl SimpleTransferProtocol {
             )),
         );
 
-        let src_chain = src.as_metadata_chain();
-        let src_head = self.get_src_head(src_ref, src_chain).await?;
-
-        let (dst_chain, dst_head) = if let Some(dst) = &maybe_dst {
-            let dst_chain = dst.as_metadata_chain();
-            let dst_head = self.get_dest_head(dst_chain).await?;
-            (dst_chain, dst_head)
-        } else {
-            (&empty_chain as &dyn odf::MetadataChain, None)
+        let (dst_chain, dst_head) = match dst {
+            LocalSyncTarget::Existing {
+                dataset,
+                expected_head,
+            } => (dataset.as_metadata_chain(), expected_head.as_ref()),
+            LocalSyncTarget::New(_) => (&empty_chain as &dyn odf::MetadataChain, None),
         };
 
-        tracing::info!(?src_head, ?dst_head, "Resolved heads");
-
         let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
+        let Some((src_head, mut blocks_desc_ordered)) = Self::collect_new_blocks(
+            src_ref,
+            src.as_metadata_chain(),
+            dst_chain,
+            dst_head,
+            force,
+            &listener_adapter,
+        )
+        .await?
+        else {
+            return Ok(SyncTransfer::UpToDate);
+        };
+
+        let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
+
+        let (dst_dataset, target) = match dst {
+            LocalSyncTarget::Existing {
+                dataset,
+                expected_head,
+            } => (
+                (**dataset).clone(),
+                TransferredSyncTarget::Existing {
+                    dataset: dataset.clone(),
+                    expected_head: expected_head.clone(),
+                },
+            ),
+            LocalSyncTarget::New(alias) => {
+                // Safety: there are blocks
+                let seed = blocks_desc_ordered.pop().unwrap();
+                let StoredSeed {
+                    dataset,
+                    seed_block,
+                    seed_block_bytes,
+                } = StoredSeed::store(&self.catalog, seed).await?;
+                (
+                    dataset,
+                    TransferredSyncTarget::New {
+                        alias: alias.clone(),
+                        seed_block,
+                        seed_block_bytes,
+                        visibility: transfer_options.visibility_for_created_dataset,
+                    },
+                )
+            }
+        };
+
+        let stats = self
+            .transfer_objects(
+                &blocks_desc_ordered,
+                src.as_ref(),
+                dst_dataset.as_ref(),
+                trust_source_hashes,
+                listener.clone(),
+                &transfer_options,
+                listener_adapter.into_status(),
+            )
+            .await?;
+
+        append_transferred_blocks(
+            dst_dataset.as_ref(),
+            Box::new(blocks_desc_ordered.into_iter().rev()),
+            odf::dataset::AppendBatchOpts {
+                validation,
+                trust_hashes: trust_source_hashes,
+            },
+        )
+        .await?;
+        Self::report_blocks_written(listener.as_ref(), stats, num_blocks);
+
+        Ok(SyncTransfer::Transferred(TransferredSync {
+            target,
+            new_head: src_head,
+            num_blocks,
+        }))
+    }
+
+    /// Compares the chains and returns the source head with the blocks to
+    /// write, newest first, or `None` when the destination is up to date
+    async fn collect_new_blocks(
+        src_ref: &odf::DatasetRefAny,
+        src_chain: &dyn odf::MetadataChain,
+        dst_chain: &dyn odf::MetadataChain,
+        dst_head: Option<&odf::Multihash>,
+        force: bool,
+        listener_adapter: &CompareChainsListenerAdapter,
+    ) -> Result<
+        Option<(
+            odf::Multihash,
+            Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,
+        )>,
+        SyncError,
+    > {
+        let src_head = Self::get_src_head(src_ref, src_chain).await?;
+
+        tracing::info!(?src_head, ?dst_head, "Resolved heads");
 
         let chains_comparison = MetadataChainComparator::compare_chains(
             src_chain,
             &src_head,
             dst_chain,
-            dst_head.as_ref(),
-            &listener_adapter,
+            dst_head,
+            listener_adapter,
         )
         .await?;
 
-        match chains_comparison {
-            CompareChainsResult::Equal => return Ok(SyncResult::UpToDate),
-            CompareChainsResult::LhsAhead { .. } => { /* Skip */ }
+        let blocks_desc_ordered = match chains_comparison {
+            CompareChainsResult::Equal => return Ok(None),
+            CompareChainsResult::LhsAhead {
+                lhs_ahead_blocks: src_ahead_blocks,
+            } => src_ahead_blocks,
             CompareChainsResult::LhsBehind {
                 ref rhs_ahead_blocks,
             } => {
                 if !force {
                     return Err(SyncError::DestinationAhead(DestinationAheadError {
                         src_head,
-                        dst_head: dst_head.unwrap(),
+                        dst_head: dst_head.unwrap().clone(),
                         dst_ahead_size: rhs_ahead_blocks.len(),
                     }));
                 }
+                Self::load_all_blocks(src_chain).await?
             }
             CompareChainsResult::Divergence {
                 uncommon_blocks_in_lhs: uncommon_blocks_in_src,
@@ -141,13 +286,14 @@ impl SimpleTransferProtocol {
                 if !force {
                     return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
                         src_head,
-                        dst_head: dst_head.unwrap(),
+                        dst_head: dst_head.unwrap().clone(),
                         detail: Some(DatasetsDivergedErrorDetail {
                             uncommon_blocks_in_src,
                             uncommon_blocks_in_dst,
                         }),
                     }));
                 }
+                Self::load_all_blocks(src_chain).await?
             }
             CompareChainsResult::DifferentDatasets {
                 lhs_dataset_id: src_dataset_id,
@@ -159,28 +305,10 @@ impl SimpleTransferProtocol {
                     dst_dataset_id,
                 }));
             }
-        }
-
-        let blocks_desc_ordered = match chains_comparison {
-            CompareChainsResult::Equal | CompareChainsResult::DifferentDatasets { .. } => {
-                unreachable!()
-            }
-            CompareChainsResult::LhsAhead {
-                lhs_ahead_blocks: src_ahead_blocks,
-            } => src_ahead_blocks,
-            CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. } => {
-                // Load all source blocks from head to tail
-                assert!(force);
-                src_chain
-                    .iter_blocks_bytes_interval((&odf::BlockRef::Head).into(), None, false)
-                    .try_collect()
-                    .await
-                    .map_err(Self::map_block_iteration_error)?
-            }
         };
 
         // Decode blocks, as we need to access events to scan for data chunks etc.
-        let mut blocks_desc_ordered = blocks_desc_ordered
+        let blocks_desc_ordered = blocks_desc_ordered
             .into_iter()
             .map(|(hash, _, bytes)| bytes.decode().map(|block| (hash, block, bytes)))
             .collect::<Result<Vec<_>, _>>()
@@ -189,63 +317,29 @@ impl SimpleTransferProtocol {
                 source: Some(e.into()),
             })?;
 
-        let old_head = dst_head.clone();
-        let num_blocks = blocks_desc_ordered.len();
+        Ok(Some((src_head, blocks_desc_ordered)))
+    }
 
-        // Create dataset if necessary using the source Seed block
-        let (dst, dst_head) = if let Some(dst) = maybe_dst {
-            (dst, dst_head)
-        } else {
-            use odf::metadata::AsTypedBlock;
-
-            // Safety: there are blocks
-            let (first_hash, first_block, first_block_bytes) = blocks_desc_ordered.pop().unwrap();
-            let seed_block = first_block
-                .into_typed()
-                .ok_or_else(|| CorruptedSourceError {
-                    message: "First metadata block is not Seed".to_owned(),
-                    source: None,
-                })?;
-
-            let alias =
-                dst_alias.ok_or_else(|| "Destination dataset alias is unknown".int_err())?;
-            let create_result = self
-                .create_dataset_transactional(
-                    alias,
-                    seed_block,
-                    first_block_bytes,
-                    &first_hash,
-                    transfer_options.visibility_for_created_dataset,
-                )
-                .await?;
-
-            assert_eq!(first_hash, create_result.head);
-            (create_result.dataset, Some(create_result.head))
-        };
-
-        self.synchronize_blocks(
-            blocks_desc_ordered,
-            src.as_ref(),
-            dst.as_ref(),
-            dst_alias,
-            dst_head,
-            validation,
-            trust_source_hashes,
-            listener,
-            transfer_options,
-            listener_adapter.into_status(),
-        )
-        .await?;
-
-        Ok(SyncResult::Updated {
-            old_head,
-            new_head: src_head,
-            num_blocks: u64::try_from(num_blocks).unwrap(),
-        })
+    /// The whole source chain, newest first, which a forced sync writes over a
+    /// destination that is ahead or has diverged
+    async fn load_all_blocks(
+        src_chain: &dyn odf::MetadataChain,
+    ) -> Result<
+        Vec<(
+            odf::Multihash,
+            odf::MetadataBlockHeader,
+            odf::MetadataBlockBytes,
+        )>,
+        SyncError,
+    > {
+        src_chain
+            .iter_blocks_bytes_interval((&odf::BlockRef::Head).into(), None, false)
+            .try_collect()
+            .await
+            .map_err(Self::map_block_iteration_error)
     }
 
     async fn get_src_head(
-        &self,
         src_ref: &odf::DatasetRefAny,
         src_chain: &dyn odf::MetadataChain,
     ) -> Result<odf::Multihash, SyncError> {
@@ -261,7 +355,6 @@ impl SimpleTransferProtocol {
     }
 
     async fn get_dest_head(
-        &self,
         dst_chain: &dyn odf::MetadataChain,
     ) -> Result<Option<odf::Multihash>, SyncError> {
         match dst_chain.resolve_ref(&odf::BlockRef::Head).await {
@@ -298,111 +391,41 @@ impl SimpleTransferProtocol {
         }
     }
 
-    #[transactional_method1(create_dataset_use_case: Arc<dyn CreateDatasetUseCase>)]
-    async fn create_dataset_transactional(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-        seed_block_bytes: odf::MetadataBlockBytes,
-        expected_hash: &odf::Multihash,
-        dataset_visibility: odf::DatasetVisibility,
-    ) -> Result<CreateDatasetResult, SyncError> {
-        let res = create_dataset_use_case
-            .execute(
-                dataset_alias,
-                seed_block,
-                CreateDatasetUseCaseOptions {
-                    dataset_visibility,
-                    seed_block_bytes: Some(seed_block_bytes),
-                },
-            )
-            .await?;
-
-        if res.head != *expected_hash {
-            // Return the same kind of error as AppendDatasetMetadataBatchUseCase would on
-            // hash mismatch
-            return Err(AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
-                odf::dataset::AppendBatchError {
-                    append_error: odf::dataset::AppendError::InvalidBlock(
-                        odf::dataset::AppendValidationError::HashMismatch(
-                            odf::storage::HashMismatchError {
-                                expected: expected_hash.clone(),
-                                actual: res.head,
-                            },
-                        ),
-                    ),
-                    block_sequence_number: 0,
-                    block_hash: expected_hash.clone(),
-                },
-            )
-            .into());
-        }
-
-        res.dataset.detach_from_transaction();
-
-        Ok(res)
-    }
-
-    async fn append_metadata(
-        &self,
-        dst: &dyn odf::Dataset,
-        dst_alias: Option<&odf::DatasetAlias>,
-        new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
-        dst_head: Option<odf::Multihash>,
-        append_opts: odf::dataset::AppendBatchOpts,
-        on_append_metadata_block_callback: Option<Box<dyn Fn() + Send>>,
-    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
-        if let Some(alias) = dst_alias {
-            self.append_metadata_transactional(
-                alias,
-                new_blocks,
-                AppendDatasetMetadataBatchUseCaseOptions {
-                    set_ref_check_ref_mode: SetRefCheckRefMode::Explicit(dst_head),
-                    append_opts,
-                    on_append_metadata_block_callback,
-                },
-            )
-            .await
-        } else {
-            Self::append_metadata_to_remote(dst, new_blocks, append_opts, dst_head.as_ref()).await
-        }
-    }
-
-    #[transactional_method2(append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>, dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn append_metadata_transactional(
-        &self,
-        dst_alias: &odf::DatasetAlias,
-        new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
-        options: AppendDatasetMetadataBatchUseCaseOptions,
-    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
-        let target = dataset_registry
-            .get_dataset_by_ref(&dst_alias.clone().into())
-            .await
-            .int_err()?;
-
-        append_dataset_metadata_batch_use_case
-            .execute(&target, new_blocks, options)
-            .await
-    }
-
     /// The `HEAD` of a remote repository is not a dataset reference of this
     /// node, so the chain moves it by its own compare-and-set rather than
     /// through `DatasetHeadCommitter`
-    async fn append_metadata_to_remote(
+    async fn append_to_remote(
         dst: &dyn odf::Dataset,
-        new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
+        blocks_desc_ordered: Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,
         append_opts: odf::dataset::AppendBatchOpts,
         expected_head: Option<&odf::Multihash>,
-    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
-        use odf::dataset::AppendBatchAndSetHeadError as E;
+    ) -> Result<(), SyncError> {
+        use odf::dataset::{AppendBatchAndSetHeadError as E, SetChainRefError};
 
         dst.as_metadata_chain()
-            .append_batch_and_set_head(new_blocks, append_opts, expected_head)
+            .append_batch_and_set_head(
+                Box::new(blocks_desc_ordered.into_iter().rev()),
+                append_opts,
+                expected_head,
+            )
             .await
             .map_err(|e| match e {
-                E::Append(e) => AppendDatasetMetadataBatchUseCaseError::BlockAppendError(e),
-                E::SetHead(e) => AppendDatasetMetadataBatchUseCaseError::SetRefError(e),
-            })
+                E::Append(e) => map_append_batch_error(e),
+                E::SetHead(SetChainRefError::CASFailed(e)) => {
+                    SyncError::UpdatedConcurrently(e.into())
+                }
+                E::SetHead(SetChainRefError::Access(e)) => SyncError::Access(e),
+                E::SetHead(
+                    e @ (SetChainRefError::Internal(_) | SetChainRefError::BlockNotFound(_)),
+                ) => SyncError::Internal(e.int_err()),
+            })?;
+
+        Ok(())
+    }
+
+    fn report_blocks_written(listener: &dyn SyncListener, mut stats: SyncStats, num_blocks: u64) {
+        stats.dst.metadata_blocks_written += num_blocks;
+        listener.on_status(SyncStage::CommitBlocks, &stats);
     }
 
     async fn download_block_data<'a>(
@@ -548,19 +571,18 @@ impl SimpleTransferProtocol {
         Ok(())
     }
 
-    async fn synchronize_blocks<'a>(
+    /// Copies the data and checkpoint files the new blocks reference, before
+    /// any block that references them is written. Returns the stats so far
+    async fn transfer_objects<'a>(
         &'a self,
-        blocks_desc_ordered: Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,
+        blocks_desc_ordered: &'a [odf::dataset::HashedMetadataBlockBytesDecoded],
         src: &'a dyn odf::Dataset,
         dst: &'a dyn odf::Dataset,
-        dst_alias: Option<&odf::DatasetAlias>,
-        dst_head: Option<odf::Multihash>,
-        validation: odf::dataset::AppendValidation,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
-        transfer_options: SimpleProtocolTransferOptions,
+        transfer_options: &SimpleProtocolTransferOptions,
         mut stats: SyncStats,
-    ) -> Result<(), SyncError> {
+    ) -> Result<SyncStats, SyncError> {
         // Update stats estimates based on metadata
         stats.dst_estimated.metadata_blocks_written +=
             u64::try_from(blocks_desc_ordered.len()).unwrap();
@@ -631,83 +653,7 @@ impl SimpleTransferProtocol {
             .try_for_each_concurrent(transfer_options.max_parallel_transfers, |future| future)
             .await?;
 
-        let on_append_metadata_block_callback = {
-            let boxed_closure: Box<dyn Fn() + Send> = Box::new(move || {
-                let mut stats = arc_stats.lock().unwrap();
-                stats.dst.metadata_blocks_written += 1;
-                listener.on_status(SyncStage::CommitBlocks, &stats);
-            });
-            Some(boxed_closure)
-        };
-
-        self.append_metadata(
-            dst,
-            dst_alias,
-            Box::new(blocks_desc_ordered.into_iter().rev()),
-            dst_head,
-            odf::dataset::AppendBatchOpts {
-                validation,
-                trust_hashes: trust_source_hashes,
-            },
-            on_append_metadata_block_callback,
-        )
-        .await
-        .map_err(|use_case_error| {
-            use odf::dataset::{AppendError, SetChainRefError};
-
-            match use_case_error {
-                AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
-                    odf::dataset::AppendBatchError {
-                        append_error,
-                        block_sequence_number,
-                        block_hash,
-                    },
-                ) => match append_error {
-                    AppendError::InvalidBlock(append_validation_error) => {
-                        let message = match &append_validation_error {
-                            odf::dataset::AppendValidationError::HashMismatch(e) => {
-                                format!(
-                                    "Block hash declared by the source {} didn't match the \
-                                     computed {} at block {} - this may be an indication of \
-                                     hashing algorithm mismatch or an attempt to tamper data",
-                                    e.actual, e.expected, block_sequence_number
-                                )
-                            }
-                            odf::dataset::AppendValidationError::FirstBlockMustBeSeed | odf::dataset::AppendValidationError::AppendingSeedBlockToNonEmptyChain | odf::dataset::AppendValidationError::PrevBlockNotFound(_) | odf::dataset::AppendValidationError::SequenceIntegrity(_) | odf::dataset::AppendValidationError::SystemTimeIsNotMonotonic | odf::dataset::AppendValidationError::WatermarkIsNotMonotonic | odf::dataset::AppendValidationError::OffsetsAreNotSequential(_) | odf::dataset::AppendValidationError::InvalidEvent(_) | odf::dataset::AppendValidationError::NoOpEvent(_) => format!(
-                                "Source metadata chain is logically inconsistent at block \
-                                 {block_hash}[{block_sequence_number}]"
-                            ),
-                        };
-
-                        CorruptedSourceError {
-                            message,
-                            source: Some(append_validation_error.into()),
-                        }
-                        .into()
-                    }
-                    AppendError::RefNotFound(_) | AppendError::RefCASFailed(_) => {
-                        unreachable!()
-                    }
-                    AppendError::Access(e) => SyncError::Access(e),
-                    e @ AppendError::Internal(_) => SyncError::Internal(e.int_err()),
-                },
-                AppendDatasetMetadataBatchUseCaseError::SetRefError(set_ref_error) => {
-                    match set_ref_error {
-                        SetChainRefError::CASFailed(e) => SyncError::UpdatedConcurrently(e.into()),
-                        SetChainRefError::Access(e) => SyncError::Access(e),
-                        e
-                        @ (SetChainRefError::Internal(_) | SetChainRefError::BlockNotFound(_)) => {
-                            SyncError::Internal(e.int_err())
-                        }
-                    }
-                }
-                e @ AppendDatasetMetadataBatchUseCaseError::Internal(_) => {
-                    SyncError::Internal(e.int_err())
-                }
-            }
-        })?;
-
-        Ok(())
+        Ok(Arc::into_inner(arc_stats).unwrap().into_inner().unwrap())
     }
 }
 

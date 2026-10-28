@@ -126,7 +126,7 @@ impl PullDatasetUseCaseImpl {
                         let maybe_listener = maybe_sync_multi_listener.as_ref().and_then(|l| {
                             l.begin_sync(
                                 &psi.sync_request.src.as_user_friendly_any_ref(),
-                                &psi.sync_request.dst.as_user_friendly_any_ref(),
+                                &psi.sync_request.dst.as_any_ref(),
                             )
                         });
                         let sync_options = options.clone();
@@ -663,9 +663,14 @@ impl PullDatasetUseCaseImpl {
         catalog: dill::Catalog,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let mut sync_result = sync_svc
-            .sync(*psi.sync_request, options.sync_options, listener)
-            .await;
+        let mut sync_result = Self::transfer_and_commit(
+            *psi.sync_request,
+            options.sync_options,
+            sync_svc,
+            catalog.clone(),
+            listener.clone(),
+        )
+        .await;
 
         // Associate newly-synced datasets with remotes
         if options.add_aliases
@@ -680,6 +685,13 @@ impl PullDatasetUseCaseImpl {
             sync_result = Err(SyncError::Internal(e));
         }
 
+        if let Some(listener) = &listener {
+            match &sync_result {
+                Ok(result) => listener.success(result),
+                Err(e) => listener.error(e),
+            }
+        }
+
         // Prepare response
         Ok(PullResponse {
             maybe_original_request: psi.maybe_original_request,
@@ -690,6 +702,34 @@ impl PullDatasetUseCaseImpl {
                 Err(e) => Err(e.into()),
             },
         })
+    }
+
+    /// Transfers with no transaction open, then commits in a transaction of
+    /// its own
+    async fn transfer_and_commit(
+        request: LocalSyncRequest,
+        options: SyncOptions,
+        sync_svc: Arc<dyn SyncService>,
+        catalog: dill::Catalog,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError> {
+        match sync_svc
+            .transfer_into_local(request, options, listener)
+            .await?
+        {
+            SyncTransfer::UpToDate => Ok(SyncResult::UpToDate),
+            SyncTransfer::Transferred(transferred) => {
+                Self::commit_sync_transactionally(catalog, transferred).await
+            }
+        }
+    }
+
+    #[transactional_static_method1(local_sync_committer: Arc<dyn LocalSyncCommitter>)]
+    async fn commit_sync_transactionally(
+        catalog: dill::Catalog,
+        transferred: TransferredSync,
+    ) -> Result<SyncResult, SyncError> {
+        local_sync_committer.commit(transferred).await
     }
 
     #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]

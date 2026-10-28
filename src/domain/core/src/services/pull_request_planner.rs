@@ -123,7 +123,7 @@ pub struct PullSyncItem {
     pub local_target: PullLocalTarget,
     pub remote_ref: odf::DatasetRefRemote,
     pub maybe_original_request: Option<PullRequest>,
-    pub sync_request: Box<SyncRequest>,
+    pub sync_request: Box<LocalSyncRequest>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

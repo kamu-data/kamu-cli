@@ -370,7 +370,7 @@ async fn test_append_dataset_metadata_batch_head_moved_concurrently() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_append_dataset_metadata_batch_force_update_if_diverged() {
+async fn test_append_dataset_metadata_batch_replaces_diverged_history_at_expected_head() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
 
@@ -383,7 +383,7 @@ async fn test_append_dataset_metadata_batch_force_update_if_diverged() {
         .await;
 
     let (batch_head, batch) = harness.set_info_batch(&foo, "ours").await;
-    let (_, diverged_batch) = harness.set_info_batch(&foo, "diverged").await;
+    let (diverged_head, diverged_batch) = harness.set_info_batch(&foo, "diverged").await;
     harness
         .append_batch(&foo, diverged_batch, SetRefCheckRefMode::default())
         .await
@@ -391,7 +391,11 @@ async fn test_append_dataset_metadata_batch_force_update_if_diverged() {
 
     assert_matches!(
         harness
-            .append_batch(&foo, batch, SetRefCheckRefMode::ForceUpdateIfDiverged(true))
+            .append_batch(
+                &foo,
+                batch,
+                SetRefCheckRefMode::Explicit(Some(diverged_head))
+            )
             .await,
         Ok(Some(new_head)) if new_head == batch_head
     );

@@ -156,9 +156,13 @@ async fn do_test_sync(
         .await;
 
     let _pull_res = sync_svc
-        .sync(
+        .transfer_into_local(
             sync_request_builder
-                .build_sync_request(pull_repo_url.as_any_ref(), dataset_alias.as_any_ref(), true)
+                .build_local_sync_request(
+                    pull_repo_url.as_any_ref(),
+                    dataset_alias.as_local_ref(),
+                    true,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),

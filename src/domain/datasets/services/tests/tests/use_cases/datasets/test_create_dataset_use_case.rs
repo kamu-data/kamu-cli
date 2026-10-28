@@ -16,6 +16,7 @@ use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetResult,
     CreateDatasetUseCase,
+    CreateDatasetUseCaseOptions,
     DatasetReferenceRepository,
     ResolvedDataset,
 };
@@ -127,12 +128,47 @@ async fn test_create_dataset_head_already_set() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_create_dataset_at_initial_head() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = CreateUseCaseHarness::new(predefined_foo_id.clone()).await;
+    let (seed_block, stored_head) = harness
+        .store_dataset_with_unreferenced_block(&predefined_foo_id)
+        .await;
+
+    let foo_created = harness
+        .use_case
+        .execute(
+            &alias_foo,
+            seed_block,
+            CreateDatasetUseCaseOptions {
+                initial_head: Some(stored_head.clone()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(foo_created.head, stored_head);
+    assert_eq!(
+        harness
+            .get_dataset_reference(&predefined_foo_id, &odf::BlockRef::Head)
+            .await,
+        stored_head,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct CreateUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
     use_case: Arc<dyn CreateDatasetUseCase>,
     create_helper: Arc<CreateDatasetUseCaseHelper>,
     dataset_reference_repo: Arc<dyn DatasetReferenceRepository>,
+    dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
 }
 
 impl CreateUseCaseHarness {
@@ -164,6 +200,7 @@ impl CreateUseCaseHarness {
             use_case: catalog.get_one().unwrap(),
             create_helper: catalog.get_one().unwrap(),
             dataset_reference_repo: catalog.get_one().unwrap(),
+            dataset_storage_unit_writer: catalog.get_one().unwrap(),
         }
     }
 
@@ -186,6 +223,45 @@ impl CreateUseCaseHarness {
             )
             .await
             .unwrap()
+    }
+
+    /// Stores a dataset in storage only, as a pull transfer does: its `Seed`
+    /// and one more block, with no `HEAD` and no entry
+    async fn store_dataset_with_unreferenced_block(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> (odf::MetadataBlockTyped<odf::metadata::Seed>, odf::Multihash) {
+        let seed_block = MetadataFactory::metadata_block(
+            MetadataFactory::seed(odf::DatasetKind::Root)
+                .id(dataset_id.clone())
+                .build(),
+        )
+        .system_time(self.system_time_source().now())
+        .build_typed();
+
+        let stored = self
+            .dataset_storage_unit_writer
+            .store_dataset(seed_block.clone(), Default::default())
+            .await
+            .unwrap();
+
+        let head = stored
+            .dataset
+            .as_metadata_chain()
+            .append(
+                MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                    .prev(&stored.seed, 0)
+                    .system_time(self.system_time_source().now())
+                    .build(),
+                odf::dataset::AppendOpts {
+                    update_ref: None,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        (seed_block, head)
     }
 
     /// Sets the first `HEAD` of a dataset again, as a concurrent creation would

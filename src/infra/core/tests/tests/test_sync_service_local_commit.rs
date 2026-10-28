@@ -1,0 +1,526 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::assert_matches;
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+
+use kamu::domain::*;
+use kamu::testing::*;
+use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
+use kamu_datasets::*;
+use kamu_datasets_inmem::*;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
+use kamu_datasets_services::*;
+use messaging_outbox::*;
+use odf::dataset::testing::create_test_dataset_from_snapshot;
+use odf::metadata::testing::MetadataFactory;
+use test_utils::LocalS3Server;
+use time_source::{SystemTimeSource, SystemTimeSourceDefault};
+use url::Url;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_first_pull_creates_dataset_at_transferred_head_local_fs() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+        .assert_first_pull_creates_dataset_at_transferred_head()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_first_pull_creates_dataset_at_transferred_head_s3() {
+    let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
+    LocalPullHarness::new(s3.url.clone())
+        .assert_first_pull_creates_dataset_at_transferred_head()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_transfer_into_existing_dataset_moves_no_head() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+
+    harness.create_source_dataset().await;
+    harness.push_source().await;
+    harness.pull(SyncOptions::default(), None).await.unwrap();
+    let old_head = harness.destination_head().await.unwrap();
+
+    let new_head = harness.append_source_data().await;
+    harness.push_source().await;
+
+    let transferred = harness.transfer().await;
+    assert_eq!(harness.destination_head().await, Some(old_head.clone()));
+
+    assert_eq!(
+        harness.commit(transferred).await.unwrap(),
+        SyncResult::Updated {
+            old_head: Some(old_head),
+            new_head: new_head.clone(),
+            num_blocks: 1,
+        }
+    );
+    assert_eq!(harness.destination_head().await, Some(new_head));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_first_pull_continues_after_uncommitted_transfer_local_fs() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+        .assert_first_pull_continues_after_uncommitted_transfer()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_first_pull_continues_after_uncommitted_transfer_s3() {
+    let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
+    LocalPullHarness::new(s3.url.clone())
+        .assert_first_pull_continues_after_uncommitted_transfer()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_commit_into_dataset_deleted_during_transfer_fails() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+
+    harness.create_source_dataset().await;
+    harness.push_source().await;
+    harness.pull(SyncOptions::default(), None).await.unwrap();
+    harness.append_source_data().await;
+    harness.push_source().await;
+
+    let transferred = harness.transfer().await;
+    harness.delete_destination().await;
+
+    assert_matches!(
+        harness.commit(transferred).await,
+        Err(SyncError::DatasetNotFound(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_forced_pull_replaces_diverged_history() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+
+    harness.create_source_dataset().await;
+    harness.push_source().await;
+    harness.pull(SyncOptions::default(), None).await.unwrap();
+
+    let diverged_head = harness.append_destination_data().await;
+    let source_head = harness.append_source_data().await;
+    harness.push_source().await;
+
+    assert_matches!(
+        harness.pull(SyncOptions::default(), None).await,
+        Err(SyncError::DatasetsDiverged(_))
+    );
+
+    assert_matches!(
+        harness.pull(SyncOptions { force: true, ..SyncOptions::default() }, None).await,
+        Ok(SyncResult::Updated { old_head: Some(old_head), new_head, .. })
+            if old_head == diverged_head && new_head == source_head
+    );
+    assert_eq!(harness.destination_head().await, Some(source_head));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_pull_with_head_moved_during_transfer_local_fs() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap())
+        .assert_pull_keeps_head_moved_during_transfer()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_pull_with_head_moved_during_transfer_s3() {
+    let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
+    LocalPullHarness::new(s3.url.clone())
+        .assert_pull_keeps_head_moved_during_transfer()
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A source workspace that pushes to a repository, and a destination
+/// workspace that pulls from it
+struct LocalPullHarness {
+    _tmp_dir: tempfile::TempDir,
+    source_catalog: dill::Catalog,
+    destination_catalog: dill::Catalog,
+    repo_url: Url,
+    dataset_alias: odf::DatasetAlias,
+}
+
+impl LocalPullHarness {
+    fn new(repo_url: Url) -> Self {
+        let tmp_dir = tempfile::tempdir().unwrap();
+
+        Self {
+            source_catalog: Self::build_workspace_catalog(&tmp_dir.path().join("source")),
+            destination_catalog: Self::build_workspace_catalog(&tmp_dir.path().join("destination")),
+            _tmp_dir: tmp_dir,
+            repo_url,
+            dataset_alias: odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
+        }
+    }
+
+    fn build_workspace_catalog(workspace_dir: &Path) -> dill::Catalog {
+        let datasets_dir = workspace_dir.join("datasets");
+        std::fs::create_dir_all(&datasets_dir).unwrap();
+
+        let mut dataset_entry_writer = MockDatasetEntryWriter::new();
+        dataset_entry_writer
+            .expect_create_entry()
+            .returning(|_, _, _, _, _| Ok(()));
+
+        let mut b = dill::CatalogBuilder::new();
+        b.add::<DidGeneratorDefault>()
+            .add::<SystemTimeSourceDefault>()
+            .add_value(odf::dataset::IpfsGateway::default())
+            .add_value(IpfsClient::default())
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(TenancyConfig::SingleTenant)
+            .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
+                datasets_dir,
+            ))
+            .add::<odf::dataset::DatasetLfsBuilderDefault>()
+            .add::<DatasetRegistrySoloUnitBridge>()
+            .add_value(RemoteReposDir::new_with_creation(
+                workspace_dir.join("repos"),
+            ))
+            .add::<RemoteRepositoryRegistryImpl>()
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
+            .add::<odf::dataset::DatasetFactoryImpl>()
+            .add::<SyncServiceImpl>()
+            .add::<LocalSyncCommitterImpl>()
+            .add::<RemoteAliasesRegistryImpl>()
+            .add::<RemoteAliasResolverImpl>()
+            .add::<SyncRequestBuilder>()
+            .add::<DummySmartTransferProtocolClient>()
+            .add::<SimpleTransferProtocol>()
+            .add::<CreateDatasetUseCaseImpl>()
+            .add::<CreateDatasetUseCaseHelper>()
+            .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
+            .bind::<dyn Outbox, OutboxImmediateImpl>()
+            .add_value(dataset_entry_writer)
+            .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
+            .add::<DatasetReferenceServiceImpl>()
+            .add::<InMemoryDatasetReferenceRepository>()
+            .add::<DatasetHeadCommitterImpl>();
+
+        register_message_dispatcher::<DatasetLifecycleMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
+        );
+        register_message_dispatcher::<DatasetReferenceMessage>(
+            &mut b,
+            MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+        );
+        database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+
+        b.build()
+    }
+
+    /// A first pull creates the dataset with its `HEAD` at the last
+    /// transferred block in one commit
+    async fn assert_first_pull_creates_dataset_at_transferred_head(&self) {
+        self.create_source_dataset().await;
+        let source_head = self.append_source_data().await;
+        self.push_source().await;
+
+        assert_eq!(
+            self.pull(SyncOptions::default(), None).await.unwrap(),
+            SyncResult::Updated {
+                old_head: None,
+                new_head: source_head.clone(),
+                num_blocks: 3,
+            }
+        );
+        assert_eq!(self.destination_head().await, Some(source_head));
+    }
+
+    /// A first pull whose transfer was never committed leaves a stored
+    /// dataset without `HEAD`, which the next pull continues into
+    async fn assert_first_pull_continues_after_uncommitted_transfer(&self) {
+        self.create_source_dataset().await;
+        let source_head = self.append_source_data().await;
+        self.push_source().await;
+
+        let _abandoned = self.transfer().await;
+        assert_eq!(self.destination_head().await, None);
+
+        let transferred = self.transfer().await;
+        assert_matches!(
+            self.commit(transferred).await,
+            Ok(SyncResult::Updated { old_head: None, new_head, .. }) if new_head == source_head
+        );
+        assert_eq!(self.destination_head().await, Some(source_head));
+    }
+
+    /// Another writer moves the destination `HEAD` while a forced pull
+    /// transfers. The commit must fail and leave the other writer's `HEAD`
+    async fn assert_pull_keeps_head_moved_during_transfer(&self) {
+        self.create_source_dataset().await;
+        self.push_source().await;
+        self.pull(SyncOptions::default(), None).await.unwrap();
+
+        self.append_source_data().await;
+        self.push_source().await;
+
+        let listener = Arc::new(DestinationHeadMovingListener {
+            catalog: self.destination_catalog.clone(),
+            dataset_alias: self.dataset_alias.clone(),
+            concurrent_head: Mutex::new(None),
+        });
+
+        let result = self
+            .pull(
+                SyncOptions {
+                    force: true,
+                    ..SyncOptions::default()
+                },
+                Some(listener.clone()),
+            )
+            .await;
+
+        let concurrent_head = listener.concurrent_head.lock().unwrap().clone().unwrap();
+        assert_matches!(
+            result,
+            Err(SyncError::HeadMoved(e)) if e.actual.as_ref() == Some(&concurrent_head)
+        );
+        assert_eq!(self.destination_head().await, Some(concurrent_head));
+    }
+
+    async fn create_source_dataset(&self) {
+        let snapshot = MetadataFactory::dataset_snapshot()
+            .name(self.dataset_alias.clone())
+            .kind(odf::DatasetKind::Root)
+            .push_event(MetadataFactory::set_data_schema().build())
+            .build();
+
+        create_test_dataset_from_snapshot(
+            self.source_catalog
+                .get_one::<dyn DatasetRegistry>()
+                .unwrap()
+                .as_ref(),
+            self.source_catalog
+                .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
+                .unwrap()
+                .as_ref(),
+            snapshot,
+            self.source_catalog
+                .get_one::<dyn DidGenerator>()
+                .unwrap()
+                .generate_dataset_id()
+                .0,
+            self.source_catalog
+                .get_one::<dyn SystemTimeSource>()
+                .unwrap()
+                .now(),
+        )
+        .await
+        .unwrap();
+    }
+
+    async fn append_source_data(&self) -> odf::Multihash {
+        Self::append_random_data(&self.source_catalog, &self.dataset_alias).await
+    }
+
+    async fn append_destination_data(&self) -> odf::Multihash {
+        Self::append_random_data(&self.destination_catalog, &self.dataset_alias).await
+    }
+
+    async fn append_random_data(
+        catalog: &dill::Catalog,
+        dataset_alias: &odf::DatasetAlias,
+    ) -> odf::Multihash {
+        DatasetTestHelper::append_random_data(
+            catalog.get_one::<dyn DatasetRegistry>().unwrap().as_ref(),
+            dataset_alias,
+            32,
+        )
+        .await
+    }
+
+    async fn push_source(&self) {
+        let request = self
+            .source_catalog
+            .get_one::<SyncRequestBuilder>()
+            .unwrap()
+            .build_sync_request(
+                self.dataset_alias.as_any_ref(),
+                self.remote_ref().as_any_ref(),
+                true,
+            )
+            .await
+            .unwrap();
+
+        self.source_catalog
+            .get_one::<dyn SyncService>()
+            .unwrap()
+            .sync(request, SyncOptions::default(), None)
+            .await
+            .unwrap();
+    }
+
+    async fn pull(
+        &self,
+        options: SyncOptions,
+        maybe_listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError> {
+        let helper = LocalSyncHelper::new(self.destination_catalog.clone());
+        let request = helper
+            .build_request(
+                self.remote_ref().as_any_ref(),
+                self.dataset_alias.as_local_ref(),
+                true,
+            )
+            .await?;
+        helper
+            .transfer_and_commit(request, options, maybe_listener)
+            .await
+    }
+
+    async fn transfer(&self) -> TransferredSync {
+        let request = LocalSyncHelper::new(self.destination_catalog.clone())
+            .build_request(
+                self.remote_ref().as_any_ref(),
+                self.dataset_alias.as_local_ref(),
+                true,
+            )
+            .await
+            .unwrap();
+
+        let transfer = self
+            .destination_catalog
+            .get_one::<dyn SyncService>()
+            .unwrap()
+            .transfer_into_local(request, SyncOptions::default(), None)
+            .await
+            .unwrap();
+        let SyncTransfer::Transferred(transferred) = transfer else {
+            panic!("Expected a transfer, got {transfer:?}");
+        };
+        transferred
+    }
+
+    async fn commit(&self, transferred: TransferredSync) -> Result<SyncResult, SyncError> {
+        self.destination_catalog
+            .get_one::<dyn LocalSyncCommitter>()
+            .unwrap()
+            .commit(transferred)
+            .await
+    }
+
+    async fn delete_destination(&self) {
+        let dataset_id = self
+            .destination_catalog
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap()
+            .resolve_dataset_handle_by_ref(&self.dataset_alias.as_local_ref())
+            .await
+            .unwrap()
+            .id;
+
+        self.destination_catalog
+            .get_one::<dyn odf::dataset::DatasetStorageUnitWriter>()
+            .unwrap()
+            .delete_dataset(&dataset_id)
+            .await
+            .unwrap();
+    }
+
+    /// `None` while the destination has no committed `HEAD`
+    async fn destination_head(&self) -> Option<odf::Multihash> {
+        let dataset = self
+            .destination_catalog
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap()
+            .get_dataset_by_ref(&self.dataset_alias.as_local_ref())
+            .await
+            .ok()?;
+
+        dataset
+            .as_metadata_chain()
+            .as_uncached_ref_repo()
+            .get(odf::BlockRef::Head.as_str())
+            .await
+            .ok()
+    }
+
+    fn remote_ref(&self) -> odf::DatasetRefRemote {
+        odf::DatasetRefRemote::from(
+            &self
+                .repo_url
+                .join(&format!("{}/", self.dataset_alias.dataset_name))
+                .unwrap(),
+        )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Commits a block to the destination the way another writer would, once
+/// the pull has read its `HEAD` and before the transfer is committed
+struct DestinationHeadMovingListener {
+    catalog: dill::Catalog,
+    dataset_alias: odf::DatasetAlias,
+    concurrent_head: Mutex<Option<odf::Multihash>>,
+}
+
+impl SyncListener for DestinationHeadMovingListener {
+    fn on_status(&self, stage: SyncStage, _stats: &SyncStats) {
+        if stage != SyncStage::TransferData || self.concurrent_head.lock().unwrap().is_some() {
+            return;
+        }
+
+        let concurrent_head = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(LocalPullHarness::append_random_data(
+                &self.catalog,
+                &self.dataset_alias,
+            ))
+        });
+        *self.concurrent_head.lock().unwrap() = Some(concurrent_head);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -802,28 +802,15 @@ async fn test_pull_sync_success() {
         dataset_name: alias_foo.dataset_name.clone(),
     });
 
-    let mocks = PullUseCaseHarnessMocks::default()
-        .with_authorizer_mock(
-            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
-                DatasetAction::Write,
-                1,
-                HashSet::from_iter([alias_foo.clone()]),
-            ),
-        )
-        .with_sync_mock(
-            MockSyncService::new().make_expect_sync_pull_from_remote_to_existing_local(
-                alias_foo.clone(),
-                remote_ref.clone(),
-                SyncResult::Updated {
-                    old_head: None,
-                    new_head: odf::Multihash::from_multibase(
-                        "f16205603b882241c71351baf996d6dba7e3ddbd571457e93c1cd282bdc61f9fed5f2",
-                    )
-                    .unwrap(),
-                    num_blocks: 0,
-                },
-            ),
-        );
+    let mocks = PullUseCaseHarnessMocks::default().for_sync_into_existing(
+        &alias_foo,
+        &remote_ref,
+        Ok(SyncResult::Updated {
+            old_head: None,
+            new_head: synced_head(),
+            num_blocks: 0,
+        }),
+    );
 
     let harness = PullUseCaseHarness::new(mocks);
 
@@ -883,28 +870,15 @@ async fn test_pull_sync_success_without_saving_alias() {
         dataset_name: alias_foo.dataset_name.clone(),
     });
 
-    let mocks = PullUseCaseHarnessMocks::default()
-        .with_authorizer_mock(
-            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
-                DatasetAction::Write,
-                1,
-                HashSet::from_iter([alias_foo.clone()]),
-            ),
-        )
-        .with_sync_mock(
-            MockSyncService::new().make_expect_sync_pull_from_remote_to_existing_local(
-                alias_foo.clone(),
-                remote_ref.clone(),
-                SyncResult::Updated {
-                    old_head: None,
-                    new_head: odf::Multihash::from_multibase(
-                        "f16205603b882241c71351baf996d6dba7e3ddbd571457e93c1cd282bdc61f9fed5f2",
-                    )
-                    .unwrap(),
-                    num_blocks: 0,
-                },
-            ),
-        );
+    let mocks = PullUseCaseHarnessMocks::default().for_sync_into_existing(
+        &alias_foo,
+        &remote_ref,
+        Ok(SyncResult::Updated {
+            old_head: None,
+            new_head: synced_head(),
+            num_blocks: 0,
+        }),
+    );
 
     let harness = PullUseCaseHarness::new(mocks);
 
@@ -945,6 +919,58 @@ async fn test_pull_sync_success_without_saving_alias() {
         } if a_pull_request == pull_request &&
         a_local_ref == foo.dataset_handle.as_local_ref() &&
         a_remote_ref == remote_ref,
+    );
+
+    let aliases = harness.get_remote_aliases(&foo).await;
+    assert!(aliases.is_empty(RemoteAliasKind::Pull));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_sync_head_moved_is_a_conflict() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let remote_ref = odf::DatasetRefRemote::Alias(odf::DatasetAliasRemote {
+        repo_name: odf::RepoName::new_unchecked(REMOTE_REPO_NAME_STR),
+        account_name: None,
+        dataset_name: alias_foo.dataset_name.clone(),
+    });
+
+    let mocks = PullUseCaseHarnessMocks::default().for_sync_into_existing(
+        &alias_foo,
+        &remote_ref,
+        Err(SyncError::HeadMoved(odf::dataset::RefCASError {
+            reference: odf::BlockRef::Head,
+            expected: None,
+            actual: None,
+        })),
+    );
+
+    let harness = PullUseCaseHarness::new(mocks);
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    harness
+        .copy_dataset_to_remote_repo(&foo.dataset_handle.id, &alias_foo.dataset_name)
+        .await;
+
+    let pull_response = harness
+        .use_case
+        .execute(
+            PullRequest::Remote(PullRequestRemote {
+                remote_ref,
+                maybe_local_alias: Some(alias_foo),
+            }),
+            PullOptions::default(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::SyncError(SyncError::HeadMoved(_)))
     );
 
     let aliases = harness.get_remote_aliases(&foo).await;
@@ -1133,10 +1159,10 @@ async fn test_pull_all_owned() {
                 .make_expect_ingest(alias_bar.clone()),
         )
         .with_sync_mock(
-            MockSyncService::new().make_expect_sync_pull_from_remote_to_existing_local(
+            MockSyncService::new().make_expect_transfer_from_remote_into_existing_local(
                 alias_baz.clone(),
                 baz_ref_remote.clone(),
-                SyncResult::UpToDate,
+                None,
             ),
         )
         .with_transform_elaboration_mock(
@@ -1351,6 +1377,8 @@ impl PullUseCaseHarness {
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>()
             .add_value(mocks.mock_sync_service)
             .bind::<dyn SyncService, MockSyncService>()
+            .add_value(mocks.mock_local_sync_committer)
+            .bind::<dyn LocalSyncCommitter, MockLocalSyncCommitter>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()
@@ -1598,6 +1626,7 @@ struct PullUseCaseHarnessMocks {
     mock_transform_execution_service: MockTransformExecutor,
     mock_compaction_executor: MockCompactionExecutor,
     mock_sync_service: MockSyncService,
+    mock_local_sync_committer: MockLocalSyncCommitter,
     /// Transforms with the real planner and executor, through an engine that
     /// only advances the watermark to this value
     real_transform_watermark: Option<DateTime<Utc>>,
@@ -1772,6 +1801,46 @@ impl PullUseCaseHarnessMocks {
             ..self
         }
     }
+
+    /// Expects one authorized pull of the existing `foo` from `remote_ref`,
+    /// transferred up to [`synced_head`] and committed with `commit_result`
+    fn for_sync_into_existing(
+        self,
+        alias_foo: &odf::DatasetAlias,
+        remote_ref: &odf::DatasetRefRemote,
+        commit_result: Result<SyncResult, SyncError>,
+    ) -> Self {
+        let synced_heads = ReportedHeads::default();
+        synced_heads.set(&synced_head(), &synced_head());
+
+        Self {
+            mock_local_sync_committer: MockLocalSyncCommitter::new()
+                .make_expect_commit(synced_head(), commit_result),
+            ..self
+        }
+        .with_authorizer_mock(
+            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                DatasetAction::Write,
+                1,
+                HashSet::from_iter([alias_foo.clone()]),
+            ),
+        )
+        .with_sync_mock(
+            MockSyncService::new().make_expect_transfer_from_remote_into_existing_local(
+                alias_foo.clone(),
+                remote_ref.clone(),
+                Some(synced_heads),
+            ),
+        )
+    }
+}
+
+/// The head a mocked sync transfers up to
+fn synced_head() -> odf::Multihash {
+    odf::Multihash::from_multibase(
+        "f16205603b882241c71351baf996d6dba7e3ddbd571457e93c1cd282bdc61f9fed5f2",
+    )
+    .unwrap()
 }
 
 impl Default for PullUseCaseHarnessMocks {
@@ -1783,6 +1852,7 @@ impl Default for PullUseCaseHarnessMocks {
             mock_transform_execution_service: MockTransformExecutor::new(),
             mock_compaction_executor: MockCompactionExecutor::new(),
             mock_sync_service: MockSyncService::new(),
+            mock_local_sync_committer: MockLocalSyncCommitter::new(),
             real_transform_watermark: None,
             env_var_resolution: None,
         }

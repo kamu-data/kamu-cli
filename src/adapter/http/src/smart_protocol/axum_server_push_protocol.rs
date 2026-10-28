@@ -235,6 +235,7 @@ impl AxumServerPushProtocolInstance {
                 let create_options = CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility_for_created_dataset,
                     seed_block_bytes: Some(first_block_bytes),
+                    ..Default::default()
                 };
                 let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(
@@ -528,7 +529,7 @@ impl AxumServerPushProtocolInstance {
         let set_ref_check_ref_mode = if force_update_if_diverged {
             SetRefCheckRefMode::Explicit(expected_head)
         } else {
-            SetRefCheckRefMode::ForceUpdateIfDiverged(false)
+            SetRefCheckRefMode::ExtendsBase
         };
         let (dataset_id, new_head) = DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with2(

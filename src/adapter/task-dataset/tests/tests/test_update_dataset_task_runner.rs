@@ -14,12 +14,14 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use datafusion::arrow::datatypes::Schema;
+use internal_error::InternalError;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
     EngineConfigDatafusionEmbeddedIngest,
     EngineProvisionerNull,
     FetchService,
+    LocalSyncCommitterImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     PollingIngestPlannerImpl,
@@ -40,9 +42,9 @@ use kamu_adapter_task_dataset::{
 use kamu_core::engine::TransformResponseExt;
 use kamu_core::testing::{MockIngestIteration, ReportedHeads};
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter};
-use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
+use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
+use kamu_datasets_services::{DatasetIncrementQueryServiceImpl, DatasetKeyValueServiceSysEnv};
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskResult, TaskRunner};
 use pretty_assertions::assert_eq;
 
@@ -527,6 +529,138 @@ async fn test_transform_with_real_planner_and_executor_commits_and_reports_incre
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_sync_commits_and_reports_increment() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let synced_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
+    synced_heads.set(&foo.head, &synced_head);
+
+    let outcome = harness.run_sync_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate {
+                pull_result: PullResult::Updated {
+                    old_head: Some(foo.head.clone()),
+                    new_head: synced_head.clone(),
+                    has_more: false,
+                },
+                data_increment: Some(odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 0,
+                    updated_watermark: None,
+                }),
+            }
+            .into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&foo).await, synced_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_expects_head_read_when_it_runs() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let synced_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let head_at_run = harness
+        .append_unreferenced_block(&foo, "after planning")
+        .await;
+    harness.move_head(&foo, &foo.head, &head_at_run).await;
+    let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
+    synced_heads.set(&head_at_run, &synced_head);
+
+    let outcome = harness.run_sync_update(&foo).await;
+
+    assert_matches!(
+        harness.task_result_update(outcome).pull_result,
+        PullResult::Updated { old_head: Some(old_head), new_head, .. }
+            if old_head == head_at_run && new_head == synced_head
+    );
+    assert_eq!(harness.get_head(&foo).await, synced_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_into_missing_dataset_is_an_internal_error() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks::default());
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    assert_matches!(
+        harness.try_run_sync_update_into_new(&foo, &alias_bar).await,
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_up_to_date() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, None);
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let outcome = harness.run_sync_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate {
+                pull_result: PullResult::UpToDate(PullResultUpToDate::Sync),
+                data_increment: None,
+            }
+            .into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_head_moved_concurrently_fails_recoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let synced_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    synced_heads.set(&foo.head, &synced_head);
+    harness.move_head_before_next_commit(concurrent_head.clone());
+
+    let outcome = harness.run_sync_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(
+            TaskErrorDatasetCommit::HeadMoved(DatasetHeadMovedError {
+                dataset_id: foo.dataset_handle.id.clone(),
+                expected_head: Some(foo.head.clone()),
+                actual_head: Some(concurrent_head.clone()),
+            })
+            .into_task_error()
+        ),
+        outcome,
+    );
+    assert!(outcome.is_recoverable_failure());
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -537,7 +671,9 @@ struct UpdateDatasetTaskRunnerHarness {
 impl UpdateDatasetTaskRunnerHarness {
     fn new(mocks: UpdateDatasetTaskRunnerMocks) -> Self {
         Self::build(|b, _| {
-            b.add_value(mocks.mock_polling_ingest_service)
+            b.add_value(mocks.mock_sync_service)
+                .bind::<dyn SyncService, MockSyncService>()
+                .add_value(mocks.mock_polling_ingest_service)
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
                 .add_value(mocks.mock_transform_planner)
                 .bind::<dyn TransformPlanner, MockTransformPlanner>()
@@ -550,7 +686,9 @@ impl UpdateDatasetTaskRunnerHarness {
     /// only advances the watermark to `watermark`
     fn new_with_real_transform(watermark: DateTime<Utc>) -> Self {
         Self::build(|b, _| {
-            b.add_value(MockPollingIngestService::new())
+            b.add_value(MockSyncService::new())
+                .bind::<dyn SyncService, MockSyncService>()
+                .add_value(MockPollingIngestService::new())
                 .bind::<dyn PollingIngestService, MockPollingIngestService>()
                 .add::<TransformPlannerImpl>()
                 .add::<TransformExecutorImpl>()
@@ -577,7 +715,9 @@ impl UpdateDatasetTaskRunnerHarness {
             let cache_dir = temp_dir.join("cache");
             std::fs::create_dir(&cache_dir).unwrap();
 
-            b.add::<PollingIngestServiceImpl>()
+            b.add_value(MockSyncService::new())
+                .bind::<dyn SyncService, MockSyncService>()
+                .add::<PollingIngestServiceImpl>()
                 .add::<FetchService>()
                 .add_value(CacheDir::new(cache_dir))
                 .add_value(ContainerRuntimeConfig::default())
@@ -605,8 +745,8 @@ impl UpdateDatasetTaskRunnerHarness {
             .add::<PollingIngestPlannerImpl>()
             .add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
-            .add_value(MockSyncService::new())
-            .bind::<dyn SyncService, MockSyncService>();
+            .add::<LocalSyncCommitterImpl>()
+            .add::<DatasetIncrementQueryServiceImpl>();
         register_operations(&mut b, base_use_case_harness.temp_dir_path());
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -618,6 +758,26 @@ impl UpdateDatasetTaskRunnerHarness {
             runner: catalog.get_one::<UpdateDatasetTaskRunner>().unwrap(),
             racing_committer: catalog.get_one().unwrap(),
         }
+    }
+
+    /// Syncs `alias` once from its remote: up to date without `heads`,
+    /// otherwise transferred up to their new head
+    fn new_syncing(alias: &odf::DatasetAlias, heads: Option<&ReportedHeads>) -> Self {
+        Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_sync_service: MockSyncService::new()
+                .make_expect_transfer_from_remote_into_existing_local(
+                    alias.clone(),
+                    Self::sync_remote_ref(alias),
+                    heads.cloned(),
+                ),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        })
+    }
+
+    fn sync_remote_ref(alias: &odf::DatasetAlias) -> odf::DatasetRefRemote {
+        format!("odf+http://example.com/{}", alias.dataset_name)
+            .parse()
+            .unwrap()
     }
 
     /// Elaborates and transforms `alias` once, from the old to the new head set
@@ -724,6 +884,65 @@ impl UpdateDatasetTaskRunnerHarness {
             .await
     }
 
+    /// Syncs `created` from its remote, planned when `created` was at its
+    /// creation head; the mocked transfer ignores the source
+    async fn run_sync_update(&self, created: &CreateDatasetResult) -> TaskOutcome {
+        let dataset = ResolvedDataset::from_created(created);
+        self.run_update(Self::sync_job(
+            created,
+            PullLocalTarget::existing(created.dataset_handle.clone()),
+            LocalSyncTarget::Existing {
+                dataset,
+                expected_head: Some(created.head.clone()),
+            },
+        ))
+        .await
+    }
+
+    /// Syncs into a dataset `alias` that does not exist yet, using `source`
+    /// as the remote's storage
+    async fn try_run_sync_update_into_new(
+        &self,
+        source: &CreateDatasetResult,
+        alias: &odf::DatasetAlias,
+    ) -> Result<TaskOutcome, InternalError> {
+        self.try_run_update(
+            Self::sync_job(
+                source,
+                PullLocalTarget::to_create(alias.clone()),
+                LocalSyncTarget::New(alias.clone()),
+            ),
+            PullOptions::default(),
+        )
+        .await
+    }
+
+    fn sync_job(
+        source: &CreateDatasetResult,
+        local_target: PullLocalTarget,
+        dst: LocalSyncTarget,
+    ) -> DatasetUpdateJob {
+        let remote_ref = Self::sync_remote_ref(local_target.alias());
+        let odf::DatasetRefRemote::Url(url) = &remote_ref else {
+            unreachable!()
+        };
+
+        DatasetUpdateJob::Sync(PullSyncItem {
+            depth: 0,
+            local_target,
+            remote_ref: remote_ref.clone(),
+            maybe_original_request: None,
+            sync_request: Box::new(LocalSyncRequest {
+                src: SyncRef::Remote(SyncRefRemote {
+                    url: url.clone(),
+                    dataset: source.dataset.clone(),
+                    original_remote_ref: remote_ref.clone(),
+                }),
+                dst,
+            }),
+        })
+    }
+
     async fn run_update(&self, job: DatasetUpdateJob) -> TaskOutcome {
         self.run_update_with(job, PullOptions::default()).await
     }
@@ -733,13 +952,20 @@ impl UpdateDatasetTaskRunnerHarness {
         job: DatasetUpdateJob,
         pull_options: PullOptions,
     ) -> TaskOutcome {
+        self.try_run_update(job, pull_options).await.unwrap()
+    }
+
+    async fn try_run_update(
+        &self,
+        job: DatasetUpdateJob,
+        pull_options: PullOptions,
+    ) -> Result<TaskOutcome, InternalError> {
         self.runner
             .run_task(TaskDefinition::new(TaskDefinitionDatasetUpdate {
                 pull_options,
                 job,
             }))
             .await
-            .unwrap()
     }
 }
 
@@ -747,6 +973,7 @@ impl UpdateDatasetTaskRunnerHarness {
 
 #[derive(Default)]
 struct UpdateDatasetTaskRunnerMocks {
+    mock_sync_service: MockSyncService,
     mock_polling_ingest_service: MockPollingIngestService,
     mock_transform_planner: MockTransformPlanner,
     mock_transform_executor: MockTransformExecutor,

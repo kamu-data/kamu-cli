@@ -124,6 +124,21 @@ async fn test_smart_pull_incompatible_version_err() {
 
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_head_moved_concurrently() {
+    assert_smart_pull_fails_when_head_moved_concurrently(false).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_forced_head_moved_concurrently() {
+    assert_smart_pull_fails_when_head_moved_concurrently(true).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `HEAD` moves after the pull read it: the commit fails and keeps the
+/// concurrent head, with or without `force`
+async fn assert_smart_pull_fails_when_head_moved_concurrently(force: bool) {
     let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
@@ -153,13 +168,14 @@ async fn test_smart_pull_head_moved_concurrently() {
 
         let pull_responses = scenario
             .client_harness
-            .pull_datasets(odf::DatasetRefAny::from(scenario.server_dataset_ref), false)
+            .pull_datasets(odf::DatasetRefAny::from(scenario.server_dataset_ref), force)
             .await;
 
         pretty_assertions::assert_eq!(pull_responses.len(), 1);
         assert_matches!(
             &pull_responses[0].result,
-            Err(PullError::SyncError(SyncError::UpdatedConcurrently(_)))
+            Err(PullError::SyncError(SyncError::HeadMoved(e)))
+                if e.actual.as_ref() == Some(&concurrent_head)
         );
         pretty_assertions::assert_eq!(
             scenario

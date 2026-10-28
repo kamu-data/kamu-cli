@@ -93,6 +93,7 @@ interface "GetDatasetSchemaUseCase" <<i>>
 interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
 interface "InitOnStartup" <<i>>
 interface "JwtTokenIssuer" <<i>>
+interface "LocalSyncCommitter" <<i>>
 interface "MessageConsumer" <<i>>
 interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
@@ -307,6 +308,7 @@ class "KamuFlightSqlService"
 class "LabelEnvironmentDispatcher"
 class "LabelLegacyConfigTargetDatasetDispatcher"
 class "LocalResourceFacadeImpl"
+class "LocalSyncCommitterImpl"
 class "LoginFlowService"
 class "LoginPasswordAuthProvider"
 class "LoginService"
@@ -603,6 +605,10 @@ class "WsSmartTransferProtocolClient"
 "SessionContextBuilder"  --> "ObjectStoreRegistry"
 "SessionContextBuilder"  --> "DatasetRegistry"
 "SessionContextBuilder"  --> "EngineConfigDatafusionEmbeddedBatchQuery"
+"LocalSyncCommitter" <|-- "LocalSyncCommitterImpl"
+"LocalSyncCommitterImpl"  --> "DatasetHeadCommitter"
+"LocalSyncCommitterImpl"  --> "DatasetRegistry"
+"LocalSyncCommitterImpl" "lazy" --> "CreateDatasetUseCase"
 "SyncRequestBuilder"  --> "RemoteAliasResolver"
 "SyncRequestBuilder"  --> "RemoteRepositoryRegistry"
 "SyncRequestBuilder"  --> "DatasetRegistry"
