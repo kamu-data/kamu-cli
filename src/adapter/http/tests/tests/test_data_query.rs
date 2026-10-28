@@ -333,16 +333,14 @@ async fn test_data_query_handler_success() {
         pretty_assertions::assert_eq!(
             response["commitment"]["inputHash"].as_str().unwrap(),
             odf::Multihash::from_digest_sha3_256(
-                canonical_json::to_string(&response["input"])
-                    .unwrap()
-                    .as_bytes()
+                serde_jcs::to_string(&response["input"]).unwrap().as_bytes()
             )
             .to_string()
         );
         pretty_assertions::assert_eq!(
             response["commitment"]["outputHash"].as_str().unwrap(),
             odf::Multihash::from_digest_sha3_256(
-                canonical_json::to_string(&response["output"])
+                serde_jcs::to_string(&response["output"])
                     .unwrap()
                     .as_bytes()
             )
@@ -351,7 +349,7 @@ async fn test_data_query_handler_success() {
         pretty_assertions::assert_eq!(
             response["commitment"]["subQueriesHash"].as_str().unwrap(),
             odf::Multihash::from_digest_sha3_256(
-                canonical_json::to_string(&response["subQueries"])
+                serde_jcs::to_string(&response["subQueries"])
                     .unwrap()
                     .as_bytes()
             )
@@ -368,7 +366,7 @@ async fn test_data_query_handler_success() {
         )
         .unwrap();
 
-        let commitment = canonical_json::to_string(&response["commitment"]).unwrap();
+        let commitment = serde_jcs::to_string(&response["commitment"]).unwrap();
 
         did.verify(commitment.as_bytes(), &signature).unwrap();
 
@@ -582,7 +580,7 @@ async fn test_data_verify_handler() {
         let mut invalid_request = request.clone();
         invalid_request["commitment"]["outputHash"] =
             "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2d".into();
-        let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
+        let c = serde_jcs::to_string(&invalid_request["commitment"]).unwrap();
         let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
@@ -617,7 +615,7 @@ async fn test_data_verify_handler() {
             .to_string()
             .into();
         invalid_request["commitment"]["inputHash"] = odf::Multihash::from_digest_sha3_256(
-            canonical_json::to_string(&invalid_request["input"])
+            serde_jcs::to_string(&invalid_request["input"])
                 .unwrap()
                 .as_bytes(),
         )
@@ -625,7 +623,7 @@ async fn test_data_verify_handler() {
         .to_string()
         .into();
 
-        let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
+        let c = serde_jcs::to_string(&invalid_request["commitment"]).unwrap();
         let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 
@@ -660,7 +658,7 @@ async fn test_data_verify_handler() {
                 .to_string()
                 .into();
         invalid_request["commitment"]["inputHash"] = odf::Multihash::from_digest_sha3_256(
-            canonical_json::to_string(&invalid_request["input"])
+            serde_jcs::to_string(&invalid_request["input"])
                 .unwrap()
                 .as_bytes(),
         )
@@ -668,7 +666,7 @@ async fn test_data_verify_handler() {
         .to_string()
         .into();
 
-        let c = canonical_json::to_string(&invalid_request["commitment"]).unwrap();
+        let c = serde_jcs::to_string(&invalid_request["commitment"]).unwrap();
         let sig: odf::metadata::Signature = harness.ed25519_private_key.sign(c.as_bytes()).into();
         invalid_request["proof"]["proofValue"] = sig.to_string().into();
 

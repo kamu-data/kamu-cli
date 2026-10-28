@@ -66,7 +66,6 @@ axum-extra = { version = "0.12", features = [
 ] }
 base64 = { version = "0.23", default-features = false }
 bytes = "1"
-canonical_json = { version = "0.7", default-features = false }
 chrono = { version = "0.4", features = [
     "serde",
 ] }
@@ -90,6 +89,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 serde = { version = "1", features = [
     "derive",
 ] }
+serde_jcs = "0.2"
 serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 setty = { version = "1", default-features = false, features = [

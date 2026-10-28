@@ -7950,7 +7950,6 @@ dependencies = [
  "axum-extra",
  "base64 0.23.1",
  "bytes",
- "canonical_json",
  "chrono",
  "container-runtime",
  "database-common",
@@ -7992,6 +7991,7 @@ dependencies = [
  "reqwest",
  "s3-utils",
  "serde",
+ "serde_jcs 0.2.0",
  "serde_json",
  "serde_with",
  "setty",
@@ -14023,6 +14023,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_jcs"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3a60f3fda61525e439ef6d67422118f11e986566997d9021c56867ad814a0aa"
+dependencies = [
+ "ryu-js",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "serde_json"
 version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14820,7 +14831,7 @@ dependencies = [
  "linked-data",
  "rdf-types",
  "serde",
- "serde_jcs",
+ "serde_jcs 0.1.0",
  "serde_json",
  "thiserror 1.0.69",
 ]
@@ -14862,7 +14873,7 @@ dependencies = [
  "num-traits",
  "rand 0.8.8",
  "serde",
- "serde_jcs",
+ "serde_jcs 0.1.0",
  "serde_json",
  "simple_asn1",
  "ssi-claims-core",

@@ -512,15 +512,38 @@ pub(crate) fn map_query_error(err: QueryError) -> ApiError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn to_canonical_json<T: serde::Serialize>(val: &T) -> Vec<u8> {
-    // TODO: PERF: Avoid double-serialization
-    // Because `canonical_json` needs `serde_json::Value` to be able to sort keys
-    // before serializing into a buffer we end up paying double for allocations.
-    // A better approach would be to use a macro to enforce alphabetic order of
-    // struct fields to avoid the need of sorting and then use a canonical formatter
-    // to write directly to a buffer.
-    let json = serde_json::to_value(val).unwrap();
-    let str = canonical_json::to_string(&json).unwrap();
-    str.into_bytes()
+    // RFC 8785 (JCS) canonical form, as required by the ODF spec for hashing and
+    // signing query commitments
+    serde_jcs::to_vec(val).unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_jcs_numbers_use_shortest_form() {
+        let out = to_canonical_json(&json!({"a": 23.1, "b": 1.0, "c": 1e21}));
+        assert_eq!(out, br#"{"a":23.1,"b":1,"c":1e+21}"#);
+    }
+
+    #[test]
+    fn test_jcs_non_ascii_strings_stay_raw_utf8() {
+        let out = to_canonical_json(&json!({"k": "café ❤"}));
+        assert_eq!(out, r#"{"k":"café ❤"}"#.as_bytes());
+    }
+
+    #[test]
+    fn test_jcs_keys_sorted_by_utf16_code_units() {
+        // U+1F600 is encoded as the surrogate pair D83D DE00, so it sorts before U+FB33
+        // in UTF-16, while its UTF-8 bytes (F0 ..) sort after those of U+FB33 (EF ..)
+        let out = to_canonical_json(&json!({"\u{FB33}": 1, "\u{1F600}": 2}));
+        assert_eq!(out, "{\"\u{1F600}\":2,\"\u{FB33}\":1}".as_bytes());
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
