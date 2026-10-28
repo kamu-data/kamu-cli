@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use kamu::testing::BaseRepoHarness;
 use kamu::*;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use url::Url;
 
@@ -152,6 +153,42 @@ async fn test_no_dataset_is_found_by_unknown_or_push_alias() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_dataset_of_another_account_is_not_found_by_its_pull_alias() {
+    let harness = PullSourceHarness::multi_tenant("bob");
+    let alice_foo = harness.create_root_owned_by("alice", "foo").await;
+    harness
+        .add_alias(
+            &alice_foo,
+            "odf+https://example.com/foo",
+            RemoteAliasKind::Pull,
+        )
+        .await;
+    let bob_bar = harness.create_root_owned_by("bob", "bar").await;
+    harness
+        .add_alias(
+            &bob_bar,
+            "odf+https://example.com/bar",
+            RemoteAliasKind::Pull,
+        )
+        .await;
+
+    assert_eq!(
+        harness
+            .find_dataset_by_pull_alias("odf+https://example.com/foo")
+            .await,
+        None
+    );
+    assert_eq!(
+        harness
+            .find_dataset_by_pull_alias("odf+https://example.com/bar")
+            .await,
+        Some(bob_bar)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_pull_source_endpoint_carries_the_url_without_credentials() {
     let source = DatasetPullSource {
@@ -186,10 +223,23 @@ struct PullSourceHarness {
 
 impl PullSourceHarness {
     fn new() -> Self {
-        let base_repo_harness = BaseRepoHarness::builder()
-            .tenancy_config(TenancyConfig::SingleTenant)
-            .build();
+        Self::with_base(
+            BaseRepoHarness::builder()
+                .tenancy_config(TenancyConfig::SingleTenant)
+                .build(),
+        )
+    }
 
+    fn multi_tenant(account_name: &str) -> Self {
+        Self::with_base(
+            BaseRepoHarness::builder()
+                .tenancy_config(TenancyConfig::MultiTenant)
+                .current_account_subject(CurrentAccountSubject::new_test_with(&account_name))
+                .build(),
+        )
+    }
+
+    fn with_base(base_repo_harness: BaseRepoHarness) -> Self {
         let repos_dir = base_repo_harness.temp_dir_path().join("repos");
         std::fs::create_dir(&repos_dir).unwrap();
 
@@ -208,6 +258,16 @@ impl PullSourceHarness {
             remote_aliases_registry: catalog.get_one().unwrap(),
             pull_source_resolver: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn create_root_owned_by(&self, account_name: &str, name: &str) -> odf::DatasetHandle {
+        self.base_repo_harness
+            .create_root_dataset(&odf::DatasetAlias::new(
+                Some(odf::AccountName::new_unchecked(account_name)),
+                odf::DatasetName::new_unchecked(name),
+            ))
+            .await
+            .dataset_handle
     }
 
     async fn create_root(&self, name: &str) -> odf::DatasetHandle {

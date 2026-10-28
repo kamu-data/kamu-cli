@@ -437,7 +437,7 @@ to `SyncOptions`.
 | `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousSource` with several; reads the alias registry only |
 | `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteAliasResolver::resolve_pull_url`; an unknown repository is `RepositoryNotFound` |
 | `resolve_pull_source` | both of the above for one dataset |
-| `find_dataset_by_pull_alias` | the local dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of all datasets |
+| `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
 
 `DatasetPullSource::to_sync_endpoint` gives the `SyncEndpoint` of a sync task, without
 credentials.
@@ -480,15 +480,18 @@ smart push server uses `AppendDatasetMetadataBatchUseCase`, which does both. Set
 
 The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS on a local destination is
 `HeadMoved`, carrying the expected and actual heads. On a remote destination it is
-`UpdatedConcurrently`, for the Simple protocol and the Smart push alike; on push the server reports
-it in `DatasetPushCompleteResponse`, without heads. Two mappings are surprising: a Smart-protocol push
-onto a remote that is ahead or has diverged fails with `InvalidInterval`, not `DestinationAhead` or
-`DatasetsDiverged`; and server-side internal failures reach the client as `Internal` with the
+`UpdatedConcurrently`, for the Simple protocol and the Smart push alike. The Smart push server
+reports it in `InvalidHead`, with both heads, when `HEAD` moved before the push began, and in
+`DatasetPushCompleteResponse`, without heads, when it moved during the commit. Two mappings are
+surprising: a Smart-protocol push onto a remote that is ahead fails with `DatasetsDiverged`, not
+`DestinationAhead`; and server-side internal failures reach the client as `Internal` with the
 generic message "Internal error", the cause staying in the server log (the one exception is a
 failure while computing the pull transfer plan, whose message is forwarded as is). Of the typed
 protocol errors, `InvalidInterval` (→ `DatasetsDiverged` on pull), `SeedBlockOverwriteRestricted`
 (→ `OverwriteSeedBlock` on push; on pull the client makes the `Seed` check itself), `RefCollision`
-and `NameCollision` keep their meaning; `InvalidHead` becomes `Internal`.
+and `NameCollision` keep their meaning. A metadata batch or an object download that cannot be read
+fails the transfer instead of stopping the process: a download answered with an error status is
+`Internal`, so it is retried rather than reported as a corrupted source.
 
 `SyncError::is_recoverable` says whether running the same sync again could succeed. A lost CAS
 (`HeadMoved`, `UpdatedConcurrently`) and `Internal`, which also covers network failures, are

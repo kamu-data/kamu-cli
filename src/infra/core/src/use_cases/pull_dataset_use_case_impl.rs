@@ -14,6 +14,7 @@ use database_common_macros::{
     transactional_method1,
     transactional_static_method1,
     transactional_static_method2,
+    transactional_static_method3,
 };
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -545,9 +546,7 @@ impl PullDatasetUseCaseImpl {
         catalog: dill::Catalog,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, PullError> {
-        let listener = maybe_listener
-            .clone()
-            .unwrap_or_else(|| Arc::new(NullTransformListener));
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
         let target = pti.target.clone();
         let mut maybe_reset_heads = None;
 
@@ -573,33 +572,79 @@ impl PullDatasetUseCaseImpl {
             result => result,
         };
 
-        let (transform_result, elaborated_up_to_date) = match elaboration {
-            Ok(TransformElaboration::Elaborated(plan)) => {
-                Self::authorize_unplanned_inputs(&plan, &pti.input_handles, catalog.clone())
-                    .await?;
-                (
-                    Self::execute_transform_and_commit(
-                        target,
-                        plan,
-                        &services,
-                        catalog,
-                        maybe_listener,
-                    )
-                    .await?,
-                    false,
-                )
+        let result = Self::execute_elaborated_transform(
+            elaboration,
+            target,
+            &pti.input_handles,
+            &services,
+            catalog,
+            listener.clone(),
+        )
+        .await;
+
+        let transform_result = match (maybe_reset_heads, result) {
+            (maybe_reset_heads, Ok(transform_result)) => {
+                Self::combine_with_reset(maybe_reset_heads, transform_result)
             }
-            Ok(TransformElaboration::UpToDate) => (TransformResult::UpToDate, true),
-            Err(e) => {
-                listener.elaborate_error(&e);
-                return Err(TransformError::from(e).into());
+            (Some((old_head, new_head)), Err(source)) => {
+                return Err(PullError::TransformStopped(Box::new(
+                    TransformStoppedError {
+                        old_head,
+                        new_head,
+                        source,
+                    },
+                )));
             }
+            (None, Err(e)) => return Err(e),
         };
 
-        // A reset and the transform after it are reported as one update. The
-        // offsets and the increment stay the transform's own: the reset
-        // rewrote history, so no interval spans both
-        let transform_result = match (maybe_reset_heads, transform_result) {
+        listener.success(&transform_result);
+
+        Ok(transform_result)
+    }
+
+    /// Authorizes, executes and commits an elaborated transform, reporting a
+    /// failure to the listener
+    async fn execute_elaborated_transform(
+        elaboration: Result<TransformElaboration, TransformElaborateError>,
+        target: ResolvedDataset,
+        planned_inputs: &[odf::DatasetHandle],
+        services: &TransformServices,
+        catalog: dill::Catalog,
+        listener: Arc<dyn TransformListener>,
+    ) -> Result<TransformResult, PullError> {
+        match elaboration {
+            Ok(TransformElaboration::Elaborated(plan)) => {
+                Self::authorize_unplanned_inputs(&plan, planned_inputs, catalog.clone()).await?;
+                Self::execute_transform_and_commit(
+                    target,
+                    plan,
+                    services,
+                    catalog,
+                    listener.clone(),
+                )
+                .await
+                .map_err(|e| {
+                    listener.execute_error(&e);
+                    TransformError::from(e).into()
+                })
+            }
+            Ok(TransformElaboration::UpToDate) => Ok(TransformResult::UpToDate),
+            Err(e) => {
+                listener.elaborate_error(&e);
+                Err(TransformError::from(e).into())
+            }
+        }
+    }
+
+    /// A reset and the transform after it are reported as one update. The
+    /// offsets and the increment stay the transform's own: the reset rewrote
+    /// history, so no interval spans both
+    fn combine_with_reset(
+        maybe_reset_heads: Option<(odf::Multihash, odf::Multihash)>,
+        transform_result: TransformResult,
+    ) -> TransformResult {
+        match (maybe_reset_heads, transform_result) {
             (
                 Some((old_head, _)),
                 TransformResult::Updated {
@@ -621,14 +666,7 @@ impl PullDatasetUseCaseImpl {
                 increment: odf::dataset::MetadataChainIncrementInterval::default(),
             },
             (None, transform_result) => transform_result,
-        };
-
-        // The executor reports its own outcomes
-        if elaborated_up_to_date {
-            listener.success(&transform_result);
         }
-
-        Ok(transform_result)
     }
 
     async fn execute_transform_and_commit(
@@ -636,11 +674,11 @@ impl PullDatasetUseCaseImpl {
         plan: TransformExecutionPlan,
         services: &TransformServices,
         catalog: dill::Catalog,
-        maybe_listener: Option<Arc<dyn TransformListener>>,
-    ) -> Result<TransformResult, TransformError> {
+        listener: Arc<dyn TransformListener>,
+    ) -> Result<TransformResult, TransformExecuteError> {
         let (target, result) = services
             .executor
-            .execute_transform(target, plan, &get_random_name(None, 10), maybe_listener)
+            .execute_transform(target, plan, &get_random_name(None, 10), Some(listener))
             .await;
 
         let result = result?;
@@ -663,27 +701,16 @@ impl PullDatasetUseCaseImpl {
         catalog: dill::Catalog,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResponse, InternalError> {
-        let mut sync_result = Self::transfer_and_commit(
+        let local_ref = psi.local_target.as_local_ref();
+        let sync_result = Self::transfer_and_commit(
             *psi.sync_request,
             options.sync_options,
             sync_svc,
-            catalog.clone(),
+            catalog,
             listener.clone(),
+            options.add_aliases.then_some((&local_ref, &psi.remote_ref)),
         )
         .await;
-
-        // Associate newly-synced datasets with remotes
-        if options.add_aliases
-            && let Ok(SyncResult::Updated { old_head: None, .. }) = &sync_result
-            && let Err(e) = Self::store_dataset_alias_transactional(
-                catalog,
-                &psi.local_target.as_local_ref(),
-                &psi.remote_ref,
-            )
-            .await
-        {
-            sync_result = Err(SyncError::Internal(e));
-        }
 
         if let Some(listener) = &listener {
             match &sync_result {
@@ -712,6 +739,7 @@ impl PullDatasetUseCaseImpl {
         sync_svc: Arc<dyn SyncService>,
         catalog: dill::Catalog,
         listener: Option<Arc<dyn SyncListener>>,
+        maybe_pull_alias: Option<(&odf::DatasetRef, &odf::DatasetRefRemote)>,
     ) -> Result<SyncResult, SyncError> {
         match sync_svc
             .transfer_into_local(request, options, listener)
@@ -719,17 +747,35 @@ impl PullDatasetUseCaseImpl {
         {
             SyncTransfer::UpToDate => Ok(SyncResult::UpToDate),
             SyncTransfer::Transferred(transferred) => {
-                Self::commit_sync_transactionally(catalog, transferred).await
+                Self::commit_sync_transactionally(catalog, transferred, maybe_pull_alias).await
             }
         }
     }
 
-    #[transactional_static_method1(local_sync_committer: Arc<dyn LocalSyncCommitter>)]
+    /// Commits the transfer. A dataset the pull created gets its pull alias in
+    /// the same transaction, so it never exists without it
+    #[transactional_static_method3(local_sync_committer: Arc<dyn LocalSyncCommitter>, dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
     async fn commit_sync_transactionally(
         catalog: dill::Catalog,
         transferred: TransferredSync,
+        maybe_pull_alias: Option<(&odf::DatasetRef, &odf::DatasetRefRemote)>,
     ) -> Result<SyncResult, SyncError> {
-        local_sync_committer.commit(transferred).await
+        let sync_result = local_sync_committer.commit(transferred).await?;
+
+        if let Some((local_ref, remote_ref)) = maybe_pull_alias
+            && let SyncResult::Updated { old_head: None, .. } = &sync_result
+        {
+            let handle = dataset_registry
+                .resolve_dataset_handle_by_ref(local_ref)
+                .await
+                .int_err()?;
+            match remote_alias_registry.get_remote_aliases(&handle).await {
+                Ok(mut aliases) => aliases.add(remote_ref, RemoteAliasKind::Pull).await?,
+                Err(GetAliasesError::Internal(e)) => return Err(e.into()),
+            };
+        }
+
+        Ok(sync_result)
     }
 
     #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
@@ -782,27 +828,6 @@ impl PullDatasetUseCaseImpl {
         }
 
         Ok(res)
-    }
-
-    #[transactional_static_method2(dataset_registry: Arc<dyn DatasetRegistry>, remote_alias_registry: Arc<dyn RemoteAliasesRegistry>)]
-    async fn store_dataset_alias_transactional(
-        catalog: dill::Catalog,
-        local_ref: &odf::DatasetRef,
-        remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<bool, InternalError> {
-        // Note: this would have failed before sync if dataset didn't exist,
-        // however, by this moment the dataset must have been created
-        let hdl = dataset_registry
-            .resolve_dataset_handle_by_ref(local_ref)
-            .await
-            .int_err()?;
-
-        match remote_alias_registry.get_remote_aliases(&hdl).await {
-            Ok(mut aliases) => aliases.add(remote_ref, RemoteAliasKind::Pull).await,
-            Err(e) => match e {
-                GetAliasesError::Internal(e) => Err(e),
-            },
-        }
     }
 }
 

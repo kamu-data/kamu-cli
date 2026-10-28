@@ -409,7 +409,7 @@ failure.
 - **Transform** — in one transaction `TransformPlanner::elaborate_transform` plans the transform
   from the target's current `HEAD` and computes each input's unprocessed slices and watermarks
   ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)). `UpToDate` ends
-  the task with an empty success, as does an executor run that appends nothing. Otherwise
+  the task with an `UpToDate` result, as does an executor run that appends nothing. Otherwise
   `TransformExecutor::execute_transform` provisions the engine named by the transform — always a
   container engine, DataFusion included — runs the query and commits `ExecuteTransform`.
   The runner never resets the derivative, so a diverged input is not repaired here:
@@ -425,8 +425,7 @@ failure.
 On success the result is `TaskResultDatasetUpdate::Updated` with the old and new heads and the
 `increment`: block and record counts and the new watermark, which the flow controllers use to
 trigger downstream flows. Each operation's result carries it, so an update without one cannot be
-represented. When nothing changed the result is `UpToDate` with the operation's reason, except for
-a transform, which returns an empty result.
+represented. When nothing changed the result is `UpToDate` with the operation's reason.
 
 Planning and execution errors classify themselves with `is_recoverable()`, and the runner turns
 the flag into an empty recoverable or unrecoverable failure. The classification of each error is
@@ -440,7 +439,7 @@ itself:
 | --- | --- |
 | Ingest, transform or sync: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
 | Transform elaboration: `InvalidInputInterval` | unrecoverable, typed `InputDatasetCompacted` |
-| Transform elaboration: `InputNotPulled` | not an error: the task ends with an empty success, as when up to date |
+| Transform elaboration: `InputNotPulled` | not an error: the task ends with an `UpToDate` result |
 
 ### 7.2 Hard compaction and reset to metadata
 
@@ -657,15 +656,13 @@ description, each into its own GraphQL union:
 
 | Task result | GraphQL result | Used by flow descriptions |
 | --- | --- | --- |
-| `TaskResultDatasetUpdate` | `FlowDescriptionUpdateResult`: `Success { numBlocks, numRecords, updatedWatermark, hasMore }`, `UpToDate`, `Unknown` | polling ingest, push ingest, transform |
+| `TaskResultDatasetUpdate` | `FlowDescriptionUpdateResult`: `Success { numBlocks, numRecords, updatedWatermark, hasMore }`, `UpToDate` | polling ingest, push ingest, transform |
 | `TaskResultDatasetHardCompact` | `FlowDescriptionDatasetReorganizationResult` | hard compaction |
 | `TaskResultDatasetResetToMetadata` | `FlowDescriptionDatasetReorganizationResult` | reset to metadata |
 | `TaskResultDatasetReset` | `FlowDescriptionResetResult` | reset |
 
 Each decoder returns nothing for result types it does not own. The update and reset decoders also
 return nothing for the empty result, while the reorganization decoder renders it as `NothingToDo`.
-For update results stored without `data_increment`, the resolver recomputes the increment and
-falls back to `Unknown` if that fails.
 
 ### Things to know
 

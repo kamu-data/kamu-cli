@@ -241,16 +241,10 @@ async fn test_pull_transform_with_real_planner_and_executor_commits_head() {
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
 
-    let pull_response = harness
-        .use_case
-        .execute(
-            PullRequest::Local(alias_bar.as_local_ref()),
-            PullOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
 
+    // The executor reports only `begin`: the outcome is reported once, after the commit
+    assert_eq!(events, vec!["begin", "success"]);
     let new_head = harness.get_head(&bar).await;
     assert_ne!(new_head, bar.head);
     assert_matches!(
@@ -317,6 +311,55 @@ async fn test_pull_ingest_head_moved_concurrently() {
         if e.expected == Some(foo.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_reports_success_after_commit() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_updated(
+        &alias_foo,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    reported_heads.set(&foo.head, &ingested_head);
+
+    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
+
+    assert_matches!(pull_response.result, Ok(PullResult::Updated { .. }));
+    assert_eq!(events, vec!["success"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_ingest_head_moved_reports_error_not_success() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_ingest_updated(
+        &alias_foo,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    let concurrent_head = harness.append_unreferenced_block(&foo, "concurrent").await;
+    reported_heads.set(&foo.head, &ingested_head);
+    harness.move_head(&foo, &foo.head, &concurrent_head).await;
+
+    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::PollingIngestError(
+            PollingIngestError::CommitError(_)
+        ))
+    );
+    assert_eq!(events, vec!["error"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -449,13 +492,13 @@ async fn test_pull_ingest_without_polling_source_is_up_to_date() {
     ));
     let foo = harness.create_root_dataset_without_source(&alias_foo).await;
 
-    let (pull_response, ingest_events) = harness.pull_local_recording_ingest(&alias_foo).await;
+    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
 
     assert_matches!(
         pull_response.result,
         Ok(PullResult::UpToDate(PullResultUpToDate::PollingIngest(_)))
     );
-    assert_eq!(ingest_events, vec!["begin", "no_polling_source"]);
+    assert_eq!(events, vec!["begin", "no_polling_source"]);
     assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
@@ -559,10 +602,10 @@ async fn test_pull_ingest_planning_failure_notifies_listener() {
     );
     let foo = harness.create_root_dataset(&alias_foo).await;
 
-    let (pull_response, ingest_events) = harness.pull_local_recording_ingest(&alias_foo).await;
+    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
 
     assert_matches!(pull_response.result, Err(PullError::Internal(_)));
-    assert_eq!(ingest_events, vec!["begin", "plan_error"]);
+    assert_eq!(events, vec!["begin", "plan_error"]);
     assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
@@ -630,6 +673,114 @@ async fn test_pull_transform_head_moved_concurrently() {
         if e.expected == Some(bar.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&bar).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_reports_success_after_commit() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_transform_updated(
+        &alias_foo,
+        &alias_bar,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    reported_heads.set(&bar.head, &transformed_head);
+
+    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
+
+    assert_matches!(pull_response.result, Ok(PullResult::Updated { .. }));
+    assert_eq!(events, vec!["success"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_head_moved_reports_error_not_success() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(PullUseCaseHarnessMocks::for_transform_updated(
+        &alias_foo,
+        &alias_bar,
+        &reported_heads,
+    ));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let transformed_head = harness.append_unreferenced_block(&bar, "transformed").await;
+    let concurrent_head = harness.append_unreferenced_block(&bar, "concurrent").await;
+    reported_heads.set(&bar.head, &transformed_head);
+    harness.move_head(&bar, &bar.head, &concurrent_head).await;
+
+    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::TransformError(TransformError::Execute(
+            TransformExecuteError::CommitError(_)
+        )))
+    );
+    assert_eq!(events, vec!["execute_error"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_pull_transform_failing_after_reset_reports_reset_heads() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
+    let reset_heads = ReportedHeads::default();
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::for_transform(&alias_foo, &alias_bar)
+            .with_transform_elaboration_mock(
+                MockTransformPlanner::new()
+                    .make_expect_elaborate_transform_diverged(alias_bar.clone())
+                    .make_expect_elaborate_transform(alias_bar.clone()),
+            )
+            .with_compaction_executor_mock(
+                MockCompactionExecutor::new()
+                    .make_expect_compaction_success(alias_bar.clone(), reset_heads.clone()),
+            )
+            .with_transform_execution_mock(
+                MockTransformExecutor::new().make_expect_transform_error(alias_bar.clone(), || {
+                    TransformExecuteError::Internal("Engine crashed".int_err())
+                }),
+            ),
+    );
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let bar = harness
+        .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
+        .await;
+    let reset_head = harness.append_unreferenced_block(&bar, "reset").await;
+    reset_heads.set(&bar.head, &reset_head);
+
+    let pull_response = harness
+        .pull_local_resetting_on_diverged_input(&alias_bar)
+        .await;
+
+    assert_matches!(
+        pull_response.result,
+        Err(PullError::TransformStopped(e))
+        if e.old_head == bar.head
+            && e.new_head == reset_head
+            && matches!(
+                e.source,
+                PullError::TransformError(TransformError::Execute(TransformExecuteError::Internal(_)))
+            )
+    );
+    assert_eq!(harness.get_head(&bar).await, reset_head);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1518,12 +1669,13 @@ impl PullUseCaseHarness {
             .unwrap()
     }
 
-    /// Pulls with a listener and returns the ingest events it received
-    async fn pull_local_recording_ingest(
+    /// Pulls with a listener and returns the ingest and transform events it
+    /// received
+    async fn pull_local_recording(
         &self,
         alias: &odf::DatasetAlias,
     ) -> (PullResponse, Vec<&'static str>) {
-        let listener = Arc::new(RecordingIngestListener::default());
+        let listener = Arc::new(RecordingListener::default());
         let pull_response = self
             .use_case
             .execute(
@@ -1939,13 +2091,13 @@ impl DatasetEnvVarResolver for ConstDatasetEnvVarResolver {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Records the ingest listener calls of a pull, in order
+/// Records the ingest and transform listener calls of a pull, in order
 #[derive(Default)]
-struct RecordingIngestListener {
+struct RecordingListener {
     events: std::sync::Mutex<Vec<&'static str>>,
 }
 
-impl RecordingIngestListener {
+impl RecordingListener {
     fn events(&self) -> Vec<&'static str> {
         self.events.lock().unwrap().clone()
     }
@@ -1955,13 +2107,13 @@ impl RecordingIngestListener {
     }
 }
 
-impl PullListener for RecordingIngestListener {
+impl PullListener for RecordingListener {
     fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestListener>> {
         Some(self)
     }
 
     fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>> {
-        None
+        Some(self)
     }
 
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncListener>> {
@@ -1969,7 +2121,25 @@ impl PullListener for RecordingIngestListener {
     }
 }
 
-impl PollingIngestListener for RecordingIngestListener {
+impl TransformListener for RecordingListener {
+    fn begin(&self) {
+        self.record("begin");
+    }
+
+    fn success(&self, _result: &TransformResult) {
+        self.record("success");
+    }
+
+    fn elaborate_error(&self, _error: &TransformElaborateError) {
+        self.record("elaborate_error");
+    }
+
+    fn execute_error(&self, _error: &TransformExecuteError) {
+        self.record("execute_error");
+    }
+}
+
+impl PollingIngestListener for RecordingListener {
     fn begin(&self) {
         self.record("begin");
     }

@@ -453,6 +453,9 @@ pub enum PullError {
     ),
 
     #[error(transparent)]
+    TransformStopped(Box<TransformStoppedError>),
+
+    #[error(transparent)]
     SyncError(
         #[from]
         #[backtrace]
@@ -489,6 +492,18 @@ pub struct IngestStoppedError {
     pub new_head: odf::Multihash,
     pub increment: odf::dataset::MetadataChainIncrementInterval,
     pub source: PollingIngestError,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The transform failed after the derivative was reset to metadata because an
+/// input diverged. The reset is committed: `HEAD` stays at `new_head`.
+#[derive(Debug, Error)]
+#[error("Reset the dataset to metadata, then failed: {source}")]
+pub struct TransformStoppedError {
+    pub old_head: odf::Multihash,
+    pub new_head: odf::Multihash,
+    pub source: PullError,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

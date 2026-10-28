@@ -9,8 +9,8 @@
 
 use std::fmt::{self, Display};
 
-use internal_error::{BoxedError, InternalError};
-use kamu_core::OverwriteSeedBlockError;
+use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
+use kamu_core::{OverwriteSeedBlockError, SyncError};
 use kamu_datasets::NameCollisionError;
 use thiserror::Error;
 
@@ -182,6 +182,11 @@ pub enum PushServerError {
     #[error(transparent)]
     NameCollision(NameCollisionError),
 
+    /// `HEAD` differs from the one the client planned the push from; nothing
+    /// was transferred
+    #[error(transparent)]
+    InvalidHead(odf::dataset::RefCASError),
+
     /// `HEAD` moved while the pushed blocks were being committed
     #[error(transparent)]
     UpdatedConcurrently(odf::dataset::RefCASError),
@@ -225,6 +230,23 @@ pub enum PushClientError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl From<PushClientError> for SyncError {
+    fn from(e: PushClientError) -> Self {
+        match e {
+            PushClientError::OverwriteSeedBlock(e) => Self::OverwriteSeedBlock(e),
+            PushClientError::RefCollision(e) => Self::RefCollision(e),
+            PushClientError::NameCollision(e) => Self::NameCollision(e),
+            PushClientError::InvalidHead(e) => Self::UpdatedConcurrently(e.into()),
+            PushClientError::UpdatedConcurrently(e) => Self::UpdatedConcurrently(e.into()),
+            e @ (PushClientError::ReadFailed(_)
+            | PushClientError::WriteFailed(_)
+            | PushClientError::Internal(_)) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The destination `HEAD` moved while the pushed blocks were being committed;
 /// nothing was committed
 #[derive(Error, Debug)]
@@ -258,6 +280,14 @@ impl std::error::Error for ClientInternalError {
     fn description(&self) -> &str {
         &self.details
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Object download failed with status {status}")]
+pub struct ObjectDownloadError {
+    pub status: reqwest::StatusCode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -346,3 +376,36 @@ where
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+
+    use kamu_core::SyncError;
+
+    use super::PushClientError;
+
+    #[test]
+    fn test_stale_push_head_is_a_recoverable_concurrent_update() {
+        let sync_error = SyncError::from(PushClientError::InvalidHead(stale_head_error()));
+
+        assert!(sync_error.is_recoverable());
+        assert_matches!(
+            sync_error,
+            SyncError::UpdatedConcurrently(e)
+                if e.downcast_ref::<odf::dataset::RefCASError>() == Some(&stale_head_error())
+        );
+    }
+
+    fn stale_head_error() -> odf::dataset::RefCASError {
+        odf::dataset::RefCASError {
+            reference: odf::BlockRef::Head,
+            expected: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
+            actual: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

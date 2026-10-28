@@ -227,11 +227,7 @@ impl WsSmartTransferProtocolClient {
                 ))))
             }
             Err(DatasetPushRequestError::InvalidHead(e)) => {
-                Err(PushClientError::InvalidHead(odf::dataset::RefCASError {
-                    actual: e.actual_head.clone(),
-                    expected: e.expected_head.clone(),
-                    reference: odf::BlockRef::Head,
-                }))
+                Err(PushClientError::InvalidHead(e.into()))
             }
         }
     }
@@ -730,7 +726,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             let object_files =
                 collect_object_references_from_metadata(dst_storage.as_ref(), &new_blocks, true)
-                    .await;
+                    .await?;
 
             // TODO: analyze sizes and split on stages
             let object_files_transfer_plan = if object_files.is_empty() {
@@ -857,7 +853,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                         .await
                     {
                         Some(mismatch) => mismatch.into(),
-                        None => SyncError::InvalidInterval(e),
+                        None => SyncError::DatasetsDiverged(DatasetsDivergedError {
+                            src_head: e.head,
+                            dst_head: e.tail,
+                            detail: None,
+                        }),
                     },
                 );
             }
@@ -915,7 +915,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok(_) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
+                return Err(e.into());
             }
         }
 
@@ -932,16 +932,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok(_) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(match e {
-                    PushClientError::OverwriteSeedBlock(err) => SyncError::OverwriteSeedBlock(err),
-                    e @ (PushClientError::ReadFailed(_)
-                    | PushClientError::WriteFailed(_)
-                    | PushClientError::InvalidHead(_)
-                    | PushClientError::RefCollision(_)
-                    | PushClientError::NameCollision(_)
-                    | PushClientError::UpdatedConcurrently(_)
-                    | PushClientError::Internal(_)) => SyncError::Internal(e.int_err()),
-                });
+                return Err(e.into());
             }
         }
 
@@ -968,16 +959,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok(push_objects_response) => push_objects_response,
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(match e {
-                    PushClientError::RefCollision(err) => SyncError::RefCollision(err),
-                    PushClientError::NameCollision(err) => SyncError::NameCollision(err),
-                    PushClientError::OverwriteSeedBlock(_)
-                    | PushClientError::ReadFailed(_)
-                    | PushClientError::WriteFailed(_)
-                    | PushClientError::InvalidHead(_)
-                    | PushClientError::UpdatedConcurrently(_)
-                    | PushClientError::Internal(_) => SyncError::Internal(e.int_err()),
-                });
+                return Err(e.into());
             }
         };
 
@@ -993,18 +975,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Ok(()) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
-                return Err(match e {
-                    PushClientError::UpdatedConcurrently(err) => {
-                        SyncError::UpdatedConcurrently(err.into())
-                    }
-                    e @ (PushClientError::OverwriteSeedBlock(_)
-                    | PushClientError::ReadFailed(_)
-                    | PushClientError::WriteFailed(_)
-                    | PushClientError::InvalidHead(_)
-                    | PushClientError::RefCollision(_)
-                    | PushClientError::NameCollision(_)
-                    | PushClientError::Internal(_)) => SyncError::Internal(e.int_err()),
-                });
+                return Err(e.into());
             }
         }
 

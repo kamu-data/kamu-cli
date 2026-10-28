@@ -16,7 +16,7 @@ use kamu_accounts::DUMMY_ACCESS_TOKEN;
 use kamu_adapter_http::smart_protocol::messages::{self, SMART_TRANSFER_PROTOCOL_VERSION};
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::*;
 use kamu_adapter_http::{BearerHeader, OdfSmtpVersion};
-use kamu_core::TenancyConfig;
+use kamu_core::{SyncError, TenancyConfig};
 use odf::metadata::testing::MetadataFactory;
 use url::Url;
 
@@ -25,6 +25,7 @@ use crate::harness::{
     ServerSideHarnessOptions,
     ServerSideLocalFsHarness,
     ServerSideS3Harness,
+    await_client_server_flow,
     commit_add_data_event,
 };
 
@@ -449,6 +450,49 @@ async fn test_pull_object_url_s3() {
             .as_str() &&
             upload_to_headers == vec![]
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_failed_object_download_is_recoverable() {
+    let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+        tenancy_config: TenancyConfig::SingleTenant,
+        authorized_writes: true,
+        base_catalog: None,
+    })
+    .await;
+
+    let test_case = create_test_case(&server_harness).await;
+    let http_dataset_url = server_harness.dataset_url_with_scheme(
+        &odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
+        "http",
+    );
+
+    let pull_strategy_missing_slice = prepare_pull_object_transfer_strategy(
+        test_case.dataset.as_ref(),
+        &messages::ObjectFileReference {
+            object_type: messages::ObjectType::DataSlice,
+            physical_hash: odf::Multihash::from_digest_sha3_256(b"missing-slice"),
+            size: 12345,
+        },
+        &http_dataset_url,
+        Some(test_case.bearer_header.clone()).as_ref(),
+    )
+    .await
+    .unwrap();
+
+    let api_server_handle = server_harness.api_server_run();
+
+    let client_handle = async {
+        let import_result =
+            dataset_import_object_file(test_case.dataset.as_ref(), pull_strategy_missing_slice)
+                .await;
+
+        assert_matches!(import_result, Err(e @ SyncError::Internal(_)) if e.is_recoverable());
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -34,6 +34,9 @@ pub trait TransformExecutor: Send + Sync {
     /// `HEAD`. Needs no transaction: `target` and the datasets of `plan` are
     /// expected to be detached. The caller commits `HEAD` afterwards.
     ///
+    /// Reports `begin` and engine progress to the listener; the caller reports
+    /// the outcome, after its commit.
+    ///
     /// Returns `UpToDate` when the engine produced nothing that would advance
     /// the dataset.
     ///

@@ -64,6 +64,13 @@ test_client_server_local_fs_harness_permutations!(
 
 test_client_server_local_fs_harness_permutations!(
     test_smart_push_shared,
+    test_smart_push_existing_diverged_dataset_fails_without_force
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+test_client_server_local_fs_harness_permutations!(
+    test_smart_push_shared,
     test_smart_push_existing_dataset_fails_as_server_advanced
 );
 

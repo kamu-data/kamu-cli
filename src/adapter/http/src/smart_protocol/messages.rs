@@ -144,8 +144,29 @@ pub enum DatasetPushRequestError {
 /// of date.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushInvalidHeadError {
+    /// The server's `HEAD`
     pub actual_head: Option<odf::Multihash>,
+    /// The `HEAD` the client planned the push from
     pub expected_head: Option<odf::Multihash>,
+}
+
+impl From<&odf::dataset::RefCASError> for DatasetPushInvalidHeadError {
+    fn from(e: &odf::dataset::RefCASError) -> Self {
+        Self {
+            actual_head: e.actual.clone(),
+            expected_head: e.expected.clone(),
+        }
+    }
+}
+
+impl From<DatasetPushInvalidHeadError> for odf::dataset::RefCASError {
+    fn from(e: DatasetPushInvalidHeadError) -> Self {
+        Self {
+            reference: odf::BlockRef::Head,
+            expected: e.expected_head,
+            actual: e.actual_head,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

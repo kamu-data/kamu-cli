@@ -82,7 +82,7 @@ impl PullIngestLoop {
                 .await
             {
                 Ok(response) => response,
-                Err(e) => return Err(Self::stopped(combined, e)),
+                Err(e) => return Err(Self::stopped(combined, e, maybe_listener.as_ref())),
             };
 
             let has_more = match &response.result {
@@ -98,11 +98,15 @@ impl PullIngestLoop {
                         .await
                     {
                         let e = PollingIngestError::CommitError(e.into());
-                        return Err(Self::stopped(combined, e));
+                        return Err(Self::stopped(combined, e, maybe_listener.as_ref()));
                     }
                     *has_more
                 }
             };
+
+            if let Some(listener) = &maybe_listener {
+                listener.success(&response.result);
+            }
 
             combined = Some(Self::merge_results(combined, response.result));
 
@@ -152,7 +156,16 @@ impl PullIngestLoop {
             .await
     }
 
-    fn stopped(combined: Option<PollingIngestResult>, error: PollingIngestError) -> PullError {
+    /// Reports the failed iteration and turns its error into the pull's
+    fn stopped(
+        combined: Option<PollingIngestResult>,
+        error: PollingIngestError,
+        maybe_listener: Option<&Arc<dyn PollingIngestListener>>,
+    ) -> PullError {
+        if let Some(listener) = maybe_listener {
+            listener.error(&error);
+        }
+
         match combined {
             Some(PollingIngestResult::Updated {
                 old_head,

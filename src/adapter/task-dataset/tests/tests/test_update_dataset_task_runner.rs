@@ -45,7 +45,7 @@ use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
-use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskResult, TaskRunner};
+use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -318,7 +318,12 @@ async fn test_transform_input_not_pulled_succeeds_as_up_to_date() {
 
     let outcome = harness.run_transform_update(&bar).await;
 
-    assert_eq!(TaskOutcome::Success(TaskResult::empty()), outcome);
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result()
+        ),
+        outcome
+    );
     assert_eq!(harness.get_head(&bar).await, bar.head);
 }
 
@@ -427,7 +432,7 @@ async fn test_transform_unsupported_engine_fails_unrecoverably() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-async fn test_transform_up_to_date_succeeds_empty() {
+async fn test_transform_up_to_date_reports_up_to_date() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
@@ -443,7 +448,12 @@ async fn test_transform_up_to_date_succeeds_empty() {
 
     let outcome = harness.run_transform_update(&bar).await;
 
-    assert_eq!(TaskOutcome::Success(TaskResult::empty()), outcome);
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result()
+        ),
+        outcome
+    );
     assert_eq!(harness.get_head(&bar).await, bar.head);
 }
 
