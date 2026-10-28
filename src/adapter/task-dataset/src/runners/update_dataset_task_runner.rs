@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use database_common_macros::{transactional_method1, transactional_method2};
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{DatasetIncrementQueryService, DatasetRegistry, ResolvedDataset};
 use kamu_task_system::*;
@@ -66,46 +66,77 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    /// Re-reads the destination's `HEAD` in a transaction of its own,
+    /// transfers with none open, and commits in another
     async fn run_sync_update(
         &self,
-        mut sync_request: SyncRequest,
+        sync_request: LocalSyncRequest,
         sync_opts: SyncOptions,
     ) -> Result<TaskOutcome, InternalError> {
-        sync_request
-            .src
-            .refresh_dataset_from_registry(dataset_registry.as_ref())
-            .await;
-        sync_request
-            .dst
-            .refresh_dataset_from_registry(dataset_registry.as_ref())
+        let sync_request = self.plan_sync(sync_request).await?;
+
+        let dst_id = match &sync_request.dst {
+            LocalSyncTarget::Existing { dataset, .. } => dataset.get_id().clone(),
+            LocalSyncTarget::New(alias) => {
+                return InternalError::bail(format!(
+                    "An update task syncs into an existing dataset, but {alias} does not exist"
+                ));
+            }
+        };
+
+        let transfer = self
+            .sync_service
+            .transfer_into_local(sync_request, sync_opts, None)
             .await;
 
-        let sync_response = self
-            .sync_service
-            .sync(sync_request.clone(), sync_opts, None)
-            .await;
-        match sync_response {
-            Ok(sync_result) => {
-                if let SyncRef::Local(local_ref) = &sync_request.dst {
-                    self.combine_task_result(sync_result.into(), &local_ref.get_handle().id)
-                        .await
-                } else {
-                    Ok(TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: sync_result.into(),
-                            data_increment: None,
-                        }
-                        .into_task_result(),
-                    ))
-                }
+        let sync_result = match transfer {
+            Ok(SyncTransfer::UpToDate) => Ok(SyncResult::UpToDate),
+            Ok(SyncTransfer::Transferred(transferred)) => self.commit_sync(transferred).await,
+            Err(e) => Err(e),
+        };
+
+        match sync_result {
+            Ok(sync_result) => self.combine_task_result(sync_result.into(), &dst_id).await,
+            Err(SyncError::HeadMoved(e)) => {
+                Ok(TaskDatasetHeadCommitter::head_moved_outcome(dst_id, e))
             }
-            Err(_) =>
-            // TODO: classify sync errors as recoverable/unrecoverable
-            {
+            Err(e) => {
+                tracing::error!(error = ?e, error_msg = %e, "Sync failed");
+                // TODO: classify sync errors as recoverable/unrecoverable
                 Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
             }
         }
+    }
+
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn plan_sync(
+        &self,
+        sync_request: LocalSyncRequest,
+    ) -> Result<LocalSyncRequest, InternalError> {
+        let LocalSyncRequest { mut src, dst } = sync_request;
+
+        src.refresh_dataset_from_registry(dataset_registry.as_ref())
+            .await;
+        src.detach_from_transaction();
+
+        let dst = match dst {
+            LocalSyncTarget::Existing { dataset, .. } => {
+                let dataset = dataset_registry
+                    .get_dataset_by_handle(dataset.get_handle())
+                    .await;
+                let target = LocalSyncTarget::existing(dataset).await.int_err()?;
+                target.detach_from_transaction();
+                target
+            }
+            new @ LocalSyncTarget::New(_) => new,
+        };
+
+        Ok(LocalSyncRequest { src, dst })
+    }
+
+    #[transactional_method1(local_sync_committer: Arc<dyn LocalSyncCommitter>)]
+    async fn commit_sync(&self, transferred: TransferredSync) -> Result<SyncResult, SyncError> {
+        local_sync_committer.commit(transferred).await
     }
 
     /// Plans the ingest and resolves its environment variables in one

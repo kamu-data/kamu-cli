@@ -24,12 +24,29 @@ use crate::*;
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait SyncService: Send + Sync {
+    /// Syncs into a destination that is not a dataset of this node: a push to
+    /// a remote repository or to IPFS. A pull into a local dataset is
+    /// [`SyncService::transfer_into_local`] followed by
+    /// [`LocalSyncCommitter::commit`]
     async fn sync(
         &self,
         request: SyncRequest,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
+
+    /// Writes the blocks, data and checkpoints a local dataset lacks as
+    /// unreferenced objects. Holds no transaction across the transfer and
+    /// moves no reference: the caller commits it with
+    /// [`LocalSyncCommitter`]. The listener gets `begin` and progress;
+    /// reporting the outcome is up to the caller, since only the commit
+    /// decides it
+    async fn transfer_into_local(
+        &self,
+        request: LocalSyncRequest,
+        options: SyncOptions,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncTransfer, SyncError>;
 
     /// Adds dataset to IPFS and returns the root CID.
     /// Unlike `sync` it does not do IPNS resolution and publishing.
@@ -38,23 +55,30 @@ pub trait SyncService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A sync into a destination that is not a dataset of this node
 #[derive(Debug, Clone)]
 pub struct SyncRequest {
     pub src: SyncRef,
-    pub dst: SyncRef,
+    pub dst: SyncRefRemote,
+}
+
+/// A sync into a dataset of this node
+#[derive(Debug, Clone)]
+pub struct LocalSyncRequest {
+    pub src: SyncRef,
+    pub dst: LocalSyncTarget,
 }
 
 #[derive(Debug, Clone)]
 pub enum SyncRef {
     Local(ResolvedDataset),
-    LocalNew(odf::DatasetAlias),
     Remote(SyncRefRemote),
 }
 
 impl SyncRef {
     pub fn is_local(&self) -> bool {
         match self {
-            Self::Local(_) | Self::LocalNew(_) => true,
+            Self::Local(_) => true,
             Self::Remote(_) => false,
         }
     }
@@ -63,8 +87,7 @@ impl SyncRef {
     pub fn as_internal_any_ref(&self) -> odf::DatasetRefAny {
         match self {
             Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
-            Self::LocalNew(alias) => alias.as_any_ref(),
-            Self::Remote(remote_ref) => odf::DatasetRefAny::Url(remote_ref.url.clone()),
+            Self::Remote(remote_ref) => remote_ref.as_internal_any_ref(),
         }
     }
 
@@ -72,20 +95,78 @@ impl SyncRef {
     pub fn as_user_friendly_any_ref(&self) -> odf::DatasetRefAny {
         match self {
             Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
-            Self::LocalNew(alias) => alias.as_any_ref(),
-            Self::Remote(remote_ref) => remote_ref.original_remote_ref.as_any_ref(),
+            Self::Remote(remote_ref) => remote_ref.as_user_friendly_any_ref(),
         }
     }
 
     pub fn detach_from_transaction(&self) {
-        if let Self::Local(r) = self {
-            r.detach_from_transaction();
+        match self {
+            Self::Local(r) => r.detach_from_transaction(),
+            Self::Remote(_) => {}
         }
     }
 
     pub async fn refresh_dataset_from_registry(&mut self, dataset_registry: &dyn DatasetRegistry) {
-        if let Self::Local(r) = self {
-            *r = dataset_registry.get_dataset_by_handle(r.get_handle()).await;
+        match self {
+            Self::Local(r) => *r = dataset_registry.get_dataset_by_handle(r.get_handle()).await,
+            Self::Remote(_) => {}
+        }
+    }
+}
+
+/// The local dataset a pull writes into
+#[derive(Debug, Clone)]
+pub enum LocalSyncTarget {
+    /// An existing dataset, whose `HEAD` must still be `expected_head` when
+    /// the transfer is committed. Read it in a transaction: a detached
+    /// dataset reads the storage `HEAD`, which may lag behind. `None` for an
+    /// entry left without `HEAD` by an interrupted creation
+    Existing {
+        dataset: ResolvedDataset,
+        expected_head: Option<odf::Multihash>,
+    },
+    /// A dataset the commit creates
+    New(odf::DatasetAlias),
+}
+
+impl LocalSyncTarget {
+    /// Targets an existing dataset, expecting its current `HEAD`
+    pub async fn existing(dataset: ResolvedDataset) -> Result<Self, SyncError> {
+        let expected_head = match dataset
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+        {
+            Ok(head) => Some(head),
+            Err(odf::GetRefError::NotFound(_)) => None,
+            Err(odf::GetRefError::Access(e)) => return Err(SyncError::Access(e)),
+            Err(odf::GetRefError::Internal(e)) => return Err(SyncError::Internal(e)),
+        };
+
+        Ok(Self::Existing {
+            dataset,
+            expected_head,
+        })
+    }
+
+    pub fn alias(&self) -> &odf::DatasetAlias {
+        match self {
+            Self::Existing { dataset, .. } => dataset.get_alias(),
+            Self::New(alias) => alias,
+        }
+    }
+
+    pub fn as_any_ref(&self) -> odf::DatasetRefAny {
+        match self {
+            Self::Existing { dataset, .. } => dataset.get_handle().as_any_ref(),
+            Self::New(alias) => alias.as_any_ref(),
+        }
+    }
+
+    pub fn detach_from_transaction(&self) {
+        match self {
+            Self::Existing { dataset, .. } => dataset.detach_from_transaction(),
+            Self::New(_) => {}
         }
     }
 }
@@ -95,6 +176,16 @@ pub struct SyncRefRemote {
     pub url: Arc<Url>,
     pub dataset: Arc<dyn odf::Dataset>,
     pub original_remote_ref: odf::DatasetRefRemote,
+}
+
+impl SyncRefRemote {
+    pub fn as_internal_any_ref(&self) -> odf::DatasetRefAny {
+        odf::DatasetRefAny::Url(self.url.clone())
+    }
+
+    pub fn as_user_friendly_any_ref(&self) -> odf::DatasetRefAny {
+        self.original_remote_ref.as_any_ref()
+    }
 }
 
 impl std::fmt::Debug for SyncRefRemote {
@@ -145,6 +236,39 @@ pub enum SyncResult {
         old_head: Option<odf::Multihash>,
         new_head: odf::Multihash,
         num_blocks: u64,
+    },
+}
+
+/// What [`SyncService::transfer_into_local`] wrote
+#[derive(Debug)]
+pub enum SyncTransfer {
+    UpToDate,
+    Transferred(TransferredSync),
+}
+
+/// Blocks and objects written into a local dataset, not yet referenced by its
+/// `HEAD`
+#[derive(Debug)]
+pub struct TransferredSync {
+    pub target: TransferredSyncTarget,
+    pub new_head: odf::Multihash,
+    pub num_blocks: u64,
+}
+
+#[derive(Debug)]
+pub enum TransferredSyncTarget {
+    /// The commit moves `HEAD` from `expected_head` to the new head
+    Existing {
+        dataset: ResolvedDataset,
+        expected_head: Option<odf::Multihash>,
+    },
+    /// The commit creates the dataset from its stored `Seed`, with `HEAD` at
+    /// the new head
+    New {
+        alias: odf::DatasetAlias,
+        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+        seed_block_bytes: odf::MetadataBlockBytes,
+        visibility: odf::DatasetVisibility,
     },
 }
 
@@ -257,10 +381,12 @@ pub enum SyncError {
     OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
-    #[error(transparent)]
-    BadMetadata(#[from] kamu_datasets::AppendDatasetMetadataBatchUseCaseError),
+    /// A remote destination moved its `HEAD` during the sync
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
+    /// A local destination moved its `HEAD` after the sync read it
+    #[error("Dataset head was moved concurrently: {0}")]
+    HeadMoved(odf::dataset::RefCASError),
     #[error(transparent)]
     Access(
         #[from]

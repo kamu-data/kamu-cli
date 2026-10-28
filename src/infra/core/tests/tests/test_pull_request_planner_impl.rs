@@ -224,15 +224,11 @@ async fn create_graph_remote(
     for import_alias in to_import {
         let remote_alias = import_alias.as_remote_alias(tmp_repo_name.clone());
         harness
-            .sync_service
-            .sync(
-                harness
-                    .sync_request_builder
-                    .build_sync_request(remote_alias.as_any_ref(), import_alias.as_any_ref(), true)
-                    .await
-                    .unwrap(),
+            .local_sync_helper
+            .pull(
+                remote_alias.as_any_ref(),
+                import_alias.as_local_ref(),
                 SyncOptions::default(),
-                None,
             )
             .await
             .unwrap();
@@ -900,8 +896,7 @@ async fn test_pull_derivative_without_transform_with_dependencies_fails_planning
 struct PullTestHarness {
     base_repo_harness: BaseRepoHarness,
     calls: Arc<Mutex<Vec<Vec<PullJob>>>>,
-    sync_service: Arc<dyn SyncService>,
-    sync_request_builder: Arc<SyncRequestBuilder>,
+    local_sync_helper: LocalSyncHelper,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_request_planner: Arc<dyn PullRequestPlanner>,
@@ -932,6 +927,7 @@ impl PullTestHarness {
             .add::<TransformPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
+            .add::<LocalSyncCommitterImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<SyncRequestBuilder>()
             .add::<odf::dataset::DatasetFactoryImpl>()
@@ -966,8 +962,7 @@ impl PullTestHarness {
         Self {
             base_repo_harness,
             calls,
-            sync_service: catalog.get_one().unwrap(),
-            sync_request_builder: catalog.get_one().unwrap(),
+            local_sync_helper: LocalSyncHelper::new(catalog.clone()),
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
@@ -1024,7 +1019,7 @@ impl PullTestHarness {
                     PullPlanIterationJob::Sync(psi) => {
                         jobs.push(PullJob::Sync((
                             psi.sync_request.src.as_user_friendly_any_ref(),
-                            psi.sync_request.dst.as_user_friendly_any_ref(),
+                            psi.sync_request.dst.as_any_ref(),
                         )));
                     }
                 }

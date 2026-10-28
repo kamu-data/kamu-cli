@@ -86,10 +86,13 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             .await?;
 
         // Set initial dataset HEAD
+        let initial_head = options
+            .initial_head
+            .unwrap_or_else(|| store_result.seed.clone());
         self.create_helper
             .set_created_head(
                 ResolvedDataset::from_stored(&store_result, canonical_alias.as_ref()),
-                &store_result.seed,
+                &initial_head,
             )
             .await?;
 
@@ -122,10 +125,10 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
             )
             .await?;
 
-        Ok(CreateDatasetResult::from_stored(
-            store_result,
-            canonical_alias.into_inner(),
-        ))
+        Ok(CreateDatasetResult {
+            head: initial_head,
+            ..CreateDatasetResult::from_stored(store_result, canonical_alias.into_inner())
+        })
     }
 }
 

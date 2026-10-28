@@ -100,7 +100,6 @@ impl PushDatasetUseCaseImpl {
             {
                 Ok(sync_request) => {
                     sync_request.src.detach_from_transaction();
-                    sync_request.dst.detach_from_transaction();
                     sync_requests.push(sync_request);
                 }
                 Err(e) => errors.push(PushResponse {

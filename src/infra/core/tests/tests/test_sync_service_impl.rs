@@ -88,6 +88,7 @@ async fn do_test_sync(
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<LocalSyncCommitterImpl>()
         .add::<RemoteAliasesRegistryImpl>()
         .add::<RemoteAliasResolverImpl>()
         .add::<SyncRequestBuilder>()
@@ -146,6 +147,7 @@ async fn do_test_sync(
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<LocalSyncCommitterImpl>()
         .add::<RemoteAliasesRegistryImpl>()
         .add::<RemoteAliasResolverImpl>()
         .add::<SyncRequestBuilder>()
@@ -204,7 +206,7 @@ async fn do_test_sync(
 
     assert_matches!(
         sync_request_builder_bar
-            .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), true)
+            .build_local_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_local_ref(), true)
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == pull_ref.as_any_ref()
     );
@@ -256,14 +258,11 @@ async fn do_test_sync(
         } if new_head == b1
     );
 
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), true)
-                .await
-                .unwrap(),
+    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+        .pull(
+            pull_ref.as_any_ref(),
+            dataset_alias_bar.as_local_ref(),
             SyncOptions::default(),
-            None,
         )
         .await
         .unwrap();
@@ -294,14 +293,14 @@ async fn do_test_sync(
     )
     .await;
 
-    let sync_err = sync_svc_foo
-        .sync(
-            sync_request_builder_foo
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_foo.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_err = LocalSyncHelper::new(catalog_foo.clone())
+        .pull(
+            pull_ref.as_any_ref(),
+            dataset_alias_foo.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .err()
@@ -336,14 +335,14 @@ async fn do_test_sync(
         } if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+        .pull(
+            pull_ref.as_any_ref(),
+            dataset_alias_bar.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .unwrap();
@@ -373,14 +372,14 @@ async fn do_test_sync(
         .unwrap();
     assert_matches!(sync_result, SyncResult::UpToDate,);
 
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+        .pull(
+            pull_ref.as_any_ref(),
+            dataset_alias_bar.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .unwrap();
@@ -466,14 +465,14 @@ async fn do_test_sync(
     );
 
     // Try pulling dataset_bar: should fail, destination is ahead
-    let sync_err = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
-            SyncOptions::default(),
-            None,
+    let sync_err = LocalSyncHelper::new(catalog_bar.clone())
+        .pull(
+            pull_ref.as_any_ref(),
+            dataset_alias_bar.as_local_ref(),
+            SyncOptions {
+                create_if_not_exists: false,
+                ..SyncOptions::default()
+            },
         )
         .await
         .err()
@@ -487,17 +486,15 @@ async fn do_test_sync(
     );
 
     // Try pulling dataset_bar with --force: should abandon diverged_head
-    let sync_result = sync_svc_bar
-        .sync(
-            sync_request_builder_bar
-                .build_sync_request(pull_ref.as_any_ref(), dataset_alias_bar.as_any_ref(), false)
-                .await
-                .unwrap(),
+    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+        .pull(
+            pull_ref.as_any_ref(),
+            dataset_alias_bar.as_local_ref(),
             SyncOptions {
+                create_if_not_exists: false,
                 force: true,
                 ..SyncOptions::default()
             },
-            None,
         )
         .await
         .unwrap();
@@ -626,21 +623,15 @@ async fn do_test_sync(
             if src_dataset_id == stored_baz.dataset_id && dst_dataset_id == stored_foo.dataset_id
         );
 
-        let sync_err = sync_svc_foo
-            .sync(
-                sync_request_builder_foo
-                    .build_sync_request(
-                        pull_ref.as_any_ref(),
-                        dataset_alias_baz.as_any_ref(),
-                        false,
-                    )
-                    .await
-                    .unwrap(),
+        let sync_err = LocalSyncHelper::new(catalog_foo.clone())
+            .pull(
+                pull_ref.as_any_ref(),
+                dataset_alias_baz.as_local_ref(),
                 SyncOptions {
+                    create_if_not_exists: false,
                     force,
                     ..SyncOptions::default()
                 },
-                None,
             )
             .await
             .err()

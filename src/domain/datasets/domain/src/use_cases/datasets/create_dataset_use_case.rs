@@ -32,6 +32,9 @@ pub trait CreateDatasetUseCase: Send + Sync {
 pub struct CreateDatasetUseCaseOptions {
     pub dataset_visibility: odf::DatasetVisibility,
     pub seed_block_bytes: Option<odf::MetadataBlockBytes>,
+    /// The first `HEAD`: a block already stored in the dataset's storage,
+    /// such as the last block a pull transferred. Defaults to the `Seed`
+    pub initial_head: Option<odf::Multihash>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

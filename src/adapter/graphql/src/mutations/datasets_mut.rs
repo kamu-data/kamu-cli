@@ -253,7 +253,7 @@ impl DatasetsMut {
 
         let create_options = kamu_datasets::CreateDatasetUseCaseOptions {
             dataset_visibility,
-            seed_block_bytes: None,
+            ..Default::default()
         };
 
         let result = match create_from_snapshot.execute(snapshot, create_options).await {

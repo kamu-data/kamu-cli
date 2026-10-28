@@ -364,7 +364,7 @@ or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync a
 | --- | --- | --- | --- |
 | Update → ingest | `PollingIngestService` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Update → transform | `TransformExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
-| Update → sync | `SyncService` | the sync itself ([dataset-sync.md](dataset-sync.md#11-committing-validation-and-errors)) | one around the call in the runner; the protocol appends and sets `HEAD` in transactions of its own |
+| Update → sync | `SyncService::transfer_into_local` | runner, `LocalSyncCommitter`: CAS on the head read before the transfer ([dataset-sync.md](dataset-sync.md#4-sync-requests)) | none; short one to read `HEAD`, short one for `HEAD` |
 | Hard compact / reset to metadata | `CompactionExecutor` | runner, CAS on `old_head` | none; short one for `HEAD` |
 | Reset | — (existing block) | `ResetExecutor`, CAS on the planned `old_head` | one for the whole reset |
 
@@ -416,9 +416,11 @@ failure.
   `InvalidInputInterval` (the previously processed input block is no longer an ancestor, usually
   because the input was compacted) becomes `TaskErrorDatasetUpdate::InputDatasetCompacted`, and
   the transform flow controller decides what to do about it.
-- **Sync** — refreshes source and destination from the registry and calls `SyncService::sync`,
-  which copies blocks and objects from the remote (smart transfer protocol for `odf+http(s)://`,
-  simple protocol otherwise) and appends them, moving `HEAD` itself.
+- **Sync** — in one transaction re-resolves the destination and reads its `HEAD`; then
+  `SyncService::transfer_into_local` copies blocks and objects from the remote (smart transfer
+  protocol for `odf+http(s)://`, simple protocol otherwise) without moving `HEAD`; then
+  `LocalSyncCommitter` moves `HEAD` in a transaction of its own. An update task syncs only into an
+  existing dataset.
 
 On success the `PullResult` is wrapped in `TaskResultDatasetUpdate` with `data_increment`: block
 and record counts and the new watermark, which the flow controllers use to trigger downstream
@@ -426,8 +428,6 @@ flows. Ingest and transform take it from the operation's result. Sync queries it
 `DatasetIncrementQueryService::get_increment_between(old_head, new_head)` in `combine_task_result`,
 a short transaction.
 
-| Error | Recoverable |
-| --- | --- |
 Planning and execution errors classify themselves with `is_recoverable()`, and the runner turns
 the flag into an empty recoverable or unrecoverable failure. The classification of each error is
 owned by its domain doc: ingest in
@@ -437,7 +437,7 @@ itself:
 
 | Error | Outcome |
 | --- | --- |
-| Ingest or transform: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
+| Ingest, transform or sync: `HEAD` moved after planning (the CAS fails when moving it) | recoverable, typed `DatasetCommitError` → `HeadMoved` with the expected and actual heads |
 | Transform elaboration: `InvalidInputInterval` | unrecoverable, typed `InputDatasetCompacted` |
 | Transform elaboration: `InputNotPulled` | not an error: the task ends with an empty success, as when up to date |
 | Sync: any | yes (not yet classified) |

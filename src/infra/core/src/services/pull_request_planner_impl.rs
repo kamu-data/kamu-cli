@@ -214,9 +214,9 @@ impl PullRequestPlannerImpl {
     ) -> Result<PullSyncItem, Box<PullResponse>> {
         match self
             .sync_request_builder
-            .build_sync_request(
+            .build_local_sync_request(
                 remote_ref.as_any_ref(),
-                pi.local_target.as_any_ref(),
+                pi.local_target.as_local_ref(),
                 sync_options.create_if_not_exists,
             )
             .await

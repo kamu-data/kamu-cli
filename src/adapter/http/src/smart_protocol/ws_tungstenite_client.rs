@@ -10,25 +10,13 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-use database_common_macros::{transactional_method1, transactional_method2};
 use futures::SinkExt;
 use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu::utils::local_sync_writes::{StoredSeed, append_transferred_blocks};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
 use kamu_core::*;
-use kamu_datasets::{
-    AppendDatasetMetadataBatchUseCase,
-    AppendDatasetMetadataBatchUseCaseError,
-    AppendDatasetMetadataBatchUseCaseOptions,
-    CreateDatasetResult,
-    CreateDatasetUseCase,
-    CreateDatasetUseCaseOptions,
-    DatasetRegistry,
-    NameCollisionError,
-    ResolvedDataset,
-    SetRefCheckRefMode,
-};
-use odf::metadata::AsTypedBlock as _;
+use kamu_datasets::{NameCollisionError, ResolvedDataset};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::net::TcpStream;
@@ -579,88 +567,6 @@ impl WsSmartTransferProtocolClient {
 
         url
     }
-
-    #[transactional_method1(create_dataset_use_case: Arc<dyn CreateDatasetUseCase>)]
-    async fn create_dataset_transactional(
-        &self,
-        dataset_alias: &odf::DatasetAlias,
-        seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-        seed_block_bytes: odf::MetadataBlockBytes,
-        expected_head: &odf::Multihash,
-        dataset_visibility: odf::DatasetVisibility,
-    ) -> Result<CreateDatasetResult, SyncError> {
-        let res = create_dataset_use_case
-            .execute(
-                dataset_alias,
-                seed_block,
-                CreateDatasetUseCaseOptions {
-                    dataset_visibility,
-                    seed_block_bytes: Some(seed_block_bytes),
-                },
-            )
-            .await?;
-
-        if res.head != *expected_head {
-            // Return the same kind of error as AppendDatasetMetadataBatchUseCase would on
-            // hash mismatch
-            return Err(AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
-                odf::dataset::AppendBatchError {
-                    append_error: odf::dataset::AppendError::InvalidBlock(
-                        odf::dataset::AppendValidationError::HashMismatch(
-                            odf::storage::HashMismatchError {
-                                expected: expected_head.clone(),
-                                actual: res.head,
-                            },
-                        ),
-                    ),
-                    block_sequence_number: 0,
-                    block_hash: expected_head.clone(),
-                },
-            )
-            .into());
-        }
-
-        res.dataset.detach_from_transaction();
-
-        Ok(res)
-    }
-
-    #[transactional_method2(append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>, dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn append_metadata_transactional(
-        &self,
-        dataset_handle: &odf::DatasetHandle,
-        new_blocks: std::collections::VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
-        force_update_if_diverged: bool,
-    ) -> Result<Option<odf::Multihash>, SyncError> {
-        let transactional_target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
-
-        let head = append_dataset_metadata_batch_use_case
-            .execute(
-                &transactional_target,
-                Box::new(new_blocks.into_iter()),
-                AppendDatasetMetadataBatchUseCaseOptions {
-                    set_ref_check_ref_mode: SetRefCheckRefMode::ForceUpdateIfDiverged(
-                        force_update_if_diverged,
-                    ),
-                    ..Default::default()
-                },
-            )
-            .await
-            .map_err(|e| match e {
-                AppendDatasetMetadataBatchUseCaseError::SetRefError(
-                    odf::dataset::SetChainRefError::CASFailed(e),
-                ) => SyncError::UpdatedConcurrently(e.into()),
-                e @ (AppendDatasetMetadataBatchUseCaseError::BlockAppendError(_)
-                | AppendDatasetMetadataBatchUseCaseError::SetRefError(
-                    odf::dataset::SetChainRefError::BlockNotFound(_)
-                    | odf::dataset::SetChainRefError::Access(_)
-                    | odf::dataset::SetChainRefError::Internal(_),
-                )
-                | AppendDatasetMetadataBatchUseCaseError::Internal(_)) => e.into(),
-            })?;
-
-        Ok(head)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -670,25 +576,29 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: Option<&ResolvedDataset>,
-        dst_alias: Option<&odf::DatasetAlias>,
-        listener: Arc<dyn SyncListener>,
+        dst: &LocalSyncTarget,
         transfer_options: TransferOptions,
-    ) -> Result<SyncResult, SyncError> {
-        listener.begin();
-
+    ) -> Result<SyncTransfer, SyncError> {
         let maybe_access_token = self
             .dataset_credential_resolver
             .resolve_odf_dataset_access_token(http_src_url);
 
+        let (dst_dataset, dst_head) = match dst {
+            LocalSyncTarget::Existing {
+                dataset,
+                expected_head,
+            } => (Some(dataset), expected_head.as_ref()),
+            LocalSyncTarget::New(_) => (None, None),
+        };
+
         // A forced pull skips the head check that would otherwise reveal a
         // different dataset, so compare the IDs before transferring anything
         if transfer_options.force_update_if_diverged
-            && let Some(dst) = dst
+            && let Some(dst_dataset) = dst_dataset
             && let Some(mismatch) = Self::find_pull_dataset_id_mismatch(
                 http_src_url,
                 maybe_access_token.as_deref(),
-                dst,
+                dst_dataset,
             )
             .await
         {
@@ -697,10 +607,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let pull_url = Self::generate_ws_url(http_src_url, "pull");
 
-        tracing::debug!(
-            %pull_url, access_token = ?maybe_access_token,
-            "Connecting smart pull protocol web socket",
-        );
+        tracing::debug!(%pull_url, "Connecting smart pull protocol web socket");
 
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = pull_url.into_client_request().int_err()?;
@@ -723,27 +630,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let dst_head = if let Some(dst) = &dst {
-            match dst
-                .as_metadata_chain()
-                .resolve_ref(&odf::BlockRef::Head)
-                .await
-            {
-                Ok(head) => Ok(Some(head)),
-                Err(odf::GetRefError::NotFound(_)) => Ok(None),
-                Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-            }?
-        } else {
-            None
-        };
-
-        let mut new_head = dst_head.clone();
-
         let dataset_pull_result = match self
             .pull_send_request(
                 &mut ws_stream,
-                dst_head.clone(),
+                dst_head.cloned(),
                 transfer_options.force_update_if_diverged,
             )
             .await
@@ -755,11 +645,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     PullClientError::InvalidInterval(e) => {
                         // The server could not find our head in its chain. Unless the
                         // datasets differ entirely, this means the chains diverged.
-                        if let Some(dst) = dst
+                        if let Some(dst_dataset) = dst_dataset
                             && let Some(mismatch) = Self::find_pull_dataset_id_mismatch(
                                 http_src_url,
                                 maybe_access_token.as_deref(),
-                                dst,
+                                dst_dataset,
                             )
                             .await
                         {
@@ -781,7 +671,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let sync_result = if dataset_pull_result.transfer_plan.num_blocks > 0 {
+        let sync_transfer = if dataset_pull_result.transfer_plan.num_blocks > 0 {
             let dataset_pull_metadata_response =
                 match self.pull_send_metadata_request(&mut ws_stream).await {
                     Ok(dataset_pull_metadata_response) => Ok(dataset_pull_metadata_response),
@@ -794,42 +684,52 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             let mut new_blocks =
                 decode_metadata_batch(&dataset_pull_metadata_response.blocks).int_err()?;
 
-            // Create destination dataset if not exists
-            let (dst, dst_handle) = if let Some(dst) = dst {
-                if transfer_options.force_update_if_diverged
-                    && !ensure_seed_not_in_conflict(new_blocks.front(), dst.get_handle())
-                {
-                    return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
-                }
-                ((**dst).clone(), dst.get_handle().clone())
-            } else {
-                let (first_hash, first_block, first_block_bytes) = new_blocks.pop_front().unwrap();
-                let seed_block = first_block
-                    .into_typed()
-                    .ok_or_else(|| CorruptedSourceError {
-                        message: "First metadata block is not Seed".to_owned(),
-                        source: None,
-                    })?;
+            let new_head = new_blocks
+                .back()
+                .map(|(hash, _, _)| hash.clone())
+                .ok_or_else(|| "Server sent no blocks for a non-empty transfer plan".int_err())?;
 
-                let alias =
-                    dst_alias.ok_or_else(|| "Destination dataset alias is unknown".int_err())?;
-                let create_result = self
-                    .create_dataset_transactional(
-                        alias,
-                        seed_block,
-                        first_block_bytes,
-                        &first_hash,
-                        transfer_options.visibility_for_created_dataset,
+            // A new destination is stored from the source Seed, for the commit to create
+            let (dst_storage, target) = match dst {
+                LocalSyncTarget::Existing {
+                    dataset,
+                    expected_head,
+                } => {
+                    if transfer_options.force_update_if_diverged
+                        && !ensure_seed_not_in_conflict(new_blocks.front(), dataset.get_handle())
+                    {
+                        return Err(SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}));
+                    }
+                    (
+                        (**dataset).clone(),
+                        TransferredSyncTarget::Existing {
+                            dataset: dataset.clone(),
+                            expected_head: expected_head.clone(),
+                        },
                     )
-                    .await?;
-                assert_eq!(first_hash, create_result.head);
-                new_head = Some(create_result.head);
-
-                (create_result.dataset, create_result.dataset_handle)
+                }
+                LocalSyncTarget::New(alias) => {
+                    let seed = new_blocks.pop_front().unwrap();
+                    let StoredSeed {
+                        dataset,
+                        seed_block,
+                        seed_block_bytes,
+                    } = StoredSeed::store(&self.catalog, seed).await?;
+                    (
+                        dataset,
+                        TransferredSyncTarget::New {
+                            alias: alias.clone(),
+                            seed_block,
+                            seed_block_bytes,
+                            visibility: transfer_options.visibility_for_created_dataset,
+                        },
+                    )
+                }
             };
 
             let object_files =
-                collect_object_references_from_metadata(dst.as_ref(), &new_blocks, true).await;
+                collect_object_references_from_metadata(dst_storage.as_ref(), &new_blocks, true)
+                    .await;
 
             // TODO: analyze sizes and split on stages
             let object_files_transfer_plan = if object_files.is_empty() {
@@ -863,7 +763,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     }
                 }?;
 
-                let dst_ref = dst.as_ref();
+                let dst_ref = dst_storage.as_ref();
                 use futures::stream::{StreamExt, TryStreamExt};
                 futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
                     .map(Ok)
@@ -874,22 +774,20 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let new_dst_head = self
-                .append_metadata_transactional(
-                    &dst_handle,
-                    new_blocks,
-                    transfer_options.force_update_if_diverged,
-                )
-                .await?
-                .unwrap_or_else(|| new_head.clone().unwrap());
+            append_transferred_blocks(
+                dst_storage.as_ref(),
+                Box::new(new_blocks.into_iter()),
+                odf::dataset::AppendBatchOpts::default(),
+            )
+            .await?;
 
-            SyncResult::Updated {
-                old_head: dst_head,
-                new_head: new_dst_head,
+            SyncTransfer::Transferred(TransferredSync {
+                target,
+                new_head,
                 num_blocks: u64::from(dataset_pull_result.transfer_plan.num_blocks),
-            }
+            })
         } else {
-            SyncResult::UpToDate
+            SyncTransfer::UpToDate
         };
 
         use tokio_tungstenite::tungstenite::protocol::CloseFrame;
@@ -902,7 +800,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
-        Ok(sync_result)
+        Ok(sync_transfer)
     }
 
     async fn push_protocol_client_flow(

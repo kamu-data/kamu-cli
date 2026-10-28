@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use odf::dataset::MetadataChainExt as _;
 use thiserror::Error;
 
 use crate::ResolvedDataset;
@@ -36,36 +35,22 @@ pub trait AppendDatasetMetadataBatchUseCase: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Which `HEAD` the batch commit expects to replace
+#[derive(Default)]
 pub enum SetRefCheckRefMode {
-    /// `false`: the block the batch is appended to. `true`: whatever `HEAD`
-    /// is in the current transaction, so a diverged chain is overwritten.
-    /// With `true` the commit does not check a head the caller observed
-    /// earlier; use `Explicit` for that.
-    ForceUpdateIfDiverged(bool),
+    /// The block the batch is appended to, so the batch must extend `HEAD`
+    #[default]
+    ExtendsBase,
     /// The given head; `None` means the dataset has no `HEAD` yet
     Explicit(Option<odf::Multihash>),
 }
 
 impl SetRefCheckRefMode {
     /// The `HEAD` that committing a batch appended to `base_head` replaces
-    pub async fn expected_head(
-        self,
-        metadata_chain: &dyn odf::MetadataChain,
-        base_head: Option<odf::Multihash>,
-    ) -> Result<Option<odf::Multihash>, InternalError> {
+    pub fn expected_head(self, base_head: Option<odf::Multihash>) -> Option<odf::Multihash> {
         match self {
-            Self::ForceUpdateIfDiverged(false) => Ok(base_head),
-            Self::ForceUpdateIfDiverged(true) => {
-                metadata_chain.try_get_ref(&odf::BlockRef::Head).await
-            }
-            Self::Explicit(head) => Ok(head),
+            Self::ExtendsBase => base_head,
+            Self::Explicit(head) => head,
         }
-    }
-}
-
-impl Default for SetRefCheckRefMode {
-    fn default() -> Self {
-        Self::ForceUpdateIfDiverged(false)
     }
 }
 
@@ -73,7 +58,6 @@ impl Default for SetRefCheckRefMode {
 pub struct AppendDatasetMetadataBatchUseCaseOptions {
     pub set_ref_check_ref_mode: SetRefCheckRefMode,
     pub append_opts: odf::dataset::AppendBatchOpts,
-    pub on_append_metadata_block_callback: Option<Box<dyn Fn() + Send>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

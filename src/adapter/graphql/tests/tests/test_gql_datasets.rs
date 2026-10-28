@@ -1115,7 +1115,7 @@ impl GraphQLDatasetsHarness {
                     .build(),
                 CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility,
-                    seed_block_bytes: None,
+                    ..Default::default()
                 },
             )
             .await
