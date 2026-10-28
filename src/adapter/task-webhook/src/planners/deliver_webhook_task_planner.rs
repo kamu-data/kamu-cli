@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
 use kamu_task_system::*;
 
 use crate::{LogicalPlanWebhookDeliver, TaskDefinitionWebhookDeliver};
@@ -29,7 +28,7 @@ impl TaskDefinitionPlanner for DeliverWebhookTaskPlanner {
         &self,
         task_id: TaskID,
         logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError> {
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
         assert_eq!(
             logical_plan.plan_type,
             LogicalPlanWebhookDeliver::TYPE_ID,

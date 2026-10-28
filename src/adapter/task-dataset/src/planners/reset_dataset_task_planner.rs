@@ -10,11 +10,11 @@
 use std::sync::Arc;
 
 use database_common_macros::transactional_method2;
-use internal_error::InternalError;
 use kamu_core::ResetPlanner;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
+use kamu_datasets::DatasetRegistry;
 use kamu_task_system::*;
 
+use super::task_planning::{planning_failed, resolve_task_dataset};
 use crate::{LogicalPlanDatasetReset, TaskDefinitionDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -34,11 +34,8 @@ impl ResetDatasetTaskPlanner {
     async fn plan_reset(
         &self,
         args: &LogicalPlanDatasetReset,
-    ) -> Result<TaskDefinition, InternalError> {
-        let target = dataset_registry
-            .get_dataset_by_ref(&args.dataset_id.as_local_ref())
-            .await
-            .int_err()?;
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
+        let target = resolve_task_dataset(dataset_registry.as_ref(), &args.dataset_id).await?;
 
         let reset_plan = reset_planner
             .plan_reset(
@@ -47,7 +44,7 @@ impl ResetDatasetTaskPlanner {
                 args.old_head_hash.as_ref(),
             )
             .await
-            .int_err()?;
+            .map_err(|e| planning_failed(&e, e.is_recoverable()))?;
 
         target.detach_from_transaction();
 
@@ -66,7 +63,7 @@ impl TaskDefinitionPlanner for ResetDatasetTaskPlanner {
         &self,
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError> {
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
         assert_eq!(
             logical_plan.plan_type,
             LogicalPlanDatasetReset::TYPE_ID,

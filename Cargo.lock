@@ -8124,6 +8124,7 @@ dependencies = [
  "kamu",
  "kamu-core",
  "kamu-datasets",
+ "kamu-datasets-inmem",
  "kamu-datasets-services",
  "kamu-task-system",
  "oop",

@@ -272,7 +272,7 @@ sequenceDiagram
 
     note over A: metrics.on_task_started<br/>root span "TaskAgent::run_task", no transaction
     A->>P: prepare_task_definition(task_id, logical_plan)
-    P-->>A: TaskDefinition (Err → Failed(empty_recoverable))
+    P-->>A: TaskDefinition (Failed(e) → Failed(e), Internal → Failed(empty_recoverable))
     A->>R: run_task(definition)
     R-->>A: TaskOutcome (Err → Failed(empty_recoverable))
 
@@ -393,8 +393,10 @@ fetch_uncacheable }`. The dataset decides what "update" means.
    writer state, no environment variable values and nothing read from a remote. A planned sync
    into a dataset that does not exist is a planning error.
 
-A planning error is logged and returned as `Err`, which the agent turns into a recoverable
-failure.
+A planning error is logged and classified by `PullError::is_recoverable()`
+([dataset-pull.md](dataset-pull.md#9-results-and-errors)), and the task fails with an empty error
+of that recoverability: a dataset deleted since the task was scheduled or one with several pull
+aliases fails unrecoverably, an infrastructure failure recoverably.
 
 **Running** (`UpdateDatasetTaskRunner`), by job:
 
@@ -457,7 +459,9 @@ by [dataset-reset.md](dataset-reset.md#6-reset-to-metadata).
 transaction): resolves the dataset, calls `CompactionPlanner::plan_compaction` with the limits from
 the logical plan (planner defaults when absent; reset to metadata passes none, and they do not
 matter when no data is kept), and stores the detached dataset and the `CompactionPlan` in the
-definition. A planning error, `InvalidDatasetKind` included, becomes an internal error.
+definition. A dataset deleted since the task was scheduled fails unrecoverably; a planning error
+fails as `CompactionPlanningError::is_recoverable()` says: `InvalidDatasetKind` (only roots are
+compacted) and `Access` unrecoverably, an internal error recoverably.
 
 **Running**: one runner, `CompactionDatasetTaskRunner`, is registered for both task types and
 picks the definition and the result type by `task_type`. `CompactionExecutor::execute` runs outside
@@ -478,8 +482,10 @@ reports.
 **Planning** (`ResetDatasetTaskPlanner`, one transaction): calls `ResetPlanner::plan_reset` with
 the new and old heads from the logical plan
 ([dataset-reset.md](dataset-reset.md#5-reset-to-a-block)). The resulting
-`ResetPlan { old_head, new_head }` and the dataset handle form the definition. A planning error,
-`OldHeadMismatch` included, becomes an internal error.
+`ResetPlan { old_head, new_head }` and the dataset handle form the definition. A dataset deleted
+since the task was scheduled fails unrecoverably, as does `OldHeadMismatch`: the expected old head
+is part of the request, so a retry fails the same way. An internal planning error fails
+recoverably.
 
 **Running** (`ResetDatasetTaskRunner`, one transaction around the whole run): re-resolves the
 dataset and calls `ResetExecutor::execute`, which moves `HEAD` by CAS on the planned `old_head`,
@@ -515,8 +521,9 @@ repeated failures is the flow system's job ([flow-system.md](flow-system.md#webh
 
 ### 7.5 Probe
 
-`ProbeTaskRunner` sleeps for `busy_time` if given, then returns `end_with_outcome` or an empty
-success. Tests use it to script outcomes; the system GC flow uses it as a placeholder task.
+`ProbeTaskPlanner` fails planning with `fail_planning_with` if given. `ProbeTaskRunner` sleeps for
+`busy_time` if given, then returns `end_with_outcome` or an empty success. Tests use it to script
+outcomes; the system GC flow uses it as a placeholder task.
 
 ---
 
@@ -527,7 +534,8 @@ error carries and whether it is recoverable.
 
 | Where it fails | Becomes |
 | --- | --- |
-| Planner returns `Err` (dataset gone, pull plan cannot be built, …) | `Failed(empty_recoverable)`, logged by the agent |
+| Planner returns `PrepareTaskDefinitionError::Failed(error)` (dataset gone, pull plan cannot be built, …) | `Failed(error)`; the runner is not called |
+| Planner returns `PrepareTaskDefinitionError::Internal` | `Failed(empty_recoverable)`, logged by the agent |
 | Runner returns `Err(InternalError)` | `Failed(empty_recoverable)`, logged by the agent |
 | Runner maps a domain error to a typed error | `Failed(<TypedError>.into_task_error())` with the type's fixed `recoverable` flag |
 | Runner maps a domain error to an empty error | `Failed(empty_recoverable)` or `Failed(empty_unrecoverable)` |
@@ -696,7 +704,9 @@ changes and failure reasons in flow histories, with the harness in
    deliberately. Otherwise use the empty variants.
 4. **Planner** — a dill component implementing `TaskDefinitionPlanner` with
    `TaskDefinitionPlannerMeta`. Open your own transaction if you read the database, and detach
-   anything you carry out of it.
+   anything you carry out of it. When the task cannot run, return
+   `PrepareTaskDefinitionError::Failed` with an error marked recoverable or not; `Internal` always
+   fails recoverably.
 5. **Runner** — a dill component implementing `TaskRunner` with `TaskRunnerMeta`. Keep the long
    work outside transactions, make the final state change atomic and conditional, and map every
    domain error explicitly to recoverable or unrecoverable. Expect to be re-run after a crash.

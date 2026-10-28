@@ -33,7 +33,7 @@ pub trait PullRequestPlanner: Send + Sync {
         request: PullRequest,
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> Result<PullPlanIterationJob, PullResponse>;
+    ) -> Result<PullPlanIterationJob, PullError>;
 
     // This function descends down the dependency tree of datasets (starting with
     // provided references) assigning depth index to every dataset in the
@@ -505,6 +505,36 @@ pub enum PullError {
     ),
 }
 
+impl PullError {
+    /// Whether pulling the same dataset again could succeed. A missing
+    /// dataset, a request or alias the pull cannot act on, and denied access
+    /// fail the same way on a retry; a moved `HEAD` and infrastructure
+    /// failures may not. Ingest, transform and sync errors are classified
+    /// by their own operation.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::NotFound(_)
+            | Self::AmbiguousSource(_)
+            | Self::SaveUnderDifferentAlias(_)
+            | Self::AutoCreateDisabled
+            | Self::CannotInferLocalName(_)
+            | Self::Access(_) => false,
+
+            Self::ScanMetadata(e) => match e {
+                ScanMetadataError::SourceNotFound(_) | ScanMetadataError::HeadNotFound(_) => false,
+                ScanMetadataError::Internal(_) => true,
+            },
+            Self::PollingIngestError(e) => e.is_recoverable(),
+            Self::IngestStopped(e) => e.source.is_recoverable(),
+            Self::TransformError(e) => e.is_recoverable(),
+            Self::TransformStopped(e) => e.source.is_recoverable(),
+            Self::SyncError(e) => e.is_recoverable(),
+
+            Self::HeadMoved(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
 impl From<ClassifyByAllowanceDatasetActionUnauthorizedError> for PullError {
     fn from(value: ClassifyByAllowanceDatasetActionUnauthorizedError) -> Self {
         use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
@@ -556,6 +586,140 @@ pub struct TransformStoppedError {
     pub old_head: odf::Multihash,
     pub new_head: odf::Multihash,
     pub source: PullError,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use internal_error::ErrorIntoInternal;
+
+    use super::*;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_pull_error_is_recoverable() {
+        let fixtures = PullErrorFixtures;
+        let cases = [
+            (
+                PullError::NotFound(odf::DatasetNotFoundError {
+                    dataset_ref: odf::DatasetID::new_seeded_ed25519(b"foo").as_local_ref(),
+                }),
+                false,
+            ),
+            (PullError::AmbiguousSource(AmbiguousPullSourceError), false),
+            (PullError::AutoCreateDisabled, false),
+            (PullError::SaveUnderDifferentAlias("foo".to_string()), false),
+            (
+                PullError::CannotInferLocalName(CannotInferLocalNameError {
+                    remote_ref: "odf+http://example.com/foo".parse().unwrap(),
+                }),
+                false,
+            ),
+            (
+                PullError::Access(odf::metadata::AccessError::ReadOnly(None)),
+                false,
+            ),
+            (
+                PullError::ScanMetadata(ScanMetadataError::SourceNotFound(
+                    SourceNotFoundError::new(None::<String>, "no source"),
+                )),
+                false,
+            ),
+            (
+                PullError::ScanMetadata(ScanMetadataError::HeadNotFound(
+                    odf::storage::BlockNotFoundError {
+                        hash: odf::Multihash::from_digest_sha3_256(b"head"),
+                    },
+                )),
+                false,
+            ),
+            (
+                PullError::ScanMetadata(ScanMetadataError::Internal(
+                    "storage unavailable".int_err(),
+                )),
+                true,
+            ),
+            (
+                PullError::PollingIngestError(PollingIngestError::ParameterNotFound(
+                    IngestParameterNotFound::new("API_KEY"),
+                )),
+                false,
+            ),
+            (
+                PullError::PollingIngestError(PollingIngestError::Internal(
+                    "storage unavailable".int_err(),
+                )),
+                true,
+            ),
+            (
+                PullError::TransformError(TransformError::Plan(
+                    TransformPlanError::TransformNotDefined(TransformNotDefinedError {}),
+                )),
+                false,
+            ),
+            (
+                PullError::TransformError(TransformError::Plan(TransformPlanError::Internal(
+                    "storage unavailable".int_err(),
+                ))),
+                true,
+            ),
+            (
+                PullError::SyncError(SyncError::HeadMoved(fixtures.head_moved())),
+                true,
+            ),
+            (PullError::HeadMoved(fixtures.head_moved()), true),
+            (
+                fixtures.ingest_stopped_by(PullError::HeadMoved(fixtures.head_moved())),
+                true,
+            ),
+            (
+                fixtures.ingest_stopped_by(PullError::AutoCreateDisabled),
+                false,
+            ),
+            (
+                fixtures.transform_stopped_by(PullError::HeadMoved(fixtures.head_moved())),
+                true,
+            ),
+            (PullError::Internal("storage unavailable".int_err()), true),
+        ];
+
+        for (error, recoverable) in cases {
+            assert_eq!(error.is_recoverable(), recoverable, "{error:?}");
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    struct PullErrorFixtures;
+
+    impl PullErrorFixtures {
+        fn head_moved(&self) -> odf::dataset::RefCASError {
+            odf::dataset::RefCASError {
+                reference: odf::BlockRef::Head,
+                expected: Some(odf::Multihash::from_digest_sha3_256(b"expected")),
+                actual: Some(odf::Multihash::from_digest_sha3_256(b"actual")),
+            }
+        }
+
+        fn ingest_stopped_by(&self, source: PullError) -> PullError {
+            PullError::IngestStopped(Box::new(IngestStoppedError {
+                old_head: odf::Multihash::from_digest_sha3_256(b"old"),
+                new_head: odf::Multihash::from_digest_sha3_256(b"new"),
+                increment: odf::dataset::MetadataChainIncrementInterval::default(),
+                source,
+            }))
+        }
+
+        fn transform_stopped_by(&self, source: PullError) -> PullError {
+            PullError::TransformStopped(Box::new(TransformStoppedError {
+                old_head: odf::Multihash::from_digest_sha3_256(b"old"),
+                new_head: odf::Multihash::from_digest_sha3_256(b"new"),
+                source,
+            }))
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -306,6 +306,10 @@ lost commit race of any job (`HeadMoved`), plus
 planning errors (`NotFound`, `AmbiguousSource`, `SaveUnderDifferentAlias`, `AutoCreateDisabled`,
 `CannotInferLocalName`, `ScanMetadata`), `Access` and `Internal`.
 
+`PullError::is_recoverable()` tells whether pulling again could succeed. The per-job errors take
+the answer from their own operation; a lost commit race and `Internal` are recoverable; the
+planning errors and `Access` are not, apart from an internal failure inside `ScanMetadata`.
+
 An `InternalError` returned by a job runner itself aborts the whole pull rather than becoming a
 per-dataset error; a failure to plan an ingest, resolve its env vars or move `HEAD` is a
 per-dataset error

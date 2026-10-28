@@ -10,6 +10,7 @@
 mod hard_compact_dataset_task_planner;
 mod reset_dataset_task_planner;
 mod reset_to_metadata_dataset_task_planner;
+mod task_planning;
 mod update_dataset_task_planner;
 
 pub use hard_compact_dataset_task_planner::*;
