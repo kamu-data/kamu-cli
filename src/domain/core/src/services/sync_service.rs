@@ -259,6 +259,9 @@ pub enum TransferredSyncTarget {
 // Listener
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Progress of a sync. The sync service reports `begin` and the stages; the
+/// pull or push ends it with `success` or `error` once the result is final,
+/// after the commit for a local destination
 pub trait SyncListener: Sync + Send {
     fn begin(&self) {}
     fn on_status(&self, _stage: SyncStage, _stats: &SyncStats) {}

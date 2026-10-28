@@ -550,19 +550,8 @@ impl SyncService for SyncServiceImpl {
     ) -> Result<SyncResult, SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
-        match self
-            .sync_impl(request.src, request.dst, options, listener.clone())
+        self.sync_impl(request.src, request.dst, options, listener)
             .await
-        {
-            Ok(result) => {
-                listener.success(&result);
-                Ok(result)
-            }
-            Err(err) => {
-                listener.error(&err);
-                Err(err)
-            }
-        }
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?request, ?options))]

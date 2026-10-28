@@ -214,7 +214,7 @@ async fn assert_smart_pull_fails_when_head_moved_concurrently(force: bool) {
         pretty_assertions::assert_eq!(pull_responses.len(), 1);
         assert_matches!(
             &pull_responses[0].result,
-            Err(PullError::SyncError(SyncError::HeadMoved(e)))
+            Err(PullError::HeadMoved(e))
                 if e.actual.as_ref() == Some(&concurrent_head)
         );
         pretty_assertions::assert_eq!(

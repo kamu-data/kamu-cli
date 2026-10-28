@@ -188,15 +188,7 @@ async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
 
-    let pull_response = harness
-        .use_case
-        .execute(
-            PullRequest::Local(alias_bar.as_local_ref()),
-            PullOptions::default(),
-            None,
-        )
-        .await
-        .unwrap();
+    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
 
     assert_matches!(
         pull_response,
@@ -206,6 +198,7 @@ async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
             ..
         } if a_local_ref == bar.dataset_handle.as_local_ref()
     );
+    assert_eq!(events, vec!["error"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -303,11 +296,7 @@ async fn test_pull_ingest_head_moved_concurrently() {
 
     assert_matches!(
         pull_response.result,
-        Err(PullError::PollingIngestError(PollingIngestError::CommitError(
-            odf::dataset::CommitError::MetadataAppendError(
-                odf::dataset::AppendError::RefCASFailed(e)
-            )
-        )))
+        Err(PullError::HeadMoved(e))
         if e.expected == Some(foo.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
@@ -353,12 +342,7 @@ async fn test_pull_ingest_head_moved_reports_error_not_success() {
 
     let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
 
-    assert_matches!(
-        pull_response.result,
-        Err(PullError::PollingIngestError(
-            PollingIngestError::CommitError(_)
-        ))
-    );
+    assert_matches!(pull_response.result, Err(PullError::HeadMoved(_)));
     assert_eq!(events, vec!["error"]);
 }
 
@@ -450,7 +434,7 @@ async fn test_pull_ingest_failure_after_committed_iterations_reports_progress() 
                 num_records: 5,
                 ..
             },
-            source: PollingIngestError::Unreachable { .. },
+            source: PullError::PollingIngestError(PollingIngestError::Unreachable { .. }),
         }
         if old_head == foo.head && new_head == committed_head
     );
@@ -498,7 +482,7 @@ async fn test_pull_ingest_without_polling_source_is_up_to_date() {
         pull_response.result,
         Ok(PullResult::UpToDate(PullResultUpToDate::PollingIngest(_)))
     );
-    assert_eq!(events, vec!["begin", "no_polling_source"]);
+    assert_eq!(events, vec!["no_polling_source"]);
     assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
@@ -536,7 +520,7 @@ async fn test_pull_ingest_head_moved_after_committed_iterations_reports_progress
             old_head,
             new_head,
             increment: odf::dataset::MetadataChainIncrementInterval { num_records: 2, .. },
-            source: PollingIngestError::CommitError(_),
+            source: PullError::HeadMoved(_),
         }
         if old_head == foo.head && new_head == committed_head
     );
@@ -605,7 +589,7 @@ async fn test_pull_ingest_planning_failure_notifies_listener() {
     let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
 
     assert_matches!(pull_response.result, Err(PullError::Internal(_)));
-    assert_eq!(events, vec!["begin", "plan_error"]);
+    assert_eq!(events, vec!["error"]);
     assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
@@ -665,11 +649,7 @@ async fn test_pull_transform_head_moved_concurrently() {
 
     assert_matches!(
         pull_response.result,
-        Err(PullError::TransformError(TransformError::Execute(
-            TransformExecuteError::CommitError(odf::dataset::CommitError::MetadataAppendError(
-                odf::dataset::AppendError::RefCASFailed(e)
-            ))
-        )))
+        Err(PullError::HeadMoved(e))
         if e.expected == Some(bar.head.clone()) && e.actual == Some(concurrent_head.clone())
     );
     assert_eq!(harness.get_head(&bar).await, concurrent_head);
@@ -725,13 +705,8 @@ async fn test_pull_transform_head_moved_reports_error_not_success() {
 
     let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
 
-    assert_matches!(
-        pull_response.result,
-        Err(PullError::TransformError(TransformError::Execute(
-            TransformExecuteError::CommitError(_)
-        )))
-    );
-    assert_eq!(events, vec!["execute_error"]);
+    assert_matches!(pull_response.result, Err(PullError::HeadMoved(_)));
+    assert_eq!(events, vec!["error"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -802,7 +777,7 @@ async fn test_pull_transform_diverged_input_fails_without_reset() {
         .create_derived_dataset(&alias_bar, vec![foo.dataset_handle.as_local_ref()])
         .await;
 
-    let pull_response = harness.pull_local(&alias_bar).await;
+    let (pull_response, events) = harness.pull_local_recording(&alias_bar).await;
 
     assert_matches!(
         pull_response.result,
@@ -810,6 +785,7 @@ async fn test_pull_transform_diverged_input_fails_without_reset() {
             TransformElaborateError::InvalidInputInterval(_)
         )))
     );
+    assert_eq!(events, vec!["error"]);
     assert_eq!(harness.get_head(&bar).await, bar.head);
 }
 
@@ -1121,10 +1097,7 @@ async fn test_pull_sync_head_moved_is_a_conflict() {
         .await
         .unwrap();
 
-    assert_matches!(
-        pull_response.result,
-        Err(PullError::SyncError(SyncError::HeadMoved(_)))
-    );
+    assert_matches!(pull_response.result, Err(PullError::HeadMoved(_)));
 
     let aliases = harness.get_remote_aliases(&foo).await;
     assert!(aliases.is_empty(RemoteAliasKind::Pull));
@@ -2192,12 +2165,8 @@ impl TransformListener for RecordingListener {
         self.record("success");
     }
 
-    fn elaborate_error(&self, _error: &TransformElaborateError) {
-        self.record("elaborate_error");
-    }
-
-    fn execute_error(&self, _error: &TransformExecuteError) {
-        self.record("execute_error");
+    fn error(&self, _error: &PullError) {
+        self.record("error");
     }
 }
 
@@ -2210,16 +2179,12 @@ impl PollingIngestListener for RecordingListener {
         self.record("success");
     }
 
-    fn error(&self, _error: &PollingIngestError) {
+    fn error(&self, _error: &PullError) {
         self.record("error");
     }
 
     fn no_polling_source(&self) {
         self.record("no_polling_source");
-    }
-
-    fn plan_error(&self, _error: &PollingIngestPlanError) {
-        self.record("plan_error");
     }
 }
 

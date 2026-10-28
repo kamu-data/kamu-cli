@@ -223,21 +223,35 @@ runs outside them.
 `DatasetUpdateSteps::commit_head` moves `HEAD` through `DatasetHeadCommitter`, expecting the head
 the iteration started from, which posts `DatasetReferenceMessage`
 ([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)), and returns a
-`HeadCommit`: committed, head moved, dataset deleted or not allowed. Any outcome but committed is
-that dataset's error: `PollingIngestError::CommitError`
-for an ingest job, `TransformExecuteError::CommitError` for a transform job, `SyncError::HeadMoved`
-for a sync job. A conflict arrives as
-`CommitError::MetadataAppendError(AppendError::RefCASFailed)` with the expected and actual heads.
+`HeadCommit`: committed, head moved, dataset deleted or not allowed. `HeadCommit::into_pull_result`
+makes any outcome but committed that dataset's error: `PullError::HeadMoved` with the expected and
+actual heads, `NotFound` or `Access`. A sync job's lost race, `SyncError::HeadMoved` from
+`LocalSyncCommitter`, becomes the same `PullError::HeadMoved`, so a conflict has one shape for every
+job. After earlier commits of the same job it is the `source` of `IngestStopped` or
+`TransformStopped`.
 
 ### 6.3 Listeners
 
 `PullMultiListener` hands out one ingest, transform or sync listener per dataset.
 `PullDatasetUseCase::execute` wraps a single-dataset `PullListener` in `ListenerMultiAdapter`.
-Listeners only report progress; they cannot change the outcome. The ingest service, the transform
-executor and the sync transfer report `begin` and progress. The job runner reports the outcome
-after its commit, so a lost CAS reaches the listener as an error, never as a success. A transform
-listener also hears `elaborate_error` when elaboration fails. A failed reset on a diverged input,
-and a failed authorization of inputs the plan did not cover, are not reported to it.
+Listeners only report progress; they cannot change the outcome.
+
+Every pull and push activity follows one rule: the operation reports `begin` and progress, and the
+caller that commits reports how the job ended, once, after its commit. A lost CAS reaches the
+listener as an error, never as a success. Every failure of the job reaches it, including those
+before the operation starts, which end the progress without a `begin`: planning, elaboration,
+authorizing inputs the plan did not cover, a reset on a diverged input, a dataset deleted since
+planning.
+
+| Activity | `begin` and progress | Ending reported by | Error passed |
+| --- | --- | --- | --- |
+| Pull ingest | `PollingIngestService::ingest`, per iteration | `PullIngestLoop`: `success` after each committed iteration, then `error`, or `no_polling_source` instead of both | `PullError` |
+| Pull transform | `TransformExecutor` | `PullTransformJob` | `PullError` |
+| Pull sync | `SyncService::transfer_into_local` | `PullSyncJob` | `SyncError` |
+| Push | `SyncService::sync` | `PushDatasetUseCaseImpl` | `SyncError` |
+| Push ingest | `PushIngestExecutor` | `PushIngestDataUseCaseImpl`, after moving `HEAD` | `PushIngestDataError` |
+
+The sync listener takes `SyncError` because pull and push share it.
 
 ---
 
@@ -276,7 +290,7 @@ The server never calls `PullDatasetUseCase`: the update task builds a single-nod
 | Diverged-input reset | optional flag | never |
 | Planning to running | immediate | separated by the task queue; planning fixes the job kind and, for a sync, the remote ref. Ingest and transform are planned when the task runs, and a sync reads the destination's `HEAD` and resolves its source then |
 | Root dataset without a polling source | up to date | unrecoverable failure: a flow that keeps polling such a dataset is misconfigured |
-| Dataset deleted before it runs | not applicable | unrecoverable failure |
+| Dataset deleted before it runs | `NotFound` for that dataset | unrecoverable failure |
 
 ---
 
@@ -287,7 +301,8 @@ the local and remote refs if resolved, and `Result<PullResult, PullError>`.
 
 `PullResult` is `UpToDate(kind)` — polling ingest (with `uncacheable`), push ingest, transform or
 sync — or `Updated { old_head, new_head, has_more }`. `PullError` wraps the per-job errors
-(`PollingIngestError`, `IngestStopped`, `TransformError`, `TransformStopped`, `SyncError`) plus
+(`PollingIngestError`, `IngestStopped`, `TransformError`, `TransformStopped`, `SyncError`), the
+lost commit race of any job (`HeadMoved`), plus
 planning errors (`NotFound`, `AmbiguousSource`, `SaveUnderDifferentAlias`, `AutoCreateDisabled`,
 `CannotInferLocalName`, `ScanMetadata`), `Access` and `Internal`.
 

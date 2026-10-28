@@ -122,16 +122,17 @@ pub enum PollingIngestStage {
     Commit,
 }
 
+/// Progress of a polling ingest. The ingest service reports `begin` and the
+/// progress of each iteration; the pull reports `success` once an iteration
+/// is committed, and ends with `error` or `no_polling_source` otherwise
 pub trait PollingIngestListener: Send + Sync {
     fn begin(&self) {}
     fn on_cache_hit(&self, _created_at: &DateTime<Utc>) {}
     fn on_stage_progress(&self, _stage: PollingIngestStage, _progress: u64, _out_of: TotalSteps) {}
     fn success(&self, _result: &PollingIngestResult) {}
-    fn error(&self, _error: &PollingIngestError) {}
+    fn error(&self, _error: &PullError) {}
     /// The dataset defines no polling source, so there is nothing to ingest
     fn no_polling_source(&self) {}
-    /// Planning the ingest failed before any iteration began
-    fn plan_error(&self, _error: &PollingIngestPlanError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::InternalError;
 use kamu_datasets::ResolvedDataset;
 
 use crate::*;
@@ -96,18 +96,19 @@ pub enum HeadCommit {
 }
 
 impl HeadCommit {
-    /// The outcome as a reference update result, for callers that report
-    /// every failed commit as an error
-    pub fn into_set_ref_result(
+    /// The outcome as a pull result: a commit that did not happen is the
+    /// error of the pull of `target`
+    pub fn into_pull_result(
         result: Result<Self, InternalError>,
-    ) -> Result<(), odf::dataset::SetChainRefError> {
+        target: &odf::DatasetHandle,
+    ) -> Result<(), PullError> {
         match result? {
             Self::Committed => Ok(()),
-            Self::HeadMoved(e) => Err(odf::dataset::SetChainRefError::CASFailed(e)),
-            Self::NotAllowed(e) => Err(odf::dataset::SetChainRefError::Access(e)),
-            Self::DatasetDeleted => {
-                Err("The dataset was deleted during the update".int_err().into())
-            }
+            Self::HeadMoved(e) => Err(PullError::HeadMoved(e)),
+            Self::NotAllowed(e) => Err(PullError::Access(e)),
+            Self::DatasetDeleted => Err(PullError::NotFound(odf::DatasetNotFoundError::new(
+                target.as_local_ref(),
+            ))),
         }
     }
 }

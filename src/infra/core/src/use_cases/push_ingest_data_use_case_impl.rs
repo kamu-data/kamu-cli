@@ -139,18 +139,8 @@ impl PushIngestDataUseCaseImpl {
 
         Ok(())
     }
-}
 
-#[common_macros::method_names_consts]
-#[async_trait::async_trait]
-impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
-    #[tracing::instrument(
-        level = "info",
-        name = PushIngestDataUseCaseImpl_execute,
-        skip_all,
-        fields(dataset_id = %target.get_id())
-    )]
-    async fn execute(
+    async fn ingest_and_commit(
         &self,
         target: ResolvedDataset,
         data_source: DataSource,
@@ -173,13 +163,9 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         Ok(push_execute_result)
     }
 
-    #[tracing::instrument(
-        level = "info",
-        name = PushIngestDataUseCaseImpl_execute_multi,
-        skip_all,
-        fields(dataset_id = %target.get_id())
-    )]
-    async fn execute_multi(
+    /// Ingests the sources one after another and commits `HEAD` once, after
+    /// the last of them
+    async fn ingest_all_and_commit(
         &self,
         target: ResolvedDataset,
         data_sources: Vec<DataSource>,
@@ -244,6 +230,64 @@ impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
         } else {
             Ok(PushIngestResult::UpToDate)
         }
+    }
+
+    /// Ends the listener's progress once `HEAD` is committed or the ingest
+    /// failed
+    fn report(
+        listener_maybe: Option<&dyn PushIngestListener>,
+        result: &Result<PushIngestResult, PushIngestDataError>,
+    ) {
+        if let Some(listener) = listener_maybe {
+            match result {
+                Ok(ingest_result) => listener.success(ingest_result),
+                Err(e) => listener.error(e),
+            }
+        }
+    }
+}
+
+#[common_macros::method_names_consts]
+#[async_trait::async_trait]
+impl PushIngestDataUseCase for PushIngestDataUseCaseImpl {
+    #[tracing::instrument(
+        level = "info",
+        name = PushIngestDataUseCaseImpl_execute,
+        skip_all,
+        fields(dataset_id = %target.get_id())
+    )]
+    async fn execute(
+        &self,
+        target: ResolvedDataset,
+        data_source: DataSource,
+        options: PushIngestDataUseCaseOptions,
+        listener_maybe: Option<Arc<dyn PushIngestListener>>,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        let result = self
+            .ingest_and_commit(target, data_source, options, listener_maybe.clone())
+            .await;
+        Self::report(listener_maybe.as_deref(), &result);
+        result
+    }
+
+    #[tracing::instrument(
+        level = "info",
+        name = PushIngestDataUseCaseImpl_execute_multi,
+        skip_all,
+        fields(dataset_id = %target.get_id())
+    )]
+    async fn execute_multi(
+        &self,
+        target: ResolvedDataset,
+        data_sources: Vec<DataSource>,
+        options: PushIngestDataUseCaseOptions,
+        listener_maybe: Option<Arc<dyn PushIngestListener>>,
+    ) -> Result<PushIngestResult, PushIngestDataError> {
+        let result = self
+            .ingest_all_and_commit(target, data_sources, options, listener_maybe.clone())
+            .await;
+        Self::report(listener_maybe.as_deref(), &result);
+        result
     }
 }
 
