@@ -23,6 +23,7 @@ use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemor
 use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
 
 use super::local_sync_writes::*;
+use super::sync_increment::sync_increment;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -96,6 +97,11 @@ impl SimpleTransferProtocol {
         };
 
         let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
+
+        // Read before the destination head moves, so a failure here aborts the push
+        let increment =
+            sync_increment(src.as_metadata_chain(), dst_head.as_ref(), &src_head).await?;
+
         let stats = self
             .transfer_objects(
                 &blocks_desc_ordered,
@@ -124,6 +130,7 @@ impl SimpleTransferProtocol {
             old_head: dst_head,
             new_head: src_head,
             num_blocks,
+            increment,
         })
     }
 
@@ -226,10 +233,14 @@ impl SimpleTransferProtocol {
         .await?;
         Self::report_blocks_written(listener.as_ref(), stats, num_blocks);
 
+        let increment =
+            sync_increment(dst_dataset.as_metadata_chain(), dst_head, &src_head).await?;
+
         Ok(SyncTransfer::Transferred(TransferredSync {
             target,
             new_head: src_head,
             num_blocks,
+            increment,
         }))
     }
 

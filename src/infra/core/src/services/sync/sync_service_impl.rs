@@ -27,6 +27,7 @@ use crate::utils::smart_transfer_protocol::{
     SmartTransferProtocolClient,
     TransferOptions as SmartTransferOptions,
 };
+use crate::utils::sync_increment::sync_increment;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -385,6 +386,14 @@ impl SyncServiceImpl {
             }
         };
 
+        // Read before publishing, so a failure here aborts the push
+        let increment = sync_increment(
+            src_dataset.as_metadata_chain(),
+            dst_head.as_ref(),
+            &src_head,
+        )
+        .await?;
+
         // Add files to IPFS
         tracing::info!("Adding files to IPFS");
         let cid = self.add_to_ipfs(src_dataset.as_ref()).await?;
@@ -407,6 +416,7 @@ impl SyncServiceImpl {
             old_head: dst_head,
             new_head: src_head,
             num_blocks: u64::try_from(num_blocks).unwrap(),
+            increment,
         })
     }
 

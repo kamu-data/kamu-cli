@@ -39,6 +39,7 @@ impl LocalSyncCommitter for LocalSyncCommitterImpl {
             target,
             new_head,
             num_blocks,
+            increment,
         } = transferred;
 
         match target {
@@ -70,6 +71,7 @@ impl LocalSyncCommitter for LocalSyncCommitterImpl {
                     old_head: expected_head,
                     new_head,
                     num_blocks,
+                    increment,
                 })
             }
             TransferredSyncTarget::New {
@@ -96,6 +98,7 @@ impl LocalSyncCommitter for LocalSyncCommitterImpl {
                     old_head: None,
                     new_head,
                     num_blocks,
+                    increment,
                 })
             }
         }

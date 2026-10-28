@@ -10,7 +10,7 @@
 use chrono::Duration;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
-use kamu_core::{PullResult, TransformStatus};
+use kamu_core::TransformStatus;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
@@ -565,19 +565,15 @@ async fn test_abort_flow_after_task_finishes() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -642,19 +638,15 @@ async fn test_abort_flow_after_task_finishes() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newer-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),

@@ -236,6 +236,9 @@ pub enum SyncResult {
         old_head: Option<odf::Multihash>,
         new_head: odf::Multihash,
         num_blocks: u64,
+        /// The data between the old and the new head; the whole new chain
+        /// when the new head does not extend the old one
+        increment: odf::dataset::MetadataChainIncrementInterval,
     },
 }
 
@@ -253,6 +256,7 @@ pub struct TransferredSync {
     pub target: TransferredSyncTarget,
     pub new_head: odf::Multihash,
     pub num_blocks: u64,
+    pub increment: odf::dataset::MetadataChainIncrementInterval,
 }
 
 #[derive(Debug)]
@@ -399,6 +403,39 @@ pub enum SyncError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl SyncError {
+    /// Whether running the same sync again could succeed. Conflicts between
+    /// the chains and errors in the request fail the same way on a retry;
+    /// concurrent updates and infrastructure failures, network included, may
+    /// not
+    pub fn is_recoverable(&self) -> bool {
+        use kamu_datasets::CreateDatasetError as E;
+
+        match self {
+            Self::CreateDatasetFailed(e) => match e {
+                E::CASFailed(_) | E::Internal(_) => true,
+                E::EmptyDataset | E::Access(_) | E::NameCollision(_) | E::RefCollision(_) => false,
+            },
+
+            Self::DatasetNotFound(_)
+            | Self::RefCollision(_)
+            | Self::NameCollision(_)
+            | Self::UnsupportedProtocol(_)
+            | Self::UnsupportedIpfsStorageType(_)
+            | Self::RepositoryNotFound(_)
+            | Self::DatasetsDiverged(_)
+            | Self::DatasetIdMismatch(_)
+            | Self::DestinationAhead(_)
+            | Self::InvalidInterval(_)
+            | Self::OverwriteSeedBlock(_)
+            | Self::Corrupted(_)
+            | Self::Access(_) => false,
+
+            Self::UpdatedConcurrently(_) | Self::HeadMoved(_) | Self::Internal(_) => true,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -578,5 +615,73 @@ pub struct UnsupportedIpfsStorageTypeError {
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Overwriting dataset id or type is restricted")]
 pub struct OverwriteSeedBlockError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use internal_error::ErrorIntoInternal;
+
+    use super::*;
+
+    fn head(seed: &[u8]) -> odf::Multihash {
+        odf::Multihash::from_digest_sha3_256(seed)
+    }
+
+    fn alias() -> odf::DatasetAlias {
+        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"))
+    }
+
+    #[test]
+    fn test_sync_error_recoverability() {
+        let cases = [
+            (SyncError::Internal("connection reset".int_err()), true),
+            (
+                SyncError::HeadMoved(odf::dataset::RefCASError {
+                    reference: odf::BlockRef::Head,
+                    expected: Some(head(b"expected")),
+                    actual: Some(head(b"actual")),
+                }),
+                true,
+            ),
+            (
+                SyncError::UpdatedConcurrently("remote head moved".into()),
+                true,
+            ),
+            (
+                SyncError::DatasetsDiverged(DatasetsDivergedError {
+                    src_head: head(b"src"),
+                    dst_head: head(b"dst"),
+                    detail: None,
+                }),
+                false,
+            ),
+            (
+                SyncError::DestinationAhead(DestinationAheadError {
+                    src_head: head(b"src"),
+                    dst_head: head(b"dst"),
+                    dst_ahead_size: 1,
+                }),
+                false,
+            ),
+            (
+                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::Internal(
+                    "storage unavailable".int_err(),
+                )),
+                true,
+            ),
+            (
+                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::NameCollision(
+                    kamu_datasets::NameCollisionError { alias: alias() },
+                )),
+                false,
+            ),
+        ];
+
+        for (error, recoverable) in cases {
+            assert_eq!(error.is_recoverable(), recoverable, "{error:?}");
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

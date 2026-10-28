@@ -14,7 +14,7 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use datafusion::arrow::datatypes::Schema;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
@@ -43,8 +43,8 @@ use kamu_core::engine::TransformResponseExt;
 use kamu_core::testing::{MockIngestIteration, ReportedHeads};
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter, ResolvedDataset};
+use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
-use kamu_datasets_services::{DatasetIncrementQueryServiceImpl, DatasetKeyValueServiceSysEnv};
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskResult, TaskRunner};
 use pretty_assertions::assert_eq;
 
@@ -104,17 +104,15 @@ async fn test_ingest_reports_increment_from_its_result() {
 
     assert_eq!(
         TaskOutcome::Success(
-            TaskResultDatasetUpdate {
-                pull_result: PullResult::Updated {
-                    old_head: Some(foo.head.clone()),
-                    new_head: ingested_head.clone(),
-                    has_more: true,
-                },
-                data_increment: Some(odf::dataset::MetadataChainIncrementInterval {
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(foo.head.clone()),
+                new_head: ingested_head.clone(),
+                has_more: true,
+                increment: odf::dataset::MetadataChainIncrementInterval {
                     num_blocks: 1,
                     num_records: 7,
                     updated_watermark: None,
-                }),
+                },
             }
             .into_task_result()
         ),
@@ -140,12 +138,9 @@ async fn test_ingest_of_uncacheable_source_succeeds_up_to_date_without_increment
 
     assert_eq!(
         TaskOutcome::Success(
-            TaskResultDatasetUpdate {
-                pull_result: PullResult::UpToDate(PullResultUpToDate::PollingIngest(
-                    PollingIngestResultUpToDate { uncacheable: true }
-                )),
-                data_increment: None,
-            }
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::PollingIngest(
+                PollingIngestResultUpToDate { uncacheable: true }
+            ))
             .into_task_result()
         ),
         outcome,
@@ -225,13 +220,15 @@ async fn test_ingest_with_real_planner_and_service_commits_and_reports_increment
     assert_ne!(new_head, foo.head);
     assert_matches!(
         harness.task_result_update(outcome),
-        TaskResultDatasetUpdate {
-            pull_result: PullResult::Updated { old_head: Some(old_head), new_head: reported_head, has_more: false },
-            data_increment: Some(odf::dataset::MetadataChainIncrementInterval {
+        TaskResultDatasetUpdate::Updated {
+            old_head: Some(old_head),
+            new_head: reported_head,
+            has_more: false,
+            increment: odf::dataset::MetadataChainIncrementInterval {
                 num_blocks: 2,
                 num_records: 3,
                 ..
-            }),
+            },
         } if old_head == foo.head && reported_head == new_head
     );
 }
@@ -376,13 +373,11 @@ async fn test_transform_success_carries_increment_from_executor() {
 
     assert_eq!(
         TaskOutcome::Success(
-            TaskResultDatasetUpdate {
-                pull_result: PullResult::Updated {
-                    old_head: Some(bar.head.clone()),
-                    new_head: transformed_head.clone(),
-                    has_more: false,
-                },
-                data_increment: Some(MockTransformExecutor::REPORTED_INCREMENT),
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(bar.head.clone()),
+                new_head: transformed_head.clone(),
+                has_more: false,
+                increment: MockTransformExecutor::REPORTED_INCREMENT,
             }
             .into_task_result()
         ),
@@ -509,17 +504,15 @@ async fn test_transform_with_real_planner_and_executor_commits_and_reports_incre
     assert_ne!(new_head, bar.head);
     assert_eq!(
         TaskOutcome::Success(
-            TaskResultDatasetUpdate {
-                pull_result: PullResult::Updated {
-                    old_head: Some(bar.head.clone()),
-                    new_head,
-                    has_more: false,
-                },
-                data_increment: Some(odf::dataset::MetadataChainIncrementInterval {
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(bar.head.clone()),
+                new_head,
+                has_more: false,
+                increment: odf::dataset::MetadataChainIncrementInterval {
                     num_blocks: 1,
                     num_records: 0,
                     updated_watermark: Some(watermark),
-                }),
+                },
             }
             .into_task_result()
         ),
@@ -543,17 +536,11 @@ async fn test_sync_commits_and_reports_increment() {
 
     assert_eq!(
         TaskOutcome::Success(
-            TaskResultDatasetUpdate {
-                pull_result: PullResult::Updated {
-                    old_head: Some(foo.head.clone()),
-                    new_head: synced_head.clone(),
-                    has_more: false,
-                },
-                data_increment: Some(odf::dataset::MetadataChainIncrementInterval {
-                    num_blocks: 1,
-                    num_records: 0,
-                    updated_watermark: None,
-                }),
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(foo.head.clone()),
+                new_head: synced_head.clone(),
+                has_more: false,
+                increment: MockSyncService::REPORTED_INCREMENT,
             }
             .into_task_result()
         ),
@@ -581,8 +568,8 @@ async fn test_sync_expects_head_read_when_it_runs() {
     let outcome = harness.run_sync_update(&foo).await;
 
     assert_matches!(
-        harness.task_result_update(outcome).pull_result,
-        PullResult::Updated { old_head: Some(old_head), new_head, .. }
+        harness.task_result_update(outcome),
+        TaskResultDatasetUpdate::Updated { old_head: Some(old_head), new_head, .. }
             if old_head == head_at_run && new_head == synced_head
     );
     assert_eq!(harness.get_head(&foo).await, synced_head);
@@ -617,11 +604,7 @@ async fn test_sync_up_to_date() {
 
     assert_eq!(
         TaskOutcome::Success(
-            TaskResultDatasetUpdate {
-                pull_result: PullResult::UpToDate(PullResultUpToDate::Sync),
-                data_increment: None,
-            }
-            .into_task_result()
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result()
         ),
         outcome,
     );
@@ -657,6 +640,37 @@ async fn test_sync_head_moved_concurrently_fails_recoverably() {
     );
     assert!(outcome.is_recoverable_failure());
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_diverged_source_fails_unrecoverably() {
+    let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(|| {
+        SyncError::DatasetsDiverged(DatasetsDivergedError {
+            src_head: odf::Multihash::from_digest_sha3_256(b"src"),
+            dst_head: odf::Multihash::from_digest_sha3_256(b"dst"),
+            detail: None,
+        })
+    })
+    .await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_from_unreachable_source_fails_recoverably() {
+    let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(|| {
+        SyncError::Internal("connection refused".int_err())
+    })
+    .await;
+
+    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -745,8 +759,7 @@ impl UpdateDatasetTaskRunnerHarness {
             .add::<PollingIngestPlannerImpl>()
             .add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>()
-            .add::<LocalSyncCommitterImpl>()
-            .add::<DatasetIncrementQueryServiceImpl>();
+            .add::<LocalSyncCommitterImpl>();
         register_operations(&mut b, base_use_case_harness.temp_dir_path());
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -790,6 +803,22 @@ impl UpdateDatasetTaskRunnerHarness {
                 .make_expect_transform_updated(alias.clone(), heads.clone()),
             ..UpdateDatasetTaskRunnerMocks::default()
         })
+    }
+
+    /// Runs the sync of a fresh dataset whose transfer fails with
+    /// `make_error()`
+    async fn run_sync_failing_with(
+        make_error: impl Fn() -> SyncError + Send + 'static,
+    ) -> TaskOutcome {
+        let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+        let harness = Self::new(UpdateDatasetTaskRunnerMocks {
+            mock_sync_service: MockSyncService::new()
+                .make_expect_transfer_error(alias_foo.clone(), make_error),
+            ..UpdateDatasetTaskRunnerMocks::default()
+        });
+        let foo = harness.create_root_dataset(&alias_foo).await;
+
+        harness.run_sync_update(&foo).await
     }
 
     /// Runs the transform of a fresh derivative whose execution fails with

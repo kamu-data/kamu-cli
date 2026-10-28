@@ -12,7 +12,7 @@ use std::sync::Arc;
 use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
-use kamu_datasets::{DatasetIncrementQueryService, DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{DatasetRegistry, ResolvedDataset};
 use kamu_task_system::*;
 use random_strings::get_random_name;
 
@@ -96,14 +96,29 @@ impl UpdateDatasetTaskRunner {
         };
 
         match sync_result {
-            Ok(sync_result) => self.combine_task_result(sync_result.into(), &dst_id).await,
+            Ok(SyncResult::Updated {
+                old_head,
+                new_head,
+                increment,
+                ..
+            }) => Ok(TaskOutcome::Success(
+                TaskResultDatasetUpdate::Updated {
+                    old_head,
+                    new_head,
+                    has_more: false,
+                    increment,
+                }
+                .into_task_result(),
+            )),
+            Ok(SyncResult::UpToDate) => Ok(TaskOutcome::Success(
+                TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
+            )),
             Err(SyncError::HeadMoved(e)) => {
                 Ok(TaskDatasetHeadCommitter::head_moved_outcome(dst_id, e))
             }
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Sync failed");
-                // TODO: classify sync errors as recoverable/unrecoverable
-                Ok(TaskOutcome::Failed(TaskError::empty_recoverable()))
+                Ok(Self::failed(e.is_recoverable()))
             }
         }
     }
@@ -203,25 +218,22 @@ impl UpdateDatasetTaskRunner {
                 }
 
                 Ok(TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                        pull_result: PullResult::Updated {
-                            old_head: Some(old_head),
-                            new_head,
-                            has_more,
-                        },
-                        data_increment: Some(increment),
+                    TaskResultDatasetUpdate::Updated {
+                        old_head: Some(old_head),
+                        new_head,
+                        has_more,
+                        increment,
                     }
                     .into_task_result(),
                 ))
             }
             Ok(PollingIngestResponse {
-                result: result @ PollingIngestResult::UpToDate { .. },
+                result: PollingIngestResult::UpToDate { uncacheable, .. },
                 ..
             }) => Ok(TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: result.into(),
-                    data_increment: None,
-                }
+                TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::PollingIngest(
+                    PollingIngestResultUpToDate { uncacheable },
+                ))
                 .into_task_result(),
             )),
             Err(e) => {
@@ -321,13 +333,11 @@ impl UpdateDatasetTaskRunner {
                 }
 
                 Ok(TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                        pull_result: PullResult::Updated {
-                            old_head: Some(old_head),
-                            new_head,
-                            has_more: false,
-                        },
-                        data_increment: Some(increment),
+                    TaskResultDatasetUpdate::Updated {
+                        old_head: Some(old_head),
+                        new_head,
+                        has_more: false,
+                        increment,
                     }
                     .into_task_result(),
                 ))
@@ -338,23 +348,6 @@ impl UpdateDatasetTaskRunner {
                 Ok(Self::failed(e.is_recoverable()))
             }
         }
-    }
-
-    #[transactional_method1(dataset_increment_query_service: Arc<dyn DatasetIncrementQueryService>)]
-    async fn combine_task_result(
-        &self,
-        pull_result: PullResult,
-        dataset_id: &odf::DatasetID,
-    ) -> Result<TaskOutcome, InternalError> {
-        let task_result = TaskResultDatasetUpdate::from_pull_result(
-            pull_result,
-            dataset_increment_query_service.as_ref(),
-            dataset_id,
-        )
-        .await
-        .int_err()?;
-
-        Ok(TaskOutcome::Success(task_result.into_task_result()))
     }
 }
 

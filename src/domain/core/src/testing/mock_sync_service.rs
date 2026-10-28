@@ -13,6 +13,13 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl MockSyncService {
+    pub const REPORTED_INCREMENT: odf::dataset::MetadataChainIncrementInterval =
+        odf::dataset::MetadataChainIncrementInterval {
+            num_blocks: 1,
+            num_records: 7,
+            updated_watermark: None,
+        };
+
     /// Expects one transfer from `src_remote_ref` into the existing local
     /// `target_alias`. It is up to date without `reported_heads`, otherwise it
     /// transfers up to their new head
@@ -57,8 +64,29 @@ impl MockSyncService {
                     },
                     new_head: reported_heads.get().1,
                     num_blocks: 1,
+                    increment: Self::REPORTED_INCREMENT,
                 }))
             });
+        self
+    }
+
+    /// Expects one transfer into the existing local `target_alias`, failing
+    /// with `make_error()`
+    pub fn make_expect_transfer_error(
+        mut self,
+        target_alias: odf::DatasetAlias,
+        make_error: impl Fn() -> SyncError + Send + 'static,
+    ) -> Self {
+        self.expect_transfer_into_local()
+            .withf(move |request, _, _| {
+                matches!(
+                    &(request.dst),
+                    LocalSyncTarget::Existing { dataset, .. }
+                    if dataset.get_alias() == &target_alias
+                )
+            })
+            .times(1)
+            .returning(move |_, _, _| Err(make_error()));
         self
     }
 }

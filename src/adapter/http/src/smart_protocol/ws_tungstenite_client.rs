@@ -15,6 +15,7 @@ use headers::Header;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::local_sync_writes::{StoredSeed, append_transferred_blocks};
 use kamu::utils::smart_transfer_protocol::{SmartTransferProtocolClient, TransferOptions};
+use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
 use kamu_datasets::{NameCollisionError, ResolvedDataset};
 use serde::Serialize;
@@ -781,10 +782,18 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             )
             .await?;
 
+            let old_head = match dst {
+                LocalSyncTarget::Existing { expected_head, .. } => expected_head.as_ref(),
+                LocalSyncTarget::New(_) => None,
+            };
+            let increment =
+                sync_increment(dst_storage.as_metadata_chain(), old_head, &new_head).await?;
+
             SyncTransfer::Transferred(TransferredSync {
                 target,
                 new_head,
                 num_blocks: u64::from(dataset_pull_result.transfer_plan.num_blocks),
+                increment,
             })
         } else {
             SyncTransfer::UpToDate
@@ -861,6 +870,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if num_blocks == 0 {
             return Ok(SyncResult::UpToDate);
         }
+
+        // Read before the remote head moves, so a failure here aborts the push
+        let increment = sync_increment(src.as_metadata_chain(), dst_head, &src_head).await?;
 
         let maybe_access_token = self
             .dataset_credential_resolver
@@ -1010,6 +1022,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             old_head: dst_head.cloned(),
             new_head: src_head,
             num_blocks: u64::from(num_blocks),
+            increment,
         })
     }
 }
