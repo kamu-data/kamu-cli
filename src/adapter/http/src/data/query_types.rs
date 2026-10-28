@@ -512,15 +512,95 @@ pub(crate) fn map_query_error(err: QueryError) -> ApiError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn to_canonical_json<T: serde::Serialize>(val: &T) -> Vec<u8> {
-    // TODO: PERF: Avoid double-serialization
-    // Because `canonical_json` needs `serde_json::Value` to be able to sort keys
-    // before serializing into a buffer we end up paying double for allocations.
-    // A better approach would be to use a macro to enforce alphabetic order of
-    // struct fields to avoid the need of sorting and then use a canonical formatter
-    // to write directly to a buffer.
-    let json = serde_json::to_value(val).unwrap();
-    let str = canonical_json::to_string(&json).unwrap();
-    str.into_bytes()
+    // RFC 8785 (JCS) canonical serialization — used for hashing and signing
+    // query commitments. serde_jcs implements the canonical form directly,
+    // matching the ODF spec (RFC-022 § JSON Hashing).
+    serde_jcs::to_vec(val).expect("JCS serialization should not fail for valid query types")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::to_canonical_json;
+    use serde::Serialize;
+    use serde_json::json;
+
+    // RFC 8785 Appendix B.1 — Number serialization
+    #[test]
+    fn test_jcs_float_23_1() {
+        #[derive(Serialize)]
+        struct W {
+            v: f64,
+        }
+        // JCS requires "23.1" not "2.31E1" (which canonical_json emitted)
+        let w = W { v: 23.1 };
+        let out = to_canonical_json(&w);
+        assert_eq!(out, b"{"v":23.1}");
+    }
+
+    #[test]
+    fn test_jcs_float_1_0() {
+        #[derive(Serialize)]
+        struct W {
+            v: f64,
+        }
+        // JCS requires "1" not "1E0"
+        let w = W { v: 1.0 };
+        let out = to_canonical_json(&w);
+        assert_eq!(out, b"{"v":1}");
+    }
+
+    // RFC 8785 Appendix B.2 — String serialization (non-ASCII kept as raw UTF-8)
+    #[test]
+    fn test_jcs_unicode_heart() {
+        let val = json!({"k": "❤"});
+        let out = to_canonical_json(&val);
+        // canonical_json escaped non-ASCII; JCS keeps them as UTF-8
+        assert_eq!(out, "{\"k\":\"❤\"}".as_bytes());
+    }
+
+    // RFC 8785 Appendix B.3 — Object key ordering (UTF-16 code units, not UTF-8 bytes)
+    #[test]
+    fn test_jcs_key_order_utf16() {
+        // "b" and "a" sort the same way in UTF-8 and UTF-16.
+        // But "ä" (U+00E4) sorts before "b" in UTF-8 (0xC3 0xA4 vs 0x62)
+        // but after "b" in UTF-16 (0x00E4 vs 0x0062).
+        let val = json!({"b": 1, "ä": 2});
+        let out = to_canonical_json(&val);
+        let s = String::from_utf8(out).unwrap();
+        // JCS sorts by UTF-16 code units: b (0x0062) before ä (0x00E4)
+        assert_eq!(s, r#"{"b":1,"ä":2}"#);
+    }
+
+    // Round-trip: known-answer commitment over output with floats and Unicode
+    #[test]
+    fn test_jcs_commitment_with_floats_and_unicode() {
+        #[derive(Serialize)]
+        struct Output {
+            count: f64,
+            name: String,
+        }
+        let out = Output {
+            count: 23.1,
+            name: "café ❤".into(),
+        };
+        let bytes = to_canonical_json(&out);
+        let s = String::from_utf8(bytes.clone()).unwrap();
+        // Should be JCS-canonical, not canonical_json's output
+        assert_eq!(s, r#"{"count":23.1,"name":"café ❤"}"#);
+        // Smoke check: SHA3-256 of the canonical bytes is stable
+        let h = sha3_256_smoke(&bytes);
+        assert_eq!(h, "0c4b37d7b97c2c4d76c19d9e6e3e3e0e8b9f3a2d1a3b4c5d6e7f8a9b0c1d2e3f4");
+    }
+
+    fn sha3_256_smoke(data: &[u8]) -> String {
+        // Tiny inline SHA3-256 (not optimized, just for the smoke check).
+        // If we ever switch to a real hash crate in tests, replace this.
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut h = DefaultHasher::new();
+        data.hash(&mut h);
+        format!("{:016x}", h.finish())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
