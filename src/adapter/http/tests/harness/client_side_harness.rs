@@ -201,6 +201,7 @@ impl ClientSideHarness {
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
+        b.add::<DatasetUpdateStepsImpl>();
         b.add::<PushDatasetUseCaseImpl>();
 
         b.add::<DatasetReferenceServiceImpl>();

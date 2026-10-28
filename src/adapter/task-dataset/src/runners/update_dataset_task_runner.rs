@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::InternalError;
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt, ResolvedDataset};
 use kamu_task_system::*;
 use random_strings::get_random_name;
 
@@ -33,10 +31,9 @@ use crate::{
     task_type: TaskDefinitionDatasetUpdate::TASK_TYPE,
 })]
 pub struct UpdateDatasetTaskRunner {
-    catalog: dill::Catalog,
     polling_ingest_service: Arc<dyn PollingIngestService>,
     transform_executor: Arc<dyn TransformExecutor>,
-    sync_service: Arc<dyn SyncService>,
+    update_steps: Arc<dyn DatasetUpdateSteps>,
 }
 
 #[common_macros::method_names_consts]
@@ -71,7 +68,11 @@ impl UpdateDatasetTaskRunner {
         remote_ref: odf::DatasetRefRemote,
         sync_opts: SyncOptions,
     ) -> Result<TaskOutcome, InternalError> {
-        let dst = match self.resolve_sync_target(target_handle).await {
+        let dst = match self
+            .update_steps
+            .resolve_sync_target(&PullLocalTarget::Existing(target_handle.clone()))
+            .await
+        {
             Ok(Some(dst)) => dst,
             Ok(None) => {
                 return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
@@ -88,16 +89,10 @@ impl UpdateDatasetTaskRunner {
             dst,
         };
 
-        let transfer = self
-            .sync_service
-            .transfer_into_local(sync_request, sync_opts, None)
+        let sync_result = self
+            .update_steps
+            .transfer_and_commit_sync(sync_request, sync_opts, None, None)
             .await;
-
-        let sync_result = match transfer {
-            Ok(SyncTransfer::UpToDate) => Ok(SyncResult::UpToDate),
-            Ok(SyncTransfer::Transferred(transferred)) => self.commit_sync(transferred).await,
-            Err(e) => Err(e),
-        };
 
         match sync_result {
             Ok(SyncResult::Updated {
@@ -128,58 +123,16 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
-    /// Returns `None` when the target was deleted
-    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
-    async fn resolve_sync_target(
-        &self,
-        target_handle: &odf::DatasetHandle,
-    ) -> Result<Option<LocalSyncTarget>, SyncError> {
-        let target = PullLocalTarget::Existing(target_handle.clone())
-            .resolve_sync_target(dataset_registry.as_ref())
-            .await?;
-        if let Some(target) = &target {
-            target.detach_from_transaction();
-        }
-        Ok(target)
-    }
-
-    #[transactional_method1(local_sync_committer: Arc<dyn LocalSyncCommitter>)]
-    async fn commit_sync(&self, transferred: TransferredSync) -> Result<SyncResult, SyncError> {
-        local_sync_committer.commit(transferred).await
-    }
-
-    /// Plans the ingest and resolves its environment variables in one
-    /// transaction, then detaches the target for execution. Returns `None`
-    /// when the target was deleted
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, polling_ingest_planner: Arc<dyn PollingIngestPlanner>)]
-    async fn plan_ingest(
-        &self,
-        target_handle: &odf::DatasetHandle,
-    ) -> Result<Option<(ResolvedDataset, PollingIngestPlan, IngestEnvVars)>, PollingIngestPlanError>
-    {
-        let Some(target) = dataset_registry
-            .try_get_dataset_by_ref(&target_handle.id.as_local_ref())
-            .await?
-        else {
-            return Ok(None);
-        };
-
-        let plan = polling_ingest_planner.plan_ingest(target.clone()).await?;
-        let env_vars = polling_ingest_planner
-            .resolve_env_vars(&target_handle.id)
-            .await?;
-
-        target.detach_from_transaction();
-
-        Ok(Some((target, plan, env_vars)))
-    }
-
     async fn run_ingest_update(
         &self,
         target_handle: &odf::DatasetHandle,
         ingest_options: PollingIngestOptions,
     ) -> Result<TaskOutcome, InternalError> {
-        let (target, plan, env_vars) = match self.plan_ingest(target_handle).await {
+        let PlannedIngest {
+            target,
+            plan,
+            env_vars,
+        } = match self.update_steps.plan_ingest(target_handle).await {
             Ok(Some(planned)) => planned,
             Ok(None) => {
                 return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
@@ -216,7 +169,7 @@ impl UpdateDatasetTaskRunner {
                     },
                 ..
             }) => {
-                if let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
+                if let Some(failed) = TaskDatasetHeadCommitter::new(self.update_steps.as_ref())
                     .commit(target.get_handle(), &old_head, &new_head)
                     .await?
                 {
@@ -263,73 +216,52 @@ impl UpdateDatasetTaskRunner {
         })
     }
 
-    /// Elaborates in one transaction, then detaches the plan for execution.
-    /// Returns `None` when the target was deleted
-    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, transform_planner: Arc<dyn TransformPlanner>)]
-    async fn elaborate_transform(
-        &self,
-        target_handle: &odf::DatasetHandle,
-    ) -> Result<Option<(ResolvedDataset, TransformElaboration)>, TransformElaborateError> {
-        let Some(target) = dataset_registry
-            .try_get_dataset_by_ref(&target_handle.id.as_local_ref())
-            .await?
-        else {
-            return Ok(None);
-        };
-
-        let elaboration = transform_planner
-            .elaborate_transform(target.clone())
-            .await?;
-
-        target.detach_from_transaction();
-        if let TransformElaboration::Elaborated(plan) = &elaboration {
-            plan.datasets_map.detach_from_transaction();
-        }
-
-        Ok(Some((target, elaboration)))
-    }
-
     async fn run_transform_update(
         &self,
         target_handle: &odf::DatasetHandle,
     ) -> Result<TaskOutcome, InternalError> {
-        let (target, transform_plan) = match self.elaborate_transform(target_handle).await {
-            Ok(Some((target, TransformElaboration::Elaborated(transform_plan)))) => {
-                (target, transform_plan)
-            }
-            Ok(None) => {
-                return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
-                    target_handle,
-                ));
-            }
-            Ok(Some((_, TransformElaboration::UpToDate))) => {
-                return Ok(Self::transform_up_to_date());
-            }
-            // The derivative waits for its input, the same as when it is up to date
-            Err(TransformElaborateError::InputNotPulled(e)) => {
-                tracing::info!(
-                    input = %e.dataset_handle,
-                    "Not processing because one of the inputs has no data yet",
-                );
-                return Ok(Self::transform_up_to_date());
-            }
-            Err(TransformElaborateError::InvalidInputInterval(e)) => {
-                return Ok(TaskOutcome::Failed(
-                    TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
-                        dataset_id: e.input_dataset.id,
-                    })
-                    .into_task_error(),
-                ));
-            }
-            Err(
-                e @ (TransformElaborateError::TransformNotDefined(_)
-                | TransformElaborateError::InputsChanged(_)
-                | TransformElaborateError::Internal(_)),
-            ) => {
-                tracing::error!(error = ?e, error_msg = %e, "Transform elaboration failed");
-                return Ok(Self::failed(e.is_recoverable()));
-            }
-        };
+        let (target, transform_plan) =
+            match self.update_steps.elaborate_transform(target_handle).await {
+                Ok(Some(ElaboratedTransform {
+                    target,
+                    elaboration: TransformElaboration::Elaborated(transform_plan),
+                })) => (target, transform_plan),
+                Ok(None) => {
+                    return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
+                        target_handle,
+                    ));
+                }
+                Ok(Some(ElaboratedTransform {
+                    elaboration: TransformElaboration::UpToDate,
+                    ..
+                })) => {
+                    return Ok(Self::transform_up_to_date());
+                }
+                // The derivative waits for its input, the same as when it is up to date
+                Err(TransformElaborateError::InputNotPulled(e)) => {
+                    tracing::info!(
+                        input = %e.dataset_handle,
+                        "Not processing because one of the inputs has no data yet",
+                    );
+                    return Ok(Self::transform_up_to_date());
+                }
+                Err(TransformElaborateError::InvalidInputInterval(e)) => {
+                    return Ok(TaskOutcome::Failed(
+                        TaskErrorDatasetUpdate::InputDatasetCompacted(InputDatasetCompactedError {
+                            dataset_id: e.input_dataset.id,
+                        })
+                        .into_task_error(),
+                    ));
+                }
+                Err(
+                    e @ (TransformElaborateError::TransformNotDefined(_)
+                    | TransformElaborateError::InputsChanged(_)
+                    | TransformElaborateError::Internal(_)),
+                ) => {
+                    tracing::error!(error = ?e, error_msg = %e, "Transform elaboration failed");
+                    return Ok(Self::failed(e.is_recoverable()));
+                }
+            };
 
         let (_, execution_result) = self
             .transform_executor
@@ -348,7 +280,7 @@ impl UpdateDatasetTaskRunner {
                 increment,
                 ..
             }) => {
-                if let Some(failed) = TaskDatasetHeadCommitter::new(&self.catalog)
+                if let Some(failed) = TaskDatasetHeadCommitter::new(self.update_steps.as_ref())
                     .commit(target.get_handle(), &old_head, &new_head)
                     .await?
                 {

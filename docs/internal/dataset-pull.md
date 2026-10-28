@@ -90,7 +90,8 @@ Out of scope, each with its own owner:
 | Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync); the planner's only production consumer |
 | Pull source | `kamu-core` — [`dataset_pull_source_resolver.rs`](../../src/domain/core/src/services/dataset_pull_source_resolver.rs); `kamu` — [`dataset_pull_source_resolver_impl.rs`](../../src/infra/core/src/services/remote/dataset_pull_source_resolver_impl.rs) | `DatasetPullSourceResolver`: a dataset's pull alias and its URL, and the inverse lookup ([dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)) |
 | Planner | `kamu` — [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner) | `PullRequestPlannerImpl`, `PullGraphDepthFirstTraversal` |
-| Use case | `kamu` — [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) | `PullDatasetUseCaseImpl`: authorization, iteration loop, per-job runners, `HEAD` updates |
+| Update steps | `kamu-core` — [`dataset_update_steps.rs`](../../src/domain/core/src/services/dataset_update_steps.rs); `kamu` — [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs) | `DatasetUpdateSteps`: the transactional steps of updating one dataset, shared with the update task: plan an ingest, elaborate a transform, read a sync target, commit `HEAD`, transfer and commit a sync |
+| Use case | `kamu` — [`src/infra/core/src/use_cases/`](../../src/infra/core/src/use_cases) | `PullDatasetUseCaseImpl`: iteration loop and authorization; `PullIngestLoop`, `PullTransformJob` and `PullSyncJob` run the jobs |
 | CLI | `kamu-cli` — [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) | `PullCommand`, progress listeners, result summary |
 | Server | `kamu-adapter-task-dataset` | `UpdateDatasetTaskPlanner` calls the planner; `UpdateDatasetTaskRunner` runs the job ([task-system.md](task-system.md)) |
 
@@ -215,14 +216,15 @@ runs outside them.
 
 | Job | Runner | Moves `HEAD` |
 | --- | --- | --- |
-| Ingest | `PullIngestLoop::run`: plans the ingest and resolves the dataset's env vars in one transaction ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)); then calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), adding up the results so the response spans the first old head to the last new head. A dataset without a polling source is up to date. A failure after earlier iterations committed is `PullError::IngestStopped`, carrying the committed heads and increment and the iteration's error | after every ingest iteration that returns `Updated`, `PullIngestLoop::commit_head` (CAS) |
-| Transform | `transform`: plans and elaborates in one transaction ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes. A failure after the reset committed is `PullError::TransformStopped`, carrying the reset's heads and the error | after the reset and after the transform, `commit_head_transactionally` (CAS) |
-| Sync | `sync`: reads the target's `HEAD` in a transaction of its own (`PullLocalTarget::resolve_sync_target`), then `SyncService::transfer_into_local` with no transaction open, which resolves and opens the source; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias in the commit's transaction, so the dataset never exists without it | after the transfer, `commit_sync_transactionally`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
+| Ingest | `PullIngestLoop::run`: plans the ingest and resolves the dataset's env vars in one transaction (`DatasetUpdateSteps::plan_ingest`) ([root-dataset-ingest.md](root-dataset-ingest.md#51-call-sequence)); then calls `PollingIngestService::ingest` until `has_more` is false (with `exhaust_sources`), adding up the results so the response spans the first old head to the last new head. A dataset without a polling source is up to date. A failure after earlier iterations committed is `PullError::IngestStopped`, carrying the committed heads and increment and the iteration's error | after every ingest iteration that returns `Updated`, `DatasetUpdateSteps::commit_head` (CAS) |
+| Transform | `PullTransformJob::run`: plans and elaborates in one transaction (`DatasetUpdateSteps::elaborate_transform`) ([derived-dataset-transform.md](derived-dataset-transform.md#44-transactions)), so it sees what earlier depths committed; on a diverged input with `reset_derivatives_on_diverged_input`, resets the derivative to metadata and elaborates once more ([derived-dataset-transform.md](derived-dataset-transform.md#7-diverged-inputs)); then executes. A failure after the reset committed is `PullError::TransformStopped`, carrying the reset's heads and the error | after the reset and after the transform, `DatasetUpdateSteps::commit_head` (CAS) |
+| Sync | `PullSyncJob::run`: reads the target's `HEAD` in a transaction of its own (`DatasetUpdateSteps::resolve_sync_target`), then `SyncService::transfer_into_local` with no transaction open (`DatasetUpdateSteps::transfer_and_commit_sync`), which resolves and opens the source; when a dataset was created by the sync (`old_head: None`) and `add_aliases` is on, stores the pull alias in the commit's transaction, so the dataset never exists without it | after the transfer, in `transfer_and_commit_sync`: `LocalSyncCommitter` (CAS, or creation of a new dataset) |
 
-`commit_head_transactionally` and `PullIngestLoop::commit_head` move `HEAD` through
-`DatasetHeadCommitter`, expecting the head the iteration started from, which posts
-`DatasetReferenceMessage` ([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)).
-Any failure there, a CAS conflict included, is that dataset's error: `PollingIngestError::CommitError`
+`DatasetUpdateSteps::commit_head` moves `HEAD` through `DatasetHeadCommitter`, expecting the head
+the iteration started from, which posts `DatasetReferenceMessage`
+([root-dataset-ingest.md](root-dataset-ingest.md#8-committing-and-concurrency)), and returns a
+`HeadCommit`: committed, head moved, dataset deleted or not allowed. Any outcome but committed is
+that dataset's error: `PollingIngestError::CommitError`
 for an ingest job, `TransformExecuteError::CommitError` for a transform job, `SyncError::HeadMoved`
 for a sync job. A conflict arrives as
 `CommitError::MetadataAppendError(AppendError::RefCASFailed)` with the expected and actual heads.
@@ -329,7 +331,11 @@ reporting it, so the deferred consumers of the datasets that did update run in t
 | Update kind of one dataset | [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) |
 | Pull source of one dataset, inverse lookup by pull alias | [`dataset_pull_source_resolver_impl.rs`](../../src/infra/core/src/services/remote/dataset_pull_source_resolver_impl.rs) |
 | Planner: resolution, traversal, depths, job building | [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner) |
-| Use case: authorization, iteration loop, runners, `HEAD` updates | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Use case: iteration loop | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Authorization of an iteration | [`pull_authorization.rs`](../../src/infra/core/src/use_cases/pull_authorization.rs) |
+| Transform job: elaboration, reset, re-authorization of inputs, execution | [`pull_transform_job.rs`](../../src/infra/core/src/use_cases/pull_transform_job.rs) |
+| Sync job | [`pull_sync_job.rs`](../../src/infra/core/src/use_cases/pull_sync_job.rs) |
+| Steps shared with the update task | [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs) |
 | Polling ingest loop of an ingest job | [`pull_ingest_loop.rs`](../../src/infra/core/src/use_cases/pull_ingest_loop.rs) |
 | CLI command, progress, error display | [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) |
 | CLI flags and dispatch | [`cli.rs`](../../src/app/cli/src/cli.rs), [`cli_commands.rs`](../../src/app/cli/src/cli_commands.rs) |

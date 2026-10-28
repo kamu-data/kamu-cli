@@ -213,7 +213,8 @@ consumed, and a `SetDataSchema` before the first data.
 
 ### 4.4 Transactions
 
-Every caller follows one rule:
+Every caller follows one rule; `kamu pull` and the update task both go through
+`DatasetUpdateSteps::{elaborate_transform, commit_head}`:
 
 | Step | Transaction | Why |
 | --- | --- | --- |
@@ -456,7 +457,7 @@ reuses an ID fails instead of mixing its output with an earlier one.
 | Preliminary request, input slicing | [`transform_helpers.rs`](../../src/infra/core/src/services/transform/transform_helpers.rs) |
 | Planner: describe, elaborate, rebuild, status, verification plan | [`transform_planner_impl.rs`](../../src/infra/core/src/services/transform/transform_planner_impl.rs) |
 | Compact stored plan | [`transform_plan_payload.rs`](../../src/domain/core/src/services/transform/transform_plan_payload.rs) |
-| Reset on diverged input during `kamu pull` | [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Reset on diverged input during `kamu pull` | [`pull_transform_job.rs`](../../src/infra/core/src/use_cases/pull_transform_job.rs) |
 | Executor, commit, verification replay | [`transform_executor_impl.rs`](../../src/infra/core/src/services/transform/transform_executor_impl.rs) |
 | Engine trait and request/response types | [`engine.rs`](../../src/domain/core/src/entities/engine.rs) |
 | Provisioner, concurrency, images | [`engine_provisioner_local.rs`](../../src/infra/core/src/engine/engine_provisioner_local.rs) |

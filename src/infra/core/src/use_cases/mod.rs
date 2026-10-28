@@ -11,8 +11,11 @@ mod queries;
 pub use queries::*;
 
 mod compact_dataset_use_case_impl;
+mod pull_authorization;
 mod pull_dataset_use_case_impl;
 mod pull_ingest_loop;
+mod pull_sync_job;
+mod pull_transform_job;
 mod push_dataset_use_case_impl;
 mod push_ingest_data_use_case_impl;
 mod reset_dataset_use_case_impl;

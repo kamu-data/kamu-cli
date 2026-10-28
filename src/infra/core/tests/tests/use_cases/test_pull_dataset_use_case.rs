@@ -1579,6 +1579,7 @@ impl PullUseCaseHarness {
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
         b.add::<PullDatasetUseCaseImpl>()
+            .add::<DatasetUpdateStepsImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
