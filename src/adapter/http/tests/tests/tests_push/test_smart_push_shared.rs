@@ -302,6 +302,39 @@ pub(crate) async fn test_smart_push_existing_diverged_dataset<TServerHarness: Se
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn test_smart_push_existing_diverged_dataset_fails_without_force<
+    TServerHarness: ServerSideHarness,
+>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPushExistingDivergedDatasetScenario::prepare(a_client_harness, a_server_harness).await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_responses = scenario
+            .client_harness
+            .push_dataset(
+                scenario.client_dataset_ref,
+                scenario.server_dataset_ref.try_into().unwrap(),
+                false,
+                odf::DatasetVisibility::Private,
+            )
+            .await;
+
+        assert_matches!(
+            &push_responses[0].result,
+            Err(PushError::SyncError(SyncError::DatasetsDiverged(_)))
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn test_smart_push_existing_dataset_fails_as_server_advanced<
     TServerHarness: ServerSideHarness,
 >(

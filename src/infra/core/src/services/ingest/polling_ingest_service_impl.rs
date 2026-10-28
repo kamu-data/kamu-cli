@@ -114,18 +114,15 @@ impl PollingIngestServiceImpl {
             "Ingest iteration details",
         );
 
-        let listener = args.listener.clone();
-        listener.begin();
+        args.listener.begin();
 
         match self.ingest_iteration_inner(args).await {
             Ok(res) => {
                 tracing::info!(result = ?res.result, "Ingest iteration successful");
-                listener.success(&res.result);
                 Ok(res)
             }
             Err(err) => {
                 tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
-                listener.error(&err);
                 Err(err)
             }
         }

@@ -40,7 +40,7 @@ pub trait DatasetPullSourceResolver: Send + Sync {
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<DatasetPullSource, ResolveRemoteSourceError>;
 
-    /// The local dataset that has this pull alias
+    /// The current account's dataset that has this pull alias
     async fn find_dataset_by_pull_alias(
         &self,
         remote_ref: &odf::DatasetRefRemote,

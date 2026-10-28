@@ -243,6 +243,12 @@ impl UpdateDatasetTaskRunner {
         }
     }
 
+    fn transform_up_to_date() -> TaskOutcome {
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Transform).into_task_result(),
+        )
+    }
+
     fn failed(recoverable: bool) -> TaskOutcome {
         TaskOutcome::Failed(if recoverable {
             TaskError::empty_recoverable()
@@ -280,7 +286,7 @@ impl UpdateDatasetTaskRunner {
                 (target, transform_plan)
             }
             Ok((_, TransformElaboration::UpToDate)) => {
-                return Ok(TaskOutcome::Success(TaskResult::empty()));
+                return Ok(Self::transform_up_to_date());
             }
             // The derivative waits for its input, the same as when it is up to date
             Err(TransformElaborateError::InputNotPulled(e)) => {
@@ -288,7 +294,7 @@ impl UpdateDatasetTaskRunner {
                     input = %e.dataset_handle,
                     "Not processing because one of the inputs has no data yet",
                 );
-                return Ok(TaskOutcome::Success(TaskResult::empty()));
+                return Ok(Self::transform_up_to_date());
             }
             Err(TransformElaborateError::InvalidInputInterval(e)) => {
                 return Ok(TaskOutcome::Failed(
@@ -342,7 +348,7 @@ impl UpdateDatasetTaskRunner {
                     .into_task_result(),
                 ))
             }
-            Ok(TransformResult::UpToDate) => Ok(TaskOutcome::Success(TaskResult::empty())),
+            Ok(TransformResult::UpToDate) => Ok(Self::transform_up_to_date()),
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Transform execution failed");
                 Ok(Self::failed(e.is_recoverable()))

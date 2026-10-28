@@ -159,6 +159,16 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with error",
                 );
             }
+            Err(PushServerError::InvalidHead(err)) => {
+                let payload = Err(DatasetPushRequestError::InvalidHead((&err).into()));
+                axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload).await;
+
+                tracing::warn!(
+                  error = ?err,
+                  error_msg = %err,
+                  "Push rejected: the client's view of the dataset head is stale",
+                );
+            }
             Err(PushServerError::UpdatedConcurrently(err)) => {
                 let payload = DatasetPushCompleteResponse::Err(
                     DatasetPushCompleteError::UpdatedConcurrently(
@@ -211,7 +221,7 @@ impl AxumServerPushProtocolInstance {
                 let dataset_alias = self
                     .dataset_ref
                     .alias()
-                    .expect("Dataset ref is not an alias");
+                    .expect("The upgrade handler rejects a push of an unknown dataset by ID");
 
                 use odf::metadata::AsTypedBlock as _;
                 let (first_block_hash, first_block, first_block_bytes) =
@@ -339,22 +349,22 @@ impl AxumServerPushProtocolInstance {
         }
         .protocol_int_err(PushPhase::InitialRequest)?;
 
-        let response = if push_request.current_head == actual_head {
-            Ok(DatasetPushRequestAccepted {})
-        } else {
-            Err(DatasetPushRequestError::InvalidHead(
-                DatasetPushInvalidHeadError {
-                    actual_head: push_request.current_head.clone(),
-                    expected_head: actual_head,
-                },
-            ))
-        };
+        if push_request.current_head != actual_head {
+            return Err(PushServerError::InvalidHead(odf::dataset::RefCASError {
+                reference: odf::BlockRef::Head,
+                expected: push_request.current_head,
+                actual: actual_head,
+            }));
+        }
 
-        axum_write_payload::<DatasetPushResponse>(&mut self.socket, response)
-            .await
-            .map_err(|e| {
-                PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
-            })?;
+        axum_write_payload::<DatasetPushResponse>(
+            &mut self.socket,
+            Ok(DatasetPushRequestAccepted {}),
+        )
+        .await
+        .map_err(|e| {
+            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
+        })?;
 
         Ok(push_request)
     }
@@ -380,10 +390,14 @@ impl AxumServerPushProtocolInstance {
             "Obtained compressed object batch",
         );
 
-        assert_eq!(
-            push_request.transfer_plan.num_blocks,
-            push_metadata_request.new_blocks.num_blocks
-        );
+        if push_request.transfer_plan.num_blocks != push_metadata_request.new_blocks.num_blocks {
+            return Err(format!(
+                "The push planned {} block(s) but sent {}",
+                push_request.transfer_plan.num_blocks, push_metadata_request.new_blocks.num_blocks
+            )
+            .protocol_int_err(PushPhase::MetadataRequest)
+            .into());
+        }
 
         let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks)
             .protocol_int_err(PushPhase::InitialRequest)?;

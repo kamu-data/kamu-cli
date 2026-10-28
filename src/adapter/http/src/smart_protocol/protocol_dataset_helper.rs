@@ -14,13 +14,13 @@ use std::str::FromStr;
 use flate2::Compression;
 use futures::TryStreamExt;
 use headers::Header as _;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{BoxedError, ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use tar::Header;
 use thiserror::Error;
 use url::Url;
 
-use crate::smart_protocol::errors::ObjectUploadError;
+use crate::smart_protocol::errors::{ObjectDownloadError, ObjectUploadError};
 use crate::smart_protocol::messages::*;
 use crate::{BearerHeader, OdfSmtpVersion};
 
@@ -189,10 +189,10 @@ pub async fn prepare_dataset_metadata_batch(
 
 pub fn decode_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Result<VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>, odf::GetBlockError> {
-    let blocks_data = unpack_dataset_metadata_batch(blocks_batch);
+) -> Result<VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>, DecodeMetadataBatchError> {
+    let blocks_data = unpack_dataset_metadata_batch(blocks_batch)?;
 
-    blocks_data
+    let blocks = blocks_data
         .into_iter()
         .map(|(hash, bytes)| {
             // TODO: Avoid depending on specific implementation of
@@ -203,45 +203,79 @@ pub fn decode_metadata_batch(
             odf::storage::deserialize_metadata_block(&hash, &bytes)
                 .map(|block| (hash, block, bytes))
         })
-        .collect::<Result<VecDeque<_>, _>>()
+        .collect::<Result<VecDeque<_>, _>>()?;
+
+    Ok(blocks)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A metadata batch received from the other side of a transfer that cannot be
+/// read
+#[derive(Error, Debug)]
+pub enum DecodeMetadataBatchError {
+    #[error("Unsupported metadata batch: media type {media_type}, encoding {encoding}")]
+    UnsupportedFormat {
+        media_type: String,
+        encoding: String,
+    },
+
+    #[error("Malformed metadata batch")]
+    Malformed(#[source] BoxedError),
+
+    #[error(transparent)]
+    Block(
+        #[from]
+        #[backtrace]
+        odf::GetBlockError,
+    ),
+}
+
+impl DecodeMetadataBatchError {
+    fn malformed(e: impl Into<BoxedError>) -> Self {
+        Self::Malformed(e.into())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn unpack_dataset_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Vec<(odf::Multihash, odf::MetadataBlockBytes)> {
-    assert!(
-        blocks_batch.media_type.eq(MEDIA_TAR_GZ),
-        "Unsupported media type {}",
-        blocks_batch.media_type
-    );
-
-    assert!(
-        blocks_batch.encoding.eq(ENCODING_RAW),
-        "Unsupported batch encoding type {}",
-        blocks_batch.encoding
-    );
+) -> Result<Vec<(odf::Multihash, odf::MetadataBlockBytes)>, DecodeMetadataBatchError> {
+    if blocks_batch.media_type != MEDIA_TAR_GZ || blocks_batch.encoding != ENCODING_RAW {
+        return Err(DecodeMetadataBatchError::UnsupportedFormat {
+            media_type: blocks_batch.media_type.clone(),
+            encoding: blocks_batch.encoding.clone(),
+        });
+    }
 
     let decoder = flate2::read::GzDecoder::new(blocks_batch.payload.as_slice());
     let mut archive = tar::Archive::new(decoder);
-    let blocks_data: Vec<(odf::Multihash, odf::MetadataBlockBytes)> = archive
+
+    let mut blocks_data = Vec::new();
+    for entry in archive
         .entries()
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|mut entry| {
-            let entry_size = entry.size();
-            let mut buf = vec![0_u8; usize::try_from(entry_size).unwrap()];
-            entry.read_exact(buf.as_mut_slice()).unwrap();
+        .map_err(DecodeMetadataBatchError::malformed)?
+    {
+        let mut entry = entry.map_err(DecodeMetadataBatchError::malformed)?;
 
-            let path = entry.path().unwrap();
-            let hash = odf::Multihash::from_multibase(path.to_str().unwrap()).unwrap();
+        let path = entry.path().map_err(DecodeMetadataBatchError::malformed)?;
+        let hash = path
+            .to_str()
+            .ok_or_else(|| DecodeMetadataBatchError::malformed("Entry name is not UTF-8"))
+            .and_then(|name| {
+                odf::Multihash::from_multibase(name).map_err(DecodeMetadataBatchError::malformed)
+            })?;
 
-            (hash, odf::MetadataBlockBytes::new(buf.into()))
-        })
-        .collect();
+        let mut buf = Vec::new();
+        entry
+            .read_to_end(&mut buf)
+            .map_err(DecodeMetadataBatchError::malformed)?;
 
-    blocks_data
+        blocks_data.push((hash, odf::MetadataBlockBytes::new(buf.into())));
+    }
+
+    Ok(blocks_data)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -297,7 +331,7 @@ pub async fn collect_object_references_from_interval(
             &mut res_references,
             missing_files_only,
         )
-        .await;
+        .await?;
     }
 
     Ok(res_references)
@@ -309,7 +343,7 @@ pub async fn collect_object_references_from_metadata(
     dataset: &dyn odf::Dataset,
     blocks: &VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
     missing_files_only: bool,
-) -> Vec<ObjectFileReference> {
+) -> Result<Vec<ObjectFileReference>, InternalError> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
     for (_, block, _) in blocks {
         collect_object_references_from_block(
@@ -318,10 +352,10 @@ pub async fn collect_object_references_from_metadata(
             &mut res_references,
             missing_files_only,
         )
-        .await;
+        .await?;
     }
 
-    res_references
+    Ok(res_references)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -331,7 +365,7 @@ async fn collect_object_references_from_block(
     block: &odf::MetadataBlock,
     target_references: &mut Vec<ObjectFileReference>,
     missing_files_only: bool,
-) {
+) -> Result<(), InternalError> {
     let data_repo = dataset.as_data_repo();
     let checkpoint_repo = dataset.as_checkpoint_repo();
 
@@ -339,7 +373,10 @@ async fn collect_object_references_from_block(
         odf::MetadataEvent::AddData(e) => {
             if let Some(new_data) = &e.new_data
                 && (!missing_files_only
-                    || !data_repo.contains(&new_data.physical_hash).await.unwrap())
+                    || !data_repo
+                        .contains(&new_data.physical_hash)
+                        .await
+                        .int_err()?)
             {
                 target_references.push(ObjectFileReference {
                     object_type: ObjectType::DataSlice,
@@ -352,7 +389,7 @@ async fn collect_object_references_from_block(
                     || !checkpoint_repo
                         .contains(&new_checkpoint.physical_hash)
                         .await
-                        .unwrap())
+                        .int_err()?)
             {
                 target_references.push(ObjectFileReference {
                     object_type: ObjectType::Checkpoint,
@@ -364,7 +401,10 @@ async fn collect_object_references_from_block(
         odf::MetadataEvent::ExecuteTransform(e) => {
             if let Some(new_data) = &e.new_data
                 && (!missing_files_only
-                    || !data_repo.contains(&new_data.physical_hash).await.unwrap())
+                    || !data_repo
+                        .contains(&new_data.physical_hash)
+                        .await
+                        .int_err()?)
             {
                 target_references.push(ObjectFileReference {
                     object_type: ObjectType::DataSlice,
@@ -377,7 +417,7 @@ async fn collect_object_references_from_block(
                     || !checkpoint_repo
                         .contains(&new_checkpoint.physical_hash)
                         .await
-                        .unwrap())
+                        .int_err()?)
             {
                 target_references.push(ObjectFileReference {
                     object_type: ObjectType::Checkpoint,
@@ -399,6 +439,8 @@ async fn collect_object_references_from_block(
         | odf::MetadataEvent::SetInfo(_)
         | odf::MetadataEvent::SetLicense(_) => (),
     }
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -520,17 +562,19 @@ fn primitivize_header_map(header_map: &http::HeaderMap) -> Vec<HeaderRow> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn reconstruct_header_map(headers_as_primitives: Vec<HeaderRow>) -> http::HeaderMap {
+fn reconstruct_header_map(
+    headers_as_primitives: Vec<HeaderRow>,
+) -> Result<http::HeaderMap, InternalError> {
     let mut res = http::HeaderMap::new();
 
     for HeaderRow { name, value } in headers_as_primitives {
         res.append(
-            http::HeaderName::from_str(name.as_str()).unwrap(),
-            http::HeaderValue::from_str(value.as_str()).unwrap(),
+            http::HeaderName::from_str(name.as_str()).int_err()?,
+            http::HeaderValue::from_str(value.as_str()).int_err()?,
         );
     }
 
-    res
+    Ok(res)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -601,11 +645,9 @@ pub async fn dataset_import_object_file(
     dataset: &dyn odf::Dataset,
     object_transfer_strategy: PullObjectTransferStrategy,
 ) -> Result<(), SyncError> {
-    assert!(
-        !(object_transfer_strategy.pull_strategy != ObjectPullStrategy::HttpDownload),
-        "Unsupported pull strategy {:?}",
-        object_transfer_strategy.pull_strategy
-    );
+    match object_transfer_strategy.pull_strategy {
+        ObjectPullStrategy::HttpDownload => {}
+    }
 
     let object_file_reference = &object_transfer_strategy.object_file;
 
@@ -615,10 +657,21 @@ pub async fn dataset_import_object_file(
         .get(object_transfer_strategy.download_from.url.clone())
         .headers(reconstruct_header_map(
             object_transfer_strategy.download_from.headers,
-        ))
+        )?)
         .send()
         .await
         .int_err()?;
+
+    // The body of a failed download is not the object: hashing it would report
+    // a corrupted source
+    if !response.status().is_success() {
+        return Err(SyncError::Internal(
+            ObjectDownloadError {
+                status: response.status(),
+            }
+            .int_err(),
+        ));
+    }
 
     let stream = response.bytes_stream();
 
@@ -667,23 +720,19 @@ pub async fn dataset_export_object_file(
     dataset: &dyn odf::Dataset,
     object_transfer_strategy: PushObjectTransferStrategy,
 ) -> Result<(), SyncError> {
-    if object_transfer_strategy.push_strategy == ObjectPushStrategy::SkipUpload {
-        tracing::debug!(
-            object_type = ?object_transfer_strategy.object_file.object_type,
-            physical_hash = %object_transfer_strategy.object_file.physical_hash,
-            "Skipping upload",
-        );
-        return Ok(());
-    }
-    assert!(
-        !(object_transfer_strategy.push_strategy != ObjectPushStrategy::HttpUpload),
-        "Unsupported push strategy {:?}",
-        object_transfer_strategy.push_strategy
-    );
-    assert!(
-        object_transfer_strategy.upload_to.is_some(),
-        "Expected URL for upload strategy"
-    );
+    let upload_to = match object_transfer_strategy.push_strategy {
+        ObjectPushStrategy::SkipUpload => {
+            tracing::debug!(
+                object_type = ?object_transfer_strategy.object_file.object_type,
+                physical_hash = %object_transfer_strategy.object_file.physical_hash,
+                "Skipping upload",
+            );
+            return Ok(());
+        }
+        ObjectPushStrategy::HttpUpload => object_transfer_strategy
+            .upload_to
+            .ok_or_else(|| "The server sent no URL to upload the object to".int_err())?,
+    };
 
     let object_file_reference = &object_transfer_strategy.object_file;
 
@@ -707,9 +756,7 @@ pub async fn dataset_export_object_file(
 
     let client = reqwest::Client::new();
 
-    let upload_to = object_transfer_strategy.upload_to.unwrap();
-
-    let mut header_map = reconstruct_header_map(upload_to.headers);
+    let mut header_map = reconstruct_header_map(upload_to.headers)?;
     header_map.append(
         http::header::CONTENT_TYPE,
         http::HeaderValue::from_static("application/octet-stream"),
@@ -755,3 +802,71 @@ pub(crate) fn ensure_seed_not_in_conflict(
     }
     true
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+    use std::io::Write as _;
+
+    use super::*;
+
+    #[test]
+    fn test_decode_metadata_batch_rejects_unsupported_format() {
+        let batch = MetadataBlocksBatch {
+            num_blocks: 1,
+            media_type: String::from("application/zip"),
+            encoding: String::from(ENCODING_RAW),
+            payload: Vec::new(),
+        };
+
+        assert_matches!(
+            decode_metadata_batch(&batch),
+            Err(DecodeMetadataBatchError::UnsupportedFormat { media_type, .. })
+                if media_type == "application/zip"
+        );
+    }
+
+    #[test]
+    fn test_decode_metadata_batch_rejects_payload_that_is_not_a_tarball() {
+        let batch = tar_gz_batch(b"not a tarball");
+
+        assert_matches!(
+            decode_metadata_batch(&batch),
+            Err(DecodeMetadataBatchError::Malformed(_))
+        );
+    }
+
+    #[test]
+    fn test_decode_metadata_batch_rejects_entry_not_named_by_hash() {
+        let mut tarball = tar::Builder::new(Vec::new());
+        let mut header = Header::new_gnu();
+        header.set_size(5);
+        header.set_cksum();
+        tarball
+            .append_data(&mut header, "not-a-hash", b"block".as_slice())
+            .unwrap();
+
+        let batch = tar_gz_batch(&tarball.into_inner().unwrap());
+
+        assert_matches!(
+            decode_metadata_batch(&batch),
+            Err(DecodeMetadataBatchError::Malformed(_))
+        );
+    }
+
+    fn tar_gz_batch(tarball: &[u8]) -> MetadataBlocksBatch {
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(tarball).unwrap();
+
+        MetadataBlocksBatch {
+            num_blocks: 1,
+            media_type: String::from(MEDIA_TAR_GZ),
+            encoding: String::from(ENCODING_RAW),
+            payload: encoder.finish().unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

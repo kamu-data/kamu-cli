@@ -885,6 +885,30 @@ async fn test_sync_from_unknown_repository_fails_planning() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_sync_from_remote_id_without_local_alias_fails_planning() {
+    let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
+
+    let responses = harness
+        .pull_with_requests(
+            vec![PullRequest::Remote(PullRequestRemote {
+                maybe_local_alias: None,
+                remote_ref: odf::DatasetRefRemote::ID(
+                    None,
+                    odf::DatasetID::new_seeded_ed25519(b"bar"),
+                ),
+            })],
+            PullOptions::default(),
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(1, responses.len());
+    assert_matches!(responses[0].result, Err(PullError::InvalidOperation(_)));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_pull_derivative_without_transform_with_dependencies_fails_planning() {
     let harness = PullTestHarness::new(TenancyConfig::SingleTenant, MockDatasetEntryWriter::new());
 

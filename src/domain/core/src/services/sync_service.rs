@@ -380,8 +380,6 @@ pub enum SyncError {
     #[error(transparent)]
     DestinationAhead(#[from] DestinationAheadError),
     #[error(transparent)]
-    InvalidInterval(#[from] odf::dataset::InvalidIntervalError),
-    #[error(transparent)]
     OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
@@ -428,7 +426,6 @@ impl SyncError {
             | Self::DatasetsDiverged(_)
             | Self::DatasetIdMismatch(_)
             | Self::DestinationAhead(_)
-            | Self::InvalidInterval(_)
             | Self::OverwriteSeedBlock(_)
             | Self::Corrupted(_)
             | Self::Access(_) => false,

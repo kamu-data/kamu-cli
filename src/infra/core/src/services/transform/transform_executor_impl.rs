@@ -60,12 +60,10 @@ impl TransformExecutorImpl {
         {
             Ok(res) => {
                 tracing::info!("Transform successful");
-                listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
                 tracing::error!(error = ?err, error_msg = %err, "Transform failed");
-                listener.execute_error(&err);
                 Err(err)
             }
         }

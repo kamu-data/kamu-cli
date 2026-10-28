@@ -31,6 +31,9 @@ pub trait PollingIngestService: Send + Sync {
     /// fetches from the polling source and appends the new blocks without
     /// moving `HEAD`. The caller commits `HEAD` from `old_head` to `new_head`.
     ///
+    /// Reports `begin` and progress to the listener; the caller reports the
+    /// outcome, after its commit.
+    ///
     /// `operation_id` names this attempt's working directory, which is removed
     /// after a successful iteration and kept after a failed one.
     async fn ingest(

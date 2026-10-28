@@ -535,23 +535,6 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                         .find_dataset_by_pull_alias(&remote.remote_ref)
                         .await?;
                     if let Some(resolved_local_handle) = &maybe_resolved_local_handle {
-                        // Ensure the alias belongs to same account
-                        if let Some(resolved_account_name) =
-                            &resolved_local_handle.alias.account_name
-                        {
-                            if let CurrentAccountSubject::Logged(l) =
-                                self.current_account_subject.as_ref()
-                            {
-                                if *resolved_account_name != l.account_handle.name {
-                                    return Err(PullError::SaveUnderDifferentAlias(
-                                        resolved_local_handle.alias.to_string(),
-                                    ));
-                                }
-                            } else {
-                                unreachable!("User must be logged by this moment")
-                            }
-                        }
-
                         // Ensure new alias is identical to the old one
                         if let Some(local_alias) = &remote.maybe_local_alias
                             && resolved_local_handle.alias != *local_alias
@@ -612,7 +595,11 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     ) -> Result<odf::DatasetAlias, PullError> {
         Ok(match &remote_ref {
             odf::DatasetRefRemote::ID(_, _) => {
-                unimplemented!("Pulling from remote by ID is not supported")
+                return Err(PullError::InvalidOperation(
+                    "Unable to infer local name from remote dataset ID, please specify the \
+                     destination explicitly"
+                        .to_owned(),
+                ));
             }
 
             odf::DatasetRefRemote::Alias(alias)
