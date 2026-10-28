@@ -12,7 +12,7 @@ use std::str::FromStr;
 use chrono::{Duration, DurationRound};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
-use kamu_core::{PullResult, TransformStatus};
+use kamu_core::TransformStatus;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
@@ -722,21 +722,20 @@ async fn test_ingest_flow_with_multiple_iterations() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "0")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                // Send some PullResult with records and has_more flag to trigger another iteration
+                // Send some update result with records and has_more flag to trigger another
+                // iteration
                 finish_in_with: Some((
                     Duration::milliseconds(20),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: true,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: true,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 3,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -755,23 +754,20 @@ async fn test_ingest_flow_with_multiple_iterations() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(40),
-                // Send some PullResult with records and has_more flag to trigger another iteration
+                // Send some update result with records and has_more flag to trigger another
+                // iteration
                 finish_in_with: Some((
                     Duration::milliseconds(20),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"newest-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice-1"),
-                                has_more: true,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"newest-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice-1"),
+                            has_more: true,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 3,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),

@@ -41,6 +41,11 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 4,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 4,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
             },
             push_result
         );
@@ -84,6 +89,11 @@ pub(crate) async fn test_smart_push_new_dataset_as_public<TServerHarness: Server
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 4,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 4,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
             },
             push_result
         );
@@ -128,6 +138,11 @@ pub(crate) async fn test_smart_push_new_empty_dataset<TServerHarness: ServerSide
                 old_head: None,
                 new_head: scenario.client_create_result.head,
                 num_blocks: 1,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 0,
+                    updated_watermark: None,
+                },
             },
             push_result
         );
@@ -210,6 +225,11 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
                 old_head: Some(scenario.client_create_result.head),
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 2,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 2,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
             },
             push_result
         );
@@ -259,6 +279,11 @@ pub(crate) async fn test_smart_push_existing_diverged_dataset<TServerHarness: Se
                 old_head: Some(scenario.client_precompaction_result.new_head),
                 new_head,
                 num_blocks: 4,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 4,
+                    num_records: 30,
+                    updated_watermark: None,
+                },
             },
             push_result
         );
@@ -377,6 +402,11 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 4,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 4,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
             },
             push_result
         );
@@ -423,6 +453,11 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
                 old_head: Some(scenario.client_create_result.head),
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 2,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 2,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
             },
             push_result
         );
@@ -467,6 +502,11 @@ pub(crate) async fn test_smart_push_via_repo_ref<TServerHarness: ServerSideHarne
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 4,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 4,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
             },
             push_result
         );

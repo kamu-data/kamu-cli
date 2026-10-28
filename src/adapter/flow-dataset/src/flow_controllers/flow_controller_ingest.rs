@@ -10,9 +10,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_adapter_task_dataset as ats;
-use kamu_core::PullResult;
 use kamu_flow_system as fs;
 use kamu_task_system as ts;
 
@@ -105,29 +104,21 @@ impl fs::FlowController for FlowControllerIngest {
         let task_result_update =
             ats::TaskResultDatasetUpdate::from_task_result(task_result).int_err()?;
 
-        let ats::TaskResultDatasetUpdate {
-            pull_result,
-            data_increment,
-        } = task_result_update;
-
-        match pull_result {
-            PullResult::UpToDate(_) => {
+        match task_result_update {
+            ats::TaskResultDatasetUpdate::UpToDate(_) => {
                 tracing::debug!(flow_id = %success_flow_state.flow_id, "Ingest up-to-date, skipping propagation");
                 return Ok(());
             }
-            PullResult::Updated {
+            ats::TaskResultDatasetUpdate::Updated {
                 old_head,
                 new_head,
                 has_more,
+                increment: dataset_increment,
             } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();
 
                 tracing::debug!(flow_id = %success_flow_state.flow_id, %dataset_id, "Ingested new data, propagating changes");
-
-                let dataset_increment = data_increment.ok_or_else(|| {
-                    format!("Ingest result for {dataset_id} carries no data increment").int_err()
-                })?;
 
                 let activation_cause = fs::FlowActivationCause::ResourceUpdate(
                     fs::FlowActivationCauseResourceUpdate {

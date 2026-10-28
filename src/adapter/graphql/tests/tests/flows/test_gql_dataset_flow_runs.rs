@@ -19,7 +19,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
 };
 use kamu_adapter_task_dataset::*;
-use kamu_core::{CompactionResult, PullResult, ResetResult};
+use kamu_core::{CompactionResult, ResetResult};
 use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{self as ts, TaskError};
@@ -302,17 +302,15 @@ async fn test_trigger_ingest_root_dataset() {
             flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
-                    },
-                    data_increment: Some(MetadataChainIncrementInterval {
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
                         num_blocks: 1,
                         num_records: 12,
                         updated_watermark: None,
-                    }),
+                    },
                 }
                 .into_task_result(),
             ),
@@ -768,17 +766,15 @@ async fn test_trigger_execute_transform_derived_dataset() {
             flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
-                    },
-                    data_increment: Some(MetadataChainIncrementInterval {
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
                         num_blocks: 1,
                         num_records: 5,
                         updated_watermark: None,
-                    }),
+                    },
                 }
                 .into_task_result(),
             ),
@@ -4264,17 +4260,15 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             flow_task_metadata,
             complete_time_2,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
-                    },
-                    data_increment: Some(MetadataChainIncrementInterval {
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
                         num_blocks: 1,
                         num_records: 12,
                         updated_watermark: None,
-                    }),
+                    },
                 }
                 .into_task_result(),
             ),

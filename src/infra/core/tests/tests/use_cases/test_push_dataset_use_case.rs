@@ -68,7 +68,7 @@ async fn test_push_success() {
         PushResponse {
             local_handle: Some(local_handle),
             target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks }),
+            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks, increment: _ }),
         } if local_handle == foo.dataset_handle &&
             repo_name == harness.remote_repo_name &&
             old_head.is_none() && num_blocks == 2
@@ -146,7 +146,7 @@ async fn test_push_success_without_saving_alias() {
          PushResponse {
             local_handle: Some(local_handle),
             target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks }),
+            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks, increment: _ }),
         } if local_handle == foo.dataset_handle &&
             repo_name == harness.remote_repo_name &&
             old_head.is_none() && num_blocks == 2

@@ -4211,7 +4211,7 @@ type FlowDescriptionUnknown {
 """
 Result of a flow that updates a dataset
 """
-union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess | FlowDescriptionUpdateResultUnknown
+union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess
 
 """
 Dataset was updated with new data
@@ -4233,16 +4233,6 @@ type FlowDescriptionUpdateResultSuccess {
 	Whether the source has more data to fetch
 	"""
 	hasMore: Boolean!
-}
-
-"""
-Dataset was updated, but the added data could not be determined
-"""
-type FlowDescriptionUpdateResultUnknown {
-	"""
-	Why the added data could not be determined
-	"""
-	message: String!
 }
 
 """

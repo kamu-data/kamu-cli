@@ -809,6 +809,7 @@ async fn test_pull_sync_success() {
             old_head: None,
             new_head: synced_head(),
             num_blocks: 0,
+            increment: odf::dataset::MetadataChainIncrementInterval::default(),
         }),
     );
 
@@ -877,6 +878,7 @@ async fn test_pull_sync_success_without_saving_alias() {
             old_head: None,
             new_head: synced_head(),
             num_blocks: 0,
+            increment: odf::dataset::MetadataChainIncrementInterval::default(),
         }),
     );
 

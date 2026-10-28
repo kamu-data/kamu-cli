@@ -10,7 +10,7 @@
 use chrono::{Duration, Utc};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
-use kamu_core::{PullResult, TransformStatus};
+use kamu_core::TransformStatus;
 use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
@@ -112,21 +112,19 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                // Send some PullResult with records to bypass batching condition
+                // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 3,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -398,21 +396,19 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                // Send some PullResult with records to bypass batching condition
+                // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 3,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -702,19 +698,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 7,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -736,19 +728,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 7,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -788,19 +776,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 7,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -840,19 +824,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 7,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1298,19 +1278,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1332,19 +1308,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 7,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1366,19 +1338,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 12,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1400,19 +1368,17 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice-2",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                b"foo-new-slice-2",
+                            )),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1434,19 +1400,17 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice-2",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                b"foo-new-slice-2",
+                            )),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1468,19 +1432,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 10,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1854,19 +1814,15 @@ async fn test_batching_condition_timeout() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1888,19 +1844,15 @@ async fn test_batching_condition_timeout() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 3,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -1924,19 +1876,15 @@ async fn test_batching_condition_timeout() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 8,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2154,19 +2102,15 @@ async fn test_batching_condition_watermark() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 0,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2188,19 +2132,15 @@ async fn test_batching_condition_watermark() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 0,
                                 updated_watermark: Some(Utc::now()),
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2224,19 +2164,15 @@ async fn test_batching_condition_watermark() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 0,
                                 updated_watermark: Some(Utc::now()),
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2471,19 +2407,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2505,19 +2437,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2539,19 +2467,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 7,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2573,19 +2497,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 2,
                                 num_records: 8,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2607,19 +2527,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 7,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -2641,19 +2557,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"baz-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 32,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -3150,19 +3062,15 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -3202,19 +3110,15 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -3548,19 +3452,15 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -3582,19 +3482,15 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 5,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -4178,21 +4074,19 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                // Send some PullResult with records to bypass batching condition
+                // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 0,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),
@@ -4457,17 +4351,15 @@ async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
-                            },
-                            data_increment: Some(MetadataChainIncrementInterval {
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
                                 num_blocks: 1,
                                 num_records: 3,
                                 updated_watermark: None,
-                            }),
+                            },
                         }
                         .into_task_result(),
                     ),

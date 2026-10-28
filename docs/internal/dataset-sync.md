@@ -163,8 +163,11 @@ earlier failed pull, so the next pull continues into it.
 | `force` | accept a destination that is ahead or has diverged, and replace its history; never disables the CAS on `HEAD` |
 | `dataset_visibility` | visibility of a dataset created by the sync (default private) |
 
-`SyncResult` is `UpToDate` or `Updated { old_head, new_head, num_blocks }`; `old_head: None` means
-the destination was created.
+`SyncResult` is `UpToDate` or `Updated { old_head, new_head, num_blocks, increment }`; `old_head:
+None` means the destination was created. `increment` is the data between the two heads, read from
+the chain that holds the new blocks (the destination on pull, the local source on push); when the
+new head does not extend the old one, as after a forced sync over a divergence, it counts the whole
+new chain.
 
 ---
 
@@ -486,6 +489,12 @@ failure while computing the pull transfer plan, whose message is forwarded as is
 protocol errors, `InvalidInterval` (→ `DatasetsDiverged` on pull), `SeedBlockOverwriteRestricted`
 (→ `OverwriteSeedBlock` on push; on pull the client makes the `Seed` check itself), `RefCollision`
 and `NameCollision` keep their meaning; `InvalidHead` becomes `Internal`.
+
+`SyncError::is_recoverable` says whether running the same sync again could succeed. A lost CAS
+(`HeadMoved`, `UpdatedConcurrently`) and `Internal`, which also covers network failures, are
+recoverable; conflicts between the chains and errors in the request are not. `CreateDatasetFailed`
+is recoverable only for a lost CAS or an internal failure. The update task runner turns the flag
+into the recoverability of the failed task.
 
 ---
 

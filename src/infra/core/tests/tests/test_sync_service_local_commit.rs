@@ -75,6 +75,11 @@ async fn test_transfer_into_existing_dataset_moves_no_head() {
             old_head: Some(old_head),
             new_head: new_head.clone(),
             num_blocks: 1,
+            increment: odf::dataset::MetadataChainIncrementInterval {
+                num_blocks: 1,
+                num_records: 10,
+                updated_watermark: None,
+            },
         }
     );
     assert_eq!(harness.destination_head().await, Some(new_head));
@@ -147,8 +152,14 @@ async fn test_forced_pull_replaces_diverged_history() {
 
     assert_matches!(
         harness.pull(SyncOptions { force: true, ..SyncOptions::default() }, None).await,
-        Ok(SyncResult::Updated { old_head: Some(old_head), new_head, .. })
+        Ok(SyncResult::Updated { old_head: Some(old_head), new_head, increment, .. })
             if old_head == diverged_head && new_head == source_head
+                // The whole replacing chain counts
+                && increment == odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 3,
+                    num_records: 10,
+                    updated_watermark: None,
+                }
     );
     assert_eq!(harness.destination_head().await, Some(source_head));
 }
@@ -273,6 +284,11 @@ impl LocalPullHarness {
                 old_head: None,
                 new_head: source_head.clone(),
                 num_blocks: 3,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 3,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
             }
         );
         assert_eq!(self.destination_head().await, Some(source_head));

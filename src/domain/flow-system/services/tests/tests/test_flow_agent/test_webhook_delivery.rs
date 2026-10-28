@@ -20,7 +20,6 @@ use kamu_adapter_flow_webhook::{
 };
 use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
 use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, TaskErrorWebhookDelivery};
-use kamu_core::PullResult;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
     GetIncrementError,
@@ -1272,13 +1271,11 @@ impl WebhookFlowHarness {
             finish_in_with: Some((
                 Duration::milliseconds(10),
                 TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                        pull_result: PullResult::Updated {
-                            old_head: Some(old_head.clone()),
-                            new_head: new_head.clone(),
-                            has_more: false,
-                        },
-                        data_increment: Some(Self::ingest_increment()),
+                    TaskResultDatasetUpdate::Updated {
+                        old_head: Some(old_head.clone()),
+                        new_head: new_head.clone(),
+                        has_more: false,
+                        increment: Self::ingest_increment(),
                     }
                     .into_task_result(),
                 ),
