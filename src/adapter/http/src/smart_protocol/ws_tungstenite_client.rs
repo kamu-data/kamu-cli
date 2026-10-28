@@ -867,10 +867,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .resolve_odf_dataset_access_token(http_dst_url);
         let push_url = Self::generate_ws_url(http_dst_url, "push");
 
-        tracing::debug!(
-            %push_url, access_token = ?maybe_access_token,
-            "Connecting smart push protocol web socket",
-        );
+        tracing::debug!(%push_url, "Connecting smart push protocol web socket");
 
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = push_url.into_client_request().int_err()?;
