@@ -18,6 +18,7 @@ use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use kamu::utils::url_ext::UrlExt;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{

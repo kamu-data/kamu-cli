@@ -106,7 +106,7 @@ verifiability. This page does not restate them; read these first:
 | Engines | `kamu` — [`src/infra/core/src/engine/`](../../src/infra/core/src/engine) | `EngineProvisionerLocal`, `ODFEngine`, `EngineContainer`, the I/O strategies |
 | Engine protocol client | `opendatafabric-metadata` — `odf::metadata::engines::EngineGrpcClient` | gRPC client for the ODF engine adapter inside the container |
 | Chain validation | `opendatafabric-dataset-impl` — [`metadata_chain_validators.rs`](../../src/odf/dataset-impl/src/entities/metadata_chain_validators.rs) | `ValidateSetTransformVisitor`, `ValidateExecuteTransformVisitor` |
-| Pull planning and execution | `kamu` — [`pull_request_planner_impl.rs`](../../src/infra/core/src/services/pull_request_planner_impl.rs), [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) | `kamu pull` |
+| Pull planning and execution | `kamu` — [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner), [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) | `kamu pull` |
 | Task adapter | `kamu-adapter-task-dataset` | `UpdateDatasetTaskPlanner`, `UpdateDatasetTaskRunner::run_transform_update` |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerTransform`, `DerivedDatasetFlowSensor`, `TransformFlowEvaluatorImpl` |
 | Verification | `kamu` — [`verification_service_impl.rs`](../../src/infra/core/src/services/verification_service_impl.rs) | replays `ExecuteTransform` blocks |
@@ -465,7 +465,7 @@ reuses an ID fails instead of mixing its output with an earlier one.
 | Container lifecycle and logs | [`engine_container.rs`](../../src/infra/core/src/engine/engine_container.rs) |
 | Input materialization | [`engine_io_strategy.rs`](../../src/infra/core/src/engine/engine_io_strategy.rs) |
 | Chain validators | [`metadata_chain_validators.rs`](../../src/odf/dataset-impl/src/entities/metadata_chain_validators.rs) |
-| Pull planning and execution | [`pull_request_planner_impl.rs`](../../src/infra/core/src/services/pull_request_planner_impl.rs), [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
+| Pull planning and execution | [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner), [`pull_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/pull_dataset_use_case_impl.rs) |
 | Update task planner / runner | [`update_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/update_dataset_task_planner.rs), [`update_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/update_dataset_task_runner.rs) |
 | Transform flow controller and sensor | [`flow_controller_transform.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_transform.rs), [`derived_dataset_flow_sensor.rs`](../../src/adapter/flow-dataset/src/flow_sensors/derived_dataset_flow_sensor.rs) |
 | Status evaluator for flows | [`transform_flow_evaluator_impl.rs`](../../src/adapter/flow-dataset/src/services/transform_flow_evaluator_impl.rs) |

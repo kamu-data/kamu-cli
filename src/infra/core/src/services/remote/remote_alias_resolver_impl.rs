@@ -15,7 +15,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use url::Url;
 
-use crate::UrlExt;
+use crate::utils::url_ext::UrlExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

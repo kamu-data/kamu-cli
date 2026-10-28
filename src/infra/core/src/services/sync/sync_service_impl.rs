@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -27,6 +26,7 @@ use crate::utils::smart_transfer_protocol::{
     TransferOptions as SmartTransferOptions,
 };
 use crate::utils::sync_increment::sync_increment;
+use crate::utils::url_ext::UrlExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -555,37 +555,3 @@ impl SyncService for SyncServiceImpl {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait UrlExt {
-    fn ensure_trailing_slash(&mut self);
-    fn is_odf_protocol(&self) -> bool;
-    fn as_odf_protocol(&self) -> Result<Url, InternalError>;
-
-    /// Converts from odf+http(s) scheme to plain http(s)
-    fn odf_to_transport_protocol(&self) -> Result<Url, InternalError>;
-}
-
-impl UrlExt for Url {
-    fn ensure_trailing_slash(&mut self) {
-        if !self.path().ends_with('/') {
-            self.set_path(&format!("{}/", self.path()));
-        }
-    }
-
-    fn as_odf_protocol(&self) -> Result<Url, InternalError> {
-        let url_string = self.as_str().replace("http", "odf+http");
-        Url::from_str(&url_string).int_err()
-    }
-
-    fn is_odf_protocol(&self) -> bool {
-        self.scheme().starts_with("odf+")
-    }
-
-    fn odf_to_transport_protocol(&self) -> Result<Url, InternalError> {
-        let s = self
-            .as_str()
-            .strip_prefix("odf+")
-            .ok_or_else(|| format!("Expected odf+http(s) URL but got: {self}").int_err())?;
-        Url::parse(s).int_err()
-    }
-}
