@@ -51,17 +51,19 @@ impl RemoteAliasResolverImpl {
             .await
             .int_err()?;
 
-        let aliases: Vec<_> = remote_aliases.get_by_kind(remote_alias_kind).collect();
-
-        match aliases.len() {
-            0 => Ok(None),
-            1 => {
-                if let odf::DatasetRefRemote::Url(remote_url) = aliases[0].clone() {
-                    return Ok(Some(remote_url.as_ref().clone()));
-                }
-                Ok(None)
+        match remote_aliases.single_by_kind(remote_alias_kind) {
+            Ok(Some(odf::DatasetRefRemote::Url(remote_url))) => {
+                Ok(Some(remote_url.as_ref().clone()))
             }
-            _ => Err(ResolveAliasError::AmbiguousAlias),
+            Ok(
+                None
+                | Some(
+                    odf::DatasetRefRemote::ID(..)
+                    | odf::DatasetRefRemote::Alias(_)
+                    | odf::DatasetRefRemote::Handle(_),
+                ),
+            ) => Ok(None),
+            Err(AmbiguousRemoteAliasError { .. }) => Err(ResolveAliasError::AmbiguousAlias),
         }
     }
 

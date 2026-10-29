@@ -600,7 +600,7 @@ pub struct DatasetListOptions {
     all_accounts: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoAlias {
     pub dataset: odf::DatasetAlias,

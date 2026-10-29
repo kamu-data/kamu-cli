@@ -12,7 +12,7 @@ use kamu_cli_puppet::extensions::{AddDatasetOptions, KamuCliPuppetExt, RepoAlias
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
+pub async fn test_repository_aliases_commands(kamu: KamuCliPuppet) {
     kamu.add_dataset(
         odf::DatasetSnapshot {
             name: "foo".try_into().unwrap(),
@@ -40,147 +40,69 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
         AddDatasetOptions::default(),
     )
     .await;
+    let foo = odf::DatasetRef::from(odf::DatasetName::new_unchecked("foo"));
 
-    let dataset_aliases = vec![
-        RepoAlias {
-            dataset: "foo".parse().unwrap(),
-            kind: "Pull".to_string(),
-            alias: "http://pull.example.com/".to_string(),
-        },
-        RepoAlias {
-            dataset: "foo".parse().unwrap(),
-            kind: "Pull".to_string(),
-            alias: "http://pull.example1.com/".to_string(),
-        },
-        RepoAlias {
-            dataset: "foo".parse().unwrap(),
-            kind: "Pull".to_string(),
-            alias: "http://pull.example2.com/".to_string(),
-        },
-    ];
+    let pull = repo_alias("Pull", "http://pull.example.com/");
+    let shared_pull = repo_alias("Pull", "http://shared.example.com/");
+    let push = repo_alias("Push", "http://push.example.com/");
+    let shared_push = repo_alias("Push", "http://shared.example.com/");
 
-    for repo_alias in &dataset_aliases {
-        kamu.execute(["repo", "alias", "add", "foo", &repo_alias.alias, "--pull"])
+    for (alias, kind_flag) in [
+        (&pull.alias, "--pull"),
+        (&shared_pull.alias, "--pull"),
+        (&push.alias, "--push"),
+        (&shared_push.alias, "--push"),
+    ] {
+        kamu.execute(["repo", "alias", "add", "foo", alias, kind_flag])
             .await
             .success();
     }
 
-    let aliases = kamu
-        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
-            "foo",
-        )))
-        .await;
-    pretty_assertions::assert_eq!(dataset_aliases, aliases);
+    pretty_assertions::assert_eq!(
+        kamu.get_list_of_repo_aliases(&foo).await,
+        [
+            pull.clone(),
+            shared_pull.clone(),
+            push.clone(),
+            shared_push.clone()
+        ]
+    );
 
-    // Test remove single pull alias
-    kamu.execute(["repo", "alias", "rm", "foo", &dataset_aliases[2].alias])
+    // A kind flag removes the alias of that kind only
+    kamu.execute(["repo", "alias", "rm", "foo", &shared_push.alias, "--push"])
         .await
         .success();
 
-    let aliases = kamu
-        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
-            "foo",
-        )))
-        .await;
-    pretty_assertions::assert_eq!(dataset_aliases[..2], aliases);
+    pretty_assertions::assert_eq!(
+        kamu.get_list_of_repo_aliases(&foo).await,
+        [pull.clone(), shared_pull.clone(), push.clone()]
+    );
 
-    // Test remove all pull aliases
+    // Without a kind flag, the alias is removed whatever its kind
+    kamu.execute(["repo", "alias", "rm", "foo", &pull.alias])
+        .await
+        .success();
+
+    pretty_assertions::assert_eq!(
+        kamu.get_list_of_repo_aliases(&foo).await,
+        [shared_pull, push]
+    );
+
     kamu.execute(["repo", "alias", "rm", "--all", "foo"])
         .await
         .success();
 
-    let aliases = kamu
-        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
-            "foo",
-        )))
-        .await;
-    assert_eq!(aliases, []);
+    assert_eq!(kamu.get_list_of_repo_aliases(&foo).await, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
-    kamu.add_dataset(
-        odf::DatasetSnapshot {
-            name: "foo".try_into().unwrap(),
-            kind: odf::DatasetKind::Root,
-            metadata: vec![
-                odf::metadata::AddPushSource {
-                    source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
-                    read: odf::metadata::ReadStepNdJson {
-                        schema: Some(odf::schema::DataSchema::new(vec![
-                            odf::schema::DataField::timestamp_millis_utc("event_time"),
-                            odf::schema::DataField::string("foo_string"),
-                        ])),
-                        ..Default::default()
-                    }
-                    .into(),
-                    preprocess: None,
-                    merge: odf::metadata::MergeStrategyLedger {
-                        primary_key: vec!["event_time".to_owned(), "foo_string".to_owned()],
-                    }
-                    .into(),
-                }
-                .into(),
-            ],
-        },
-        AddDatasetOptions::default(),
-    )
-    .await;
-
-    let dataset_aliases = vec![
-        RepoAlias {
-            dataset: "foo".parse().unwrap(),
-            kind: "Push".to_string(),
-            alias: "http://push.example.com/".to_string(),
-        },
-        RepoAlias {
-            dataset: "foo".parse().unwrap(),
-            kind: "Push".to_string(),
-            alias: "http://push.example1.com/".to_string(),
-        },
-        RepoAlias {
-            dataset: "foo".parse().unwrap(),
-            kind: "Push".to_string(),
-            alias: "http://push.example2.com/".to_string(),
-        },
-    ];
-
-    for repo_alias in &dataset_aliases {
-        kamu.execute(["repo", "alias", "add", "foo", &repo_alias.alias, "--push"])
-            .await
-            .success();
+fn repo_alias(kind: &str, alias: &str) -> RepoAlias {
+    RepoAlias {
+        dataset: "foo".parse().unwrap(),
+        kind: kind.to_string(),
+        alias: alias.to_string(),
     }
-
-    let aliases = kamu
-        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
-            "foo",
-        )))
-        .await;
-    pretty_assertions::assert_eq!(dataset_aliases, aliases);
-
-    // Test remove single push alias
-    kamu.execute(["repo", "alias", "rm", "foo", &dataset_aliases[2].alias])
-        .await
-        .success();
-
-    let aliases = kamu
-        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
-            "foo",
-        )))
-        .await;
-    pretty_assertions::assert_eq!(dataset_aliases[..2], aliases);
-    // Test remove all push aliases
-    kamu.execute(["repo", "alias", "rm", "--all", "foo"])
-        .await
-        .success();
-
-    let aliases = kamu
-        .get_list_of_repo_aliases(&odf::DatasetRef::from(odf::DatasetName::new_unchecked(
-            "foo",
-        )))
-        .await;
-    assert_eq!(aliases, []);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
