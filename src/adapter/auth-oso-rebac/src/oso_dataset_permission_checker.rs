@@ -178,7 +178,6 @@ impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
         Ok(matched_dataset_handles)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count = %dataset_handles.len(), %permission))]
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
@@ -192,6 +191,7 @@ impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
         .await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count = %dataset_handles.len(), %permission))]
     async fn classify_dataset_handles_by_allowance_for(
         &self,
         principal: &CurrentAccountSubject,
