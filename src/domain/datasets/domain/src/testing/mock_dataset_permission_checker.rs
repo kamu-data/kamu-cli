@@ -39,7 +39,6 @@ impl MockDatasetPermissionChecker {
                 ))
             });
         let missing_ids_clone = missing_ids.clone();
-        let missing_ids_for = missing_ids.clone();
         mock_dataset_permission_checker
             .expect_classify_dataset_ids_by_allowance()
             .returning(move |ids, permission| {
@@ -66,44 +65,19 @@ impl MockDatasetPermissionChecker {
                         .collect(),
                 })
             });
+        let missing_ids_for = missing_ids.clone();
         mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
             .returning(move |handles, permission| {
-                Ok(ClassifyByAllowanceResponse {
-                    authorized_handles: Vec::new(),
-                    unauthorized_handles_with_errors: handles
-                        .into_iter()
-                        .map(|hdl| {
-                            if missing_ids.contains(&hdl.id) {
-                                (
-                                    hdl.clone(),
-                                    odf::DatasetNotFoundError::new(hdl.id.as_local_ref()).into(),
-                                )
-                            } else {
-                                (
-                                    hdl.clone(),
-                                    ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                                        hdl.id.as_local_ref(),
-                                        permission,
-                                    ),
-                                )
-                            }
-                        })
-                        .collect(),
-                })
+                Ok(Self::classify_handles(handles, |hdl| {
+                    Some(Self::denial(&missing_ids, hdl, permission))
+                }))
             });
         mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance_for()
             .returning(move |_, handles, permission| {
                 Ok(Self::classify_handles(handles, |hdl| {
-                    Some(if missing_ids_for.contains(&hdl.id) {
-                        odf::DatasetNotFoundError::new(hdl.id.as_local_ref()).into()
-                    } else {
-                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                            hdl.id.as_local_ref(),
-                            permission,
-                        )
-                    })
+                    Some(Self::denial(&missing_ids_for, hdl, permission))
                 }))
             });
         mock_dataset_permission_checker
@@ -157,23 +131,14 @@ impl MockDatasetPermissionChecker {
         mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
             .returning(move |handles, permission| {
-                let (unauthorized, authorized): (Vec<_>, Vec<_>) = handles
-                    .into_iter()
-                    .partition(|hdl| denied.contains(&hdl.id));
-                Ok(ClassifyByAllowanceResponse {
-                    authorized_handles: authorized,
-                    unauthorized_handles_with_errors: unauthorized
-                        .into_iter()
-                        .map(|hdl| {
-                            let err =
-                                ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                                    hdl.id.as_local_ref(),
-                                    permission,
-                                );
-                            (hdl, err)
-                        })
-                        .collect(),
-                })
+                Ok(Self::classify_handles(handles, |hdl| {
+                    denied.contains(&hdl.id).then(|| {
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
+                            hdl.id.as_local_ref(),
+                            permission,
+                        )
+                    })
+                }))
             });
 
         let denied = denied_ids.clone();
@@ -217,12 +182,7 @@ impl MockDatasetPermissionChecker {
             });
         mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
-            .returning(|handles, _| {
-                Ok(ClassifyByAllowanceResponse {
-                    authorized_handles: handles,
-                    unauthorized_handles_with_errors: Vec::new(),
-                })
-            });
+            .returning(|handles, _| Ok(Self::classify_handles(handles, |_| None)));
         mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance_for()
             .returning(|_, handles, _| Ok(Self::classify_handles(handles, |_| None)));
@@ -352,26 +312,14 @@ impl MockDatasetPermissionChecker {
             .with(always(), eq(permission))
             .times(times)
             .returning(move |handles, permission| {
-                let mut good = Vec::new();
-                let mut bad = Vec::new();
-
-                for handle in handles {
-                    if authorized.contains(&handle.alias) {
-                        good.push(handle);
-                    } else {
-                        let error =
-                            ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
-                                handle.as_local_ref(),
-                                permission,
-                            );
-                        bad.push((handle, error));
-                    }
-                }
-
-                Ok(ClassifyByAllowanceResponse {
-                    authorized_handles: good,
-                    unauthorized_handles_with_errors: bad,
-                })
+                Ok(Self::classify_handles(handles, |handle| {
+                    (!authorized.contains(&handle.alias)).then(|| {
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
+                            handle.as_local_ref(),
+                            permission,
+                        )
+                    })
+                }))
             });
 
         self
@@ -523,6 +471,22 @@ impl MockDatasetPermissionChecker {
             }
         }
         response
+    }
+
+    /// Not found for the missing datasets, a missing permission for the rest
+    fn denial(
+        missing_ids: &HashSet<odf::DatasetID>,
+        hdl: &odf::DatasetHandle,
+        permission: DatasetPermission,
+    ) -> ClassifyByAllowanceDatasetPermissionError {
+        if missing_ids.contains(&hdl.id) {
+            odf::DatasetNotFoundError::new(hdl.id.as_local_ref()).into()
+        } else {
+            ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
+                hdl.id.as_local_ref(),
+                permission,
+            )
+        }
     }
 
     pub fn make_expect_get_granted_permissions(
