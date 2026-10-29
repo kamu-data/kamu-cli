@@ -356,9 +356,9 @@ Ingest, transform and compaction share one shape: **the core service writes new 
 `update_block_ref: false` outside any transaction, and the runner then moves `HEAD` in a short
 transaction with compare-and-swap** — the runner re-resolves the dataset through
 `DatasetRegistry` and moves `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter`
-(`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses; `TaskDatasetHeadCommitter`,
-shared by the update, compaction and reset runners, turns a commit that did not happen into the task's
-outcome). Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run
+(`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses;
+`HeadCommitTaskOutcome::into_failed_task_outcome` in `task_head_commit.rs`, shared by the update,
+compaction and reset runners, turns a commit that did not happen into the task's outcome). Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run
 after a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and
 reset differ:
 

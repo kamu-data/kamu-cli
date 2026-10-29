@@ -411,9 +411,11 @@ impl SyncError {
         use kamu_datasets::CreateDatasetError as E;
 
         match self {
+            // The dataset ID names the source's dataset, so a collision on it means a concurrent
+            // pull created that dataset first, and planning again finds it
             Self::CreateDatasetFailed(e) => match e {
-                E::CASFailed(_) | E::Internal(_) => true,
-                E::EmptyDataset | E::Access(_) | E::NameCollision(_) | E::RefCollision(_) => false,
+                E::CASFailed(_) | E::RefCollision(_) | E::Internal(_) => true,
+                E::EmptyDataset | E::Access(_) | E::NameCollision(_) => false,
             },
 
             Self::DatasetNotFound(_)
@@ -719,7 +721,7 @@ mod tests {
                         id: fixtures.dataset_id(b"foo"),
                     },
                 )),
-                false,
+                true,
             ),
             (
                 SyncError::DatasetNotFound(DatasetAnyRefUnresolvedError::new(

@@ -457,8 +457,7 @@ impl SyncServiceImpl {
         }
     }
 
-    /// Resolves a pull source's URL and opens it. The source must have a
-    /// `HEAD`
+    /// Resolves a pull source's URL and opens it
     async fn open_remote_source(
         &self,
         remote_ref: odf::DatasetRefRemote,
@@ -469,13 +468,6 @@ impl SyncServiceImpl {
                 .await?,
         );
         let dataset = self.dataset_factory.get_dataset(&url, false).await?;
-
-        if try_resolve_head(dataset.as_metadata_chain())
-            .await?
-            .is_none()
-        {
-            return Err(DatasetAnyRefUnresolvedError::new(odf::DatasetRefAny::Url(url)).into());
-        }
 
         Ok(SyncRefRemote {
             url,
@@ -495,8 +487,14 @@ impl SyncServiceImpl {
         let src = self.open_remote_source(src_ref).await?;
 
         if src.url.is_odf_protocol() {
-            let src_url = src.url.clone();
-            self.transfer_smart_pull(src_url.as_ref(), dst, opts).await
+            // The Simple protocol reads the source `HEAD` as it compares the chains
+            if try_resolve_head(src.dataset.as_metadata_chain())
+                .await?
+                .is_none()
+            {
+                return Err(DatasetAnyRefUnresolvedError::new(src.as_internal_any_ref()).into());
+            }
+            self.transfer_smart_pull(src.url.as_ref(), dst, opts).await
         } else {
             self.transfer_generic(SyncRef::Remote(src), dst, opts, listener)
                 .await

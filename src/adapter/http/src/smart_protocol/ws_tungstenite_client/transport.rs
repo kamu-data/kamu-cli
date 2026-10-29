@@ -17,6 +17,7 @@ use serde::de::DeserializeOwned;
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
@@ -78,6 +79,41 @@ pub(super) type TungsteniteStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Closes the socket normally once a flow has ended, so the server sees the
+/// client leave rather than lose the connection. Failing to close fails only
+/// a flow that succeeded; a failed flow keeps its own error
+pub(super) async fn close_after_flow<T>(
+    stream: &mut TungsteniteStream,
+    flow_result: Result<T, SyncError>,
+) -> Result<T, SyncError> {
+    let reason = if flow_result.is_ok() {
+        "Client flow succeeded"
+    } else {
+        "Client flow failed"
+    };
+    let close_result = stream
+        .close(Some(CloseFrame {
+            code: CloseCode::Normal,
+            reason: reason.into(),
+        }))
+        .await;
+
+    match flow_result {
+        Ok(value) => {
+            close_result.int_err()?;
+            Ok(value)
+        }
+        Err(e) => {
+            if let Err(close_error) = close_result {
+                tracing::debug!(error = %close_error, "Failed to close the socket of a failed flow");
+            }
+            Err(e)
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(super) async fn read_payload<TMessagePayload: DeserializeOwned>(
     stream: &mut TungsteniteStream,
 ) -> Result<TMessagePayload, ReadMessageError> {
@@ -92,12 +128,12 @@ pub(super) async fn read_payload<TMessagePayload: DeserializeOwned>(
                 {
                     return ws_common::parse_payload::<TMessagePayload>(&close_frame.reason);
                 }
-                Err(ReadMessageError::ClientDisconnected)
+                Err(ReadMessageError::ServerDisconnected)
             }
             Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
             Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
         },
-        None => Err(ReadMessageError::ClientDisconnected),
+        None => Err(ReadMessageError::ServerDisconnected),
     }
 }
 

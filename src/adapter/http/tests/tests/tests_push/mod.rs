@@ -9,6 +9,7 @@
 
 pub(crate) mod scenarios;
 
+mod test_smart_push_collision_reply;
 mod test_smart_push_complete_reply;
 mod test_smart_push_invalid_head_reply;
 mod test_smart_push_local_fs;

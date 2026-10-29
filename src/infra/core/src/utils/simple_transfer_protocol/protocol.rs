@@ -179,6 +179,7 @@ impl SimpleTransferProtocol {
         let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
 
         // Safety: there are blocks, oldest last
+        ensure_seed_matches_headless_target(dst, blocks_desc_ordered.last().unwrap())?;
         let TransferTarget {
             storage: dst_dataset,
             target,

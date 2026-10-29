@@ -16,12 +16,10 @@ use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
 use kamu_datasets::NameCollisionError;
-use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use url::Url;
 
 use super::WsSmartTransferProtocolClient;
-use super::transport::{TungsteniteStream, read_payload, write_payload};
+use super::transport::{TungsteniteStream, close_after_flow, read_payload, write_payload};
 use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
@@ -321,27 +319,37 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Reading push complete response");
 
-        let reply = read_payload::<DatasetPushCompleteReply>(socket)
-            .await
-            .map_err(|e| {
-                PushClientError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
-            })?;
+        loop {
+            let reply = read_payload::<DatasetPushCompleteReply>(socket)
+                .await
+                .map_err(|e| {
+                    PushClientError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
+                })?;
 
-        match reply {
-            DatasetPushCompleteReply::Response(Ok(DatasetPushCompleteConfirmed {}))
-            | DatasetPushCompleteReply::Legacy(DatasetPushCompleteLegacyConfirmed {}) => Ok(()),
-            DatasetPushCompleteReply::Response(Err(DatasetPushCompleteError::Internal(e))) => {
-                Err(PushClientError::Internal(InternalError::new(Box::new(
-                    ClientInternalError::new(e.error_message.as_str(), e.phase),
-                ))))
-            }
-            DatasetPushCompleteReply::Response(Err(
-                DatasetPushCompleteError::UpdatedConcurrently(
-                    DatasetPushUpdatedConcurrentlyError {},
-                ),
-            )) => Err(PushClientError::UpdatedConcurrently(
-                DestinationUpdatedConcurrentlyError,
-            )),
+            return match reply {
+                // The server stops asking for progress once it reads that the
+                // upload finished, but a request may already be on its way
+                DatasetPushCompleteReply::StaleProgressRequest(_) => {
+                    tracing::debug!(
+                        "Skipping an upload progress request sent before the upload ended"
+                    );
+                    continue;
+                }
+                DatasetPushCompleteReply::Response(Ok(DatasetPushCompleteConfirmed {}))
+                | DatasetPushCompleteReply::Legacy(DatasetPushCompleteLegacyConfirmed {}) => Ok(()),
+                DatasetPushCompleteReply::Response(Err(DatasetPushCompleteError::Internal(e))) => {
+                    Err(PushClientError::Internal(InternalError::new(Box::new(
+                        ClientInternalError::new(e.error_message.as_str(), e.phase),
+                    ))))
+                }
+                DatasetPushCompleteReply::Response(Err(
+                    DatasetPushCompleteError::UpdatedConcurrently(
+                        DatasetPushUpdatedConcurrentlyError {},
+                    ),
+                )) => Err(PushClientError::UpdatedConcurrently(
+                    DestinationUpdatedConcurrentlyError,
+                )),
+            };
         }
     }
 
@@ -412,61 +420,61 @@ impl WsSmartTransferProtocolClient {
         let mut ws_stream =
             Self::connect(http_dst_url, "push", maybe_access_token.as_deref()).await?;
 
-        self.push_send_request(
-            &mut ws_stream,
-            transfer_plan,
-            dst_head,
-            transfer_options.force_update_if_diverged,
-            transfer_options.visibility_for_created_dataset,
-        )
-        .await
-        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
+        let flow_result = async {
+            let ws_stream = &mut ws_stream;
 
-        self.push_send_metadata_request(
-            &mut ws_stream,
-            src.as_ref(),
-            &src_head,
-            dst_head,
-            transfer_options.force_update_if_diverged,
-        )
-        .await
-        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
-
-        let missing_objects = collect_object_references_from_interval(
-            src.as_ref(),
-            &src_head,
-            dst_head,
-            transfer_options.force_update_if_diverged,
-            false,
-        )
-        .await
-        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))
-        .int_err()?;
-
-        let push_objects_response = self
-            .push_send_objects_request(&mut ws_stream, missing_objects)
+            self.push_send_request(
+                ws_stream,
+                transfer_plan,
+                dst_head,
+                transfer_options.force_update_if_diverged,
+                transfer_options.visibility_for_created_dataset,
+            )
             .await
             .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
-        self.export_group_of_object_files(
-            &mut ws_stream,
-            push_objects_response,
-            src.as_ref(),
-            transfer_options,
-        )
-        .await?;
-
-        self.push_send_complete_request(&mut ws_stream)
+            self.push_send_metadata_request(
+                ws_stream,
+                src.as_ref(),
+                &src_head,
+                dst_head,
+                transfer_options.force_update_if_diverged,
+            )
             .await
             .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
-        ws_stream
-            .close(Some(CloseFrame {
-                code: CloseCode::Normal,
-                reason: "Client push flow succeeded".into(),
-            }))
+            let missing_objects = collect_object_references_from_interval(
+                src.as_ref(),
+                &src_head,
+                dst_head,
+                transfer_options.force_update_if_diverged,
+                false,
+            )
             .await
+            .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))
             .int_err()?;
+
+            let push_objects_response = self
+                .push_send_objects_request(ws_stream, missing_objects)
+                .await
+                .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
+
+            self.export_group_of_object_files(
+                ws_stream,
+                push_objects_response,
+                src.as_ref(),
+                transfer_options,
+            )
+            .await?;
+
+            self.push_send_complete_request(ws_stream)
+                .await
+                .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
+
+            Ok::<_, SyncError>(())
+        }
+        .await;
+        close_after_flow(&mut ws_stream, flow_result).await?;
 
         Ok(SyncResult::Updated {
             old_head: dst_head.cloned(),

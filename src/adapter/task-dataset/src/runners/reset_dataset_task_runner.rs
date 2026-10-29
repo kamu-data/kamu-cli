@@ -15,7 +15,7 @@ use kamu_core::{ResetExecutionError, ResetExecutor};
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
-use super::task_dataset_head_committer::TaskDatasetHeadCommitter;
+use super::task_head_commit::{dataset_deleted_outcome, head_moved_outcome};
 use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,9 +41,7 @@ impl ResetDatasetTaskRunner {
             .try_get_dataset_by_ref(&task_reset.dataset_handle.as_local_ref())
             .await?
         else {
-            return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
-                &task_reset.dataset_handle,
-            ));
+            return Ok(dataset_deleted_outcome(&task_reset.dataset_handle));
         };
 
         let reset_result_maybe = self
@@ -63,10 +61,7 @@ impl ResetDatasetTaskRunner {
                 )),
                 ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::CASFailed(e),
-                ) => Ok(TaskDatasetHeadCommitter::head_moved_outcome(
-                    task_reset.dataset_handle.id,
-                    e,
-                )),
+                ) => Ok(head_moved_outcome(task_reset.dataset_handle.id, e)),
                 // Retrying under the same account cannot gain the access
                 ResetExecutionError::SetReferenceFailed(
                     odf::dataset::SetChainRefError::Access(e),

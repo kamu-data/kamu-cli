@@ -275,9 +275,18 @@ pub enum ObjectPushStrategy {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: object upload progress request
+/// Push stage 3: object upload progress request, sent by the server
+/// periodically while the client uploads objects
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPushObjectsUploadProgressRequest {}
+pub struct DatasetPushObjectsUploadProgressRequest {
+    /// Always `true` when sent. A request that arrives after the client
+    /// finished uploading is read alongside the complete response, and the
+    /// field keeps it apart from the bare confirmation of an older server.
+    /// An older server sends `{}`, which stays indistinguishable from that
+    /// confirmation.
+    #[serde(default)]
+    pub progress_requested: bool,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -348,12 +357,14 @@ pub struct DatasetPushUpdatedConcurrentlyError {}
 
 /// Push stage 4: the complete response as a client reads it, accepting the
 /// bare confirmation sent by a server that predates
-/// `DatasetPushCompleteResponse`
+/// `DatasetPushCompleteResponse`, and skipping an upload progress request
+/// the server sent before it read that the upload had finished
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum DatasetPushCompleteReply {
     Response(DatasetPushCompleteResponse),
     Legacy(DatasetPushCompleteLegacyConfirmed),
+    StaleProgressRequest(DatasetPushStaleProgressRequest),
 }
 
 /// The bare confirmation of a server that predates
@@ -362,6 +373,13 @@ pub enum DatasetPushCompleteReply {
 #[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DatasetPushCompleteLegacyConfirmed {}
+
+/// An upload progress request read while awaiting the complete response
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetPushStaleProgressRequest {
+    pub progress_requested: bool,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

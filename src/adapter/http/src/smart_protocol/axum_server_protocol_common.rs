@@ -83,6 +83,24 @@ pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Sends an error reply as a text message, for a reply that may not fit the
+/// 123 bytes a close frame reason allows. The client reads it where it reads
+/// the phase's response
+pub(crate) async fn axum_write_error_message<TMessagePayload: Serialize>(
+    socket: &mut axum::extract::ws::WebSocket,
+    payload: TMessagePayload,
+) {
+    if let Err(err) = axum_write_payload(socket, payload).await {
+        tracing::error!(
+          error = ?err,
+          error_msg = %err,
+          "Failed to send error to client with error",
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) async fn wait_for_close(socket: &mut axum::extract::ws::WebSocket) {
     while let Some(msg) = socket.recv().await {
         match msg {
