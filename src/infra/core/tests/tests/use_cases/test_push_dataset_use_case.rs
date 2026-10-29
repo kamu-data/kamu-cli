@@ -37,7 +37,7 @@ async fn test_push_success() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
+        .make_expect_classify_datasets_by_allowance_for(
             DatasetAction::Read,
             2,
             HashSet::from_iter([alias_foo.clone()]),
@@ -117,7 +117,7 @@ async fn test_push_success_without_saving_alias() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
+        .make_expect_classify_datasets_by_allowance_for(
             DatasetAction::Read,
             1,
             HashSet::from_iter([alias_foo.clone()]),
@@ -163,7 +163,7 @@ async fn test_push_unauthorized() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
+        .make_expect_classify_datasets_by_allowance_for(
             DatasetAction::Read,
             1,
             HashSet::new(), // not authorized
@@ -209,7 +209,7 @@ async fn test_push_multiple_success() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
     let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
+        .make_expect_classify_datasets_by_allowance_for(
             DatasetAction::Read,
             1,
             HashSet::from_iter([alias_foo.clone(), alias_bar.clone()]),
@@ -284,7 +284,7 @@ async fn test_push_multiple_mixed_authorization_issues() {
     let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
     let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
+        .make_expect_classify_datasets_by_allowance_for(
             DatasetAction::Read,
             1,
             HashSet::from_iter([alias_bar.clone()]), // 1 of 3 is authorized
@@ -344,7 +344,7 @@ async fn test_push_reports_success_to_the_listener_once() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
     let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
+        .make_expect_classify_datasets_by_allowance_for(
             DatasetAction::Read,
             1,
             HashSet::from_iter([alias_foo.clone()]),

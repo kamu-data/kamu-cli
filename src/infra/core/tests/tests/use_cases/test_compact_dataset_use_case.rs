@@ -13,7 +13,7 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
-use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{DatasetAction, MockDatasetActionAuthorizer, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
 use pretty_assertions::assert_matches;
 
@@ -25,7 +25,12 @@ async fn test_compact_dataset_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            true,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -50,8 +55,8 @@ async fn test_compact_multiple_datasets_success() {
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
-            .expect_check_maintain_dataset(&dataset_id_foo, 1, true)
-            .expect_check_maintain_dataset(&dataset_id_bar, 1, true),
+            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_foo, 1, true)
+            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 
@@ -92,10 +97,10 @@ async fn test_try_compact_not_found_dataset() {
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_not_found_dataset(
+        MockDatasetActionAuthorizer::new().expect_authorize_for_not_found(
+            DatasetAction::Maintain,
             &not_found_dataset_handle.id,
             1,
-            false,
         ),
         MockDidGenerator::new(),
     );
@@ -110,7 +115,7 @@ async fn test_try_compact_not_found_dataset() {
             )
             .await,
         Err(CompactionError::NotFound(e))
-            if e.dataset_ref == not_found_dataset_handle.id.as_local_ref()
+            if e.dataset_ref == not_found_dataset_handle.as_local_ref()
     );
 }
 
@@ -122,7 +127,12 @@ async fn test_compact_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, false),
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            false,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -139,6 +149,33 @@ async fn test_compact_dataset_unauthorized() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_reset_dataset_to_metadata_requires_maintain() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = CompactUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            false,
+        ),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    assert_matches!(
+        harness
+            .reset_dataset_to_metadata(ResolvedDataset::from_created(&foo))
+            .await,
+        Err(CompactionError::Access(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_compact_dataset_mixed_authorization_outcome() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
@@ -147,8 +184,8 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
 
     let harness = CompactUseCaseHarness::new(
         MockDatasetActionAuthorizer::new()
-            .expect_check_maintain_dataset(&dataset_id_foo, 1, false)
-            .expect_check_maintain_dataset(&dataset_id_bar, 1, true),
+            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_foo, 1, false)
+            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 
@@ -190,7 +227,12 @@ async fn test_compact_dataset_commits_head_and_reports_breaking() {
     let reported_heads = ReportedHeads::default();
 
     let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            true,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
         MockCompactionExecutor::new()
             .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
@@ -222,7 +264,12 @@ async fn test_reset_dataset_to_metadata_commits_head() {
     let reported_heads = ReportedHeads::default();
 
     let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            true,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
         MockCompactionExecutor::new()
             .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),
@@ -253,7 +300,12 @@ async fn test_compact_dataset_head_moved_concurrently() {
     let reported_heads = ReportedHeads::default();
 
     let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            true,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
         MockCompactionExecutor::new()
             .make_expect_compaction_success(alias_foo.clone(), reported_heads.clone()),

@@ -464,6 +464,33 @@ pub async fn test_ingest_into_derivative_fails(kamu: KamuCliPuppet) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_ingest_into_other_accounts_dataset_fails(mut kamu: KamuCliPuppet) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    kamu.set_account(Some(bob));
+    kamu.execute_with_input(
+        ["add", "--stdin", "--name", "bob-root"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+
+    kamu.set_account(Some(alice));
+    kamu.assert_failure_command_execution_with_input(
+        ["ingest", "bob/bob-root", "--stdin"],
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        None,
+        Some([r#"User has no 'write' permission in dataset 'bob/bob-root'"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_ingest_without_files_or_stdin_fails(kamu: KamuCliPuppet) {
     kamu.execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
         .await

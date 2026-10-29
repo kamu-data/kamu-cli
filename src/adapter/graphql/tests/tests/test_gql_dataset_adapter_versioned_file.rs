@@ -14,7 +14,7 @@ use kamu_accounts::{AccountQuotaService, CurrentAccountSubject, QuotaType};
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_core::*;
 use kamu_datasets::{DatasetStatisticsRepository, MockDatasetActionAuthorizer};
-use kamu_datasets_services::*;
+use kamu_datasets_services::{DatasetOperationAuthorizerImpl, *};
 use messaging_outbox::OutboxProvider;
 use serde_json::json;
 
@@ -1000,6 +1000,7 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<FindVersionedFileVersionUseCaseImpl>()
             .add::<UpdateVersionedFileUseCaseImpl>()
+            .add::<DatasetOperationAuthorizerImpl>()
             .add::<ViewVersionedFileHistoryUseCaseImpl>()
             .add::<UploadServiceLocal>()
             .add_value(ServerUrlConfig::new_test(None))

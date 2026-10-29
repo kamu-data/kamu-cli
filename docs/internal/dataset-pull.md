@@ -259,17 +259,22 @@ The sync listener takes `SyncError` because pull and push share it.
 
 ## 7. Authorization
 
-`make_authorization_checks` runs per iteration, in one transaction, through
-`DatasetActionAuthorizer`:
+`PullAuthorization::authorize` runs per iteration, in one transaction: each job becomes an
+operation on its target (`PullPlanIterationJob::as_operation_request`), and one
+[`DatasetOperationAuthorizer`](../../src/domain/datasets/domain/src/services/dataset_operation_authorizer.rs) call checks them all for the current account. That
+authorizer owns which actions each operation needs:
 
-| Check | Datasets |
-| --- | --- |
-| Write | every job's written dataset: the ingest or transform target, or a sync target that already exists |
-| Read | every transform input (`PullTransformItem::input_handles`) |
+| Job | Operation | Checks |
+| --- | --- | --- |
+| Ingest | `PollingIngest` | Write on the target |
+| Transform | `Transform { inputs }` | Write on the target, Read on every input (`PullTransformItem::input_handles`) |
+| Sync into an existing dataset | `SyncFrom` | Write on the target |
+
+Denied jobs are reported in job order; a job's target error comes before its input errors.
 
 A transform job elaborates its transform again when it runs, and another writer may have changed
-the inputs meanwhile. Before executing, the job checks Read on any input the iteration did not
-check, and fails with `PullError::Access` if one is denied.
+the inputs meanwhile. Before executing, the job authorizes `Transform` again with the inputs the
+iteration did not check, and fails with `PullError::Access` if one is denied.
 
 A sync target that does not exist yet has nothing to check; creating it is governed by the sync.
 `--all` only plans datasets the current account owns. Planning itself resolves datasets without

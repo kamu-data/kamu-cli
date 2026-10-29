@@ -15,14 +15,13 @@ use file_utils::MediaType;
 use http::HeaderMap;
 use http_common::*;
 use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
 use kamu_core::services::upload_service::{
     UploadService,
     UploadTokenBase64Json,
     UploadTokenIntoStreamError,
 };
 use kamu_core::*;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use time_source::SystemTimeSource;
 use tokio::io::AsyncRead;
 
@@ -122,17 +121,16 @@ pub async fn dataset_ingest_handler(
                 Some(time_source.now())
             });
 
-    // Resolve dataset
-    let rebac_dataset_registry_facade =
-        catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
+    // Resolve dataset; the use case checks the write permission
+    let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
 
-    let target_dataset = rebac_dataset_registry_facade
-        .resolve_dataset_by_ref(&dataset_ref, DatasetAction::Write)
+    let target_dataset = dataset_registry
+        .get_dataset_by_ref(&dataset_ref)
         .await
         .map_err(|e| {
-            use RebacDatasetRefUnresolvedError as E;
+            use odf::DatasetRefUnresolvedError as E;
             match e {
-                E::NotFound(_) | E::Access(_) => ApiError::not_found_without_reason(),
+                E::NotFound(_) => ApiError::not_found_without_reason(),
                 e @ E::Internal(_) => e.int_err().api_err(),
             }
         })?;
@@ -166,6 +164,9 @@ pub async fn dataset_ingest_handler(
             }
             PushIngestDataError::Execution(PushIngestError::QuotaExceeded(_)) => {
                 ApiError::new_forbidden()
+            }
+            PushIngestDataError::NotFound(_) | PushIngestDataError::Access(_) => {
+                ApiError::not_found_without_reason()
             }
             e @ (PushIngestDataError::Planning(_)
             | PushIngestDataError::Execution(_)

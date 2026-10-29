@@ -33,6 +33,7 @@ use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetHeadCommitterImpl,
+    DatasetOperationAuthorizerImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -1632,6 +1633,7 @@ impl CompactTestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<PushIngestDataUseCaseImpl>()
+            .add::<DatasetOperationAuthorizerImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformPlannerImpl>()
@@ -1688,6 +1690,7 @@ impl CompactTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
+            .add::<DatasetOperationAuthorizerImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()

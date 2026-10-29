@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,6 +38,29 @@ impl OwnerByAliasDatasetActionAuthorizer {
             .int_err()?;
 
         Ok(self.owns_dataset_by_alias(dataset.get_alias()))
+    }
+
+    fn classify_response(
+        allowed: Vec<odf::DatasetHandle>,
+        not_allowed: Vec<odf::DatasetHandle>,
+        action: DatasetAction,
+    ) -> ClassifyByAllowanceResponse {
+        ClassifyByAllowanceResponse {
+            authorized_handles: allowed,
+            unauthorized_handles_with_errors: not_allowed
+                .into_iter()
+                .map(|dataset_handle| {
+                    let dataset_ref = dataset_handle.as_local_ref();
+                    (
+                        dataset_handle,
+                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                            dataset_ref,
+                            action,
+                        ),
+                    )
+                })
+                .collect(),
+        }
     }
 }
 
@@ -95,22 +119,21 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
             .into_iter()
             .partition(|dataset_handle| self.owns_dataset_by_alias(&dataset_handle.alias));
 
-        Ok(ClassifyByAllowanceResponse {
-            authorized_handles: allowed,
-            unauthorized_handles_with_errors: not_allowed
-                .into_iter()
-                .map(|dataset_handle| {
-                    let dataset_ref = dataset_handle.as_local_ref();
-                    (
-                        dataset_handle,
-                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
-                            dataset_ref,
-                            action,
-                        ),
-                    )
-                })
-                .collect(),
-        })
+        Ok(Self::classify_response(allowed, not_allowed, action))
+    }
+
+    async fn classify_dataset_handles_by_allowance_for(
+        &self,
+        principal: &CurrentAccountSubject,
+        dataset_handles: Vec<odf::DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        let (allowed, not_allowed): (Vec<_>, Vec<_>) =
+            dataset_handles.into_iter().partition(|dataset_handle| {
+                dataset_handle.alias.account_name.as_ref() == principal.maybe_account_name()
+            });
+
+        Ok(Self::classify_response(allowed, not_allowed, action))
     }
 
     async fn classify_dataset_ids_by_allowance<'a>(

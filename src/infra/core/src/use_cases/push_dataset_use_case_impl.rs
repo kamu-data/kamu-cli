@@ -9,9 +9,10 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common_macros::{transactional_method1, transactional_method2};
 use dill::{component, interface};
 use internal_error::InternalError;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     PushDatasetUseCase,
     PushError,
@@ -29,7 +30,12 @@ use kamu_core::{
     SyncResult,
     SyncService,
 };
-use kamu_datasets::{ClassifyByAllowanceResponse, DatasetAction, DatasetActionAuthorizer};
+use kamu_datasets::{
+    DatasetActionUnauthorizedError,
+    DatasetOperation,
+    DatasetOperationAuthorizer,
+    DatasetOperationRequest,
+};
 
 use crate::SyncRequestBuilder;
 
@@ -43,36 +49,41 @@ pub struct PushDatasetUseCaseImpl {
 }
 
 impl PushDatasetUseCaseImpl {
-    #[transactional_method1(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>)]
+    #[transactional_method2(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, current_account_subject: Arc<CurrentAccountSubject>)]
     #[tracing::instrument(level = "debug", name = "PushDatasetUseCase::authorizations", skip_all, fields(?dataset_handles, ?push_target))]
     async fn make_authorization_checks(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         push_target: Option<&odf::DatasetPushTarget>,
     ) -> Result<(Vec<odf::DatasetHandle>, Vec<PushResponse>), InternalError> {
-        let ClassifyByAllowanceResponse {
-            authorized_handles,
-            unauthorized_handles_with_errors,
-        } = dataset_action_authorizer
-            .classify_dataset_handles_by_allowance(dataset_handles, DatasetAction::Read)
+        let requests: Vec<_> = dataset_handles
+            .into_iter()
+            .map(|hdl| DatasetOperationRequest::new(hdl, DatasetOperation::SyncTo))
+            .collect();
+        let verdicts = dataset_operation_authorizer
+            .authorize_operations(&current_account_subject, &requests)
             .await?;
 
-        let unauthorized_responses = unauthorized_handles_with_errors
-            .into_iter()
-            .map(|(hdl, error)| PushResponse {
-                local_handle: Some(hdl),
-                target: push_target.cloned(),
-                result: Err(PushError::SyncError({
-                    use kamu_datasets::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+        let mut authorized_handles = Vec::with_capacity(requests.len());
+        let mut unauthorized_responses = Vec::new();
+        for (request, verdict) in requests.into_iter().zip(verdicts) {
+            match verdict {
+                Ok(()) => authorized_handles.push(request.target),
+                Err(error) => unauthorized_responses.push(PushResponse {
+                    local_handle: Some(request.target),
+                    target: push_target.cloned(),
+                    result: Err(PushError::SyncError({
+                        use DatasetActionUnauthorizedError as E;
 
-                    match error {
-                        E::NotFound(e) => SyncError::DatasetNotFound(e.into()),
-                        E::Access(e) => SyncError::Access(e),
-                        E::Internal(e) => SyncError::Internal(e),
-                    }
-                })),
-            })
-            .collect();
+                        match error {
+                            E::NotFound(e) => SyncError::DatasetNotFound(e.into()),
+                            E::Access(e) => SyncError::Access(e),
+                            E::Internal(e) => SyncError::Internal(e),
+                        }
+                    })),
+                }),
+            }
+        }
 
         Ok((authorized_handles, unauthorized_responses))
     }

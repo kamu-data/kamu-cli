@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
+    TransformPlanner,
     VerificationError,
     VerificationListener,
     VerificationMultiListener,
@@ -20,8 +21,16 @@ use kamu_core::{
     VerificationResult,
     VerificationService,
     VerifyDatasetUseCase,
+    VerifyTransformError,
 };
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{
+    DatasetActionUnauthorizedError,
+    DatasetOperation,
+    DatasetOperationAuthorizer,
+    DatasetOperationRequest,
+    DatasetRegistry,
+    ResolvedDataset,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +38,58 @@ use kamu_datasets::DatasetAction;
 #[interface(dyn VerifyDatasetUseCase)]
 pub struct VerifyDatasetUseCaseImpl {
     verification_service: Arc<dyn VerificationService>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    transform_planner: Arc<dyn TransformPlanner>,
+    current_account_subject: Arc<CurrentAccountSubject>,
+}
+
+impl VerifyDatasetUseCaseImpl {
+    /// Checks the target before its chain is read, then the inputs a replay
+    /// of its transforms would read
+    async fn authorize(
+        &self,
+        request: &VerificationRequest<odf::DatasetHandle>,
+    ) -> Result<ResolvedDataset, VerificationError> {
+        self.authorize_verify(&request.target, Vec::new()).await?;
+
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(&request.target)
+            .await;
+
+        if request.options.replay_transformations
+            && target.get_kind() == odf::DatasetKind::Derivative
+        {
+            let replayed_inputs = self
+                .transform_planner
+                .get_verification_inputs(target.clone(), request.block_range.clone())
+                .await
+                .map_err(|e| VerificationError::VerifyTransform(VerifyTransformError::Plan(e)))?;
+
+            self.authorize_verify(&request.target, replayed_inputs)
+                .await?;
+        }
+
+        Ok(target)
+    }
+
+    async fn authorize_verify(
+        &self,
+        target: &odf::DatasetHandle,
+        replayed_inputs: Vec<odf::DatasetHandle>,
+    ) -> Result<(), VerificationError> {
+        self.dataset_operation_authorizer
+            .authorize_operation(
+                &self.current_account_subject,
+                &DatasetOperationRequest::new(
+                    target.clone(),
+                    DatasetOperation::Verify { replayed_inputs },
+                ),
+            )
+            .await
+            .map_err(map_unauthorized_error)
+    }
 }
 
 #[common_macros::method_names_consts]
@@ -46,16 +106,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         request: VerificationRequest<odf::DatasetHandle>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> VerificationResult {
-        // TODO: Private Datasets: verification of derived datasets requires read
-        //       permission for inputs
-
-        // Resolve dataset
-        let resolve_result = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(&request.target, DatasetAction::Read)
-            .await
-            .map_err(map_unresolved_error);
-        let target = match resolve_result {
+        let target = match self.authorize(&request).await {
             Ok(target) => target,
             Err(e) => return VerificationResult::err(request.target.clone(), e),
         };
@@ -89,11 +140,7 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
         // Exclude tasks, where there is no read permission for dataset
         let mut authorized_requests = Vec::new();
         for request in requests {
-            let res = self
-                .rebac_dataset_registry_facade
-                .resolve_dataset_by_handle(&request.target, DatasetAction::Read)
-                .await
-                .map_err(map_unresolved_error);
+            let res = self.authorize(&request).await;
             match res {
                 Ok(resolved_dataset) => authorized_requests.push(VerificationRequest {
                     target: resolved_dataset,
@@ -122,8 +169,8 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_unresolved_error(e: RebacDatasetIdUnresolvedError) -> VerificationError {
-    use RebacDatasetIdUnresolvedError as E;
+fn map_unauthorized_error(e: DatasetActionUnauthorizedError) -> VerificationError {
+    use DatasetActionUnauthorizedError as E;
 
     match e {
         E::NotFound(e) => VerificationError::DatasetNotFound(e),

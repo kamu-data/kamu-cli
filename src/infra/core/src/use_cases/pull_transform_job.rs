@@ -9,13 +9,14 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::{ErrorIntoInternal, InternalError};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::{
-    ClassifyByAllowanceResponse,
-    DatasetAction,
-    DatasetActionAuthorizer,
+    DatasetOperation,
+    DatasetOperationAuthorizer,
+    DatasetOperationRequest,
     DatasetRegistry,
     DatasetRegistryExt,
     ResolvedDataset,
@@ -156,7 +157,7 @@ impl PullTransformJob {
     /// The pull authorized reading the inputs of the transform it planned.
     /// Another writer may change the transform before the job elaborates it,
     /// so inputs the pull did not plan are authorized here, before any is read
-    #[transactional_method1(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>)]
+    #[transactional_method2(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, current_account_subject: Arc<CurrentAccountSubject>)]
     async fn authorize_unplanned_inputs(
         &self,
         plan: &TransformExecutionPlan,
@@ -174,17 +175,21 @@ impl PullTransformJob {
             return Ok(());
         }
 
-        let ClassifyByAllowanceResponse {
-            authorized_handles: _,
-            unauthorized_handles_with_errors,
-        } = dataset_action_authorizer
-            .classify_dataset_handles_by_allowance(unplanned_inputs, DatasetAction::Read)
+        // The target is checked again along with the inputs; the iteration
+        // already granted it, unless its permissions changed since
+        dataset_operation_authorizer
+            .authorize_operation(
+                &current_account_subject,
+                &DatasetOperationRequest::new(
+                    plan.request.dataset_handle.clone(),
+                    DatasetOperation::Transform {
+                        inputs: unplanned_inputs,
+                    },
+                ),
+            )
             .await?;
 
-        match unauthorized_handles_with_errors.into_iter().next() {
-            None => Ok(()),
-            Some((_, error)) => Err(error.into()),
-        }
+        Ok(())
     }
 
     async fn execute_and_commit(

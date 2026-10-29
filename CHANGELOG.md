@@ -15,6 +15,10 @@ Recommendation: for ease of reading, use the following format:
 
 ## [Unreleased]
 ### Changed
+- `kamu verify` with transform replay requires read permission on every input it replays; an
+  unreadable input fails with an access error before anything is replayed
+- `kamu ingest` in a multi-tenant workspace requires write permission on the dataset, as ingesting
+  through the API does
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again
 - When a dataset's head moves while `kamu pull` or `kamu system compact` runs, or while an update or

@@ -77,7 +77,7 @@ impl PushSourceDatasetBaseUseCaseHarness {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .without_outbox()
-                .with_maybe_authorizer(Some(MockDatasetActionAuthorizer::new())),
+                .with_maybe_authorizer(Some(MockDatasetActionAuthorizer::allowing())),
         );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());

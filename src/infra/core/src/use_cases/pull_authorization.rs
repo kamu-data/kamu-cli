@@ -7,23 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common_macros::transactional_method2;
 use internal_error::InternalError;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_datasets::{
-    ClassifyByAllowanceDatasetActionUnauthorizedError,
-    ClassifyByAllowanceResponse,
-    DatasetAction,
-    DatasetActionAuthorizer,
-};
+use kamu_datasets::DatasetOperationAuthorizer;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Authorizes a pull iteration: writing every target, reading every input of
-/// a transform
+/// Authorizes a pull iteration: each job's operation on its target, with the
+/// inputs a transform reads
 pub(crate) struct PullAuthorization {
     catalog: dill::Catalog,
 }
@@ -39,182 +34,57 @@ impl PullAuthorization {
         Self { catalog }
     }
 
-    /// Write denials come before read denials
-    #[transactional_method1(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>)]
+    /// Denials come in job order. A sync into a dataset that does not exist
+    /// yet is not checked.
+    #[transactional_method2(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, current_account_subject: Arc<CurrentAccountSubject>)]
+    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::authorize", skip_all, fields(?iteration))]
     pub(crate) async fn authorize(
         &self,
         iteration: PullPlanIteration,
     ) -> Result<AuthorizedIteration, InternalError> {
-        let writes = Self::authorize_writes(iteration, dataset_action_authorizer.as_ref()).await?;
-        let reads =
-            Self::authorize_reads(writes.iteration, dataset_action_authorizer.as_ref()).await?;
-
-        let mut denied = writes.denied;
-        denied.extend(reads.denied);
-        Ok(AuthorizedIteration {
-            iteration: reads.iteration,
-            denied,
-        })
-    }
-
-    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::write_authorizations", skip_all, fields(?iteration))]
-    async fn authorize_writes(
-        iteration: PullPlanIteration,
-        dataset_action_authorizer: &dyn DatasetActionAuthorizer,
-    ) -> Result<AuthorizedIteration, InternalError> {
-        let mut written_datasets = Vec::with_capacity(iteration.jobs.len());
-        let mut written_jobs_by_handle = HashMap::with_capacity(iteration.jobs.len());
-        let mut other_jobs = Vec::new();
-
-        for job in iteration.jobs {
-            if let Some(written_handle) = job.as_common_item().try_get_written_handle() {
-                written_datasets.push(written_handle.clone());
-                written_jobs_by_handle.insert(written_handle.clone(), job);
-            } else {
-                other_jobs.push(job);
-            }
-        }
-
-        if written_datasets.is_empty() {
-            return Ok(AuthorizedIteration {
-                iteration: PullPlanIteration {
-                    depth: iteration.depth,
-                    jobs: other_jobs,
-                },
-                denied: Vec::new(),
-            });
-        }
-
-        let ClassifyByAllowanceResponse {
-            authorized_handles,
-            unauthorized_handles_with_errors,
-        } = dataset_action_authorizer
-            .classify_dataset_handles_by_allowance(written_datasets, DatasetAction::Write)
-            .await?;
-
-        let mut okay_jobs = Vec::with_capacity(authorized_handles.len() + other_jobs.len());
-        for authorized_hdl in authorized_handles {
-            let job = written_jobs_by_handle
-                .remove(&authorized_hdl)
-                .expect("item must be present");
-            okay_jobs.push(job);
-        }
-        okay_jobs.extend(other_jobs);
-
-        let unauthorized_responses: Vec<_> = unauthorized_handles_with_errors
+        let jobs_with_requests: Vec<_> = iteration
+            .jobs
             .into_iter()
-            .map(|(hdl, auth_error)| {
-                let job = written_jobs_by_handle
-                    .remove(&hdl)
-                    .expect("item must be present");
-                PullResponse {
-                    maybe_local_ref: Some(hdl.as_local_ref()),
-                    maybe_remote_ref: None,
-                    maybe_original_request: job.into_original_pull_request(),
-                    result: Err(auth_error.into()),
-                }
+            .map(|job| {
+                let maybe_request = job.as_operation_request();
+                (job, maybe_request)
             })
             .collect();
 
-        Ok(AuthorizedIteration {
-            iteration: PullPlanIteration {
-                depth: iteration.depth,
-                jobs: okay_jobs,
-            },
-            denied: unauthorized_responses,
-        })
-    }
+        let requests: Vec<_> = jobs_with_requests
+            .iter()
+            .filter_map(|(_, maybe_request)| maybe_request.clone())
+            .collect();
+        let mut verdicts = dataset_operation_authorizer
+            .authorize_operations(&current_account_subject, &requests)
+            .await?
+            .into_iter();
 
-    #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::read_authorizations", skip_all, fields(?iteration))]
-    async fn authorize_reads(
-        iteration: PullPlanIteration,
-        dataset_action_authorizer: &dyn DatasetActionAuthorizer,
-    ) -> Result<AuthorizedIteration, InternalError> {
-        let mut read_datasets = Vec::new();
-        let mut reading_jobs = Vec::with_capacity(iteration.jobs.len());
-        let mut other_jobs = Vec::with_capacity(iteration.jobs.len());
+        let mut jobs = Vec::with_capacity(jobs_with_requests.len());
+        let mut denied = Vec::new();
+        for (job, maybe_request) in jobs_with_requests {
+            let Some(request) = maybe_request else {
+                jobs.push(job);
+                continue;
+            };
 
-        for job in iteration.jobs {
-            let read_handles = job.as_common_item().get_read_handles();
-            if read_handles.is_empty() {
-                other_jobs.push(job);
-            } else {
-                read_datasets.extend(read_handles.into_iter().cloned());
-                reading_jobs.push(job);
-            }
-        }
-
-        if read_datasets.is_empty() {
-            return Ok(AuthorizedIteration {
-                iteration: PullPlanIteration {
-                    depth: iteration.depth,
-                    jobs: other_jobs,
-                },
-                denied: Vec::new(),
-            });
-        }
-
-        let ClassifyByAllowanceResponse {
-            authorized_handles: _,
-            unauthorized_handles_with_errors,
-        } = dataset_action_authorizer
-            .classify_dataset_handles_by_allowance(read_datasets, DatasetAction::Read)
-            .await?;
-
-        if unauthorized_handles_with_errors.is_empty() {
-            let mut all_jobs = Vec::with_capacity(reading_jobs.len() + other_jobs.len());
-            all_jobs.extend(reading_jobs);
-            all_jobs.extend(other_jobs);
-            return Ok(AuthorizedIteration {
-                iteration: PullPlanIteration {
-                    jobs: all_jobs,
-                    depth: iteration.depth,
-                },
-                denied: vec![],
-            });
-        }
-
-        let mut unauthorized_handles_to_errors: HashMap<
-            odf::DatasetHandle,
-            ClassifyByAllowanceDatasetActionUnauthorizedError,
-        > = unauthorized_handles_with_errors.into_iter().collect();
-
-        let mut unauthorized_responses = Vec::new();
-
-        let mut okay_jobs = Vec::with_capacity(reading_jobs.len() + other_jobs.len());
-        okay_jobs.extend(other_jobs);
-
-        for reading_job in reading_jobs {
-            let read_handles = reading_job.as_common_item().get_read_handles();
-            let mut maybe_error = None;
-            for read_hdl in read_handles {
-                if let Some(auth_error) = unauthorized_handles_to_errors.remove(read_hdl) {
-                    maybe_error = Some(PullError::from(auth_error));
-                    break;
-                }
-            }
-
-            if let Some(error) = maybe_error {
-                unauthorized_responses.push(PullResponse {
-                    maybe_local_ref: reading_job
-                        .as_common_item()
-                        .try_get_written_handle()
-                        .map(odf::DatasetHandle::as_local_ref),
+            match verdicts.next().expect("one verdict per request") {
+                Ok(()) => jobs.push(job),
+                Err(error) => denied.push(PullResponse {
+                    maybe_local_ref: Some(request.target.as_local_ref()),
                     maybe_remote_ref: None,
-                    maybe_original_request: reading_job.into_original_pull_request(),
-                    result: Err(error),
-                });
-            } else {
-                okay_jobs.push(reading_job);
+                    maybe_original_request: job.into_original_pull_request(),
+                    result: Err(error.into()),
+                }),
             }
         }
 
         Ok(AuthorizedIteration {
             iteration: PullPlanIteration {
                 depth: iteration.depth,
-                jobs: okay_jobs,
+                jobs,
             },
-            denied: unauthorized_responses,
+            denied,
         })
     }
 }

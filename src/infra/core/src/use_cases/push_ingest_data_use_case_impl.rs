@@ -11,11 +11,16 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::{
+    DatasetActionUnauthorizedError,
     DatasetExternallyChangedMessage,
     DatasetHeadCommitter,
+    DatasetOperation,
+    DatasetOperationAuthorizer,
+    DatasetOperationRequest,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ResolvedDataset,
 };
@@ -29,10 +34,33 @@ pub struct PushIngestDataUseCaseImpl {
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
+    dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl PushIngestDataUseCaseImpl {
+    async fn authorize(&self, target: &ResolvedDataset) -> Result<(), PushIngestDataError> {
+        self.dataset_operation_authorizer
+            .authorize_operation(
+                &self.current_account_subject,
+                &DatasetOperationRequest::new(
+                    target.get_handle().clone(),
+                    DatasetOperation::PushIngest,
+                ),
+            )
+            .await
+            .map_err(|e| {
+                use DatasetActionUnauthorizedError as E;
+
+                match e {
+                    E::NotFound(e) => PushIngestDataError::NotFound(e),
+                    E::Access(e) => PushIngestDataError::Access(e),
+                    e @ E::Internal(_) => PushIngestDataError::Internal(e.int_err()),
+                }
+            })
+    }
+
     async fn run_single_ingest(
         &self,
         target: ResolvedDataset,
@@ -147,6 +175,8 @@ impl PushIngestDataUseCaseImpl {
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.authorize(&target).await?;
+
         let source_name = options.source_name.clone();
         let push_execute_result = self
             .run_single_ingest(target.clone(), data_source, options, listener_maybe)
@@ -172,6 +202,8 @@ impl PushIngestDataUseCaseImpl {
         options: PushIngestDataUseCaseOptions,
         listener_maybe: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestDataError> {
+        self.authorize(&target).await?;
+
         if data_sources.is_empty() {
             return Ok(PushIngestResult::UpToDate);
         }

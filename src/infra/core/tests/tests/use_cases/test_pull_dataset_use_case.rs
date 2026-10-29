@@ -49,7 +49,7 @@ async fn test_pull_ingest_up_to_date_keeps_pull_aliases() {
 
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
-            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance_for(
                 DatasetAction::Write,
                 1,
                 HashSet::from_iter([alias_foo.clone()]),
@@ -96,12 +96,12 @@ async fn test_pull_transform_up_to_date_keeps_pull_aliases() {
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
             MockDatasetActionAuthorizer::new()
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Read,
                     1,
                     HashSet::from_iter([alias_foo.clone()]),
@@ -159,16 +159,17 @@ async fn test_pull_transform_rechecks_inputs_changed_after_planning() {
         odf::DatasetKind::Root,
     );
 
-    // The pull authorizes `foo`, but elaboration finds a transform reading `baz`
+    // The pull authorizes `foo`, but elaboration finds a transform reading `baz`.
+    // The recheck authorizes the transform again, its target included.
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
             MockDatasetActionAuthorizer::new()
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
-                    1,
+                    2,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Read,
                     2,
                     HashSet::from_iter([alias_foo.clone()]),
@@ -210,12 +211,12 @@ async fn test_pull_transform_with_real_planner_and_executor_commits_head() {
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
             MockDatasetActionAuthorizer::new()
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Read,
                     1,
                     HashSet::from_iter([alias_foo.clone()]),
@@ -472,7 +473,7 @@ async fn test_pull_ingest_unparsable_source_fails_unrecoverably() {
     let harness = PullUseCaseHarness::new(
         PullUseCaseHarnessMocks::default()
             .with_authorizer_mock(
-                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_foo.clone()]),
@@ -1082,7 +1083,7 @@ async fn test_pull_sync_transfer_failure_is_reported_and_commits_nothing() {
 
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
-            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance_for(
                 DatasetAction::Write,
                 1,
                 HashSet::from_iter([alias_foo.clone()]),
@@ -1138,17 +1139,17 @@ async fn test_pull_multi_recursive() {
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
             MockDatasetActionAuthorizer::new()
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_foo.clone(), alias_bar.clone(), alias_baz.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_foo_bar.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Read,
                     1,
                     HashSet::from_iter([alias_foo.clone(), alias_bar.clone()]),
@@ -1285,17 +1286,17 @@ async fn test_pull_all_owned() {
     let mocks = PullUseCaseHarnessMocks::default()
         .with_authorizer_mock(
             MockDatasetActionAuthorizer::new()
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_foo.clone(), alias_bar.clone(), alias_baz.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_foo_bar.clone(), alias_foo_baz.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Read,
                     1,
                     HashSet::from_iter([alias_foo.clone(), alias_bar.clone(), alias_baz.clone()]),
@@ -1448,7 +1449,7 @@ async fn test_pull_authorization_issue() {
     let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
     let mocks = PullUseCaseHarnessMocks::default().with_authorizer_mock(
-        MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+        MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance_for(
             DatasetAction::Write,
             1,
             HashSet::from_iter([alias_foo.clone(), alias_baz.clone()]),
@@ -1807,6 +1808,14 @@ impl TransformPlanner for TransformPlannerWithMockedElaboration {
             .build_transform_verification_plan(target, block_range)
             .await
     }
+
+    async fn get_verification_inputs(
+        &self,
+        target: ResolvedDataset,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
+    ) -> Result<Vec<odf::DatasetHandle>, VerifyTransformPlanError> {
+        self.real.get_verification_inputs(target, block_range).await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1930,7 +1939,7 @@ impl PullUseCaseHarnessMocks {
     ) -> Self {
         Self::default()
             .with_authorizer_mock(
-                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_foo.clone()]),
@@ -1945,7 +1954,7 @@ impl PullUseCaseHarnessMocks {
     fn for_ingest_updated(alias_foo: &odf::DatasetAlias, reported_heads: &ReportedHeads) -> Self {
         Self::default()
             .with_authorizer_mock(
-                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_foo.clone()]),
@@ -1978,12 +1987,12 @@ impl PullUseCaseHarnessMocks {
     fn for_transform(alias_foo: &odf::DatasetAlias, alias_bar: &odf::DatasetAlias) -> Self {
         Self::default().with_authorizer_mock(
             MockDatasetActionAuthorizer::new()
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Write,
                     1,
                     HashSet::from_iter([alias_bar.clone()]),
                 )
-                .make_expect_classify_datasets_by_allowance(
+                .make_expect_classify_datasets_by_allowance_for(
                     DatasetAction::Read,
                     1,
                     HashSet::from_iter([alias_foo.clone()]),
@@ -2051,7 +2060,7 @@ impl PullUseCaseHarnessMocks {
             ..self
         }
         .with_authorizer_mock(
-            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+            MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance_for(
                 DatasetAction::Write,
                 1,
                 HashSet::from_iter([alias_foo.clone()]),

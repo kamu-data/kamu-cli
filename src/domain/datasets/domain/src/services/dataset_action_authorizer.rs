@@ -11,6 +11,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::CurrentAccountSubject;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,6 +37,15 @@ pub trait DatasetActionAuthorizer: Sync + Send {
 
     async fn classify_dataset_handles_by_allowance(
         &self,
+        dataset_handles: Vec<odf::DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError>;
+
+    /// Same as [`Self::classify_dataset_handles_by_allowance`], for the given
+    /// principal instead of the current account
+    async fn classify_dataset_handles_by_allowance_for(
+        &self,
+        principal: &CurrentAccountSubject,
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
@@ -505,6 +515,16 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
             authorized_handles: dataset_handles,
             unauthorized_handles_with_errors: vec![],
         })
+    }
+
+    async fn classify_dataset_handles_by_allowance_for(
+        &self,
+        _principal: &CurrentAccountSubject,
+        dataset_handles: Vec<odf::DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        self.classify_dataset_handles_by_allowance(dataset_handles, action)
+            .await
     }
 
     async fn classify_dataset_ids_by_allowance<'a>(

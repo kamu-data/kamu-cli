@@ -12,6 +12,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{MockDidGenerator, TenancyConfig};
 use kamu_datasets::{DatasetActionAuthorizer, MockDatasetActionAuthorizer};
+use kamu_datasets_services::DatasetOperationAuthorizerImpl;
 use messaging_outbox::{MockOutbox, Outbox};
 use time_source::SystemTimeSourceStub;
 
@@ -116,6 +117,7 @@ impl BaseUseCaseHarness {
             let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
 
             b.add::<RebacDatasetRegistryFacadeImpl>();
+            b.add::<DatasetOperationAuthorizerImpl>();
 
             if let Some(mock_outbox) = options.mock_outbox {
                 b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
