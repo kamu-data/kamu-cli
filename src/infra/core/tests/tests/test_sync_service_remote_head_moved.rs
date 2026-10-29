@@ -199,7 +199,11 @@ impl RemotePushHarness {
             .catalog
             .get_one::<SyncRequestBuilder>()
             .unwrap()
-            .build_sync_request(self.dataset_alias.as_any_ref(), push_ref.as_any_ref(), true)
+            .build_sync_request(
+                self.dataset_alias.as_local_ref(),
+                push_ref.as_any_ref(),
+                true,
+            )
             .await
             .unwrap();
 

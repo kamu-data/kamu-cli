@@ -352,7 +352,7 @@ impl IpnsPushHarness {
         let url = Url::parse(&format!("ipns://{key_id}")).unwrap();
         let dataset = self.dataset_factory.get_dataset(&url, true).await.unwrap();
         let request = SyncRequest {
-            src: SyncRef::Local(ResolvedDataset::from_created(created)),
+            src: ResolvedDataset::from_created(created),
             dst: SyncRefRemote {
                 url: Arc::new(url.clone()),
                 dataset,

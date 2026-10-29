@@ -58,43 +58,23 @@ impl SyncServiceImpl {
         }
     }
 
-    /// Whether a source's blocks and objects are validated and re-hashed
-    fn source_trust(src: &SyncRef, opts: SyncOptions) -> SourceTrust {
-        let trust_source = opts.trust_source.unwrap_or(src.is_local());
-        let validation = if trust_source {
-            odf::dataset::AppendValidation::None
-        } else {
-            odf::dataset::AppendValidation::Full
-        };
-        SourceTrust {
-            validation,
-            trust_hashes: trust_source,
-        }
-    }
-
-    fn source_dataset(src: &SyncRef) -> Arc<dyn odf::Dataset> {
-        match src {
-            SyncRef::Local(resolved_dataset) => (**resolved_dataset).clone(),
-            SyncRef::Remote(src_remote) => src_remote.dataset.clone(),
-        }
-    }
-
     #[tracing::instrument(level = "debug", skip_all, fields(?src, ?dst, ?opts))]
     async fn push_generic(
         &self,
-        src: SyncRef,
+        src: ResolvedDataset,
         dst: SyncRefRemote,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let trust = Self::source_trust(&src, opts);
+        // A local dataset is trusted unless the options say otherwise
+        let trust = SourceTrust::new(opts.trust_source.unwrap_or(true));
 
         tracing::info!("Starting sync using Simple Transfer Protocol");
 
         self.simple_transfer_protocol
             .push(
-                &src.as_internal_any_ref(),
-                Self::source_dataset(&src),
+                &src.get_handle().as_any_ref(),
+                (*src).clone(),
                 dst.dataset,
                 trust.validation,
                 trust.trust_hashes,
@@ -108,19 +88,20 @@ impl SyncServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?src, ?dst, ?opts))]
     async fn transfer_generic(
         &self,
-        src: SyncRef,
+        src: SyncRefRemote,
         dst: &LocalSyncTarget,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncTransfer, SyncError> {
-        let trust = Self::source_trust(&src, opts);
+        // A remote dataset is validated unless the options say otherwise
+        let trust = SourceTrust::new(opts.trust_source.unwrap_or(false));
 
         tracing::info!("Starting transfer using Simple Transfer Protocol");
 
         self.simple_transfer_protocol
             .transfer_into_local(
                 &src.as_internal_any_ref(),
-                Self::source_dataset(&src),
+                src.dataset,
                 dst,
                 trust.validation,
                 trust.trust_hashes,
@@ -161,7 +142,7 @@ impl SyncServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?src, %dst_url, ?opts))]
     async fn sync_smart_push_transfer_protocol(
         &self,
-        src: SyncRef,
+        src: ResolvedDataset,
         dst_url: &Url,
         opts: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
@@ -174,12 +155,10 @@ impl SyncServiceImpl {
             .await?;
         let maybe_dst_head = try_resolve_head(http_dst_dataset_view.as_metadata_chain()).await?;
 
-        let src_dataset = Self::source_dataset(&src);
-
         tracing::info!("Starting sync using Smart Transfer Protocol (Push flow)");
         self.smart_transfer_protocol
             .push_protocol_client_flow(
-                src_dataset,
+                (*src).clone(),
                 &http_dst_url,
                 maybe_dst_head.as_ref(),
                 SmartTransferOptions {
@@ -378,14 +357,13 @@ impl SyncServiceImpl {
     #[tracing::instrument(level = "info", name = "sync", skip_all, fields(src=?src, dst=?dst))]
     async fn sync_impl(
         &self,
-        src: SyncRef,
+        src: ResolvedDataset,
         dst: SyncRefRemote,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        match (&src, dst.url.scheme()) {
-            // * -> ipfs
-            (_, "ipfs") => Err(odf::dataset::UnsupportedProtocolError {
+        match dst.url.scheme() {
+            "ipfs" => Err(odf::dataset::UnsupportedProtocolError {
                 url: dst.url.as_ref().clone(),
                 message: Some(
                     concat!(
@@ -398,25 +376,8 @@ impl SyncServiceImpl {
                 ),
             }
             .into()),
-            // <remote> -> ipns
-            (SyncRef::Remote(_), "ipns") => Err(odf::dataset::UnsupportedProtocolError {
-                url: dst.url.as_ref().clone(),
-                message: Some(
-                    concat!(
-                        "Syncing from a remote repository directly to IPFS ",
-                        "is not currently supported. Consider pulling the dataset ",
-                        "locally and then pushing to IPFS.",
-                    )
-                    .to_owned(),
-                ),
-            }
-            .into()),
-            // <local> -> ipns
-            (SyncRef::Local(src_dataset), "ipns") => match dst.url.path() {
-                "" | "/" => {
-                    self.sync_to_ipfs(src_dataset.clone(), dst.url.as_ref(), opts)
-                        .await
-                }
+            "ipns" => match dst.url.path() {
+                "" | "/" => self.sync_to_ipfs(src, dst.url.as_ref(), opts).await,
                 _ => Err(odf::dataset::UnsupportedProtocolError {
                     url: dst.url.as_ref().clone(),
                     message: Some(
@@ -429,31 +390,12 @@ impl SyncServiceImpl {
                 }
                 .into()),
             },
-            // odf -> odf
-            (SyncRef::Remote(src_remote), _)
-                if src_remote.url.is_odf_protocol() && dst.url.is_odf_protocol() =>
-            {
-                Err(odf::dataset::UnsupportedProtocolError {
-                    url: dst.url.as_ref().clone(),
-                    message: Some(
-                        concat!(
-                            "Syncing from a remote ODF repository directly to remote ODF ",
-                            "repository is not currently supported. Consider pulling the ",
-                            "dataset locally and then pushing to ODF repository.",
-                        )
-                        .to_owned(),
-                    ),
-                }
-                .into())
-            }
-            // * -> odf
-            (_, _) if dst.url.is_odf_protocol() => {
+            _ if dst.url.is_odf_protocol() => {
                 let dst_url = dst.url.clone();
                 self.sync_smart_push_transfer_protocol(src, dst_url.as_ref(), opts)
                     .await
             }
-            // * -> *
-            (_, _) => self.push_generic(src, dst, opts, listener).await,
+            _ => self.push_generic(src, dst, opts, listener).await,
         }
     }
 
@@ -496,8 +438,7 @@ impl SyncServiceImpl {
             }
             self.transfer_smart_pull(src.url.as_ref(), dst, opts).await
         } else {
-            self.transfer_generic(SyncRef::Remote(src), dst, opts, listener)
-                .await
+            self.transfer_generic(src, dst, opts, listener).await
         }
     }
 }
@@ -539,6 +480,19 @@ impl SyncService for SyncServiceImpl {
 struct SourceTrust {
     validation: odf::dataset::AppendValidation,
     trust_hashes: bool,
+}
+
+impl SourceTrust {
+    fn new(trusted: bool) -> Self {
+        Self {
+            validation: if trusted {
+                odf::dataset::AppendValidation::None
+            } else {
+                odf::dataset::AppendValidation::Full
+            },
+            trust_hashes: trusted,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

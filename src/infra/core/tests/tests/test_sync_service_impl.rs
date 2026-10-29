@@ -203,7 +203,7 @@ async fn do_test_sync(
     // Dataset does not exist locally / remotely
     assert_matches!(
         sync_request_builder_foo
-            .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), true)
+            .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.as_any_ref(), true)
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == dataset_alias_foo.as_any_ref()
     );
@@ -240,7 +240,7 @@ async fn do_test_sync(
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
         sync_request_builder_foo
-            .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+            .build_sync_request(dataset_alias_foo.as_local_ref(), push_ref.as_any_ref(), false)
             .await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_ref.as_any_ref()
     );
@@ -248,7 +248,11 @@ async fn do_test_sync(
     let sync_result = sync_svc_foo
         .sync(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), true)
+                .build_sync_request(
+                    dataset_alias_foo.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    true,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -325,7 +329,11 @@ async fn do_test_sync(
     let sync_result = sync_svc_foo
         .sync(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(
+                    dataset_alias_foo.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    false,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -370,7 +378,11 @@ async fn do_test_sync(
     let sync_result = sync_svc_foo
         .sync(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(
+                    dataset_alias_foo.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    false,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -408,7 +420,11 @@ async fn do_test_sync(
     let sync_result = sync_svc_bar
         .sync(
             sync_request_builder_bar
-                .build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(
+                    dataset_alias_bar.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    false,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -430,7 +446,11 @@ async fn do_test_sync(
     let sync_err = sync_svc_foo
         .sync(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(
+                    dataset_alias_foo.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    false,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -451,7 +471,11 @@ async fn do_test_sync(
     let sync_result = sync_svc_foo
         .sync(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(
+                    dataset_alias_foo.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    false,
+                )
                 .await
                 .unwrap(),
             SyncOptions {
@@ -542,7 +566,11 @@ async fn do_test_sync(
     let sync_result = sync_svc_foo
         .sync(
             sync_request_builder_foo
-                .build_sync_request(dataset_alias_foo.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(
+                    dataset_alias_foo.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    false,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -563,7 +591,11 @@ async fn do_test_sync(
     let sync_err = sync_svc_bar
         .sync(
             sync_request_builder_bar
-                .build_sync_request(dataset_alias_bar.as_any_ref(), push_ref.as_any_ref(), false)
+                .build_sync_request(
+                    dataset_alias_bar.as_local_ref(),
+                    push_ref.as_any_ref(),
+                    false,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),
@@ -607,7 +639,7 @@ async fn do_test_sync(
             .sync(
                 sync_request_builder_foo
                     .build_sync_request(
-                        dataset_alias_baz.as_any_ref(),
+                        dataset_alias_baz.as_local_ref(),
                         push_ref.as_any_ref(),
                         false,
                     )
@@ -685,7 +717,7 @@ async fn do_test_sync(
             .sync(
                 sync_request_builder_foo
                     .build_sync_request(
-                        dataset_alias_foo.as_any_ref(),
+                        dataset_alias_foo.as_local_ref(),
                         push_ref.as_any_ref(),
                         false,
                     )

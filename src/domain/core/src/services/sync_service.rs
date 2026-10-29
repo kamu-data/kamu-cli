@@ -52,10 +52,10 @@ pub trait SyncService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A sync into a destination that is not a dataset of this node
+/// A push of a dataset of this node into a destination that is not one
 #[derive(Debug, Clone)]
 pub struct SyncRequest {
-    pub src: SyncRef,
+    pub src: ResolvedDataset,
     pub dst: SyncRefRemote,
 }
 
@@ -67,46 +67,6 @@ pub struct SyncRequest {
 pub struct LocalSyncRequest {
     pub src: odf::DatasetRefRemote,
     pub dst: LocalSyncTarget,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub enum SyncRef {
-    Local(ResolvedDataset),
-    Remote(SyncRefRemote),
-}
-
-impl SyncRef {
-    pub fn is_local(&self) -> bool {
-        match self {
-            Self::Local(_) => true,
-            Self::Remote(_) => false,
-        }
-    }
-
-    // If remote, refers to resolved repository URL
-    pub fn as_internal_any_ref(&self) -> odf::DatasetRefAny {
-        match self {
-            Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
-            Self::Remote(remote_ref) => remote_ref.as_internal_any_ref(),
-        }
-    }
-
-    // If remote, returns the original unresolved ref
-    pub fn as_user_friendly_any_ref(&self) -> odf::DatasetRefAny {
-        match self {
-            Self::Local(local_ref) => local_ref.get_handle().as_any_ref(),
-            Self::Remote(remote_ref) => remote_ref.as_user_friendly_any_ref(),
-        }
-    }
-
-    pub fn detach_from_transaction(&self) {
-        match self {
-            Self::Local(r) => r.detach_from_transaction(),
-            Self::Remote(_) => {}
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,6 +107,8 @@ impl LocalSyncTarget {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A dataset behind a URL, opened over its storage: a push destination or a
+/// pull source
 #[derive(Clone)]
 pub struct SyncRefRemote {
     pub url: Arc<Url>,
@@ -178,8 +140,8 @@ impl std::fmt::Debug for SyncRefRemote {
 #[derive(Debug, Copy, Clone)]
 pub struct SyncOptions {
     /// Whether the source of data can be assumed non-malicious to skip hash sum
-    /// and other expensive checks. Defaults to `true` when the source is
-    /// local workspace.
+    /// and other expensive checks. Defaults to `true` for a push, whose source
+    /// is a local dataset, and to `false` for a pull.
     pub trust_source: Option<bool>,
 
     /// Whether destination dataset should be created if it does not exist
