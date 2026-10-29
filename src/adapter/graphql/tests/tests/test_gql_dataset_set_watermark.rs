@@ -27,7 +27,7 @@ use kamu_datasets::{
     CreateDatasetUseCaseOptions,
     DatasetReferenceRepository,
 };
-use kamu_datasets_services::DatasetOperationAuthorizerImpl;
+use kamu_datasets_services::DatasetOperationGuardImpl;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
@@ -115,7 +115,7 @@ impl SetWatermarkHarness {
 
         let base_catalog = dill::CatalogBuilder::new_chained(base_gql_harness.catalog())
             .add::<SetWatermarkUseCaseImpl>()
-            .add::<DatasetOperationAuthorizerImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
             .add::<RemoteAliasesRegistryImpl>()

@@ -41,7 +41,7 @@ impl BaseGQLDatasetHarness {
     #[builder]
     pub fn new(
         tenancy_config: TenancyConfig,
-        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
         base_catalog: Option<&dill::Catalog>,
         outbox_provider: Option<OutboxProvider>,
         system_time_source_provider: Option<SystemTimeSourceProvider>,
@@ -112,9 +112,9 @@ impl BaseGQLDatasetHarness {
             let system_time_source_provider = system_time_source_provider.unwrap_or_default();
             system_time_source_provider.embed_into_catalog(&mut b);
 
-            if let Some(mock) = mock_dataset_action_authorizer {
+            if let Some(mock) = mock_dataset_permission_checker {
                 b.add_value(mock)
-                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+                    .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
             } else {
                 kamu_adapter_auth_oso_rebac::register_dependencies(&mut b);
             }

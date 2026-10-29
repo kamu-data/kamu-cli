@@ -27,11 +27,11 @@ use kamu_core::{
     NullCompactionMultiListener,
 };
 use kamu_datasets::{
-    DatasetActionUnauthorizedError,
     DatasetHeadCommitter,
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermissionError,
     DatasetRegistry,
     ResolvedDataset,
 };
@@ -49,7 +49,7 @@ pub struct CompactDatasetUseCaseImpl {
 }
 
 impl CompactDatasetUseCaseImpl {
-    #[transactional_method3(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
+    #[transactional_method3(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
     async fn plan_transactionally(
         &self,
         dataset_handle: &odf::DatasetHandle,
@@ -61,14 +61,14 @@ impl CompactDatasetUseCaseImpl {
         } else {
             DatasetOperation::Compaction
         };
-        dataset_operation_authorizer
-            .authorize_operation(
+        dataset_operation_guard
+            .check_operation(
                 &self.current_account_subject,
                 &DatasetOperationRequest::new(dataset_handle.clone(), operation),
             )
             .await
             .map_err(|e| {
-                use DatasetActionUnauthorizedError as E;
+                use DatasetPermissionError as E;
 
                 match e {
                     E::NotFound(e) => CompactionError::NotFound(e),

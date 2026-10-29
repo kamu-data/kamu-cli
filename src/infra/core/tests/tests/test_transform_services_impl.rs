@@ -26,7 +26,7 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::{
-    AlwaysHappyDatasetActionAuthorizer,
+    AlwaysHappyDatasetPermissionChecker,
     DatasetRegistry,
     DatasetRegistryExt,
     ResolvedDataset,
@@ -35,7 +35,7 @@ use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetHeadCommitterImpl,
-    DatasetOperationAuthorizerImpl,
+    DatasetOperationGuardImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -82,7 +82,7 @@ impl TransformTestHarness {
             ))
             .add::<DatasetRegistrySoloUnitBridge>()
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add::<SystemTimeSourceStub>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()
@@ -106,7 +106,7 @@ impl TransformTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<DatasetOperationAuthorizerImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<DummyOutboxImpl>()
             .add_value(engine_provisioner)

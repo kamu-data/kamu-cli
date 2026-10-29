@@ -16,51 +16,51 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{
-    ClassifyByAllowanceDatasetActionUnauthorizedError,
-    DatasetAction,
-    DatasetActionAuthorizer,
-    DatasetActionUnauthorizedError,
-    DatasetOperationAuthorizer,
+    ClassifyByAllowanceDatasetPermissionError,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermission,
+    DatasetPermissionChecker,
+    DatasetPermissionError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetOperationAuthorizerImpl {
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+pub struct DatasetOperationGuardImpl {
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
 }
 
 #[component(pub)]
-#[interface(dyn DatasetOperationAuthorizer)]
-impl DatasetOperationAuthorizerImpl {
-    pub fn new(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>) -> Self {
+#[interface(dyn DatasetOperationGuard)]
+impl DatasetOperationGuardImpl {
+    pub fn new(dataset_permission_checker: Arc<dyn DatasetPermissionChecker>) -> Self {
         Self {
-            dataset_action_authorizer,
+            dataset_permission_checker,
         }
     }
 
-    /// Classifies every distinct (action, dataset) pair of the requests, one
-    /// call per action
+    /// Classifies every distinct (permission, dataset) pair of the requests, one
+    /// call per permission
     async fn classify(
         &self,
         principal: &CurrentAccountSubject,
         requests: &[DatasetOperationRequest],
-    ) -> Result<HashMap<(DatasetAction, odf::DatasetID), Verdict>, InternalError> {
-        let mut handles_by_action: HashMap<
-            DatasetAction,
+    ) -> Result<HashMap<(DatasetPermission, odf::DatasetID), Verdict>, InternalError> {
+        let mut handles_by_permission: HashMap<
+            DatasetPermission,
             HashMap<odf::DatasetID, odf::DatasetHandle>,
         > = HashMap::new();
         for request in requests {
-            let checks = once((request.operation.target_action(), &request.target)).chain(
+            let checks = once((request.operation.target_permission(), &request.target)).chain(
                 request
                     .operation
                     .read_inputs()
                     .iter()
-                    .map(|input| (DatasetAction::Read, input)),
+                    .map(|input| (DatasetPermission::Read, input)),
             );
-            for (action, handle) in checks {
-                handles_by_action
-                    .entry(action)
+            for (permission, handle) in checks {
+                handles_by_permission
+                    .entry(permission)
                     .or_default()
                     .entry(handle.id.clone())
                     .or_insert_with(|| handle.clone());
@@ -68,27 +68,27 @@ impl DatasetOperationAuthorizerImpl {
         }
 
         let mut verdicts = HashMap::new();
-        for (action, handles) in handles_by_action {
+        for (permission, handles) in handles_by_permission {
             let response = self
-                .dataset_action_authorizer
+                .dataset_permission_checker
                 .classify_dataset_handles_by_allowance_for(
                     principal,
                     handles.into_values().collect(),
-                    action,
+                    permission,
                 )
                 .await?;
 
             for handle in response.authorized_handles {
-                verdicts.insert((action, handle.id), Verdict::Allowed);
+                verdicts.insert((permission, handle.id), Verdict::Allowed);
             }
             for (handle, error) in response.unauthorized_handles_with_errors {
-                use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+                use ClassifyByAllowanceDatasetPermissionError as E;
                 let verdict = match error {
                     E::NotFound(_) => Verdict::NotFound,
                     E::Access(_) => Verdict::Denied,
                     e @ E::Internal(_) => return Err(e.int_err()),
                 };
-                verdicts.insert((action, handle.id), verdict);
+                verdicts.insert((permission, handle.id), verdict);
             }
         }
 
@@ -96,32 +96,36 @@ impl DatasetOperationAuthorizerImpl {
     }
 
     fn check_request(
-        verdicts: &HashMap<(DatasetAction, odf::DatasetID), Verdict>,
+        verdicts: &HashMap<(DatasetPermission, odf::DatasetID), Verdict>,
         request: &DatasetOperationRequest,
-    ) -> Result<(), DatasetActionUnauthorizedError> {
-        Self::check(verdicts, request.operation.target_action(), &request.target)?;
+    ) -> Result<(), DatasetPermissionError> {
+        Self::check(
+            verdicts,
+            request.operation.target_permission(),
+            &request.target,
+        )?;
         for input in request.operation.read_inputs() {
-            Self::check(verdicts, DatasetAction::Read, input)?;
+            Self::check(verdicts, DatasetPermission::Read, input)?;
         }
         Ok(())
     }
 
     fn check(
-        verdicts: &HashMap<(DatasetAction, odf::DatasetID), Verdict>,
-        action: DatasetAction,
+        verdicts: &HashMap<(DatasetPermission, odf::DatasetID), Verdict>,
+        permission: DatasetPermission,
         handle: &odf::DatasetHandle,
-    ) -> Result<(), DatasetActionUnauthorizedError> {
-        match verdicts.get(&(action, handle.id.clone())) {
+    ) -> Result<(), DatasetPermissionError> {
+        match verdicts.get(&(permission, handle.id.clone())) {
             Some(Verdict::Allowed) => Ok(()),
             Some(Verdict::NotFound) => {
                 Err(odf::DatasetNotFoundError::new(handle.as_local_ref()).into())
             }
-            Some(Verdict::Denied) => Err(DatasetActionUnauthorizedError::not_enough_permissions(
+            Some(Verdict::Denied) => Err(DatasetPermissionError::not_enough_permissions(
                 handle.as_local_ref(),
-                action,
+                permission,
             )),
             None => Err(format!(
-                "Dataset '{}' was not classified for '{action}'",
+                "Dataset '{}' was not classified for '{permission}'",
                 handle.alias
             )
             .int_err()
@@ -131,21 +135,21 @@ impl DatasetOperationAuthorizerImpl {
 }
 
 #[async_trait::async_trait]
-impl DatasetOperationAuthorizer for DatasetOperationAuthorizerImpl {
-    async fn authorize_operation(
+impl DatasetOperationGuard for DatasetOperationGuardImpl {
+    async fn check_operation(
         &self,
         principal: &CurrentAccountSubject,
         request: &DatasetOperationRequest,
-    ) -> Result<(), DatasetActionUnauthorizedError> {
+    ) -> Result<(), DatasetPermissionError> {
         let verdicts = self.classify(principal, slice::from_ref(request)).await?;
         Self::check_request(&verdicts, request)
     }
 
-    async fn authorize_operations(
+    async fn check_operations(
         &self,
         principal: &CurrentAccountSubject,
         requests: &[DatasetOperationRequest],
-    ) -> Result<Vec<Result<(), DatasetActionUnauthorizedError>>, InternalError> {
+    ) -> Result<Vec<Result<(), DatasetPermissionError>>, InternalError> {
         let verdicts = self.classify(principal, requests).await?;
         Ok(requests
             .iter()
@@ -156,7 +160,7 @@ impl DatasetOperationAuthorizer for DatasetOperationAuthorizerImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Outcome of one (action, dataset) check. The authorizers deny only for
+/// Outcome of one (permission, dataset) check. Permission checkers deny only for
 /// missing permissions, so the error is rebuilt for every request that
 /// shares the check.
 enum Verdict {

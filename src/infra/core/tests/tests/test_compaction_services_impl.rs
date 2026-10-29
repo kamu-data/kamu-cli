@@ -33,7 +33,7 @@ use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetHeadCommitterImpl,
-    DatasetOperationAuthorizerImpl,
+    DatasetOperationGuardImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -1605,7 +1605,7 @@ impl CompactTestHarness {
             ))
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<ObjectStoreRegistryImpl>()
@@ -1633,7 +1633,7 @@ impl CompactTestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<DatasetOperationAuthorizerImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<DummyOutboxImpl>()
             .add::<TransformPlannerImpl>()
@@ -1673,7 +1673,7 @@ impl CompactTestHarness {
             .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
             .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
@@ -1690,7 +1690,7 @@ impl CompactTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<DatasetOperationAuthorizerImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()

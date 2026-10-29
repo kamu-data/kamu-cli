@@ -15,8 +15,8 @@ use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetResult,
-    DatasetAction,
-    MockDatasetActionAuthorizer,
+    DatasetPermission,
+    MockDatasetPermissionChecker,
     ResolvedDataset,
 };
 use kamu_datasets_services::DatasetHeadCommitterImpl;
@@ -30,8 +30,8 @@ async fn test_set_watermark_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Write,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Write,
             &dataset_id_foo,
             1,
             true,
@@ -60,8 +60,8 @@ async fn test_try_set_watermark_for_not_found_dataset() {
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
 
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for_not_found(
-            DatasetAction::Write,
+        MockDatasetPermissionChecker::new().expect_authorize_for_not_found(
+            DatasetPermission::Write,
             &not_found_dataset_handle.id,
             1,
         ),
@@ -88,8 +88,8 @@ async fn test_set_watermark_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Write,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Write,
             &dataset_id_foo,
             1,
             false,
@@ -120,12 +120,12 @@ struct SetWatermarkUseCaseHarness {
 
 impl SetWatermarkUseCaseHarness {
     fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 

@@ -35,11 +35,11 @@ use kamu_auth_rebac_services::{
 };
 use kamu_core::TenancyConfig;
 use kamu_datasets::{
-    DatasetAction,
-    DatasetActionAuthorizer,
-    DatasetActionUnauthorizedError,
     DatasetLifecycleMessage,
-    GetAllowedActionsError,
+    DatasetPermission,
+    DatasetPermissionChecker,
+    DatasetPermissionError,
+    GetGrantedPermissionsError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
@@ -71,22 +71,22 @@ macro_rules! assert_single_dataset {
     ) => {
         assert_matches!(
             $harness
-                .dataset_authorizer
-                .check_action_allowed(&$dataset_id, DatasetAction::Read)
+                .dataset_permission_checker
+                .check_permission(&$dataset_id, DatasetPermission::Read)
                 .await,
             $( $expected_read_pattern )|+ $( if $expected_read_guard )?
         );
         assert_matches!(
             $harness
-                .dataset_authorizer
-                .check_action_allowed(&$dataset_id, DatasetAction::Write)
+                .dataset_permission_checker
+                .check_permission(&$dataset_id, DatasetPermission::Write)
                 .await,
             $( $expected_write_pattern )|+ $( if $expected_write_guard )?
         );
         assert_matches!(
             $harness
-                .dataset_authorizer
-                .get_allowed_actions(&$dataset_id)
+                .dataset_permission_checker
+                .get_granted_permissions(&$dataset_id)
                 .await,
             $( $expected_allowed_actions_pattern )|+ $( if $expected_allowed_actions_guard )?
         );
@@ -104,9 +104,11 @@ async fn test_owner_can_read_and_write_owned_private_dataset() {
     let owned_private_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
-    let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
-            .await;
+    let harness = DatasetPermissionCheckerHarness::new(
+        CurrentAccountSubjectTestHelper::logged("owner"),
+        false,
+    )
+    .await;
     harness
         .create_private_datasets(&[&owned_private_dataset_handle])
         .await;
@@ -120,10 +122,10 @@ async fn test_owner_can_read_and_write_owned_private_dataset() {
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions == [
-                    DatasetAction::Read,
-                    DatasetAction::Write,
-                    DatasetAction::Maintain,
-                    DatasetAction::Own
+                    DatasetPermission::Read,
+                    DatasetPermission::Write,
+                    DatasetPermission::Maintain,
+                    DatasetPermission::Own
                 ].into()
     );
 }
@@ -135,9 +137,11 @@ async fn test_owner_can_read_and_write_owned_public_dataset() {
     let owned_public_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
-    let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
-            .await;
+    let harness = DatasetPermissionCheckerHarness::new(
+        CurrentAccountSubjectTestHelper::logged("owner"),
+        false,
+    )
+    .await;
     harness
         .create_public_datasets(&[&owned_public_dataset_handle])
         .await;
@@ -151,10 +155,10 @@ async fn test_owner_can_read_and_write_owned_public_dataset() {
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions == [
-                    DatasetAction::Read,
-                    DatasetAction::Write,
-                    DatasetAction::Maintain,
-                    DatasetAction::Own
+                    DatasetPermission::Read,
+                    DatasetPermission::Write,
+                    DatasetPermission::Maintain,
+                    DatasetPermission::Own
                 ].into()
     );
 }
@@ -167,7 +171,8 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false).await;
+        DatasetPermissionCheckerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false)
+            .await;
     harness
         .create_public_datasets(&[&public_dataset_handle])
         .await;
@@ -178,9 +183,9 @@ async fn test_guest_can_read_but_not_write_public_dataset() {
             dataset_id = public_dataset_handle.id,
         expected:
             read_result = Ok(()),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
+            write_result = Err(DatasetPermissionError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read].into()
+                if actual_actions == [DatasetPermission::Read].into()
     );
 }
 
@@ -192,7 +197,8 @@ async fn test_guest_can_not_read_and_write_private_dataset() {
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
     let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false).await;
+        DatasetPermissionCheckerHarness::new(CurrentAccountSubjectTestHelper::anonymous(), false)
+            .await;
     harness
         .create_private_datasets(&[&private_dataset_handle])
         .await;
@@ -202,8 +208,8 @@ async fn test_guest_can_not_read_and_write_private_dataset() {
             harness,
             dataset_id = private_dataset_handle.id,
         expected:
-            read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
+            read_result = Err(DatasetPermissionError::Access(odf::AccessError::Unauthorized(_))),
+            write_result = Err(DatasetPermissionError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions.is_empty()
     );
@@ -216,9 +222,11 @@ async fn test_not_owner_can_read_but_not_write_public_dataset() {
     let not_owned_public_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
-    let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner"), false)
-            .await;
+    let harness = DatasetPermissionCheckerHarness::new(
+        CurrentAccountSubjectTestHelper::logged("not-owner"),
+        false,
+    )
+    .await;
 
     harness
         .create_public_datasets(&[&not_owned_public_dataset_handle])
@@ -230,9 +238,9 @@ async fn test_not_owner_can_read_but_not_write_public_dataset() {
             dataset_id = not_owned_public_dataset_handle.id,
         expected:
             read_result = Ok(()),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
+            write_result = Err(DatasetPermissionError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
-                if actual_actions == [DatasetAction::Read].into()
+                if actual_actions == [DatasetPermission::Read].into()
     );
 }
 
@@ -243,9 +251,11 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
     let not_owned_private_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
-    let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("not-owner"), false)
-            .await;
+    let harness = DatasetPermissionCheckerHarness::new(
+        CurrentAccountSubjectTestHelper::logged("not-owner"),
+        false,
+    )
+    .await;
 
     harness
         .create_private_datasets(&[&not_owned_private_dataset_handle])
@@ -256,8 +266,8 @@ async fn test_not_owner_can_not_read_and_write_private_dataset() {
             harness,
             dataset_id = not_owned_private_dataset_handle.id,
         expected:
-            read_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
-            write_result = Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(_))),
+            read_result = Err(DatasetPermissionError::Access(odf::AccessError::Unauthorized(_))),
+            write_result = Err(DatasetPermissionError::Access(odf::AccessError::Unauthorized(_))),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions.is_empty()
     );
@@ -270,8 +280,11 @@ async fn test_admin_can_read_and_write_not_owned_public_dataset() {
     let not_owned_public_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"public-dataset", odf::DatasetKind::Root);
 
-    let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("admin"), true).await;
+    let harness = DatasetPermissionCheckerHarness::new(
+        CurrentAccountSubjectTestHelper::logged("admin"),
+        true,
+    )
+    .await;
 
     harness
         .create_public_datasets(&[&not_owned_public_dataset_handle])
@@ -286,10 +299,10 @@ async fn test_admin_can_read_and_write_not_owned_public_dataset() {
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions == [
-                    DatasetAction::Read,
-                    DatasetAction::Write,
-                    DatasetAction::Maintain,
-                    DatasetAction::Own
+                    DatasetPermission::Read,
+                    DatasetPermission::Write,
+                    DatasetPermission::Maintain,
+                    DatasetPermission::Own
                 ].into()
     );
 }
@@ -301,8 +314,11 @@ async fn test_admin_can_read_and_write_not_owned_private_dataset() {
     let not_owned_private_dataset_handle =
         odf::metadata::testing::handle(&"owner", &"private-dataset", odf::DatasetKind::Root);
 
-    let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("admin"), true).await;
+    let harness = DatasetPermissionCheckerHarness::new(
+        CurrentAccountSubjectTestHelper::logged("admin"),
+        true,
+    )
+    .await;
 
     harness
         .create_private_datasets(&[&not_owned_private_dataset_handle])
@@ -317,10 +333,10 @@ async fn test_admin_can_read_and_write_not_owned_private_dataset() {
             write_result = Ok(()),
             allowed_actions_result = Ok(actual_actions)
                 if actual_actions == [
-                    DatasetAction::Read,
-                    DatasetAction::Write,
-                    DatasetAction::Maintain,
-                    DatasetAction::Own
+                    DatasetPermission::Read,
+                    DatasetPermission::Write,
+                    DatasetPermission::Maintain,
+                    DatasetPermission::Own
                 ].into()
     );
 }
@@ -551,7 +567,7 @@ async fn test_multi_datasets_matrix() {
     ];
 
     for (subject, is_admin, expected_results) in subjects_with_expected_results {
-        let harness = DatasetAuthorizerHarness::new(subject, is_admin).await;
+        let harness = DatasetPermissionCheckerHarness::new(subject, is_admin).await;
 
         harness
             .create_private_datasets(&[
@@ -571,8 +587,8 @@ async fn test_multi_datasets_matrix() {
             },
             {
                 let mut actual = harness
-                    .dataset_authorizer
-                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetAction::Read)
+                    .dataset_permission_checker
+                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetPermission::Read)
                     .await
                     .unwrap();
                 actual.sort_by(|left, right| left.id.cmp(&right.id));
@@ -587,8 +603,8 @@ async fn test_multi_datasets_matrix() {
             },
             {
                 let mut res = harness
-                    .dataset_authorizer
-                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetAction::Write)
+                    .dataset_permission_checker
+                    .filter_datasets_allowing(all_dataset_handles.clone(), DatasetPermission::Write)
                     .await
                     .unwrap();
                 res.sort_by(|left, right| left.id.cmp(&right.id));
@@ -600,10 +616,10 @@ async fn test_multi_datasets_matrix() {
             expected_results.read_classify_dataset_handles_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
-                    .dataset_authorizer
+                    .dataset_permission_checker
                     .classify_dataset_handles_by_allowance(
                         all_dataset_handles.clone(),
-                        DatasetAction::Read
+                        DatasetPermission::Read
                     )
                     .await
                     .unwrap()
@@ -615,10 +631,10 @@ async fn test_multi_datasets_matrix() {
             expected_results.write_classify_dataset_handles_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
-                    .dataset_authorizer
+                    .dataset_permission_checker
                     .classify_dataset_handles_by_allowance(
                         all_dataset_handles.clone(),
-                        DatasetAction::Write
+                        DatasetPermission::Write
                     )
                     .await
                     .unwrap()
@@ -631,8 +647,8 @@ async fn test_multi_datasets_matrix() {
             expected_results.read_classify_dataset_ids_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
-                    .dataset_authorizer
-                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetAction::Read)
+                    .dataset_permission_checker
+                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetPermission::Read)
                     .await
                     .unwrap(),
                 &dataset_handle_map
@@ -642,8 +658,8 @@ async fn test_multi_datasets_matrix() {
             expected_results.write_classify_dataset_ids_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
-                    .dataset_authorizer
-                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetAction::Write)
+                    .dataset_permission_checker
+                    .classify_dataset_ids_by_allowance(&all_dataset_ids, DatasetPermission::Write)
                     .await
                     .unwrap(),
                 &dataset_handle_map
@@ -659,20 +675,22 @@ async fn test_nobody_cannot_read_not_found_dataset() {
     let not_found_dataset_id = odf::DatasetID::new_seeded_ed25519(b"not_found_dataset_id");
     let not_found_dataset_ref = not_found_dataset_id.as_local_ref();
 
-    let harness =
-        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
-            .await;
+    let harness = DatasetPermissionCheckerHarness::new(
+        CurrentAccountSubjectTestHelper::logged("owner"),
+        false,
+    )
+    .await;
 
     assert_single_dataset!(
         setup:
             harness,
             dataset_id = not_found_dataset_id,
         expected:
-            read_result = Err(DatasetActionUnauthorizedError::NotFound(e))
+            read_result = Err(DatasetPermissionError::NotFound(e))
                 if e.dataset_ref == not_found_dataset_ref,
-            write_result = Err(DatasetActionUnauthorizedError::NotFound(e))
+            write_result = Err(DatasetPermissionError::NotFound(e))
                 if e.dataset_ref == not_found_dataset_ref,
-            allowed_actions_result = Err(GetAllowedActionsError::NotFound(e))
+            allowed_actions_result = Err(GetGrantedPermissionsError::NotFound(e))
                 if e.dataset_ref == not_found_dataset_ref
     );
 }
@@ -681,13 +699,13 @@ async fn test_nobody_cannot_read_not_found_dataset() {
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct DatasetAuthorizerHarness {
-    dataset_authorizer: Arc<dyn DatasetActionAuthorizer>,
+struct DatasetPermissionCheckerHarness {
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
-impl DatasetAuthorizerHarness {
+impl DatasetPermissionCheckerHarness {
     pub async fn new(current_account_subject: CurrentAccountSubject, is_admin: bool) -> Self {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
 
@@ -756,7 +774,7 @@ impl DatasetAuthorizerHarness {
         };
 
         Self {
-            dataset_authorizer: catalog.get_one().unwrap(),
+            dataset_permission_checker: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
             dataset_entry_writer: catalog.get_one().unwrap(),
         }

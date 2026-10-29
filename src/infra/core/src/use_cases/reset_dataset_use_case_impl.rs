@@ -14,10 +14,10 @@ use internal_error::ErrorIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult};
 use kamu_datasets::{
-    DatasetActionUnauthorizedError,
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermissionError,
     DatasetRegistry,
 };
 
@@ -28,7 +28,7 @@ use kamu_datasets::{
 pub struct ResetDatasetUseCaseImpl {
     reset_planner: Arc<dyn ResetPlanner>,
     reset_executor: Arc<dyn ResetExecutor>,
-    dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     current_account_subject: Arc<CurrentAccountSubject>,
 }
@@ -48,14 +48,14 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         maybe_new_head: Option<&odf::Multihash>,
         maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
-        self.dataset_operation_authorizer
-            .authorize_operation(
+        self.dataset_operation_guard
+            .check_operation(
                 &self.current_account_subject,
                 &DatasetOperationRequest::new(dataset_handle.clone(), DatasetOperation::Reset),
             )
             .await
             .map_err(|e| {
-                use DatasetActionUnauthorizedError as E;
+                use DatasetPermissionError as E;
 
                 match e {
                     E::NotFound(e) => ResetError::NotFound(e),

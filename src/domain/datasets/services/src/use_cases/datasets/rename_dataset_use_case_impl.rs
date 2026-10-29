@@ -46,7 +46,7 @@ impl RenameDatasetUseCase for RenameDatasetUseCaseImpl {
         // Locate dataset
         let dataset_handle = self
             .rebac_dataset_registry_facade
-            .resolve_dataset_handle_by_ref(dataset_ref, DatasetAction::Maintain)
+            .resolve_dataset_handle_by_ref(dataset_ref, DatasetPermission::Maintain)
             .await
             .map_err(|e| {
                 use kamu_auth_rebac::RebacDatasetRefUnresolvedError as E;

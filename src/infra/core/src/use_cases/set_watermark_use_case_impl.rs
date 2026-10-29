@@ -15,10 +15,10 @@ use internal_error::ErrorIntoInternal;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::{
-    DatasetActionUnauthorizedError,
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermissionError,
     DatasetRegistry,
 };
 
@@ -29,7 +29,7 @@ use kamu_datasets::{
 pub struct SetWatermarkUseCaseImpl {
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
     set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
-    dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     current_account_subject: Arc<CurrentAccountSubject>,
 }
@@ -48,8 +48,8 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         dataset_handle: &odf::DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
-        self.dataset_operation_authorizer
-            .authorize_operation(
+        self.dataset_operation_guard
+            .check_operation(
                 &self.current_account_subject,
                 &DatasetOperationRequest::new(
                     dataset_handle.clone(),
@@ -58,7 +58,7 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
             )
             .await
             .map_err(|e| {
-                use DatasetActionUnauthorizedError as E;
+                use DatasetPermissionError as E;
 
                 match e {
                     E::NotFound(e) => SetWatermarkError::NotFound(e),

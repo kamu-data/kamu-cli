@@ -14,7 +14,7 @@ use kamu::testing::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry};
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
@@ -49,7 +49,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
         .add::<DatasetRegistrySoloUnitBridge>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<RemoteRepositoryRegistryImpl>()
         .add_value(RemoteReposDir::new_with_creation(
             tmp_workspace_dir.join("repos"),

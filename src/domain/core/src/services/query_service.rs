@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use datafusion::prelude::SessionContext;
 use internal_error::*;
-use kamu_datasets::{DatasetActionUnauthorizedError, ResolvedDataset};
+use kamu_datasets::{DatasetPermissionError, ResolvedDataset};
 use odf::utils::data::DataFrameExt;
 use thiserror::Error;
 
@@ -485,9 +485,9 @@ impl From<odf::DatasetRefUnresolvedError> for QueryError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DatasetActionUnauthorizedError> for QueryError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
+impl From<DatasetPermissionError> for QueryError {
+    fn from(v: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
 
         match v {
             E::NotFound(e) => Self::DatasetNotFound(e),

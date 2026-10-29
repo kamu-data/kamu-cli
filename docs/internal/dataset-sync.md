@@ -406,7 +406,7 @@ upload is not re-hashed by the server.
 `kamu push <dataset>…` builds `PushDatasetUseCase::execute_multi`:
 
 1. **Authorization:** `SyncTo` on every dataset to push, which needs Read
-   ([`DatasetOperationAuthorizer`](../../src/domain/datasets/domain/src/services/dataset_operation_authorizer.rs), [§10](#10-authorization)); any failure
+   ([`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs), [§10](#10-authorization)); any failure
    returns only those failures.
 2. **Plan:** `PushRequestPlanner::collect_plan` resolves each dataset's target with
    `RemoteAliasResolver::resolve_push_target` ([§9](#9-remote-repositories-and-aliases)).

@@ -25,9 +25,9 @@ use kamu_auth_rebac::{
     UnsetAccountDatasetRelationsOperation,
 };
 use kamu_datasets::{
-    ClassifyByAllowanceDatasetActionUnauthorizedError,
-    DatasetAction,
-    DatasetActionAuthorizer,
+    ClassifyByAllowanceDatasetPermissionError,
+    DatasetPermission,
+    DatasetPermissionChecker,
 };
 use messaging_outbox::{Outbox, OutboxExt};
 
@@ -37,7 +37,7 @@ use messaging_outbox::{Outbox, OutboxExt};
 #[dill::interface(dyn ApplyAccountDatasetRelationsUseCase)]
 pub struct ApplyAccountDatasetRelationsUseCaseImpl {
     rebac_service: Arc<dyn RebacService>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     outbox: Arc<dyn Outbox>,
 }
 
@@ -46,10 +46,10 @@ impl ApplyAccountDatasetRelationsUseCaseImpl {
         &self,
         dataset_ids: &[Cow<'_, odf::DatasetID>],
     ) -> Result<(), ApplyRelationMatrixError> {
-        const EXPECTED_ACCESS: DatasetAction = DatasetAction::Maintain;
+        const EXPECTED_ACCESS: DatasetPermission = DatasetPermission::Maintain;
 
         let unauthorized_ids_with_errors = self
-            .dataset_action_authorizer
+            .dataset_permission_checker
             .classify_dataset_ids_by_allowance(dataset_ids, EXPECTED_ACCESS)
             .await?
             .unauthorized_ids_with_errors;
@@ -61,7 +61,7 @@ impl ApplyAccountDatasetRelationsUseCaseImpl {
         let mut not_found_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         let mut unauthorized_dataset_refs = Vec::with_capacity(unauthorized_ids_with_errors.len());
         for (dataset_id, e) in unauthorized_ids_with_errors {
-            use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+            use ClassifyByAllowanceDatasetPermissionError as E;
 
             match e {
                 E::NotFound(_) => {

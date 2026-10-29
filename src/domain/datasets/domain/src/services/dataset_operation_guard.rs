@@ -10,14 +10,15 @@
 use internal_error::InternalError;
 use kamu_accounts::CurrentAccountSubject;
 
-use crate::{DatasetAction, DatasetActionUnauthorizedError};
+use crate::{DatasetPermission, DatasetPermissionError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Authorizes operations on datasets for an explicitly given principal.
+/// Checks whether a principal, given explicitly, may run an operation on a
+/// dataset.
 ///
-/// Owns the rule mapping each operation to the actions it needs, on top of
-/// [`crate::DatasetActionAuthorizer`], which answers per action:
+/// Owns the rule mapping each operation to the permissions it needs, on top of
+/// [`crate::DatasetPermissionChecker`], which checks one permission at a time:
 ///
 /// | Operation | Target | Inputs |
 /// | --- | --- | --- |
@@ -37,19 +38,19 @@ use crate::{DatasetAction, DatasetActionUnauthorizedError};
 /// input in input order. Errors name the dataset that failed.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
-pub trait DatasetOperationAuthorizer: Send + Sync {
-    async fn authorize_operation(
+pub trait DatasetOperationGuard: Send + Sync {
+    async fn check_operation(
         &self,
         principal: &CurrentAccountSubject,
         request: &DatasetOperationRequest,
-    ) -> Result<(), DatasetActionUnauthorizedError>;
+    ) -> Result<(), DatasetPermissionError>;
 
     /// One result per request, in request order
-    async fn authorize_operations(
+    async fn check_operations(
         &self,
         principal: &CurrentAccountSubject,
         requests: &[DatasetOperationRequest],
-    ) -> Result<Vec<Result<(), DatasetActionUnauthorizedError>>, InternalError>;
+    ) -> Result<Vec<Result<(), DatasetPermissionError>>, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -89,19 +90,19 @@ pub enum DatasetOperation {
 }
 
 impl DatasetOperation {
-    pub fn target_action(&self) -> DatasetAction {
+    pub fn target_permission(&self) -> DatasetPermission {
         match self {
             Self::Transform { .. }
             | Self::PollingIngest
             | Self::PushIngest
             | Self::SyncFrom
-            | Self::SetWatermark => DatasetAction::Write,
-            Self::SyncTo | Self::Verify { .. } => DatasetAction::Read,
-            Self::Compaction | Self::ResetToMetadata | Self::Reset => DatasetAction::Maintain,
+            | Self::SetWatermark => DatasetPermission::Write,
+            Self::SyncTo | Self::Verify { .. } => DatasetPermission::Read,
+            Self::Compaction | Self::ResetToMetadata | Self::Reset => DatasetPermission::Maintain,
         }
     }
 
-    /// Datasets the operation reads, each needing [`DatasetAction::Read`]
+    /// Datasets the operation reads, each needing [`DatasetPermission::Read`]
     pub fn read_inputs(&self) -> &[odf::DatasetHandle] {
         match self {
             Self::Transform { inputs } => inputs,

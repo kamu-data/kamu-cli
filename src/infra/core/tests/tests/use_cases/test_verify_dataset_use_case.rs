@@ -15,8 +15,8 @@ use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetResult,
-    DatasetAction,
-    MockDatasetActionAuthorizer,
+    DatasetPermission,
+    MockDatasetPermissionChecker,
     ResolvedDataset,
 };
 use odf::metadata::testing::MetadataFactory;
@@ -29,8 +29,8 @@ async fn test_verify_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = VerifyUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Read,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Read,
             &dataset_id_foo,
             1,
             true,
@@ -58,9 +58,9 @@ async fn test_verify_multiple_success() {
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
     let harness = VerifyUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_authorize_for(DatasetAction::Read, &dataset_id_foo, 1, true)
-            .expect_authorize_for(DatasetAction::Read, &dataset_id_bar, 1, true),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Read, &dataset_id_foo, 1, true)
+            .expect_authorize_for(DatasetPermission::Read, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 
@@ -106,9 +106,9 @@ async fn test_verify_replay_denied_on_input_replays_nothing() {
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
     let harness = VerifyUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_authorize_for(DatasetAction::Read, &dataset_id_foo, 1, false)
-            .expect_authorize_for(DatasetAction::Read, &dataset_id_bar, 1, true),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Read, &dataset_id_foo, 1, false)
+            .expect_authorize_for(DatasetPermission::Read, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 
@@ -138,8 +138,8 @@ async fn test_verify_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = VerifyUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Read,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Read,
             &dataset_id_foo,
             1,
             false,
@@ -169,10 +169,10 @@ async fn test_verify_mixed_authorization_outcome() {
     let (_, dataset_id_baz) = odf::DatasetID::new_generated_ed25519();
 
     let harness = VerifyUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_authorize_for(DatasetAction::Read, &dataset_id_foo, 1, true)
-            .expect_authorize_for(DatasetAction::Read, &dataset_id_bar, 1, false)
-            .expect_authorize_for(DatasetAction::Read, &dataset_id_baz, 1, true),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Read, &dataset_id_foo, 1, true)
+            .expect_authorize_for(DatasetPermission::Read, &dataset_id_bar, 1, false)
+            .expect_authorize_for(DatasetPermission::Read, &dataset_id_baz, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo,
             dataset_id_bar,
@@ -233,12 +233,12 @@ struct VerifyUseCaseHarness {
 
 impl VerifyUseCaseHarness {
     fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 

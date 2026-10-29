@@ -12,7 +12,7 @@ use std::ops::Deref;
 
 use fallible_map::FallibleMapExt as _;
 use kamu_auth_rebac::AuthorizedAccount;
-use kamu_datasets::{DatasetAction, DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{DatasetPermission, DatasetRegistry, ResolvedDataset};
 use odf::dataset::MetadataChainExt as _;
 use tokio::sync::OnceCell;
 
@@ -26,7 +26,7 @@ pub(crate) struct DatasetRequestState {
     dataset_handle: odf::DatasetHandle,
     resolved_dataset: OnceCell<ResolvedDataset>,
     dataset_statistics: OnceCell<Box<kamu_datasets::DatasetStatistics>>,
-    allowed_dataset_actions: OnceCell<HashSet<DatasetAction>>,
+    granted_dataset_permissions: OnceCell<HashSet<DatasetPermission>>,
     authorized_accounts: OnceCell<Vec<AuthorizedAccount>>,
     archetype: OnceCell<Option<odf::schema::ext::DatasetArchetype>>,
 }
@@ -37,7 +37,7 @@ impl DatasetRequestState {
             dataset_handle,
             resolved_dataset: OnceCell::new(),
             dataset_statistics: OnceCell::new(),
-            allowed_dataset_actions: OnceCell::new(),
+            granted_dataset_permissions: OnceCell::new(),
             authorized_accounts: OnceCell::new(),
             archetype: OnceCell::new(),
         }
@@ -121,19 +121,19 @@ impl DatasetRequestState {
             .await
     }
 
-    pub(crate) async fn allowed_dataset_actions(
+    pub(crate) async fn granted_dataset_permissions(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<&HashSet<DatasetAction>> {
-        self.allowed_dataset_actions
+    ) -> Result<&HashSet<DatasetPermission>> {
+        self.granted_dataset_permissions
             .get_or_try_init(|| async {
-                use kamu_datasets::DatasetActionAuthorizerExt;
+                use kamu_datasets::DatasetPermissionCheckerExt;
 
-                let dataset_action_authorizer =
-                    from_catalog_n!(ctx, dyn kamu_datasets::DatasetActionAuthorizer);
+                let dataset_permission_checker =
+                    from_catalog_n!(ctx, dyn kamu_datasets::DatasetPermissionChecker);
 
-                let allowed_actions = dataset_action_authorizer
-                    .get_allowed_actions_for_exist_dataset(&self.dataset_handle.id)
+                let allowed_actions = dataset_permission_checker
+                    .get_granted_permissions_for_existing_dataset(&self.dataset_handle.id)
                     .await?;
 
                 Ok(allowed_actions)

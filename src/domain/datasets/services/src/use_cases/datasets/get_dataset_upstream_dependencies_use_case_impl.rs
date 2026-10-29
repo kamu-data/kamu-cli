@@ -22,7 +22,7 @@ use kamu_datasets::*;
 pub struct GetDatasetUpstreamDependenciesUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
@@ -62,8 +62,8 @@ impl GetDatasetUpstreamDependenciesUseCase for GetDatasetUpstreamDependenciesUse
             authorized_ids,
             unauthorized_ids_with_errors,
         } = self
-            .dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(&upstream_dependency_ids, DatasetAction::Read)
+            .dataset_permission_checker
+            .classify_dataset_ids_by_allowance(&upstream_dependency_ids, DatasetPermission::Read)
             .await?;
 
         upstream_dependencies.extend(unauthorized_ids_with_errors.into_iter().map(

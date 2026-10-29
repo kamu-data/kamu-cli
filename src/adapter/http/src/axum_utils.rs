@@ -10,7 +10,7 @@
 use dill::Catalog;
 use http_common::{ApiError, IntoApiError};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_datasets::DatasetAction;
+use kamu_datasets::DatasetPermission;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -97,13 +97,13 @@ pub(crate) fn body_into_async_read(body: axum::body::Body) -> impl tokio::io::As
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn get_dataset_action_for_request(
+pub(crate) fn get_dataset_permission_for_request(
     request: &http::Request<axum::body::Body>,
-) -> DatasetAction {
+) -> DatasetPermission {
     if !request.method().is_safe() || request.uri().path() == "/push" {
-        DatasetAction::Write
+        DatasetPermission::Write
     } else {
-        DatasetAction::Read
+        DatasetPermission::Read
     }
 }
 

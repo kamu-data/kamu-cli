@@ -21,7 +21,7 @@ use kamu_accounts::{
 
 // NOTE: If you need to extend this utility,
 //       please consider implementing it through OSO instead
-//       (similar to OsoDatasetAuthorizer).
+//       (similar to OsoDatasetPermissionChecker).
 
 #[cfg_attr(any(feature = "testing", test), mockall::automock)]
 #[async_trait::async_trait]

@@ -19,13 +19,13 @@ use kamu_datasets::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[component]
-#[interface(dyn DatasetActionAuthorizer)]
-pub struct OwnerByAliasDatasetActionAuthorizer {
+#[interface(dyn DatasetPermissionChecker)]
+pub struct OwnerByAliasDatasetPermissionChecker {
     maybe_owner: Arc<Option<odf::AccountName>>,
     dataset_registry: Arc<dyn DatasetRegistry>,
 }
 
-impl OwnerByAliasDatasetActionAuthorizer {
+impl OwnerByAliasDatasetPermissionChecker {
     fn owns_dataset_by_alias(&self, dataset_alias: &odf::DatasetAlias) -> bool {
         dataset_alias.account_name.as_ref() == (*self.maybe_owner).as_ref()
     }
@@ -43,7 +43,7 @@ impl OwnerByAliasDatasetActionAuthorizer {
     fn classify_response(
         allowed: Vec<odf::DatasetHandle>,
         not_allowed: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> ClassifyByAllowanceResponse {
         ClassifyByAllowanceResponse {
             authorized_handles: allowed,
@@ -53,9 +53,9 @@ impl OwnerByAliasDatasetActionAuthorizer {
                     let dataset_ref = dataset_handle.as_local_ref();
                     (
                         dataset_handle,
-                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                             dataset_ref,
-                            action,
+                            permission,
                         ),
                     )
                 })
@@ -65,44 +65,44 @@ impl OwnerByAliasDatasetActionAuthorizer {
 }
 
 #[async_trait::async_trait]
-impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
-    async fn check_action_allowed(
+impl DatasetPermissionChecker for OwnerByAliasDatasetPermissionChecker {
+    async fn check_permission(
         &self,
         dataset_id: &odf::DatasetID,
-        action: DatasetAction,
-    ) -> Result<(), DatasetActionUnauthorizedError> {
+        permission: DatasetPermission,
+    ) -> Result<(), DatasetPermissionError> {
         if self.owns_dataset_by_id(dataset_id).await? {
             Ok(())
         } else {
-            Err(DatasetActionUnauthorizedError::not_enough_permissions(
+            Err(DatasetPermissionError::not_enough_permissions(
                 dataset_id.as_local_ref(),
-                action,
+                permission,
             ))
         }
     }
 
-    async fn get_allowed_actions(
+    async fn get_granted_permissions(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError> {
-        let allowed_actions = if self.owns_dataset_by_id(dataset_id).await? {
+    ) -> Result<HashSet<DatasetPermission>, GetGrantedPermissionsError> {
+        let granted_permissions = if self.owns_dataset_by_id(dataset_id).await? {
             HashSet::from([
-                DatasetAction::Read,
-                DatasetAction::Write,
-                DatasetAction::Maintain,
-                DatasetAction::Own,
+                DatasetPermission::Read,
+                DatasetPermission::Write,
+                DatasetPermission::Maintain,
+                DatasetPermission::Own,
             ])
         } else {
             HashSet::new()
         };
 
-        Ok(allowed_actions)
+        Ok(granted_permissions)
     }
 
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        _action: DatasetAction,
+        _permission: DatasetPermission,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
         Ok(dataset_handles
             .into_iter()
@@ -113,33 +113,33 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         let (allowed, not_allowed): (Vec<_>, Vec<_>) = dataset_handles
             .into_iter()
             .partition(|dataset_handle| self.owns_dataset_by_alias(&dataset_handle.alias));
 
-        Ok(Self::classify_response(allowed, not_allowed, action))
+        Ok(Self::classify_response(allowed, not_allowed, permission))
     }
 
     async fn classify_dataset_handles_by_allowance_for(
         &self,
         principal: &CurrentAccountSubject,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         let (allowed, not_allowed): (Vec<_>, Vec<_>) =
             dataset_handles.into_iter().partition(|dataset_handle| {
                 dataset_handle.alias.account_name.as_ref() == principal.maybe_account_name()
             });
 
-        Ok(Self::classify_response(allowed, not_allowed, action))
+        Ok(Self::classify_response(allowed, not_allowed, permission))
     }
 
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         let mut allowed = Vec::new();
         let mut not_allowed = Vec::new();
@@ -148,11 +148,10 @@ impl DatasetActionAuthorizer for OwnerByAliasDatasetActionAuthorizer {
             if self.owns_dataset_by_id(dataset_id).await? {
                 allowed.push(dataset_id.as_ref().clone());
             } else {
-                let error =
-                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
-                        dataset_id.as_local_ref(),
-                        action,
-                    );
+                let error = ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
+                    dataset_id.as_local_ref(),
+                    permission,
+                );
 
                 not_allowed.push((dataset_id.as_ref().clone(), error));
             }

@@ -16,7 +16,7 @@ use kamu::testing::DatasetDataHelper;
 use kamu::*;
 use kamu_adapter_http::platform::UploadServiceLocal;
 use kamu_datasets::CreateDatasetResult;
-use kamu_datasets_services::DatasetOperationAuthorizerImpl;
+use kamu_datasets_services::DatasetOperationGuardImpl;
 use serde_json::json;
 use url::Url;
 use uuid::Uuid;
@@ -665,7 +665,7 @@ impl DataIngestHarness {
             .add::<EngineProvisionerNull>()
             .add::<UploadServiceLocal>()
             .add::<PushIngestDataUseCaseImpl>()
-            .add::<DatasetOperationAuthorizerImpl>()
+            .add::<DatasetOperationGuardImpl>()
             .add_value(FileUploadLimitConfig::new_in_bytes(1000))
             .build();
 

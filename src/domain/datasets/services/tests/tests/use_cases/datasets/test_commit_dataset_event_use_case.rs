@@ -16,9 +16,9 @@ use kamu_core::MockDidGenerator;
 use kamu_datasets::{
     CommitDatasetEventUseCase,
     CreateDatasetResult,
-    DatasetAction,
+    DatasetPermission,
     DatasetReferenceRepository,
-    MockDatasetActionAuthorizer,
+    MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::CommitDatasetEventUseCaseImpl;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
@@ -38,11 +38,11 @@ async fn test_commit_dataset_event() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
+    let mock_permission_checker =
+        MockDatasetPermissionChecker::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
 
     let harness = CommitDatasetEventUseCaseHarness::new(
-        mock_authorizer,
+        mock_permission_checker,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo.clone()]),
     )
     .await;
@@ -99,11 +99,11 @@ async fn test_commit_event_unauthorized() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false);
+    let mock_permission_checker =
+        MockDatasetPermissionChecker::new().expect_check_write_dataset(&dataset_id_foo, 1, false);
 
     let harness = CommitDatasetEventUseCaseHarness::new(
-        mock_authorizer,
+        mock_permission_checker,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     )
     .await;
@@ -133,16 +133,16 @@ async fn test_commit_event_with_same_dependencies() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
-    let mock_authorizer = MockDatasetActionAuthorizer::new()
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
         .expect_check_write_dataset(&dataset_id_bar, 1, true)
         .make_expect_classify_datasets_by_allowance(
-            DatasetAction::Read,
+            DatasetPermission::Read,
             1,
             HashSet::from([alias_foo.clone()]),
         );
 
     let harness = CommitDatasetEventUseCaseHarness::new(
-        mock_authorizer,
+        mock_permission_checker,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar.clone()]),
     )
     .await;
@@ -218,10 +218,10 @@ async fn test_commit_event_with_new_dependencies() {
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_id_baz) = odf::DatasetID::new_generated_ed25519();
 
-    let mock_authorizer = MockDatasetActionAuthorizer::allowing();
+    let mock_permission_checker = MockDatasetPermissionChecker::allowing();
 
     let harness = CommitDatasetEventUseCaseHarness::new(
-        mock_authorizer,
+        mock_permission_checker,
         MockDidGenerator::predefined_dataset_ids(vec![
             dataset_id_foo.clone(),
             dataset_id_bar.clone(),
@@ -309,11 +309,11 @@ async fn test_commit_dataset_event_head_moved_concurrently() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
-    let mock_authorizer =
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
+    let mock_permission_checker =
+        MockDatasetPermissionChecker::new().expect_check_write_dataset(&dataset_id_foo, 1, true);
 
     let harness = CommitDatasetEventUseCaseHarness::new(
-        mock_authorizer,
+        mock_permission_checker,
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     )
     .await;
@@ -360,7 +360,7 @@ struct CommitDatasetEventUseCaseHarness {
 
 impl CommitDatasetEventUseCaseHarness {
     async fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
         let dataset_base_use_case_harness =
@@ -370,7 +370,7 @@ impl CommitDatasetEventUseCaseHarness {
                         Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                     ),
                 ),
-                maybe_mock_dataset_action_authorizer: Some(mock_dataset_action_authorizer),
+                maybe_mock_dataset_permission_checker: Some(mock_dataset_permission_checker),
                 maybe_mock_did_generator: Some(mock_did_generator),
                 racing_head_committer: true,
                 ..DatasetBaseUseCaseHarnessOpts::default()

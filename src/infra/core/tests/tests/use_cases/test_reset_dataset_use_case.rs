@@ -12,7 +12,7 @@ use std::sync::Arc;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{DatasetAction, MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_matches;
@@ -25,8 +25,8 @@ async fn test_reset_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = ResetUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             true,
@@ -73,8 +73,8 @@ async fn test_try_reset_not_found_dataset() {
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
 
     let harness = ResetUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for_not_found(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for_not_found(
+            DatasetPermission::Maintain,
             &not_found_dataset_handle.id,
             1,
         ),
@@ -99,8 +99,8 @@ async fn test_reset_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = ResetUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             false,
@@ -129,12 +129,12 @@ struct ResetUseCaseHarness {
 
 impl ResetUseCaseHarness {
     fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 

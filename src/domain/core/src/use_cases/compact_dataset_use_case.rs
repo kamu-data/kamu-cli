@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::DatasetActionUnauthorizedError;
+use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
 use crate::{
@@ -87,9 +87,9 @@ pub enum CompactionError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DatasetActionUnauthorizedError> for CompactionError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
+impl From<DatasetPermissionError> for CompactionError {
+    fn from(v: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
 
         match v {
             E::NotFound(e) => Self::NotFound(e),

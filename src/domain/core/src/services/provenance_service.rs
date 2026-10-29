@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::DatasetActionUnauthorizedError;
+use kamu_datasets::DatasetPermissionError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,9 +105,9 @@ impl From<odf::DatasetRefUnresolvedError> for GetLineageError {
     }
 }
 
-impl From<DatasetActionUnauthorizedError> for GetLineageError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
+impl From<DatasetPermissionError> for GetLineageError {
+    fn from(v: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
 
         match v {
             E::NotFound(e) => Self::NotFound(e),

@@ -78,8 +78,8 @@ async fn test_all_downstream_dependencies_are_accessible() {
     //   │  bob/root-3  │
     //   └──────────────┘
     let harness = GetDatasetDownstreamDependenciesUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_dataset_ids_by_allowance(
-            DatasetAction::Read,
+        MockDatasetPermissionChecker::new().make_expect_classify_dataset_ids_by_allowance(
+            DatasetPermission::Read,
             1,
             // All
             [
@@ -190,9 +190,9 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
     //   │  bob/root-3  │
     //   └──────────────┘
     let harness = GetDatasetDownstreamDependenciesUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
+        MockDatasetPermissionChecker::new()
             .make_expect_classify_dataset_ids_by_allowance(
-                DatasetAction::Read,
+                DatasetPermission::Read,
                 2,
                 [
                     alice_root_1_dataset_handle.id.clone(),
@@ -281,7 +281,7 @@ async fn test_maintainer_counts_inaccessible_downstream_dependencies() {
 
     // No access check of the downstreams: a maintainer gets all of them
     let harness = GetDatasetDownstreamDependenciesUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(
+        MockDatasetPermissionChecker::new().expect_check_maintain_dataset(
             &alice_root_dataset_handle.id,
             1,
             true,
@@ -327,13 +327,13 @@ struct GetDatasetDownstreamDependenciesUseCaseHarness {
 
 impl GetDatasetDownstreamDependenciesUseCaseHarness {
     async fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         predefined_account: impl IntoIterator<Item = odf::AccountName>,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_tenancy_config(TenancyConfig::MultiTenant)
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
                 .without_outbox(),
         );
 
