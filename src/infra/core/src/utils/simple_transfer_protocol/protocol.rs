@@ -10,14 +10,9 @@
 use std::sync::Arc;
 
 use internal_error::ErrorIntoInternal;
+use kamu_core::utils::metadata_chain_comparator::ChainWithHead;
 use kamu_core::*;
-use odf::dataset::{
-    MetadataChainExt as _,
-    MetadataChainImpl,
-    MetadataChainReferenceRepositoryImpl,
-};
-use odf::storage::inmem::{NamedObjectRepositoryInMemory, ObjectRepositoryInMemory};
-use odf::storage::{MetadataBlockRepositoryImpl, ReferenceRepositoryImpl};
+use odf::dataset::MetadataChainExt as _;
 
 use super::progress::CompareChainsListenerAdapter;
 use crate::utils::local_sync_writes::*;
@@ -84,8 +79,10 @@ impl SimpleTransferProtocol {
         let Some((src_head, blocks_desc_ordered)) = Self::collect_new_blocks(
             src_ref,
             src.as_metadata_chain(),
-            dst.as_metadata_chain(),
-            dst_head.as_ref(),
+            dst_head.as_ref().map(|head| ChainWithHead {
+                chain: dst.as_metadata_chain(),
+                head,
+            }),
             force,
             &listener_adapter,
         )
@@ -146,27 +143,23 @@ impl SimpleTransferProtocol {
         transfer_options: SimpleProtocolTransferOptions,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncTransfer, SyncError> {
-        let empty_chain = MetadataChainImpl::new(
-            MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
-            MetadataChainReferenceRepositoryImpl::new(ReferenceRepositoryImpl::new(
-                NamedObjectRepositoryInMemory::new(),
-            )),
-        );
-
-        let (dst_chain, dst_head) = match dst {
+        let dst_chain = match dst {
             LocalSyncTarget::Existing {
                 dataset,
                 expected_head,
-            } => (dataset.as_metadata_chain(), expected_head.as_ref()),
-            LocalSyncTarget::New(_) => (&empty_chain as &dyn odf::MetadataChain, None),
+            } => expected_head.as_ref().map(|head| ChainWithHead {
+                chain: dataset.as_metadata_chain(),
+                head,
+            }),
+            LocalSyncTarget::New(_) => None,
         };
+        let dst_head = dst_chain.map(|dst| dst.head);
 
         let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
         let Some((src_head, mut blocks_desc_ordered)) = Self::collect_new_blocks(
             src_ref,
             src.as_metadata_chain(),
             dst_chain,
-            dst_head,
             force,
             &listener_adapter,
         )

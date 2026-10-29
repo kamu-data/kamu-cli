@@ -228,7 +228,9 @@ sequenceDiagram
 ```
 
 1. **Heads and comparison.** `MetadataChainComparator::compare_chains` walks both chains and
-   returns `Equal`, `LhsAhead` (the blocks to copy), `LhsBehind` or `Divergence`. Without `force`,
+   returns `Equal`, `LhsAhead` (the blocks to copy), `LhsBehind` or `Divergence`. A destination
+   with no blocks yet, such as a dataset to create, is passed as no chain, so the whole source chain
+   is ahead. Without `force`,
    behind is `DestinationAhead` and divergence is `DatasetsDiverged`. With `force`, the whole
    source chain, `Seed` included, is appended onto the destination; this protocol does not compare
    the two `Seed` blocks.

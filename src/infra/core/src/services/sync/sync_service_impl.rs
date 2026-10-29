@@ -242,8 +242,10 @@ impl SyncServiceImpl {
                             let chains_comparison = MetadataChainComparator::compare_chains(
                                 src_dataset.as_metadata_chain(),
                                 &src_head,
-                                dst_dataset.as_metadata_chain(),
-                                Some(&dst_head),
+                                Some(ChainWithHead {
+                                    chain: dst_dataset.as_metadata_chain(),
+                                    head: &dst_head,
+                                }),
                                 &NullCompareChainsListener,
                             )
                             .await?;

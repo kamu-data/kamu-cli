@@ -19,12 +19,12 @@ use super::protocol::SimpleTransferProtocol;
 
 impl SimpleTransferProtocol {
     /// Compares the chains and returns the source head with the blocks to
-    /// write, newest first, or `None` when the destination is up to date
+    /// write, newest first, or `None` when the destination is up to date. `dst`
+    /// is the destination chain with its head, or `None` when it has no blocks
     pub(super) async fn collect_new_blocks(
         src_ref: &odf::DatasetRefAny,
         src_chain: &dyn odf::MetadataChain,
-        dst_chain: &dyn odf::MetadataChain,
-        dst_head: Option<&odf::Multihash>,
+        dst: Option<ChainWithHead<'_>>,
         force: bool,
         listener_adapter: &CompareChainsListenerAdapter,
     ) -> Result<
@@ -35,17 +35,13 @@ impl SimpleTransferProtocol {
         SyncError,
     > {
         let src_head = Self::get_src_head(src_ref, src_chain).await?;
+        let dst_head = dst.map(|dst| dst.head);
 
         tracing::info!(?src_head, ?dst_head, "Resolved heads");
 
-        let chains_comparison = MetadataChainComparator::compare_chains(
-            src_chain,
-            &src_head,
-            dst_chain,
-            dst_head,
-            listener_adapter,
-        )
-        .await?;
+        let chains_comparison =
+            MetadataChainComparator::compare_chains(src_chain, &src_head, dst, listener_adapter)
+                .await?;
 
         let blocks_desc_ordered = match chains_comparison {
             CompareChainsResult::Equal => return Ok(None),
