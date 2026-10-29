@@ -44,7 +44,7 @@ pub trait PollingIngestService: Send + Sync {
         env_vars: &IngestEnvVars,
         operation_id: &str,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResponse, PollingIngestError>;
+    ) -> Result<PollingIngestResult, PollingIngestError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,15 +79,7 @@ impl Default for SchemaInferenceOpts {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct PollingIngestResponse {
-    pub result: PollingIngestResult,
-    /// Writer state after the new blocks, to plan the next iteration from
-    /// once `HEAD` is committed. Present when the result is `Updated`.
-    pub metadata_state: Option<Box<DataWriterMetadataState>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum PollingIngestResult {
     UpToDate {
         /// The source has data but no source state, and fetching uncacheable
@@ -104,6 +96,9 @@ pub enum PollingIngestResult {
         increment: odf::dataset::MetadataChainIncrementInterval,
         /// Source state recorded by the new blocks
         new_source_state: Option<odf::metadata::SourceState>,
+        /// Writer state after the new blocks, to plan the next iteration from
+        /// once `HEAD` is committed
+        metadata_state: Box<DataWriterMetadataState>,
     },
 }
 

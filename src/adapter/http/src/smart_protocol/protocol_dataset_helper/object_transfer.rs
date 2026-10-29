@@ -23,6 +23,56 @@ use crate::{BearerHeader, OdfSmtpVersion};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// How the client transfers one object, as the server prepares it for each
+/// object the client asks for
+#[async_trait::async_trait]
+pub trait ObjectTransferStrategy: Sized + Send {
+    async fn prepare(
+        dataset: &dyn odf::Dataset,
+        object_file_ref: &ObjectFileReference,
+        dataset_url: &Url,
+        maybe_bearer_header: Option<&BearerHeader>,
+    ) -> Result<Self, InternalError>;
+}
+
+#[async_trait::async_trait]
+impl ObjectTransferStrategy for PullObjectTransferStrategy {
+    async fn prepare(
+        dataset: &dyn odf::Dataset,
+        object_file_ref: &ObjectFileReference,
+        dataset_url: &Url,
+        maybe_bearer_header: Option<&BearerHeader>,
+    ) -> Result<Self, InternalError> {
+        prepare_pull_object_transfer_strategy(
+            dataset,
+            object_file_ref,
+            dataset_url,
+            maybe_bearer_header,
+        )
+        .await
+    }
+}
+
+#[async_trait::async_trait]
+impl ObjectTransferStrategy for PushObjectTransferStrategy {
+    async fn prepare(
+        dataset: &dyn odf::Dataset,
+        object_file_ref: &ObjectFileReference,
+        dataset_url: &Url,
+        maybe_bearer_header: Option<&BearerHeader>,
+    ) -> Result<Self, InternalError> {
+        prepare_push_object_transfer_strategy(
+            dataset,
+            object_file_ref,
+            dataset_url,
+            maybe_bearer_header,
+        )
+        .await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn prepare_pull_object_transfer_strategy(
     dataset: &dyn odf::Dataset,
     object_file_ref: &ObjectFileReference,

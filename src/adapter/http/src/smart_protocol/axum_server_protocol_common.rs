@@ -7,10 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+use std::time::Duration;
+
 use axum::extract::ws::{CloseFrame, Message};
+use database_common::DatabaseTransactionRunner;
+use dill::Catalog;
+use internal_error::InternalError;
+use kamu_datasets::DatasetRegistry;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
+use url::Url;
 
+use super::error_close::ErrorReplyClose;
+use super::messages::ObjectFileReference;
+use super::protocol_dataset_helper::ObjectTransferStrategy;
+use crate::BearerHeader;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,30 +61,28 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn axum_write_close_payload<TMessagePayload: Serialize>(
+/// Ends the session with an error reply in the close frame
+pub(crate) async fn axum_write_error_close(
     socket: &mut axum::extract::ws::WebSocket,
-    payload: TMessagePayload,
+    close: Result<ErrorReplyClose, WriteMessageError>,
 ) {
-    let payload_as_json_string = match ws_common::payload_to_json::<TMessagePayload>(payload) {
-        Ok(payload) => payload,
+    let ErrorReplyClose { code, reason } = match close {
+        Ok(close) => close,
         Err(err) => {
             tracing::error!(
               error = ?err,
               error_msg = %err,
-              "Failed to parse error message",
+              "Failed to serialize the error reply",
             );
             return;
         }
     };
-    let close_frame = CloseFrame {
-        // Code will be mapped CloseCode::Error type on client side
-        code: 1011,
-        reason: payload_as_json_string.into(),
-    };
 
-    let message = axum::extract::ws::Message::Close(Some(close_frame));
-    let send_result = socket.send(message).await;
-    if let Err(err) = send_result {
+    let message = Message::Close(Some(CloseFrame {
+        code,
+        reason: reason.into(),
+    }));
+    if let Err(err) = socket.send(message).await {
         tracing::error!(
           error = ?err,
           error_msg = %err,
@@ -101,7 +111,20 @@ pub(crate) async fn axum_write_error_message<TMessagePayload: Serialize>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn wait_for_close(socket: &mut axum::extract::ws::WebSocket) {
+/// Waits for the client to close the session after the server's last reply.
+/// A client that never closes is given a few seconds
+pub(crate) async fn axum_await_client_close(socket: &mut axum::extract::ws::WebSocket) {
+    const CLIENT_CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+
+    if tokio::time::timeout(CLIENT_CLOSE_TIMEOUT, wait_for_close(socket))
+        .await
+        .is_err()
+    {
+        tracing::debug!("Timeout reached, closing connection");
+    }
+}
+
+async fn wait_for_close(socket: &mut axum::extract::ws::WebSocket) {
     while let Some(msg) = socket.recv().await {
         match msg {
             Ok(Message::Close(_)) | Err(_) => {
@@ -111,3 +134,42 @@ pub(crate) async fn wait_for_close(socket: &mut axum::extract::ws::WebSocket) {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// One transfer strategy per object a client asks for, read from the dataset
+/// in a transaction of its own
+pub(crate) async fn prepare_object_transfer_strategies<
+    TStrategy: ObjectTransferStrategy + 'static,
+>(
+    catalog: &Catalog,
+    dataset_handle: odf::DatasetHandle,
+    object_files: Vec<ObjectFileReference>,
+    dataset_url: Url,
+    maybe_bearer_header: Option<BearerHeader>,
+) -> Result<Vec<TStrategy>, InternalError> {
+    DatabaseTransactionRunner::new(catalog.clone())
+        .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
+            let resolved_dataset = dataset_registry
+                .get_dataset_by_handle(&dataset_handle)
+                .await;
+
+            let mut object_transfer_strategies = Vec::with_capacity(object_files.len());
+            for object_file_ref in &object_files {
+                object_transfer_strategies.push(
+                    TStrategy::prepare(
+                        resolved_dataset.as_ref(),
+                        object_file_ref,
+                        &dataset_url,
+                        maybe_bearer_header.as_ref(),
+                    )
+                    .await?,
+                );
+            }
+
+            Ok(object_transfer_strategies)
+        })
+        .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

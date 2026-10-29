@@ -8,15 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_datasets::DatasetRegistry;
 use tracing::Instrument;
 use url::Url;
 
+use super::error_close::ErrorReplyClose;
 use super::errors::*;
 use super::messages::*;
 use super::phases::*;
@@ -58,12 +58,9 @@ impl AxumServerPullProtocolInstance {
                 tracing::debug!("Pull process success");
             }
             Err(ref e @ PullServerError::Internal(ref int_err)) => {
-                axum_write_close_payload::<DatasetPullResponse>(
+                axum_write_error_close(
                     &mut self.socket,
-                    Err(DatasetPullRequestError::Internal(TransferInternalError {
-                        phase: int_err.phase.clone(),
-                        error_message: "Internal error".to_string(),
-                    })),
+                    ErrorReplyClose::internal(int_err.phase.clone()),
                 )
                 .await;
 
@@ -85,17 +82,7 @@ impl AxumServerPullProtocolInstance {
             ),
         }
 
-        // After we finish processing to ensure graceful closing
-        // we wait for client acknowledgment. And to handle
-        // custom clients without logic of close acknowledgment
-        // we will give 5 secs timeout
-        let timeout_duration = Duration::from_secs(5);
-        if tokio::time::timeout(timeout_duration, wait_for_close(&mut self.socket))
-            .await
-            .is_err()
-        {
-            tracing::debug!("Timeout reached, closing connection");
-        }
+        axum_await_client_close(&mut self.socket).await;
     }
 
     async fn pull_main_flow(&mut self) -> Result<(), PullServerError> {
@@ -295,39 +282,19 @@ impl AxumServerPullProtocolInstance {
                     "Pull client sent a pull objects request"
                 );
 
-                let dataset_handle = self.dataset_handle.clone();
-                let dataset_url = self.dataset_url.clone();
-                let maybe_bearer_header = self.maybe_bearer_header.clone();
-
-                let object_transfer_strategies: Vec<PullObjectTransferStrategy> =
-                    DatabaseTransactionRunner::new(self.catalog.clone())
-                        .transactional_with(
-                            |dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                                let resolved_dataset = dataset_registry
-                                    .get_dataset_by_handle(&dataset_handle)
-                                    .await;
-
-                                let mut object_transfer_strategies = Vec::new();
-                                for r in request.object_files {
-                                    let transfer_strategy = prepare_pull_object_transfer_strategy(
-                                        resolved_dataset.as_ref(),
-                                        &r,
-                                        &dataset_url,
-                                        maybe_bearer_header.as_ref(),
-                                    )
-                                    .await?;
-
-                                    object_transfer_strategies.push(transfer_strategy);
-                                }
-
-                                Ok::<_, InternalError>(object_transfer_strategies)
-                            },
-                        )
-                        .instrument(tracing::debug_span!(
-                            "AxumServerPullProtocolInstance::try_handle_pull_objects_request",
-                        ))
-                        .await
-                        .protocol_int_err(PullPhase::ObjectsRequest)?;
+                let object_transfer_strategies =
+                    prepare_object_transfer_strategies::<PullObjectTransferStrategy>(
+                        &self.catalog,
+                        self.dataset_handle.clone(),
+                        request.object_files,
+                        self.dataset_url.clone(),
+                        self.maybe_bearer_header.clone(),
+                    )
+                    .instrument(tracing::debug_span!(
+                        "AxumServerPullProtocolInstance::try_handle_pull_objects_request",
+                    ))
+                    .await
+                    .protocol_int_err(PullPhase::ObjectsRequest)?;
 
                 tracing::debug!("Object transfer strategies defined");
 

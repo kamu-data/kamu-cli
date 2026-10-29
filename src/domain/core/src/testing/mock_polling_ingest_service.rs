@@ -8,12 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::ReportedHeads;
-use crate::{
-    MockPollingIngestService,
-    PollingIngestError,
-    PollingIngestResponse,
-    PollingIngestResult,
-};
+use crate::{MockPollingIngestService, PollingIngestError, PollingIngestResult};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,12 +17,7 @@ impl MockPollingIngestService {
         self.expect_ingest()
             .withf(move |target, _, _, _, _, _| target.get_alias() == &dataset_alias)
             .times(1)
-            .returning(|_, _, _, _, _, _| {
-                Ok(PollingIngestResponse {
-                    result: PollingIngestResult::UpToDate { uncacheable: false },
-                    metadata_state: None,
-                })
-            });
+            .returning(|_, _, _, _, _, _| Ok(PollingIngestResult::UpToDate { uncacheable: false }));
         self
     }
 
@@ -43,20 +33,18 @@ impl MockPollingIngestService {
             .times(1)
             .returning(move |_, plan, _, _, _, _| {
                 let (old_head, new_head) = heads.get();
-                Ok(PollingIngestResponse {
-                    result: PollingIngestResult::Updated {
-                        old_head,
-                        new_head,
-                        has_more: false,
-                        uncacheable: false,
-                        increment: odf::dataset::MetadataChainIncrementInterval {
-                            num_blocks: 1,
-                            num_records: 0,
-                            updated_watermark: None,
-                        },
-                        new_source_state: None,
+                Ok(PollingIngestResult::Updated {
+                    old_head,
+                    new_head,
+                    has_more: false,
+                    uncacheable: false,
+                    increment: odf::dataset::MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 0,
+                        updated_watermark: None,
                     },
-                    metadata_state: Some(plan.into_metadata_state()),
+                    new_source_state: None,
+                    metadata_state: plan.into_metadata_state(),
                 })
             });
         self
@@ -76,12 +64,7 @@ impl MockPollingIngestService {
                     && options.fetch_uncacheable == fetch_uncacheable
             })
             .times(1)
-            .returning(move |_, _, _, _, _, _| {
-                Ok(PollingIngestResponse {
-                    result: PollingIngestResult::UpToDate { uncacheable },
-                    metadata_state: None,
-                })
-            });
+            .returning(move |_, _, _, _, _, _| Ok(PollingIngestResult::UpToDate { uncacheable }));
         self
     }
 
@@ -105,26 +88,23 @@ impl MockPollingIngestService {
                         num_records,
                     } => {
                         let (old_head, new_head) = heads.get();
-                        Ok(PollingIngestResponse {
-                            result: PollingIngestResult::Updated {
-                                old_head,
-                                new_head,
-                                has_more: *has_more,
-                                uncacheable: false,
-                                increment: odf::dataset::MetadataChainIncrementInterval {
-                                    num_blocks: 1,
-                                    num_records: *num_records,
-                                    updated_watermark: None,
-                                },
-                                new_source_state: None,
+                        Ok(PollingIngestResult::Updated {
+                            old_head,
+                            new_head,
+                            has_more: *has_more,
+                            uncacheable: false,
+                            increment: odf::dataset::MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: *num_records,
+                                updated_watermark: None,
                             },
-                            metadata_state: Some(plan.into_metadata_state()),
+                            new_source_state: None,
+                            metadata_state: plan.into_metadata_state(),
                         })
                     }
-                    MockIngestIteration::UpToDate => Ok(PollingIngestResponse {
-                        result: PollingIngestResult::UpToDate { uncacheable: false },
-                        metadata_state: None,
-                    }),
+                    MockIngestIteration::UpToDate => {
+                        Ok(PollingIngestResult::UpToDate { uncacheable: false })
+                    }
                     MockIngestIteration::Unreachable => {
                         Err(PollingIngestError::unreachable("http://example.com", None))
                     }
