@@ -20,24 +20,33 @@ use crate::*;
 
 pub struct MetadataChainComparator {}
 
+/// A chain to compare, ending at `head`
+#[derive(Clone, Copy)]
+pub struct ChainWithHead<'a> {
+    pub chain: &'a dyn odf::MetadataChain,
+    pub head: &'a odf::Multihash,
+}
+
 // TODO: This comparator explores the chains eagerly and may not be optimal for
 // really long chains. We should explore alternatives such as:
 // - making comparator streaming
 // - adding `MetadataChain::nth_block(head, sequence_number)` function that can skip through long
 //   chains faster
 impl MetadataChainComparator {
+    /// Compares the chain ending at `lhs_head` with the chain `rhs` ending at
+    /// its head. `rhs` is `None` when that chain has no blocks yet, so the
+    /// whole `lhs` chain is ahead
     pub async fn compare_chains(
         lhs_chain: &dyn odf::MetadataChain,
         lhs_head: &odf::Multihash,
-        rhs_chain: &dyn odf::MetadataChain,
-        rhs_head: Option<&odf::Multihash>,
+        rhs: Option<ChainWithHead<'_>>,
         listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
         use odf::MetadataChain;
 
         // When source and destination point to the same block, chains are equal, no
         // further scanning required
-        if Some(&lhs_head) == rhs_head.as_ref() {
+        if rhs.is_some_and(|rhs| rhs.head == lhs_head) {
             return Ok(CompareChainsResult::Equal);
         }
 
@@ -50,21 +59,15 @@ impl MetadataChainComparator {
                 listener.on_lhs_read(n);
             },
         );
-        let rhs_chain = MetadataChainWithStats::new(
-            rhs_chain,
-            |n| {
-                listener.on_rhs_expected_reads(n);
-            },
-            |n| {
-                listener.on_rhs_read(n);
-            },
-        );
-
         // Extract sequence numbers of head blocks
         lhs_chain.expecting_to_read_blocks(1);
         let lhs_sequence_number = lhs_chain.get_block(lhs_head).await?.sequence_number;
 
-        let Some(rhs_head) = rhs_head else {
+        let Some(ChainWithHead {
+            chain: rhs_chain,
+            head: rhs_head,
+        }) = rhs
+        else {
             // LHS chain is unconditionally ahead - simply return all of its blocks
             lhs_chain.expecting_to_read_blocks(lhs_sequence_number + 1);
             return Ok(CompareChainsResult::LhsAhead {
@@ -74,6 +77,16 @@ impl MetadataChainComparator {
                     .await?,
             });
         };
+
+        let rhs_chain = MetadataChainWithStats::new(
+            rhs_chain,
+            |n| {
+                listener.on_rhs_expected_reads(n);
+            },
+            |n| {
+                listener.on_rhs_read(n);
+            },
+        );
 
         rhs_chain.expecting_to_read_blocks(1);
         let rhs_sequence_number = rhs_chain.get_block(rhs_head).await?.sequence_number;
