@@ -13,6 +13,8 @@ use futures::TryStreamExt;
 use headers::Header as _;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
+use tokio_util::io::ReaderStream;
 use url::Url;
 
 use crate::smart_protocol::errors::{ObjectDownloadError, ObjectUploadError};
@@ -251,7 +253,6 @@ pub async fn dataset_import_object_file(
 
     let stream = response.bytes_stream();
 
-    use tokio_util::compat::FuturesAsyncReadCompatExt;
     let reader = stream
         .map_err(std::io::Error::other)
         .into_async_read()
@@ -329,7 +330,6 @@ pub async fn dataset_export_object_file(
         .await
         .int_err()?;
 
-    use tokio_util::io::ReaderStream;
     let reader_stream = ReaderStream::new(stream);
 
     let client = reqwest::Client::new();

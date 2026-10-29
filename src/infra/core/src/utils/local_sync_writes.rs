@@ -13,6 +13,7 @@ use database_common::DatabaseTransactionRunner;
 use internal_error::ErrorIntoInternal;
 use kamu_core::{CorruptedSourceError, LocalSyncTarget, SyncError, TransferredSyncTarget};
 use odf::dataset::MetadataChainExt as _;
+use odf::metadata::AsTypedBlock;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,8 +34,6 @@ impl StoredSeed {
         catalog: &dill::Catalog,
         (seed_hash, seed, seed_block_bytes): odf::dataset::HashedMetadataBlockBytesDecoded,
     ) -> Result<Self, SyncError> {
-        use odf::metadata::AsTypedBlock;
-
         let seed_block = seed.into_typed().ok_or_else(|| CorruptedSourceError {
             message: "First metadata block is not Seed".to_owned(),
             source: None,
@@ -154,12 +153,12 @@ pub(crate) fn map_append_batch_error(
         block_hash,
     }: odf::dataset::AppendBatchError,
 ) -> SyncError {
-    use odf::dataset::{AppendError, AppendValidationError};
+    use odf::dataset::{AppendError as E, AppendValidationError as V};
 
     match append_error {
-        AppendError::InvalidBlock(append_validation_error) => {
+        E::InvalidBlock(append_validation_error) => {
             let message = match &append_validation_error {
-                AppendValidationError::HashMismatch(e) => {
+                V::HashMismatch(e) => {
                     format!(
                         "Block hash declared by the source {} didn't match the computed {} at \
                          block {block_sequence_number} - this may be an indication of hashing \
@@ -167,15 +166,15 @@ pub(crate) fn map_append_batch_error(
                         e.actual, e.expected
                     )
                 }
-                AppendValidationError::FirstBlockMustBeSeed
-                | AppendValidationError::AppendingSeedBlockToNonEmptyChain
-                | AppendValidationError::PrevBlockNotFound(_)
-                | AppendValidationError::SequenceIntegrity(_)
-                | AppendValidationError::SystemTimeIsNotMonotonic
-                | AppendValidationError::WatermarkIsNotMonotonic
-                | AppendValidationError::OffsetsAreNotSequential(_)
-                | AppendValidationError::InvalidEvent(_)
-                | AppendValidationError::NoOpEvent(_) => format!(
+                V::FirstBlockMustBeSeed
+                | V::AppendingSeedBlockToNonEmptyChain
+                | V::PrevBlockNotFound(_)
+                | V::SequenceIntegrity(_)
+                | V::SystemTimeIsNotMonotonic
+                | V::WatermarkIsNotMonotonic
+                | V::OffsetsAreNotSequential(_)
+                | V::InvalidEvent(_)
+                | V::NoOpEvent(_) => format!(
                     "Source metadata chain is logically inconsistent at block \
                      {block_hash}[{block_sequence_number}]"
                 ),
@@ -188,9 +187,9 @@ pub(crate) fn map_append_batch_error(
             .into()
         }
         // A batch is appended without moving a reference
-        AppendError::RefNotFound(_) | AppendError::RefCASFailed(_) => unreachable!(),
-        AppendError::Access(e) => SyncError::Access(e),
-        e @ AppendError::Internal(_) => SyncError::Internal(e.int_err()),
+        E::RefNotFound(_) | E::RefCASFailed(_) => unreachable!(),
+        E::Access(e) => SyncError::Access(e),
+        e @ E::Internal(_) => SyncError::Internal(e.int_err()),
     }
 }
 

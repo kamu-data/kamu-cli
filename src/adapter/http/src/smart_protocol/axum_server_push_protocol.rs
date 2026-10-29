@@ -30,6 +30,7 @@ use kamu_datasets::{
 };
 use messaging_outbox::{Outbox, OutboxExt};
 use odf::Multihash;
+use odf::metadata::AsTypedBlock as _;
 use tracing::Instrument;
 use url::Url;
 
@@ -227,7 +228,6 @@ impl AxumServerPushProtocolInstance {
                     .alias()
                     .expect("The upgrade handler rejects a push of an unknown dataset by ID");
 
-                use odf::metadata::AsTypedBlock as _;
                 let (first_block_hash, first_block, first_block_bytes) =
                     new_blocks.pop_front().unwrap();
                 let seed_block = first_block

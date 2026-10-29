@@ -245,6 +245,23 @@ async fn test_pull_from_unknown_repository_fails_in_transfer_unrecoverably() {
     assert_matches!(result, Err(e @ SyncError::RepositoryNotFound(_)) if !e.is_recoverable());
 }
 
+#[test_log::test(tokio::test)]
+async fn test_pull_of_remote_by_id_fails_unrecoverably() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+
+    let result = harness
+        .pull_from(odf::DatasetRefRemote::ID(
+            None,
+            odf::DatasetID::new_seeded_ed25519(b"foo"),
+        ))
+        .await;
+
+    assert_matches!(result, Err(e @ SyncError::RemoteByIdUnsupported(_)) if !e.is_recoverable());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

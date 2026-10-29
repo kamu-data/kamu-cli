@@ -9,6 +9,7 @@
 
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
+use odf::dataset::MetadataChainExt;
 use url::Url;
 
 use super::WsSmartTransferProtocolClient;
@@ -40,7 +41,6 @@ impl WsSmartTransferProtocolClient {
         src: &dyn odf::Dataset,
         http_dst_url: &Url,
     ) -> Option<DatasetIdMismatchError> {
-        use odf::dataset::MetadataChainExt;
         let src_dataset_id = match src
             .as_metadata_chain()
             .accept_one(odf::dataset::SearchSeedVisitor::new())

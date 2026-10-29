@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ResultIntoInternal;
 use kamu_core::*;
 use url::Url;
 
@@ -67,9 +67,10 @@ impl RemoteDatasetUrlResolver for RemoteDatasetUrlResolverImpl {
         match remote_ref {
             // TODO: the reference can be resolved if using ODF protocol.
             // However, it is still difficult with simple folder repositories without index.
-            odf::DatasetRefRemote::ID(_, _) => Err(ResolveRemoteSourceError::Internal(
-                "Syncing remote dataset by ID is not yet supported".int_err(),
-            )),
+            odf::DatasetRefRemote::ID(_, _) => Err(RemoteDatasetByIdUnsupportedError {
+                remote_ref: remote_ref.clone(),
+            }
+            .into()),
             odf::DatasetRefRemote::Url(url) => {
                 let mut dataset_url = url.as_ref().clone();
                 dataset_url.ensure_trailing_slash();

@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 use kamu_core::*;
 use kamu_datasets::DependencyGraphService;
+use tokio_stream::StreamExt;
 
 use super::pull_item::{PullItem, PullItemJob};
 use super::pull_target_resolution::{PullTarget, PullTargetResolver};
@@ -124,7 +125,6 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
         // ones?
         let mut max_dep_depth = -1;
 
-        use tokio_stream::StreamExt;
         let upstream_dependencies = self
             .dependency_graph_service
             .get_upstream_dependencies(dataset_id)

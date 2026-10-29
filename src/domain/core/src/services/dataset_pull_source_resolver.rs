@@ -95,8 +95,21 @@ pub enum FindPullAliasError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A remote dataset named only by its ID: a repository cannot be searched
+/// for it, so there is no URL to sync from
+#[derive(Debug, Error)]
+#[error("Syncing remote dataset by ID is not yet supported: {remote_ref}")]
+pub struct RemoteDatasetByIdUnsupportedError {
+    pub remote_ref: odf::DatasetRefRemote,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 pub enum ResolveRemoteSourceError {
+    #[error(transparent)]
+    ByIdUnsupported(#[from] RemoteDatasetByIdUnsupportedError),
+
     #[error(transparent)]
     RepositoryNotFound(
         #[from]
@@ -124,6 +137,7 @@ impl From<GetRepoError> for ResolveRemoteSourceError {
 impl From<ResolveRemoteSourceError> for SyncError {
     fn from(value: ResolveRemoteSourceError) -> Self {
         match value {
+            ResolveRemoteSourceError::ByIdUnsupported(e) => Self::RemoteByIdUnsupported(e),
             ResolveRemoteSourceError::RepositoryNotFound(e) => Self::RepositoryNotFound(e),
             ResolveRemoteSourceError::Internal(e) => Self::Internal(e),
         }
@@ -136,6 +150,9 @@ impl From<ResolveRemoteSourceError> for SyncError {
 pub enum ResolvePullSourceError {
     #[error(transparent)]
     AmbiguousSource(#[from] AmbiguousPullSourceError),
+
+    #[error(transparent)]
+    ByIdUnsupported(#[from] RemoteDatasetByIdUnsupportedError),
 
     #[error(transparent)]
     RepositoryNotFound(
@@ -164,6 +181,7 @@ impl From<FindPullAliasError> for ResolvePullSourceError {
 impl From<ResolveRemoteSourceError> for ResolvePullSourceError {
     fn from(value: ResolveRemoteSourceError) -> Self {
         match value {
+            ResolveRemoteSourceError::ByIdUnsupported(e) => Self::ByIdUnsupported(e),
             ResolveRemoteSourceError::RepositoryNotFound(e) => Self::RepositoryNotFound(e),
             ResolveRemoteSourceError::Internal(e) => Self::Internal(e),
         }

@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use futures::TryStreamExt;
 use internal_error::InternalError;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
@@ -311,7 +312,6 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         options: &PullOptions,
         tenancy_config: TenancyConfig,
     ) -> Result<(Vec<PullPlanIteration>, Vec<PullResponse>), InternalError> {
-        use futures::TryStreamExt;
         let requests: Vec<_> = self
             .dataset_registry
             .all_dataset_handles_by_owner_name(self.current_account_subject.account_name())

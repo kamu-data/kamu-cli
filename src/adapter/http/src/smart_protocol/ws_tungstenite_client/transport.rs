@@ -9,11 +9,13 @@
 
 use futures::SinkExt;
 use headers::Header;
+use http::StatusCode;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::net::TcpStream;
+use tokio_stream::StreamExt;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
@@ -79,7 +81,6 @@ pub(super) type TungsteniteStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 pub(super) async fn read_payload<TMessagePayload: DeserializeOwned>(
     stream: &mut TungsteniteStream,
 ) -> Result<TMessagePayload, ReadMessageError> {
-    use tokio_stream::StreamExt;
     match stream.next().await {
         Some(msg) => match msg {
             Ok(Message::Text(raw_message)) => {
@@ -119,8 +120,6 @@ pub(super) async fn write_payload<TMessagePayload: Serialize>(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn map_tungstenite_error(error: TungsteniteError, dataset_endpoint: &Url) -> SyncError {
-    use http::StatusCode;
-
     if let TungsteniteError::Http(response) = &error {
         match response.status() {
             StatusCode::FORBIDDEN => {

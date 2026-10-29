@@ -356,6 +356,8 @@ pub enum SyncError {
     #[error(transparent)]
     UnsupportedIpfsStorageType(#[from] UnsupportedIpfsStorageTypeError),
     #[error(transparent)]
+    RemoteByIdUnsupported(#[from] RemoteDatasetByIdUnsupportedError),
+    #[error(transparent)]
     RepositoryNotFound(
         #[from]
         #[backtrace]
@@ -411,6 +413,7 @@ impl SyncError {
             | Self::NameCollision(_)
             | Self::UnsupportedProtocol(_)
             | Self::UnsupportedIpfsStorageType(_)
+            | Self::RemoteByIdUnsupported(_)
             | Self::RepositoryNotFound(_)
             | Self::DatasetsDiverged(_)
             | Self::DatasetIdMismatch(_)

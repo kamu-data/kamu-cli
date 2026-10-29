@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 use futures::{StreamExt, TryStreamExt, stream};
 use kamu_core::*;
+use odf::metadata::IntoDataStreamBlock;
 
 use super::protocol::{SimpleProtocolTransferOptions, SimpleTransferProtocol};
 
@@ -90,7 +91,6 @@ impl SimpleTransferProtocol {
         stats.dst_estimated.metadata_blocks_written +=
             u64::try_from(blocks_desc_ordered.len()).unwrap();
 
-        use odf::metadata::IntoDataStreamBlock;
         for block in blocks_desc_ordered
             .iter()
             .filter_map(|(_, b, _)| b.as_data_stream_block())

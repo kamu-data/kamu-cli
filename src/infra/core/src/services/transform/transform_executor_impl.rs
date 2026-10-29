@@ -15,6 +15,8 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{ResolvedDataset, ResolvedDatasetsMap};
 use kamu_ingest_datafusion::DataWriterDataFusion;
+use odf::dataset::MetadataChainExt;
+use odf::metadata::EnumWithVariants;
 use random_strings::get_random_name;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -201,7 +203,6 @@ impl TransformExecutorImpl {
 
         // Computed here, where the appended blocks are known, so that callers
         // need not query the chain again
-        use odf::dataset::MetadataChainExt;
         let increment = resolved_dataset
             .as_metadata_chain()
             .get_increment_for_interval(Some(&old_head), &new_head)
@@ -262,7 +263,6 @@ impl TransformExecutor for TransformExecutorImpl {
         let num_steps = verification_operation.steps.len();
         listener.begin_phase(VerificationPhase::ReplayTransform);
 
-        use odf::metadata::EnumWithVariants;
         for (step_index, step) in verification_operation.steps.into_iter().enumerate() {
             let request = step.request;
 
