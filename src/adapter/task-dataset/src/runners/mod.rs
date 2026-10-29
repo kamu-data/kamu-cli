@@ -9,7 +9,7 @@
 
 mod compaction_dataset_task_runner;
 mod reset_dataset_task_runner;
-mod task_dataset_head_committer;
+mod task_head_commit;
 mod update_dataset_task_runner;
 
 pub use compaction_dataset_task_runner::*;

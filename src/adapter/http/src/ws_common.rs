@@ -19,6 +19,9 @@ pub enum ReadMessageError {
     #[error("Client has disconnected unexpectedly")]
     ClientDisconnected,
 
+    #[error("Server has disconnected unexpectedly")]
+    ServerDisconnected,
+
     #[error("Close message received")]
     Closed,
 

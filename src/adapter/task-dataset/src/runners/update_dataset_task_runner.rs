@@ -14,7 +14,11 @@ use kamu_core::*;
 use kamu_task_system::*;
 use random_strings::get_random_name;
 
-use super::task_dataset_head_committer::TaskDatasetHeadCommitter;
+use super::task_head_commit::{
+    HeadCommitTaskOutcome as _,
+    dataset_deleted_outcome,
+    head_moved_outcome,
+};
 use crate::{
     DatasetUpdateJob,
     InputDatasetCompactedError,
@@ -75,9 +79,7 @@ impl UpdateDatasetTaskRunner {
         {
             Ok(Some(dst)) => dst,
             Ok(None) => {
-                return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
-                    target_handle,
-                ));
+                return Ok(dataset_deleted_outcome(target_handle));
             }
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Reading the sync target failed");
@@ -112,9 +114,9 @@ impl UpdateDatasetTaskRunner {
             Ok(SyncResult::UpToDate) => Ok(TaskOutcome::Success(
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
             )),
-            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) })) => Ok(
-                TaskDatasetHeadCommitter::head_moved_outcome(target_handle.id.clone(), e),
-            ),
+            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) })) => {
+                Ok(head_moved_outcome(target_handle.id.clone(), e))
+            }
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Sync failed");
                 Ok(Self::failed(e.is_recoverable()))
@@ -134,9 +136,7 @@ impl UpdateDatasetTaskRunner {
         } = match self.update_steps.plan_ingest(target_handle).await {
             Ok(Some(planned)) => planned,
             Ok(None) => {
-                return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
-                    target_handle,
-                ));
+                return Ok(dataset_deleted_outcome(target_handle));
             }
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Ingest planning failed");
@@ -168,9 +168,11 @@ impl UpdateDatasetTaskRunner {
                     },
                 ..
             }) => {
-                if let Some(failed) = TaskDatasetHeadCommitter::new(self.update_steps.as_ref())
-                    .commit(target.get_handle(), &old_head, &new_head)
+                if let Some(failed) = self
+                    .update_steps
+                    .commit_head(target.get_handle(), &old_head, &new_head)
                     .await?
+                    .into_failed_task_outcome(target.get_handle())
                 {
                     return Ok(failed);
                 }
@@ -222,9 +224,7 @@ impl UpdateDatasetTaskRunner {
                     elaboration: TransformElaboration::Elaborated(transform_plan),
                 })) => (target, transform_plan),
                 Ok(None) => {
-                    return Ok(TaskDatasetHeadCommitter::dataset_deleted_outcome(
-                        target_handle,
-                    ));
+                    return Ok(dataset_deleted_outcome(target_handle));
                 }
                 Ok(Some(ElaboratedTransform {
                     elaboration: TransformElaboration::UpToDate,
@@ -275,9 +275,11 @@ impl UpdateDatasetTaskRunner {
                 increment,
                 ..
             }) => {
-                if let Some(failed) = TaskDatasetHeadCommitter::new(self.update_steps.as_ref())
-                    .commit(target.get_handle(), &old_head, &new_head)
+                if let Some(failed) = self
+                    .update_steps
+                    .commit_head(target.get_handle(), &old_head, &new_head)
                     .await?
+                    .into_failed_task_outcome(target.get_handle())
                 {
                     return Ok(failed);
                 }

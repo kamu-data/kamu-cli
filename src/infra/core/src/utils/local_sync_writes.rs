@@ -11,7 +11,13 @@ use std::sync::Arc;
 
 use database_common::DatabaseTransactionRunner;
 use internal_error::ErrorIntoInternal;
-use kamu_core::{CorruptedSourceError, LocalSyncTarget, SyncError, TransferredSyncTarget};
+use kamu_core::{
+    CorruptedSourceError,
+    DatasetIdMismatchError,
+    LocalSyncTarget,
+    SyncError,
+    TransferredSyncTarget,
+};
 use odf::dataset::MetadataChainExt as _;
 use odf::metadata::AsTypedBlock;
 
@@ -87,6 +93,44 @@ impl StoredSeed {
             seed_block_bytes,
         })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Checks that a source written into an existing dataset without `HEAD`, whose
+/// whole chain is transferred, starts with that dataset's `Seed`: nothing else
+/// compares the dataset IDs when the destination has no blocks to compare
+pub fn ensure_seed_matches_headless_target(
+    dst: &LocalSyncTarget,
+    oldest_block: &odf::dataset::HashedMetadataBlockBytesDecoded,
+) -> Result<(), SyncError> {
+    let LocalSyncTarget::Existing {
+        dataset,
+        expected_head: None,
+    } = dst
+    else {
+        return Ok(());
+    };
+
+    let (_, block, _) = oldest_block;
+    let Some(seed) = block.as_typed::<odf::metadata::Seed>() else {
+        return Err(CorruptedSourceError {
+            message: "First metadata block is not Seed".to_owned(),
+            source: None,
+        }
+        .into());
+    };
+
+    let dst_dataset_id = dataset.get_id();
+    if seed.event.dataset_id != *dst_dataset_id {
+        return Err(DatasetIdMismatchError {
+            src_dataset_id: seed.event.dataset_id.clone(),
+            dst_dataset_id: dst_dataset_id.clone(),
+        }
+        .into());
+    }
+
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

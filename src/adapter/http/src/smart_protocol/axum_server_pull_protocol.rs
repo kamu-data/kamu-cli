@@ -99,10 +99,10 @@ impl AxumServerPullProtocolInstance {
     }
 
     async fn pull_main_flow(&mut self) -> Result<(), PullServerError> {
-        let pull_request = self.handle_pull_request_initiation().await?;
+        let planned_pull = self.handle_pull_request_initiation().await?;
 
         let received_pull_metadata_request =
-            self.try_handle_pull_metadata_request(pull_request).await?;
+            self.try_handle_pull_metadata_request(planned_pull).await?;
 
         if received_pull_metadata_request {
             loop {
@@ -116,9 +116,7 @@ impl AxumServerPullProtocolInstance {
         Ok(())
     }
 
-    async fn handle_pull_request_initiation(
-        &mut self,
-    ) -> Result<DatasetPullRequest, PullServerError> {
+    async fn handle_pull_request_initiation(&mut self) -> Result<PlannedPull, PullServerError> {
         let pull_request = axum_read_payload::<DatasetPullRequest>(&mut self.socket)
             .await
             .map_err(|e| {
@@ -152,28 +150,41 @@ impl AxumServerPullProtocolInstance {
                     .await;
 
                 let metadata_chain = resolved_dataset.as_metadata_chain();
-                let head = metadata_chain
-                    .resolve_ref(&odf::BlockRef::Head)
-                    .await
-                    .int_err()?;
+                let stop_at = match stop_at {
+                    Some(stop_at) => stop_at,
+                    None => metadata_chain
+                        .resolve_ref(&odf::BlockRef::Head)
+                        .await
+                        .int_err()?,
+                };
 
-                prepare_dataset_transfer_plan(
+                let transfer_plan = prepare_dataset_transfer_plan(
                     metadata_chain,
-                    stop_at.as_ref().unwrap_or(&head),
+                    &stop_at,
                     begin_faster.as_ref(),
                     pull_request.force_update_if_diverged,
                 )
-                .await
+                .await?;
+
+                Ok::<_, PrepareDatasetTransferEstimateError>(PlannedTransfer {
+                    stop_at,
+                    transfer_plan,
+                })
             })
             .instrument(tracing::debug_span!(
                 "AxumServerPullProtocolInstance::handle_pull_request_initiation"
             ))
             .await;
 
+        let planned_stop_at = transfer_plan_result
+            .as_ref()
+            .ok()
+            .map(|planned| planned.stop_at.clone());
+
         axum_write_payload::<DatasetPullResponse>(
             &mut self.socket,
             match transfer_plan_result {
-                Ok(transfer_plan) => {
+                Ok(PlannedTransfer { transfer_plan, .. }) => {
                     tracing::debug!("Sending size estimate: {:?}", transfer_plan);
                     Ok(DatasetPullSuccessResponse { transfer_plan })
                 }
@@ -200,12 +211,15 @@ impl AxumServerPullProtocolInstance {
             PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::InitialRequest))
         })?;
 
-        Ok(pull_request)
+        Ok(PlannedPull {
+            request: pull_request,
+            stop_at: planned_stop_at,
+        })
     }
 
     async fn try_handle_pull_metadata_request(
         &mut self,
-        pull_request: DatasetPullRequest,
+        planned_pull: PlannedPull,
     ) -> Result<bool, PullServerError> {
         let maybe_pull_metadata_request =
             axum_read_payload::<DatasetPullMetadataRequest>(&mut self.socket).await;
@@ -215,6 +229,13 @@ impl AxumServerPullProtocolInstance {
                 tracing::debug!("Pull client sent a pull metadata request");
 
                 let dataset_handle = self.dataset_handle.clone();
+                let PlannedPull { request, stop_at } = planned_pull;
+                // The batch ends at the head the plan was made from, so a head that
+                // moved since sends the blocks the plan counted
+                let stop_at = stop_at.ok_or_else(|| {
+                    "Metadata was requested after a failed plan"
+                        .protocol_int_err(PullPhase::MetadataRequest)
+                })?;
 
                 let metadata_batch = DatabaseTransactionRunner::new(self.catalog.clone())
                     .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
@@ -222,17 +243,11 @@ impl AxumServerPullProtocolInstance {
                             .get_dataset_by_handle(&dataset_handle)
                             .await;
 
-                        let metadata_chain = resolved_dataset.as_metadata_chain();
-                        let head = metadata_chain
-                            .resolve_ref(&odf::BlockRef::Head)
-                            .await
-                            .int_err()?;
-
                         prepare_dataset_metadata_batch(
-                            metadata_chain,
-                            pull_request.stop_at.as_ref().unwrap_or(&head),
-                            pull_request.begin_after.as_ref(),
-                            pull_request.force_update_if_diverged,
+                            resolved_dataset.as_metadata_chain(),
+                            &stop_at,
+                            request.begin_after.as_ref(),
+                            request.force_update_if_diverged,
                         )
                         .await
                     })
@@ -336,6 +351,22 @@ impl AxumServerPullProtocolInstance {
             ))),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A pull request with the head its transfer plan was made from, or `None`
+/// when planning failed
+struct PlannedPull {
+    request: DatasetPullRequest,
+    stop_at: Option<odf::Multihash>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct PlannedTransfer {
+    stop_at: odf::Multihash,
+    transfer_plan: TransferPlan,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -278,9 +278,28 @@ async fn test_concurrent_first_pulls_create_dataset_once() {
     assert_matches!(
         harness.commit(second).await,
         Err(e @ SyncError::CreateDatasetFailed(CreateDatasetError::RefCollision(_)))
-            if !e.is_recoverable()
+            if e.is_recoverable()
     );
     assert_eq!(harness.destination_head().await, Some(source_head));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_pull_into_headless_dataset_of_another_id_fails_unrecoverably() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+
+    harness.create_source_dataset().await;
+    harness.append_source_data().await;
+    harness.push_source().await;
+
+    let result = harness.transfer_into_headless_dataset("other").await;
+
+    assert_matches!(
+        result,
+        Err(e @ SyncError::DatasetIdMismatch(_)) if !e.is_recoverable()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -579,6 +598,48 @@ impl LocalPullHarness {
             panic!("Expected a transfer, got {transfer:?}");
         };
         transferred
+    }
+
+    /// Transfers into a destination dataset stored without `HEAD` from its own
+    /// `Seed`, as an interrupted creation leaves it
+    async fn transfer_into_headless_dataset(
+        &self,
+        dataset_name: &str,
+    ) -> Result<SyncTransfer, SyncError> {
+        let seed_block = MetadataFactory::metadata_block(
+            MetadataFactory::seed(odf::DatasetKind::Root)
+                .id_from(dataset_name)
+                .build(),
+        )
+        .build_typed();
+        let stored = self
+            .destination_catalog
+            .get_one::<dyn odf::dataset::DatasetStorageUnitWriter>()
+            .unwrap()
+            .store_dataset(seed_block, odf::dataset::StoreDatasetOpts::default())
+            .await
+            .unwrap();
+        let handle = odf::DatasetHandle::new(
+            stored.dataset_id,
+            odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked(dataset_name)),
+            stored.dataset_kind,
+        );
+
+        self.destination_catalog
+            .get_one::<dyn SyncService>()
+            .unwrap()
+            .transfer_into_local(
+                LocalSyncRequest {
+                    src: self.remote_ref(),
+                    dst: LocalSyncTarget::Existing {
+                        dataset: ResolvedDataset::new(stored.dataset, handle),
+                        expected_head: None,
+                    },
+                },
+                SyncOptions::default(),
+                None,
+            )
+            .await
     }
 
     async fn commit(&self, transferred: TransferredSync) -> Result<SyncResult, SyncError> {

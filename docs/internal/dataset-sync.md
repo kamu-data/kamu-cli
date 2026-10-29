@@ -321,11 +321,13 @@ sequenceDiagram
     Note over C: the caller commits: CAS on begin_after, with or without force
 ```
 
-The server builds the plan from the chain interval after `begin_after` up to its head. A
-`begin_after` that is not an ancestor of the head is `InvalidInterval`, which the client reports
-as `DatasetsDiverged`, even when the local copy is merely ahead of the server;
-with `force` the server sends the whole chain instead, and the client refuses it when its `Seed`
-has a different dataset ID or kind from the local one (`OverwriteSeedBlock`).
+The server builds the plan from the chain interval after `begin_after` up to its head, and the
+metadata batch ends at that same head even if it moves meanwhile. A `begin_after` that is not an
+ancestor of the head is `InvalidInterval`, which the client reports as `DatasetsDiverged`, even
+when the local copy is merely ahead of the server; with `force` the server sends the whole chain
+instead. When the chain it receives starts with a `Seed` and the target exists (with `force`, or
+without a `HEAD`), the client refuses a `Seed` of another dataset ID (`DatasetIdMismatch`) or of
+another kind (`OverwriteSeedBlock`).
 
 ### 7.2 Push flow
 
@@ -363,7 +365,9 @@ frame reason: `Internal`, or `UpdatedConcurrently` when the CAS on `HEAD` fails.
 carries no heads, since a close frame reason holds at most 123 bytes; the server logs them. The
 error stays in the close frame because a client that predates the typed response reads any text
 reply here as a bare confirmation, ignoring the `Ok` key; such a client fails at its next send
-instead. The client accepts the bare `{}` confirmation of a server that predates it.
+instead. The client accepts the bare `{}` confirmation of a server that predates it. Progress
+requests carry `progress_requested: true`, so one still in flight is skipped rather than taken for
+the confirmation; a server that predates the field sends `{}`, which stays ambiguous.
 
 Server-side details:
 
@@ -377,8 +381,9 @@ Server-side details:
   the request's `current_head` instead, or the `Seed` when the push created the dataset
   (`SetRefCheckRefMode::Explicit`). Either way a head moved after initiation fails the push with
   `UpdatedConcurrently`. A server that predates this expects whatever `HEAD` is at commit time
-  under `force`.
-- Completion posts `DatasetExternallyChangedMessage::smart_transfer_protocol_sync` in a separate
+  under `force`. A batch starting with a `Seed` into an existing dataset, with `force` or without a
+  `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` is of another dataset.
+- Completion posts `DatasetExternallyChangedMessage::smart_transfer_protocol_sync` in the commit's
   transaction, which is how flows learn about a push
   ([flow-system.md](flow-system.md#changes-made-outside-flows)).
 - Each step that touches the database opens its own short transaction; no transaction spans the
@@ -509,7 +514,8 @@ recoverable.
 (`HeadMoved`) and `Internal`, which also covers network failures, are
 recoverable; conflicts between the chains, a corrupted source, denied access and errors in the
 request, such as an `InvalidDestination`, are not. `CreateDatasetFailed`
-is recoverable only for a lost CAS or an internal failure. The update task runner turns the flag
+is recoverable for a lost CAS, an internal failure and a `RefCollision`, where a concurrent first
+pull created the same dataset and the next attempt finds it. The update task runner turns the flag
 into the recoverability of the failed task.
 
 ---

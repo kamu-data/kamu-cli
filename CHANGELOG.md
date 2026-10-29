@@ -82,6 +82,14 @@ Recommendation: for ease of reading, use the following format:
   that has the same pull alias, which failed the pull and revealed that dataset's name
 - `kamu pull` of a remote dataset by ID without a local name fails with an error asking for the
   destination instead of crashing
+- `kamu pull` and `kamu push` into a dataset left without a head by an interrupted transfer fail
+  when the incoming dataset is a different one, instead of writing its history
+- `kamu push` over the smart protocol no longer reports success when the server's commit failed
+  while it was asking for upload progress
+- A dataset updated by a smart protocol push always notifies the node's flows; a failure to record
+  the change now fails the push with nothing committed
+- `kamu push` over the smart protocol reports a name collision for a long dataset alias, instead of
+  a retried internal error
 - Update, compaction and reset tasks of a dataset deleted after they were scheduled fail without
   retries, instead of being retried or crashing
 - When `kamu pull` or `kamu system compact` fails for some datasets, the datasets that did update

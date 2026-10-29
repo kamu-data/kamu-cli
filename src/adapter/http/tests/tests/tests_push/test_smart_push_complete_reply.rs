@@ -14,6 +14,7 @@ use kamu_adapter_http::smart_protocol::messages::{
     DatasetPushCompleteError,
     DatasetPushCompleteReply,
     DatasetPushCompleteResponse,
+    DatasetPushObjectsUploadProgressRequest,
     DatasetPushUpdatedConcurrentlyError,
 };
 use pretty_assertions::assert_eq;
@@ -86,6 +87,42 @@ fn test_unknown_error_is_not_taken_for_a_confirmation() {
     assert_matches!(
         serde_json::from_str::<DatasetPushCompleteReply>(r#"{"Err":{"FutureError":{}}}"#),
         Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_progress_request_read_with_the_complete_reply_is_not_a_confirmation() {
+    let json = serde_json::to_string(&DatasetPushObjectsUploadProgressRequest {
+        progress_requested: true,
+    })
+    .unwrap();
+
+    assert_eq!(json, r#"{"progress_requested":true}"#);
+    assert_matches!(
+        serde_json::from_str::<DatasetPushCompleteReply>(&json),
+        Ok(DatasetPushCompleteReply::StaleProgressRequest(_))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_progress_request_is_read_by_clients_that_predate_its_field() {
+    #[derive(serde::Deserialize, Debug)]
+    struct ProgressRequestBeforeTheField {}
+
+    assert_matches!(
+        serde_json::from_str::<ProgressRequestBeforeTheField>(r#"{"progress_requested":true}"#),
+        Ok(ProgressRequestBeforeTheField {})
+    );
+    // And the progress request of an older server is read by this one
+    assert_eq!(
+        serde_json::from_str::<DatasetPushObjectsUploadProgressRequest>("{}").unwrap(),
+        DatasetPushObjectsUploadProgressRequest {
+            progress_requested: false
+        }
     );
 }
 
