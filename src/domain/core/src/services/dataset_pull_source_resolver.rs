@@ -21,6 +21,11 @@ use crate::{GetRepoError, RepositoryNotFoundError, SyncError};
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait DatasetPullSourceResolver: Send + Sync {
+    /// Whether the dataset has any pull alias, ambiguous ones included. Such a
+    /// dataset is updated by pulling only, so writing to it locally would
+    /// diverge its history from the remote. Reads the alias registry only
+    async fn has_pull_source(&self, target: &odf::DatasetHandle) -> Result<bool, InternalError>;
+
     /// The dataset's pull alias. Reads the alias registry only
     async fn find_pull_alias(
         &self,

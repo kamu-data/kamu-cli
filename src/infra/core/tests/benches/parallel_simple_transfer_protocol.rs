@@ -22,6 +22,7 @@ use kamu::utils::simple_transfer_protocol::{
 };
 use kamu::{
     DatasetRegistrySoloUnitBridge,
+    IpfsServiceImpl,
     RemoteDatasetUrlResolverImpl,
     RemoteReposDir,
     RemoteRepositoryRegistryImpl,
@@ -79,6 +80,7 @@ async fn setup_dataset(
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<IpfsServiceImpl>()
         .add::<RemoteDatasetUrlResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<SystemTimeSourceDefault>()

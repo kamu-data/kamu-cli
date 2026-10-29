@@ -25,6 +25,7 @@ mod test_schema_utils;
 mod test_search_service_remote_impl;
 mod test_setup;
 mod test_sync_service_impl;
+mod test_sync_service_ipns_push;
 mod test_sync_service_local_commit;
 mod test_sync_service_remote_head_moved;
 mod test_transform_services_impl;

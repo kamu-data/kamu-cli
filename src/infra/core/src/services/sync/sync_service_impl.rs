@@ -16,7 +16,6 @@ use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
 use url::Url;
 
-use crate::utils::ipfs_wrapper::*;
 use crate::utils::simple_transfer_protocol::{
     SimpleProtocolTransferOptions,
     SimpleTransferProtocol,
@@ -35,7 +34,7 @@ pub struct SyncServiceImpl {
     remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     simple_transfer_protocol: Arc<SimpleTransferProtocol>,
-    ipfs_client: Arc<IpfsClient>,
+    ipfs_service: Arc<dyn IpfsService>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,14 +47,14 @@ impl SyncServiceImpl {
         remote_dataset_url_resolver: Arc<dyn RemoteDatasetUrlResolver>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         simple_transfer_protocol: Arc<SimpleTransferProtocol>,
-        ipfs_client: Arc<IpfsClient>,
+        ipfs_service: Arc<dyn IpfsService>,
     ) -> Self {
         Self {
             dataset_factory,
             remote_dataset_url_resolver,
             smart_transfer_protocol,
             simple_transfer_protocol,
-            ipfs_client,
+            ipfs_service,
         }
     }
 
@@ -192,7 +191,7 @@ impl SyncServiceImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(%dst_url, ?opts))]
     async fn sync_to_ipfs(
         &self,
-        src_dataset: Arc<dyn odf::Dataset>,
+        src_dataset: ResolvedDataset,
         dst_url: &Url,
         opts: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
@@ -202,13 +201,11 @@ impl SyncServiceImpl {
             _ => Err("Malformed IPFS URL".int_err()),
         }?;
 
-        let keys = self.ipfs_client.key_list().await.int_err()?;
-
-        let key = if let Some(key) = keys.into_iter().find(|k| k.id == key_id) {
-            Ok(key)
-        } else {
-            Err(format!("IPFS does not have a key with ID {key_id}").int_err())
-        }?;
+        let Some(key) = self.ipfs_service.find_ipns_key(key_id).await? else {
+            return Err(format!("IPFS does not have a key with ID {key_id}")
+                .int_err()
+                .into());
+        };
 
         tracing::info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
 
@@ -226,7 +223,7 @@ impl SyncServiceImpl {
         // try resolving it with a short timeout. If resolution fails - we assume that
         // the key was not published yet.
         let (old_cid, dst_head, chains_comparison) =
-            match self.ipfs_client.name_resolve_local(&key.id).await? {
+            match self.ipfs_service.resolve_ipns_name_locally(&key).await? {
                 None => {
                     tracing::info!("Key does not resolve locally - assuming it's unpublished");
                     (None, None, None)
@@ -269,15 +266,8 @@ impl SyncServiceImpl {
                 // so even if data is up-to-date we re-publish to keep the entry alive.
                 let cid = old_cid.unwrap();
                 tracing::info!(%cid, "Refreshing IPNS entry");
-                let _id = self
-                    .ipfs_client
-                    .name_publish(
-                        &cid,
-                        PublishOptions {
-                            key: Some(&key.name),
-                            ..Default::default()
-                        },
-                    )
+                self.ipfs_service
+                    .publish_ipns_name(&key, &cid, true)
                     .await?;
 
                 return Ok(SyncResult::UpToDate);
@@ -361,20 +351,12 @@ impl SyncServiceImpl {
 
         // Add files to IPFS
         tracing::info!("Adding files to IPFS");
-        let cid = self.add_to_ipfs(src_dataset.as_ref()).await?;
+        let cid = self.ipfs_service.add_dataset(src_dataset).await?;
 
         // Publish to IPNS
         tracing::info!(%cid, "Publishing to IPNS");
-        let _id = self
-            .ipfs_client
-            .name_publish(
-                &cid,
-                PublishOptions {
-                    key: Some(&key.name),
-                    resolve: Some(false),
-                    ..Default::default()
-                },
-            )
+        self.ipfs_service
+            .publish_ipns_name(&key, &cid, false)
             .await?;
 
         Ok(SyncResult::Updated {
@@ -383,29 +365,6 @@ impl SyncServiceImpl {
             num_blocks: u64::try_from(num_blocks).unwrap(),
             increment,
         })
-    }
-
-    async fn add_to_ipfs(&self, src_dataset: &dyn odf::Dataset) -> Result<String, IpfsAddError> {
-        let source_url = src_dataset.get_storage_internal_url();
-        let source_path = source_url.to_file_path().map_err(|_| {
-            IpfsAddError::UnsupportedIpfsStorageType({
-                UnsupportedIpfsStorageTypeError {
-                    url: source_url.clone(),
-                }
-            })
-        })?;
-
-        let cid = self
-            .ipfs_client
-            .add_path(
-                source_path,
-                AddOptions {
-                    ignore: Some(&["/config", "/info"]),
-                },
-            )
-            .await?;
-
-        Ok(cid)
     }
 
     #[tracing::instrument(level = "info", name = "sync", skip_all, fields(src=?src, dst=?dst))]
@@ -447,7 +406,7 @@ impl SyncServiceImpl {
             // <local> -> ipns
             (SyncRef::Local(src_dataset), "ipns") => match dst.url.path() {
                 "" | "/" => {
-                    self.sync_to_ipfs((**src_dataset).clone(), dst.url.as_ref(), opts)
+                    self.sync_to_ipfs(src_dataset.clone(), dst.url.as_ref(), opts)
                         .await
                 }
                 _ => Err(odf::dataset::UnsupportedProtocolError {
@@ -565,11 +524,6 @@ impl SyncService for SyncServiceImpl {
         listener.begin();
         self.transfer_into_local_impl(request.src, &request.dst, options, listener)
             .await
-    }
-
-    #[tracing::instrument(level = "debug", skip_all)]
-    async fn ipfs_add(&self, src: ResolvedDataset) -> Result<String, IpfsAddError> {
-        self.add_to_ipfs(src.as_ref()).await
     }
 }
 

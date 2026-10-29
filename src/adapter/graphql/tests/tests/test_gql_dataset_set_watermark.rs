@@ -11,7 +11,11 @@ use std::sync::Arc;
 
 use indoc::indoc;
 use kamu::{
+    DatasetPullSourceResolverImpl,
     RemoteAliasesRegistryImpl,
+    RemoteDatasetUrlResolverImpl,
+    RemoteReposDir,
+    RemoteRepositoryRegistryImpl,
     SetWatermarkExecutorImpl,
     SetWatermarkPlannerImpl,
     SetWatermarkUseCaseImpl,
@@ -113,6 +117,13 @@ impl SetWatermarkHarness {
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
             .add::<RemoteAliasesRegistryImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
+            .add::<RemoteRepositoryRegistryImpl>()
+            .add_value(RemoteReposDir::new_with_creation(
+                base_gql_harness.temp_dir().join("repos"),
+            ))
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .build();
 
         let (_, catalog_authorized) =

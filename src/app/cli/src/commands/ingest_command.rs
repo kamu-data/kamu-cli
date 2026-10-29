@@ -29,7 +29,7 @@ pub struct IngestCommand {
     output_config: Arc<OutputConfig>,
     data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_registry: Arc<dyn DatasetRegistry>,
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     push_ingest_data_use_case: Arc<dyn PushIngestDataUseCase>,
 
     #[dill::component(explicit)]
@@ -67,21 +67,16 @@ impl IngestCommand {
         &self,
         dataset_handle: &odf::DatasetHandle,
     ) -> Result<ResolvedDataset, CLIError> {
-        let aliases = self
-            .remote_alias_reg
-            .get_remote_aliases(dataset_handle)
+        if self
+            .pull_source_resolver
+            .has_pull_source(dataset_handle)
             .await
-            .map_err(CLIError::failure)?;
-        let pull_aliases: Vec<_> = aliases
-            .get_by_kind(RemoteAliasKind::Pull)
-            .map(ToString::to_string)
-            .collect();
-        if !pull_aliases.is_empty() {
-            return Err(CLIError::usage_error(format!(
-                "Ingesting data into remote dataset will cause histories to diverge. Existing \
-                 pull aliases:\n{}",
-                pull_aliases.join("\n- ")
-            )));
+            .map_err(CLIError::failure)?
+        {
+            return Err(CLIError::usage_error(
+                "Ingesting data into a dataset that is pulled from a remote will cause histories \
+                 to diverge. See its pull aliases with `kamu repo alias list`",
+            ));
         }
 
         let resolved_dataset = self

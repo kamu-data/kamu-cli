@@ -115,6 +115,34 @@ async fn test_several_pull_aliases_are_ambiguous() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_any_pull_alias_is_a_pull_source() {
+    let harness = PullSourceHarness::new();
+    let unaliased = harness.create_root("unaliased").await;
+    let pushed = harness.create_root("pushed").await;
+    harness
+        .add_alias(&pushed, "https://example.com/pushed", RemoteAliasKind::Push)
+        .await;
+    let pulled = harness.create_root("pulled").await;
+    harness
+        .add_alias(&pulled, "https://example.com/pulled", RemoteAliasKind::Pull)
+        .await;
+    let ambiguous = harness.create_root("ambiguous").await;
+    harness
+        .add_alias(&ambiguous, "https://example.com/a", RemoteAliasKind::Pull)
+        .await;
+    harness
+        .add_alias(&ambiguous, "https://example.com/b", RemoteAliasKind::Pull)
+        .await;
+
+    assert!(!harness.has_pull_source(&unaliased).await);
+    assert!(!harness.has_pull_source(&pushed).await);
+    assert!(harness.has_pull_source(&pulled).await);
+    assert!(harness.has_pull_source(&ambiguous).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_dataset_is_found_by_its_pull_alias() {
     let harness = PullSourceHarness::new();
     harness.create_root("foo").await;
@@ -298,6 +326,13 @@ impl PullSourceHarness {
             .add(&remote_ref(alias), kind)
             .await
             .unwrap();
+    }
+
+    async fn has_pull_source(&self, target: &odf::DatasetHandle) -> bool {
+        self.pull_source_resolver
+            .has_pull_source(target)
+            .await
+            .unwrap()
     }
 
     async fn find_pull_alias(

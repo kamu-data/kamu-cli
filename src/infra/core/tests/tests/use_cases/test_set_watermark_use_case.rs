@@ -120,6 +120,13 @@ impl SetWatermarkUseCaseHarness {
             .add::<SetWatermarkExecutorImpl>()
             .add::<DatasetHeadCommitterImpl>()
             .add::<RemoteAliasesRegistryImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
+            .add::<RemoteRepositoryRegistryImpl>()
+            .add_value(RemoteReposDir::new_with_creation(
+                base_use_case_harness.temp_dir_path().join("repos"),
+            ))
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<MetadataQueryServiceImpl>()
             .build();
 

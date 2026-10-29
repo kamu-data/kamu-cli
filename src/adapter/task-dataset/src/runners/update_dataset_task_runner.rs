@@ -112,10 +112,9 @@ impl UpdateDatasetTaskRunner {
             Ok(SyncResult::UpToDate) => Ok(TaskOutcome::Success(
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result(),
             )),
-            Err(SyncError::HeadMoved(e)) => Ok(TaskDatasetHeadCommitter::head_moved_outcome(
-                target_handle.id.clone(),
-                e,
-            )),
+            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) })) => Ok(
+                TaskDatasetHeadCommitter::head_moved_outcome(target_handle.id.clone(), e),
+            ),
             Err(e) => {
                 tracing::error!(error = ?e, error_msg = %e, "Sync failed");
                 Ok(Self::failed(e.is_recoverable()))

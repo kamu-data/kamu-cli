@@ -30,7 +30,7 @@ pub struct VerifyCommand {
     verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     output_config: Arc<OutputConfig>,
 
     #[dill::component(explicit)]
@@ -170,13 +170,10 @@ impl VerifyCommand {
 
         for hdl in dataset_handles {
             let is_remote = self
-                .remote_alias_reg
-                .get_remote_aliases(&hdl)
+                .pull_source_resolver
+                .has_pull_source(&hdl)
                 .await
-                .unwrap()
-                .get_by_kind(RemoteAliasKind::Pull)
-                .next()
-                .is_some();
+                .unwrap();
             if !is_remote || self.integrity {
                 result.push(hdl);
                 continue;

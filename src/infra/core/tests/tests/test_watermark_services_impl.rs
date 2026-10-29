@@ -13,13 +13,19 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use kamu::testing::BaseRepoHarness;
 use kamu::{
+    DatasetPullSourceResolverImpl,
     MetadataQueryServiceImpl,
     RemoteAliasesRegistryImpl,
+    RemoteDatasetUrlResolverImpl,
+    RemoteReposDir,
+    RemoteRepositoryRegistryImpl,
     SetWatermarkExecutorImpl,
     SetWatermarkPlannerImpl,
 };
 use kamu_core::{
     MetadataQueryService,
+    RemoteAliasKind,
+    RemoteAliasesRegistry,
     SetWatermarkError,
     SetWatermarkExecutionError,
     SetWatermarkExecutor,
@@ -29,7 +35,7 @@ use kamu_core::{
     SetWatermarkResult,
     TenancyConfig,
 };
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -202,6 +208,41 @@ async fn test_set_watermark_rejects_on_derivative() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_set_watermark_rejects_on_dataset_pulled_from_remote() {
+    let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
+
+    let foo = harness
+        .create_root_dataset(&odf::DatasetAlias::new(
+            None,
+            odf::DatasetName::try_from("foo").unwrap(),
+        ))
+        .await;
+    harness
+        .add_pull_alias(&foo, "odf+http://example.com/foo")
+        .await;
+
+    assert_matches!(
+        harness
+            .set_watermark(
+                ResolvedDataset::from_created(&foo),
+                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
+            )
+            .await,
+        Err(SetWatermarkError::Planning(
+            SetWatermarkPlanningError::IsRemote
+        ))
+    );
+    assert_eq!(
+        harness
+            .current_watermark(ResolvedDataset::from_created(&foo))
+            .await,
+        None,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_set_watermark_head_moved_after_planning() {
     let harness = WatermarkTestHarness::new(TenancyConfig::SingleTenant);
 
@@ -253,6 +294,7 @@ struct WatermarkTestHarness {
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
     set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
     metadata_query_svc: Arc<dyn MetadataQueryService>,
+    remote_aliases_registry: Arc<dyn RemoteAliasesRegistry>,
 }
 
 impl WatermarkTestHarness {
@@ -263,6 +305,13 @@ impl WatermarkTestHarness {
 
         let catalog = dill::CatalogBuilder::new_chained(base_repo_harness.catalog())
             .add::<RemoteAliasesRegistryImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
+            .add::<RemoteRepositoryRegistryImpl>()
+            .add_value(RemoteReposDir::new_with_creation(
+                base_repo_harness.temp_dir_path().join("repos"),
+            ))
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
             .add::<DatasetHeadCommitterImpl>()
@@ -274,7 +323,18 @@ impl WatermarkTestHarness {
             set_watermark_planner: catalog.get_one().unwrap(),
             set_watermark_executor: catalog.get_one().unwrap(),
             metadata_query_svc: catalog.get_one().unwrap(),
+            remote_aliases_registry: catalog.get_one().unwrap(),
         }
+    }
+
+    async fn add_pull_alias(&self, created: &CreateDatasetResult, remote_ref: &str) {
+        self.remote_aliases_registry
+            .get_remote_aliases(&created.dataset_handle)
+            .await
+            .unwrap()
+            .add(&remote_ref.parse().unwrap(), RemoteAliasKind::Pull)
+            .await
+            .unwrap();
     }
 
     async fn plan_set_watermark(

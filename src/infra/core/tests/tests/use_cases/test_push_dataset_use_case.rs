@@ -392,6 +392,7 @@ impl PushUseCaseHarness {
         b.add::<PushDatasetUseCaseImpl>()
             .add::<PushRequestPlannerImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()

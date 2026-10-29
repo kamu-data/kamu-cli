@@ -88,6 +88,7 @@ impl RemotePushHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetFactoryImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<RemoteDatasetUrlResolverImpl>()
@@ -139,7 +140,8 @@ impl RemotePushHarness {
 
         assert_matches!(
             self.push(&repo_url, Some(listener)).await,
-            Err(SyncError::UpdatedConcurrently(_))
+            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) }))
+                if e.actual.as_ref() == Some(&concurrent_head)
         );
         assert_eq!(self.remote_head(&repo_url).await, concurrent_head);
     }

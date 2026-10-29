@@ -1069,11 +1069,14 @@ async fn test_pull_sync_head_moved_is_a_conflict() {
     let mocks = PullUseCaseHarnessMocks::default().for_sync_into_existing(
         &alias_foo,
         &remote_ref,
-        Err(SyncError::HeadMoved(odf::dataset::RefCASError {
-            reference: odf::BlockRef::Head,
-            expected: None,
-            actual: None,
-        })),
+        Err(SyncError::HeadMoved(
+            odf::dataset::RefCASError {
+                reference: odf::BlockRef::Head,
+                expected: None,
+                actual: None,
+            }
+            .into(),
+        )),
     );
 
     let harness = PullUseCaseHarness::new(mocks);

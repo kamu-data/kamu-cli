@@ -517,6 +517,7 @@ pub fn configure_base_catalog(
     b.add_builder(SearchServiceRemoteImpl::builder(None));
 
     b.add::<SyncServiceImpl>();
+    b.add::<IpfsServiceImpl>();
     b.add::<LocalSyncCommitterImpl>();
     b.add::<SyncRequestBuilder>();
 

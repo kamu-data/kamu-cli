@@ -60,7 +60,7 @@ impl LocalSyncCommitter for LocalSyncCommitterImpl {
                     .commit_head(&dataset, expected_head.as_ref(), &new_head)
                     .await
                     .map_err(|e| match e {
-                        E::CASFailed(e) => SyncError::HeadMoved(e),
+                        E::CASFailed(e) => SyncError::HeadMoved(e.into()),
                         E::Access(e) => SyncError::Access(e),
                         e @ (E::BlockNotFound(_) | E::Internal(_)) => {
                             SyncError::Internal(e.int_err())

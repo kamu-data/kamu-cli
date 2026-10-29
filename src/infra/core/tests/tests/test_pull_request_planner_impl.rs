@@ -976,6 +976,7 @@ impl PullTestHarness {
             .add::<TransformPlannerImpl>()
             .add::<ObjectStoreRegistryImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<LocalSyncCommitterImpl>()
             .add::<RemoteAliasResolverImpl>()
             .add::<RemoteDatasetUrlResolverImpl>()

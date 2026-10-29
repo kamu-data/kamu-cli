@@ -94,6 +94,7 @@ interface "GetDatasetDownstreamDependenciesUseCase" <<i>>
 interface "GetDatasetSchemaUseCase" <<i>>
 interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
 interface "InitOnStartup" <<i>>
+interface "IpfsService" <<i>>
 interface "JwtTokenIssuer" <<i>>
 interface "LocalSyncCommitter" <<i>>
 interface "MessageConsumer" <<i>>
@@ -306,6 +307,7 @@ class "IdentityConfig" <<singleton>>
 class "Interact" <<singleton>>
 class "IpfsClient" <<singleton>>
 class "IpfsGateway" <<singleton>>
+class "IpfsServiceImpl"
 class "JupyterConfig" <<singleton>>
 class "JwtAuthenticationConfig" <<singleton>>
 class "KamuAuthOso"
@@ -568,6 +570,8 @@ class "WsSmartTransferProtocolClient"
 "PushIngestPlannerImpl"  --> "DataFormatRegistry"
 "PushIngestPlannerImpl"  --> "SystemTimeSource"
 "PushIngestPlannerImpl"  --> "RunInfoDir"
+"IpfsService" <|-- "IpfsServiceImpl"
+"IpfsServiceImpl"  --> "IpfsClient"
 "MetadataQueryService" <|-- "MetadataQueryServiceImpl"
 "ObjectStoreBuilder" <|-- "ObjectStoreBuilderLocalFs"
 "ObjectStoreRegistry" <|-- "ObjectStoreRegistryImpl"
@@ -631,9 +635,9 @@ class "WsSmartTransferProtocolClient"
 "SyncRequestBuilder"  --> "DatasetFactory"
 "SyncService" <|-- "SyncServiceImpl"
 "SyncServiceImpl"  --> "SmartTransferProtocolClient"
+"SyncServiceImpl"  --> "IpfsService"
 "SyncServiceImpl"  --> "RemoteDatasetUrlResolver"
 "SyncServiceImpl"  --> "DatasetFactory"
-"SyncServiceImpl"  --> "IpfsClient"
 "SyncServiceImpl"  --> "SimpleTransferProtocol"
 "TransformExecutor" <|-- "TransformExecutorImpl"
 "TransformExecutorImpl"  --> "EngineProvisioner"
@@ -646,7 +650,7 @@ class "WsSmartTransferProtocolClient"
 "SetWatermarkExecutor" <|-- "SetWatermarkExecutorImpl"
 "SetWatermarkExecutorImpl"  --> "DatasetHeadCommitter"
 "SetWatermarkPlanner" <|-- "SetWatermarkPlannerImpl"
-"SetWatermarkPlannerImpl"  --> "RemoteAliasesRegistry"
+"SetWatermarkPlannerImpl"  --> "DatasetPullSourceResolver"
 "SetWatermarkPlannerImpl"  --> "SystemTimeSource"
 "CompactDatasetUseCase" <|-- "CompactDatasetUseCaseImpl"
 "CompactDatasetUseCaseImpl"  --> "Catalog"

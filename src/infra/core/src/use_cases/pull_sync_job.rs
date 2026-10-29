@@ -51,9 +51,9 @@ impl PullSyncJob {
     }
 
     /// A lost commit race is the pull's [`PullError::HeadMoved`], the same as
-    /// for an ingest or a transform
+    /// for an ingest or a transform. A local commit always knows the heads.
     fn into_pull_error(error: SyncError) -> PullError {
-        if let SyncError::HeadMoved(e) = error {
+        if let SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) }) = error {
             PullError::HeadMoved(e)
         } else {
             error.into()
