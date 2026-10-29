@@ -11,5 +11,8 @@ pub mod cached_object;
 pub mod datasets_filtering;
 pub mod docker_images;
 pub mod ipfs_wrapper;
+pub mod local_sync_writes;
 pub mod simple_transfer_protocol;
 pub mod smart_transfer_protocol;
+pub mod sync_increment;
+pub mod url_ext;

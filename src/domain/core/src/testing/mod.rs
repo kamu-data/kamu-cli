@@ -7,8 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod mock_compaction_executor;
 mod mock_engine_provisioner;
+mod mock_local_sync_committer;
 mod mock_polling_ingest_service;
 mod mock_sync_service;
-mod mock_transform_elaboration_service;
 mod mock_transform_executor;
+mod mock_transform_planner;
+mod reported_heads;
+
+pub use mock_polling_ingest_service::MockIngestIteration;
+pub use reported_heads::*;

@@ -78,10 +78,13 @@ fn parse_tokens(tokens_str: &str) -> Result<Vec<TemplateToken>, TemplateError> {
     Ok(tokens)
 }
 
-pub fn template_string<'a>(
+/// Substitutes `${{ env.NAME || default }}` templates. A variable `lookup_fn`
+/// does not know is `Ok(None)`, and the next option of the template applies;
+/// a failed lookup fails the substitution.
+pub fn template_string<'a, E: From<TemplateError>>(
     s: &'a str,
-    lookup_fn: &dyn Fn(&str) -> Option<String>,
-) -> Result<String, TemplateError> {
+    lookup_fn: &dyn Fn(&str) -> Result<Option<String>, E>,
+) -> Result<String, E> {
     let mut s = Cow::from(s);
     let re_tpl = Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
     loop {
@@ -96,20 +99,24 @@ pub fn template_string<'a>(
                 .trim();
             let tokens = parse_tokens(tokens_str)?;
 
-            let value = tokens
-                .iter()
-                .map(|token| match token {
-                    TemplateToken::EnvVar(v) => lookup_fn(v),
+            let mut value = None;
+            for token in &tokens {
+                value = match token {
+                    TemplateToken::EnvVar(v) => lookup_fn(v)?,
                     TemplateToken::Literal(v) => Some(v.clone()),
-                })
-                .find_map(std::convert::identity);
+                };
+                if value.is_some() {
+                    break;
+                }
+            }
 
             match value {
                 Some(v) => s.to_mut().replace_range(tpl_range, &v),
                 None => {
-                    return Err(TemplateError::ValueNotFound(
-                        TemplateValueNotFoundError::new(tokens_str),
-                    ));
+                    return Err(
+                        TemplateError::ValueNotFound(TemplateValueNotFoundError::new(tokens_str))
+                            .into(),
+                    );
                 }
             }
         } else {
@@ -131,12 +138,12 @@ mod tests {
 
     #[test]
     fn test_template_string() {
-        let lookup_fn = |env_name: &str| -> Option<String> {
-            match env_name {
+        let lookup_fn = |env_name: &str| -> Result<Option<String>, TemplateError> {
+            Ok(match env_name {
                 "test1" => Some(String::from("val1")),
                 "test2" => Some(String::from("val2")),
                 _ => None,
-            }
+            })
         };
 
         // Populates multiple vars.
@@ -158,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_template_string_numbers() {
-        let lookup_fn = |_: &str| -> Option<String> { None };
+        let lookup_fn = |_: &str| -> Result<Option<String>, TemplateError> { Ok(None) };
 
         assert_matches!(
             template_string("${{ env.test2 || 123 }}", &lookup_fn),
@@ -180,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_template_string_strings() {
-        let lookup_fn = |_: &str| -> Option<String> { None };
+        let lookup_fn = |_: &str| -> Result<Option<String>, TemplateError> { Ok(None) };
 
         let result = template_string("${{ env.test2 || '\"random str __%.?' }}\"", &lookup_fn);
         assert_matches!(result, Ok(val) if val.as_str() == "\"random str __%.?\"");
@@ -230,11 +237,11 @@ mod tests {
 
     #[test]
     fn test_template_string_multiple_options() {
-        let lookup_fn = |env_name: &str| -> Option<String> {
-            match env_name {
+        let lookup_fn = |env_name: &str| -> Result<Option<String>, TemplateError> {
+            Ok(match env_name {
                 "test1" => Some(String::from("val1")),
                 _ => None,
-            }
+            })
         };
 
         let result = template_string(
@@ -248,6 +255,19 @@ mod tests {
             &lookup_fn,
         );
         assert_matches!(result, Ok(val) if val.as_str() == "foo=val1");
+    }
+
+    #[test]
+    fn test_template_string_failed_lookup_skips_default() {
+        let lookup_fn = |_: &str| -> Result<Option<String>, TemplateError> {
+            Err(TemplateError::InvalidPattern(
+                TemplateInvalidPatternError::new("lookup failed"),
+            ))
+        };
+
+        let result = template_string("foo=${{ env.test1 || 'default-val1' }}", &lookup_fn);
+        assert_matches!(result, Err(TemplateError::InvalidPattern(err))
+            if err.pattern.as_str() == "lookup failed");
     }
 }
 

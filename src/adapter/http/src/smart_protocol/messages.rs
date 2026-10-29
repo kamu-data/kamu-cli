@@ -45,6 +45,8 @@ pub struct DatasetPullSuccessResponse {
 /// Unsuccessful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
+    /// Servers do not send it, since the client checks the `Seed` itself; it
+    /// stays so that a reply from an older server can still be read
     SeedBlockOverwriteRestricted(DatasetPushMetadataSeedBlockOverwriteRestrictedError),
     Internal(TransferInternalError),
     InvalidInterval(DatasetPullInvalidIntervalError),
@@ -144,8 +146,29 @@ pub enum DatasetPushRequestError {
 /// of date.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushInvalidHeadError {
+    /// The server's `HEAD`
     pub actual_head: Option<odf::Multihash>,
+    /// The `HEAD` the client planned the push from
     pub expected_head: Option<odf::Multihash>,
+}
+
+impl From<&odf::dataset::RefCASError> for DatasetPushInvalidHeadError {
+    fn from(e: &odf::dataset::RefCASError) -> Self {
+        Self {
+            actual_head: e.actual.clone(),
+            expected_head: e.expected.clone(),
+        }
+    }
+}
+
+impl From<DatasetPushInvalidHeadError> for odf::dataset::RefCASError {
+    fn from(e: DatasetPushInvalidHeadError) -> Self {
+        Self {
+            reference: odf::BlockRef::Head,
+            expected: e.expected_head,
+            actual: e.actual_head,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,13 +195,13 @@ pub enum DatasetPushMetadataError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Rewriting seed block is restricted
+/// Error: the push would replace the destination's Seed block
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushMetadataSeedBlockOverwriteRestrictedError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase 2: object transfer response
+/// Push phase 1: push metadata response
 pub type DatasetPushMetadataResponse =
     Result<DatasetPushMetadataAccepted, DatasetPushMetadataError>;
 
@@ -217,7 +240,7 @@ pub enum DatasetPushObjectsTransferError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Dataset with such id already exists with different alias
+/// Error: a dataset with the pushed dataset's ID exists under another alias
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRefCollisionError {
     pub dataset_id: odf::DatasetID,
@@ -225,7 +248,7 @@ pub struct DatasetPushObjectsTransferRefCollisionError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Dataset with such id already exists
+/// Error: another dataset already has the alias pushed to
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferNameCollisionError {
     pub dataset_alias: odf::DatasetAlias,
@@ -252,9 +275,18 @@ pub enum ObjectPushStrategy {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: object upload progress request
+/// Push stage 3: object upload progress request, sent by the server
+/// periodically while the client uploads objects
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPushObjectsUploadProgressRequest {}
+pub struct DatasetPushObjectsUploadProgressRequest {
+    /// Always `true` when sent. A request that arrives after the client
+    /// finished uploading is read alongside the complete response, and the
+    /// field keeps it apart from the bare confirmation of an older server.
+    /// An older server sends `{}`, which stays indistinguishable from that
+    /// confirmation.
+    #[serde(default)]
+    pub progress_requested: bool,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -287,9 +319,67 @@ pub struct DatasetPushComplete {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: complete handshake acknowledge
+/// Push stage 4: complete handshake acknowledge
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push stage 4: response to the complete request.
+///
+/// A client that predates it reads `{"Ok": {}}` as a bare
+/// `DatasetPushCompleteConfirmed`, ignoring the unknown key.
+pub type DatasetPushCompleteResponse =
+    Result<DatasetPushCompleteConfirmed, DatasetPushCompleteError>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push stage 4: the pushed blocks could not be committed
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPushCompleteError {
+    Internal(TransferInternalError),
+    UpdatedConcurrently(DatasetPushUpdatedConcurrentlyError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The destination `HEAD` moved while the pushed blocks were being committed;
+/// nothing was committed.
+///
+/// It carries no heads: errors of this stage travel as the close frame reason,
+/// which is limited to 123 bytes. A text message would not do, since a client
+/// that predates `DatasetPushCompleteResponse` takes any text reply for a
+/// confirmation.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushUpdatedConcurrentlyError {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Push stage 4: the complete response as a client reads it, accepting the
+/// bare confirmation sent by a server that predates
+/// `DatasetPushCompleteResponse`, and skipping an upload progress request
+/// the server sent before it read that the upload had finished
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(untagged)]
+pub enum DatasetPushCompleteReply {
+    Response(DatasetPushCompleteResponse),
+    Legacy(DatasetPushCompleteLegacyConfirmed),
+    StaleProgressRequest(DatasetPushStaleProgressRequest),
+}
+
+/// The bare confirmation of a server that predates
+/// `DatasetPushCompleteResponse`. Only an empty object matches, so an error
+/// this client does not know is never taken for a confirmation.
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetPushCompleteLegacyConfirmed {}
+
+/// An upload progress request read while awaiting the complete response
+#[derive(Deserialize, Clone, PartialEq, Eq, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct DatasetPushStaleProgressRequest {
+    pub progress_requested: bool,
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -357,6 +447,20 @@ pub struct HeaderRow {
 pub struct TransferInternalError {
     pub phase: TransferPhase,
     pub error_message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The internal error any phase may end with, in the shape of the `Err` of a
+/// phase response: `{"Err":{"Internal":{..}}}`
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum TransferInternalErrorReply {
+    Err(TransferInternalErrorKind),
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum TransferInternalErrorKind {
+    Internal(TransferInternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

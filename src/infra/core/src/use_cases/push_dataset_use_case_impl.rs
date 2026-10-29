@@ -9,9 +9,10 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method1;
+use database_common_macros::{transactional_method1, transactional_method2};
 use dill::{component, interface};
 use internal_error::InternalError;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     PushDatasetUseCase,
     PushError,
@@ -22,12 +23,19 @@ use kamu_core::{
     RemoteAliasKind,
     RemoteAliasesRegistry,
     SyncError,
+    SyncListener,
     SyncMultiListener,
     SyncOptions,
     SyncRequest,
+    SyncResult,
     SyncService,
 };
-use kamu_datasets::{ClassifyByAllowanceResponse, DatasetAction, DatasetActionAuthorizer};
+use kamu_datasets::{
+    DatasetOperation,
+    DatasetOperationGuard,
+    DatasetOperationRequest,
+    DatasetPermissionError,
+};
 
 use crate::SyncRequestBuilder;
 
@@ -41,36 +49,41 @@ pub struct PushDatasetUseCaseImpl {
 }
 
 impl PushDatasetUseCaseImpl {
-    #[transactional_method1(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>)]
+    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
     #[tracing::instrument(level = "debug", name = "PushDatasetUseCase::authorizations", skip_all, fields(?dataset_handles, ?push_target))]
     async fn make_authorization_checks(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
         push_target: Option<&odf::DatasetPushTarget>,
     ) -> Result<(Vec<odf::DatasetHandle>, Vec<PushResponse>), InternalError> {
-        let ClassifyByAllowanceResponse {
-            authorized_handles,
-            unauthorized_handles_with_errors,
-        } = dataset_action_authorizer
-            .classify_dataset_handles_by_allowance(dataset_handles, DatasetAction::Read)
+        let requests: Vec<_> = dataset_handles
+            .into_iter()
+            .map(|hdl| DatasetOperationRequest::new(hdl, DatasetOperation::SyncTo))
+            .collect();
+        let verdicts = dataset_operation_guard
+            .check_operations(&current_account_subject, &requests)
             .await?;
 
-        let unauthorized_responses = unauthorized_handles_with_errors
-            .into_iter()
-            .map(|(hdl, error)| PushResponse {
-                local_handle: Some(hdl),
-                target: push_target.cloned(),
-                result: Err(PushError::SyncError({
-                    use kamu_datasets::ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+        let mut authorized_handles = Vec::with_capacity(requests.len());
+        let mut unauthorized_responses = Vec::new();
+        for (request, verdict) in requests.into_iter().zip(verdicts) {
+            match verdict {
+                Ok(()) => authorized_handles.push(request.target),
+                Err(error) => unauthorized_responses.push(PushResponse {
+                    local_handle: Some(request.target),
+                    target: push_target.cloned(),
+                    result: Err(PushError::SyncError({
+                        use DatasetPermissionError as E;
 
-                    match error {
-                        E::NotFound(e) => SyncError::DatasetNotFound(e.into()),
-                        E::Access(e) => SyncError::Access(e),
-                        E::Internal(e) => SyncError::Internal(e),
-                    }
-                })),
-            })
-            .collect();
+                        match error {
+                            E::NotFound(e) => SyncError::DatasetNotFound(e.into()),
+                            E::Access(e) => SyncError::Access(e),
+                            E::Internal(e) => SyncError::Internal(e),
+                        }
+                    })),
+                }),
+            }
+        }
 
         Ok((authorized_handles, unauthorized_responses))
     }
@@ -92,7 +105,7 @@ impl PushDatasetUseCaseImpl {
         let mut errors = Vec::new();
 
         for pi in plan {
-            let src_ref = pi.local_handle.as_any_ref();
+            let src_ref = pi.local_handle.as_local_ref();
             let dst_ref = (&pi.remote_target.url).into();
             match sync_request_builder
                 .build_sync_request(src_ref, dst_ref, sync_options.create_if_not_exists)
@@ -100,7 +113,6 @@ impl PushDatasetUseCaseImpl {
             {
                 Ok(sync_request) => {
                     sync_request.src.detach_from_transaction();
-                    sync_request.dst.detach_from_transaction();
                     sync_requests.push(sync_request);
                 }
                 Err(e) => errors.push(PushResponse {
@@ -137,6 +149,27 @@ impl PushDatasetUseCaseImpl {
         Ok(push_request_planner
             .collect_plan(authorized_handles, remote_target)
             .await)
+    }
+
+    /// Syncs, then reports the result to the listener: a push to a remote
+    /// commits there, so the result is final when the sync returns
+    async fn sync_and_report(
+        &self,
+        sync_request: SyncRequest,
+        sync_options: SyncOptions,
+        listener: Option<Arc<dyn SyncListener>>,
+    ) -> Result<SyncResult, SyncError> {
+        let result = self
+            .sync_service
+            .sync(sync_request, sync_options, listener.clone())
+            .await;
+        if let Some(listener) = &listener {
+            match &result {
+                Ok(sync_result) => listener.success(sync_result),
+                Err(e) => listener.error(e),
+            }
+        }
+        result
     }
 }
 
@@ -197,12 +230,11 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
             .map(|sync_request| {
                 let listener = sync_listener.as_ref().and_then(|l| {
                     l.begin_sync(
-                        &sync_request.src.as_user_friendly_any_ref(),
+                        &sync_request.src.get_handle().as_any_ref(),
                         &sync_request.dst.as_user_friendly_any_ref(),
                     )
                 });
-                self.sync_service
-                    .sync(sync_request, options.sync_options, listener)
+                self.sync_and_report(sync_request, options.sync_options, listener)
             })
             .collect();
         // TODO: PERF: use tokio-tasks?

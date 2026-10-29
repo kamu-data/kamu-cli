@@ -19,11 +19,11 @@ use kamu_auth_rebac::{
     RebacDatasetRegistryFacade,
 };
 use kamu_datasets::{
-    ClassifyByAllowanceDatasetActionUnauthorizedError,
-    DatasetAction,
-    DatasetActionAccess,
-    DatasetActionAuthorizer,
-    DatasetActionUnauthorizedError,
+    ClassifyByAllowanceDatasetPermissionError,
+    DatasetPermission,
+    DatasetPermissionAccess,
+    DatasetPermissionChecker,
+    DatasetPermissionError,
     DatasetRegistry,
     ResolvedDataset,
 };
@@ -34,7 +34,7 @@ use kamu_datasets::{
 #[dill::interface(dyn RebacDatasetRegistryFacade)]
 pub struct RebacDatasetRegistryFacadeImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
 }
 
 #[async_trait::async_trait]
@@ -42,7 +42,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError> {
         use RebacDatasetRefUnresolvedError as Error;
 
@@ -59,11 +59,11 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
                 }
             })?;
 
-        self.dataset_action_authorizer
-            .check_action_allowed(&handle.id, action)
+        self.dataset_permission_checker
+            .check_permission(&handle.id, permission)
             .await
             .map_err(|e| {
-                use DatasetActionUnauthorizedError as SourceError;
+                use DatasetPermissionError as SourceError;
 
                 match e {
                     SourceError::NotFound(e) => Error::NotFound(e),
@@ -78,10 +78,10 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
     async fn resolve_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError> {
         let dataset_handle = self
-            .resolve_dataset_handle_by_ref(dataset_ref, action)
+            .resolve_dataset_handle_by_ref(dataset_ref, permission)
             .await?;
         let resolved_dataset = self
             .dataset_registry
@@ -94,13 +94,13 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
     async fn resolve_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError> {
-        self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle.id, action)
+        self.dataset_permission_checker
+            .check_permission(&dataset_handle.id, permission)
             .await
             .map_err(|e| {
-                use DatasetActionUnauthorizedError as SourceError;
+                use DatasetPermissionError as SourceError;
                 use RebacDatasetIdUnresolvedError as Error;
 
                 match e {
@@ -120,7 +120,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
     async fn classify_dataset_refs_by_allowance(
         &self,
         dataset_refs: &[&odf::DatasetRef],
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError> {
         // The next work will be done using handles, so we need to get them first.
         let handles_resolution = self
@@ -135,7 +135,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             .map(|(dataset_ref, e)| (dataset_ref, e.into()))
             .collect::<Vec<_>>();
 
-        // Next sort according to allowed actions
+        // Next sort according to granted permissions
         let mut accessible_resolved_refs =
             Vec::with_capacity(dataset_refs.len() - inaccessible_refs.len());
 
@@ -146,13 +146,13 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             .map(|(dataset_ref, handle)| (handle, dataset_ref))
             .collect::<HashMap<_, _>>();
 
-        // Extract handles for action classification
+        // Extract handles for permission classification
         let resolved_handles = resolved_handles_to_refs.keys().cloned().collect();
 
         // Run vectorized classification
         let classification = self
-            .dataset_action_authorizer
-            .classify_dataset_handles_by_allowance(resolved_handles, action)
+            .dataset_permission_checker
+            .classify_dataset_handles_by_allowance(resolved_handles, permission)
             .await?;
 
         // Collect authorized handles
@@ -165,13 +165,13 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         for (handle, error) in classification.unauthorized_handles_with_errors {
             let handle_ref = resolved_handles_to_refs.remove(&handle).unwrap();
             let e = match error {
-                ClassifyByAllowanceDatasetActionUnauthorizedError::NotFound(e) => {
+                ClassifyByAllowanceDatasetPermissionError::NotFound(e) => {
                     RebacDatasetRefUnresolvedError::NotFound(e)
                 }
-                ClassifyByAllowanceDatasetActionUnauthorizedError::Access(e) => {
+                ClassifyByAllowanceDatasetPermissionError::Access(e) => {
                     RebacDatasetRefUnresolvedError::Access(e)
                 }
-                ClassifyByAllowanceDatasetActionUnauthorizedError::Internal(e) => {
+                ClassifyByAllowanceDatasetPermissionError::Internal(e) => {
                     RebacDatasetRefUnresolvedError::Internal(e)
                 }
             };
@@ -188,9 +188,9 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
     async fn classify_dataset_refs_by_access(
         &self,
         dataset_refs: &[&odf::DatasetRef],
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError> {
-        use kamu_datasets::DatasetActionAuthorizerExt;
+        use kamu_datasets::DatasetPermissionCheckerExt;
 
         // The next work will be done using handles, so we need to get them first.
         let handles_resolution = self
@@ -204,21 +204,21 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         let mut tasks = tokio::task::JoinSet::<Result<_, InternalError>>::new();
 
         for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
-            let authorizer = self.dataset_action_authorizer.clone();
+            let permission_checker = self.dataset_permission_checker.clone();
 
             tasks.spawn(async move {
-                let allowed_actions = authorizer
-                    .get_allowed_actions_for_exist_dataset(&dataset_handle.id)
+                let granted_permissions = permission_checker
+                    .get_granted_permissions_for_existing_dataset(&dataset_handle.id)
                     .await?;
                 Ok((
                     dataset_ref,
                     dataset_handle,
-                    DatasetAction::resolve_access(&allowed_actions, action),
+                    DatasetPermission::resolve_access(&granted_permissions, permission),
                 ))
             });
         }
 
-        // Next sort, according to allowed actions
+        // Next sort, according to granted permissions
         let mut forbidden = Vec::new();
         let mut insufficient = Vec::new();
         let mut allowed = Vec::new();
@@ -228,14 +228,14 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             let (dataset_ref, dataset_handle, access) = result?;
 
             match access {
-                DatasetActionAccess::Forbidden => forbidden.push((
+                DatasetPermissionAccess::Forbidden => forbidden.push((
                     dataset_ref.clone(),
-                    RebacDatasetRefUnresolvedError::not_enough_permissions(dataset_ref, action),
+                    RebacDatasetRefUnresolvedError::not_enough_permissions(dataset_ref, permission),
                 )),
-                DatasetActionAccess::Insufficient => {
+                DatasetPermissionAccess::Insufficient => {
                     insufficient.push((dataset_ref, dataset_handle));
                 }
-                DatasetActionAccess::Allowed => {
+                DatasetPermissionAccess::Allowed => {
                     allowed.push((dataset_ref, dataset_handle));
                 }
             }

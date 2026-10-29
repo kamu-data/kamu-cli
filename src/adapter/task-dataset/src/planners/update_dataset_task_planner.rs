@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
-use internal_error::InternalError;
+use database_common_macros::transactional_method1;
 use kamu_core::{
     PollingIngestOptions,
     PullOptions,
@@ -18,9 +17,9 @@ use kamu_core::{
     PullRequestPlanner,
     TenancyConfig,
 };
-use kamu_datasets::DatasetEnvVarResolver;
 use kamu_task_system::*;
 
+use super::task_planning::planning_failed;
 use crate::{LogicalPlanDatasetUpdate, TaskDefinitionDatasetUpdate};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,55 +35,36 @@ pub struct UpdateDatasetTaskPlanner {
 }
 
 impl UpdateDatasetTaskPlanner {
-    #[transactional_method2(
-        pull_request_planner: Arc<dyn PullRequestPlanner>,
-        dataset_env_var_resolver: Arc<dyn DatasetEnvVarResolver>
-    )]
+    #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
     #[tracing::instrument(level = "debug", skip_all, fields(?args))]
     async fn plan_update(
         &self,
         args: &LogicalPlanDatasetUpdate,
-    ) -> Result<TaskDefinition, InternalError> {
-        let dataset_env_vars = dataset_env_var_resolver
-            .resolve_effective_env_vars(&args.dataset_id)
-            .await?;
-
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
         let pull_options = PullOptions {
             ingest_options: PollingIngestOptions {
-                dataset_env_vars,
                 fetch_uncacheable: args.fetch_uncacheable,
                 ..Default::default()
             },
             ..Default::default()
         };
 
-        let plan_res = pull_request_planner
+        let pull_job = pull_request_planner
             .build_pull_plan(
                 PullRequest::local(args.dataset_id.as_local_ref()),
                 &pull_options,
                 *self.tenancy_config,
             )
-            .await;
+            .await
+            .map_err(|e| planning_failed(&e, e.is_recoverable()))?;
 
-        match plan_res {
-            Ok(pull_job) => {
-                pull_job.detach_from_transaction();
-
-                Ok(TaskDefinition::new(TaskDefinitionDatasetUpdate {
-                    pull_options,
-                    pull_job,
-                }))
-            }
-            Err(e) => {
-                assert!(e.result.is_err());
-                tracing::error!(
-                    args = ?args,
-                    error = ?e,
-                    "Update failed",
-                );
-                Err("Update task planning failed".int_err())
-            }
-        }
+        Ok(TaskDefinition::new(TaskDefinitionDatasetUpdate {
+            ingest_options: pull_options.ingest_options,
+            sync_options: pull_options.sync_options,
+            job: pull_job
+                .try_into()
+                .map_err(|e| planning_failed(&e, false))?,
+        }))
     }
 }
 
@@ -96,7 +76,7 @@ impl TaskDefinitionPlanner for UpdateDatasetTaskPlanner {
         &self,
         _task_id: TaskID,
         logical_plan: &LogicalPlan,
-    ) -> Result<TaskDefinition, InternalError> {
+    ) -> Result<TaskDefinition, PrepareTaskDefinitionError> {
         assert_eq!(
             logical_plan.plan_type,
             LogicalPlanDatasetUpdate::TYPE_ID,

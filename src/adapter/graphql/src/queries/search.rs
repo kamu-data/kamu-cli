@@ -11,7 +11,7 @@ use database_common::PaginationOpts;
 use kamu::utils::datasets_filtering::filter_dataset_handle_stream;
 use kamu_accounts::{AccountService, SearchAccountsByNamePatternFilters};
 use kamu_auth_rebac::RebacServiceExt;
-use kamu_datasets::{DatasetAction, DatasetActionAuthorizerExt};
+use kamu_datasets::{DatasetPermission, DatasetPermissionCheckerExt};
 
 use crate::prelude::*;
 use crate::queries::{Account, Dataset};
@@ -42,10 +42,10 @@ impl Search {
     ) -> Result<SearchResultConnection> {
         use futures::TryStreamExt;
 
-        let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+        let (dataset_registry, dataset_permission_checker) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_datasets::DatasetActionAuthorizer
+            dyn kamu_datasets::DatasetPermissionChecker
         );
 
         let page = page.unwrap_or(0);
@@ -72,8 +72,8 @@ impl Search {
 
                 id.contains(&query)
             });
-        let mut readable_dataset_handles = dataset_action_authorizer
-            .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetAction::Read)
+        let mut readable_dataset_handles = dataset_permission_checker
+            .filtered_datasets_stream(filtered_all_dataset_handles_stream, DatasetPermission::Read)
             .try_collect::<Vec<_>>()
             .await?;
         // Sort first by dataset name and for stability after by account name

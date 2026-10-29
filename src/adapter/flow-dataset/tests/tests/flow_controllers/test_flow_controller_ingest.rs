@@ -13,8 +13,7 @@ use chrono::Utc;
 use kamu_accounts::TEST_ACCOUNT_ID;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
-use kamu_core::{PollingIngestResultUpToDate, PullResult, PullResultUpToDate};
-use kamu_datasets::{DatasetIncrementQueryService, MockDatasetIncrementQueryService};
+use kamu_core::{PollingIngestResultUpToDate, PullResultUpToDate};
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
@@ -100,10 +99,9 @@ async fn test_ingest_propagate_success_up_to_date_causes_no_interaction() {
     harness
         .propagate_success(
             &ingest_flow,
-            PullResult::UpToDate(PullResultUpToDate::PollingIngest(
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::PollingIngest(
                 PollingIngestResultUpToDate { uncacheable: false },
             )),
-            None,
         )
         .await;
 }
@@ -115,18 +113,6 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
     const FLOW_ID: u64 = 1;
     let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
     let new_head = odf::Multihash::from_digest_sha3_256(b"new_head");
-
-    let mock_dataset_increment_service =
-        MockDatasetIncrementQueryService::with_increment_between_for_args(
-            foo_dataset_id.clone(),
-            None,
-            new_head.clone(),
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            },
-        );
 
     let mock_flow_sensor_dispatcher =
         MockFlowSensorDispatcher::with_dispatch_for_resource_update_cause(
@@ -154,10 +140,7 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
             },
         );
 
-    let harness = FlowControllerIngestHarness::with_overrides(
-        mock_dataset_increment_service,
-        mock_flow_sensor_dispatcher,
-    );
+    let harness = FlowControllerIngestHarness::with_overrides(mock_flow_sensor_dispatcher);
 
     let ingest_flow = harness
         .make_ingest_flow(FlowID::new(FLOW_ID), &foo_dataset_id, None)
@@ -166,12 +149,88 @@ async fn test_ingest_propagate_success_updated_notifies_dispatcher() {
     harness
         .propagate_success(
             &ingest_flow,
-            PullResult::Updated {
+            TaskResultDatasetUpdate::Updated {
                 old_head: None,
                 new_head,
                 has_more: false,
+                increment: MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 5,
+                    updated_watermark: None,
+                },
             },
-            None,
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ingest_propagate_success_with_more_data_runs_next_iteration() {
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let mut mock_flow_sensor_dispatcher = MockFlowSensorDispatcher::new();
+    mock_flow_sensor_dispatcher
+        .expect_dispatch_input_flow_success()
+        .times(1)
+        .returning(|_, _, _| Ok(()));
+
+    let mut mock_flow_run_service = MockFlowRunService::new();
+    mock_flow_run_service
+        .expect_run_flow_automatically()
+        .withf(|_, flow_binding, activation_causes, _, maybe_config| {
+            flow_binding.flow_type == FLOW_TYPE_DATASET_INGEST
+                && matches!(
+                    activation_causes.as_slice(),
+                    [FlowActivationCause::IterationFinished(_)]
+                )
+                && maybe_config.is_some()
+        })
+        .times(1)
+        .returning(
+            |activation_time, flow_binding, activation_causes, _, maybe_config| {
+                Ok(Flow::new(
+                    activation_time,
+                    FlowID::new(2),
+                    flow_binding.clone(),
+                    activation_causes[0].clone(),
+                    maybe_config,
+                    None,
+                )
+                .into())
+            },
+        );
+
+    let harness =
+        FlowControllerIngestHarness::with_mocks(mock_flow_sensor_dispatcher, mock_flow_run_service);
+
+    let ingest_flow = harness
+        .make_ingest_flow(
+            FlowID::new(1),
+            &foo_dataset_id,
+            Some(
+                FlowConfigRuleIngest {
+                    fetch_uncacheable: false,
+                    fetch_next_iteration: true,
+                }
+                .into_flow_config(),
+            ),
+        )
+        .await;
+
+    harness
+        .propagate_success(
+            &ingest_flow,
+            TaskResultDatasetUpdate::Updated {
+                old_head: None,
+                new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
+                has_more: true,
+                increment: MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 5,
+                    updated_watermark: None,
+                },
+            },
         )
         .await;
 }
@@ -185,18 +244,17 @@ struct FlowControllerIngestHarness {
 
 impl FlowControllerIngestHarness {
     fn new() -> Self {
-        Self::with_overrides(
-            MockDatasetIncrementQueryService::new(),
-            MockFlowSensorDispatcher::new(),
-        )
+        Self::with_overrides(MockFlowSensorDispatcher::new())
     }
 
-    fn with_overrides(
-        mock_dataset_increment_service: MockDatasetIncrementQueryService,
-        mock_flow_sensor_dispatcher: MockFlowSensorDispatcher,
-    ) -> Self {
-        let mock_flow_run_service = MockFlowRunService::new();
+    fn with_overrides(mock_flow_sensor_dispatcher: MockFlowSensorDispatcher) -> Self {
+        Self::with_mocks(mock_flow_sensor_dispatcher, MockFlowRunService::new())
+    }
 
+    fn with_mocks(
+        mock_flow_sensor_dispatcher: MockFlowSensorDispatcher,
+        mock_flow_run_service: MockFlowRunService,
+    ) -> Self {
         let mut b = dill::CatalogBuilder::new();
         b.add::<FlowControllerIngest>()
             .add::<InMemoryFlowEventStore>()
@@ -205,8 +263,6 @@ impl FlowControllerIngestHarness {
             .add::<InMemoryFlowSystemEventBridge>()
             .add::<InMemoryWakeupHub>()
             .add::<WakeupListenerMetrics>()
-            .add_value(mock_dataset_increment_service)
-            .bind::<dyn DatasetIncrementQueryService, MockDatasetIncrementQueryService>()
             .add_value(mock_flow_sensor_dispatcher)
             .bind::<dyn FlowSensorDispatcher, MockFlowSensorDispatcher>()
             .add::<FakeDatasetEntryService>()
@@ -247,20 +303,9 @@ impl FlowControllerIngestHarness {
             .unwrap()
     }
 
-    async fn propagate_success(
-        &self,
-        flow_state: &FlowState,
-        pull_result: PullResult,
-        data_increment: Option<MetadataChainIncrementInterval>,
-    ) {
-        let task_result = TaskResultDatasetUpdate {
-            pull_result,
-            data_increment,
-        }
-        .into_task_result();
-
+    async fn propagate_success(&self, flow_state: &FlowState, update: TaskResultDatasetUpdate) {
         self.controller
-            .propagate_success(flow_state, &task_result, Utc::now())
+            .propagate_success(flow_state, &update.into_task_result(), Utc::now())
             .await
             .unwrap();
     }

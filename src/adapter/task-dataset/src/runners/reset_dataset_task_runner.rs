@@ -12,9 +12,10 @@ use std::sync::Arc;
 use database_common_macros::transactional_method1;
 use internal_error::InternalError;
 use kamu_core::{ResetExecutionError, ResetExecutor};
-use kamu_datasets::DatasetRegistry;
+use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use kamu_task_system::*;
 
+use super::task_head_commit::{dataset_deleted_outcome, head_moved_outcome};
 use crate::{TaskDefinitionDatasetReset, TaskErrorDatasetReset, TaskResultDatasetReset};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,9 +37,12 @@ impl ResetDatasetTaskRunner {
         &self,
         task_reset: TaskDefinitionDatasetReset,
     ) -> Result<TaskOutcome, InternalError> {
-        let target = dataset_registry
-            .get_dataset_by_handle(&task_reset.dataset_handle)
-            .await;
+        let Some(target) = dataset_registry
+            .try_get_dataset_by_ref(&task_reset.dataset_handle.as_local_ref())
+            .await?
+        else {
+            return Ok(dataset_deleted_outcome(&task_reset.dataset_handle));
+        };
 
         let reset_result_maybe = self
             .reset_executor
@@ -55,7 +59,19 @@ impl ResetDatasetTaskRunner {
                 ) => Ok(TaskOutcome::Failed(
                     TaskErrorDatasetReset::ResetHeadNotFound.into_task_error(),
                 )),
-                err @ (ResetExecutionError::SetReferenceFailed(_)
+                ResetExecutionError::SetReferenceFailed(
+                    odf::dataset::SetChainRefError::CASFailed(e),
+                ) => Ok(head_moved_outcome(task_reset.dataset_handle.id, e)),
+                // Retrying under the same account cannot gain the access
+                ResetExecutionError::SetReferenceFailed(
+                    odf::dataset::SetChainRefError::Access(e),
+                ) => {
+                    tracing::error!(error = ?e, error_msg = %e, "Not allowed to reset the dataset");
+                    Ok(TaskOutcome::Failed(TaskError::empty_unrecoverable()))
+                }
+                err @ (ResetExecutionError::SetReferenceFailed(
+                    odf::dataset::SetChainRefError::Internal(_),
+                )
                 | ResetExecutionError::Internal(_)) => {
                     tracing::error!(
                         error = ?err,

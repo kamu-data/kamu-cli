@@ -57,6 +57,53 @@ where
         }
     }
 
+    async fn compare_and_set(
+        &self,
+        r: &str,
+        expected: Option<&Multihash>,
+        hash: &Multihash,
+    ) -> Result<(), CompareAndSetRefError> {
+        let mismatch = || {
+            CompareAndSetRefError::Mismatch(RefMismatchError {
+                block_ref_name: r.to_string(),
+            })
+        };
+
+        // The same hash can be stored in another multibase encoding, so hashes are
+        // compared here, and the conditional write expects the exact stored text
+        let expected_text = match expected {
+            None => None,
+            Some(expected) => {
+                let stored = match self.repo.get(r).await {
+                    Ok(stored) => stored,
+                    Err(GetNamedError::NotFound(_)) => return Err(mismatch()),
+                    Err(GetNamedError::Access(e)) => return Err(CompareAndSetRefError::Access(e)),
+                    Err(GetNamedError::Internal(e)) => {
+                        return Err(CompareAndSetRefError::Internal(e));
+                    }
+                };
+                let text = std::str::from_utf8(&stored[..]).int_err()?;
+                if Multihash::from_multibase(text).int_err()? != *expected {
+                    return Err(mismatch());
+                }
+                Some(stored)
+            }
+        };
+
+        let multibase = hash.as_multibase().to_stack_string();
+        match self
+            .repo
+            .compare_and_set(r, expected_text.as_deref(), multibase.as_bytes())
+            .await
+        {
+            Ok(()) => Ok(()),
+            Err(CompareAndSetNamedError::Mismatch(_)) => Err(mismatch()),
+            Err(CompareAndSetNamedError::NotSupported) => Err(CompareAndSetRefError::NotSupported),
+            Err(CompareAndSetNamedError::Access(e)) => Err(CompareAndSetRefError::Access(e)),
+            Err(CompareAndSetNamedError::Internal(e)) => Err(CompareAndSetRefError::Internal(e)),
+        }
+    }
+
     async fn delete(&self, r: &str) -> Result<(), DeleteRefError> {
         match self.repo.delete(r).await {
             Ok(()) => Ok(()),

@@ -25,9 +25,9 @@ use kamu::{
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGenerator, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::{
-    DatasetActionAuthorizer,
+    DatasetPermissionChecker,
     DatasetRegistry,
-    MockDatasetActionAuthorizer,
+    MockDatasetPermissionChecker,
     ResolvedDataset,
 };
 use odf::dataset::testing::create_test_dataset_from_snapshot;
@@ -148,7 +148,7 @@ pub(crate) async fn create_test_dataset(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn create_base_catalog(dataset_action_authorizer: MockDatasetActionAuthorizer) -> dill::Catalog {
+fn create_base_catalog(dataset_permission_checker: MockDatasetPermissionChecker) -> dill::Catalog {
     dill::CatalogBuilder::new()
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceStub>()
@@ -158,8 +158,8 @@ fn create_base_catalog(dataset_action_authorizer: MockDatasetActionAuthorizer) -
         .add::<SessionContextBuilder>()
         .add::<ObjectStoreRegistryImpl>()
         .add_value(CurrentAccountSubject::new_test())
-        .add_value(dataset_action_authorizer)
-        .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .add_value(dataset_permission_checker)
+        .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>()
         .build()
 }
 
@@ -167,9 +167,9 @@ fn create_base_catalog(dataset_action_authorizer: MockDatasetActionAuthorizer) -
 
 pub(crate) fn create_base_catalog_with_local_workspace(
     tempdir: &std::path::Path,
-    dataset_action_authorizer: MockDatasetActionAuthorizer,
+    dataset_permission_checker: MockDatasetPermissionChecker,
 ) -> dill::Catalog {
-    let base_catalog = create_base_catalog(dataset_action_authorizer);
+    let base_catalog = create_base_catalog(dataset_permission_checker);
 
     let datasets_dir = tempdir.join("datasets");
     std::fs::create_dir(&datasets_dir).unwrap();
@@ -187,9 +187,9 @@ pub(crate) fn create_base_catalog_with_local_workspace(
 
 pub(crate) fn create_base_catalog_with_s3_workspace(
     s3: &LocalS3Server,
-    dataset_action_authorizer: MockDatasetActionAuthorizer,
+    dataset_permission_checker: MockDatasetPermissionChecker,
 ) -> dill::Catalog {
-    let base_catalog = create_base_catalog(dataset_action_authorizer);
+    let base_catalog = create_base_catalog(dataset_permission_checker);
 
     dill::CatalogBuilder::new_chained(&base_catalog)
         .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))

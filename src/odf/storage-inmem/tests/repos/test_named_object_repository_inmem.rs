@@ -19,3 +19,12 @@ async fn test_basics_in_memory() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_compare_and_set_in_memory() {
+    let repo = NamedObjectRepositoryInMemory::new();
+    test_named_object_repository_shared::test_named_repository_compare_and_set(&repo).await;
+    test_named_object_repository_shared::test_named_repository_compare_and_set_race(&repo).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

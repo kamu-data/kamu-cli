@@ -12,9 +12,15 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::RebacDatasetRegistryFacade;
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{
+    DatasetOperation,
+    DatasetOperationGuard,
+    DatasetOperationRequest,
+    DatasetPermissionError,
+    DatasetRegistry,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +29,9 @@ use kamu_datasets::DatasetAction;
 pub struct SetWatermarkUseCaseImpl {
     set_watermark_planner: Arc<dyn SetWatermarkPlanner>,
     set_watermark_executor: Arc<dyn SetWatermarkExecutor>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 #[common_macros::method_names_consts]
@@ -40,13 +48,17 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
         dataset_handle: &odf::DatasetHandle,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkResult, SetWatermarkError> {
-        // Resolve dataset
-        let target = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Write)
+        self.dataset_operation_guard
+            .check_operation(
+                &self.current_account_subject,
+                &DatasetOperationRequest::new(
+                    dataset_handle.clone(),
+                    DatasetOperation::SetWatermark,
+                ),
+            )
             .await
             .map_err(|e| {
-                use kamu_auth_rebac::RebacDatasetIdUnresolvedError as E;
+                use DatasetPermissionError as E;
 
                 match e {
                     E::NotFound(e) => SetWatermarkError::NotFound(e),
@@ -54,6 +66,11 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
                     e @ E::Internal(_) => SetWatermarkError::Internal(e.int_err()),
                 }
             })?;
+
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         // Make a plan
         let plan = self

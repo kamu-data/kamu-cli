@@ -87,6 +87,10 @@ pub trait KamuCliPuppetExt {
 
     async fn log_stdout(&self, dataset_name: &odf::DatasetName, args: &[&str]) -> String;
 
+    /// `HEAD` of every dataset as written to the workspace storage, which can
+    /// lag the database until the Outbox is processed
+    fn list_storage_heads(&self) -> Vec<odf::Multihash>;
+
     async fn ingest_data(&self, dataset_name: &odf::DatasetName, data: &str);
 
     async fn get_list_of_repo_aliases(&self, dataset_ref: &odf::DatasetRef) -> Vec<RepoAlias>;
@@ -240,6 +244,20 @@ impl KamuCliPuppetExt for KamuCliPuppet {
                     .unwrap();
 
                 BlockRecord { block_hash, block }
+            })
+            .collect()
+    }
+
+    fn list_storage_heads(&self) -> Vec<odf::Multihash> {
+        let datasets_dir = self.workspace_path().join(".kamu").join("datasets");
+
+        std::fs::read_dir(datasets_dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path().join("refs").join("head"))
+            .filter(|head_path| head_path.is_file())
+            .map(|head_path| {
+                let head = std::fs::read_to_string(head_path).unwrap();
+                odf::Multihash::from_multibase(head.trim()).unwrap()
             })
             .collect()
     }
@@ -582,7 +600,7 @@ pub struct DatasetListOptions {
     all_accounts: bool,
 }
 
-#[derive(Debug, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "PascalCase", deny_unknown_fields)]
 pub struct RepoAlias {
     pub dataset: odf::DatasetAlias,

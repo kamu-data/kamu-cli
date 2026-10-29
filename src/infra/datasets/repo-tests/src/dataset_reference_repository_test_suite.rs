@@ -185,6 +185,112 @@ pub async fn test_update_reference_provoke_cas_violation(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_update_reference_from_stale_hash_provoke_cas_violation(catalog: &Catalog) {
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
+    let dataset_name = odf::DatasetName::new_unchecked("foo");
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &test_account_name,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
+
+    let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
+
+    let ref_1_hash = odf::Multihash::from_digest_sha3_256(b"a");
+    let ref_2_hash = odf::Multihash::from_digest_sha3_256(b"b");
+    let stale_hash = odf::Multihash::from_digest_sha3_256(b"stale");
+
+    // -- set a reference 1 relatively to None
+
+    let set_res = dataset_ref_repo
+        .set_dataset_reference(&dataset_id, &odf::BlockRef::Head, None, &ref_1_hash)
+        .await;
+    assert_matches!(set_res, Ok(()));
+
+    // -- set a reference 2 relatively to a hash it does not point at => CAS error
+
+    let set_res = dataset_ref_repo
+        .set_dataset_reference(
+            &dataset_id,
+            &odf::BlockRef::Head,
+            Some(&stale_hash),
+            &ref_2_hash,
+        )
+        .await;
+    assert_matches!(
+        set_res,
+        Err(SetDatasetReferenceError::CASFailed(e))
+        if e.dataset_id == dataset_id &&
+           e.block_ref == odf::BlockRef::Head &&
+           e.expected_prev_block_hash == Some(stale_hash.clone()) &&
+           e.actual_prev_block_hash == Some(ref_1_hash.clone())
+    );
+
+    // -- observe the changes: they should have stuck at reference 1
+
+    let get_all_res = dataset_ref_repo
+        .get_all_dataset_references(&dataset_id)
+        .await;
+    assert_matches!(get_all_res, Ok(v) if v == vec![(odf::BlockRef::Head, ref_1_hash)]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_update_missing_reference_provoke_cas_violation(catalog: &Catalog) {
+    let (test_account_id, test_account_name) = init_test_account(catalog).await;
+
+    let dataset_id = odf::DatasetID::new_seeded_ed25519(b"some-id");
+    let dataset_name = odf::DatasetName::new_unchecked("foo");
+    init_dataset_entry(
+        catalog,
+        &test_account_id,
+        &test_account_name,
+        &dataset_id,
+        &dataset_name,
+        odf::DatasetKind::Root,
+    )
+    .await;
+
+    let dataset_ref_repo = catalog.get_one::<dyn DatasetReferenceRepository>().unwrap();
+
+    let ref_1_hash = odf::Multihash::from_digest_sha3_256(b"a");
+    let ref_2_hash = odf::Multihash::from_digest_sha3_256(b"b");
+
+    // -- set a reference 2 relatively to a never stored reference 1 => CAS error
+
+    let set_res = dataset_ref_repo
+        .set_dataset_reference(
+            &dataset_id,
+            &odf::BlockRef::Head,
+            Some(&ref_1_hash),
+            &ref_2_hash,
+        )
+        .await;
+    assert_matches!(
+        set_res,
+        Err(SetDatasetReferenceError::CASFailed(e))
+        if e.dataset_id == dataset_id &&
+           e.block_ref == odf::BlockRef::Head &&
+           e.expected_prev_block_hash == Some(ref_1_hash.clone()) &&
+           e.actual_prev_block_hash.is_none()
+    );
+
+    // -- observe the changes: nothing should have been stored
+
+    let get_all_res = dataset_ref_repo
+        .get_all_dataset_references(&dataset_id)
+        .await;
+    assert_matches!(get_all_res, Ok(v) if v.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_set_and_remove_reference(catalog: &Catalog) {
     let (test_account_id, test_account_name) = init_test_account(catalog).await;
 

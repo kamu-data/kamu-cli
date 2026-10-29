@@ -22,7 +22,7 @@ use kamu_accounts::{
     LoggedAccount,
 };
 use kamu_accounts_services::utils::AccountAuthorizationHelper;
-use kamu_datasets::DatasetActionAuthorizer;
+use kamu_datasets::DatasetPermissionChecker;
 use kamu_signing::common::ProofType;
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{
@@ -40,7 +40,7 @@ use kamu_signing::use_cases::{
 pub struct SignEip712UseCaseImpl {
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     current_account_subject: Arc<CurrentAccountSubject>,
     account_service: Arc<dyn AccountService>,
     account_authorization_helper: Arc<dyn AccountAuthorizationHelper>,
@@ -61,11 +61,11 @@ impl SignEip712UseCaseImpl {
         &self,
         dataset_id: odf::DatasetID,
     ) -> Result<Option<DidSecretKey>, InternalError> {
-        use kamu_datasets::DatasetActionAuthorizerExt;
+        use kamu_datasets::DatasetPermissionCheckerExt;
 
         let has_read_access = self
-            .dataset_action_authorizer
-            .is_action_allowed(&dataset_id, kamu_datasets::DatasetAction::Read)
+            .dataset_permission_checker
+            .is_permission_granted(&dataset_id, kamu_datasets::DatasetPermission::Read)
             .await?;
 
         if !has_read_access {

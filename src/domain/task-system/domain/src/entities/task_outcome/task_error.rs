@@ -41,6 +41,14 @@ impl TaskError {
         }
     }
 
+    pub fn empty(recoverable: bool) -> Self {
+        if recoverable {
+            Self::empty_recoverable()
+        } else {
+            Self::empty_unrecoverable()
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.error_type == Self::TASK_ERROR_EMPTY
     }

@@ -104,12 +104,10 @@ impl PushIngestExecutorImpl {
         {
             Ok(res) => {
                 tracing::info!(result = ?res, "Ingest iteration successful");
-                listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
                 tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
-                listener.error(&err);
                 Err(err)
             }
         }

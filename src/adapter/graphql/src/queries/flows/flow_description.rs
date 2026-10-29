@@ -33,7 +33,6 @@ use kamu_adapter_task_dataset::{
     TaskResultDatasetUpdate,
 };
 use kamu_core::{CompactionResult, PullResultUpToDate};
-use kamu_datasets::{DatasetIncrementQueryService, GetIncrementError};
 use kamu_flow_system as fs;
 use kamu_flow_system::{FLOW_SCOPE_TYPE_SYSTEM, FLOW_TYPE_SYSTEM_GC};
 use kamu_task_system as ts;
@@ -158,14 +157,6 @@ pub(crate) struct FlowDescriptionDatasetResetToMetadata {
 pub(crate) enum FlowDescriptionUpdateResult {
     UpToDate(FlowDescriptionUpdateResultUpToDate),
     Success(FlowDescriptionUpdateResultSuccess),
-    Unknown(FlowDescriptionUpdateResultUnknown),
-}
-
-/// Dataset was updated, but the added data could not be determined
-#[derive(SimpleObject)]
-pub(crate) struct FlowDescriptionUpdateResultUnknown {
-    /// Why the added data could not be determined
-    message: String,
 }
 
 /// Dataset was already up to date, nothing was added
@@ -189,11 +180,7 @@ pub(crate) struct FlowDescriptionUpdateResultSuccess {
 }
 
 impl FlowDescriptionUpdateResult {
-    async fn from_maybe_flow_outcome(
-        maybe_outcome: Option<&fs::FlowOutcome>,
-        dataset_id: &odf::DatasetID,
-        increment_query_service: &dyn DatasetIncrementQueryService,
-    ) -> Result<Option<Self>, InternalError> {
+    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Result<Option<Self>> {
         if let Some(outcome) = maybe_outcome {
             match outcome {
                 fs::FlowOutcome::Success(result) => match result.result_type.as_str() {
@@ -203,73 +190,29 @@ impl FlowDescriptionUpdateResult {
                     | TaskResultDatasetReset::TYPE_ID => Ok(None),
 
                     TaskResultDatasetUpdate::TYPE_ID => {
-                        let update = TaskResultDatasetUpdate::from_task_result(result)?;
-                        if let Some((old_head, new_head)) = update.try_as_increment() {
-                            // TODO: consider removing fallback if we will completely migrate
-                            // existing flows to new structure
-                            let data_increment = if let Some(increment) = &update.data_increment {
-                                *increment
-                            } else {
-                                match increment_query_service
-                                    .get_increment_between(dataset_id, old_head, new_head)
-                                    .await
-                                {
-                                    Ok(increment) => {
-                                        tracing::warn!(
-                                            ?dataset_id,
-                                            "Call fetching increment fallback"
-                                        );
-                                        increment
+                        match TaskResultDatasetUpdate::from_task_result(result)? {
+                            TaskResultDatasetUpdate::Updated {
+                                has_more,
+                                increment,
+                                ..
+                            } => Ok(Some(Self::Success(FlowDescriptionUpdateResultSuccess {
+                                num_blocks: increment.num_blocks,
+                                num_records: increment.num_records,
+                                updated_watermark: increment.updated_watermark,
+                                has_more,
+                            }))),
+                            TaskResultDatasetUpdate::UpToDate(up_to_date) => {
+                                let uncacheable = match up_to_date {
+                                    PullResultUpToDate::PollingIngest(pi) => pi.uncacheable,
+                                    PullResultUpToDate::PushIngest(pi) => pi.uncacheable,
+                                    PullResultUpToDate::Sync | PullResultUpToDate::Transform => {
+                                        false
                                     }
-                                    Err(err) => {
-                                        let unknown_message = match err {
-                                            GetIncrementError::BlockNotFound(e) => format!(
-                                                "Unable to fetch increment. Block is missing: {}",
-                                                e.hash
-                                            ),
-                                            GetIncrementError::DatasetNotFound(_)
-                                            | GetIncrementError::RefNotFound(_)
-                                            | GetIncrementError::InvalidInterval(_)
-                                            | GetIncrementError::Access(_)
-                                            | GetIncrementError::Internal(_) => {
-                                                "Unable to fetch increment".to_string()
-                                            }
-                                        };
-                                        return Ok(Some(Self::Unknown(
-                                            FlowDescriptionUpdateResultUnknown {
-                                                message: unknown_message,
-                                            },
-                                        )));
-                                    }
-                                }
-                            };
-
-                            Ok(Some(Self::Success(FlowDescriptionUpdateResultSuccess {
-                                num_blocks: data_increment.num_blocks,
-                                num_records: data_increment.num_records,
-                                updated_watermark: data_increment.updated_watermark,
-                                has_more: update.has_more(),
-                            })))
-                        } else if let Some(up_to_date_result) = update.try_as_up_to_date() {
-                            match up_to_date_result {
-                                PullResultUpToDate::PollingIngest(pi) => {
-                                    Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
-                                        uncacheable: pi.uncacheable,
-                                    })))
-                                }
-                                PullResultUpToDate::PushIngest(pi) => {
-                                    Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
-                                        uncacheable: pi.uncacheable,
-                                    })))
-                                }
-                                PullResultUpToDate::Sync | PullResultUpToDate::Transform => {
-                                    Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
-                                        uncacheable: false,
-                                    })))
-                                }
+                                };
+                                Ok(Some(Self::UpToDate(FlowDescriptionUpdateResultUpToDate {
+                                    uncacheable,
+                                })))
                             }
-                        } else {
-                            unreachable!()
                         }
                     }
 
@@ -348,6 +291,7 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 ref new_head,
                                 old_num_blocks,
                                 new_num_blocks,
+                                breaking: _,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
                                 original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
                                 resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),
@@ -367,6 +311,7 @@ impl FlowDescriptionDatasetReorganizationResult {
                                 ref new_head,
                                 old_num_blocks,
                                 new_num_blocks,
+                                breaking: _,
                             } => Ok(Some(Self::Success(FlowDescriptionReorganizationSuccess {
                                 original_blocks_count: u64::try_from(old_num_blocks).unwrap(),
                                 resulting_blocks_count: u64::try_from(new_num_blocks).unwrap(),
@@ -580,19 +525,16 @@ impl FlowDescriptionBuilder {
         Ok(results)
     }
 
-    pub async fn build(
-        &mut self,
-        ctx: &Context<'_>,
-        flow_state: &fs::FlowState,
-    ) -> Result<FlowDescription> {
+    pub fn build(&mut self, flow_state: &fs::FlowState) -> Result<FlowDescription> {
         let flow_type = flow_state.flow_binding.flow_type.as_str();
         Ok(match flow_state.flow_binding.scope.scope_type() {
             FLOW_SCOPE_TYPE_DATASET => {
                 let dataset_id = FlowScopeDataset::new(&flow_state.flow_binding.scope).dataset_id();
-                FlowDescription::Dataset(
-                    self.dataset_flow_description(ctx, flow_state, flow_type, &dataset_id)
-                        .await?,
-                )
+                FlowDescription::Dataset(self.dataset_flow_description(
+                    flow_state,
+                    flow_type,
+                    &dataset_id,
+                )?)
             }
 
             FLOW_SCOPE_TYPE_WEBHOOK_SUBSCRIPTION => {
@@ -670,24 +612,17 @@ impl FlowDescriptionBuilder {
         }
     }
 
-    async fn dataset_flow_description(
+    fn dataset_flow_description(
         &self,
-        ctx: &Context<'_>,
         flow_state: &fs::FlowState,
         flow_type: &str,
         dataset_id: &odf::DatasetID,
     ) -> Result<FlowDescriptionDataset> {
         Ok(match flow_type {
             FLOW_TYPE_DATASET_INGEST => {
-                let increment_query_service =
-                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
                 let ingest_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                     flow_state.outcome.as_ref(),
-                    dataset_id,
-                    increment_query_service.as_ref(),
-                )
-                .await
-                .int_err()?;
+                )?;
 
                 if let Some(polling_source) = self.polling_sources_by_dataset_id.get(dataset_id) {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
@@ -727,17 +662,10 @@ impl FlowDescriptionBuilder {
             }
 
             FLOW_TYPE_DATASET_TRANSFORM => {
-                let increment_query_service =
-                    from_catalog_n!(ctx, dyn DatasetIncrementQueryService);
-
                 if let Some(transform) = self.transforms_by_dataset_id.get(dataset_id) {
                     let transform_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                         flow_state.outcome.as_ref(),
-                        dataset_id,
-                        increment_query_service.as_ref(),
-                    )
-                    .await
-                    .int_err()?;
+                    )?;
 
                     FlowDescriptionDataset::ExecuteTransform(
                         FlowDescriptionDatasetExecuteTransform {

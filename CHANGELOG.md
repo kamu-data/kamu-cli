@@ -15,11 +15,131 @@ Recommendation: for ease of reading, use the following format:
 
 ## [Unreleased]
 ### Changed
+- `kamu verify` with transform replay requires read permission on every input it replays; an
+  unreadable input fails with an access error before anything is replayed
+- `kamu ingest` in a multi-tenant workspace requires write permission on the dataset, as ingesting
+  through the API does
 - Tests: the FTP ingest test runs against an in-process FTP server instead of a container, and is
   enabled again
+- When a dataset's head moves while `kamu pull` or `kamu system compact` runs, or while an update or
+  compaction task runs, the command or task now fails with a head-moved conflict that names the
+  expected and actual heads, instead of an internal error. Such tasks fail as recoverable
+- Reset tasks no longer overwrite a head that moved after the reset was planned; they fail with the
+  same recoverable head-moved conflict
+- `kamu push` over the smart protocol fails with "Dataset was updated concurrently" when the remote
+  dataset's head moves while the pushed blocks are being committed, instead of an unrelated
+  WebSocket error
+- GraphQL: `setWatermark` returns `SetWatermarkCasFailed` with the expected and actual heads when the
+  dataset's head moves concurrently, instead of an internal error
+- A forced pull or push (`--force`) no longer overwrites a head that another writer moved while the
+  new blocks were being transferred or committed. `kamu push --force` over the smart protocol also
+  fails with "Dataset was updated concurrently" when the remote head moved at any point after the
+  push started, and pushes to S3 and local file system repositories fail the same way when the
+  remote head moves during the push. A server that predates this, and storage without conditional
+  writes, still overwrite such a change
+- `kamu system compact` no longer holds a database transaction while it merges data, so a long
+  compaction no longer blocks other writers. A dataset whose head moves meanwhile fails with the
+  head-moved conflict. Each dataset is committed as soon as it is compacted, so a failure in one
+  dataset no longer undoes the compaction of the others
+- `kamu pull` of a derivative fails with "Input dataset … has no data yet, pull it first" when an
+  input has never received data, instead of reporting the derivative as up to date
+- `kamu pull --reset-derivatives-on-diverged-input` reports a reset derivative as updated, even when
+  the transform that follows the reset has no new data to process
+- Update tasks that pull a dataset from a remote no longer retry failures that a retry cannot fix,
+  such as diverged histories, an unknown repository, a missing remote dataset or a remote dataset
+  named by ID; network and other transient failures are still retried
+- `kamu pull` of a dataset whose pull alias names an unknown repository fails with "Repository …
+  does not exist", and one whose pull alias names a remote dataset by ID fails with "Syncing remote
+  dataset by ID is not yet supported: …", instead of an internal error
+- Upgrading clears the history of tasks and flow runs, including pending manual runs. Flow
+  configurations and triggers are kept, and enabled flows are scheduled again when the node starts
+- GraphQL (breaking): `FlowDescriptionUpdateResultUnknown` is removed from
+  `FlowDescriptionUpdateResult`; a flow that updated a dataset always reports the blocks and
+  records it added
+- GraphQL: a transform flow that found nothing to do reports `FlowDescriptionUpdateResultUpToDate`,
+  as ingest flows do, instead of no result
+- Update and compaction tasks no longer retry a commit the account is not allowed to make, and
+  update tasks no longer retry a pull whose server sends metadata that cannot be read
+- `kamu pull` of several datasets no longer pulls none of them when the remote of one is unknown
+  or cannot be reached; that dataset fails on its own
+- A slow or unreachable remote repository no longer delays other writers to the node's database
+  while `kamu pull` or an update task prepares to pull from it
+- Compaction tasks of a derived dataset, and reset tasks whose expected old head no longer matches,
+  fail without retries
 ### Fixed
+- `kamu pull` no longer shows an ingest or a transform as successful when its commit then fails
+  because the dataset's head moved
+- When `kamu pull --reset-derivatives-on-diverged-input` resets a derivative and the transform that
+  follows fails, the error now says that the dataset was reset to its metadata
+- A first `kamu pull` from a remote that fails, including when saving the pull alias fails, no
+  longer leaves a dataset behind: the dataset appears only once the pull succeeds
+- `kamu push` over the smart protocol fails with "Dataset was updated concurrently" when the remote
+  head moved before the push started, instead of an internal error
+- `kamu push` over the smart protocol onto a remote with a diverged history reports the histories as
+  diverged, as the other protocols do, instead of an invalid interval
+- Update tasks that pull over the smart protocol retry a failed object download, such as an expired
+  download link, instead of failing as a corrupted source
+- A malformed reply during a smart protocol transfer fails the transfer instead of crashing the
+  client or the server's connection
+- `kamu push` over the smart protocol to a dataset ID that does not exist fails with "not found"
+- In a multi-tenant workspace, `kamu pull` from a remote no longer picks another account's dataset
+  that has the same pull alias, which failed the pull and revealed that dataset's name
+- `kamu pull` of a remote dataset by ID without a local name fails with an error asking for the
+  destination instead of crashing
+- `kamu pull` and `kamu push` into a dataset left without a head by an interrupted transfer fail
+  when the incoming dataset is a different one, instead of writing its history
+- `kamu push` over the smart protocol no longer reports success when the server's commit failed
+  while it was asking for upload progress
+- A dataset updated by a smart protocol push always notifies the node's flows; a failure to record
+  the change now fails the push with nothing committed
+- `kamu push` over the smart protocol reports a name collision for a long dataset alias, instead of
+  a retried internal error
+- `kamu push` from an older `kamu` to this node reports a failure, instead of success, when the node
+  could not commit the push
+- When a smart protocol transfer fails on the server, the error names the failed step instead of
+  showing a JSON parse error
+- Update, compaction and reset tasks of a dataset deleted after they were scheduled fail without
+  retries, instead of being retried or crashing
+- When `kamu pull` or `kamu system compact` fails for some datasets, the datasets that did update
+  are now fully processed before the command exits, instead of on the next command
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.
   Only queries that request a `Proof` need the key
+- Transform flows now run for a derivative whose input has a single record, or whose input only
+  advanced its watermark; before, the flow treated them as up to date
+- `kamu pull` of a derivative that defines no transform, together with other datasets or with
+  `--recursive` or `--all`, fails with "Dataset does not define a transform" instead of crashing
+- Changing the inputs of a derivative's transform makes its pulls, flows and verification fail with
+  an error that names the dataset, instead of crashing the process
+- `kamu verify` of a derivative whose query was changed no longer reports the blocks produced by
+  the earlier query as not reproducible
+- `kamu verify` of a derivative that ran its transform more than once no longer fails with an
+  internal engine error: the input data of later transforms was skipped when they were replayed
+- A transform whose output schema is incompatible with the dataset's schema fails without retries
+- Engine names in a transform are case-insensitive (`Spark` works like `spark`); an unknown engine
+  fails without retries
+- A transform whose engine output adds nothing no longer crashes the process; it is reported as up
+  to date
+- Transform runs no longer leave their working files behind after a successful commit
+- An ingest flow of a root dataset without a polling source fails instead of reporting success on
+  every run
+- An ingest whose data fails validation or does not parse as its column's type fails without
+  retries; `kamu pull` and `kamu ingest` report a CSV or JSON value that does not parse with its
+  own message instead of an internal error
+- When `kamu pull` fails part-way through a source that yields several batches, it reports how many
+  blocks and records it ingested before the failure, along with the actual error
+- Ingest flows no longer fail after their data was committed, which left downstream flows
+  untriggered
+- Failures to read a dataset environment variable used in a fetch step, such as a secret that
+  cannot be decrypted, are reported instead of being treated as a missing value
+- Polling ingest runs no longer leave their working files behind after success, and a failed fetch
+  no longer leaves its partial download in the cache
+- Re-running an ingest after its downloaded data was deleted from the cache downloads it again
+  instead of recording the source as ingested without its data
+- After a local source file (`file://` or `FilesGlob`) that failed to ingest is fixed, its data is
+  ingested once instead of again on the next poll
+- A preprocess step that names an unsupported engine fails without retries
+- A fetch savepoint left truncated by a crash or a full disk is fetched again instead of failing
+  every later run until the cache is cleared
 
 ## [0.271.0] - 2026-10-21
 ### Added

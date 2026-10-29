@@ -598,8 +598,9 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
                     Some(cli::SystemApiServerSubCommand::GqlQuery(_))
                 )
             }
-            cli::SystemSubCommand::Compact(_)
-            | cli::SystemSubCommand::DebugToken(_)
+            // Opens short transactions of its own around the merge
+            cli::SystemSubCommand::Compact(_) => false,
+            cli::SystemSubCommand::DebugToken(_)
             | cli::SystemSubCommand::Depgraph(_)
             | cli::SystemSubCommand::Decode(_)
             | cli::SystemSubCommand::Diagnose(_)

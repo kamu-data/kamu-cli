@@ -97,6 +97,7 @@ impl Command for SetWatermarkCommand {
                 e @ (SetWatermarkError::Planning(
                     SetWatermarkPlanningError::IsRemote | SetWatermarkPlanningError::IsDerivative,
                 )
+                | SetWatermarkError::Execution(SetWatermarkExecutionError::RefCASFailed(_))
                 | SetWatermarkError::Access(_)),
             ) => Err(CLIError::failure(e)),
             Err(

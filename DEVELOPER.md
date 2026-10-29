@@ -201,6 +201,8 @@ This will do a number of highly useful checks:
 * Rust formatting check
 * `Cargo.toml` sorting and formatting check (`cargo sort`, `taplo`)
 * License headers check
+* Dividing lines check (exactly 120 characters)
+* Dataset reference writes check (`HEAD` moves only through `DatasetHeadCommitter`)
 * Dependencies check: detecting issues with existing dependencies, detecting unused dependencies
 * Rust coding practices checks (`clippy`)
 * SQLX offline data check (`sqlx` data for offline compilation must be up-to-date with the database schema)

@@ -12,6 +12,8 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use thiserror::Error;
 
+use crate::smart_protocol::phases::TransferPhase;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -19,14 +21,31 @@ pub enum ReadMessageError {
     #[error("Client has disconnected unexpectedly")]
     ClientDisconnected,
 
+    #[error("Server has disconnected unexpectedly")]
+    ServerDisconnected,
+
     #[error("Close message received")]
     Closed,
 
+    /// The server ended the session with an internal error instead of the
+    /// expected reply
+    #[error("Server failed in phase {phase:?}: {message}")]
+    ServerFailed {
+        phase: TransferPhase,
+        message: String,
+    },
+
+    /// The server closed the session with a reason that is no reply this
+    /// client can read
+    #[error("Server closed the session with an unreadable reply {reason:?}")]
+    UnreadableCloseReason {
+        reason: String,
+        #[source]
+        source: serde_json::Error,
+    },
+
     #[error("Message is not in text format")]
     NonTextMessageReceived,
-
-    #[error("Incompatible message version. Please upgrade client version")]
-    IncompatibleVersion,
 
     #[error(transparent)]
     SerdeError(

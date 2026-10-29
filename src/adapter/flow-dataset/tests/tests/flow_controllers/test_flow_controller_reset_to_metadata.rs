@@ -72,6 +72,32 @@ async fn test_reset_to_metadata_propagate_success_untouched_causes_no_interactio
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_reset_to_metadata_propagate_success_non_breaking_causes_no_interaction() {
+    let harness = FlowControllerResetToMetadataHarness::new();
+
+    let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let reset_to_metadata_flow = harness
+        .make_reset_to_metadata_flow(FlowID::new(1), &foo_dataset_id)
+        .await;
+
+    harness
+        .propagate_success(
+            &reset_to_metadata_flow,
+            CompactionResult::Success {
+                old_head: odf::Multihash::from_digest_sha3_256(b"old_head"),
+                new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
+                old_num_blocks: 100,
+                new_num_blocks: 1,
+                breaking: false,
+            },
+        )
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_compact_propagate_success_compacted_notifies_dispatcher() {
     const FLOW_ID: u64 = 1;
     let foo_dataset_id = odf::DatasetID::new_seeded_ed25519(b"foo");
@@ -119,6 +145,7 @@ async fn test_compact_propagate_success_compacted_notifies_dispatcher() {
                 new_head,
                 old_num_blocks: 50,
                 new_num_blocks: 4,
+                breaking: true,
             },
         )
         .await;
@@ -160,6 +187,7 @@ async fn test_reset_to_metadata_propagate_success_reactivates_own_sensor() {
                 new_head: odf::Multihash::from_digest_sha3_256(b"new_head"),
                 old_num_blocks: 50,
                 new_num_blocks: 4,
+                breaking: true,
             },
         )
         .await;

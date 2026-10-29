@@ -32,6 +32,8 @@ use kamu_datasets::*;
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
+    DatasetHeadCommitterImpl,
+    DatasetOperationGuardImpl,
     DatasetStatisticsServiceImpl,
     QuotaDefaultsConfig,
 };
@@ -124,7 +126,8 @@ async fn test_dataset_compact() {
             new_head,
             old_head,
             new_num_blocks: 5,
-            old_num_blocks: 6
+            old_num_blocks: 6,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -258,7 +261,8 @@ async fn test_dataset_compact_s3() {
             new_head,
             old_head,
             new_num_blocks: 5,
-            old_num_blocks: 6
+            old_num_blocks: 6,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -544,7 +548,8 @@ async fn test_dataset_compaction_limits() {
             new_head,
             old_head,
             new_num_blocks: 7,
-            old_num_blocks: 9
+            old_num_blocks: 9,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);
@@ -698,7 +703,8 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
             new_head,
             old_head,
             new_num_blocks: 7,
-            old_num_blocks: 9
+            old_num_blocks: 9,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);
@@ -855,7 +861,8 @@ async fn test_large_dataset_compact() {
             new_head,
             old_head,
             new_num_blocks: 24,
-            old_num_blocks: 104
+            old_num_blocks: 104,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);
@@ -950,7 +957,8 @@ async fn test_compact_offsets_are_sequential_impl() {
             new_head,
             old_head,
             new_num_blocks: 5,
-            old_num_blocks: 14
+            old_num_blocks: 14,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -1060,7 +1068,8 @@ async fn test_dataset_keep_metadata_only_compact() {
             new_head,
             old_head,
             new_num_blocks: 2,
-            old_num_blocks: 3
+            old_num_blocks: 3,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -1105,7 +1114,8 @@ async fn test_dataset_keep_metadata_only_compact() {
             new_head,
             old_head,
             new_num_blocks: 4,
-            old_num_blocks: 6
+            old_num_blocks: 6,
+            breaking: true,
         }) if new_head != old_head,
     );
 
@@ -1266,7 +1276,8 @@ async fn test_hard_compaction_with_schema_migration() {
             new_head,
             old_head,
             new_num_blocks: 8,
-            old_num_blocks: 10
+            old_num_blocks: 10,
+            breaking: true,
         }) if new_head != old_head,
     );
     assert!(harness.verify_dataset(target).await);
@@ -1594,7 +1605,7 @@ impl CompactTestHarness {
             ))
             .add::<odf::dataset::DatasetLfsBuilderDefault>()
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<ObjectStoreRegistryImpl>()
@@ -1622,9 +1633,10 @@ impl CompactTestHarness {
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<PushIngestDataUseCaseImpl>()
+            .add::<DatasetOperationGuardImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<DummyOutboxImpl>()
-            .add::<TransformRequestPlannerImpl>()
-            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<TransformExecutorImpl>()
             .add_value(MockEngineProvisioner::new().stub_provision_engine())
             .bind::<dyn EngineProvisioner, MockEngineProvisioner>()
@@ -1661,7 +1673,7 @@ impl CompactTestHarness {
             .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
             .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
             .add::<DatasetRegistrySoloUnitBridge>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(SystemTimeSourceStub::new_set(current_date_time))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
@@ -1678,6 +1690,8 @@ impl CompactTestHarness {
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
             .add::<PushIngestDataUseCaseImpl>()
+            .add::<DatasetOperationGuardImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
@@ -1690,8 +1704,7 @@ impl CompactTestHarness {
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())
             .add::<DummyOutboxImpl>()
-            .add::<TransformRequestPlannerImpl>()
-            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<TransformExecutorImpl>()
             .add::<DataFormatRegistryImpl>()
             .add_value(QuotaDefaultsConfig::default())

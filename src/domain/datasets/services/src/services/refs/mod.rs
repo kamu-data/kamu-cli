@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_head_committer_impl;
 mod dataset_reference_indexer;
 mod dataset_reference_service_impl;
 
+pub use dataset_head_committer_impl::*;
 pub use dataset_reference_indexer::*;
 pub use dataset_reference_service_impl::*;

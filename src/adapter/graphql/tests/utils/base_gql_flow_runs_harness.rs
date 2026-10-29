@@ -13,7 +13,7 @@ use std::num::NonZeroUsize;
 use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use indoc::indoc;
-use kamu::TransformRequestPlannerImpl;
+use kamu::TransformPlannerImpl;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_flow_webhook::webhook_deliver_binding;
 use kamu_core::TenancyConfig;
@@ -109,7 +109,7 @@ impl BaseGQLFlowRunsHarness {
             .add::<TaskSchedulerImpl>()
             .add::<InMemoryTaskEventStore>()
             .add::<InMemoryTaskQueueWakeupSource>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<FakeDependencyGraphIndexer>()
             .add::<DeleteDatasetUseCaseImpl>();
 

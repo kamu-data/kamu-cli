@@ -9,9 +9,10 @@
 
 use std::sync::Arc;
 
+use database_common_macros::{transactional_method2, transactional_method3};
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     CompactDatasetUseCase,
     CompactionError,
@@ -19,21 +20,87 @@ use kamu_core::{
     CompactionListener,
     CompactionMultiListener,
     CompactionOptions,
+    CompactionPlan,
     CompactionPlanner,
     CompactionResponse,
     CompactionResult,
     NullCompactionMultiListener,
 };
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{
+    DatasetHeadCommitter,
+    DatasetOperation,
+    DatasetOperationGuard,
+    DatasetOperationRequest,
+    DatasetPermissionError,
+    DatasetRegistry,
+    ResolvedDataset,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Plans and commits in short transactions of their own and runs the merge
+/// with no transaction open, so a long compaction blocks no other writer.
 #[component]
 #[interface(dyn CompactDatasetUseCase)]
 pub struct CompactDatasetUseCaseImpl {
-    compaction_planner: Arc<dyn CompactionPlanner>,
+    catalog: dill::Catalog,
     compaction_executor: Arc<dyn CompactionExecutor>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    current_account_subject: Arc<CurrentAccountSubject>,
+}
+
+impl CompactDatasetUseCaseImpl {
+    #[transactional_method3(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
+    async fn plan_transactionally(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        options: CompactionOptions,
+        maybe_listener: Option<Arc<dyn CompactionListener>>,
+    ) -> Result<(ResolvedDataset, CompactionPlan), CompactionError> {
+        let operation = if options.keep_metadata_only {
+            DatasetOperation::ResetToMetadata
+        } else {
+            DatasetOperation::Compaction
+        };
+        dataset_operation_guard
+            .check_operation(
+                &self.current_account_subject,
+                &DatasetOperationRequest::new(dataset_handle.clone(), operation),
+            )
+            .await
+            .map_err(|e| {
+                use DatasetPermissionError as E;
+
+                match e {
+                    E::NotFound(e) => CompactionError::NotFound(e),
+                    E::Access(e) => CompactionError::Access(e),
+                    e @ E::Internal(_) => CompactionError::Internal(e.int_err()),
+                }
+            })?;
+
+        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+
+        let compaction_plan = compaction_planner
+            .plan_compaction(target.clone(), options, maybe_listener)
+            .await?;
+
+        target.detach_from_transaction();
+
+        Ok((target, compaction_plan))
+    }
+
+    #[transactional_method2(dataset_registry: Arc<dyn DatasetRegistry>, dataset_head_committer: Arc<dyn DatasetHeadCommitter>)]
+    async fn commit_head_transactionally(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        old_head: &odf::Multihash,
+        new_head: &odf::Multihash,
+    ) -> Result<(), odf::dataset::SetChainRefError> {
+        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
+
+        dataset_head_committer
+            .commit_head(&target, Some(old_head), new_head)
+            .await
+    }
 }
 
 #[common_macros::method_names_consts]
@@ -51,30 +118,13 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<CompactionResult, CompactionError> {
-        let target = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Maintain)
-            .await
-            .map_err(|e| {
-                use RebacDatasetIdUnresolvedError as E;
-
-                match e {
-                    E::NotFound(e) => CompactionError::NotFound(e),
-                    E::Access(e) => CompactionError::Access(e),
-                    e @ E::Internal(_) => CompactionError::Internal(e.int_err()),
-                }
-            })?;
-
-        // Plan compacting
-        let compaction_plan = self
-            .compaction_planner
-            .plan_compaction(target.clone(), options, maybe_listener.clone())
+        let (target, compaction_plan) = self
+            .plan_transactionally(dataset_handle, options, maybe_listener.clone())
             .await?;
 
-        // Execute compacting
         let compaction_result = self
             .compaction_executor
-            .execute(target.clone(), compaction_plan, maybe_listener)
+            .execute(target, compaction_plan, maybe_listener)
             .await?;
 
         // Set proposed reference, if something got compacted
@@ -86,16 +136,7 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
                 old_head, new_head, ..
             } => {
                 tracing::debug!(%dataset_handle, %new_head, "Setting new compacted head");
-                target
-                    .as_metadata_chain()
-                    .set_ref(
-                        &odf::BlockRef::Head,
-                        new_head,
-                        odf::dataset::SetRefOpts {
-                            validate_block_present: true,
-                            check_ref_is: Some(Some(old_head)),
-                        },
-                    )
+                self.commit_head_transactionally(dataset_handle, old_head, new_head)
                     .await?;
             }
         }

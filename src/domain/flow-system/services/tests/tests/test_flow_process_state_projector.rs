@@ -14,7 +14,6 @@ use chrono::{Duration, Utc};
 use dill::*;
 use kamu_adapter_flow_dataset::ingest_dataset_binding;
 use kamu_adapter_task_dataset::TaskResultDatasetUpdate;
-use kamu_core::PullResult;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::InMemoryFlowProcessState;
 use kamu_flow_system_services::*;
@@ -495,13 +494,11 @@ async fn test_flow_succeeded() {
                 flow_binding: foo_binding.clone(),
                 flow_id: FlowID::new(1),
                 outcome: FlowOutcome::Success(
-                    TaskResultDatasetUpdate {
-                        pull_result: PullResult::Updated {
-                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                            new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                            has_more: false,
-                        },
-                        data_increment: None,
+                    TaskResultDatasetUpdate::Updated {
+                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                        has_more: false,
+                        increment: odf::dataset::MetadataChainIncrementInterval::default(),
                     }
                     .into_task_result(),
                 ),

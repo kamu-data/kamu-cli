@@ -299,6 +299,37 @@ impl S3Context {
         .await
     }
 
+    /// Writes the object only if the `condition` holds at the time of the
+    /// write. A failed condition is a `412 Precondition Failed` or, when a
+    /// concurrent conditional write wins, a `409 Conflict`
+    pub async fn put_object_conditional(
+        &self,
+        key: String,
+        data: &[u8],
+        condition: PutObjectCondition,
+    ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+        self.api_call("put_object(conditional)", || async {
+            let size = i64::try_from(data.len()).unwrap();
+
+            let request = self
+                .client
+                .put_object()
+                .bucket(self.shared_state.bucket.clone())
+                .key(key)
+                // TODO: PERF: Avoid copying data into a buffer
+                .body(Vec::from(data).into())
+                .content_length(size);
+
+            let request = match condition {
+                PutObjectCondition::IfMatch(e_tag) => request.if_match(e_tag),
+                PutObjectCondition::IfNoneMatch => request.if_none_match("*"),
+            };
+
+            request.send().await
+        })
+        .await
+    }
+
     pub async fn put_object_presigned_request(
         &self,
         key: impl Into<String>,
@@ -721,6 +752,15 @@ impl S3Context {
 #[derive(bon::Builder)]
 pub struct GetObjectOptions {
     presigned_config: PresigningConfig,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub enum PutObjectCondition {
+    /// The object exists and its `ETag` is the given one
+    IfMatch(String),
+    /// The object does not exist
+    IfNoneMatch,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

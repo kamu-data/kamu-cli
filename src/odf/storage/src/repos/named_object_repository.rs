@@ -24,6 +24,18 @@ pub trait NamedObjectRepository: Sync + Send {
     /// Update reference to point at the specified object hash
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError>;
 
+    /// Writes `data` only if the object currently holds `expected`, or is
+    /// absent when `expected` is `None`, as one atomic step. Storage that
+    /// cannot do that returns `NotSupported` without writing anything
+    async fn compare_and_set(
+        &self,
+        _name: &str,
+        _expected: Option<&[u8]>,
+        _data: &[u8],
+    ) -> Result<(), CompareAndSetNamedError> {
+        Err(CompareAndSetNamedError::NotSupported)
+    }
+
     /// Deletes specified reference
     async fn delete(&self, name: &str) -> Result<(), DeleteNamedError>;
 }
@@ -66,6 +78,36 @@ pub enum SetNamedError {
         #[backtrace]
         InternalError,
     ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum CompareAndSetNamedError {
+    #[error(transparent)]
+    Mismatch(NamedObjectMismatchError),
+    #[error("Storage does not support conditional writes")]
+    NotSupported,
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Object does not hold the expected content: {name}")]
+pub struct NamedObjectMismatchError {
+    pub name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

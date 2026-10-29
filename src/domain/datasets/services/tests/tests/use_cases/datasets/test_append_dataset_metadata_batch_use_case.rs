@@ -14,7 +14,14 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use kamu::testing::BaseRepoHarness;
 use kamu_core::MockDidGenerator;
-use kamu_datasets::AppendDatasetMetadataBatchUseCase;
+use kamu_datasets::{
+    AppendDatasetMetadataBatchUseCase,
+    AppendDatasetMetadataBatchUseCaseError,
+    AppendDatasetMetadataBatchUseCaseOptions,
+    CreateDatasetResult,
+    ResolvedDataset,
+    SetRefCheckRefMode,
+};
 use kamu_datasets_services::AppendDatasetMetadataBatchUseCaseImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
@@ -77,7 +84,7 @@ async fn test_append_dataset_metadata_batch() {
     let res = harness
         .use_case
         .execute(
-            foo.dataset.as_ref(),
+            &ResolvedDataset::from_created(&foo),
             Box::new(new_blocks.into_iter()),
             Default::default(),
         )
@@ -177,7 +184,7 @@ async fn test_append_dataset_metadata_batch_with_same_dependencies() {
     let res = harness
         .use_case
         .execute(
-            baz.dataset.as_ref(),
+            &ResolvedDataset::from_created(&baz),
             Box::new(new_blocks.into_iter()),
             Default::default(),
         )
@@ -278,7 +285,7 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
     let res = harness
         .use_case
         .execute(
-            bar.dataset.as_ref(),
+            &ResolvedDataset::from_created(&bar),
             Box::new(new_blocks.into_iter()),
             Default::default(),
         )
@@ -324,6 +331,79 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_append_dataset_metadata_batch_head_moved_concurrently() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = AppendDatasetMetadataBatchUseCaseHarness::new(
+        MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id]),
+    )
+    .await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+
+    let (batch_head, batch) = harness.set_info_batch(&foo, "ours").await;
+    let (concurrent_head, concurrent_batch) = harness.set_info_batch(&foo, "concurrent").await;
+    harness
+        .append_batch(&foo, concurrent_batch, SetRefCheckRefMode::default())
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness
+            .append_batch(&foo, batch, SetRefCheckRefMode::default())
+            .await,
+        Err(AppendDatasetMetadataBatchUseCaseError::SetRefError(
+            odf::dataset::SetChainRefError::CASFailed(odf::dataset::RefCASError {
+                expected,
+                actual,
+                ..
+            })
+        )) if expected == Some(foo.head.clone()) && actual == Some(concurrent_head.clone())
+    );
+    assert_ne!(batch_head, concurrent_head);
+    assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_append_dataset_metadata_batch_replaces_diverged_history_at_expected_head() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let predefined_foo_id = odf::DatasetID::new_seeded_ed25519(b"foo");
+
+    let harness = AppendDatasetMetadataBatchUseCaseHarness::new(
+        MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id]),
+    )
+    .await;
+    let foo = harness
+        .create_root_dataset(&harness.catalog, &alias_foo)
+        .await;
+
+    let (batch_head, batch) = harness.set_info_batch(&foo, "ours").await;
+    let (diverged_head, diverged_batch) = harness.set_info_batch(&foo, "diverged").await;
+    harness
+        .append_batch(&foo, diverged_batch, SetRefCheckRefMode::default())
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness
+            .append_batch(
+                &foo,
+                batch,
+                SetRefCheckRefMode::Explicit(Some(diverged_head))
+            )
+            .await,
+        Ok(Some(new_head)) if new_head == batch_head
+    );
+    assert_eq!(harness.get_head(&foo).await, batch_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(DatasetBaseUseCaseHarness, dataset_base_use_case_harness)]
 struct AppendDatasetMetadataBatchUseCaseHarness {
     dataset_base_use_case_harness: DatasetBaseUseCaseHarness,
@@ -355,6 +435,60 @@ impl AppendDatasetMetadataBatchUseCaseHarness {
             use_case: catalog.get_one().unwrap(),
             catalog,
         }
+    }
+
+    /// A one-block batch on top of the dataset's initial `HEAD`
+    async fn set_info_batch(
+        &self,
+        created: &CreateDatasetResult,
+        description: &str,
+    ) -> (
+        odf::Multihash,
+        VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+    ) {
+        let head_block = created
+            .dataset
+            .as_metadata_chain()
+            .get_block(&created.head)
+            .await
+            .unwrap();
+
+        let block = MetadataFactory::metadata_block(
+            MetadataFactory::set_info().description(description).build(),
+        )
+        .prev(&created.head, head_block.sequence_number)
+        .system_time(self.system_time_source().now())
+        .build();
+        let (hash, bytes) = BaseRepoHarness::serialize_block(&block);
+
+        (hash.clone(), VecDeque::from([(hash, block, bytes)]))
+    }
+
+    async fn append_batch(
+        &self,
+        created: &CreateDatasetResult,
+        batch: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
+        set_ref_check_ref_mode: SetRefCheckRefMode,
+    ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
+        self.use_case
+            .execute(
+                &ResolvedDataset::from_created(created),
+                Box::new(batch.into_iter()),
+                AppendDatasetMetadataBatchUseCaseOptions {
+                    set_ref_check_ref_mode,
+                    ..Default::default()
+                },
+            )
+            .await
+    }
+
+    async fn get_head(&self, created: &CreateDatasetResult) -> odf::Multihash {
+        created
+            .dataset
+            .as_metadata_chain()
+            .resolve_ref(&odf::BlockRef::Head)
+            .await
+            .unwrap()
     }
 }
 

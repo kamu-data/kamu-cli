@@ -10,22 +10,28 @@
 use std::assert_matches;
 use std::collections::HashSet;
 
-use chrono::{TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     DATASET_DERIVATIVE_CITY_POPULATION_SNAPSHOT,
+    DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR,
     DATASET_ROOT_CITY_POPULATION_SNAPSHOT,
     DATASET_ROOT_PLAYER_NAME,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2,
     DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_3,
+    DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
     FlowDownstreamSummary,
+    FlowSummary,
     FlowTriggerResponse,
     KamuApiServerClient,
     KamuApiServerClientExt,
     RequestBody,
+    leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
+
+use crate::resources::ResourceCtx;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1066,6 +1072,351 @@ pub async fn test_trigger_flow_ingest_no_polling_source(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_trigger_flow_ingest_with_env_var_from_variable_set(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    std::fs::write(temp_dir.path().join("data.csv"), CITY_POPULATION_CSV).unwrap();
+
+    // Logs the client in as the e2e user, who then owns both the dataset and the
+    // variable set
+    let ctx = ResourceCtx::remote_from_server(
+        &mut kamu_api_server_client,
+        ResourceCtx::DEFAULT_REMOTE_CONTEXT,
+    )
+    .await;
+
+    // No default in the template: the flow fails unless the server resolves it
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&city_population_snapshot(
+            "Url",
+            "url",
+            "file://${{ env.data_dir }}/data.csv",
+        ))
+        .await;
+
+    let variable_set = indoc::formatdoc!(
+        r#"
+        $schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSet
+        headers:
+          name: ingest-vars
+          labels:
+            legacy-config-target-dataset: {dataset_id}
+        spec:
+          variables:
+            data_dir: {data_dir}
+        "#,
+        data_dir = temp_dir.path().display(),
+    );
+    ctx.assert_success_with_stdin(["apply", "--stdin"], &variable_set, None)
+        .await;
+    wait_until_ready(&ctx, "ingest-vars").await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+
+    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
+    pretty_assertions::assert_eq!(
+        vec![Some("FlowSuccessResult")],
+        flows
+            .iter()
+            .map(|f| f.outcome.as_deref())
+            .collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(vec!["A", "B"], query_cities(&kamu_api_server_client).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest_of_unparsable_data_fails_without_retries(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let src_path = temp_dir.path().join("data.csv");
+    std::fs::write(&src_path, "city,population\nA,not-a-number\n").unwrap();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&city_population_snapshot(
+            "Url",
+            "url",
+            &format!("file://{}", src_path.display()),
+        ))
+        .await;
+    kamu_api_server_client
+        .flow()
+        .set_ingest_config(&dataset_id, false, false, 3)
+        .await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+
+    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
+    pretty_assertions::assert_eq!(1, flows.len());
+    pretty_assertions::assert_eq!(Some("FlowFailedError"), flows[0].outcome.as_deref());
+    pretty_assertions::assert_eq!(1, flows[0].task_ids.len());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest_from_unreachable_source_retries(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&city_population_snapshot(
+            "Url",
+            "url",
+            "http://127.0.0.1:1/data.csv",
+        ))
+        .await;
+    kamu_api_server_client
+        .flow()
+        .set_ingest_config(&dataset_id, false, false, 3)
+        .await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+
+    let flow = kamu_api_server_client
+        .flow()
+        .wait_for_flow(&dataset_id, |flow| flow.status == "RETRYING")
+        .await;
+    pretty_assertions::assert_eq!(1, flow.task_ids.len());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest_fetches_next_iterations(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    for (i, city) in ["A", "B", "C"].iter().enumerate() {
+        std::fs::write(
+            temp_dir.path().join(format!("chunk-{}.csv", i + 1)),
+            format!("city,population\n{city},1000\n"),
+        )
+        .unwrap();
+    }
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&city_population_snapshot(
+            "FilesGlob",
+            "path",
+            &temp_dir.path().join("chunk-*.csv").display().to_string(),
+        ))
+        .await;
+    kamu_api_server_client
+        .flow()
+        .set_ingest_config(&dataset_id, false, true, 3)
+        .await;
+
+    // One trigger: each iteration that reports more data schedules the next
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    let flows = wait_advancing_time(&kamu_api_server_client, &dataset_id, 3).await;
+
+    pretty_assertions::assert_eq!(
+        vec![Some("FlowSuccessResult"); 3],
+        flows
+            .iter()
+            .map(|f| f.outcome.as_deref())
+            .collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(
+        vec!["A", "B", "C"],
+        query_cities(&kamu_api_server_client).await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_ingest_fetching_uncacheable(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let src_path = temp_dir.path().join("data.csv");
+    std::fs::write(&src_path, "city,population\nA,1000\n").unwrap();
+
+    kamu_api_server_client.auth().login_as_kamu().await;
+    let CreateDatasetResponse { dataset_id, .. } = kamu_api_server_client
+        .dataset()
+        .create_dataset(&city_population_snapshot(
+            "Url",
+            "url",
+            &format!("file://{}", src_path.display()),
+        ))
+        .await;
+
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client.flow().wait(&dataset_id, 1).await;
+
+    // The watermark block records no source state, so the source becomes
+    // uncacheable
+    kamu_api_server_client
+        .dataset()
+        .set_watermark(
+            &dataset_id,
+            Utc.with_ymd_and_hms(2050, 1, 1, 0, 0, 0).unwrap(),
+        )
+        .await;
+    std::fs::write(&src_path, "city,population\nB,2000\n").unwrap();
+
+    // Past the throttling period of the previous flow
+    advance_time(&kamu_api_server_client, 1).await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client.flow().wait(&dataset_id, 2).await;
+    pretty_assertions::assert_eq!(vec!["A"], query_cities(&kamu_api_server_client).await);
+
+    advance_time(&kamu_api_server_client, 2).await;
+    assert_matches!(
+        kamu_api_server_client
+            .flow()
+            .trigger_ingest_fetching_uncacheable(&dataset_id)
+            .await,
+        FlowTriggerResponse::Success(_)
+    );
+    kamu_api_server_client.flow().wait(&dataset_id, 3).await;
+
+    let flows = kamu_api_server_client.flow().list_flows(&dataset_id).await;
+    // Newest first; only the forced trigger carries an ingest configuration
+    pretty_assertions::assert_eq!(
+        vec![Some(true), None, None],
+        flows
+            .iter()
+            .map(|f| f.fetch_uncacheable)
+            .collect::<Vec<_>>()
+    );
+    pretty_assertions::assert_eq!(vec!["A", "B"], query_cities(&kamu_api_server_client).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const CITY_POPULATION_CSV: &str = "city,population\nA,1000\nB,2000\n";
+
+/// A root dataset `city-population` reading CSV with `city` and `population`
+/// from a polling source of `fetch_kind`, whose `fetch_key` is `fetch_value`
+fn city_population_snapshot(fetch_kind: &str, fetch_key: &str, fetch_value: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: city-population
+          kind: Root
+          metadata:
+            - kind: SetPollingSource
+              fetch:
+                kind: {fetch_kind}
+                {fetch_key}: "{fetch_value}"
+              read:
+                kind: Csv
+                header: true
+                schema:
+                  fields:
+                    - name: city
+                      type: String
+                    - name: population
+                      type: Int64
+              merge:
+                kind: Append
+        "#
+    )
+    .escape_default()
+    .to_string()
+}
+
+/// Moves the frozen system time `hours` past its start, so flows held by the
+/// throttling period can run
+async fn advance_time(kamu_api_server_client: &KamuApiServerClient, hours: u32) {
+    kamu_api_server_client
+        .e2e()
+        .set_system_time(
+            Utc.with_ymd_and_hms(2050, 1, 2, 3, 4, 5).unwrap() + Duration::hours(i64::from(hours)),
+        )
+        .await;
+}
+
+/// Waits for `expected_count` finished flows, advancing the frozen system time
+/// so that each follow-up flow passes its throttling period
+async fn wait_advancing_time(
+    kamu_api_server_client: &KamuApiServerClient,
+    dataset_id: &odf::DatasetID,
+    expected_count: usize,
+) -> Vec<FlowSummary> {
+    for hours in 1..=60 {
+        let flows = kamu_api_server_client.flow().list_flows(dataset_id).await;
+        if flows.len() >= expected_count && flows.iter().all(|f| f.status == "FINISHED") {
+            return flows;
+        }
+        advance_time(kamu_api_server_client, hours).await;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+    panic!("Expected {expected_count} finished flows");
+}
+
+async fn query_cities(kamu_api_server_client: &KamuApiServerClient) -> Vec<String> {
+    let result = kamu_api_server_client
+        .odf_query()
+        .query("SELECT city FROM 'city-population' ORDER BY city")
+        .await
+        .unwrap();
+    result.lines().skip(1).map(ToOwned::to_owned).collect()
+}
+
+/// Flows resolve variables from reconciled sets, and reconciliation follows
+/// `apply` asynchronously
+async fn wait_until_ready(ctx: &ResourceCtx, variable_set_name: &str) {
+    for _ in 0..60 {
+        if ctx.get_one(["get", "vs", variable_set_name]).await.phase() == "Ready" {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    }
+    panic!("VariableSet {variable_set_name} did not become ready");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_trigger_flow_execute_transform(mut kamu_api_server_client: KamuApiServerClient) {
     kamu_api_server_client.auth().login_as_kamu().await;
 
@@ -1149,6 +1500,263 @@ pub async fn test_trigger_flow_execute_transform_no_set_transform(
         FlowTriggerResponse::Error(message)
             if message == "Flow didn't met preconditions: 'No SetTransform event defined'"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_of_single_record_input(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse { dataset_alias, .. } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &dataset_alias,
+            RequestBody::NdJson(
+                r#"{"match_time": "2000-01-01", "match_id": 1, "player_id": "Alice", "score": 100}"#
+                    .into(),
+            ),
+        )
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        Some("FlowDescriptionUpdateResultSuccess"),
+        flow.transform_result.as_deref()
+    );
+    pretty_assertions::assert_eq!(Some(1), flow.transformed_records);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_after_input_watermark_advanced(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+    advance_time(&kamu_api_server_client, 1).await;
+
+    let watermark = Utc.with_ymd_and_hms(2000, 1, 5, 0, 0, 0).unwrap();
+    kamu_api_server_client
+        .dataset()
+        .set_watermark(&root_dataset_id, watermark)
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(
+        Some("FlowDescriptionUpdateResultSuccess"),
+        flow.transform_result.as_deref()
+    );
+    pretty_assertions::assert_eq!(Some(0), flow.transformed_records);
+    pretty_assertions::assert_eq!(Some(watermark), flow.updated_watermark);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_of_never_ingested_input(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowSuccessResult"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(
+        "",
+        kamu_api_server_client
+            .dataset()
+            .tail_data(&derivative_dataset_id)
+            .await
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_after_inputs_changed_fails(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+    advance_time(&kamu_api_server_client, 1).await;
+
+    let CreateDatasetResponse {
+        dataset_id: other_dataset_id,
+        dataset_alias: other_dataset_alias,
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(
+            &DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR
+                .replace("name: player-scores", "name: other-scores")
+                .escape_default()
+                .to_string(),
+        )
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &other_dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
+        )
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .commit_event(
+            &derivative_dataset_id,
+            &leaderboard_set_transform_event(&other_dataset_id, LEADERBOARD_QUERY),
+        )
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_with_incompatible_schema_fails(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    let CreateDatasetResponse {
+        dataset_id: root_dataset_id,
+        dataset_alias: root_dataset_alias,
+    } = kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client.dataset().create_leaderboard().await;
+    run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+    advance_time(&kamu_api_server_client, 1).await;
+
+    kamu_api_server_client
+        .dataset()
+        .commit_event(
+            &derivative_dataset_id,
+            &leaderboard_set_transform_event(
+                &root_dataset_id,
+                "SELECT match_time, CAST(score AS STRING) AS score FROM player_scores",
+            ),
+        )
+        .await;
+    kamu_api_server_client
+        .dataset()
+        .ingest_data(
+            &root_dataset_alias,
+            RequestBody::NdJson(DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_2.into()),
+        )
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_trigger_flow_execute_transform_with_unknown_engine_fails(
+    mut kamu_api_server_client: KamuApiServerClient,
+) {
+    kamu_api_server_client.auth().login_as_kamu().await;
+
+    kamu_api_server_client
+        .dataset()
+        .create_player_scores_dataset_with_data()
+        .await;
+    let CreateDatasetResponse {
+        dataset_id: derivative_dataset_id,
+        ..
+    } = kamu_api_server_client
+        .dataset()
+        .create_dataset(
+            &DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+                .replace("engine: datafusion", "engine: no-such-engine")
+                .escape_default()
+                .to_string(),
+        )
+        .await;
+
+    let flow = run_transform_flow(&kamu_api_server_client, &derivative_dataset_id).await;
+
+    pretty_assertions::assert_eq!(Some("FlowFailedError"), flow.outcome.as_deref());
+    pretty_assertions::assert_eq!(Some(false), flow.failure_recoverable);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The leaderboard's own query, on one line
+const LEADERBOARD_QUERY: &str = "SELECT ROW_NUMBER() OVER (PARTITION BY 1 ORDER BY score DESC) AS \
+                                 place, match_time, match_id, player_id, score FROM player_scores \
+                                 LIMIT 2";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Triggers a transform flow and waits for it to finish
+async fn run_transform_flow(
+    kamu_api_server_client: &KamuApiServerClient,
+    dataset_id: &odf::DatasetID,
+) -> FlowSummary {
+    let FlowTriggerResponse::Success(flow_id) = kamu_api_server_client
+        .flow()
+        .trigger_transform(dataset_id)
+        .await
+    else {
+        panic!("Transform flow was not triggered");
+    };
+    let flow_id = flow_id.to_string();
+
+    kamu_api_server_client
+        .flow()
+        .wait_for_flow(dataset_id, |flow| {
+            flow.flow_id == flow_id && flow.status == "FINISHED"
+        })
+        .await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2413,7 +3021,7 @@ pub async fn test_config_change_reaches_waiting_flow(
 
     kamu_api_server_client
         .flow()
-        .set_ingest_config(&dataset_id, true, 3)
+        .set_ingest_config(&dataset_id, true, false, 3)
         .await;
 
     let configured_flow = kamu_api_server_client

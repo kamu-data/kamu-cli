@@ -337,7 +337,8 @@ async fn test_collection_handler_by_name_not_found() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_collection_handler_by_private_dataset_name_not_found() {
-    let harness = TestHarness::new_with_authorizer(MockDatasetActionAuthorizer::denying()).await;
+    let harness =
+        TestHarness::new_with_permission_checker(MockDatasetPermissionChecker::denying()).await;
 
     harness.create_simple_dataset().await;
 
@@ -367,11 +368,13 @@ struct TestHarness {
 
 impl TestHarness {
     async fn new() -> Self {
-        Self::new_with_authorizer(AlwaysHappyDatasetActionAuthorizer::new()).await
+        Self::new_with_permission_checker(AlwaysHappyDatasetPermissionChecker::new()).await
     }
 
-    async fn new_with_authorizer<TDatasetAuthorizer: DatasetActionAuthorizer + 'static>(
-        dataset_action_authorizer: TDatasetAuthorizer,
+    async fn new_with_permission_checker<
+        TDatasetPermissionChecker: DatasetPermissionChecker + 'static,
+    >(
+        dataset_permission_checker: TDatasetPermissionChecker,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
@@ -395,8 +398,8 @@ impl TestHarness {
                 .add::<ObjectStoreBuilderLocalFs>()
                 .add::<DataFormatRegistryImpl>()
                 .add_value(CurrentAccountSubject::new_test())
-                .add_value(dataset_action_authorizer)
-                .bind::<dyn DatasetActionAuthorizer, TDatasetAuthorizer>()
+                .add_value(dataset_permission_checker)
+                .bind::<dyn DatasetPermissionChecker, TDatasetPermissionChecker>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
@@ -405,6 +408,7 @@ impl TestHarness {
                 .add_value(MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
+                .add::<DatasetHeadCommitterImpl>()
                 .add_value(SystemTimeSourceStub::new_set(
                     Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
                 ))

@@ -14,7 +14,7 @@ use dill::Catalog;
 use http_common::*;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_auth_rebac::{RebacDatasetRefUnresolvedError, RebacDatasetRegistryFacade};
-use kamu_datasets::{DatasetAction, DatasetEntryService};
+use kamu_datasets::{DatasetEntryService, DatasetPermission};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -101,7 +101,7 @@ async fn get_dataset_by_id(
         catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
 
     let dataset_handle = rebac_dataset_registry_facade
-        .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref(), DatasetAction::Read)
+        .resolve_dataset_handle_by_ref(&dataset_id.as_local_ref(), DatasetPermission::Read)
         .await
         .map_err(|e| {
             use RebacDatasetRefUnresolvedError as E;

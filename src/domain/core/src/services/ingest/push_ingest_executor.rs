@@ -61,11 +61,14 @@ pub enum PushIngestStage {
     Commit,
 }
 
+/// Progress of a push ingest. The executor reports `begin` and the stages;
+/// the push ingest ends it with `success` once `HEAD` is committed, or with
+/// `error` for any failure
 pub trait PushIngestListener: Send + Sync {
     fn begin(&self) {}
     fn on_stage_progress(&self, _stage: PushIngestStage, _progress: u64, _out_of: TotalSteps) {}
     fn success(&self, _result: &PushIngestResult) {}
-    fn error(&self, _error: &PushIngestError) {}
+    fn error(&self, _error: &PushIngestDataError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None

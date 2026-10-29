@@ -13,10 +13,12 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
+use futures::{SinkExt, StreamExt};
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use kamu::utils::url_ext::UrlExt;
 use kamu::*;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{
@@ -25,6 +27,11 @@ use kamu_accounts_inmem::{
     InMemoryOAuthDeviceCodeRepository,
 };
 use kamu_accounts_services::*;
+use kamu_adapter_http::smart_protocol::messages::{
+    DatasetPushRequest,
+    DatasetPushResponse,
+    SMART_TRANSFER_PROTOCOL_VERSION,
+};
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::{
@@ -41,6 +48,7 @@ use kamu_datasets_inmem::{
     InMemoryDatasetKeyBlockRepository,
     InMemoryDatasetReferenceRepository,
 };
+use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -48,8 +56,11 @@ use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
-use tokio_tungstenite::tungstenite::Error;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::{Error, Message};
 use url::Url;
+
+use super::append_unreferenced_block;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -63,6 +74,7 @@ pub(crate) struct ClientSideHarness {
     pull_dataset_use_case: Arc<dyn PullDatasetUseCase>,
     push_dataset_use_case: Arc<dyn PushDatasetUseCase>,
     access_token_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
+    racing_committer: Arc<RacingDatasetHeadCommitter>,
     options: ClientSideHarnessOptions,
 }
 
@@ -122,7 +134,7 @@ impl ClientSideHarness {
         }
         b.add_value(AuthConfig::sample());
 
-        b.add::<AlwaysHappyDatasetActionAuthorizer>();
+        b.add::<AlwaysHappyDatasetPermissionChecker>();
 
         if options.authenticated_remotely {
             b.add::<odf::dataset::DummyOdfServerAccessTokenResolver>();
@@ -145,6 +157,7 @@ impl ClientSideHarness {
 
         b.add::<RemoteAliasesRegistryImpl>();
         b.add::<RemoteAliasResolverImpl>();
+        b.add::<RemoteDatasetUrlResolverImpl>();
 
         b.add::<EngineProvisionerNull>();
 
@@ -156,6 +169,7 @@ impl ClientSideHarness {
         b.add::<FetchService>();
 
         b.add_value(EngineConfigDatafusionEmbeddedIngest::default());
+        b.add::<PollingIngestPlannerImpl>();
         b.add::<PollingIngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>();
@@ -164,10 +178,12 @@ impl ClientSideHarness {
         b.add::<SimpleTransferProtocol>();
 
         b.add::<SyncServiceImpl>();
+
+        b.add::<IpfsServiceImpl>();
+        b.add::<LocalSyncCommitterImpl>();
         b.add::<SyncRequestBuilder>();
 
-        b.add::<TransformRequestPlannerImpl>();
-        b.add::<TransformElaborationServiceImpl>();
+        b.add::<TransformPlannerImpl>();
         b.add::<TransformExecutorImpl>();
 
         b.add_value(EngineConfigDatafusionEmbeddedCompaction::default());
@@ -175,6 +191,8 @@ impl ClientSideHarness {
         b.add::<CompactionExecutorImpl>();
 
         b.add::<PullRequestPlannerImpl>();
+        b.add::<DatasetUpdateKindResolverImpl>();
+        b.add::<DatasetPullSourceResolverImpl>();
 
         b.add::<PushRequestPlannerImpl>();
 
@@ -185,9 +203,13 @@ impl ClientSideHarness {
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
+        b.add::<DatasetOperationGuardImpl>();
+        b.add::<DatasetUpdateStepsImpl>();
         b.add::<PushDatasetUseCaseImpl>();
 
         b.add::<DatasetReferenceServiceImpl>();
+        b.add_value(RacingDatasetHeadCommitter::default())
+            .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
         b.add::<InMemoryDatasetReferenceRepository>();
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
@@ -241,6 +263,7 @@ impl ClientSideHarness {
             pull_dataset_use_case: catalog.get_one().unwrap(),
             push_dataset_use_case: catalog.get_one().unwrap(),
             access_token_resolver: catalog.get_one().unwrap(),
+            racing_committer: catalog.get_one().unwrap(),
             catalog,
             options,
         }
@@ -296,6 +319,27 @@ impl ClientSideHarness {
 
     pub fn dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService> {
         self.catalog.get_one().unwrap()
+    }
+
+    /// Arms the next `HEAD` commit to first move `HEAD` to `concurrent_head`,
+    /// the way a concurrent writer would
+    pub fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
+        self.racing_committer
+            .move_head_before_next_commit(concurrent_head);
+    }
+
+    pub async fn append_unreferenced_block(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> odf::Multihash {
+        append_unreferenced_block(self.dataset_registry().as_ref(), dataset_handle).await
+    }
+
+    pub async fn stored_head(&self, dataset_id: &odf::DatasetID) -> odf::Multihash {
+        self.dataset_reference_service()
+            .get_reference(dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
     }
 
     // TODO: accept alias or handle
@@ -424,8 +468,52 @@ impl ClientSideHarness {
         self.tempdir.path().join("datasets")
     }
 
+    /// Connects with an unsupported protocol version, returning the server's
+    /// refusal
     pub async fn try_connect_to_websocket(&self, url: &Url, method: &str) -> Result<(), String> {
-        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        match connect_async(self.websocket_request(url, method, 0)).await {
+            Ok(_) => Ok(()),
+            Err(ref _err @ Error::Http(ref http_err)) => {
+                Err(std::str::from_utf8(http_err.body().as_ref().unwrap())
+                    .unwrap()
+                    .to_owned())
+            }
+            Err(_err) => Err("dummy".to_string()),
+        }
+    }
+
+    /// Sends a push request as it is, bypassing the client's own checks, and
+    /// returns the server's reply, which must be a message
+    pub async fn send_raw_push_request(
+        &self,
+        url: &Url,
+        request: &DatasetPushRequest,
+    ) -> DatasetPushResponse {
+        let (mut socket, _) =
+            connect_async(self.websocket_request(url, "push", SMART_TRANSFER_PROTOCOL_VERSION))
+                .await
+                .unwrap();
+
+        socket
+            .send(Message::Text(
+                serde_json::to_string(request).unwrap().into(),
+            ))
+            .await
+            .unwrap();
+
+        let reply = socket.next().await;
+        let Some(Ok(Message::Text(reply))) = reply else {
+            panic!("The server must reply with a message, got {reply:?}");
+        };
+        serde_json::from_str(&reply).unwrap()
+    }
+
+    fn websocket_request(
+        &self,
+        url: &Url,
+        method: &str,
+        protocol_version: i32,
+    ) -> http::Request<()> {
         let mut ws_url = url.odf_to_transport_protocol().unwrap();
         ws_url.ensure_trailing_slash();
         let maybe_access_token = self
@@ -435,25 +523,17 @@ impl ClientSideHarness {
         ws_url = ws_url.join(method).unwrap();
         ws_url.set_scheme("ws").unwrap();
         let mut request = ws_url.into_client_request().unwrap();
-        request
-            .headers_mut()
-            .append(OdfSmtpVersion::name(), http::HeaderValue::from(0));
+        request.headers_mut().append(
+            OdfSmtpVersion::name(),
+            http::HeaderValue::from(protocol_version),
+        );
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
                 http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
         }
-
-        match connect_async(request).await {
-            Ok(_) => Ok(()),
-            Err(ref _err @ Error::Http(ref http_err)) => {
-                Err(std::str::from_utf8(http_err.body().as_ref().unwrap())
-                    .unwrap()
-                    .to_owned())
-            }
-            Err(_err) => Err("dummy".to_string()),
-        }
+        request
     }
 }
 

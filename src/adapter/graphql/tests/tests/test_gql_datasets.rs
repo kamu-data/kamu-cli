@@ -840,7 +840,7 @@ async fn test_dataset_delete_dangling_ref() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_view_permissions_for_a_reader() {
     test_dataset_view_permissions(
-        &[DatasetAction::Read],
+        &[DatasetPermission::Read],
         async_graphql::value!({
             "collaboration": {
                 "canView": false,
@@ -872,7 +872,7 @@ async fn test_dataset_view_permissions_for_a_reader() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_view_permissions_for_an_editor() {
     test_dataset_view_permissions(
-        &[DatasetAction::Read, DatasetAction::Write],
+        &[DatasetPermission::Read, DatasetPermission::Write],
         async_graphql::value!({
             "collaboration": {
                 "canView": false,
@@ -905,9 +905,9 @@ async fn test_dataset_view_permissions_for_an_editor() {
 async fn test_dataset_view_permissions_for_a_maintainer() {
     test_dataset_view_permissions(
         &[
-            DatasetAction::Read,
-            DatasetAction::Write,
-            DatasetAction::Maintain,
+            DatasetPermission::Read,
+            DatasetPermission::Write,
+            DatasetPermission::Maintain,
         ],
         async_graphql::value!({
             "collaboration": {
@@ -941,10 +941,10 @@ async fn test_dataset_view_permissions_for_a_maintainer() {
 async fn test_dataset_view_permissions_for_an_owner() {
     test_dataset_view_permissions(
         &[
-            DatasetAction::Read,
-            DatasetAction::Write,
-            DatasetAction::Maintain,
-            DatasetAction::Own,
+            DatasetPermission::Read,
+            DatasetPermission::Write,
+            DatasetPermission::Maintain,
+            DatasetPermission::Own,
         ],
         async_graphql::value!({
             "collaboration": {
@@ -977,7 +977,7 @@ async fn test_dataset_view_permissions_for_an_owner() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_view_permissions(
-    allowed_actions: &[DatasetAction],
+    granted_permissions: &[DatasetPermission],
     expected_permission: async_graphql::Value,
 ) {
     let dataset_name = odf::DatasetName::new_unchecked("foo");
@@ -985,14 +985,14 @@ async fn test_dataset_view_permissions(
 
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::SingleTenant)
-        .mock_dataset_action_authorizer(
-            MockDatasetActionAuthorizer::new()
+        .mock_dataset_permission_checker(
+            MockDatasetPermissionChecker::new()
                 .make_expect_classify_datasets_by_allowance(
-                    DatasetAction::Read,
+                    DatasetPermission::Read,
                     1,
                     HashSet::from([dataset_alias]),
                 )
-                .make_expect_get_allowed_actions(allowed_actions, 1),
+                .make_expect_get_granted_permissions(granted_permissions, 1),
         )
         .build()
         .await;
@@ -1066,14 +1066,14 @@ impl GraphQLDatasetsHarness {
     #[builder]
     pub async fn new(
         tenancy_config: TenancyConfig,
-        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
     ) -> Self {
         let base_gql_harness = BaseGQLDatasetHarness::builder()
             .tenancy_config(tenancy_config)
             .outbox_provider(OutboxProvider::Immediate {
                 force_immediate: true,
             })
-            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
+            .maybe_mock_dataset_permission_checker(mock_dataset_permission_checker)
             .build();
 
         let base_catalog = {
@@ -1115,7 +1115,7 @@ impl GraphQLDatasetsHarness {
                     .build(),
                 CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility,
-                    seed_block_bytes: None,
+                    ..Default::default()
                 },
             )
             .await

@@ -43,8 +43,10 @@ async fn compare_chains(
     MetadataChainComparator::compare_chains(
         lhs_chain,
         &lhs_head,
-        rhs_chain,
-        rhs_head.as_ref(),
+        rhs_head.as_ref().map(|head| ChainWithHead {
+            chain: rhs_chain,
+            head,
+        }),
         &NullCompareChainsListener,
     )
     .await

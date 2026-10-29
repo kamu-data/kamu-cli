@@ -52,7 +52,27 @@ impl EngineProvisioningListener for NullEngineProvisioningListener {}
 #[derive(Debug, Error)]
 pub enum EngineProvisioningError {
     #[error(transparent)]
+    UnsupportedEngine(#[from] UnsupportedEngineError),
+    #[error(transparent)]
     ImagePull(#[from] ImagePullError),
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl EngineProvisioningError {
+    /// Whether provisioning again could succeed. An engine name no node
+    /// configures fails the same way until the dataset's metadata changes.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::UnsupportedEngine(_) => false,
+            Self::ImagePull(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
+/// No engine with this name is configured
+#[derive(Debug, Error)]
+#[error("Unsupported engine {engine_id}")]
+pub struct UnsupportedEngineError {
+    pub engine_id: String,
 }

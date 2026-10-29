@@ -72,12 +72,19 @@ impl fs::FlowController for FlowControllerResetToMetadata {
                 return Ok(());
             }
             CompactionResult::Success {
+                breaking: false, ..
+            } => {
+                // History was kept, downstream has nothing to react to
+                tracing::debug!(flow_id = %success_flow_state.flow_id, "Reset to metadata was not breaking, skipping propagation");
+                return Ok(());
+            }
+            CompactionResult::Success {
                 old_head,
                 new_head,
                 old_num_blocks: _,
                 new_num_blocks: _,
+                breaking: true,
             } => {
-                // Reset to metadata is a breaking operation.
                 // Datasets with enabled updates would compact to metadata only.
                 // Other datasets will stay unaffected, but would break on next update attempt
                 let dataset_id =

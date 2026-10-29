@@ -10,8 +10,8 @@
 use std::sync::Arc;
 
 use console::style as s;
-use kamu::UrlExt;
 use kamu::domain::{AddRepoError, RemoteRepositoryRegistry};
+use kamu::utils::url_ext::UrlExt;
 use kamu_accounts::{AccountProvider, CurrentAccountSubject};
 use url::Url;
 

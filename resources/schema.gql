@@ -4211,7 +4211,7 @@ type FlowDescriptionUnknown {
 """
 Result of a flow that updates a dataset
 """
-union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess | FlowDescriptionUpdateResultUnknown
+union FlowDescriptionUpdateResult = FlowDescriptionUpdateResultUpToDate | FlowDescriptionUpdateResultSuccess
 
 """
 Dataset was updated with new data
@@ -4233,16 +4233,6 @@ type FlowDescriptionUpdateResultSuccess {
 	Whether the source has more data to fetch
 	"""
 	hasMore: Boolean!
-}
-
-"""
-Dataset was updated, but the added data could not be determined
-"""
-type FlowDescriptionUpdateResultUnknown {
-	"""
-	Why the added data could not be determined
-	"""
-	message: String!
 }
 
 """
@@ -8384,6 +8374,25 @@ type SetVocab {
 	Name of the event time column.
 	"""
 	eventTimeColumn: String
+}
+
+"""
+Dataset head moved while the watermark was being set, likely due to a
+concurrent update; nothing was committed
+"""
+type SetWatermarkCasFailed implements SetWatermarkResult {
+	"""
+	Head block hash the watermark was being set on top of
+	"""
+	expectedHead: Multihash!
+	"""
+	Current head block hash of the dataset, null if it has none
+	"""
+	actualHead: Multihash
+	"""
+	Human-readable error message
+	"""
+	message: String!
 }
 
 """

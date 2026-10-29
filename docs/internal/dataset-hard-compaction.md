@@ -90,11 +90,11 @@ history and treats the metadata chain as append-only. The pieces compaction work
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
 | Domain interfaces | `kamu-core` — [`src/domain/core/src/services/compaction/`](../../src/domain/core/src/services/compaction) | `CompactionPlanner`, `CompactionExecutor`, `CompactionOptions`, `CompactionPlan`, `CompactionResult`, listeners, errors |
-| Use case | `kamu` — [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) | `CompactDatasetUseCaseImpl`: authorization, plan, execute, move `HEAD` |
+| Use case | `kamu` — [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) | `CompactDatasetUseCaseImpl`: authorization and plan, execute, move `HEAD`, each step in its own transaction or none |
 | Services | `kamu` — [`src/infra/core/src/services/compaction/`](../../src/infra/core/src/services/compaction) | `CompactionPlannerImpl`, `CompactionExecutorImpl` |
 | DataFusion session config | `kamu` — [`engine_config_embedded.rs`](../../src/infra/core/src/engine/engine_config_embedded.rs) | `EngineConfigDatafusionEmbeddedCompaction` |
 | CLI | `kamu-cli` — [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs) | `kamu system compact` |
-| Task adapter | `kamu-adapter-task-dataset` | `HardCompactDatasetTaskPlanner`, `HardCompactDatasetTaskRunner` |
+| Task adapter | `kamu-adapter-task-dataset` | `HardCompactDatasetTaskPlanner`, `CompactionDatasetTaskRunner` (shared with reset to metadata) |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerCompact`, `FlowConfigRuleCompact` |
 
 ---
@@ -112,14 +112,24 @@ compactions are not yet supported". It expands local patterns, asks for confirma
 verifies every dataset first (`--verify`, stopping at the first failure), then compacts the
 datasets one after another. `--max-slice-size` (bytes, default 300 MB) and `--max-slice-records`
 (default 10 000) bound each merged file. `--keep-metadata-only` turns the run into a reset to
-metadata. The command runs in a single database transaction, merges included, and processes the
-outbox afterwards. If any dataset fails, the command returns an error and the transaction rolls
-back the `HEAD` updates of every dataset, including those reported as compacted.
+metadata. The command holds no database transaction of its own: listing the datasets and each
+verification run in short transactions, and the use case opens its own around each dataset's
+compaction. Each dataset commits on its own, so when one fails the command returns an error, but
+the datasets reported as compacted stay compacted. The outbox is processed afterwards, also when
+the command fails, so the deferred consumers of the compacted datasets run before it exits.
 
-**Use case.** `CompactDatasetUseCaseImpl::execute` resolves the dataset with
-`DatasetAction::Maintain`, plans, executes, and on `Success` sets `HEAD` with
-`check_ref_is: Some(old_head)` and `validate_block_present`. `execute_multi` calls `execute` per
-dataset and returns one `CompactionResponse` each; one failure does not stop the others.
+**Use case.** `CompactDatasetUseCaseImpl::execute` works in three steps, so that no transaction is
+open during the merge:
+
+| Step | Transaction | Does |
+| --- | --- | --- |
+| Plan | a short one | authorizes `Compaction` (or `ResetToMetadata` with `keep_metadata_only`) through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs), which needs Maintain; resolves the dataset, plans, detaches the dataset from the transaction |
+| Execute | none | `CompactionExecutor::execute`, which writes only blocks and files that no reference points to yet |
+| Commit | a new short one | on `Success`, re-resolves the dataset and moves `HEAD` from `old_head` through `DatasetHeadCommitter` |
+
+A `HEAD` moved by another writer during the merge fails the commit with `RefCASFailed`, and nothing
+is committed. `execute_multi` calls `execute` per dataset and returns one `CompactionResponse`
+each; one failure does not stop the others.
 
 **Flow.** The flow's preconditions, configuration and logical plan are owned by
 [flow-system.md](flow-system.md#10-flow-types); how the task plans, runs and moves `HEAD`, by
@@ -177,8 +187,10 @@ count.
    moves `HEAD`.
 
 The caller moves `HEAD` with a compare-and-swap against `old_head`. A write that moved `HEAD`
-after planning (an ingest, a push, another compaction) makes the swap fail; the failure surfaces as
-an internal error, and the new blocks and merged files stay unreferenced.
+after planning (an ingest, a push, another compaction) makes the swap fail, and the new blocks and merged files
+stay unreferenced. The use case returns `CompactionError::RefCASFailed` with the expected and actual
+heads; the task runners return the recoverable `DatasetCommitError`
+([task-system.md](task-system.md#72-hard-compaction-and-reset-to-metadata)).
 
 `CompactionListener` receives the plan, the result, and the `GatherChainInfo`, `MergeDataslices`
 and `CommitNewBlocks` phases. In the CLI, `CompactionMultiProgress` (a
@@ -245,5 +257,5 @@ unchanged, the Smart protocol accepts a forced push of the compacted chain.
 | Executor | [`compaction_executor_impl.rs`](../../src/infra/core/src/services/compaction/compaction_executor_impl.rs) |
 | Use case | [`compact_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/compact_dataset_use_case_impl.rs) |
 | CLI command, arguments, progress | [`compact_command.rs`](../../src/app/cli/src/commands/compact_command.rs), `SystemCompact` in [`cli.rs`](../../src/app/cli/src/cli.rs), [`compact_progress.rs`](../../src/app/cli/src/output/compact_progress.rs) |
-| Task planner and runner | [`hard_compact_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/hard_compact_dataset_task_planner.rs), [`hard_compact_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/hard_compact_dataset_task_runner.rs) |
+| Task planner and runner | [`hard_compact_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/hard_compact_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
 | Flow controller and rule | [`flow_controller_compact.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_compact.rs), [`flow_config_rule_compact.rs`](../../src/adapter/flow-dataset/src/entities/flow_config_rules/flow_config_rule_compact.rs) |

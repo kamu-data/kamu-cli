@@ -11,11 +11,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use url::Url;
 
-use crate::UrlExt;
+use crate::utils::url_ext::UrlExt;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,40 +45,29 @@ impl RemoteAliasResolverImpl {
         dataset_handle: &odf::DatasetHandle,
         remote_alias_kind: RemoteAliasKind,
     ) -> Result<Option<Url>, ResolveAliasError> {
-        let remote_aliases = self
+        let remote_aliases = match self
             .remote_alias_reg
             .get_remote_aliases(dataset_handle)
             .await
-            .int_err()?;
+        {
+            Ok(remote_aliases) => remote_aliases,
+            Err(GetAliasesError::Internal(e)) => return Err(e.into()),
+        };
 
-        let aliases: Vec<_> = remote_aliases.get_by_kind(remote_alias_kind).collect();
-
-        match aliases.len() {
-            0 => Ok(None),
-            1 => {
-                if let odf::DatasetRefRemote::Url(remote_url) = aliases[0].clone() {
-                    return Ok(Some(remote_url.as_ref().clone()));
-                }
-                Ok(None)
+        match remote_aliases.single_by_kind(remote_alias_kind) {
+            Ok(Some(odf::DatasetRefRemote::Url(remote_url))) => {
+                Ok(Some(remote_url.as_ref().clone()))
             }
-            _ => Err(ResolveAliasError::AmbiguousAlias),
+            Ok(
+                None
+                | Some(
+                    odf::DatasetRefRemote::ID(..)
+                    | odf::DatasetRefRemote::Alias(_)
+                    | odf::DatasetRefRemote::Handle(_),
+                ),
+            ) => Ok(None),
+            Err(AmbiguousRemoteAliasError { .. }) => Err(ResolveAliasError::AmbiguousAlias),
         }
-    }
-
-    fn combine_remote_url(
-        &self,
-        repo_url: &Url,
-        account_name_maybe: Option<&odf::AccountName>,
-        dataset_name: &odf::DatasetName,
-    ) -> Result<Url, InternalError> {
-        let mut res_url = repo_url.clone().as_odf_protocol().int_err()?;
-
-        if let Some(account_name) = account_name_maybe {
-            res_url = res_url.join(format!("{account_name}/").as_str()).unwrap();
-        }
-        res_url = res_url.join(dataset_name).unwrap();
-
-        Ok(res_url)
     }
 
     async fn resolve_remote_dataset_name(
@@ -100,32 +89,6 @@ impl RemoteAliasResolverImpl {
             dataset_handle.alias.dataset_name.clone()
         };
         Ok(result)
-    }
-
-    async fn resolve_pull_url_from_odf_transfer_url(
-        &self,
-        alias: &odf::DatasetAliasRemote,
-        odf_transfer_url: &Url,
-    ) -> Result<url::Url, ResolveAliasError> {
-        let account_name = if alias.account_name.is_some() {
-            alias.account_name.clone()
-        } else {
-            let access_token_maybe = self
-                .access_token_resolver
-                .resolve_odf_dataset_access_token(odf_transfer_url);
-            RemoteAliasResolverApiHelper::resolve_remote_account_name(
-                odf_transfer_url,
-                access_token_maybe.as_ref(),
-            )
-            .await
-            .int_err()?
-        };
-
-        let mut remote_url =
-            self.combine_remote_url(odf_transfer_url, account_name.as_ref(), &alias.dataset_name)?;
-        remote_url.ensure_trailing_slash();
-
-        Ok(remote_url)
     }
 }
 
@@ -202,8 +165,11 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             .await?
         };
 
-        let remote_url =
-            self.combine_remote_url(&transfer_url, account_name.as_ref(), &transfer_dataset_name)?;
+        let remote_url = RemoteAliasResolverApiHelper::combine_remote_url(
+            &transfer_url,
+            account_name.as_ref(),
+            &transfer_dataset_name,
+        )?;
 
         return Ok(RemoteTarget::new(
             remote_url,
@@ -212,38 +178,6 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
             account_name,
         ));
     }
-
-    async fn resolve_pull_url(
-        &self,
-        remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<url::Url, ResolveAliasError> {
-        match remote_ref {
-            // TODO: the reference can be resolved if using ODF protocol.
-            // However, it is still difficult with simple folder repositories without index.
-            odf::DatasetRefRemote::ID(_, _) => Err(ResolveAliasError::Internal(
-                "Syncing remote dataset by ID is not yet supported".int_err(),
-            )),
-            odf::DatasetRefRemote::Url(url) => {
-                let mut dataset_url = url.as_ref().clone();
-                dataset_url.ensure_trailing_slash();
-                Ok(dataset_url)
-            }
-            odf::DatasetRefRemote::Alias(alias)
-            | odf::DatasetRefRemote::Handle(odf::metadata::DatasetHandleRemote { alias, .. }) => {
-                let remote_repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
-                if remote_repo.url.is_odf_protocol() {
-                    let transfer_url = remote_repo.url.clone().odf_to_transport_protocol()?;
-                    self.resolve_pull_url_from_odf_transfer_url(alias, &transfer_url)
-                        .await
-                } else {
-                    Ok(remote_repo
-                        .url
-                        .join(&format!("{}/", alias.local_alias()))
-                        .unwrap())
-                }
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -251,6 +185,21 @@ impl RemoteAliasResolver for RemoteAliasResolverImpl {
 pub struct RemoteAliasResolverApiHelper {}
 
 impl RemoteAliasResolverApiHelper {
+    pub(crate) fn combine_remote_url(
+        repo_url: &Url,
+        account_name_maybe: Option<&odf::AccountName>,
+        dataset_name: &odf::DatasetName,
+    ) -> Result<Url, InternalError> {
+        let mut res_url = repo_url.as_odf_protocol()?;
+
+        if let Some(account_name) = account_name_maybe {
+            res_url = res_url.join(format!("{account_name}/").as_str()).unwrap();
+        }
+        res_url = res_url.join(dataset_name).unwrap();
+
+        Ok(res_url)
+    }
+
     fn build_headers_map(access_token_maybe: Option<&String>) -> http::HeaderMap {
         let mut header_map = http::HeaderMap::new();
         if let Some(access_token) = access_token_maybe {

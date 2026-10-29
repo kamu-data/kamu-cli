@@ -37,9 +37,9 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::{
-    AlwaysHappyDatasetActionAuthorizer,
-    DatasetActionAuthorizer,
-    MockDatasetActionAuthorizer,
+    AlwaysHappyDatasetPermissionChecker,
+    DatasetPermissionChecker,
+    MockDatasetPermissionChecker,
 };
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{SignEip712UseCase, SignEip712UseCaseOptions};
@@ -139,7 +139,7 @@ async fn test_not_configured() {
 
 #[test_log::test(tokio::test)]
 async fn test_execute_matrix() {
-    for (subject, mock_dataset_action_authorizer, test_cases) in [
+    for (subject, mock_dataset_permission_checker, test_cases) in [
         // 1. Admin has access to all datasets / accounts
         (
             CurrentAccountSubject::logged(
@@ -147,7 +147,7 @@ async fn test_execute_matrix() {
                 admin_account_id(),
                 odf::AccountName::new_unchecked(ADMIN),
             ),
-            mock_dataset_action_authorizer()
+            mock_dataset_permission_checker()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, true)
@@ -228,7 +228,7 @@ async fn test_execute_matrix() {
                 molecule_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE),
             ),
-            mock_dataset_action_authorizer()
+            mock_dataset_permission_checker()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, false)
@@ -309,7 +309,7 @@ async fn test_execute_matrix() {
                 molecule_dev_account_id(),
                 odf::AccountName::new_unchecked(MOLECULE_DEV),
             ),
-            mock_dataset_action_authorizer()
+            mock_dataset_permission_checker()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, true)
@@ -390,7 +390,7 @@ async fn test_execute_matrix() {
                 user_account_id(),
                 odf::AccountName::new_unchecked(USER),
             ),
-            mock_dataset_action_authorizer()
+            mock_dataset_permission_checker()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, false)
@@ -467,7 +467,7 @@ async fn test_execute_matrix() {
         // 5. Anonymous has no access to any datasets / accounts
         (
             CurrentAccountSubject::anonymous_no_authentication_provided(),
-            mock_dataset_action_authorizer()
+            mock_dataset_permission_checker()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_dev_dataset_id(), 1, false)
@@ -544,7 +544,7 @@ async fn test_execute_matrix() {
     ] {
         let harness = SignEip712UseCaseHarness::builder()
             .current_account_subject(subject.clone())
-            .maybe_mock_dataset_action_authorizer(mock_dataset_action_authorizer)
+            .maybe_mock_dataset_permission_checker(mock_dataset_permission_checker)
             .has_identity_config(true)
             .build()
             .await;
@@ -582,7 +582,7 @@ impl SignEip712UseCaseHarness {
     #[builder]
     pub async fn new(
         current_account_subject: CurrentAccountSubject,
-        maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        maybe_mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
         has_identity_config: bool,
     ) -> Self {
         let mut b = dill::CatalogBuilder::new();
@@ -652,11 +652,11 @@ impl SignEip712UseCaseHarness {
 
         b.add_value(current_account_subject);
 
-        if let Some(mock_dataset_action_authorizer) = maybe_mock_dataset_action_authorizer {
-            b.add_value(mock_dataset_action_authorizer)
-                .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+        if let Some(mock_dataset_permission_checker) = maybe_mock_dataset_permission_checker {
+            b.add_value(mock_dataset_permission_checker)
+                .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
         } else {
-            b.add::<AlwaysHappyDatasetActionAuthorizer>();
+            b.add::<AlwaysHappyDatasetPermissionChecker>();
         }
 
         NoOpDatabasePlugin::init_database_components(&mut b);
@@ -851,8 +851,8 @@ fn typed_data() -> Eip712TypedData {
     .unwrap()
 }
 
-fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
-    MockDatasetActionAuthorizer::new()
+fn mock_dataset_permission_checker() -> MockDatasetPermissionChecker {
+    MockDatasetPermissionChecker::new()
         // NOTE: At the time of the request, we don't know what the DID is, so we can check it
         //       for the account as well
         .expect_check_read_dataset(&to_dataset_id(&molecule_account_id()), 1, false)

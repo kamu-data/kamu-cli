@@ -7,25 +7,29 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_action_authorizer;
 mod dataset_entry_service;
 mod dataset_env_var_mutation_adapter;
 mod dataset_env_var_resolver;
 mod dataset_env_var_service;
+mod dataset_head_committer;
 mod dataset_increment_query_service;
 mod dataset_key_value_service;
+mod dataset_operation_guard;
+mod dataset_permission_checker;
 mod dataset_reference_service;
 mod dataset_registry;
 mod dataset_statistics_service;
 mod dependency_graph_service;
 
-pub use dataset_action_authorizer::*;
 pub use dataset_entry_service::*;
 pub use dataset_env_var_mutation_adapter::*;
 pub use dataset_env_var_resolver::*;
 pub use dataset_env_var_service::*;
+pub use dataset_head_committer::*;
 pub use dataset_increment_query_service::*;
 pub use dataset_key_value_service::*;
+pub use dataset_operation_guard::*;
+pub use dataset_permission_checker::*;
 pub use dataset_reference_service::*;
 pub use dataset_registry::*;
 pub use dataset_statistics_service::*;

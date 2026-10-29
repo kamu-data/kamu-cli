@@ -464,7 +464,7 @@ where
                 // Ensure the first page containing the head sequence number is preloaded and cached
                 // This allows multiple concurrent iterators to reuse the same cached first page
                 let cached_data_blocks_page = self
-                    .ensure_data_blocks_are_preloaded(head_block.sequence_number..head_block.sequence_number)
+                    .ensure_data_blocks_are_preloaded(head_block.sequence_number..head_block.sequence_number + 1)
                     .await?
                     .expect("Data block repository is available, so data blocks should be loaded");
 

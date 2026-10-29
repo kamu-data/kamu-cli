@@ -14,10 +14,11 @@ use kamu::testing::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry};
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
     CreateDatasetUseCaseImpl,
+    DatasetHeadCommitterImpl,
     DependencyGraphServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
@@ -48,7 +49,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         ))
         .add::<odf::dataset::DatasetLfsBuilderDefault>()
         .add::<DatasetRegistrySoloUnitBridge>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<RemoteRepositoryRegistryImpl>()
         .add_value(RemoteReposDir::new_with_creation(
             tmp_workspace_dir.join("repos"),
@@ -58,8 +59,10 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
+        .add::<IpfsServiceImpl>()
         .add::<RemoteAliasesRegistryImpl>()
         .add::<RemoteAliasResolverImpl>()
+        .add::<RemoteDatasetUrlResolverImpl>()
         .add::<SyncRequestBuilder>()
         .add::<DummySmartTransferProtocolClient>()
         .add::<SimpleTransferProtocol>()
@@ -67,6 +70,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<CreateDatasetUseCaseImpl>()
         .add::<DummyOutboxImpl>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+        .add::<DatasetHeadCommitterImpl>()
         .add::<DependencyGraphServiceImpl>();
 
     database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -108,7 +112,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .sync(
             sync_request_builder
                 .build_sync_request(
-                    dataset_local_alias.as_any_ref(),
+                    dataset_local_alias.as_local_ref(),
                     dataset_remote_alias.as_any_ref(),
                     true,
                 )

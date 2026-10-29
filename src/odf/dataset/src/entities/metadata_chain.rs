@@ -141,6 +141,84 @@ pub trait MetadataChainExt: MetadataChain {
         }
     }
 
+    /// Appends the blocks in order without moving any reference. Returns
+    /// `None` for an empty batch.
+    async fn append_batch(
+        &self,
+        new_blocks: Box<dyn Iterator<Item = HashedMetadataBlockBytesDecoded> + Send>,
+        opts: AppendBatchOpts,
+    ) -> Result<Option<AppendedBatch>, AppendBatchError> {
+        let mut new_blocks = new_blocks.peekable();
+
+        let Some((_, first_block, _)) = new_blocks.peek() else {
+            return Ok(None);
+        };
+        let base_head = first_block.prev_block_hash.clone();
+
+        let mut new_head = None;
+        for (hash, block, block_bytes) in new_blocks {
+            tracing::debug!(sequence_number = %block.sequence_number, hash = %hash, "Appending block");
+
+            let block_sequence_number = block.sequence_number;
+            if let Err(append_error) = self
+                .append(
+                    block,
+                    AppendOpts {
+                        validation: opts.validation,
+                        update_ref: None,
+                        precomputed_hash: opts.trust_hashes.then_some(&hash),
+                        expected_hash: Some(&hash),
+                        block_data: Some(&block_bytes),
+                        ..Default::default()
+                    },
+                )
+                .await
+            {
+                return Err(AppendBatchError {
+                    append_error,
+                    block_sequence_number,
+                    block_hash: hash,
+                });
+            }
+
+            new_head = Some(hash);
+        }
+
+        Ok(Some(AppendedBatch {
+            base_head,
+            // Safety: the batch is not empty
+            new_head: new_head.unwrap(),
+        }))
+    }
+
+    /// Appends the blocks like `append_batch`, then moves `HEAD` once to the
+    /// last one by compare-and-set from `expected_head`. For a chain whose
+    /// `HEAD` is written directly, such as a dataset in a remote repository; a
+    /// node moves the `HEAD` of its own datasets through its commit primitive.
+    /// Returns `None` for an empty batch.
+    async fn append_batch_and_set_head(
+        &self,
+        new_blocks: Box<dyn Iterator<Item = HashedMetadataBlockBytesDecoded> + Send>,
+        opts: AppendBatchOpts,
+        expected_head: Option<&Multihash>,
+    ) -> Result<Option<Multihash>, AppendBatchAndSetHeadError> {
+        let Some(appended) = self.append_batch(new_blocks, opts).await? else {
+            return Ok(None);
+        };
+
+        self.set_ref(
+            &BlockRef::Head,
+            &appended.new_head,
+            SetRefOpts {
+                validate_block_present: false,
+                check_ref_is: Some(expected_head),
+            },
+        )
+        .await?;
+
+        Ok(Some(appended.new_head))
+    }
+
     /// Convenience function to iterate blocks starting with the `head`
     /// reference
     ///
@@ -778,6 +856,34 @@ impl Default for AppendOpts<'_> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct AppendBatchOpts {
+    /// Validations to perform on each appended block
+    pub validation: AppendValidation,
+
+    /// Store each block under the hash it comes with instead of computing it.
+    ///
+    /// Warning: Use only when you fully trust the source of the blocks.
+    pub trust_hashes: bool,
+}
+
+impl Default for AppendBatchOpts {
+    fn default() -> Self {
+        Self {
+            validation: AppendValidation::Full,
+            trust_hashes: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AppendedBatch {
+    /// The block the batch was appended to
+    pub base_head: Option<Multihash>,
+    /// The last appended block
+    pub new_head: Multihash,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Response Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -900,6 +1006,22 @@ pub struct AppendResult {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AppendBatchAndSetHeadError {
+    #[error(transparent)]
+    Append(#[from] AppendBatchError),
+    #[error(transparent)]
+    SetHead(#[from] SetChainRefError),
+}
+
+#[derive(Error, Debug)]
+#[error("Failed to append block {block_sequence_number} ({block_hash}): {append_error}")]
+pub struct AppendBatchError {
+    pub append_error: AppendError,
+    pub block_sequence_number: u64,
+    pub block_hash: Multihash,
+}
 
 #[derive(Error, Debug)]
 pub enum AppendError {

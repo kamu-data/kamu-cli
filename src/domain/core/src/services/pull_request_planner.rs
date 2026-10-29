@@ -12,7 +12,13 @@ use std::sync::Arc;
 
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
-use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{
+    DatasetOperation,
+    DatasetOperationRequest,
+    DatasetPermissionError,
+    DatasetRegistry,
+    DatasetRegistryExt,
+};
 use thiserror::Error;
 
 use crate::*;
@@ -28,7 +34,7 @@ pub trait PullRequestPlanner: Send + Sync {
         request: PullRequest,
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> Result<PullPlanIterationJob, PullResponse>;
+    ) -> Result<PullPlanIterationJob, PullError>;
 
     // This function descends down the dependency tree of datasets (starting with
     // provided references) assigning depth index to every dataset in the
@@ -39,13 +45,23 @@ pub trait PullRequestPlanner: Send + Sync {
         requests: &[PullRequest],
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> (Vec<PullPlanIteration>, Vec<PullResponse>);
+    ) -> PullPlan;
 
     async fn build_pull_plan_all_owner_datasets(
         &self,
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> Result<(Vec<PullPlanIteration>, Vec<PullResponse>), InternalError>;
+    ) -> Result<PullPlan, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A plan for several pulls: iterations to run in order, or the responses of
+/// the requests that could not be planned
+#[derive(Debug, Default)]
+pub struct PullPlan {
+    pub iterations: Vec<PullPlanIteration>,
+    pub errors: Vec<PullResponse>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,11 +80,27 @@ pub enum PullPlanIterationJob {
 }
 
 impl PullPlanIterationJob {
-    pub fn as_common_item(&self) -> &dyn PullItemCommon {
+    /// What running the job does to its target, for authorization. `None`
+    /// for a sync into a dataset that does not exist yet.
+    pub fn as_operation_request(&self) -> Option<DatasetOperationRequest> {
         match self {
-            Self::Ingest(pii) => pii,
-            Self::Transform(pti) => pti,
-            Self::Sync(psi) => psi,
+            Self::Ingest(pii) => Some(DatasetOperationRequest::new(
+                pii.target.clone(),
+                DatasetOperation::PollingIngest,
+            )),
+            Self::Transform(pti) => Some(DatasetOperationRequest::new(
+                pti.target.clone(),
+                DatasetOperation::Transform {
+                    inputs: pti.input_handles.clone(),
+                },
+            )),
+            Self::Sync(psi) => match &psi.local_target {
+                PullLocalTarget::Existing(hdl) => Some(DatasetOperationRequest::new(
+                    hdl.clone(),
+                    DatasetOperation::SyncFrom,
+                )),
+                PullLocalTarget::ToCreate(_) => None,
+            },
         }
     }
 
@@ -79,67 +111,39 @@ impl PullPlanIterationJob {
             Self::Sync(psi) => psi.maybe_original_request,
         }
     }
-
-    pub fn detach_from_transaction(&self) {
-        match self {
-            Self::Ingest(pii) => pii.target.detach_from_transaction(),
-            Self::Transform(pti) => {
-                pti.target.detach_from_transaction();
-                pti.plan.datasets_map.detach_from_transaction();
-            }
-            Self::Sync(psi) => {
-                psi.sync_request.src.detach_from_transaction();
-                psi.sync_request.dst.detach_from_transaction();
-            }
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A root dataset to ingest. The ingest itself is planned when the job runs.
 #[derive(Debug)]
 pub struct PullIngestItem {
-    pub depth: i32,
-    pub target: ResolvedDataset,
-    pub metadata_state: Box<DataWriterMetadataState>,
+    pub target: odf::DatasetHandle,
     pub maybe_original_request: Option<PullRequest>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A derivative to transform. The transform itself is planned when the job
+/// runs, in the transaction that elaborates it.
 #[derive(Debug)]
 pub struct PullTransformItem {
-    pub depth: i32,
-    pub target: ResolvedDataset,
+    pub target: odf::DatasetHandle,
     pub maybe_original_request: Option<PullRequest>,
-    pub plan: TransformPreliminaryPlan,
-}
-
-impl PullTransformItem {
-    pub async fn refresh_from_dataset_registry(
-        &mut self,
-        dataset_registry: &dyn DatasetRegistry,
-    ) -> Result<(), InternalError> {
-        self.target = dataset_registry
-            .get_dataset_by_handle(self.target.get_handle())
-            .await;
-        self.plan
-            .datasets_map
-            .refresh_datasets_from_registry(dataset_registry)
-            .await;
-        Ok(())
-    }
+    /// Inputs of the transform, which the pull reads
+    pub input_handles: Vec<odf::DatasetHandle>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A dataset to sync from a remote source. Planning reads no remote and no
+/// `HEAD`: the job reads the target's `HEAD` when it runs, and the transfer
+/// resolves and opens the source.
 #[derive(Debug)]
 pub struct PullSyncItem {
-    pub depth: i32,
     pub local_target: PullLocalTarget,
     pub remote_ref: odf::DatasetRefRemote,
     pub maybe_original_request: Option<PullRequest>,
-    pub sync_request: Box<SyncRequest>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,10 +177,22 @@ impl PullLocalTarget {
         }
     }
 
-    pub fn as_any_ref(&self) -> odf::DatasetRefAny {
-        match self {
-            Self::Existing(hdl) => hdl.as_any_ref(),
-            Self::ToCreate(alias) => alias.as_any_ref(),
+    /// The sync target as it is now, with the `HEAD` the commit will expect.
+    /// Reads `HEAD`, so call it inside a transaction. A dataset to create that
+    /// appeared since planning is synced as an existing one. `None` when an
+    /// existing dataset was deleted since planning
+    pub async fn resolve_sync_target(
+        &self,
+        dataset_registry: &dyn DatasetRegistry,
+    ) -> Result<Option<LocalSyncTarget>, SyncError> {
+        let (local_ref, new_target) = match self {
+            Self::Existing(hdl) => (hdl.id.as_local_ref(), None),
+            Self::ToCreate(alias) => (alias.as_local_ref(), Some(alias)),
+        };
+
+        match dataset_registry.try_get_dataset_by_ref(&local_ref).await? {
+            Some(dataset) => Ok(Some(LocalSyncTarget::existing(dataset).await?)),
+            None => Ok(new_target.map(|alias| LocalSyncTarget::New(alias.clone()))),
         }
     }
 }
@@ -243,50 +259,6 @@ impl PullRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait PullItemCommon {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle>;
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle>;
-}
-
-impl PullItemCommon for PullIngestItem {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        Some(self.target.get_handle())
-    }
-
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
-        vec![]
-    }
-}
-
-impl PullItemCommon for PullTransformItem {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        Some(self.target.get_handle())
-    }
-
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
-        let mut read_handles = Vec::new();
-        for hdl in self.plan.datasets_map.iterate_all_handles() {
-            if hdl != self.target.get_handle() {
-                read_handles.push(hdl);
-            }
-        }
-        read_handles
-    }
-}
-
-impl PullItemCommon for PullSyncItem {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        match &self.local_target {
-            PullLocalTarget::Existing(hdl) => Some(hdl),
-            PullLocalTarget::ToCreate(_) => None,
-        }
-    }
-
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
-        vec![]
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
@@ -313,6 +285,8 @@ pub struct PullOptions {
     pub add_aliases: bool,
     /// Ingest-specific options
     pub ingest_options: PollingIngestOptions,
+    /// Repeat polling ingest while the source reports more data
+    pub exhaust_sources: bool,
     /// Sync-specific options,
     pub sync_options: SyncOptions,
     /// Transform-specific options,
@@ -325,6 +299,7 @@ impl Default for PullOptions {
             recursive: false,
             add_aliases: true,
             ingest_options: PollingIngestOptions::default(),
+            exhaust_sources: false,
             sync_options: SyncOptions::default(),
             transform_options: TransformOptions::default(),
         }
@@ -399,7 +374,9 @@ impl From<TransformResult> for PullResult {
     fn from(other: TransformResult) -> Self {
         match other {
             TransformResult::UpToDate => PullResult::UpToDate(PullResultUpToDate::Transform),
-            TransformResult::Updated { old_head, new_head } => PullResult::Updated {
+            TransformResult::Updated {
+                old_head, new_head, ..
+            } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 has_more: false,
@@ -436,14 +413,17 @@ pub enum PullError {
         odf::DatasetNotFoundError,
     ),
 
-    #[error("Cannot choose between multiple pull aliases")]
-    AmbiguousSource,
+    #[error(transparent)]
+    AmbiguousSource(#[from] AmbiguousPullSourceError),
 
     #[error("The dataset was previously saved via '{0}' alias")]
     SaveUnderDifferentAlias(String),
 
-    #[error("{0}")]
-    InvalidOperation(String),
+    #[error("Dataset does not exist and auto-create is switched off")]
+    AutoCreateDisabled,
+
+    #[error(transparent)]
+    CannotInferLocalName(#[from] CannotInferLocalNameError),
 
     #[error(transparent)]
     ScanMetadata(
@@ -460,6 +440,9 @@ pub enum PullError {
     ),
 
     #[error(transparent)]
+    IngestStopped(Box<IngestStoppedError>),
+
+    #[error(transparent)]
     TransformError(
         #[from]
         #[backtrace]
@@ -467,11 +450,19 @@ pub enum PullError {
     ),
 
     #[error(transparent)]
+    TransformStopped(Box<TransformStoppedError>),
+
+    #[error(transparent)]
     SyncError(
         #[from]
         #[backtrace]
         SyncError,
     ),
+
+    /// Another writer moved `HEAD` while the dataset was updated, so the
+    /// update was not committed
+    #[error("Dataset head was moved concurrently: {0}")]
+    HeadMoved(odf::dataset::RefCASError),
 
     #[error(transparent)]
     Access(
@@ -486,6 +477,220 @@ pub enum PullError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl PullError {
+    /// Whether pulling the same dataset again could succeed. A missing
+    /// dataset, a request or alias the pull cannot act on, and denied access
+    /// fail the same way on a retry; a moved `HEAD` and infrastructure
+    /// failures may not. Ingest, transform and sync errors are classified
+    /// by their own operation.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::NotFound(_)
+            | Self::AmbiguousSource(_)
+            | Self::SaveUnderDifferentAlias(_)
+            | Self::AutoCreateDisabled
+            | Self::CannotInferLocalName(_)
+            | Self::Access(_) => false,
+
+            Self::ScanMetadata(e) => e.is_recoverable(),
+            Self::PollingIngestError(e) => e.is_recoverable(),
+            Self::IngestStopped(e) => e.source.is_recoverable(),
+            Self::TransformError(e) => e.is_recoverable(),
+            Self::TransformStopped(e) => e.source.is_recoverable(),
+            Self::SyncError(e) => e.is_recoverable(),
+
+            Self::HeadMoved(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
+impl From<DatasetPermissionError> for PullError {
+    fn from(value: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
+
+        match value {
+            E::NotFound(e) => Self::NotFound(e),
+            E::Access(e) => Self::Access(e),
+            E::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A remote dataset is pulled without a local name, and its reference gives
+/// none
+#[derive(Debug, Error)]
+#[error(
+    "Unable to infer a local name from {remote_ref}, please specify the destination explicitly"
+)]
+pub struct CannotInferLocalNameError {
+    pub remote_ref: odf::DatasetRefRemote,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A polling ingest iteration failed after earlier iterations of the same pull
+/// had already committed. `HEAD` stays at `new_head`.
+#[derive(Debug, Error)]
+#[error(
+    "Ingested {} block(s) with {} record(s) before failing: {source}",
+    increment.num_blocks,
+    increment.num_records
+)]
+pub struct IngestStoppedError {
+    pub old_head: odf::Multihash,
+    pub new_head: odf::Multihash,
+    pub increment: odf::dataset::MetadataChainIncrementInterval,
+    pub source: PullError,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The transform failed after the derivative was reset to metadata because an
+/// input diverged. The reset is committed: `HEAD` stays at `new_head`.
+#[derive(Debug, Error)]
+#[error("Reset the dataset to metadata, then failed: {source}")]
+pub struct TransformStoppedError {
+    pub old_head: odf::Multihash,
+    pub new_head: odf::Multihash,
+    pub source: PullError,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use internal_error::ErrorIntoInternal;
+
+    use super::*;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_pull_error_is_recoverable() {
+        let fixtures = PullErrorFixtures;
+        let cases = [
+            (
+                PullError::NotFound(odf::DatasetNotFoundError {
+                    dataset_ref: odf::DatasetID::new_seeded_ed25519(b"foo").as_local_ref(),
+                }),
+                false,
+            ),
+            (PullError::AmbiguousSource(AmbiguousPullSourceError), false),
+            (PullError::AutoCreateDisabled, false),
+            (PullError::SaveUnderDifferentAlias("foo".to_string()), false),
+            (
+                PullError::CannotInferLocalName(CannotInferLocalNameError {
+                    remote_ref: "odf+http://example.com/foo".parse().unwrap(),
+                }),
+                false,
+            ),
+            (
+                PullError::Access(odf::metadata::AccessError::ReadOnly(None)),
+                false,
+            ),
+            (
+                PullError::ScanMetadata(ScanMetadataError::SourceNotFound(
+                    SourceNotFoundError::new(None::<String>, "no source"),
+                )),
+                false,
+            ),
+            (
+                PullError::ScanMetadata(ScanMetadataError::HeadNotFound(
+                    odf::storage::BlockNotFoundError {
+                        hash: odf::Multihash::from_digest_sha3_256(b"head"),
+                    },
+                )),
+                true,
+            ),
+            (
+                PullError::ScanMetadata(ScanMetadataError::Internal(
+                    "storage unavailable".int_err(),
+                )),
+                true,
+            ),
+            (
+                PullError::PollingIngestError(PollingIngestError::ParameterNotFound(
+                    IngestParameterNotFound::new("API_KEY"),
+                )),
+                false,
+            ),
+            (
+                PullError::PollingIngestError(PollingIngestError::Internal(
+                    "storage unavailable".int_err(),
+                )),
+                true,
+            ),
+            (
+                PullError::TransformError(TransformError::Plan(
+                    TransformPlanError::TransformNotDefined(TransformNotDefinedError {}),
+                )),
+                false,
+            ),
+            (
+                PullError::TransformError(TransformError::Plan(TransformPlanError::Internal(
+                    "storage unavailable".int_err(),
+                ))),
+                true,
+            ),
+            (
+                PullError::SyncError(SyncError::HeadMoved(fixtures.head_moved().into())),
+                true,
+            ),
+            (PullError::HeadMoved(fixtures.head_moved()), true),
+            (
+                fixtures.ingest_stopped_by(PullError::HeadMoved(fixtures.head_moved())),
+                true,
+            ),
+            (
+                fixtures.ingest_stopped_by(PullError::AutoCreateDisabled),
+                false,
+            ),
+            (
+                fixtures.transform_stopped_by(PullError::HeadMoved(fixtures.head_moved())),
+                true,
+            ),
+            (PullError::Internal("storage unavailable".int_err()), true),
+        ];
+
+        for (error, recoverable) in cases {
+            assert_eq!(error.is_recoverable(), recoverable, "{error:?}");
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    struct PullErrorFixtures;
+
+    impl PullErrorFixtures {
+        fn head_moved(&self) -> odf::dataset::RefCASError {
+            odf::dataset::RefCASError {
+                reference: odf::BlockRef::Head,
+                expected: Some(odf::Multihash::from_digest_sha3_256(b"expected")),
+                actual: Some(odf::Multihash::from_digest_sha3_256(b"actual")),
+            }
+        }
+
+        fn ingest_stopped_by(&self, source: PullError) -> PullError {
+            PullError::IngestStopped(Box::new(IngestStoppedError {
+                old_head: odf::Multihash::from_digest_sha3_256(b"old"),
+                new_head: odf::Multihash::from_digest_sha3_256(b"new"),
+                increment: odf::dataset::MetadataChainIncrementInterval::default(),
+                source,
+            }))
+        }
+
+        fn transform_stopped_by(&self, source: PullError) -> PullError {
+            PullError::TransformStopped(Box::new(TransformStoppedError {
+                old_head: odf::Multihash::from_digest_sha3_256(b"old"),
+                new_head: odf::Multihash::from_digest_sha3_256(b"new"),
+                source,
+            }))
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

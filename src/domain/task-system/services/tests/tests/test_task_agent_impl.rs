@@ -308,6 +308,36 @@ async fn test_task_metrics_track_outcomes_and_running_task() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_planning_failure_finishes_task_with_its_error() {
+    let mut mock_outbox = MockOutbox::new();
+    TaskAgentHarness::add_outbox_task_expectations(&mut mock_outbox, TaskID::new(0));
+
+    let harness = TaskAgentHarness::new(
+        mock_outbox,
+        MockTaskDefinitionPlanner::new(),
+        MockTaskRunner::new(),
+    );
+    let task_id = harness
+        .schedule_probe_task(LogicalPlanProbe {
+            fail_planning_with: Some(TaskError::empty_unrecoverable()),
+            ..LogicalPlanProbe::default()
+        })
+        .await;
+
+    harness.task_agent.run_single_task().await.unwrap();
+
+    let task = harness.get_task(task_id).await;
+    assert_eq!(task.status(), TaskStatus::Finished);
+    assert_eq!(
+        task.outcome(),
+        Some(&TaskOutcome::Failed(TaskError::empty_unrecoverable()))
+    );
+    assert_eq!(harness.finished_tasks("failed"), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const LISTENING_TIMEOUT: Duration = Duration::from_mins(1);
 
 struct TaskAgentHarness {
@@ -349,15 +379,18 @@ impl TaskAgentHarness {
             .bind::<dyn Outbox, MockOutbox>()
             .add::<SystemTimeSourceDefault>()
             .add::<PullRequestPlannerImpl>()
+            .add::<DatasetUpdateKindResolverImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
             .add::<CompactionPlannerImpl>()
             .add::<ResetPlannerImpl>()
-            .add::<TransformRequestPlannerImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteRepositoryRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add_value(IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()

@@ -18,6 +18,7 @@ use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
+use odf::dataset::MetadataChainExt;
 use odf::metadata::serde::yaml::legacy::Manifest;
 use odf::utils::data::DataFrameExt;
 use random_strings::get_random_name;
@@ -47,39 +48,23 @@ impl PollingIngestServiceImpl {
     async fn ingest_inner(
         &self,
         target: ResolvedDataset,
-        metadata_state: Box<DataWriterMetadataState>,
+        plan: PollingIngestPlan,
         options: PollingIngestOptions,
+        env_vars: &IngestEnvVars,
+        operation_id: &str,
         listener: Arc<dyn PollingIngestListener>,
-    ) -> Result<PollingIngestResponse, PollingIngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
+        let polling_source = plan.polling_source().clone();
+
         let ctx = ingest_common::new_session_context(
             &self.engine_config,
             self.object_store_registry.clone(),
         );
-        let mut data_writer =
-            DataWriterDataFusion::from_metadata_state(ctx.clone(), target.clone(), *metadata_state);
-
-        let Some(odf::MetadataEvent::SetPollingSource(polling_source)) =
-            data_writer.source_event().cloned()
-        else {
-            tracing::warn!("Dataset does not define a polling source - considering up-to-date",);
-
-            let result = PollingIngestResult::UpToDate {
-                no_source_defined: true,
-                uncacheable: false,
-            };
-
-            listener.begin();
-            listener.success(&result);
-
-            let res = PollingIngestResponse {
-                result,
-                metadata_state: None,
-            };
-
-            return Ok(res);
-        };
-
-        let operation_id = get_random_name(None, 10);
+        let mut data_writer = DataWriterDataFusion::from_metadata_state(
+            ctx.clone(),
+            target.clone(),
+            *plan.into_metadata_state(),
+        );
 
         let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
         std::fs::create_dir_all(&operation_dir).int_err()?;
@@ -91,18 +76,26 @@ impl PollingIngestServiceImpl {
         data_writer.set_session_context(new_ctx.clone());
 
         let iteration_args = IngestIterationArgs {
-            dataset_handle: target.get_handle().clone(),
-            operation_id,
-            operation_dir,
+            target,
+            operation_id: operation_id.to_string(),
+            operation_dir: operation_dir.clone(),
             system_time: self.time_source.now(),
             options,
+            env_vars,
             polling_source,
             listener,
             ctx: new_ctx,
             data_writer: &mut data_writer,
         };
 
-        self.ingest_iteration(iteration_args).await
+        let response = self.ingest_iteration(iteration_args).await?;
+
+        // A failed attempt keeps its directory: errors point at the logs in it
+        if let Err(err) = std::fs::remove_dir_all(&operation_dir) {
+            tracing::warn!(error = %err, ?operation_dir, "Failed to remove the ingest directory");
+        }
+
+        Ok(response)
     }
 
     #[tracing::instrument(
@@ -115,24 +108,38 @@ impl PollingIngestServiceImpl {
     async fn ingest_iteration(
         &self,
         args: IngestIterationArgs<'_>,
-    ) -> Result<PollingIngestResponse, PollingIngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         tracing::info!(
             options = ?args.options,
             "Ingest iteration details",
         );
 
-        let listener = args.listener.clone();
-        listener.begin();
+        args.listener.begin();
 
         match self.ingest_iteration_inner(args).await {
             Ok(res) => {
-                tracing::info!(result = ?res.result, "Ingest iteration successful");
-                listener.success(&res.result);
+                match &res {
+                    PollingIngestResult::UpToDate { uncacheable } => {
+                        tracing::info!(uncacheable, "Ingest iteration successful, up to date");
+                    }
+                    PollingIngestResult::Updated {
+                        old_head,
+                        new_head,
+                        has_more,
+                        increment,
+                        ..
+                    } => tracing::info!(
+                        %old_head,
+                        %new_head,
+                        has_more,
+                        ?increment,
+                        "Ingest iteration successful",
+                    ),
+                }
                 Ok(res)
             }
             Err(err) => {
                 tracing::error!(error = ?err, error_msg = %err, "Ingest iteration failed");
-                listener.error(&err);
                 Err(err)
             }
         }
@@ -141,7 +148,7 @@ impl PollingIngestServiceImpl {
     async fn ingest_iteration_inner(
         &self,
         args: IngestIterationArgs<'_>,
-    ) -> Result<PollingIngestResponse, PollingIngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         args.listener
             .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
@@ -151,25 +158,13 @@ impl PollingIngestServiceImpl {
 
         if uncacheable && !args.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
-            return Ok(PollingIngestResponse {
-                result: PollingIngestResult::UpToDate {
-                    no_source_defined: false,
-                    uncacheable,
-                },
-                metadata_state: None,
-            });
+            return Ok(PollingIngestResult::UpToDate { uncacheable });
         }
 
         let savepoint = match self.fetch(&args).await? {
             FetchStepResult::Updated(savepoint) => savepoint,
             FetchStepResult::UpToDate => {
-                return Ok(PollingIngestResponse {
-                    result: PollingIngestResult::UpToDate {
-                        no_source_defined: false,
-                        uncacheable,
-                    },
-                    metadata_state: None,
-                });
+                return Ok(PollingIngestResult::UpToDate { uncacheable });
             }
         };
 
@@ -180,10 +175,74 @@ impl PollingIngestServiceImpl {
             .prepare(&args, &savepoint, self.run_info_dir.clone())
             .await?;
 
+        let stage_result = self
+            .read_and_stage(&args, &savepoint, &prepare_result)
+            .await;
+
+        // Clean up intermediate files
+        // Note that we are leaving the fetch data and savepoint intact
+        // in case user wants to iterate on the dataset.
+        if prepare_result.data != savepoint.data
+            && let Err(err) = prepare_result.data.remove_owned(&self.cache_dir)
+        {
+            tracing::warn!(error = %err, "Failed to remove the prepared data");
+        }
+
+        match stage_result? {
+            Ok(staged) => {
+                args.listener.on_stage_progress(
+                    PollingIngestStage::Commit,
+                    0,
+                    TotalSteps::Exact(1),
+                );
+
+                let writer_res = args.data_writer.commit(staged).await?;
+                let new_source_state = writer_res
+                    .add_data_block
+                    .as_ref()
+                    .and_then(|block| block.event.new_source_state.clone());
+
+                let increment = args
+                    .target
+                    .as_metadata_chain()
+                    .get_increment_for_interval(Some(&writer_res.old_head), &writer_res.new_head)
+                    .await
+                    .int_err()?;
+
+                Ok(PollingIngestResult::Updated {
+                    old_head: writer_res.old_head,
+                    new_head: writer_res.new_head,
+                    has_more: savepoint.has_more,
+                    uncacheable,
+                    increment,
+                    new_source_state,
+                    metadata_state: Box::new(args.data_writer.as_metadata_state()),
+                })
+            }
+            Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
+            Err(StageDataError::IncompatibleSchema(e)) => Err(e.into()),
+            Err(StageDataError::MergeError(e)) => Err(e.into()),
+            Err(StageDataError::ExecutionError(e)) => Err(e.into()),
+            Err(StageDataError::DataValidation(e)) => Err(e.into()),
+            Err(StageDataError::EmptyCommit(_)) => {
+                Ok(PollingIngestResult::UpToDate { uncacheable })
+            }
+            Err(StageDataError::Internal(e)) => Err(e.into()),
+        }
+    }
+
+    /// Reads the prepared data, preprocesses it and stages the writer output.
+    /// The outer error is a failure before staging.
+    async fn read_and_stage(
+        &self,
+        args: &IngestIterationArgs<'_>,
+        savepoint: &FetchSavepoint,
+        prepare_result: &PrepStepResult,
+    ) -> Result<Result<StageDataResult, StageDataError>, PollingIngestError> {
         args.listener
             .on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(1));
 
-        let df = if let Some(df) = self.read(&args, &prepare_result).await? {
+        let df = if let Some(df) = self.read(args, prepare_result).await? {
             tracing::info!(schema = ?df.schema(), "Read the input data frame");
 
             if let Some(transform) = &args.polling_source.preprocess {
@@ -219,7 +278,10 @@ impl PollingIngestServiceImpl {
             None
         };
 
-        let new_source_state = savepoint.source_state.map(|ss| ss.to_source_state());
+        let new_source_state = savepoint
+            .source_state
+            .as_ref()
+            .map(PollingSourceState::to_source_state);
 
         let out_dir = args.operation_dir.join("out");
         let data_staging_path = out_dir.join("data.parquet");
@@ -241,51 +303,7 @@ impl PollingIngestServiceImpl {
 
         tracing::info!(?stage_result, "Stage result");
 
-        // Clean up intermediate files
-        // Note that we are leaving the fetch data and savepoint intact
-        // in case user wants to iterate on the dataset.
-        if prepare_result.data != savepoint.data {
-            prepare_result
-                .data
-                .remove_owned(&self.cache_dir)
-                .int_err()?;
-        }
-
-        match stage_result {
-            Ok(staged) => {
-                args.listener.on_stage_progress(
-                    PollingIngestStage::Commit,
-                    0,
-                    TotalSteps::Exact(1),
-                );
-
-                let writer_res = args.data_writer.commit(staged).await?;
-                let res = PollingIngestResponse {
-                    result: PollingIngestResult::Updated {
-                        old_head: writer_res.old_head,
-                        new_head: writer_res.new_head,
-                        has_more: savepoint.has_more,
-                        uncacheable,
-                    },
-                    metadata_state: Some(Box::new(args.data_writer.as_metadata_state())),
-                };
-
-                Ok(res)
-            }
-            Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
-            Err(StageDataError::IncompatibleSchema(e)) => Err(e.into()),
-            Err(StageDataError::MergeError(e)) => Err(e.into()),
-            Err(StageDataError::ExecutionError(e)) => Err(e.into()),
-            Err(StageDataError::DataValidation(e)) => Err(e.into()),
-            Err(StageDataError::EmptyCommit(_)) => Ok(PollingIngestResponse {
-                result: PollingIngestResult::UpToDate {
-                    no_source_defined: false,
-                    uncacheable,
-                },
-                metadata_state: None,
-            }),
-            Err(StageDataError::Internal(e)) => Err(e.into()),
-        }
+        Ok(stage_result)
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -309,6 +327,12 @@ impl PollingIngestServiceImpl {
                     "Ignoring savepoint due to --fetch-uncacheable"
                 );
             } else if let odf::metadata::FetchStep::Mqtt(_) = fetch_step {
+            } else if let SavepointData::Ref { .. } = savepoint.data {
+                // The referenced file may have changed since the savepoint was written
+                tracing::info!(?savepoint_path, "Ignoring savepoint of a zero-copy fetch");
+            } else if !savepoint.data.path(&self.cache_dir).exists() {
+                // Resuming would commit the savepoint's source state without its data
+                tracing::warn!(?savepoint_path, "Ignoring savepoint whose data is gone");
             } else {
                 tracing::info!(?savepoint_path, "Resuming from savepoint");
                 args.listener.on_cache_hit(&savepoint.created_at);
@@ -326,28 +350,37 @@ impl PollingIngestServiceImpl {
 
         // Note: Boxing the fetch service to reduce stack usage
         let fetch_result = Box::pin(self.fetch_service.fetch(
-            &args.dataset_handle,
+            args.target.get_handle(),
             &args.operation_id,
             fetch_step,
             prev_source_state.as_ref(),
             &target_path,
             &args.system_time,
-            &args.options.dataset_env_vars,
+            args.env_vars.as_map(),
             Some(Arc::new(FetchProgressListenerBridge::new(
                 args.listener.clone(),
             ))),
         ))
-        .await?;
+        .await;
 
         match fetch_result {
-            FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
-            FetchResult::Updated(upd) => {
-                let data = if let Some(path) = upd.zero_copy_path {
-                    SavepointData::Ref { path }
+            Err(e) => {
+                Self::discard_fetch_target(&target_path);
+                Err(e)
+            }
+            Ok(FetchResult::UpToDate) => {
+                Self::discard_fetch_target(&target_path);
+                Ok(FetchStepResult::UpToDate)
+            }
+            Ok(FetchResult::Updated(upd)) => {
+                let (data, keep_savepoint) = if let Some(path) = upd.zero_copy_path {
+                    Self::discard_fetch_target(&target_path);
+                    (SavepointData::Ref { path }, false)
                 } else {
-                    SavepointData::Owned {
+                    let data = SavepointData::Owned {
                         cache_key: data_cache_key,
-                    }
+                    };
+                    (data, true)
                 };
 
                 let savepoint = FetchSavepoint {
@@ -357,7 +390,12 @@ impl PollingIngestServiceImpl {
                     data,
                     has_more: upd.has_more,
                 };
-                self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
+                // A zero-copy fetch is free to repeat, and resuming one would
+                // pair the source state it recorded with whatever the file
+                // holds by then
+                if keep_savepoint {
+                    self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
+                }
                 Ok(FetchStepResult::Updated(savepoint))
             }
         }
@@ -394,6 +432,17 @@ impl PollingIngestServiceImpl {
         self.cache_dir.join(format!("fetch-savepoint-{hash}"))
     }
 
+    /// Removes a fetch target that no savepoint refers to
+    fn discard_fetch_target(target_path: &Path) {
+        if target_path.exists()
+            && let Err(err) = std::fs::remove_file(target_path)
+        {
+            tracing::warn!(error = %err, ?target_path, "Failed to remove the fetch target");
+        }
+    }
+
+    /// A savepoint that does not parse is ignored, so the source is fetched
+    /// again instead of failing every run until the cache is cleared
     fn read_fetch_savepoint(
         &self,
         savepoint_path: &Path,
@@ -402,12 +451,18 @@ impl PollingIngestServiceImpl {
             return Ok(None);
         }
 
-        let manifest: Manifest<FetchSavepoint> =
-            serde_yaml::from_reader(std::fs::File::open(savepoint_path).int_err()?).int_err()?;
-
-        Ok(Some(manifest.content))
+        let file = std::fs::File::open(savepoint_path).int_err()?;
+        match serde_yaml::from_reader::<_, Manifest<FetchSavepoint>>(file) {
+            Ok(manifest) => Ok(Some(manifest.content)),
+            Err(err) => {
+                tracing::warn!(error = %err, ?savepoint_path, "Ignoring unreadable savepoint");
+                Ok(None)
+            }
+        }
     }
 
+    /// Writes to a temporary file first, so a failed write never leaves a
+    /// truncated savepoint behind
     fn write_fetch_savepoint(
         &self,
         savepoint_path: &Path,
@@ -419,8 +474,13 @@ impl PollingIngestServiceImpl {
             content: savepoint.clone(),
         };
 
-        serde_yaml::to_writer(std::fs::File::create(savepoint_path).int_err()?, &manifest)
-            .int_err()?;
+        let tmp_path = self
+            .cache_dir
+            .join(get_random_name(Some("fetch-savepoint-tmp-"), 10));
+        let file = std::fs::File::create(&tmp_path).int_err()?;
+        serde_yaml::to_writer(&file, &manifest).int_err()?;
+        file.sync_all().int_err()?;
+        std::fs::rename(&tmp_path, savepoint_path).int_err()?;
 
         Ok(())
     }
@@ -525,13 +585,15 @@ impl PollingIngestService for PollingIngestServiceImpl {
     async fn ingest(
         &self,
         target: ResolvedDataset,
-        metadata_state: Box<DataWriterMetadataState>,
+        plan: PollingIngestPlan,
         options: PollingIngestOptions,
+        env_vars: &IngestEnvVars,
+        operation_id: &str,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PollingIngestResponse, PollingIngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPollingIngestListener));
 
-        self.ingest_inner(target, metadata_state, options, listener)
+        self.ingest_inner(target, plan, options, env_vars, operation_id, listener)
             .await
     }
 }
@@ -550,11 +612,12 @@ pub(crate) struct PrepStepResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct IngestIterationArgs<'a> {
-    dataset_handle: odf::DatasetHandle,
+    target: ResolvedDataset,
     operation_id: String,
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
     options: PollingIngestOptions,
+    env_vars: &'a IngestEnvVars,
     polling_source: odf::metadata::SetPollingSource,
     listener: Arc<dyn PollingIngestListener>,
     ctx: SessionContext,

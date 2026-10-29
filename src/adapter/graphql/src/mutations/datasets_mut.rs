@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{CreateDatasetFromSnapshotError, DatasetAction, DatasetActionAccess};
+use kamu_datasets::{CreateDatasetFromSnapshotError, DatasetPermission, DatasetPermissionAccess};
 
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
@@ -90,17 +90,19 @@ impl DatasetsMut {
         };
 
         let dataset_request_state = DatasetRequestState::new(dataset_handle);
-        let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
-        let current_dataset_action = DatasetAction::Write;
+        let allowed_actions = dataset_request_state
+            .granted_dataset_permissions(ctx)
+            .await?;
+        let current_dataset_permission = DatasetPermission::Write;
 
-        match DatasetAction::resolve_access(allowed_actions, current_dataset_action) {
-            DatasetActionAccess::Allowed => {
+        match DatasetPermission::resolve_access(allowed_actions, current_dataset_permission) {
+            DatasetPermissionAccess::Allowed => {
                 Ok(Some(DatasetMut::new_access_checked(dataset_request_state)))
             }
-            DatasetActionAccess::Insufficient => Err(utils::make_dataset_access_error(
+            DatasetPermissionAccess::Insufficient => Err(utils::make_dataset_access_error(
                 dataset_request_state.dataset_handle(),
             )),
-            DatasetActionAccess::Forbidden => Ok(None),
+            DatasetPermissionAccess::Forbidden => Ok(None),
         }
     }
 
@@ -132,7 +134,7 @@ impl DatasetsMut {
         let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
 
         let resolution = rebac_dataset_registry_facade
-            .classify_dataset_refs_by_access(&dataset_refs_refs, DatasetAction::Write)
+            .classify_dataset_refs_by_access(&dataset_refs_refs, DatasetPermission::Write)
             .await?;
 
         if let Some(error_msg) = resolution.try_get_user_error_report(skip_missing) {
@@ -253,7 +255,7 @@ impl DatasetsMut {
 
         let create_options = kamu_datasets::CreateDatasetUseCaseOptions {
             dataset_visibility,
-            seed_block_bytes: None,
+            ..Default::default()
         };
 
         let result = match create_from_snapshot.execute(snapshot, create_options).await {

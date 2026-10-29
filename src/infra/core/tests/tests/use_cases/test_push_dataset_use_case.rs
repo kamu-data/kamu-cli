@@ -20,8 +20,12 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, DatasetAction, MockDatasetActionAuthorizer};
-use kamu_datasets_services::{AppendDatasetMetadataBatchUseCaseImpl, DependencyGraphServiceImpl};
+use kamu_datasets::{CreateDatasetResult, DatasetPermission, MockDatasetPermissionChecker};
+use kamu_datasets_services::{
+    AppendDatasetMetadataBatchUseCaseImpl,
+    DatasetHeadCommitterImpl,
+    DependencyGraphServiceImpl,
+};
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
 use tempfile::TempDir;
 use url::Url;
@@ -32,14 +36,14 @@ use url::Url;
 async fn test_push_success() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
-            DatasetAction::Read,
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
+        .make_expect_classify_datasets_by_allowance_for(
+            DatasetPermission::Read,
             2,
             HashSet::from_iter([alias_foo.clone()]),
         );
 
-    let harness = PushUseCaseHarness::new(mock_authorizer);
+    let harness = PushUseCaseHarness::new(mock_permission_checker);
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let aliases = harness.get_remote_aliases(&foo).await;
@@ -64,7 +68,7 @@ async fn test_push_success() {
         PushResponse {
             local_handle: Some(local_handle),
             target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks }),
+            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks, increment: _ }),
         } if local_handle == foo.dataset_handle &&
             repo_name == harness.remote_repo_name &&
             old_head.is_none() && num_blocks == 2
@@ -112,14 +116,14 @@ async fn test_push_success() {
 async fn test_push_success_without_saving_alias() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
-            DatasetAction::Read,
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
+        .make_expect_classify_datasets_by_allowance_for(
+            DatasetPermission::Read,
             1,
             HashSet::from_iter([alias_foo.clone()]),
         );
 
-    let harness = PushUseCaseHarness::new(mock_authorizer);
+    let harness = PushUseCaseHarness::new(mock_permission_checker);
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let push_options = PushMultiOptions {
@@ -142,7 +146,7 @@ async fn test_push_success_without_saving_alias() {
          PushResponse {
             local_handle: Some(local_handle),
             target: Some(odf::DatasetPushTarget::Repository(repo_name)),
-            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks }),
+            result: Ok(SyncResult::Updated { old_head, new_head: _, num_blocks, increment: _ }),
         } if local_handle == foo.dataset_handle &&
             repo_name == harness.remote_repo_name &&
             old_head.is_none() && num_blocks == 2
@@ -158,14 +162,14 @@ async fn test_push_success_without_saving_alias() {
 async fn test_push_unauthorized() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
 
-    let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
-            DatasetAction::Read,
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
+        .make_expect_classify_datasets_by_allowance_for(
+            DatasetPermission::Read,
             1,
             HashSet::new(), // not authorized
         );
 
-    let harness = PushUseCaseHarness::new(mock_authorizer);
+    let harness = PushUseCaseHarness::new(mock_permission_checker);
     let foo = harness.create_root_dataset(&alias_foo).await;
 
     let push_options = PushMultiOptions {
@@ -204,14 +208,14 @@ async fn test_push_multiple_success() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
 
-    let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
-            DatasetAction::Read,
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
+        .make_expect_classify_datasets_by_allowance_for(
+            DatasetPermission::Read,
             1,
             HashSet::from_iter([alias_foo.clone(), alias_bar.clone()]),
         );
 
-    let harness = PushUseCaseHarness::new(mock_authorizer);
+    let harness = PushUseCaseHarness::new(mock_permission_checker);
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness.create_root_dataset(&alias_bar).await;
 
@@ -279,14 +283,14 @@ async fn test_push_multiple_mixed_authorization_issues() {
     let alias_bar = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("bar"));
     let alias_baz = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("baz"));
 
-    let mock_authorizer = MockDatasetActionAuthorizer::new()
-        .make_expect_classify_datasets_by_allowance(
-            DatasetAction::Read,
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
+        .make_expect_classify_datasets_by_allowance_for(
+            DatasetPermission::Read,
             1,
             HashSet::from_iter([alias_bar.clone()]), // 1 of 3 is authorized
         );
 
-    let harness = PushUseCaseHarness::new(mock_authorizer);
+    let harness = PushUseCaseHarness::new(mock_permission_checker);
     let foo = harness.create_root_dataset(&alias_foo).await;
     let bar = harness.create_root_dataset(&alias_bar).await;
     let baz = harness.create_root_dataset(&alias_baz).await;
@@ -335,6 +339,34 @@ async fn test_push_multiple_mixed_authorization_issues() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[tokio::test]
+async fn test_push_reports_success_to_the_listener_once() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let mock_permission_checker = MockDatasetPermissionChecker::new()
+        .make_expect_classify_datasets_by_allowance_for(
+            DatasetPermission::Read,
+            1,
+            HashSet::from_iter([alias_foo.clone()]),
+        );
+
+    let harness = PushUseCaseHarness::new(mock_permission_checker);
+    let foo = harness.create_root_dataset(&alias_foo).await;
+
+    let (responses, events) = harness.push_to_remote_repo_recording(&foo).await;
+
+    assert_matches!(
+        responses.as_slice(),
+        [PushResponse {
+            result: Ok(SyncResult::Updated { .. }),
+            ..
+        }]
+    );
+    assert_eq!(events, vec!["begin", "success"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct PushUseCaseHarness {
     base_use_case_harness: BaseUseCaseHarness,
@@ -346,10 +378,10 @@ struct PushUseCaseHarness {
 }
 
 impl PushUseCaseHarness {
-    fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
+    fn new(mock_dataset_permission_checker: MockDatasetPermissionChecker) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer)),
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker)),
         );
 
         let repos_dir = base_use_case_harness.temp_dir_path().join("repos");
@@ -360,9 +392,11 @@ impl PushUseCaseHarness {
         b.add::<PushDatasetUseCaseImpl>()
             .add::<PushRequestPlannerImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteRepositoryRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))
@@ -372,6 +406,7 @@ impl PushUseCaseHarness {
             .add_value(IpfsClient::default())
             .add_value(IpfsGateway::default())
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<DependencyGraphServiceImpl>();
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -400,11 +435,76 @@ impl PushUseCaseHarness {
         }
     }
 
+    async fn push_to_remote_repo_recording(
+        &self,
+        created: &CreateDatasetResult,
+    ) -> (Vec<PushResponse>, Vec<&'static str>) {
+        let listener = Arc::new(RecordingSyncListener::default());
+        let responses = self
+            .use_case
+            .execute_multi(
+                vec![created.dataset_handle.clone()],
+                PushMultiOptions {
+                    remote_target: Some(odf::DatasetPushTarget::Repository(
+                        self.remote_repo_name.clone(),
+                    )),
+                    ..Default::default()
+                },
+                Some(Arc::new(RecordingSyncMultiListener(listener.clone()))),
+            )
+            .await
+            .unwrap();
+        (responses, listener.events())
+    }
+
     async fn get_remote_aliases(&self, created: &CreateDatasetResult) -> Box<dyn RemoteAliases> {
         self.remote_aliases_registry
             .get_remote_aliases(&created.dataset_handle)
             .await
             .unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct RecordingSyncListener {
+    events: std::sync::Mutex<Vec<&'static str>>,
+}
+
+impl RecordingSyncListener {
+    fn events(&self) -> Vec<&'static str> {
+        self.events.lock().unwrap().clone()
+    }
+
+    fn record(&self, event: &'static str) {
+        self.events.lock().unwrap().push(event);
+    }
+}
+
+struct RecordingSyncMultiListener(Arc<RecordingSyncListener>);
+
+impl SyncMultiListener for RecordingSyncMultiListener {
+    fn begin_sync(
+        &self,
+        _src: &odf::DatasetRefAny,
+        _dst: &odf::DatasetRefAny,
+    ) -> Option<Arc<dyn SyncListener>> {
+        Some(self.0.clone())
+    }
+}
+
+impl SyncListener for RecordingSyncListener {
+    fn begin(&self) {
+        self.record("begin");
+    }
+
+    fn success(&self, _result: &SyncResult) {
+        self.record("success");
+    }
+
+    fn error(&self, _error: &SyncError) {
+        self.record("error");
     }
 }
 

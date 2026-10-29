@@ -4,7 +4,8 @@ description: >
     Test organization, harness design, and DI wiring patterns for Kamu CLI tests.
     Use this skill whenever writing, editing, or reviewing any test code in the Kamu
     codebase — including unit tests, integration tests, or test helpers. Covers:
-    harness struct design, dill catalog wiring, per-account service isolation,
+    choosing between an inline unit test and an integration test, harness struct
+    design, dill catalog wiring, per-account service isolation,
     temporary directories, in-memory test doubles, cross-crate reusable harnesses,
     and keeping test bodies high-level and readable. Always consult this skill before
     writing a new test, adding a helper function, or structuring a new test module.
@@ -72,6 +73,29 @@ mod utils {
     pub async fn create_dataset(catalog: &dill::Catalog, name: &str) { ... }
 }
 ```
+
+---
+
+## Unit or integration test
+
+Choose by what the code under test touches, not by how small the test is.
+
+| The code under test | Test it | Where |
+|---|---|---|
+| Computes values from values in memory: parsing, formatting, conversions, query or filter builders, matching rules, state transitions | Unit test | `#[cfg(test)] mod tests` at the bottom of its own file |
+| Reads or writes files (temp files and directories included), datasets, databases, containers or the network, or needs a DI catalog | Integration test | the crate's `tests/` tree, through the crate's public API, with a harness from the scopes below |
+| Is a whole command or API scenario | E2E test | `kamu-cli-e2e-tests` |
+
+- A unit test needs no `tempfile`, no catalog and no container. If it does, it is an integration
+  test in the wrong place.
+- Async is not a reason to move a test: `#[tokio::test]` in a unit test is fine while everything
+  stays in memory.
+- If an integration test can only reach the logic through a private item, the logic is usually a
+  concept of its own. Extract it into a public type with a narrow API and test that from `tests/`,
+  rather than testing the private item inline or widening visibility only for the test. Example:
+  `EngineTransformOutput`, which checks an engine's output files against its response, was a
+  private method of `ODFEngine` tested inline with temp files.
+- Pure helpers private to a module stay private and get an inline unit test.
 
 ---
 
@@ -324,6 +348,14 @@ impl DatasetEnvVarServiceHarness {
 [dev-dependencies]
 kamu-configuration-services = { workspace = true, features = ["testing"] }
 ```
+
+## Rejected approaches
+
+Do not re-propose these without new evidence.
+
+| Approach | Why it was rejected |
+|---|---|
+| An inline `#[cfg(test)]` module that writes temp files to reach a private method | It is an integration test hidden in a source file: it couples the test to private internals and keeps the logic from being reused. Extract the logic into a public type and test it from `tests/`. |
 
 ## What lives elsewhere
 

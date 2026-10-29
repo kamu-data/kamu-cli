@@ -19,7 +19,7 @@ use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
 use kamu_datasets_inmem::*;
-use kamu_datasets_services::testing::TestDatasetOutboxListener;
+use kamu_datasets_services::testing::{RacingDatasetHeadCommitter, TestDatasetOutboxListener};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
@@ -80,12 +80,20 @@ impl DatasetBaseUseCaseHarness {
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<TestDatasetOutboxListener>();
 
-            if let Some(mock_dataset_action_authorizer) = opts.maybe_mock_dataset_action_authorizer
+            if let Some(mock_dataset_permission_checker) =
+                opts.maybe_mock_dataset_permission_checker
             {
-                b.add_value(mock_dataset_action_authorizer)
-                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+                b.add_value(mock_dataset_permission_checker)
+                    .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
             } else {
-                b.add::<AlwaysHappyDatasetActionAuthorizer>();
+                b.add::<AlwaysHappyDatasetPermissionChecker>();
+            }
+
+            if opts.racing_head_committer {
+                b.add_value(RacingDatasetHeadCommitter::default())
+                    .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
+            } else {
+                b.add::<DatasetHeadCommitterImpl>();
             }
 
             if let Some(mock_did_generator) = opts.maybe_mock_did_generator {
@@ -284,7 +292,7 @@ impl DatasetBaseUseCaseHarness {
         // Execute append use case
         use_case
             .execute(
-                dataset.as_ref(),
+                &dataset,
                 Box::new(new_hashed_blocks.into_iter()),
                 AppendDatasetMetadataBatchUseCaseOptions::default(),
             )
@@ -345,6 +353,37 @@ impl DatasetBaseUseCaseHarness {
         use_case.execute_plan(plan).await.unwrap();
     }
 
+    /// Appends a `SetInfo` block after `prev_block_hash` without moving any
+    /// reference.
+    pub async fn append_unreferenced_block(
+        &self,
+        dataset: &CreateDatasetResult,
+        prev_block_hash: &odf::Multihash,
+        description: &str,
+    ) -> odf::Multihash {
+        let chain = dataset.dataset.as_metadata_chain();
+        let prev_block = chain.get_block(prev_block_hash).await.unwrap();
+
+        use odf::metadata::testing::MetadataFactory;
+        let block = MetadataFactory::metadata_block(
+            MetadataFactory::set_info().description(description).build(),
+        )
+        .prev(prev_block_hash, prev_block.sequence_number)
+        .system_time(self.system_time_source().now())
+        .build();
+
+        chain
+            .append(
+                block,
+                odf::dataset::AppendOpts {
+                    update_ref: None,
+                    ..odf::dataset::AppendOpts::default()
+                },
+            )
+            .await
+            .unwrap()
+    }
+
     pub fn collected_outbox_messages(&self) -> String {
         format!("{}", self.test_dataset_outbox_listener.as_ref())
     }
@@ -359,10 +398,13 @@ impl DatasetBaseUseCaseHarness {
 pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub maybe_base_catalog: Option<&'a dill::Catalog>,
     pub tenancy_config: TenancyConfig,
-    pub maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    pub maybe_mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
     pub outbox_provider: OutboxProvider,
     pub system_time_source_provider: SystemTimeSourceProvider,
+    /// Registers `RacingDatasetHeadCommitter` in place of
+    /// `DatasetHeadCommitterImpl`
+    pub racing_head_committer: bool,
 }
 
 impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
@@ -370,13 +412,14 @@ impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
         Self {
             maybe_base_catalog: None,
             tenancy_config: TenancyConfig::SingleTenant,
-            maybe_mock_dataset_action_authorizer: None,
+            maybe_mock_dataset_permission_checker: None,
             maybe_mock_did_generator: None,
             // Use immediate outbox in all dataset use case harnesses
             outbox_provider: OutboxProvider::Immediate {
                 force_immediate: true,
             },
             system_time_source_provider: SystemTimeSourceProvider::Default,
+            racing_head_committer: false,
         }
     }
 }

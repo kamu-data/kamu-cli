@@ -88,10 +88,18 @@ impl fs::FlowController for FlowControllerCompact {
                 return Ok(());
             }
             CompactionResult::Success {
+                breaking: false, ..
+            } => {
+                // History was kept, downstream has nothing to react to
+                tracing::debug!(flow_id=%success_flow_state.flow_id, "Compaction was not breaking, skipping propagation");
+                return Ok(());
+            }
+            CompactionResult::Success {
                 old_head,
                 new_head,
                 old_num_blocks: _,
                 new_num_blocks: _,
+                breaking: true,
             } => {
                 let dataset_id =
                     FlowScopeDataset::new(&success_flow_state.flow_binding.scope).dataset_id();

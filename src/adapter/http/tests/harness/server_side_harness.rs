@@ -16,14 +16,14 @@ use internal_error::InternalError;
 use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
-    AlwaysHappyDatasetActionAuthorizer,
+    AlwaysHappyDatasetPermissionChecker,
     CommitDatasetEventUseCase,
     CreateDatasetFromSnapshotUseCase,
     CreateDatasetUseCase,
-    DatasetActionAuthorizer,
+    DatasetPermissionChecker,
     DatasetReferenceService,
     DatasetRegistry,
-    MockDatasetActionAuthorizer,
+    MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::DatasetEntryWriter;
 use reqwest::Url;
@@ -63,6 +63,13 @@ pub(crate) trait ServerSideHarness {
     fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter>;
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
+
+    /// Taken before `api_server_run`, which consumes the harness
+    fn stored_heads(&self) -> StoredHeads {
+        StoredHeads {
+            dataset_reference_service: self.cli_dataset_reference_service(),
+        }
+    }
 
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url;
 
@@ -126,7 +133,7 @@ pub(crate) fn create_cli_user_catalog(
 
     dill::CatalogBuilder::new_chained(base_catalog)
         .add_value(current_account_subject)
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .build()
 }
 
@@ -138,18 +145,34 @@ pub(crate) fn create_web_user_catalog(
 ) -> dill::Catalog {
     let mut web_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
     if options.authorized_writes {
-        web_catalog_builder.add::<AlwaysHappyDatasetActionAuthorizer>();
+        web_catalog_builder.add::<AlwaysHappyDatasetPermissionChecker>();
     } else {
-        let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
-        mock_dataset_action_authorizer
-            .expect_get_allowed_actions()
+        let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
+        mock_dataset_permission_checker
+            .expect_get_granted_permissions()
             .returning(|_dataset_id| Ok(HashSet::new()));
         web_catalog_builder
-            .add_value(mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+            .add_value(mock_dataset_permission_checker)
+            .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
     }
 
     web_catalog_builder.build()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Reads the `HEAD` stored on the server
+pub(crate) struct StoredHeads {
+    dataset_reference_service: Arc<dyn DatasetReferenceService>,
+}
+
+impl StoredHeads {
+    pub async fn get(&self, dataset_id: &odf::DatasetID) -> odf::Multihash {
+        self.dataset_reference_service
+            .get_reference(dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

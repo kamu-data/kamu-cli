@@ -20,7 +20,6 @@ use kamu_adapter_flow_webhook::{
 };
 use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
 use kamu_adapter_task_webhook::{LogicalPlanWebhookDeliver, TaskErrorWebhookDelivery};
-use kamu_core::PullResult;
 use kamu_datasets::{
     DatasetExternallyChangedMessage,
     GetIncrementError,
@@ -1136,11 +1135,15 @@ impl WebhookFlowHarness {
     }
 
     fn new_data_increment() -> MockDatasetIncrementQueryService {
-        MockDatasetIncrementQueryService::with_increment_between(MetadataChainIncrementInterval {
+        MockDatasetIncrementQueryService::with_increment_between(Self::ingest_increment())
+    }
+
+    fn ingest_increment() -> MetadataChainIncrementInterval {
+        MetadataChainIncrementInterval {
             num_blocks: 1,
             num_records: 3,
             updated_watermark: None,
-        })
+        }
     }
 
     fn target_url() -> url::Url {
@@ -1268,13 +1271,11 @@ impl WebhookFlowHarness {
             finish_in_with: Some((
                 Duration::milliseconds(10),
                 TaskOutcome::Success(
-                    TaskResultDatasetUpdate {
-                        pull_result: PullResult::Updated {
-                            old_head: Some(old_head.clone()),
-                            new_head: new_head.clone(),
-                            has_more: false,
-                        },
-                        data_increment: None,
+                    TaskResultDatasetUpdate::Updated {
+                        old_head: Some(old_head.clone()),
+                        new_head: new_head.clone(),
+                        has_more: false,
+                        increment: Self::ingest_increment(),
                     }
                     .into_task_result(),
                 ),

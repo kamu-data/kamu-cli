@@ -23,3 +23,15 @@ async fn test_basics_s3() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[tokio::test]
+async fn test_compare_and_set_s3() {
+    let s3 = LocalS3Server::new().await;
+    let repo = NamedObjectRepositoryS3::new(s3.ctx.clone());
+
+    test_named_object_repository_shared::test_named_repository_compare_and_set(&repo).await;
+    test_named_object_repository_shared::test_named_repository_compare_and_set_race(&repo).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

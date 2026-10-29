@@ -23,7 +23,7 @@ use crate::utils::cached_object::CachedObject;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct VerificationServiceImpl {
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
+    transform_planner: Arc<dyn TransformPlanner>,
     transform_executor: Arc<dyn TransformExecutor>,
 }
 
@@ -31,11 +31,11 @@ pub struct VerificationServiceImpl {
 #[interface(dyn VerificationService)]
 impl VerificationServiceImpl {
     pub fn new(
-        transform_request_planner: Arc<dyn TransformRequestPlanner>,
+        transform_planner: Arc<dyn TransformPlanner>,
         transform_executor: Arc<dyn TransformExecutor>,
     ) -> Self {
         Self {
-            transform_request_planner,
+            transform_planner,
             transform_executor,
         }
     }
@@ -315,7 +315,7 @@ impl VerificationService for VerificationServiceImpl {
                 && request.options.replay_transformations
             {
                 let plan = self
-                    .transform_request_planner
+                    .transform_planner
                     .build_transform_verification_plan(
                         request.target.clone(),
                         request.block_range.clone(),

@@ -10,19 +10,13 @@
 use chrono::{Duration, Utc};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
-use kamu_core::{PullResult, TransformStatus};
+use kamu_core::TransformStatus;
 use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
 
-use crate::tests::{
-    FlowHarness,
-    FlowHarnessOverrides,
-    FlowSystemTestListener,
-    SCHEDULING_ALIGNMENT_MS,
-    TaskDriverArgs,
-};
+use crate::tests::{FlowHarness, FlowHarnessOverrides, SCHEDULING_ALIGNMENT_MS, TaskDriverArgs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,13 +31,6 @@ async fn test_derived_dataset_triggered_after_input_change() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 3,
-                updated_watermark: None,
-            },
-        )),
         ..Default::default()
     });
 
@@ -88,7 +75,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -119,17 +106,19 @@ async fn test_derived_dataset_triggered_after_input_change() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                // Send some PullResult with records to bypass batching condition
+                // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -352,7 +341,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -401,17 +390,19 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "2")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                // Send some PullResult with records to bypass batching condition
+                // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -623,13 +614,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
         mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 7,
-                updated_watermark: None,
-            },
-        )),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -691,7 +675,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -708,15 +692,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -738,15 +722,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -786,15 +770,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -834,15 +818,15 @@ async fn test_throttling_derived_dataset_with_2_parents() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1218,83 +1202,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
 
 #[test_log::test(tokio::test)]
 async fn test_batching_condition_records_reached() {
-    let mut seq_dataset_changes = mockall::Sequence::new();
-
-    // foo: reading after task 0
-    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
-    // foo: reading after task 1
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 7,
-                updated_watermark: None,
-            })
-        });
-    // bar: reading after task 2
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 12,
-                updated_watermark: None,
-            })
-        });
-
-    // foo: reading after task 3
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
-    // foo: reading after task 4
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
-    // bar: reading after task 5
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 10,
-                updated_watermark: None,
-            })
-        });
-
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
 
     // bar: evaluated after enabling trigger
@@ -1304,7 +1211,6 @@ async fn test_batching_condition_records_reached() {
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(mock_dataset_changes),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -1350,7 +1256,7 @@ async fn test_batching_condition_records_reached() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -1366,15 +1272,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1396,15 +1302,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1426,15 +1332,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 12,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1456,15 +1362,17 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice-2",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                b"foo-new-slice-2",
+                            )),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1486,15 +1394,17 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice-2",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(
+                                b"foo-new-slice-2",
+                            )),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1516,15 +1426,15 @@ async fn test_batching_condition_records_reached() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 10,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1828,47 +1738,6 @@ async fn test_batching_condition_records_reached() {
 
 #[test_log::test(tokio::test)]
 async fn test_batching_condition_timeout() {
-    let mut seq_dataset_changes = mockall::Sequence::new();
-
-    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // foo: reading after task 0
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
-
-    // foo: reading after task 1
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 3,
-                updated_watermark: None,
-            })
-        });
-    // bar: reading after task 3
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 8,
-                updated_watermark: None,
-            })
-        });
-
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
 
     // bar: evaluated after enabling trigger
@@ -1878,7 +1747,6 @@ async fn test_batching_condition_timeout() {
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(mock_dataset_changes),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -1924,7 +1792,7 @@ async fn test_batching_condition_timeout() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -1940,15 +1808,15 @@ async fn test_batching_condition_timeout() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -1970,15 +1838,15 @@ async fn test_batching_condition_timeout() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2002,15 +1870,15 @@ async fn test_batching_condition_timeout() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 8,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2159,47 +2027,6 @@ async fn test_batching_condition_timeout() {
 
 #[test_log::test(tokio::test)]
 async fn test_batching_condition_watermark() {
-    let mut seq_dataset_changes = mockall::Sequence::new();
-
-    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // foo: reading after task 0
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 0,
-                updated_watermark: None,
-            })
-        });
-
-    // foo: reading after task 1
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 0, // no records, just watermark
-                updated_watermark: Some(Utc::now()),
-            })
-        });
-    // bar: reading after task 3
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 0, // no records, just watermark
-                updated_watermark: Some(Utc::now()),
-            })
-        });
-
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     // bar: evaluated after enabling trigger
     mock_transform_flow_evaluator
@@ -2208,7 +2035,6 @@ async fn test_batching_condition_watermark() {
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(mock_dataset_changes),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -2254,7 +2080,7 @@ async fn test_batching_condition_watermark() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -2270,15 +2096,15 @@ async fn test_batching_condition_watermark() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 0,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2300,15 +2126,15 @@ async fn test_batching_condition_watermark() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 0,
+                                updated_watermark: Some(Utc::now()),
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2332,15 +2158,15 @@ async fn test_batching_condition_watermark() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 0,
+                                updated_watermark: Some(Utc::now()),
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2489,83 +2315,6 @@ async fn test_batching_condition_watermark() {
 
 #[test_log::test(tokio::test)]
 async fn test_batching_condition_with_2_inputs() {
-    let mut seq_dataset_changes = mockall::Sequence::new();
-
-    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // 'foo': reading after task 0
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
-    // 'bar': reading after task 1
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
-
-    // 'foo' : reading after task 2
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 7,
-                updated_watermark: None,
-            })
-        });
-    // 'bar': reading after task 3
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 2,
-                num_records: 8,
-                updated_watermark: None,
-            })
-        });
-    // 'foo' : reading after task 4
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 7,
-                updated_watermark: None,
-            })
-        });
-    // 'baz' : reading after task 5
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
-        .in_sequence(&mut seq_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 32,
-                updated_watermark: None,
-            })
-        });
-
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     // 'baz': evaluated after enabling trigger
     mock_transform_flow_evaluator
@@ -2574,7 +2323,6 @@ async fn test_batching_condition_with_2_inputs() {
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(mock_dataset_changes),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -2636,7 +2384,7 @@ async fn test_batching_condition_with_2_inputs() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -2653,15 +2401,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2683,15 +2431,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2713,15 +2461,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2743,15 +2491,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 2,
+                                num_records: 8,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2773,15 +2521,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -2803,15 +2551,15 @@ async fn test_batching_condition_with_2_inputs() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"baz-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"baz-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 32,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3204,15 +2952,11 @@ async fn test_batching_condition_with_2_inputs() {
 
 #[test_log::test(tokio::test)]
 async fn test_respect_last_success_time_for_derived_dataset_when_activate_configuration() {
-    // foo: reading after task 0
-    // bar: reading after task 1
-    // foo: reading after task 2
-    // foo: reading after reactivation of bar
-    // bar: reading after task 3
+    // foo: read by the "bar" sensor on reactivation of bar
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
     mock_dataset_changes
         .expect_get_increment_between()
-        .times(3)
+        .times(1)
         .returning(|_, _, _| {
             Ok(MetadataChainIncrementInterval {
                 num_blocks: 1,
@@ -3293,7 +3037,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -3312,15 +3056,15 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3360,15 +3104,15 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3599,22 +3343,10 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
     let mut sequence_transform_evaluator = mockall::Sequence::new();
 
     let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // foo: checked after task 0
+    // foo: read by the "bar" sensor twice after resuming
     mock_dataset_changes
         .expect_get_increment_between()
-        .times(3)
-        .in_sequence(&mut sequence_dataset_changes)
-        .returning(|_, _, _| {
-            Ok(MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            })
-        });
-    // bar: checked after task 1
-    mock_dataset_changes
-        .expect_get_increment_between()
-        .times(1)
+        .times(2)
         .in_sequence(&mut sequence_dataset_changes)
         .returning(|_, _, _| {
             Ok(MetadataChainIncrementInterval {
@@ -3695,7 +3427,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -3714,15 +3446,15 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -3744,15 +3476,15 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4193,7 +3925,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -4263,13 +3995,6 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 0,
-                updated_watermark: None,
-            },
-        )),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -4312,7 +4037,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -4343,17 +4068,19 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
                 task_metadata: TaskMetadata::from(vec![(METADATA_TASK_FLOW_ID, "1")]),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                // Send some PullResult with records to bypass batching condition
+                // Send some update result with records to bypass batching condition
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 0,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4513,13 +4240,6 @@ async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
-        mock_dataset_changes: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 3,
-                updated_watermark: None,
-            },
-        )),
         ..Default::default()
     });
 
@@ -4571,7 +4291,7 @@ async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -4625,13 +4345,15 @@ async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"newest-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 3,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -4832,7 +4554,7 @@ async fn test_restored_sensor_hears_input_change_delivered_after_restart() {
         .schedule_flow_for_activation(&bar_transform_binding, harness.now())
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 

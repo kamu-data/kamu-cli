@@ -10,6 +10,8 @@
 mod data_format_registry;
 mod data_writer;
 mod merge_strategy;
+mod polling_ingest_plan_payload;
+mod polling_ingest_planner;
 mod polling_ingest_service;
 mod push_ingest_executor;
 mod push_ingest_planner;
@@ -18,6 +20,8 @@ mod reader;
 pub use data_format_registry::*;
 pub use data_writer::*;
 pub use merge_strategy::*;
+pub use polling_ingest_plan_payload::*;
+pub use polling_ingest_planner::*;
 pub use polling_ingest_service::*;
 pub use push_ingest_executor::*;
 pub use push_ingest_planner::*;

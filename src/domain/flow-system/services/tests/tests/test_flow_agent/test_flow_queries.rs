@@ -12,19 +12,13 @@ use futures::TryStreamExt;
 use kamu_accounts::{AccountConfig, CurrentAccountSubject};
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::*;
-use kamu_core::{PullResult, TransformStatus};
-use kamu_datasets::{DatasetEntryServiceExt, MockDatasetIncrementQueryService};
+use kamu_core::TransformStatus;
+use kamu_datasets::DatasetEntryServiceExt;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
 
-use crate::tests::{
-    FlowHarness,
-    FlowHarnessOverrides,
-    FlowSystemTestListener,
-    ManualFlowActivationArgs,
-    TaskDriverArgs,
-};
+use crate::tests::{FlowHarness, FlowHarnessOverrides, ManualFlowActivationArgs, TaskDriverArgs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,7 +52,7 @@ async fn test_list_all_flow_initiators() {
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -209,7 +203,7 @@ async fn test_list_all_datasets_with_flow() {
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -387,7 +381,7 @@ async fn test_flow_duration_starts_at_manual_activation_before_schedule() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -509,23 +503,6 @@ async fn test_flow_duration_starts_at_manual_activation_before_schedule() {
 
 #[test_log::test(tokio::test)]
 async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
-    let mut seq_dataset_changes = mockall::Sequence::new();
-    let mut mock_dataset_changes = MockDatasetIncrementQueryService::new();
-    // foo: reading after task 0, then task 1, then bar after task 2
-    for num_records in [5, 7, 12] {
-        mock_dataset_changes
-            .expect_get_increment_between()
-            .times(1)
-            .in_sequence(&mut seq_dataset_changes)
-            .returning(move |_, _, _| {
-                Ok(MetadataChainIncrementInterval {
-                    num_blocks: 1,
-                    num_records,
-                    updated_watermark: None,
-                })
-            });
-    }
-
     let mut mock_transform_flow_evaluator = MockTransformFlowEvaluator::new();
     mock_transform_flow_evaluator
         .expect_evaluate_transform_status()
@@ -533,7 +510,6 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
         .returning(|_| Ok(TransformStatus::UpToDate));
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
-        mock_dataset_changes: Some(mock_dataset_changes),
         mock_transform_flow_evaluator: Some(mock_transform_flow_evaluator),
         ..Default::default()
     });
@@ -574,7 +550,7 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -589,15 +565,15 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 5,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -619,15 +595,15 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"foo-new-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"foo-new-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 7,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),
@@ -649,15 +625,15 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
                 finish_in_with: Some((
                     Duration::milliseconds(10),
                     TaskOutcome::Success(
-                        TaskResultDatasetUpdate {
-                            pull_result: PullResult::Updated {
-                                old_head: Some(odf::Multihash::from_digest_sha3_256(
-                                    b"bar-old-slice",
-                                )),
-                                new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
-                                has_more: false,
+                        TaskResultDatasetUpdate::Updated {
+                            old_head: Some(odf::Multihash::from_digest_sha3_256(b"bar-old-slice")),
+                            new_head: odf::Multihash::from_digest_sha3_256(b"bar-new-slice"),
+                            has_more: false,
+                            increment: MetadataChainIncrementInterval {
+                                num_blocks: 1,
+                                num_records: 12,
+                                updated_watermark: None,
                             },
-                            data_increment: None,
                         }
                         .into_task_result(),
                     ),

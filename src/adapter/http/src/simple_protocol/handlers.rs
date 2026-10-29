@@ -338,6 +338,12 @@ pub async fn dataset_push_ws_upgrade_handler(
                     .await
                 {
                     Ok(dataset_handle) => Ok(Some(dataset_handle)),
+                    // Only a push by alias creates a dataset
+                    Err(odf::DatasetRefUnresolvedError::NotFound(e))
+                        if dataset_ref.alias().is_none() =>
+                    {
+                        Err(ApiError::not_found(e))
+                    }
                     Err(odf::DatasetRefUnresolvedError::NotFound(_)) => {
                         // Make sure account in dataset ref being created and token account match
                         let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref()

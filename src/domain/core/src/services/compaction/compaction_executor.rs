@@ -18,6 +18,7 @@ use crate::{CompactionListener, CompactionPlan};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait CompactionExecutor: Send + Sync {
     /// Executes the compacting accordingly to the plan.
@@ -40,7 +41,18 @@ pub enum CompactionResult {
         new_head: odf::Multihash,
         old_num_blocks: usize,
         new_num_blocks: usize,
+        /// History was rewritten, so downstream datasets must treat the update
+        /// as a breaking change. A stored result without the field reads as
+        /// breaking.
+        #[serde(default = "CompactionResult::breaking_by_default")]
+        breaking: bool,
     },
+}
+
+impl CompactionResult {
+    fn breaking_by_default() -> bool {
+        true
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

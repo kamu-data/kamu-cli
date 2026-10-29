@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use database_common_macros::transactional_method1;
 use futures::TryStreamExt as _;
 use kamu::domain::{
     CompactDatasetUseCase,
@@ -33,9 +34,8 @@ use crate::{
 #[dill::interface(dyn Command)]
 pub struct CompactCommand {
     interact: Arc<Interact>,
+    catalog: dill::Catalog,
     compact_dataset_use_case: Arc<dyn CompactDatasetUseCase>,
-    verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
 
     #[dill::component(explicit)]
     dataset_ref_patterns: Vec<odf::DatasetRefPattern>,
@@ -57,6 +57,19 @@ pub struct CompactCommand {
 }
 
 impl CompactCommand {
+    #[transactional_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
+    async fn get_dataset_handles(&self) -> Result<Vec<odf::DatasetHandle>, CLIError> {
+        let dataset_handles = kamu::utils::datasets_filtering::filter_datasets_by_local_pattern(
+            dataset_registry.as_ref(),
+            self.dataset_ref_patterns.clone(),
+        )
+        .try_collect()
+        .await?;
+
+        Ok(dataset_handles)
+    }
+
+    #[transactional_method1(verify_dataset_use_case: Arc<dyn VerifyDatasetUseCase>)]
     async fn verify_dataset(&self, dataset_handle: &odf::DatasetHandle) -> Result<(), CLIError> {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
@@ -64,8 +77,7 @@ impl CompactCommand {
             progress.draw();
         });
 
-        let result = self
-            .verify_dataset_use_case
+        let result = verify_dataset_use_case
             .execute(
                 VerificationRequest {
                     target: dataset_handle.clone(),
@@ -96,14 +108,7 @@ impl Command for CompactCommand {
             ));
         }
 
-        let dataset_handles: Vec<odf::DatasetHandle> = {
-            kamu::utils::datasets_filtering::filter_datasets_by_local_pattern(
-                self.dataset_registry.as_ref(),
-                self.dataset_ref_patterns.clone(),
-            )
-            .try_collect()
-            .await?
-        };
+        let dataset_handles = self.get_dataset_handles().await?;
 
         self.interact.require_confirmation(format!(
             "{}\n  {}\n{}",

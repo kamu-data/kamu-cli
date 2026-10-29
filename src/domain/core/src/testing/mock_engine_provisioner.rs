@@ -20,20 +20,53 @@ use crate::*;
 impl MockEngineProvisioner {
     pub fn stub_provision_engine(mut self) -> Self {
         self.expect_provision_engine()
-            .return_once(|_, _| Ok(Arc::new(EngineStub {})));
+            .return_once(|_, _| Ok(Arc::new(EngineStub::advancing_watermark())));
         self
     }
 
     pub fn always_provision_engine(mut self) -> Self {
         self.expect_provision_engine()
-            .returning(|_, _| Ok(Arc::new(EngineStub {})));
+            .returning(|_, _| Ok(Arc::new(EngineStub::advancing_watermark())));
+        self
+    }
+
+    /// Provisions engines whose every transform returns `make_response()`
+    pub fn always_provision_engine_responding(
+        mut self,
+        make_response: impl Fn() -> TransformResponseExt + Send + Sync + 'static,
+    ) -> Self {
+        let make_response: Arc<dyn Fn() -> TransformResponseExt + Send + Sync> =
+            Arc::new(make_response);
+        self.expect_provision_engine().returning(move |_, _| {
+            Ok(Arc::new(EngineStub {
+                make_response: make_response.clone(),
+            }))
+        });
         self
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct EngineStub {}
+struct EngineStub {
+    make_response: Arc<dyn Fn() -> TransformResponseExt + Send + Sync>,
+}
+
+impl EngineStub {
+    // Note: At least 1 output field must be present, watermark is easy to mimic
+    fn advancing_watermark() -> Self {
+        Self {
+            make_response: Arc::new(|| TransformResponseExt {
+                new_offset_interval: None,
+                new_watermark: Some(Utc::now()),
+                output_schema: None,
+                new_checkpoint: None,
+                new_data: None,
+                run_dir: None,
+            }),
+        }
+    }
+}
 
 #[async_trait::async_trait]
 impl Engine for EngineStub {
@@ -47,16 +80,10 @@ impl Engine for EngineStub {
     async fn execute_transform(
         &self,
         _request: TransformRequestExt,
+        _operation_id: &str,
         _datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError> {
-        // Note: At least 1 output field must be present, watermark is easy to mimic
-        Ok(TransformResponseExt {
-            new_offset_interval: None,
-            new_watermark: Some(Utc::now()),
-            output_schema: None,
-            new_checkpoint: None,
-            new_data: None,
-        })
+        Ok((self.make_response)())
     }
 }
 

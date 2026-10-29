@@ -21,14 +21,23 @@ use crate::{DataWriterMetadataState, SchemaInferenceOpts};
 
 #[async_trait::async_trait]
 pub trait PushIngestPlanner: Send + Sync {
-    /// Uses or auto-creates push source definition in metadata to plan
-    /// ingestion
+    /// Plans ingestion through the push source defined in metadata
     async fn plan_ingest(
         &self,
         target: ResolvedDataset,
         source_name: Option<&str>,
         opts: PushIngestOpts,
     ) -> Result<PushIngestPlan, PushIngestPlanningError>;
+
+    /// Defines the push source to add when the dataset has no source at all,
+    /// reading data of `opts.media_type`. Returns `None` when a source exists.
+    /// Writes nothing.
+    async fn plan_push_source_creation(
+        &self,
+        target: ResolvedDataset,
+        source_name: Option<&str>,
+        opts: &PushIngestOpts,
+    ) -> Result<Option<odf::metadata::AddPushSource>, PushIngestPlanningError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +48,6 @@ pub struct PushIngestOpts {
     pub media_type: Option<MediaType>,
     /// Event time to use if data does not contain such column itself
     pub source_event_time: Option<DateTime<Utc>>,
-    /// Whether to automatically create a push source if it doesn't exist
-    pub auto_create_push_source: bool,
     /// Schema inference configuration
     pub schema_inference: SchemaInferenceOpts,
     /// Expected head block to prevent concurrent updates
@@ -89,13 +96,6 @@ pub enum PushIngestPlanningError {
         #[from]
         #[backtrace]
         UnsupportedMediaTypeError,
-    ),
-
-    #[error(transparent)]
-    CommitError(
-        #[from]
-        #[backtrace]
-        odf::dataset::CommitError,
     ),
 
     #[error(transparent)]

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_datasets::DatasetActionUnauthorizedError;
+use kamu_datasets::DatasetPermissionError;
 
 use crate::{ResetExecutionError, ResetPlanningError, ResetResult};
 
@@ -58,9 +58,9 @@ pub enum ResetError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<DatasetActionUnauthorizedError> for ResetError {
-    fn from(v: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
+impl From<DatasetPermissionError> for ResetError {
+    fn from(v: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
 
         match v {
             E::NotFound(e) => Self::NotFound(e),

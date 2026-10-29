@@ -1348,13 +1348,17 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
     )
     .await;
 
-    kamu.assert_success_command_execution(
+    // Access is granted: the pull reaches the inputs, which have no data yet
+    kamu.assert_failure_command_execution(
         [
             "pull",
             alice_public_derivative_dataset_alias.dataset_name.as_str(),
         ],
         None,
-        Some([r#"1 dataset\(s\) up-to-date"#]),
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Failed to pull alice/public-derivative-dataset-1: Input dataset alice/public-root-dataset has no data yet, pull it first"#,
+        ]),
     )
     .await;
 
@@ -1417,13 +1421,17 @@ pub async fn test_a_dataset_that_has_a_private_dependency_can_only_be_pulled_in_
     )
     .await;
 
-    kamu.assert_success_command_execution(
+    // Access is granted: the pull reaches the inputs, which have no data yet
+    kamu.assert_failure_command_execution(
         [
             "pull",
             admin_public_derivative_dataset_alias.dataset_name.as_str(),
         ],
         None,
-        Some([r#"1 dataset\(s\) up-to-date"#]),
+        Some([
+            r#"Failed to update 1 dataset\(s\)"#,
+            r#"Failed to pull admin/public-derivative-dataset-3: Input dataset alice/public-root-dataset has no data yet, pull it first"#,
+        ]),
     )
     .await;
 }

@@ -16,6 +16,7 @@ use kamu_core::TenancyConfig;
 use kamu_datasets::{
     CreateDatasetError,
     CreateDatasetFromSnapshotError,
+    DatasetHeadCommitter,
     DatasetLifecycleMessage,
     DatasetReferenceCASError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
@@ -36,6 +37,7 @@ pub struct CreateDatasetUseCaseHelper {
     tenancy_config: Arc<TenancyConfig>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
+    dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
 }
@@ -223,21 +225,15 @@ impl CreateDatasetUseCaseHelper {
             .await
     }
 
+    /// Sets the first `HEAD` of a dataset; fails with a CAS error if the
+    /// dataset already has one
     pub async fn set_created_head(
         &self,
         dataset: ResolvedDataset,
         initial_head: &odf::Multihash,
     ) -> Result<(), CreateDatasetError> {
-        dataset
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                initial_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(None),
-                },
-            )
+        self.dataset_head_committer
+            .commit_head(&dataset, None, initial_head)
             .await
             .map_err(|e| match e {
                 odf::dataset::SetChainRefError::CASFailed(e) => {

@@ -49,11 +49,6 @@ pub trait RemoteAliasResolver: Send + Sync {
         dataset_handle: &odf::DatasetHandle,
         dataset_push_target_maybe: Option<odf::DatasetPushTarget>,
     ) -> Result<RemoteTarget, ResolveAliasError>;
-
-    async fn resolve_pull_url(
-        &self,
-        remote_ref: &odf::DatasetRefRemote,
-    ) -> Result<url::Url, ResolveAliasError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

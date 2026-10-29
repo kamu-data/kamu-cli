@@ -25,7 +25,7 @@ use crate::DatasetEntryWriter;
 #[interface(dyn DeleteDatasetUseCase)]
 pub struct DeleteDatasetUseCaseImpl {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
@@ -248,8 +248,8 @@ impl DeleteDatasetUseCase for DeleteDatasetUseCaseImpl {
             .await?;
 
         let classification = self
-            .dataset_action_authorizer
-            .classify_dataset_handles_by_allowance(candidate_handles, DatasetAction::Own)
+            .dataset_permission_checker
+            .classify_dataset_handles_by_allowance(candidate_handles, DatasetPermission::Own)
             .await?;
 
         let (unauthorized_selected_handles, inaccessible_downstream_handles): (Vec<_>, Vec<_>) =

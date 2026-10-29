@@ -13,7 +13,13 @@ use chrono::{DateTime, TimeDelta, Utc};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{CreateDatasetResult, MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{
+    CreateDatasetResult,
+    DatasetPermission,
+    MockDatasetPermissionChecker,
+    ResolvedDataset,
+};
+use kamu_datasets_services::DatasetHeadCommitterImpl;
 use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +30,12 @@ async fn test_set_watermark_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, true),
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Write,
+            &dataset_id_foo,
+            1,
+            true,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -49,10 +60,10 @@ async fn test_try_set_watermark_for_not_found_dataset() {
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
 
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_not_found_dataset(
+        MockDatasetPermissionChecker::new().expect_authorize_for_not_found(
+            DatasetPermission::Write,
             &not_found_dataset_handle.id,
             1,
-            false,
         ),
         MockDidGenerator::new(),
     );
@@ -65,7 +76,7 @@ async fn test_try_set_watermark_for_not_found_dataset() {
             .execute(&not_found_dataset_handle, new_watermark)
             .await,
         Err(SetWatermarkError::NotFound(e))
-            if e.dataset_ref == not_found_dataset_handle.id.as_local_ref()
+            if e.dataset_ref == not_found_dataset_handle.as_local_ref()
     );
 }
 
@@ -77,7 +88,12 @@ async fn test_set_watermark_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_write_dataset(&dataset_id_foo, 1, false),
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Write,
+            &dataset_id_foo,
+            1,
+            false,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -104,12 +120,12 @@ struct SetWatermarkUseCaseHarness {
 
 impl SetWatermarkUseCaseHarness {
     fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 
@@ -117,7 +133,15 @@ impl SetWatermarkUseCaseHarness {
             .add::<SetWatermarkUseCaseImpl>()
             .add::<SetWatermarkPlannerImpl>()
             .add::<SetWatermarkExecutorImpl>()
+            .add::<DatasetHeadCommitterImpl>()
             .add::<RemoteAliasesRegistryImpl>()
+            .add::<DatasetPullSourceResolverImpl>()
+            .add::<RemoteDatasetUrlResolverImpl>()
+            .add::<RemoteRepositoryRegistryImpl>()
+            .add_value(RemoteReposDir::new_with_creation(
+                base_use_case_harness.temp_dir_path().join("repos"),
+            ))
+            .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<MetadataQueryServiceImpl>()
             .build();
 

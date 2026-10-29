@@ -23,6 +23,8 @@ pub struct DataWriterMetadataState {
     pub head: odf::Multihash,
     pub schema: Option<odf::schema::DataSchema>,
     pub source_event: Option<odf::MetadataEvent>,
+    /// Hash of the block that holds `source_event`
+    pub source_block: Option<odf::Multihash>,
     pub merge_strategy: odf::metadata::MergeStrategy,
     pub vocab: odf::metadata::DatasetVocabulary,
     pub data_slices: Vec<odf::Multihash>,
@@ -121,7 +123,7 @@ impl DataWriterMetadataState {
             assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
         }
 
-        let (source_event, merge_strategy) =
+        let (source_event, source_block, merge_strategy) =
             source_event_visitor.get_source_event_and_merge_strategy()?;
         let (prev_offset, prev_watermark, prev_checkpoint) = {
             match add_data_visitor.into_inner().into_inner().into_event() {
@@ -145,6 +147,7 @@ impl DataWriterMetadataState {
             head,
             schema,
             source_event,
+            source_block,
             merge_strategy,
             vocab: set_vocab_visitor
                 .into_inner()
@@ -182,6 +185,17 @@ pub enum ScanMetadataError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl ScanMetadataError {
+    /// Whether scanning again could succeed. A missing source needs a change
+    /// of metadata first; a block not found yet may be written by then.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::SourceNotFound(_) => false,
+            Self::HeadNotFound(_) | Self::Internal(_) => true,
+        }
+    }
 }
 
 impl From<odf::dataset::AcceptVisitorError<ScanMetadataError>> for ScanMetadataError {

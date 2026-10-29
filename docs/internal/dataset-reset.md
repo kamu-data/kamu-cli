@@ -94,7 +94,7 @@ latest block. The ideas reset relies on:
 | Services | `kamu` — [`src/infra/core/src/services/reset/`](../../src/infra/core/src/services/reset) | `ResetPlannerImpl`, `ResetExecutorImpl` |
 | Reset to metadata | `kamu` — compaction services | see [dataset-hard-compaction.md](dataset-hard-compaction.md#3-layers-and-crates) |
 | CLI | `kamu-cli` — [`reset_command.rs`](../../src/app/cli/src/commands/reset_command.rs) | `kamu reset` |
-| Task adapter | `kamu-adapter-task-dataset` | `ResetDatasetTaskPlanner` / `ResetDatasetTaskRunner`, `ResetToMetadataDatasetTaskPlanner` / `ResetDatasetToMetadataTaskRunner` |
+| Task adapter | `kamu-adapter-task-dataset` | `ResetDatasetTaskPlanner` / `ResetDatasetTaskRunner`, `ResetToMetadataDatasetTaskPlanner` / `CompactionDatasetTaskRunner` (shared with hard compaction) |
 | Flow adapter | `kamu-adapter-flow-dataset` | `FlowControllerReset`, `FlowControllerResetToMetadata`, `FlowConfigRuleReset`, `DerivedDatasetFlowSensor` |
 | Read models that follow `HEAD` | `kamu-datasets-services` | `DatasetBlockUpdateHandler`, `DatasetStatisticsUpdateHandler`, `DatasetSearchUpdater`, `DependencyGraphImmediateListener` |
 
@@ -104,12 +104,12 @@ latest block. The ideas reset relies on:
 
 | Entry point | Mechanism | Authorization | `HEAD` swap |
 | --- | --- | --- | --- |
-| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain, in the use case | none, see [§5](#5-reset-to-a-block) |
-| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as the system | none |
-| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain, in the use case | CAS on the planned head |
+| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain (`Reset` through [`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs)), in the use case | CAS on the planned head, see [§5](#5-reset-to-a-block) |
+| GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as the system | CAS on the planned head |
+| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain (`ResetToMetadata`), in the use case | CAS on the planned head |
 | GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task | Maintain, checked by the mutation | CAS on the planned head |
 | `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as the system | CAS on the planned head |
-| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata during transform elaboration | Write, as for any pull job | CAS on the planned head |
+| `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata by the pull use case when elaboration finds a diverged input, before elaborating again | Write, as for any pull job | CAS on the planned head |
 
 Reset flows run only when triggered, or (reset to metadata) when a sensor recovers from a breaking
 change. The GraphQL preconditions, configuration and trigger rules are owned by
@@ -135,15 +135,12 @@ head:
 
 The planner does not check that the new head is an ancestor of the current one.
 
-**Execute.** `ResetExecutorImpl::execute` calls `set_ref(Head, new_head)` with
-`validate_block_present: true` and `check_ref_is: None`. "Present" means the block exists in the
-dataset's block store, which also holds blocks no longer reachable from `HEAD` (from an earlier
-reset, compaction, or an attempt that lost its `HEAD` swap). With no expected value, the
-database-backed reference repository uses the dataset's cached reference as the expected head. In
-the CLI the planner and executor share one resolved dataset, so that is the head the planner read
-and a concurrent move fails as `CASFailed`; the reset task re-resolves the dataset in a new
-transaction, reads the current head, and overwrites a move that landed after planning without an
-error ([task-system.md](task-system.md#73-reset)).
+**Execute.** `ResetExecutorImpl::execute` moves `HEAD` from the plan's `old_head` to its
+`new_head` through `DatasetHeadCommitter`, which checks that the new block is present. "Present"
+means the block exists in the dataset's block store, which also holds blocks no longer reachable
+from `HEAD` (from an earlier reset, compaction, or an attempt that lost its `HEAD` swap). A `HEAD`
+moved after planning fails the swap as `SetReferenceFailed(CASFailed)` and nothing changes, in the
+CLI and in the reset task alike ([task-system.md](task-system.md#73-reset)).
 
 Nothing else changes: no block is written, and data, checkpoints and blocks after the new head
 stay in storage. The dataset's watermark, offsets, checkpoint and source state are whatever the
@@ -207,7 +204,8 @@ consumers handle a rewrite as follows:
 | `ResetError::NotFound`, `Access` | use case | the dataset is missing, or the caller lacks Maintain |
 | `ResetPlanningError::OldHeadMismatch` | planner | the head changed since the caller looked |
 | `ResetExecutionError::SetReferenceFailed(BlockNotFound)` | executor | the target block is not in the dataset's block store |
-| `ResetExecutionError::SetReferenceFailed(…)`, `Internal` | executor | storage or database failure, or a lost compare-and-swap (`CASFailed`) |
+| `ResetExecutionError::SetReferenceFailed(CASFailed)` | executor | `HEAD` moved after planning |
+| `ResetExecutionError::SetReferenceFailed(…)`, `Internal` | executor | storage or database failure |
 
 `ResetResult { old_head, new_head }` reports the head the planner read and the new head. The CLI
 prints errors as failures; task and GraphQL mappings are owned by
@@ -248,7 +246,7 @@ prints errors as failures; task and GraphQL mappings are owned by
 | Planner and executor | [`reset_planner_impl.rs`](../../src/infra/core/src/services/reset/reset_planner_impl.rs), [`reset_executor_impl.rs`](../../src/infra/core/src/services/reset/reset_executor_impl.rs) |
 | Use case | [`reset_dataset_use_case.rs`](../../src/domain/core/src/use_cases/reset_dataset_use_case.rs), [`reset_dataset_use_case_impl.rs`](../../src/infra/core/src/use_cases/reset_dataset_use_case_impl.rs) |
 | CLI | [`reset_command.rs`](../../src/app/cli/src/commands/reset_command.rs), `Reset` in [`cli.rs`](../../src/app/cli/src/cli.rs) |
-| Task planners and runners | [`reset_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_dataset_task_planner.rs), [`reset_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/reset_dataset_task_runner.rs), [`reset_to_metadata_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_to_metadata_dataset_task_planner.rs), [`reset_dataset_to_metadata_runner.rs`](../../src/adapter/task-dataset/src/runners/reset_dataset_to_metadata_runner.rs) |
+| Task planners and runners | [`reset_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_dataset_task_planner.rs), [`reset_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/reset_dataset_task_runner.rs), [`reset_to_metadata_dataset_task_planner.rs`](../../src/adapter/task-dataset/src/planners/reset_to_metadata_dataset_task_planner.rs), [`compaction_dataset_task_runner.rs`](../../src/adapter/task-dataset/src/runners/compaction_dataset_task_runner.rs) |
 | Flow controllers | [`flow_controller_reset.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_reset.rs), [`flow_controller_reset_to_metadata.rs`](../../src/adapter/flow-dataset/src/flow_controllers/flow_controller_reset_to_metadata.rs) |
 | Block index, statistics, search, dependency graph after a rewrite | [`dataset_block_update_handler.rs`](../../src/domain/datasets/services/src/services/blocks/dataset_block_update_handler.rs), [`dataset_statistics_update_handler.rs`](../../src/domain/datasets/services/src/services/statistics/dataset_statistics_update_handler.rs), [`dataset_statistics_helper.rs`](../../src/domain/datasets/services/src/services/statistics/dataset_statistics_helper.rs), [`dataset_search_updater.rs`](../../src/domain/datasets/services/src/search/dataset_search_updater.rs), [`dataset_search_indexer.rs`](../../src/domain/datasets/services/src/search/dataset_search_indexer.rs), [`dependency_graph_immediate_listener.rs`](../../src/domain/datasets/services/src/services/graph/dependency_graph_immediate_listener.rs) |
 | Dependency extraction | [`dependency_extraction_helper.rs`](../../src/domain/datasets/services/src/services/graph/dependency_extraction_helper.rs) |

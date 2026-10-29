@@ -122,6 +122,28 @@ pub static DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT: LazyLock<String> = LazyLock:
 pub static DATASET_DERIVATIVE_LEADERBOARD_NAME: LazyLock<odf::DatasetName> =
     LazyLock::new(|| odf::DatasetName::new_unchecked("leaderboard"));
 
+/// `SetTransform` event that replaces the leaderboard's transform with
+/// `query`, reading `input_id` as `player_scores`
+pub fn leaderboard_set_transform_event(input_id: &odf::DatasetID, query: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        kind: MetadataEvent
+        version: 1
+        content:
+          kind: SetTransform
+          inputs:
+            - datasetRef: {}
+              alias: player_scores
+          transform:
+            kind: Sql
+            engine: datafusion
+            queries:
+              - query: "{query}"
+        "#,
+        input_id.as_did_str()
+    )
+}
+
 /// Root dataset `root-dataset`, polling CSV chunks of city populations from
 /// the files matching `<chunks_glob>`
 pub const DATASET_ROOT_CITY_POPULATION_SNAPSHOT_STR: &str = indoc::indoc!(
@@ -941,6 +963,79 @@ impl DatasetApi<'_> {
             .await;
     }
 
+    /// Advances the watermark without data; the new block records no source
+    /// state
+    pub async fn set_watermark(&self, dataset_id: &odf::DatasetID, watermark: DateTime<Utc>) {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          setWatermark(watermark: "<watermark>") {
+                            __typename
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .replace("<watermark>", &watermark.to_rfc3339())
+                .as_str(),
+                None,
+            )
+            .await
+            .data();
+
+        pretty_assertions::assert_eq!(
+            "SetWatermarkUpdated",
+            response["datasets"]["byId"]["setWatermark"]["__typename"]
+                .as_str()
+                .unwrap()
+        );
+    }
+
+    pub async fn commit_event(&self, dataset_id: &odf::DatasetID, event_yaml: &str) {
+        let response = self
+            .client
+            .graphql_api_call(
+                indoc::indoc!(
+                    r#"
+                    mutation ($event: String!) {
+                      datasets {
+                        byId(datasetId: "<dataset_id>") {
+                          metadata {
+                            chain {
+                              commitEvent(event: $event, eventFormat: YAML) {
+                                __typename
+                                message
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                    "#,
+                )
+                .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
+                .as_str(),
+                Some(serde_json::json!({ "event": event_yaml })),
+            )
+            .await
+            .data();
+
+        pretty_assertions::assert_eq!(
+            "CommitResultSuccess",
+            response["datasets"]["byId"]["metadata"]["chain"]["commitEvent"]["__typename"]
+                .as_str()
+                .unwrap(),
+            "{response}"
+        );
+    }
+
     pub async fn tail_data(&self, dataset_id: &odf::DatasetID) -> String {
         let tail_response = self
             .client
@@ -1642,6 +1737,17 @@ impl FlowApi<'_> {
         dataset_id: &odf::DatasetID,
         mutation_name: &str,
     ) -> FlowTriggerResponse {
+        self.trigger_flow_with(dataset_id, mutation_name, "").await
+    }
+
+    /// `arguments` is the mutation's argument list with its parentheses, or
+    /// empty
+    async fn trigger_flow_with(
+        &self,
+        dataset_id: &odf::DatasetID,
+        mutation_name: &str,
+        arguments: &str,
+    ) -> FlowTriggerResponse {
         let mutation = format!(
             r#"
             mutation {{
@@ -1649,7 +1755,7 @@ impl FlowApi<'_> {
                 byId(datasetId: "<dataset_id>") {{
                   flows {{
                     runs {{
-                      {mutation_name} {{
+                      {mutation_name}{arguments} {{
                         message
                         ... on TriggerFlowSuccess {{
                           flow {{
@@ -1682,6 +1788,19 @@ impl FlowApi<'_> {
 
     pub async fn trigger_ingest(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
         self.trigger_flow(dataset_id, "triggerIngestFlow").await
+    }
+
+    /// Triggers an ingest that fetches even a source without source state
+    pub async fn trigger_ingest_fetching_uncacheable(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> FlowTriggerResponse {
+        self.trigger_flow_with(
+            dataset_id,
+            "triggerIngestFlow",
+            "(ingestConfigInput: { fetchUncacheable: true, fetchNextIteration: false })",
+        )
+        .await
     }
 
     pub async fn trigger_transform(&self, dataset_id: &odf::DatasetID) -> FlowTriggerResponse {
@@ -1802,6 +1921,7 @@ impl FlowApi<'_> {
         &self,
         dataset_id: &odf::DatasetID,
         fetch_uncacheable: bool,
+        fetch_next_iteration: bool,
         retry_max_attempts: u32,
     ) {
         let mutation = indoc::indoc!(
@@ -1814,7 +1934,7 @@ impl FlowApi<'_> {
                       setIngestConfig(
                         ingestConfigInput: {
                           fetchUncacheable: <fetch_uncacheable>,
-                          fetchNextIteration: false
+                          fetchNextIteration: <fetch_next_iteration>
                         },
                         retryPolicyInput: {
                           maxAttempts: <retry_max_attempts>,
@@ -1833,6 +1953,7 @@ impl FlowApi<'_> {
         )
         .replace("<dataset_id>", &dataset_id.as_did_str().to_stack_string())
         .replace("<fetch_uncacheable>", &fetch_uncacheable.to_string())
+        .replace("<fetch_next_iteration>", &fetch_next_iteration.to_string())
         .replace("<retry_max_attempts>", &retry_max_attempts.to_string());
 
         let response = self.client.graphql_api_call(&mutation, None).await.data();
@@ -1843,6 +1964,25 @@ impl FlowApi<'_> {
                 .as_str()
                 .unwrap()
         );
+    }
+
+    /// Waits until the dataset has a flow that satisfies the condition
+    pub async fn wait_for_flow(
+        &self,
+        dataset_id: &odf::DatasetID,
+        condition: impl Fn(&FlowSummary) -> bool,
+    ) -> FlowSummary {
+        let retry_strategy = FixedInterval::from_millis(500).take(60); // 30s
+
+        Retry::start(retry_strategy, || async {
+            self.list_flows(dataset_id)
+                .await
+                .into_iter()
+                .find(&condition)
+                .ok_or(())
+        })
+        .await
+        .unwrap()
     }
 
     /// Waits until the dataset has a waiting flow that satisfies the
@@ -1906,11 +2046,27 @@ impl FlowApi<'_> {
                                     flowId
                                     description {
                                       __typename
+                                      ... on FlowDescriptionDatasetExecuteTransform {
+                                        transformResult {
+                                          __typename
+                                          ... on FlowDescriptionUpdateResultSuccess {
+                                            numRecords
+                                            updatedWatermark
+                                          }
+                                        }
+                                      }
                                     }
                                     status
                                     taskIds
                                     outcome {
                                       __typename
+                                      ... on FlowFailedError {
+                                        reason {
+                                          ... on TaskFailureReasonGeneral {
+                                            recoverable
+                                          }
+                                        }
+                                      }
                                     }
                                     startCondition {
                                       __typename
@@ -1956,9 +2112,18 @@ impl FlowApi<'_> {
                         .unwrap()
                         .to_owned(),
                     status: node["status"].as_str().unwrap().to_owned(),
+                    transform_result: node["description"]["transformResult"]["__typename"]
+                        .as_str()
+                        .map(ToOwned::to_owned),
+                    transformed_records: node["description"]["transformResult"]["numRecords"]
+                        .as_u64(),
+                    updated_watermark: node["description"]["transformResult"]["updatedWatermark"]
+                        .as_str()
+                        .map(|watermark| DateTime::parse_from_rfc3339(watermark).unwrap().into()),
                     outcome: node["outcome"]["__typename"]
                         .as_str()
                         .map(ToOwned::to_owned),
+                    failure_recoverable: node["outcome"]["reason"]["recoverable"].as_bool(),
                     task_ids: node["taskIds"]
                         .as_array()
                         .unwrap()
@@ -2070,9 +2235,14 @@ pub struct FlowSummary {
     pub flow_id: String,
     /// GraphQL type name of the flow description, identifying the flow type
     pub description: String,
+    /// GraphQL type name of a transform flow's result, once it succeeded
+    pub transform_result: Option<String>,
+    pub transformed_records: Option<u64>,
+    pub updated_watermark: Option<DateTime<Utc>>,
     pub status: String,
     /// GraphQL type name of the outcome, if the flow finished
     pub outcome: Option<String>,
+    pub failure_recoverable: Option<bool>,
     pub task_ids: Vec<String>,
     /// GraphQL type name of the start condition, if the flow waits for one
     pub start_condition: Option<String>,

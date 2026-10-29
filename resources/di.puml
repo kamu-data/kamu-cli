@@ -38,7 +38,6 @@ interface "CreateDatasetUseCase" <<i>>
 interface "DataFormatRegistry" <<i>>
 interface "DatabasePasswordProvider" <<i>>
 interface "DatabaseTransactionManager" <<i>>
-interface "DatasetActionAuthorizer" <<i>>
 interface "DatasetDataBlockRepository" <<i>>
 interface "DatasetDependencyRepository" <<i>>
 interface "DatasetEntryRemovalListener" <<i>>
@@ -50,10 +49,14 @@ interface "DatasetEnvVarResolver" <<i>>
 interface "DatasetEnvVarService" <<i>>
 interface "DatasetEnvVarSpecResolver" <<i>>
 interface "DatasetFactory" <<i>>
+interface "DatasetHeadCommitter" <<i>>
 interface "DatasetIncrementQueryService" <<i>>
 interface "DatasetKeyBlockRepository" <<i>>
 interface "DatasetKeyValueService" <<i>>
 interface "DatasetLfsBuilder" <<i>>
+interface "DatasetOperationGuard" <<i>>
+interface "DatasetPermissionChecker" <<i>>
+interface "DatasetPullSourceResolver" <<i>>
 interface "DatasetReferenceRepository" <<i>>
 interface "DatasetReferenceService" <<i>>
 interface "DatasetRegistry" <<i>>
@@ -62,6 +65,8 @@ interface "DatasetStatisticsRepository" <<i>>
 interface "DatasetStatisticsService" <<i>>
 interface "DatasetStorageUnit" <<i>>
 interface "DatasetStorageUnitWriter" <<i>>
+interface "DatasetUpdateKindResolver" <<i>>
+interface "DatasetUpdateSteps" <<i>>
 interface "DeleteAccountUseCase" <<i>>
 interface "DeleteDatasetRebacPropertiesUseCase" <<i>>
 interface "DeleteDatasetUseCase" <<i>>
@@ -90,7 +95,9 @@ interface "GetDatasetDownstreamDependenciesUseCase" <<i>>
 interface "GetDatasetSchemaUseCase" <<i>>
 interface "GetDatasetUpstreamDependenciesUseCase" <<i>>
 interface "InitOnStartup" <<i>>
+interface "IpfsService" <<i>>
 interface "JwtTokenIssuer" <<i>>
+interface "LocalSyncCommitter" <<i>>
 interface "MessageConsumer" <<i>>
 interface "MessageConsumerT" <<i>>
 interface "MetadataQueryService" <<i>>
@@ -105,6 +112,7 @@ interface "OdfServerAccessTokenResolver" <<i>>
 interface "OutboxAgent" <<i>>
 interface "OutboxMessageBridge" <<i>>
 interface "PasswordHashRepository" <<i>>
+interface "PollingIngestPlanner" <<i>>
 interface "PollingIngestService" <<i>>
 interface "ProvenanceService" <<i>>
 interface "PullDatasetUseCase" <<i>>
@@ -122,6 +130,7 @@ interface "RebacService" <<i>>
 interface "ReconcileResourceUseCase" <<i>>
 interface "RemoteAliasResolver" <<i>>
 interface "RemoteAliasesRegistry" <<i>>
+interface "RemoteDatasetUrlResolver" <<i>>
 interface "RemoteRepositoryRegistry" <<i>>
 interface "RemoteStatusService" <<i>>
 interface "RenameDatasetUseCase" <<i>>
@@ -173,9 +182,8 @@ interface "SyncService" <<i>>
 interface "SystemTimeSource" <<i>>
 interface "TaskEventStore" <<i>>
 interface "TaskQueueWakeupSource" <<i>>
-interface "TransformElaborationService" <<i>>
 interface "TransformExecutor" <<i>>
-interface "TransformRequestPlanner" <<i>>
+interface "TransformPlanner" <<i>>
 interface "TypedResourceQueryService" <<i>>
 interface "UnsetDatasetAccountsRelationsUseCase" <<i>>
 interface "UpdateAccountUseCase" <<i>>
@@ -241,10 +249,13 @@ class "DatasetEnvVarResolverImpl"
 class "DatasetEnvVarServiceNull"
 class "DatasetEnvVarSpecResolverImpl"
 class "DatasetFactoryImpl"
+class "DatasetHeadCommitterImpl"
 class "DatasetIncrementQueryServiceImpl"
 class "DatasetKeyValueServiceSysEnv"
 class "DatasetLfsBuilderDatabaseBackedImpl"
+class "DatasetOperationGuardImpl"
 class "DatasetProperties" <<singleton>>
+class "DatasetPullSourceResolverImpl"
 class "DatasetReferenceIndexer"
 class "DatasetReferenceServiceImpl"
 class "DatasetSearchSchemaProvider"
@@ -254,6 +265,8 @@ class "DatasetStatisticsIndexer"
 class "DatasetStatisticsServiceImpl"
 class "DatasetStatisticsUpdateHandler"
 class "DatasetStorageUnitLocalFs"
+class "DatasetUpdateKindResolverImpl"
+class "DatasetUpdateStepsImpl"
 class "DeleteAccountUseCaseImpl"
 class "DeleteDatasetRebacPropertiesUseCaseImpl"
 class "DeleteDatasetUseCaseImpl"
@@ -296,6 +309,7 @@ class "IdentityConfig" <<singleton>>
 class "Interact" <<singleton>>
 class "IpfsClient" <<singleton>>
 class "IpfsGateway" <<singleton>>
+class "IpfsServiceImpl"
 class "JupyterConfig" <<singleton>>
 class "JwtAuthenticationConfig" <<singleton>>
 class "KamuAuthOso"
@@ -303,6 +317,7 @@ class "KamuFlightSqlService"
 class "LabelEnvironmentDispatcher"
 class "LabelLegacyConfigTargetDatasetDispatcher"
 class "LocalResourceFacadeImpl"
+class "LocalSyncCommitterImpl"
 class "LoginFlowService"
 class "LoginPasswordAuthProvider"
 class "LoginService"
@@ -325,7 +340,7 @@ class "OAuthDeviceCodeServiceImpl"
 class "OAuthGithub" <<singleton>>
 class "ObjectStoreBuilderLocalFs" <<agnostic>>
 class "ObjectStoreRegistryImpl" <<singleton>>
-class "OsoDatasetAuthorizer"
+class "OsoDatasetPermissionChecker"
 class "OsoResourceServiceImpl"
 class "OutboxAgentConfig" <<singleton>>
 class "OutboxAgentImpl" <<singleton>>
@@ -336,6 +351,7 @@ class "OutboxTransactionalImpl"
 class "OutputConfig" <<singleton>>
 class "PasswordHashingMode" <<singleton>>
 class "PasswordPolicyConfig" <<singleton>>
+class "PollingIngestPlannerImpl"
 class "PollingIngestServiceImpl"
 class "Pool" <<singleton>>
 class "PredefinedAccountsConfig" <<singleton>>
@@ -359,6 +375,7 @@ class "ReconciliationErrorConditionDispatcher"
 class "Registry" <<singleton>>
 class "RemoteAliasResolverImpl"
 class "RemoteAliasesRegistryImpl"
+class "RemoteDatasetUrlResolverImpl"
 class "RemoteReposDir" <<singleton>>
 class "RemoteRepositoryRegistryImpl"
 class "RemoteStatusServiceImpl"
@@ -474,9 +491,8 @@ class "SystemTimeSourceDefault" <<agnostic>>
 class "TenancyConfig" <<singleton>>
 class "TransactionRef" <<singleton>>
 class "TransactionRefT" <<singleton>>
-class "TransformElaborationServiceImpl"
 class "TransformExecutorImpl"
-class "TransformRequestPlannerImpl"
+class "TransformPlannerImpl"
 class "UnsetDatasetAccountsRelationsUseCaseImpl"
 class "UpdateAccountUseCaseImpl"
 class "UpdateCollectionEntriesUseCaseImpl"
@@ -519,6 +535,11 @@ class "WsSmartTransferProtocolClient"
 "CompactionExecutorImpl"  --> "EngineConfigDatafusionEmbeddedCompaction"
 "CompactionExecutorImpl"  --> "RunInfoDir"
 "CompactionPlanner" <|-- "CompactionPlannerImpl"
+"DatasetUpdateKindResolver" <|-- "DatasetUpdateKindResolverImpl"
+"DatasetUpdateKindResolverImpl"  --> "DatasetPullSourceResolver"
+"DatasetUpdateSteps" <|-- "DatasetUpdateStepsImpl"
+"DatasetUpdateStepsImpl"  --> "Catalog"
+"DatasetUpdateStepsImpl" "lazy" --> "SyncService"
 "ExportService" <|-- "ExportServiceImpl"
 "DataFormatRegistry" <|-- "DataFormatRegistryImpl"
 "FetchService"  --> "ContainerRuntime"
@@ -528,6 +549,8 @@ class "WsSmartTransferProtocolClient"
 "FetchService" "?" --> "MqttSourceConfig"
 "FetchService" "?" --> "SourceConfig"
 "FetchService"  --> "RunInfoDir"
+"PollingIngestPlanner" <|-- "PollingIngestPlannerImpl"
+"PollingIngestPlannerImpl"  --> "Catalog"
 "PollingIngestService" <|-- "PollingIngestServiceImpl"
 "PollingIngestServiceImpl"  --> "EngineProvisioner"
 "PollingIngestServiceImpl"  --> "DataFormatRegistry"
@@ -549,6 +572,8 @@ class "WsSmartTransferProtocolClient"
 "PushIngestPlannerImpl"  --> "DataFormatRegistry"
 "PushIngestPlannerImpl"  --> "SystemTimeSource"
 "PushIngestPlannerImpl"  --> "RunInfoDir"
+"IpfsService" <|-- "IpfsServiceImpl"
+"IpfsServiceImpl"  --> "IpfsClient"
 "MetadataQueryService" <|-- "MetadataQueryServiceImpl"
 "ObjectStoreBuilder" <|-- "ObjectStoreBuilderLocalFs"
 "ObjectStoreRegistry" <|-- "ObjectStoreRegistryImpl"
@@ -558,24 +583,32 @@ class "WsSmartTransferProtocolClient"
 "ProvenanceServiceImpl"  --> "DatasetRegistry"
 "ProvenanceServiceImpl"  --> "DependencyGraphService"
 "PullRequestPlanner" <|-- "PullRequestPlannerImpl"
-"PullRequestPlannerImpl"  --> "RemoteAliasesRegistry"
-"PullRequestPlannerImpl"  --> "TransformRequestPlanner"
+"PullRequestPlannerImpl"  --> "DatasetPullSourceResolver"
+"PullRequestPlannerImpl"  --> "DatasetUpdateKindResolver"
+"PullRequestPlannerImpl"  --> "TransformPlanner"
 "PullRequestPlannerImpl"  --> "DatasetRegistry"
 "PullRequestPlannerImpl"  --> "DependencyGraphService"
-"PullRequestPlannerImpl"  --> "SyncRequestBuilder"
 "PullRequestPlannerImpl"  --> "CurrentAccountSubject"
 "PushRequestPlanner" <|-- "PushRequestPlannerImpl"
 "PushRequestPlannerImpl"  --> "RemoteAliasResolver"
 "QueryService" <|-- "QueryServiceImpl"
-"QueryServiceImpl"  --> "DatasetActionAuthorizer"
+"QueryServiceImpl"  --> "DatasetPermissionChecker"
 "QueryServiceImpl"  --> "DatasetRegistry"
 "QueryServiceImpl"  --> "SessionContextBuilder"
+"DatasetPullSourceResolver" <|-- "DatasetPullSourceResolverImpl"
+"DatasetPullSourceResolverImpl"  --> "RemoteAliasesRegistry"
+"DatasetPullSourceResolverImpl"  --> "RemoteDatasetUrlResolver"
+"DatasetPullSourceResolverImpl"  --> "DatasetRegistry"
+"DatasetPullSourceResolverImpl"  --> "CurrentAccountSubject"
 "RemoteAliasResolver" <|-- "RemoteAliasResolverImpl"
 "RemoteAliasResolverImpl"  --> "RemoteAliasesRegistry"
 "RemoteAliasResolverImpl"  --> "RemoteRepositoryRegistry"
 "RemoteAliasResolverImpl"  --> "OdfServerAccessTokenResolver"
 "RemoteAliasesRegistry" <|-- "RemoteAliasesRegistryImpl"
 "RemoteAliasesRegistryImpl"  --> "DatasetRegistry"
+"RemoteDatasetUrlResolver" <|-- "RemoteDatasetUrlResolverImpl"
+"RemoteDatasetUrlResolverImpl"  --> "RemoteRepositoryRegistry"
+"RemoteDatasetUrlResolverImpl"  --> "OdfServerAccessTokenResolver"
 "RemoteRepositoryRegistry" <|-- "RemoteRepositoryRegistryImpl"
 "RemoteRepositoryRegistryImpl"  --> "RemoteReposDir"
 "RemoteStatusService" <|-- "RemoteStatusServiceImpl"
@@ -584,6 +617,7 @@ class "WsSmartTransferProtocolClient"
 "RemoteStatusServiceImpl"  --> "DatasetFactory"
 "ResourceLoader" <|-- "ResourceLoaderImpl"
 "ResetExecutor" <|-- "ResetExecutorImpl"
+"ResetExecutorImpl"  --> "DatasetHeadCommitter"
 "ResetPlanner" <|-- "ResetPlannerImpl"
 "SchemaService" <|-- "SchemaServiceImpl"
 "SchemaServiceImpl"  --> "SessionContextBuilder"
@@ -593,40 +627,43 @@ class "WsSmartTransferProtocolClient"
 "SessionContextBuilder"  --> "ObjectStoreRegistry"
 "SessionContextBuilder"  --> "DatasetRegistry"
 "SessionContextBuilder"  --> "EngineConfigDatafusionEmbeddedBatchQuery"
-"SyncRequestBuilder"  --> "RemoteAliasResolver"
+"LocalSyncCommitter" <|-- "LocalSyncCommitterImpl"
+"LocalSyncCommitterImpl"  --> "DatasetHeadCommitter"
+"LocalSyncCommitterImpl"  --> "DatasetRegistry"
+"LocalSyncCommitterImpl" "lazy" --> "CreateDatasetUseCase"
+"SyncRequestBuilder"  --> "RemoteDatasetUrlResolver"
 "SyncRequestBuilder"  --> "RemoteRepositoryRegistry"
 "SyncRequestBuilder"  --> "DatasetRegistry"
 "SyncRequestBuilder"  --> "DatasetFactory"
 "SyncService" <|-- "SyncServiceImpl"
 "SyncServiceImpl"  --> "SmartTransferProtocolClient"
-"SyncServiceImpl"  --> "RemoteRepositoryRegistry"
+"SyncServiceImpl"  --> "IpfsService"
+"SyncServiceImpl"  --> "RemoteDatasetUrlResolver"
 "SyncServiceImpl"  --> "DatasetFactory"
-"SyncServiceImpl"  --> "IpfsClient"
 "SyncServiceImpl"  --> "SimpleTransferProtocol"
-"TransformElaborationService" <|-- "TransformElaborationServiceImpl"
-"TransformElaborationServiceImpl"  --> "CompactionExecutor"
-"TransformElaborationServiceImpl"  --> "CompactionPlanner"
-"TransformElaborationServiceImpl"  --> "SystemTimeSource"
 "TransformExecutor" <|-- "TransformExecutorImpl"
 "TransformExecutorImpl"  --> "EngineProvisioner"
-"TransformRequestPlanner" <|-- "TransformRequestPlannerImpl"
-"TransformRequestPlannerImpl"  --> "DatasetRegistry"
+"TransformPlanner" <|-- "TransformPlannerImpl"
+"TransformPlannerImpl"  --> "DatasetRegistry"
+"TransformPlannerImpl"  --> "SystemTimeSource"
 "VerificationService" <|-- "VerificationServiceImpl"
 "VerificationServiceImpl"  --> "TransformExecutor"
-"VerificationServiceImpl"  --> "TransformRequestPlanner"
+"VerificationServiceImpl"  --> "TransformPlanner"
 "SetWatermarkExecutor" <|-- "SetWatermarkExecutorImpl"
+"SetWatermarkExecutorImpl"  --> "DatasetHeadCommitter"
 "SetWatermarkPlanner" <|-- "SetWatermarkPlannerImpl"
-"SetWatermarkPlannerImpl"  --> "RemoteAliasesRegistry"
+"SetWatermarkPlannerImpl"  --> "DatasetPullSourceResolver"
 "SetWatermarkPlannerImpl"  --> "SystemTimeSource"
 "CompactDatasetUseCase" <|-- "CompactDatasetUseCaseImpl"
-"CompactDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"CompactDatasetUseCaseImpl"  --> "Catalog"
 "CompactDatasetUseCaseImpl"  --> "CompactionExecutor"
-"CompactDatasetUseCaseImpl"  --> "CompactionPlanner"
+"CompactDatasetUseCaseImpl"  --> "CurrentAccountSubject"
 "PullDatasetUseCase" <|-- "PullDatasetUseCaseImpl"
 "PullDatasetUseCaseImpl"  --> "Catalog"
+"PullDatasetUseCaseImpl"  --> "CompactionExecutor"
+"PullDatasetUseCaseImpl"  --> "CompactionPlanner"
+"PullDatasetUseCaseImpl"  --> "DatasetUpdateSteps"
 "PullDatasetUseCaseImpl"  --> "PollingIngestService"
-"PullDatasetUseCaseImpl"  --> "SyncService"
-"PullDatasetUseCaseImpl"  --> "TransformElaborationService"
 "PullDatasetUseCaseImpl"  --> "TransformExecutor"
 "PullDatasetUseCaseImpl"  --> "TenancyConfig"
 "PushDatasetUseCase" <|-- "PushDatasetUseCaseImpl"
@@ -635,7 +672,10 @@ class "WsSmartTransferProtocolClient"
 "PushIngestDataUseCase" <|-- "PushIngestDataUseCaseImpl"
 "PushIngestDataUseCaseImpl"  --> "PushIngestExecutor"
 "PushIngestDataUseCaseImpl"  --> "PushIngestPlanner"
+"PushIngestDataUseCaseImpl"  --> "DatasetHeadCommitter"
+"PushIngestDataUseCaseImpl"  --> "DatasetOperationGuard"
 "PushIngestDataUseCaseImpl"  --> "Outbox"
+"PushIngestDataUseCaseImpl"  --> "CurrentAccountSubject"
 "GetDatasetSchemaUseCase" <|-- "GetDatasetSchemaUseCaseImpl"
 "GetDatasetSchemaUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "GetDatasetSchemaUseCaseImpl"  --> "SchemaService"
@@ -644,16 +684,23 @@ class "WsSmartTransferProtocolClient"
 "QueryDatasetDataUseCaseImpl"  --> "QueryService"
 "QueryDatasetDataUseCaseImpl"  --> "DatasetRegistry"
 "ResetDatasetUseCase" <|-- "ResetDatasetUseCaseImpl"
-"ResetDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "ResetDatasetUseCaseImpl"  --> "ResetExecutor"
 "ResetDatasetUseCaseImpl"  --> "ResetPlanner"
+"ResetDatasetUseCaseImpl"  --> "DatasetOperationGuard"
+"ResetDatasetUseCaseImpl"  --> "DatasetRegistry"
+"ResetDatasetUseCaseImpl"  --> "CurrentAccountSubject"
 "SetWatermarkUseCase" <|-- "SetWatermarkUseCaseImpl"
-"SetWatermarkUseCaseImpl"  --> "RebacDatasetRegistryFacade"
 "SetWatermarkUseCaseImpl"  --> "SetWatermarkExecutor"
 "SetWatermarkUseCaseImpl"  --> "SetWatermarkPlanner"
+"SetWatermarkUseCaseImpl"  --> "DatasetOperationGuard"
+"SetWatermarkUseCaseImpl"  --> "DatasetRegistry"
+"SetWatermarkUseCaseImpl"  --> "CurrentAccountSubject"
 "VerifyDatasetUseCase" <|-- "VerifyDatasetUseCaseImpl"
-"VerifyDatasetUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"VerifyDatasetUseCaseImpl"  --> "TransformPlanner"
 "VerifyDatasetUseCaseImpl"  --> "VerificationService"
+"VerifyDatasetUseCaseImpl"  --> "DatasetOperationGuard"
+"VerifyDatasetUseCaseImpl"  --> "DatasetRegistry"
+"VerifyDatasetUseCaseImpl"  --> "CurrentAccountSubject"
 "SimpleTransferProtocol"  --> "Catalog"
 "SearchEntitySchemaProvider" <|-- "AccountSearchSchemaProvider"
 "AccountSearchSchemaProvider"  --> "Catalog"
@@ -734,10 +781,10 @@ class "WsSmartTransferProtocolClient"
 "SqliteDidSecretKeyRepository"  --> "TransactionRefT"
 "OAuthDeviceCodeRepository" <|-- "SqliteOAuthDeviceCodeRepository"
 "SqliteOAuthDeviceCodeRepository"  --> "TransactionRefT"
-"DatasetActionAuthorizer" <|-- "OsoDatasetAuthorizer"
-"OsoDatasetAuthorizer"  --> "CurrentAccountSubject"
-"OsoDatasetAuthorizer"  --> "KamuAuthOso"
-"OsoDatasetAuthorizer"  --> "OsoResourceServiceImpl"
+"DatasetPermissionChecker" <|-- "OsoDatasetPermissionChecker"
+"OsoDatasetPermissionChecker"  --> "CurrentAccountSubject"
+"OsoDatasetPermissionChecker"  --> "KamuAuthOso"
+"OsoDatasetPermissionChecker"  --> "OsoResourceServiceImpl"
 "OsoResourceServiceImpl"  --> "RebacService"
 "OsoResourceServiceImpl"  --> "DatasetEntryService"
 "KamuFlightSqlService"  --> "SqlInfoData"
@@ -762,7 +809,7 @@ class "WsSmartTransferProtocolClient"
 "RebacDatasetLifecycleMessageConsumer"  --> "SetDatasetRebacPropertiesUseCase"
 "RebacDatasetLifecycleMessageConsumer"  --> "DatasetProperties"
 "RebacDatasetRegistryFacade" <|-- "RebacDatasetRegistryFacadeImpl"
-"RebacDatasetRegistryFacadeImpl"  --> "DatasetActionAuthorizer"
+"RebacDatasetRegistryFacadeImpl"  --> "DatasetPermissionChecker"
 "RebacDatasetRegistryFacadeImpl"  --> "DatasetRegistry"
 "InitOnStartup" <|-- "RebacIndexer"
 "RebacIndexer"  --> "ExpensiveAccountRepository"
@@ -776,7 +823,7 @@ class "WsSmartTransferProtocolClient"
 "RebacServiceImpl"  --> "DatasetProperties"
 "ApplyAccountDatasetRelationsUseCase" <|-- "ApplyAccountDatasetRelationsUseCaseImpl"
 "ApplyAccountDatasetRelationsUseCaseImpl"  --> "RebacService"
-"ApplyAccountDatasetRelationsUseCaseImpl"  --> "DatasetActionAuthorizer"
+"ApplyAccountDatasetRelationsUseCaseImpl"  --> "DatasetPermissionChecker"
 "ApplyAccountDatasetRelationsUseCaseImpl"  --> "Outbox"
 "DeleteDatasetRebacPropertiesUseCase" <|-- "DeleteDatasetRebacPropertiesUseCaseImpl"
 "DeleteDatasetRebacPropertiesUseCaseImpl"  --> "RebacService"
@@ -1007,6 +1054,8 @@ class "WsSmartTransferProtocolClient"
 "DatasetAliasUpdateHandler"  --> "DatasetRegistry"
 "DatasetIncrementQueryService" <|-- "DatasetIncrementQueryServiceImpl"
 "DatasetIncrementQueryServiceImpl"  --> "DatasetRegistry"
+"DatasetOperationGuard" <|-- "DatasetOperationGuardImpl"
+"DatasetOperationGuardImpl"  --> "DatasetPermissionChecker"
 "MessageConsumer" <|-- "DidSecretService"
 "MessageConsumerT" <|-- "DidSecretService"
 "MessageConsumerT" <|-- "DidSecretService"
@@ -1044,6 +1093,7 @@ class "WsSmartTransferProtocolClient"
 "DatasetLfsBuilder" <|-- "DatasetLfsBuilderDatabaseBackedImpl"
 "DatasetLfsBuilderDatabaseBackedImpl"  --> "Catalog"
 "DatasetLfsBuilderDatabaseBackedImpl"  --> "MetadataChainDbBackedConfig"
+"DatasetHeadCommitter" <|-- "DatasetHeadCommitterImpl"
 "InitOnStartup" <|-- "DatasetReferenceIndexer"
 "DatasetReferenceIndexer"  --> "DatasetEntryRepository"
 "DatasetReferenceIndexer"  --> "DatasetReferenceRepository"
@@ -1071,8 +1121,10 @@ class "WsSmartTransferProtocolClient"
 "ViewCollectionEntriesUseCase" <|-- "ViewCollectionEntriesUseCaseImpl"
 "ViewCollectionEntriesUseCaseImpl"  --> "QueryService"
 "AppendDatasetMetadataBatchUseCase" <|-- "AppendDatasetMetadataBatchUseCaseImpl"
+"AppendDatasetMetadataBatchUseCaseImpl"  --> "DatasetHeadCommitter"
 "CommitDatasetEventUseCase" <|-- "CommitDatasetEventUseCaseImpl"
 "CommitDatasetEventUseCaseImpl"  --> "RebacDatasetRegistryFacade"
+"CommitDatasetEventUseCaseImpl"  --> "DatasetHeadCommitter"
 "CommitDatasetEventUseCaseImpl"  --> "SystemTimeSource"
 "CreateDatasetFromSnapshotUseCase" <|-- "CreateDatasetFromSnapshotUseCaseImpl"
 "CreateDatasetFromSnapshotUseCaseImpl"  --> "DidSecretKeyRepository"
@@ -1088,7 +1140,7 @@ class "WsSmartTransferProtocolClient"
 "CreateDatasetUseCaseImpl"  --> "CurrentAccountSubject"
 "CreateDatasetUseCaseImpl"  --> "CreateDatasetUseCaseHelper"
 "DeleteDatasetUseCase" <|-- "DeleteDatasetUseCaseImpl"
-"DeleteDatasetUseCaseImpl"  --> "DatasetActionAuthorizer"
+"DeleteDatasetUseCaseImpl"  --> "DatasetPermissionChecker"
 "DeleteDatasetUseCaseImpl"  --> "DatasetRegistry"
 "DeleteDatasetUseCaseImpl"  --> "DependencyGraphService"
 "DeleteDatasetUseCaseImpl"  --> "DatasetEntryWriter"
@@ -1096,13 +1148,13 @@ class "WsSmartTransferProtocolClient"
 "DeleteDatasetUseCaseImpl"  --> "DatasetStorageUnitWriter"
 "DeleteDatasetUseCaseImpl"  --> "SystemTimeSource"
 "GetDatasetDownstreamDependenciesUseCase" <|-- "GetDatasetDownstreamDependenciesUseCaseImpl"
-"GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DatasetActionAuthorizer"
 "GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DatasetEntryService"
+"GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DatasetPermissionChecker"
 "GetDatasetDownstreamDependenciesUseCaseImpl"  --> "DependencyGraphService"
 "GetDatasetDownstreamDependenciesUseCaseImpl"  --> "TenancyConfig"
 "GetDatasetUpstreamDependenciesUseCase" <|-- "GetDatasetUpstreamDependenciesUseCaseImpl"
-"GetDatasetUpstreamDependenciesUseCaseImpl"  --> "DatasetActionAuthorizer"
 "GetDatasetUpstreamDependenciesUseCaseImpl"  --> "DatasetEntryService"
+"GetDatasetUpstreamDependenciesUseCaseImpl"  --> "DatasetPermissionChecker"
 "GetDatasetUpstreamDependenciesUseCaseImpl"  --> "DependencyGraphService"
 "GetDatasetUpstreamDependenciesUseCaseImpl"  --> "TenancyConfig"
 "RenameDatasetUseCase" <|-- "RenameDatasetUseCaseImpl"
@@ -1118,6 +1170,7 @@ class "WsSmartTransferProtocolClient"
 "UpdateVersionedFileUseCaseImpl"  --> "SystemTimeSource"
 "ViewVersionedFileHistoryUseCase" <|-- "ViewVersionedFileHistoryUseCaseImpl"
 "ViewVersionedFileHistoryUseCaseImpl"  --> "QueryService"
+"CreateDatasetUseCaseHelper"  --> "DatasetHeadCommitter"
 "CreateDatasetUseCaseHelper"  --> "DatasetEntryWriter"
 "CreateDatasetUseCaseHelper"  --> "Outbox"
 "CreateDatasetUseCaseHelper"  --> "DatasetStorageUnitWriter"
@@ -1202,7 +1255,7 @@ class "WsSmartTransferProtocolClient"
 "SignEip712UseCaseImpl"  --> "DidSecretKeyRepository"
 "SignEip712UseCaseImpl"  --> "AccountService"
 "SignEip712UseCaseImpl"  --> "AccountAuthorizationHelper"
-"SignEip712UseCaseImpl"  --> "DatasetActionAuthorizer"
+"SignEip712UseCaseImpl"  --> "DatasetPermissionChecker"
 "SignEip712UseCaseImpl"  --> "CurrentAccountSubject"
 "SignEip712UseCaseImpl"  --> "DidSecretEncryptionConfig"
 "SignEip712UseCaseImpl"  --> "IdentityConfig"

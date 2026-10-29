@@ -310,7 +310,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 
         let tx_runner = DatabaseTransactionRunner::new(cli_catalog.clone());
 
-        tx_runner
+        let command_run_result = tx_runner
             .maybe_transactional(
                 is_transactional,
                 |maybe_transactional_cli_catalog: dill::Catalog| async move {
@@ -340,20 +340,34 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 },
             )
             .instrument(tracing::debug_span!("app::run_command"))
-            .await?;
+            .await;
 
+        // A failed command may still have committed some of its work in
+        // transactions of its own, so the Outbox is processed either way
         if is_outbox_processing_required {
-            // Process the Outbox messages while they are present
-            let outbox_agent = cli_catalog
-                .get_one::<dyn messaging_outbox::OutboxAgent>()
-                .int_err()?;
-            outbox_agent
-                .run_while_has_tasks()
-                .instrument(tracing::debug_span!(
-                    "Consume accumulated the Outbox messages"
-                ))
-                .await?;
+            let outbox_result = async {
+                let outbox_agent = cli_catalog
+                    .get_one::<dyn messaging_outbox::OutboxAgent>()
+                    .int_err()?;
+                outbox_agent
+                    .run_while_has_tasks()
+                    .instrument(tracing::debug_span!(
+                        "Consume accumulated the Outbox messages"
+                    ))
+                    .await
+            }
+            .await;
+
+            match (&command_run_result, outbox_result) {
+                (_, Ok(())) => {}
+                (Ok(()), Err(e)) => return Err(e.into()),
+                (Err(_), Err(e)) => {
+                    tracing::error!(error = ?e, error_msg = %e, "Outbox processing failed after a failed command");
+                }
+            }
         }
+
+        command_run_result?;
 
         let post_command_actions = cli_catalog.get_one::<PostCommandActions>().int_err()?;
         for action in post_command_actions.take() {
@@ -475,6 +489,8 @@ pub fn configure_base_catalog(
     b.add::<RemoteAliasesRegistryImpl>();
 
     b.add::<RemoteAliasResolverImpl>();
+    b.add::<RemoteDatasetUrlResolverImpl>();
+    b.add::<DatasetPullSourceResolverImpl>();
 
     b.add::<ResourceLoaderImpl>();
 
@@ -484,13 +500,13 @@ pub fn configure_base_catalog(
 
     b.add::<FetchService>();
 
+    b.add::<PollingIngestPlannerImpl>();
     b.add::<PollingIngestServiceImpl>();
 
     b.add::<PushIngestExecutorImpl>();
     b.add::<PushIngestPlannerImpl>();
 
-    b.add::<TransformRequestPlannerImpl>();
-    b.add::<TransformElaborationServiceImpl>();
+    b.add::<TransformPlannerImpl>();
     b.add::<TransformExecutorImpl>();
 
     b.add::<VerificationServiceImpl>();
@@ -501,9 +517,12 @@ pub fn configure_base_catalog(
     b.add_builder(SearchServiceRemoteImpl::builder(None));
 
     b.add::<SyncServiceImpl>();
+    b.add::<IpfsServiceImpl>();
+    b.add::<LocalSyncCommitterImpl>();
     b.add::<SyncRequestBuilder>();
 
     b.add::<PullRequestPlannerImpl>();
+    b.add::<DatasetUpdateKindResolverImpl>();
 
     b.add::<PushRequestPlannerImpl>();
 
@@ -536,6 +555,7 @@ pub fn configure_base_catalog(
     b.add::<GetDatasetSchemaUseCaseImpl>();
     b.add::<PushIngestDataUseCaseImpl>();
     b.add::<PullDatasetUseCaseImpl>();
+    b.add::<DatasetUpdateStepsImpl>();
     b.add::<PushDatasetUseCaseImpl>();
     b.add::<QueryDatasetDataUseCaseImpl>();
     b.add::<ResetDatasetUseCaseImpl>();

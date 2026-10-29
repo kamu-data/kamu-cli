@@ -579,6 +579,33 @@ impl DataWriterDataFusion {
         }
     }
 
+    /// Errors caused by the data being written, such as a value that does not
+    /// parse as its column's type, are [`ExecutionError`]s; the rest are
+    /// internal
+    fn classify_write_error(err: datafusion::error::DataFusionError) -> StageDataError {
+        use datafusion::arrow::error::ArrowError;
+        use datafusion::error::DataFusionError;
+
+        let root = err.find_root();
+        let message = if let DataFusionError::Execution(msg) = root {
+            Some(msg.clone())
+        } else if let DataFusionError::ArrowError(arrow_err, _) = root
+            && matches!(
+                arrow_err.as_ref(),
+                ArrowError::ParseError(_) | ArrowError::CastError(_) | ArrowError::JsonError(_)
+            )
+        {
+            Some(arrow_err.to_string())
+        } else {
+            None
+        };
+
+        match message {
+            Some(message) => StageDataError::ExecutionError(ExecutionError::new(message)),
+            None => err.int_err().into(),
+        }
+    }
+
     #[tracing::instrument(name = DataWriterDataFusion_write_output, level = "debug", skip_all, fields(?path))]
     async fn write_output(
         &self,
@@ -604,10 +631,7 @@ impl DataWriterDataFusion {
             .await
         {
             Ok(res) => Ok(res),
-            Err(datafusion::error::DataFusionError::Execution(msg)) => {
-                Err(StageDataError::ExecutionError(ExecutionError::new(msg)))
-            }
-            Err(err) => Err(err.int_err().into()),
+            Err(err) => Err(Self::classify_write_error(err)),
         }?;
 
         let file = if path.exists() {

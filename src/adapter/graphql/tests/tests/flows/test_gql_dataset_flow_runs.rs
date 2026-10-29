@@ -19,7 +19,7 @@ use kamu_adapter_flow_dataset::{
     FLOW_TYPE_DATASET_INGEST,
 };
 use kamu_adapter_task_dataset::*;
-use kamu_core::{CompactionResult, PullResult, ResetResult};
+use kamu_core::{CompactionResult, ResetResult};
 use kamu_datasets::MockDatasetIncrementQueryService;
 use kamu_flow_system::*;
 use kamu_task_system::{self as ts, TaskError};
@@ -38,13 +38,7 @@ use crate::utils::{
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -302,13 +296,15 @@ async fn test_trigger_ingest_root_dataset() {
             flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 12,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -626,13 +622,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -764,13 +754,15 @@ async fn test_trigger_execute_transform_derived_dataset() {
             flow_task_metadata,
             complete_time,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 5,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -861,13 +853,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -1116,6 +1102,7 @@ async fn test_trigger_compaction_root_dataset() {
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
+                        breaking: true,
                     },
                 }
                 .into_task_result(),
@@ -1445,6 +1432,7 @@ async fn test_trigger_reset_to_metadata_root_dataset() {
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
+                        breaking: true,
                     },
                 }
                 .into_task_result(),
@@ -3509,13 +3497,7 @@ async fn test_history_with_activation_cause_of_missing_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_execute_transform_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -3585,6 +3567,7 @@ async fn test_execute_transform_flow_error_after_compaction() {
                         new_head: new_head.clone(),
                         old_num_blocks: 5,
                         new_num_blocks: 4,
+                        breaking: true,
                     },
                 }
                 .into_task_result(),
@@ -3835,13 +3818,7 @@ async fn test_anonymous_operation_fails() {
 #[test_log::test(tokio::test)]
 async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -3956,13 +3933,7 @@ async fn test_config_snapshot_returned_correctly() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset_with_retry_policy() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -4253,13 +4224,15 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
             flow_task_metadata,
             complete_time_2,
             ts::TaskOutcome::Success(
-                TaskResultDatasetUpdate {
-                    pull_result: PullResult::Updated {
-                        old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
-                        new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
-                        has_more: false,
+                TaskResultDatasetUpdate::Updated {
+                    old_head: Some(odf::Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: odf::Multihash::from_digest_sha3_256(b"new-slice"),
+                    has_more: false,
+                    increment: MetadataChainIncrementInterval {
+                        num_blocks: 1,
+                        num_records: 12,
+                        updated_watermark: None,
                     },
-                    data_increment: None,
                 }
                 .into_task_result(),
             ),
@@ -4427,13 +4400,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_flow_automatically_via_schedule() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 

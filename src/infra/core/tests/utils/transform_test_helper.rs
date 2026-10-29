@@ -10,27 +10,26 @@
 use std::sync::Arc;
 
 use dill::Catalog;
-use kamu::{TransformElaborationServiceImpl, TransformExecutorImpl, TransformRequestPlannerImpl};
+use kamu::{TransformExecutorImpl, TransformPlannerImpl};
 use kamu_core::{
-    CompactionExecutor,
-    CompactionPlanner,
     EngineProvisioner,
+    TransformElaborateError,
     TransformElaboration,
-    TransformElaborationService,
+    TransformExecuteError,
+    TransformExecutionPlan,
     TransformExecutor,
-    TransformOptions,
-    TransformRequestPlanner,
+    TransformPlanner,
     TransformResult,
     VerifyTransformError,
 };
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
+use random_strings::get_random_name;
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TransformTestHelper {
-    transform_request_planner: Arc<dyn TransformRequestPlanner>,
-    transform_elab_svc: Arc<dyn TransformElaborationService>,
+    transform_planner: Arc<dyn TransformPlanner>,
     transform_executor: Arc<dyn TransformExecutor>,
 }
 
@@ -38,15 +37,11 @@ impl TransformTestHelper {
     pub fn build(
         dataset_registry: Arc<dyn DatasetRegistry>,
         system_time_source: Arc<dyn SystemTimeSource>,
-        compaction_planner: Arc<dyn CompactionPlanner>,
-        compaction_executor: Arc<dyn CompactionExecutor>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
-            transform_request_planner: Arc::new(TransformRequestPlannerImpl::new(dataset_registry)),
-            transform_elab_svc: Arc::new(TransformElaborationServiceImpl::new(
-                compaction_planner,
-                compaction_executor,
+            transform_planner: Arc::new(TransformPlannerImpl::new(
+                dataset_registry,
                 system_time_source,
             )),
             transform_executor: Arc::new(TransformExecutorImpl::new(engine_provisioner)),
@@ -55,27 +50,47 @@ impl TransformTestHelper {
 
     pub fn from_catalog(catalog: &Catalog) -> Self {
         Self {
-            transform_request_planner: catalog.get_one().unwrap(),
-            transform_elab_svc: catalog.get_one().unwrap(),
+            transform_planner: catalog.get_one().unwrap(),
             transform_executor: catalog.get_one().unwrap(),
         }
     }
 
-    pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {
-        let plan = self
-            .transform_request_planner
-            .build_transform_preliminary_plan(derived_target.clone())
+    pub async fn elaborate_transform(
+        &self,
+        derived_target: ResolvedDataset,
+    ) -> Result<TransformElaboration, TransformElaborateError> {
+        self.transform_planner
+            .elaborate_transform(derived_target)
             .await
-            .unwrap();
+    }
 
+    /// Runs the engine and appends the blocks, without moving `HEAD`
+    pub async fn execute_transform(
+        &self,
+        derived_target: ResolvedDataset,
+        plan: TransformExecutionPlan,
+        operation_id: &str,
+    ) -> TransformResult {
+        self.try_execute_transform(derived_target, plan, operation_id)
+            .await
+            .unwrap()
+    }
+
+    pub async fn try_execute_transform(
+        &self,
+        derived_target: ResolvedDataset,
+        plan: TransformExecutionPlan,
+        operation_id: &str,
+    ) -> Result<TransformResult, TransformExecuteError> {
+        self.transform_executor
+            .execute_transform(derived_target, plan, operation_id, None)
+            .await
+            .1
+    }
+
+    pub async fn transform_dataset(&self, derived_target: ResolvedDataset) -> TransformResult {
         let plan = match self
-            .transform_elab_svc
-            .elaborate_transform(
-                derived_target.clone(),
-                plan,
-                TransformOptions::default(),
-                None,
-            )
+            .elaborate_transform(derived_target.clone())
             .await
             .unwrap()
         {
@@ -84,13 +99,13 @@ impl TransformTestHelper {
         };
 
         let transform_result = self
-            .transform_executor
-            .execute_transform(derived_target.clone(), plan, None)
-            .await
-            .1
-            .unwrap();
+            .execute_transform(derived_target.clone(), plan, &get_random_name(None, 10))
+            .await;
 
-        if let TransformResult::Updated { old_head, new_head } = &transform_result {
+        if let TransformResult::Updated {
+            old_head, new_head, ..
+        } = &transform_result
+        {
             derived_target
                 .as_metadata_chain()
                 .set_ref(
@@ -113,7 +128,7 @@ impl TransformTestHelper {
         derived_target: ResolvedDataset,
     ) -> Result<(), VerifyTransformError> {
         let verify_plan = self
-            .transform_request_planner
+            .transform_planner
             .build_transform_verification_plan(derived_target.clone(), (None, None))
             .await
             .map_err(VerifyTransformError::Plan)?;

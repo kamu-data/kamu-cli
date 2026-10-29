@@ -30,9 +30,12 @@ pub trait Engine: Send + Sync {
         request: RawQueryRequestExt,
     ) -> Result<RawQueryResponseExt, EngineError>;
 
+    /// `operation_id` names the run directory and the engine container, so it
+    /// must be unique per execution attempt.
     async fn execute_transform(
         &self,
         request: TransformRequestExt,
+        operation_id: &str,
         datasets_map: &ResolvedDatasetsMap,
     ) -> Result<TransformResponseExt, EngineError>;
 }
@@ -70,8 +73,6 @@ pub struct RawQueryResponseExt {
 /// locations before passing it to the engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequestExt {
-    /// Randomly assigned value that identifies this specific engine operation
-    pub operation_id: String,
     /// Identifies the output dataset
     pub dataset_handle: odf::DatasetHandle,
     /// Block reference to advance upon commit
@@ -80,6 +81,8 @@ pub struct TransformRequestExt {
     pub head: odf::Multihash,
     /// Transformation that will be applied to produce new data
     pub transform: odf::metadata::Transform,
+    /// Hash of the `SetTransform` block that defines the transformation
+    pub transform_block: odf::Multihash,
     /// System time to use for new records
     pub system_time: DateTime<Utc>,
     /// Expected data schema (if already defined)
@@ -132,6 +135,13 @@ pub struct TransformRequestInputExt {
     pub explicit_watermarks: Vec<odf::metadata::Watermark>,
 }
 
+impl TransformRequestInputExt {
+    /// Whether the transform consumes anything from this input
+    pub fn has_new_data_or_watermarks(&self) -> bool {
+        !self.data_slices.is_empty() || !self.explicit_watermarks.is_empty()
+    }
+}
+
 #[derive(Debug)]
 pub struct TransformResponseExt {
     /// Data slice produced by the transaction, if any
@@ -146,6 +156,9 @@ pub struct TransformResponseExt {
     /// Data produced by the operation, if any. Must be `None` if offset
     /// interval is empty.
     pub new_data: Option<OwnedFile>,
+    /// Directory the engine ran in, if it used one. The caller removes it
+    /// once the response is committed.
+    pub run_dir: Option<PathBuf>,
 }
 
 impl From<TransformRequestInputExt> for odf::metadata::ExecuteTransformInput {
@@ -174,6 +187,17 @@ pub enum EngineError {
     ContractError(#[from] ContractError),
     #[error(transparent)]
     InternalError(#[from] InternalEngineError),
+}
+
+impl EngineError {
+    /// Whether running the engine again on the same input could succeed. An
+    /// invalid query fails the same way until the dataset's metadata changes.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::InvalidQuery(_) => false,
+            Self::ProcessError(_) | Self::ContractError(_) | Self::InternalError(_) => true,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -284,11 +308,13 @@ pub struct InternalEngineError {
 
 impl std::fmt::Display for InternalEngineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if !self.log_files.is_empty() {
-            write!(f, "Internal engine error, see log files for details:")?;
-            for path in &self.log_files {
-                write!(f, "\n- {}", path.display())?;
-            }
+        if self.log_files.is_empty() {
+            return write!(f, "Internal engine error");
+        }
+
+        write!(f, "Internal engine error, see log files for details:")?;
+        for path in &self.log_files {
+            write!(f, "\n- {}", path.display())?;
         }
 
         Ok(())

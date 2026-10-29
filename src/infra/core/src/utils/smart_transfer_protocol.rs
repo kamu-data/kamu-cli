@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu_core::{SyncError, SyncListener, SyncResult};
-use kamu_datasets::ResolvedDataset;
+use kamu_core::{LocalSyncTarget, SyncError, SyncResult, SyncTransfer};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,21 +42,22 @@ impl Default for TransferOptions {
 
 #[async_trait::async_trait]
 pub trait SmartTransferProtocolClient: Sync + Send {
+    /// Transfers into a local dataset without moving its `HEAD`, see
+    /// [`kamu_core::SyncService::transfer_into_local`].
+    /// `force_update_if_diverged` lets the server send its whole chain over a
+    /// local history that is ahead or has diverged
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: Option<&ResolvedDataset>,
-        dst_alias: Option<&odf::DatasetAlias>,
-        listener: Arc<dyn SyncListener>,
+        dst: &LocalSyncTarget,
         transfer_options: TransferOptions,
-    ) -> Result<SyncResult, SyncError>;
+    ) -> Result<SyncTransfer, SyncError>;
 
     async fn push_protocol_client_flow(
         &self,
         src: Arc<dyn odf::Dataset>,
         http_dst_url: &Url,
         dst_head: Option<&odf::Multihash>,
-        listener: Arc<dyn SyncListener>,
         transfer_options: TransferOptions,
     ) -> Result<SyncResult, SyncError>;
 }

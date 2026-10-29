@@ -13,7 +13,7 @@ use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_core::TenancyConfig;
-use kamu_datasets::{DatasetAction, SecretsEncryptionConfig};
+use kamu_datasets::{DatasetPermission, SecretsEncryptionConfig};
 use kamu_task_system as ts;
 use time_source::SystemTimeSource;
 
@@ -96,7 +96,7 @@ pub(crate) async fn check_dataset_maintain_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
 ) -> Result<(), GqlError> {
-    check_dataset_access(ctx, dataset_request_state, DatasetAction::Maintain).await
+    check_dataset_access(ctx, dataset_request_state, DatasetPermission::Maintain).await
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,11 +104,13 @@ pub(crate) async fn check_dataset_maintain_access(
 async fn check_dataset_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
-    action: DatasetAction,
+    permission: DatasetPermission,
 ) -> Result<(), GqlError> {
-    let allowed_actions = dataset_request_state.allowed_dataset_actions(ctx).await?;
+    let granted_permissions = dataset_request_state
+        .granted_dataset_permissions(ctx)
+        .await?;
 
-    if allowed_actions.contains(&action) {
+    if granted_permissions.contains(&permission) {
         Ok(())
     } else {
         Err(make_dataset_access_error(

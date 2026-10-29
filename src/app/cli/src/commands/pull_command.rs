@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -18,7 +17,7 @@ use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{DatasetActionNotEnoughPermissionsError, DatasetRegistry};
+use kamu_datasets::{DatasetPermissionMissingError, DatasetRegistry};
 use odf::{DatasetRefAny, DatasetRefUnresolvedError};
 
 use super::{BatchError, CLIError, Command};
@@ -123,13 +122,9 @@ impl PullCommand {
             add_aliases: self.add_aliases,
             ingest_options: PollingIngestOptions {
                 fetch_uncacheable: self.fetch_uncacheable,
-                exhaust_sources: true,
-                // Left empty deliberately: env vars are per-dataset, and one
-                // `PullOptions` may cover many. `PullDatasetUseCaseImpl`
-                // resolves them per dataset at the ingest fan-out.
-                dataset_env_vars: HashMap::new(),
                 schema_inference: SchemaInferenceOpts::default(),
             },
+            exhaust_sources: true,
             transform_options: TransformOptions {
                 reset_derivatives_on_diverged_input: self.reset_derivatives_on_diverged_input,
             },
@@ -477,6 +472,17 @@ impl PrettyIngestProgress {
         };
         Self::spinner_message(&self.dataset_handle, stage as u32, msg)
     }
+
+    fn finish_failed(&self) {
+        let state = self.state.lock().unwrap();
+        state
+            .curr_progress
+            .finish_with_message(Self::spinner_message(
+                &self.dataset_handle,
+                state.stage as u32,
+                console::style("Failed to update root dataset").red(),
+            ));
+    }
 }
 
 impl PollingIngestListener for PrettyIngestProgress {
@@ -533,23 +539,29 @@ impl PollingIngestListener for PrettyIngestProgress {
         }
     }
 
+    fn no_polling_source(&self) {
+        let state = self.state.lock().unwrap();
+
+        state
+            .curr_progress
+            .finish_with_message(Self::spinner_message(
+                &self.dataset_handle,
+                PollingIngestStage::Commit as u32,
+                console::style("Dataset does not specify a polling source".to_owned()).yellow(),
+            ));
+    }
+
     fn success(&self, result: &PollingIngestResult) {
         let mut state = self.state.lock().unwrap();
 
         match result {
-            PollingIngestResult::UpToDate {
-                no_source_defined,
-                uncacheable,
-            } => {
+            PollingIngestResult::UpToDate { uncacheable } => {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
                         PollingIngestStage::Commit as u32,
-                        if *no_source_defined {
-                            console::style("Dataset does not specify a polling source".to_owned())
-                                .yellow()
-                        } else if *uncacheable && !self.fetch_uncacheable {
+                        if *uncacheable && !self.fetch_uncacheable {
                             console::style(
                                 "Dataset is uncacheable (use --fetch-uncacheable to update)"
                                     .to_owned(),
@@ -590,15 +602,8 @@ impl PollingIngestListener for PrettyIngestProgress {
         }
     }
 
-    fn error(&self, _error: &PollingIngestError) {
-        let state = self.state.lock().unwrap();
-        state
-            .curr_progress
-            .finish_with_message(Self::spinner_message(
-                &self.dataset_handle,
-                state.stage as u32,
-                console::style("Failed to update root dataset").red(),
-            ));
+    fn error(&self, _error: &PullError) {
+        self.finish_failed();
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
@@ -723,25 +728,14 @@ impl TransformListener for PrettyTransformProgress {
             .finish_with_message(Self::spinner_message(&self.dataset_handle, 0, msg));
     }
 
-    fn elaborate_error(&self, _error: &TransformElaborateError) {
+    fn error(&self, _error: &PullError) {
         self.curr_progress
             .lock()
             .unwrap()
             .finish_with_message(Self::spinner_message(
                 &self.dataset_handle,
                 0,
-                console::style("Failed to update derivative dataset (elaborate phase)").red(),
-            ));
-    }
-
-    fn execute_error(&self, _error: &TransformExecuteError) {
-        self.curr_progress
-            .lock()
-            .unwrap()
-            .finish_with_message(Self::spinner_message(
-                &self.dataset_handle,
-                0,
-                console::style("Failed to update derivative dataset (execute phase)").red(),
+                console::style("Failed to update derivative dataset").red(),
             ));
     }
 
@@ -981,7 +975,7 @@ fn sanitize_pull_error(original_pull_error: PullError) -> PullError {
     // Tricky way...
     if let PullError::Access(odf::AccessError::Unauthorized(forbidden_error)) = &original_pull_error
         && let Some(permissions_error) =
-            forbidden_error.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
+            forbidden_error.downcast_ref::<DatasetPermissionMissingError>()
     {
         let dataset_ref = permissions_error.dataset_ref.clone();
         return PullError::NotFound(odf::DatasetNotFoundError { dataset_ref });

@@ -29,7 +29,7 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
@@ -261,7 +261,7 @@ impl TestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add::<ContainerRuntime>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
@@ -281,8 +281,7 @@ impl TestHarness {
             .add::<PollingIngestServiceImpl>()
             .add::<PushIngestExecutorImpl>()
             .add::<PushIngestPlannerImpl>()
-            .add::<TransformRequestPlannerImpl>()
-            .add::<TransformElaborationServiceImpl>()
+            .add::<TransformPlannerImpl>()
             .add::<TransformExecutorImpl>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryAccountRepository>()
@@ -323,10 +322,112 @@ impl TestHarness {
         }
     }
 
+    async fn elaborated_plan(&self, target: ResolvedDataset) -> TransformExecutionPlan {
+        match self
+            .transform_helper
+            .elaborate_transform(target)
+            .await
+            .unwrap()
+        {
+            TransformElaboration::Elaborated(plan) => plan,
+            TransformElaboration::UpToDate => panic!("Expected the transform to be elaborated"),
+        }
+    }
+
     async fn build_metadata_state(&self, target: ResolvedDataset) -> DataWriterMetadataState {
         DataWriterMetadataState::build(target, &odf::BlockRef::Head, None, None)
             .await
             .unwrap()
+    }
+
+    /// Creates a root with a polling source over a CSV file, ingests it, and a
+    /// derivative of it. Returns the CSV path, the root and the derivative.
+    async fn new_root_ingested_and_deriv(
+        &self,
+        transform: odf::metadata::Transform,
+    ) -> (PathBuf, ResolvedDataset, ResolvedDataset) {
+        let src_path = self.tempdir.path().join("data.csv");
+        std::fs::write(
+            &src_path,
+            indoc!(
+                "
+                city,population
+                A,10
+                B,20
+                C,30
+                "
+            ),
+        )
+        .unwrap();
+
+        let root_snapshot = MetadataFactory::dataset_snapshot()
+            .name("root")
+            .kind(odf::DatasetKind::Root)
+            .push_event(
+                // TODO: Simplify using push sources
+                MetadataFactory::set_polling_source()
+                    .fetch_file(&src_path)
+                    .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
+                        header: Some(true),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i32("population"),
+                        ])),
+                        ..odf::metadata::ReadStepCsv::default()
+                    }))
+                    .merge(odf::metadata::MergeStrategySnapshot {
+                        primary_key: vec!["city".to_string()],
+                        compare_columns: None,
+                    })
+                    .build(),
+            )
+            .build();
+
+        let root_alias = root_snapshot.name.clone();
+
+        let root_stored = create_test_dataset_from_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            root_snapshot,
+            self.did_generator.generate_dataset_id().0,
+            self.time_source.now(),
+        )
+        .await
+        .unwrap();
+
+        let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
+
+        let root_metadata_state = self.build_metadata_state(root_target.clone()).await;
+
+        self.polling_ingest(root_target.clone(), Box::new(root_metadata_state))
+            .await;
+
+        let deriv_snapshot = MetadataFactory::dataset_snapshot()
+            .name("deriv")
+            .kind(odf::DatasetKind::Derivative)
+            .push_event(
+                MetadataFactory::set_transform()
+                    .inputs_from_refs([&root_alias.dataset_name])
+                    .transform(transform.clone())
+                    .build(),
+            )
+            .build();
+
+        let deriv_alias = deriv_snapshot.name.clone();
+
+        let deriv_stored = create_test_dataset_from_snapshot(
+            self.dataset_registry.as_ref(),
+            self.dataset_storage_unit_writer.as_ref(),
+            deriv_snapshot,
+            self.did_generator.generate_dataset_id().0,
+            self.time_source.now(),
+        )
+        .await
+        .unwrap();
+
+        let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
+
+        (src_path, root_target, deriv_target)
     }
 
     async fn polling_ingest(
@@ -338,8 +439,10 @@ impl TestHarness {
             .polling_ingest_svc
             .ingest(
                 target.clone(),
-                metadata_state,
+                PollingIngestPlan::new(target.get_handle(), metadata_state).unwrap(),
                 PollingIngestOptions::default(),
+                &IngestEnvVars::default(),
+                &random_strings::get_random_name(None, 10),
                 None,
             )
             .await
@@ -347,7 +450,7 @@ impl TestHarness {
 
         if let PollingIngestResult::Updated {
             old_head, new_head, ..
-        } = &ingest_result.result
+        } = &ingest_result
         {
             target
                 .as_metadata_chain()
@@ -405,98 +508,11 @@ impl TestHarness {
 async fn test_transform_common(transform: odf::metadata::Transform, test_retractions: bool) {
     let harness = TestHarness::new();
 
-    ///////////////////////////////////////////////////////////////////////////
-    // Root setup
-    ///////////////////////////////////////////////////////////////////////////
+    let (src_path, root_target, deriv_target) =
+        harness.new_root_ingested_and_deriv(transform.clone()).await;
 
-    let src_path = harness.tempdir.path().join("data.csv");
-    std::fs::write(
-        &src_path,
-        indoc!(
-            "
-            city,population
-            A,10
-            B,20
-            C,30
-            "
-        ),
-    )
-    .unwrap();
-
-    let root_snapshot = MetadataFactory::dataset_snapshot()
-        .name("root")
-        .kind(odf::DatasetKind::Root)
-        .push_event(
-            // TODO: Simplify using push sources
-            MetadataFactory::set_polling_source()
-                .fetch_file(&src_path)
-                .read(odf::metadata::ReadStep::Csv(odf::metadata::ReadStepCsv {
-                    header: Some(true),
-                    schema: Some(odf::schema::DataSchema::new(vec![
-                        odf::schema::DataField::string("city"),
-                        odf::schema::DataField::i32("population"),
-                    ])),
-                    ..odf::metadata::ReadStepCsv::default()
-                }))
-                .merge(odf::metadata::MergeStrategySnapshot {
-                    primary_key: vec!["city".to_string()],
-                    compare_columns: None,
-                })
-                .build(),
-        )
-        .build();
-
-    let root_alias = root_snapshot.name.clone();
-
-    let root_stored = create_test_dataset_from_snapshot(
-        harness.dataset_registry.as_ref(),
-        harness.dataset_storage_unit_writer.as_ref(),
-        root_snapshot,
-        harness.did_generator.generate_dataset_id().0,
-        harness.time_source.now(),
-    )
-    .await
-    .unwrap();
-
-    let root_target = ResolvedDataset::from_stored(&root_stored, &root_alias);
-
-    let root_metadata_state = harness.build_metadata_state(root_target.clone()).await;
-
-    harness
-        .polling_ingest(root_target.clone(), Box::new(root_metadata_state))
-        .await;
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Derivative setup
-    ///////////////////////////////////////////////////////////////////////////
-
-    let deriv_snapshot = MetadataFactory::dataset_snapshot()
-        .name("deriv")
-        .kind(odf::DatasetKind::Derivative)
-        .push_event(
-            MetadataFactory::set_transform()
-                .inputs_from_refs([&root_alias.dataset_name])
-                .transform(transform.clone())
-                .build(),
-        )
-        .build();
-
-    let deriv_alias = deriv_snapshot.name.clone();
-
-    let deriv_stored = create_test_dataset_from_snapshot(
-        harness.dataset_registry.as_ref(),
-        harness.dataset_storage_unit_writer.as_ref(),
-        deriv_snapshot,
-        harness.did_generator.generate_dataset_id().0,
-        harness.time_source.now(),
-    )
-    .await
-    .unwrap();
-
-    let deriv_target = ResolvedDataset::from_stored(&deriv_stored, &deriv_alias);
-
-    let deriv_helper = DatasetHelper::new(deriv_stored.dataset.clone(), harness.tempdir.path());
-    let deriv_data_helper = DatasetDataHelper::new(deriv_stored.dataset.clone());
+    let deriv_helper = DatasetHelper::new((*deriv_target).clone(), harness.tempdir.path());
+    let deriv_data_helper = DatasetDataHelper::new((*deriv_target).clone());
 
     harness
         .time_source
@@ -506,10 +522,33 @@ async fn test_transform_common(transform: odf::metadata::Transform, test_retract
         .transform_helper
         .transform_dataset(deriv_target.clone())
         .await;
-    assert_matches!(res, TransformResult::Updated { .. });
+    let TransformResult::Updated {
+        old_head,
+        new_head,
+        new_offset_interval,
+        increment,
+    } = res
+    else {
+        panic!("Expected the transform to update the dataset, got {res:?}");
+    };
 
     // First transform writes two blocks: SetDataSchema, ExecuteTransform
     assert_eq!(deriv_helper.block_count().await, 4);
+    assert_eq!(increment.num_blocks, 2);
+    assert_eq!(increment.num_records, 3);
+    assert_eq!(
+        new_offset_interval,
+        Some(odf::metadata::OffsetInterval { start: 0, end: 2 })
+    );
+    use odf::dataset::MetadataChainExt;
+    assert_eq!(
+        increment,
+        deriv_target
+            .as_metadata_chain()
+            .get_increment_for_interval(Some(&old_head), &new_head)
+            .await
+            .unwrap()
+    );
 
     let df = deriv_data_helper.get_last_data().await;
     odf::utils::testing::assert_data_eq(
@@ -724,6 +763,41 @@ async fn test_transform_with_engine_datafusion() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized, engine, transform, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_transform_attempts_use_own_locations() {
+    let harness = TestHarness::new();
+    let (_, _, deriv_target) = harness
+        .new_root_ingested_and_deriv(
+            MetadataFactory::transform()
+                .engine("datafusion")
+                .query("SELECT op, event_time, city, population FROM root")
+                .build(),
+        )
+        .await;
+    let run_dir = harness.tempdir.path().join("run");
+
+    // An attempt never writes into a directory another attempt left behind
+    std::fs::create_dir(run_dir.join("transform-attempt-a")).unwrap();
+    let plan = harness.elaborated_plan(deriv_target.clone()).await;
+    let res = harness
+        .transform_helper
+        .try_execute_transform(deriv_target.clone(), plan, "attempt-a")
+        .await;
+    assert_matches!(res, Err(_));
+
+    // A successful attempt removes its directory
+    let plan = harness.elaborated_plan(deriv_target.clone()).await;
+    let res = harness
+        .transform_helper
+        .execute_transform(deriv_target, plan, "attempt-b")
+        .await;
+    assert_matches!(res, TransformResult::Updated { .. });
+    assert!(!run_dir.join("transform-attempt-b").exists());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, transform, risingwave)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_risingwave() {
@@ -852,14 +926,17 @@ async fn test_transform_empty_inputs() {
     // DatasetDataHelper::new(dataset);
 
     ///////////////////////////////////////////////////////////////////////////
-    // 1: Input doesn't have schema yet - skip update completely
+    // 1: Input doesn't have schema yet - elaboration reports the input
     ///////////////////////////////////////////////////////////////////////////
 
     let res = harness
         .transform_helper
-        .transform_dataset(deriv_target.clone())
+        .elaborate_transform(deriv_target.clone())
         .await;
-    assert_matches!(res, TransformResult::UpToDate);
+    assert_matches!(
+        res,
+        Err(TransformElaborateError::InputNotPulled(e)) if e.dataset_handle.alias == root_alias
+    );
 
     ///////////////////////////////////////////////////////////////////////////
     // 2: Input has schema, but no data - transorm will establish output schema

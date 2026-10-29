@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{DatasetAction, DatasetActionAuthorizerExt};
+use kamu_datasets::{DatasetPermission, DatasetPermissionCheckerExt};
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -64,7 +64,7 @@ impl Datasets {
 
         let dataset_refs_refs = dataset_refs.iter().collect::<Vec<_>>();
         let resolution = rebac_dataset_registry_facade
-            .classify_dataset_refs_by_allowance(&dataset_refs_refs, DatasetAction::Read)
+            .classify_dataset_refs_by_allowance(&dataset_refs_refs, DatasetPermission::Read)
             .await?;
 
         if !skip_missing && !resolution.inaccessible_refs.is_empty() {
@@ -217,10 +217,10 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+        let (dataset_registry, dataset_permission_checker) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn kamu_datasets::DatasetActionAuthorizer
+            dyn kamu_datasets::DatasetPermissionChecker
         );
 
         let page = page.unwrap_or(0);
@@ -230,8 +230,8 @@ impl Datasets {
 
         let account_owned_datasets_stream =
             dataset_registry.all_dataset_handles_by_owner_id(account_ref.account_id_internal());
-        let readable_dataset_handles_stream = dataset_action_authorizer
-            .filtered_datasets_stream(account_owned_datasets_stream, DatasetAction::Read);
+        let readable_dataset_handles_stream = dataset_permission_checker
+            .filtered_datasets_stream(account_owned_datasets_stream, DatasetPermission::Read);
         let mut accessible_datasets_handles = readable_dataset_handles_stream
             .try_collect::<Vec<_>>()
             .await?;
