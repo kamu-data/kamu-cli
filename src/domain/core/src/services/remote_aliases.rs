@@ -9,6 +9,7 @@
 
 use async_trait::async_trait;
 use internal_error::InternalError;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteAliasKind {
@@ -22,6 +23,19 @@ pub trait RemoteAliases: Send + Sync {
         &'a self,
         kind: RemoteAliasKind,
     ) -> Box<dyn Iterator<Item = &'a odf::DatasetRefRemote> + 'a>;
+
+    /// The dataset's only alias of the kind; `None` when it has none
+    fn single_by_kind(
+        &self,
+        kind: RemoteAliasKind,
+    ) -> Result<Option<&odf::DatasetRefRemote>, AmbiguousRemoteAliasError> {
+        let mut aliases = self.get_by_kind(kind);
+        let first = aliases.next();
+        if aliases.next().is_some() {
+            return Err(AmbiguousRemoteAliasError { kind });
+        }
+        Ok(first)
+    }
 
     fn contains(&self, remote_ref: &odf::DatasetRefRemote, kind: RemoteAliasKind) -> bool;
 
@@ -41,3 +55,14 @@ pub trait RemoteAliases: Send + Sync {
 
     async fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, InternalError>;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A dataset has several aliases of a kind, so none of them can be chosen
+#[derive(Debug, Error)]
+#[error("Dataset has several {kind:?} aliases")]
+pub struct AmbiguousRemoteAliasError {
+    pub kind: RemoteAliasKind,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -63,12 +63,9 @@ impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
             Err(GetAliasesError::Internal(e)) => return Err(e.into()),
         };
 
-        let mut pull_aliases: Vec<_> = remote_aliases.get_by_kind(RemoteAliasKind::Pull).collect();
-
-        match pull_aliases.len() {
-            0 => Ok(None),
-            1 => Ok(Some(pull_aliases.remove(0).clone())),
-            _ => Err(AmbiguousPullSourceError.into()),
+        match remote_aliases.single_by_kind(RemoteAliasKind::Pull) {
+            Ok(maybe_alias) => Ok(maybe_alias.cloned()),
+            Err(AmbiguousRemoteAliasError { .. }) => Err(AmbiguousPullSourceError.into()),
         }
     }
 
