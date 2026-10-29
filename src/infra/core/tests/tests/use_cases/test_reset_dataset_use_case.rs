@@ -12,7 +12,7 @@ use std::sync::Arc;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::*;
-use kamu_datasets::{MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{DatasetAction, MockDatasetActionAuthorizer, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_matches;
@@ -25,7 +25,12 @@ async fn test_reset_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = ResetUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, true),
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            true,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -68,10 +73,10 @@ async fn test_try_reset_not_found_dataset() {
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
 
     let harness = ResetUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_not_found_dataset(
+        MockDatasetActionAuthorizer::new().expect_authorize_for_not_found(
+            DatasetAction::Maintain,
             &not_found_dataset_handle.id,
             1,
-            false,
         ),
         MockDidGenerator::new(),
     );
@@ -82,7 +87,7 @@ async fn test_try_reset_not_found_dataset() {
             .execute(&not_found_dataset_handle, None, None)
             .await,
         Err(ResetError::NotFound(e))
-            if e.dataset_ref == not_found_dataset_handle.id.as_local_ref()
+            if e.dataset_ref == not_found_dataset_handle.as_local_ref()
     );
 }
 
@@ -94,7 +99,12 @@ async fn test_reset_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = ResetUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_check_maintain_dataset(&dataset_id_foo, 1, false),
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Maintain,
+            &dataset_id_foo,
+            1,
+            false,
+        ),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 

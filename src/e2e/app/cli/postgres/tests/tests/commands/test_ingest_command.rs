@@ -56,3 +56,14 @@ kamu_cli_execute_command_e2e_test!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+kamu_cli_execute_command_e2e_test!(
+    storage = postgres,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_ingest_into_other_accounts_dataset_fails,
+    options = Options::default()
+        .with_multi_tenant()
+        .with_kamu_config(MULTITENANT_KAMU_CONFIG_WITH_DEFAULT_USER),
+    extra_test_groups = "engine, ingest, datafusion"
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

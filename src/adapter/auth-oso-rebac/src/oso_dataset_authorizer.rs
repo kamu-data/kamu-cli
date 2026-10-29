@@ -35,7 +35,14 @@ pub struct OsoDatasetAuthorizer {
 
 impl OsoDatasetAuthorizer {
     async fn user_actor(&self) -> Result<UserActor, InternalError> {
-        let maybe_account_id = self.current_account_subject.get_maybe_logged_account_id();
+        self.user_actor_for(&self.current_account_subject).await
+    }
+
+    async fn user_actor_for(
+        &self,
+        principal: &CurrentAccountSubject,
+    ) -> Result<UserActor, InternalError> {
+        let maybe_account_id = principal.get_maybe_logged_account_id();
 
         let user_actor = self
             .oso_resource_service
@@ -177,7 +184,21 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handles: Vec<odf::DatasetHandle>,
         action: DatasetAction,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
-        let user_actor = self.user_actor().await?;
+        self.classify_dataset_handles_by_allowance_for(
+            &self.current_account_subject,
+            dataset_handles,
+            action,
+        )
+        .await
+    }
+
+    async fn classify_dataset_handles_by_allowance_for(
+        &self,
+        principal: &CurrentAccountSubject,
+        dataset_handles: Vec<odf::DatasetHandle>,
+        action: DatasetAction,
+    ) -> Result<ClassifyByAllowanceResponse, InternalError> {
+        let user_actor = self.user_actor_for(principal).await?;
 
         let dataset_ids = dataset_handles
             .iter()

@@ -332,7 +332,10 @@ A source that yields data in batches (glob, container, EVM) reports `has_more`. 
 
 ### 6.1 Call sequence
 
-`PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)`:
+`PushIngestDataUseCaseImpl::execute(target, data_source, options, listener)` first authorizes
+`PushIngest` (Write) on the target for the current account through
+[`DatasetOperationAuthorizer`](../../src/domain/datasets/domain/src/services/dataset_operation_authorizer.rs), before anything is read; a denial is
+`PushIngestDataError::Access`, a missing dataset `NotFound`. Then:
 
 1. **Add a push source** (uploads through the HTTP endpoint only) —
    `PushIngestPlannerImpl::plan_push_source_creation` returns an
@@ -389,9 +392,9 @@ schema.
 | --- | --- | --- | --- | --- | --- |
 | `kamu pull <root>` | `PullCommand` → `PullDatasetUseCaseImpl` → `PullIngestLoop` → `PollingIngestService` | write check per plan iteration | short transactions: pull planning; ingest planning with env-var lookup; each ref update | after each iteration | `DatasetReferenceMessage` from the ref update |
 | Ingest flow | `FlowControllerIngest` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner` → `PollingIngestService` (one iteration) | system | ingest planning with env-var lookup in one transaction, when the task runs; fetch and write outside; ref update in its own | once | `DatasetReferenceMessage`; task and flow progress messages |
-| `kamu ingest <root>` | `IngestCommand` → `PushIngestDataUseCase::execute` per file | none; the command rejects derivative datasets and datasets with a pull alias | the command's | once per file | `DatasetReferenceMessage`, `DatasetExternallyChangedMessage` |
-| `POST /{dataset}/ingest` | `dataset_ingest_handler` → `PushIngestDataUseCase::execute` | `DatasetAction::Write` via ReBAC; upload token must belong to the caller | the whole request (`#[transactional_handler]`) | once; twice when a push source is auto-created | as above |
-| Collections, versioned files | `UpdateCollectionEntriesUseCaseImpl`, `UpdateVersionedFileUseCaseImpl` → `PushIngestDataUseCase` | the calling use case | the caller's | once | as above |
+| `kamu ingest <root>` | `IngestCommand` → `PushIngestDataUseCase::execute` per file | Write, in the use case; the command rejects derivative datasets and datasets with a pull alias | the command's | once per file | `DatasetReferenceMessage`, `DatasetExternallyChangedMessage` |
+| `POST /{dataset}/ingest` | `dataset_ingest_handler` → `PushIngestDataUseCase::execute` | Write, in the use case; upload token must belong to the caller | the whole request (`#[transactional_handler]`) | once; twice when a push source is auto-created | as above |
+| Collections, versioned files | `UpdateCollectionEntriesUseCaseImpl`, `UpdateVersionedFileUseCaseImpl` → `PushIngestDataUseCase` | the calling use case, then Write again in the push ingest use case | the caller's | once | as above |
 
 Flow-side options reach ingest through `FlowConfigRuleIngest`: `fetch_uncacheable` becomes
 `PollingIngestOptions::fetch_uncacheable`; `fetch_next_iteration` is read by the flow controller
@@ -460,7 +463,8 @@ savepoint only if the winning commit left the source state unchanged; if the win
 skipped as up to date unless `fetch_uncacheable` is set.
 
 The HTTP handler maps push errors to status codes: `SourceNotFound` and `ReadError` → 400,
-unsupported media type → 415, `QuotaExceeded` → 403, the rest → 500.
+unsupported media type → 415, `QuotaExceeded` → 403, `NotFound` and `Access` → 404 (a dataset the
+caller may not write looks missing), the rest → 500.
 
 ---
 

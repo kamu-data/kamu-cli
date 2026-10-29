@@ -409,32 +409,7 @@ impl TransformPlanner for TransformPlannerImpl {
         target: ResolvedDataset,
         block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     ) -> Result<VerifyTransformOperation, VerifyTransformPlanError> {
-        let metadata_chain = target.as_metadata_chain();
-
-        let head = match block_range.1 {
-            None => metadata_chain.resolve_ref(&odf::BlockRef::Head).await?,
-            Some(hash) => hash,
-        };
-        let tail = block_range.0;
-        let tail_sequence_number = match tail.as_ref() {
-            Some(tail) => {
-                let block = metadata_chain.get_block(tail).await?;
-
-                Some(block.sequence_number)
-            }
-            None => None,
-        };
-
-        let history = VerificationHistory::collect(metadata_chain, &head, tail_sequence_number)
-            .await
-            .int_err()?;
-
-        // Ensure start_block was found if specified
-        if let Some(tail) = tail
-            && !history.finished_range
-        {
-            return Err(odf::dataset::InvalidIntervalError { head, tail }.into());
-        }
+        let history = VerificationHistory::collect_range(&target, block_range).await?;
 
         let mut datasets_map = ResolvedDatasetsMap::default();
         datasets_map.register(target.clone());
@@ -511,6 +486,39 @@ impl TransformPlanner for TransformPlannerImpl {
             datasets_map,
         })
     }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(target=%target.get_handle(), ?block_range))]
+    async fn get_verification_inputs(
+        &self,
+        target: ResolvedDataset,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
+    ) -> Result<Vec<odf::DatasetHandle>, VerifyTransformPlanError> {
+        let history = VerificationHistory::collect_range(&target, block_range).await?;
+
+        let mut seen_inputs = HashSet::new();
+        let mut inputs = Vec::new();
+        for (_, block) in history.transforms.iter().rev() {
+            let (_, source) =
+                VerificationHistory::in_effect(&history.set_transforms, block.sequence_number)
+                    .ok_or_else(|| {
+                        "Expected a derivative dataset but SetTransform block was not found"
+                            .int_err()
+                    })?;
+
+            for input in &source.inputs {
+                if seen_inputs.insert(input.dataset_ref.clone()) {
+                    let handle = self
+                        .dataset_registry
+                        .resolve_dataset_handle_by_ref(&input.dataset_ref)
+                        .await
+                        .int_err()?;
+                    inputs.push(handle);
+                }
+            }
+        }
+
+        Ok(inputs)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -528,6 +536,42 @@ struct VerificationHistory {
 }
 
 impl VerificationHistory {
+    /// Collects the history of `block_range` of `target`; the range ends at
+    /// `HEAD` unless given
+    async fn collect_range(
+        target: &ResolvedDataset,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
+    ) -> Result<Self, VerifyTransformPlanError> {
+        let metadata_chain = target.as_metadata_chain();
+
+        let head = match block_range.1 {
+            None => metadata_chain.resolve_ref(&odf::BlockRef::Head).await?,
+            Some(hash) => hash,
+        };
+        let tail = block_range.0;
+        let tail_sequence_number = match tail.as_ref() {
+            Some(tail) => {
+                let block = metadata_chain.get_block(tail).await?;
+
+                Some(block.sequence_number)
+            }
+            None => None,
+        };
+
+        let history = Self::collect(metadata_chain, &head, tail_sequence_number)
+            .await
+            .int_err()?;
+
+        // Ensure start_block was found if specified
+        if let Some(tail) = tail
+            && !history.finished_range
+        {
+            return Err(odf::dataset::InvalidIntervalError { head, tail }.into());
+        }
+
+        Ok(history)
+    }
+
     async fn collect(
         metadata_chain: &dyn odf::MetadataChain,
         head: &odf::Multihash,

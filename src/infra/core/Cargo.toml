@@ -54,6 +54,7 @@ query-extensions-nested-functions = [
 testing = [
     # Deps: kamu
     "dep:kamu-auth-rebac-services",
+    "dep:kamu-datasets-services",
     # Deps: 3-rd party
     "dep:bon",
     "dep:mockall",
@@ -181,6 +182,7 @@ datafusion-ethers = { optional = true, version = "~55.0", features = [
 ] }
 datafusion-functions-json = { optional = true, version = "0.55" }
 kamu-auth-rebac-services = { optional = true, workspace = true }
+kamu-datasets-services = { optional = true, workspace = true, default-features = false }
 mockall = { optional = true, version = "0.15", default-features = false }
 oop = { optional = true, version = "0.0.2" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [

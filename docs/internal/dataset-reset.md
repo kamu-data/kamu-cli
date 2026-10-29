@@ -104,9 +104,9 @@ latest block. The ideas reset relies on:
 
 | Entry point | Mechanism | Authorization | `HEAD` swap |
 | --- | --- | --- | --- |
-| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain, in the use case | CAS on the planned head, see [§5](#5-reset-to-a-block) |
+| `kamu reset <dataset> <hash>` | reset to a block, via `ResetDatasetUseCase` | Maintain (`Reset` through [`DatasetOperationAuthorizer`](../../src/domain/datasets/domain/src/services/dataset_operation_authorizer.rs)), in the use case | CAS on the planned head, see [§5](#5-reset-to-a-block) |
 | GraphQL `runs.triggerResetFlow` | reset to a block (custom hash or `toSeed`), via the reset task | Maintain, checked by the mutation; the task runs as the system | CAS on the planned head |
-| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain, in the use case | CAS on the planned head |
+| `kamu system compact --hard --keep-metadata-only <pattern>…` | reset to metadata, via `CompactDatasetUseCase` | Maintain (`ResetToMetadata`), in the use case | CAS on the planned head |
 | GraphQL `runs.triggerResetToMetadataFlow` | reset to metadata, via the reset-to-metadata task | Maintain, checked by the mutation | CAS on the planned head |
 | `DerivedDatasetFlowSensor` with the `Recover` rule | reset to metadata of a derivative whose input broke | the downstream owner's opt-in; runs as the system | CAS on the planned head |
 | `kamu pull --reset-derivatives-on-diverged-input` | reset to metadata by the pull use case when elaboration finds a diverged input, before elaborating again | Write, as for any pull job | CAS on the planned head |

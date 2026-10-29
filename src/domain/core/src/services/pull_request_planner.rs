@@ -13,7 +13,9 @@ use std::sync::Arc;
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
 use kamu_datasets::{
-    ClassifyByAllowanceDatasetActionUnauthorizedError,
+    DatasetActionUnauthorizedError,
+    DatasetOperation,
+    DatasetOperationRequest,
     DatasetRegistry,
     DatasetRegistryExt,
 };
@@ -78,11 +80,27 @@ pub enum PullPlanIterationJob {
 }
 
 impl PullPlanIterationJob {
-    pub fn as_common_item(&self) -> &dyn PullItemCommon {
+    /// What running the job does to its target, for authorization. `None`
+    /// for a sync into a dataset that does not exist yet.
+    pub fn as_operation_request(&self) -> Option<DatasetOperationRequest> {
         match self {
-            Self::Ingest(pii) => pii,
-            Self::Transform(pti) => pti,
-            Self::Sync(psi) => psi,
+            Self::Ingest(pii) => Some(DatasetOperationRequest::new(
+                pii.target.clone(),
+                DatasetOperation::PollingIngest,
+            )),
+            Self::Transform(pti) => Some(DatasetOperationRequest::new(
+                pti.target.clone(),
+                DatasetOperation::Transform {
+                    inputs: pti.input_handles.clone(),
+                },
+            )),
+            Self::Sync(psi) => match &psi.local_target {
+                PullLocalTarget::Existing(hdl) => Some(DatasetOperationRequest::new(
+                    hdl.clone(),
+                    DatasetOperation::SyncFrom,
+                )),
+                PullLocalTarget::ToCreate(_) => None,
+            },
         }
     }
 
@@ -240,44 +258,6 @@ impl PullRequest {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait PullItemCommon {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle>;
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle>;
-}
-
-impl PullItemCommon for PullIngestItem {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        Some(&self.target)
-    }
-
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
-        vec![]
-    }
-}
-
-impl PullItemCommon for PullTransformItem {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        Some(&self.target)
-    }
-
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
-        self.input_handles.iter().collect()
-    }
-}
-
-impl PullItemCommon for PullSyncItem {
-    fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        match &self.local_target {
-            PullLocalTarget::Existing(hdl) => Some(hdl),
-            PullLocalTarget::ToCreate(_) => None,
-        }
-    }
-
-    fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
-        vec![]
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -526,9 +506,9 @@ impl PullError {
     }
 }
 
-impl From<ClassifyByAllowanceDatasetActionUnauthorizedError> for PullError {
-    fn from(value: ClassifyByAllowanceDatasetActionUnauthorizedError) -> Self {
-        use ClassifyByAllowanceDatasetActionUnauthorizedError as E;
+impl From<DatasetActionUnauthorizedError> for PullError {
+    fn from(value: DatasetActionUnauthorizedError) -> Self {
+        use DatasetActionUnauthorizedError as E;
 
         match value {
             E::NotFound(e) => Self::NotFound(e),

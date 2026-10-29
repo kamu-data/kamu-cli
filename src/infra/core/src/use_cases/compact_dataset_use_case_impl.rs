@@ -9,10 +9,10 @@
 
 use std::sync::Arc;
 
-use database_common_macros::transactional_method2;
+use database_common_macros::{transactional_method2, transactional_method3};
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{
     CompactDatasetUseCase,
     CompactionError,
@@ -26,7 +26,15 @@ use kamu_core::{
     CompactionResult,
     NullCompactionMultiListener,
 };
-use kamu_datasets::{DatasetAction, DatasetHeadCommitter, DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{
+    DatasetActionUnauthorizedError,
+    DatasetHeadCommitter,
+    DatasetOperation,
+    DatasetOperationAuthorizer,
+    DatasetOperationRequest,
+    DatasetRegistry,
+    ResolvedDataset,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,21 +45,30 @@ use kamu_datasets::{DatasetAction, DatasetHeadCommitter, DatasetRegistry, Resolv
 pub struct CompactDatasetUseCaseImpl {
     catalog: dill::Catalog,
     compaction_executor: Arc<dyn CompactionExecutor>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 impl CompactDatasetUseCaseImpl {
-    #[transactional_method2(rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>, compaction_planner: Arc<dyn CompactionPlanner>)]
+    #[transactional_method3(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, dataset_registry: Arc<dyn DatasetRegistry>, compaction_planner: Arc<dyn CompactionPlanner>)]
     async fn plan_transactionally(
         &self,
         dataset_handle: &odf::DatasetHandle,
         options: CompactionOptions,
         maybe_listener: Option<Arc<dyn CompactionListener>>,
     ) -> Result<(ResolvedDataset, CompactionPlan), CompactionError> {
-        let target = rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Maintain)
+        let operation = if options.keep_metadata_only {
+            DatasetOperation::ResetToMetadata
+        } else {
+            DatasetOperation::Compaction
+        };
+        dataset_operation_authorizer
+            .authorize_operation(
+                &self.current_account_subject,
+                &DatasetOperationRequest::new(dataset_handle.clone(), operation),
+            )
             .await
             .map_err(|e| {
-                use RebacDatasetIdUnresolvedError as E;
+                use DatasetActionUnauthorizedError as E;
 
                 match e {
                     E::NotFound(e) => CompactionError::NotFound(e),
@@ -59,6 +76,8 @@ impl CompactDatasetUseCaseImpl {
                     e @ E::Internal(_) => CompactionError::Internal(e.int_err()),
                 }
             })?;
+
+        let target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
         let compaction_plan = compaction_planner
             .plan_compaction(target.clone(), options, maybe_listener)

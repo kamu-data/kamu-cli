@@ -39,6 +39,7 @@ impl MockDatasetActionAuthorizer {
                 ))
             });
         let missing_ids_clone = missing_ids.clone();
+        let missing_ids_for = missing_ids.clone();
         mock_dataset_action_authorizer
             .expect_classify_dataset_ids_by_allowance()
             .returning(move |ids, action| {
@@ -90,6 +91,20 @@ impl MockDatasetActionAuthorizer {
                         })
                         .collect(),
                 })
+            });
+        mock_dataset_action_authorizer
+            .expect_classify_dataset_handles_by_allowance_for()
+            .returning(move |_, handles, action| {
+                Ok(Self::classify_handles(handles, |hdl| {
+                    Some(if missing_ids_for.contains(&hdl.id) {
+                        odf::DatasetNotFoundError::new(hdl.id.as_local_ref()).into()
+                    } else {
+                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                            hdl.id.as_local_ref(),
+                            action,
+                        )
+                    })
+                }))
             });
         mock_dataset_action_authorizer
     }
@@ -158,6 +173,20 @@ impl MockDatasetActionAuthorizer {
                 })
             });
 
+        let denied = denied_ids.clone();
+        mock_dataset_action_authorizer
+            .expect_classify_dataset_handles_by_allowance_for()
+            .returning(move |_, handles, action| {
+                Ok(Self::classify_handles(handles, |hdl| {
+                    denied.contains(&hdl.id).then(|| {
+                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                            hdl.id.as_local_ref(),
+                            action,
+                        )
+                    })
+                }))
+            });
+
         mock_dataset_action_authorizer
             .expect_filter_datasets_allowing()
             .returning(move |handles, _| {
@@ -191,6 +220,9 @@ impl MockDatasetActionAuthorizer {
                     unauthorized_handles_with_errors: Vec::new(),
                 })
             });
+        mock_dataset_action_authorizer
+            .expect_classify_dataset_handles_by_allowance_for()
+            .returning(|_, handles, _| Ok(Self::classify_handles(handles, |_| None)));
         mock_dataset_action_authorizer
             .expect_filter_datasets_allowing()
             .returning(|handles, _| Ok(handles));
@@ -275,36 +307,6 @@ impl MockDatasetActionAuthorizer {
         )
     }
 
-    pub fn expect_check_write_not_found_dataset(
-        self,
-        expected_dataset_id: &odf::DatasetID,
-        times: usize,
-        success: bool,
-    ) -> Self {
-        let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_not_found_internal(
-            function(move |dataset_id| *dataset_id == expected_dataset_id),
-            DatasetAction::Write,
-            times,
-            success,
-        )
-    }
-
-    pub fn expect_check_maintain_not_found_dataset(
-        self,
-        expected_dataset_id: &odf::DatasetID,
-        times: usize,
-        success: bool,
-    ) -> Self {
-        let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_not_found_internal(
-            function(move |dataset_id| *dataset_id == expected_dataset_id),
-            DatasetAction::Maintain,
-            times,
-            success,
-        )
-    }
-
     pub fn expect_check_action_allowed_unauthorized_internal<P>(
         self,
         dataset_id_predicate: P,
@@ -322,27 +324,6 @@ impl MockDatasetActionAuthorizer {
                     dataset_id.as_local_ref(),
                     action,
                 )
-            },
-            action,
-            times,
-            success,
-        )
-    }
-
-    pub fn expect_check_action_allowed_not_found_internal<P>(
-        self,
-        dataset_id_predicate: P,
-        action: DatasetAction,
-        times: usize,
-        success: bool,
-    ) -> Self
-    where
-        P: Predicate<odf::DatasetID> + Sync + Send + 'static,
-    {
-        self.expect_check_action_allowed_internal(
-            dataset_id_predicate,
-            |dataset_id, _action| {
-                DatasetActionUnauthorizedError::NotFound(dataset_id.as_local_ref().into())
             },
             action,
             times,
@@ -453,6 +434,120 @@ impl MockDatasetActionAuthorizer {
             });
 
         self
+    }
+
+    /// Expects the principal-explicit classification of `action` to include
+    /// the given dataset; other datasets in the same call are authorized
+    pub fn expect_authorize_for(
+        self,
+        action: DatasetAction,
+        expected_dataset_id: &odf::DatasetID,
+        times: usize,
+        success: bool,
+    ) -> Self {
+        self.expect_authorize_for_internal(action, expected_dataset_id, times, move |hdl| {
+            (!success).then(|| {
+                ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                    hdl.as_local_ref(),
+                    action,
+                )
+            })
+        })
+    }
+
+    /// Like [`Self::expect_authorize_for`], answering that the dataset is not
+    /// found
+    pub fn expect_authorize_for_not_found(
+        self,
+        action: DatasetAction,
+        expected_dataset_id: &odf::DatasetID,
+        times: usize,
+    ) -> Self {
+        self.expect_authorize_for_internal(action, expected_dataset_id, times, |hdl| {
+            Some(odf::DatasetNotFoundError::new(hdl.as_local_ref()).into())
+        })
+    }
+
+    fn expect_authorize_for_internal<E>(
+        mut self,
+        action: DatasetAction,
+        expected_dataset_id: &odf::DatasetID,
+        times: usize,
+        error_callback: E,
+    ) -> Self
+    where
+        E: Fn(&odf::DatasetHandle) -> Option<ClassifyByAllowanceDatasetActionUnauthorizedError>
+            + Sync
+            + Send
+            + 'static,
+    {
+        let matched_id = expected_dataset_id.clone();
+        let answered_id = expected_dataset_id.clone();
+        let expectation = self
+            .expect_classify_dataset_handles_by_allowance_for()
+            .withf(move |_, handles, a| {
+                *a == action && handles.iter().any(|hdl| hdl.id == matched_id)
+            });
+
+        if times > 0 {
+            expectation.times(times).returning(move |_, handles, _| {
+                Ok(Self::classify_handles(handles, |hdl| {
+                    if hdl.id == answered_id {
+                        error_callback(hdl)
+                    } else {
+                        None
+                    }
+                }))
+            });
+        } else {
+            expectation.never();
+        }
+
+        self
+    }
+
+    /// Principal-explicit counterpart of
+    /// [`Self::make_expect_classify_datasets_by_allowance`]
+    pub fn make_expect_classify_datasets_by_allowance_for(
+        mut self,
+        action: DatasetAction,
+        times: usize,
+        authorized: HashSet<odf::DatasetAlias>,
+    ) -> Self {
+        self.expect_classify_dataset_handles_by_allowance_for()
+            .withf(move |_, _, a| *a == action)
+            .times(times)
+            .returning(move |_, handles, action| {
+                Ok(Self::classify_handles(handles, |hdl| {
+                    (!authorized.contains(&hdl.alias)).then(|| {
+                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                            hdl.as_local_ref(),
+                            action,
+                        )
+                    })
+                }))
+            });
+
+        self
+    }
+
+    fn classify_handles(
+        handles: Vec<odf::DatasetHandle>,
+        error_for: impl Fn(
+            &odf::DatasetHandle,
+        ) -> Option<ClassifyByAllowanceDatasetActionUnauthorizedError>,
+    ) -> ClassifyByAllowanceResponse {
+        let mut response = ClassifyByAllowanceResponse {
+            authorized_handles: Vec::new(),
+            unauthorized_handles_with_errors: Vec::new(),
+        };
+        for hdl in handles {
+            match error_for(&hdl) {
+                Some(error) => response.unauthorized_handles_with_errors.push((hdl, error)),
+                None => response.authorized_handles.push(hdl),
+            }
+        }
+        response
     }
 
     pub fn make_expect_get_allowed_actions(

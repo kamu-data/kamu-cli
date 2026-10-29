@@ -405,7 +405,8 @@ upload is not re-hashed by the server.
 
 `kamu push <dataset>…` builds `PushDatasetUseCase::execute_multi`:
 
-1. **Authorization:** Read on every dataset to push ([§10](#10-authorization)); any failure
+1. **Authorization:** `SyncTo` on every dataset to push, which needs Read
+   ([`DatasetOperationAuthorizer`](../../src/domain/datasets/domain/src/services/dataset_operation_authorizer.rs), [§10](#10-authorization)); any failure
    returns only those failures.
 2. **Plan:** `PushRequestPlanner::collect_plan` resolves each dataset's target with
    `RemoteAliasResolver::resolve_push_target` ([§9](#9-remote-repositories-and-aliases)).
@@ -465,8 +466,8 @@ How `kamu pull` uses pull aliases to decide that a dataset is synced belongs to
 | --- | --- |
 | Server, every `{dataset}/…` route | `DatasetResolverLayer` resolves the dataset from the path (optional only for `/push`); `DatasetAuthorizationLayer` requires **Write** for `/push` and every unsafe method (anything but `GET`, `HEAD`, `OPTIONS` and `TRACE`), **Read** otherwise. With `allowAnonymous=false`, `AuthPolicyLayer` rejects anonymous callers first |
 | Server push to a new dataset | logged-in caller; the account in the path must be the caller's |
-| `kamu pull` sync jobs | Write on an existing destination ([dataset-pull.md](dataset-pull.md#7-authorization)) |
-| `kamu push` | Read on each pushed dataset; the remote server decides about the destination |
+| `kamu pull` sync jobs | `SyncFrom`: Write on an existing destination ([dataset-pull.md](dataset-pull.md#7-authorization)) |
+| `kamu push` | `SyncTo`: Read on each pushed dataset; the remote server decides about the destination |
 | Update task sync jobs | none at run time ([dataset-pull.md](dataset-pull.md#8-server-use)) |
 
 `SyncService` and `SyncRequestBuilder` resolve local datasets through the plain registry and check

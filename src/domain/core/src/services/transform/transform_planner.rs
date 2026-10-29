@@ -57,6 +57,15 @@ pub trait TransformPlanner: Send + Sync {
         target: ResolvedDataset,
         block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
     ) -> Result<VerifyTransformOperation, VerifyTransformPlanError>;
+
+    /// The inputs that replaying the transforms in `block_range` reads, the
+    /// same ones [`Self::build_transform_verification_plan`] resolves, without
+    /// reading them
+    async fn get_verification_inputs(
+        &self,
+        target: ResolvedDataset,
+        block_range: (Option<odf::Multihash>, Option<odf::Multihash>),
+    ) -> Result<Vec<odf::DatasetHandle>, VerifyTransformPlanError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

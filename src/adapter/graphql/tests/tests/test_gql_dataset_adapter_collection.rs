@@ -12,7 +12,7 @@ use futures::future;
 use indoc::indoc;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_services::*;
+use kamu_datasets_services::{DatasetOperationAuthorizerImpl, *};
 use messaging_outbox::OutboxProvider;
 use odf::dataset::MetadataChainExt;
 use pretty_assertions::assert_eq;
@@ -1097,6 +1097,7 @@ impl GraphQLDatasetsHarness {
             .add::<kamu::PushIngestDataUseCaseImpl>()
             .add::<FindCollectionEntriesUseCaseImpl>()
             .add::<UpdateCollectionEntriesUseCaseImpl>()
+            .add::<DatasetOperationAuthorizerImpl>()
             .add::<ViewCollectionEntriesUseCaseImpl>()
             .build();
 

@@ -304,7 +304,7 @@ A successful run leaves nothing behind ([§10](#10-local-files)).
 | --- | --- | --- | --- | --- |
 | `kamu pull <derivative>` | `PullCommand` → `PullDatasetUseCaseImpl` → planner, executor | per pull ([dataset-pull.md](dataset-pull.md#7-authorization)) | pull planning in one transaction per pull; per job, the rule of [§4.4](#44-transactions) ([dataset-pull.md](dataset-pull.md#62-per-job-runners)) | after each job |
 | Transform flow | `DerivedDatasetFlowSensor` → `FlowControllerTransform` → `LogicalPlanDatasetUpdate` → `UpdateDatasetTaskPlanner` → `UpdateDatasetTaskRunner::run_transform_update` | system; the GraphQL mutations that configure or trigger the flow check access ([flow-system.md](flow-system.md#12-graphql-api)) | the rule of [§4.4](#44-transactions), when the task runs | once |
-| `kamu verify <derivative>` | `VerifyDatasetUseCaseImpl` → `VerificationServiceImpl` → `build_transform_verification_plan` → `execute_verify_transform` | Read | the command's | never |
+| `kamu verify <derivative>` | `VerifyDatasetUseCaseImpl` → `VerificationServiceImpl` → `build_transform_verification_plan` → `execute_verify_transform` | Read on the target; with replay, also Read on every input the replay reads (`get_verification_inputs`), checked before replaying (`Verify` through [`DatasetOperationAuthorizer`](../../src/domain/datasets/domain/src/services/dataset_operation_authorizer.rs)) | the command's | never |
 
 **`kamu pull`.** Planning, depth ordering, concurrency and authorization belong to pull
 ([dataset-pull.md](dataset-pull.md)). What matters for transforms: a transform at depth 1 sees

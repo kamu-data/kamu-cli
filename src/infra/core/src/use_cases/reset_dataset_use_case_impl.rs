@@ -11,9 +11,15 @@ use std::sync::Arc;
 
 use dill::{component, interface};
 use internal_error::ErrorIntoInternal;
-use kamu_auth_rebac::{RebacDatasetIdUnresolvedError, RebacDatasetRegistryFacade};
+use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{ResetDatasetUseCase, ResetError, ResetExecutor, ResetPlanner, ResetResult};
-use kamu_datasets::DatasetAction;
+use kamu_datasets::{
+    DatasetActionUnauthorizedError,
+    DatasetOperation,
+    DatasetOperationAuthorizer,
+    DatasetOperationRequest,
+    DatasetRegistry,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,7 +28,9 @@ use kamu_datasets::DatasetAction;
 pub struct ResetDatasetUseCaseImpl {
     reset_planner: Arc<dyn ResetPlanner>,
     reset_executor: Arc<dyn ResetExecutor>,
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
+    dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+    dataset_registry: Arc<dyn DatasetRegistry>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 #[common_macros::method_names_consts]
@@ -40,13 +48,14 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
         maybe_new_head: Option<&odf::Multihash>,
         maybe_old_head: Option<&odf::Multihash>,
     ) -> Result<ResetResult, ResetError> {
-        // Resolve dataset
-        let target = self
-            .rebac_dataset_registry_facade
-            .resolve_dataset_by_handle(dataset_handle, DatasetAction::Maintain)
+        self.dataset_operation_authorizer
+            .authorize_operation(
+                &self.current_account_subject,
+                &DatasetOperationRequest::new(dataset_handle.clone(), DatasetOperation::Reset),
+            )
             .await
             .map_err(|e| {
-                use RebacDatasetIdUnresolvedError as E;
+                use DatasetActionUnauthorizedError as E;
 
                 match e {
                     E::NotFound(e) => ResetError::NotFound(e),
@@ -54,6 +63,11 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
                     e @ E::Internal(_) => ResetError::Internal(e.int_err()),
                 }
             })?;
+
+        let target = self
+            .dataset_registry
+            .get_dataset_by_handle(dataset_handle)
+            .await;
 
         // Make a plan
         let reset_plan = self

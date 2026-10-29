@@ -25,6 +25,7 @@ use kamu_auth_rebac_services::{
 use kamu_core::*;
 use kamu_datasets::{
     CreateDatasetResult,
+    DatasetAction,
     DatasetHeadCommitter,
     MockDatasetActionAuthorizer,
     ResolvedDataset,
@@ -47,7 +48,7 @@ async fn test_push_ingest_data_source_not_found() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -79,13 +80,53 @@ async fn test_push_ingest_data_source_not_found() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_push_ingest_data_denied_without_write() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
+
+    let harness = PushIngestDataUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new().expect_authorize_for(
+            DatasetAction::Write,
+            &dataset_id_foo,
+            1,
+            false,
+        ),
+        MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
+    );
+
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let head_before = harness.get_head(&foo).await;
+
+    assert_matches!(
+        harness
+            .ingest_data(
+                ResolvedDataset::from_created(&foo),
+                DataSource::Stream(Box::new(std::io::Cursor::new("{}"))),
+                PushIngestDataUseCaseOptions {
+                    source_name: None,
+                    source_event_time: None,
+                    is_ingest_from_upload: true,
+                    media_type: None,
+                    expected_head: None,
+                    skip_quota_check: false,
+                }
+            )
+            .await,
+        Err(PushIngestDataError::Access(_))
+    );
+    assert_eq!(head_before, harness.get_head(&foo).await);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 #[test_group::group(engine, ingest, datafusion)]
 async fn test_push_ingest_data_from_json() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -123,7 +164,7 @@ async fn test_push_ingest_data_from_file() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -169,7 +210,7 @@ async fn test_push_ingest_data_execute_multi() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -236,7 +277,7 @@ async fn test_push_ingest_data_upload_adds_push_source() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -264,7 +305,7 @@ async fn test_push_ingest_data_head_moved_concurrently() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -301,7 +342,7 @@ async fn test_push_ingest_data_upload_head_moved_before_push_source_commit() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -335,7 +376,7 @@ async fn test_push_ingest_data_execute_multi_head_moved_concurrently() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -378,7 +419,7 @@ async fn test_push_ingest_data_named_source() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
     let foo = harness
@@ -413,7 +454,7 @@ async fn test_push_ingest_data_empty_input_into_source_with_schema() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
     let foo = harness
@@ -437,7 +478,7 @@ async fn test_push_ingest_data_empty_input_into_source_without_schema() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
     let foo = harness
@@ -458,7 +499,7 @@ async fn test_push_ingest_data_unsupported_media_type() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
     let foo = harness
@@ -494,7 +535,7 @@ async fn test_push_ingest_data_reports_success_after_commit() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
@@ -517,7 +558,7 @@ async fn test_push_ingest_data_head_moved_before_commit_reports_error_not_succes
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = PushIngestDataUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::allowing(),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo]),
     );
 
