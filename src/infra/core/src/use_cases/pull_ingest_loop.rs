@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::*;
 use random_strings::get_random_name;
 
@@ -33,12 +33,37 @@ impl PullIngestLoop {
         }
     }
 
+    /// Runs the ingest job of one dataset and reports it as the pull's response
+    pub(crate) async fn run(
+        self,
+        pii: PullIngestItem,
+        options: PullOptions,
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PullResponse, InternalError> {
+        let result = self
+            .ingest(
+                &pii.target,
+                options.ingest_options,
+                options.exhaust_sources,
+                maybe_listener,
+            )
+            .await
+            .map(Into::into);
+
+        Ok(PullResponse {
+            maybe_original_request: pii.maybe_original_request,
+            maybe_local_ref: Some(pii.target.as_local_ref()),
+            maybe_remote_ref: None,
+            result,
+        })
+    }
+
     /// Ingests until the source reports no more data, or once when
     /// `exhaust_sources` is off. The result spans all committed iterations. An
     /// iteration that fails after others committed is
     /// [`PullError::IngestStopped`]. The listener learns of each committed
     /// iteration, and of the failure that ends the ingest
-    pub(crate) async fn run(
+    async fn ingest(
         &self,
         target_handle: &odf::DatasetHandle,
         options: PollingIngestOptions,

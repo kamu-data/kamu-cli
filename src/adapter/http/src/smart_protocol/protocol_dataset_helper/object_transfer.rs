@@ -50,34 +50,49 @@ pub async fn prepare_pull_object_transfer_strategy(
         }
     };
 
-    let transfer_url_result = match get_download_url_result {
+    let download_from = external_or_simple_transfer_url(
+        get_download_url_result,
+        object_file_ref,
+        dataset_url,
+        maybe_bearer_header,
+    )?;
+
+    Ok(PullObjectTransferStrategy {
+        object_file: object_file_ref.clone(),
+        pull_strategy: ObjectPullStrategy::HttpDownload,
+        download_from,
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The storage's own transfer URL, or the simple transfer protocol endpoint of
+/// this node when the storage has none
+fn external_or_simple_transfer_url(
+    get_external_url_result: Result<
+        odf::storage::GetExternalUrlResult,
+        odf::storage::GetExternalUrlError,
+    >,
+    object_file_ref: &ObjectFileReference,
+    dataset_url: &Url,
+    maybe_bearer_header: Option<&BearerHeader>,
+) -> Result<TransferUrl, InternalError> {
+    match get_external_url_result {
         Ok(result) => Ok(TransferUrl {
             url: result.url,
-            headers: primitivize_header_map(&result.header_map),
+            headers: primitivize_header_map(&result.header_map)?,
             expires_at: result.expires_at,
         }),
-        Err(error) => match error {
-            odf::storage::GetExternalUrlError::NotSupported => Ok(TransferUrl {
-                url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
-                headers: get_simple_transfer_protocol_headers(
-                    maybe_bearer_header,
-                    SMART_TRANSFER_PROTOCOL_VERSION,
-                ),
-                expires_at: None,
-            }),
-            odf::storage::GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
-            // AccessError
-            odf::storage::GetExternalUrlError::Internal(e) => Err(e),
-        },
-    };
-
-    match transfer_url_result {
-        Ok(transfer_url) => Ok(PullObjectTransferStrategy {
-            object_file: object_file_ref.clone(),
-            pull_strategy: ObjectPullStrategy::HttpDownload,
-            download_from: transfer_url,
+        Err(odf::storage::GetExternalUrlError::NotSupported) => Ok(TransferUrl {
+            url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
+            headers: get_simple_transfer_protocol_headers(
+                maybe_bearer_header,
+                SMART_TRANSFER_PROTOCOL_VERSION,
+            ),
+            expires_at: None,
         }),
-        Err(e) => Err(e),
+        Err(odf::storage::GetExternalUrlError::Access(e)) => Err(e.int_err()),
+        Err(odf::storage::GetExternalUrlError::Internal(e)) => Err(e),
     }
 }
 
@@ -125,17 +140,16 @@ fn get_simple_transfer_protocol_headers(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn primitivize_header_map(header_map: &http::HeaderMap) -> Vec<HeaderRow> {
-    let mut res = Vec::new();
-
-    for (name, value) in header_map {
-        res.push(HeaderRow {
-            name: name.to_string(),
-            value: value.to_str().unwrap().to_string(),
-        });
-    }
-
-    res
+fn primitivize_header_map(header_map: &http::HeaderMap) -> Result<Vec<HeaderRow>, InternalError> {
+    header_map
+        .iter()
+        .map(|(name, value)| {
+            Ok(HeaderRow {
+                name: name.to_string(),
+                value: value.to_str().int_err()?.to_string(),
+            })
+        })
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -186,34 +200,18 @@ pub async fn prepare_push_object_transfer_strategy(
                 odf::storage::ExternalTransferOpts::default(),
             )
             .await;
-        let transfer_url_result = match get_upload_url_result {
-            Ok(result) => Ok(TransferUrl {
-                url: result.url,
-                headers: primitivize_header_map(&result.header_map),
-                expires_at: result.expires_at,
-            }),
-            Err(error) => match error {
-                odf::storage::GetExternalUrlError::NotSupported => Ok(TransferUrl {
-                    url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
-                    headers: get_simple_transfer_protocol_headers(
-                        maybe_bearer_header,
-                        SMART_TRANSFER_PROTOCOL_VERSION,
-                    ),
-                    expires_at: None,
-                }),
-                odf::storage::GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
-                // AccessError
-                odf::storage::GetExternalUrlError::Internal(e) => Err(e),
-            },
-        };
-        match transfer_url_result {
-            Ok(transfer_url) => Ok(PushObjectTransferStrategy {
-                object_file: object_file_ref.clone(),
-                push_strategy: ObjectPushStrategy::HttpUpload,
-                upload_to: Some(transfer_url),
-            }),
-            Err(e) => Err(e),
-        }
+        let upload_to = external_or_simple_transfer_url(
+            get_upload_url_result,
+            object_file_ref,
+            dataset_url,
+            maybe_bearer_header,
+        )?;
+
+        Ok(PushObjectTransferStrategy {
+            object_file: object_file_ref.clone(),
+            push_strategy: ObjectPushStrategy::HttpUpload,
+            upload_to: Some(upload_to),
+        })
     }
 }
 
@@ -238,7 +236,7 @@ pub async fn dataset_import_object_file(
         )?)
         .send()
         .await
-        .int_err()?;
+        .map_err(|e| e.without_url().int_err())?;
 
     // The body of a failed download is not the object: hashing it would report
     // a corrupted source
@@ -347,20 +345,28 @@ pub async fn dataset_export_object_file(
         .body(reqwest::Body::wrap_stream(reader_stream))
         .send()
         .await
-        .int_err()?;
+        .map_err(|e| e.without_url().int_err())?;
 
-    if response.status().is_success() {
+    let status = response.status();
+    if status.is_success() {
         Ok(())
     } else {
         tracing::error!(
-            "File transfer to {} failed, result is {:?}",
-            upload_to.url,
-            response
+            url = %url_without_query(&upload_to.url),
+            %status,
+            "Object upload failed",
         );
-        Err(SyncError::Internal(
-            (ObjectUploadError { response }).int_err(),
-        ))
+        Err(SyncError::Internal(ObjectUploadError { status }.int_err()))
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A transfer URL may be presigned, with its signature in the query
+pub fn url_without_query(url: &Url) -> Url {
+    let mut url = url.clone();
+    url.set_query(None);
+    url
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

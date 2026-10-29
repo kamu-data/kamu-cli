@@ -324,9 +324,9 @@ Since the progress messages are posted in the same transaction as the event that
 task is `Running` if and only if its `Running` message exists, and likewise for `Finished`
 ([outbox.md](outbox.md#1-purpose--scope) explains the guarantee).
 
-A dataset planner resolves a `ResolvedDataset` inside its transaction and calls
+A dataset planner that keeps a `ResolvedDataset` in the definition calls
 `detach_from_transaction()` before returning, so the definition can outlive that transaction and
-be used by the runner. A runner that needs the database again opens a new transaction and
+be used by the runner; the update planner keeps only handles. A runner that needs the database again opens a new transaction and
 re-resolves what it needs (`DatasetUpdateSteps`, `LocalSyncCommitter`).
 
 `TaskSchedulerImpl` itself opens no transactions: `create_task`, `cancel_task` and `try_take` run in
@@ -357,7 +357,7 @@ Ingest, transform and compaction share one shape: **the core service writes new 
 transaction with compare-and-swap** — the runner re-resolves the dataset through
 `DatasetRegistry` and moves `HEAD` from `old_head` to `new_head` through `DatasetHeadCommitter`
 (`DatasetUpdateSteps::commit_head`, the step `kamu pull` also uses; `TaskDatasetHeadCommitter`,
-shared by the update and compaction runners, turns a commit that did not happen into the task's
+shared by the update, compaction and reset runners, turns a commit that did not happen into the task's
 outcome). Blocks written by an attempt that never reaches that step stay unreferenced, so a re-run
 after a crash, or a concurrent writer that moved `HEAD` first, cannot corrupt the chain. Sync and
 reset differ:
@@ -387,8 +387,7 @@ fetch_uncacheable }`. The dataset decides what "update" means.
 1. `PullRequestPlanner::build_pull_plan(PullRequest::local(id), non-recursive)` builds a
    single-node pull plan and yields one `PullPlanIterationJob`: `Ingest`, `Transform` or `Sync`,
    chosen as described in [dataset-pull.md](dataset-pull.md#53-turning-items-into-jobs).
-2. The job is detached from the transaction and stored in `TaskDefinitionDatasetUpdate` as a
-   `DatasetUpdateJob`, with the ingest and sync options. Every job keeps only the target's handle,
+2. The job is stored in `TaskDefinitionDatasetUpdate` as a `DatasetUpdateJob`, with the ingest and sync options. Every job keeps only the target's handle,
    and a sync job also the remote ref: the runner plans them itself, so the definition holds no
    writer state, no environment variable values and nothing read from a remote. A planned sync
    into a dataset that does not exist is a planning error.

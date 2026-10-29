@@ -59,6 +59,8 @@ pub struct SyncRequest {
     pub dst: SyncRefRemote,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A pull from a remote dataset into a dataset of this node. The source is
 /// only a reference: the transfer resolves and opens it
 #[derive(Debug, Clone)]
@@ -66,6 +68,8 @@ pub struct LocalSyncRequest {
     pub src: odf::DatasetRefRemote,
     pub dst: LocalSyncTarget,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub enum SyncRef {
@@ -105,6 +109,8 @@ impl SyncRef {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The local dataset a pull writes into
 #[derive(Debug, Clone)]
 pub enum LocalSyncTarget {
@@ -131,13 +137,6 @@ impl LocalSyncTarget {
         })
     }
 
-    pub fn as_any_ref(&self) -> odf::DatasetRefAny {
-        match self {
-            Self::Existing { dataset, .. } => dataset.get_handle().as_any_ref(),
-            Self::New(alias) => alias.as_any_ref(),
-        }
-    }
-
     pub fn detach_from_transaction(&self) {
         match self {
             Self::Existing { dataset, .. } => dataset.detach_from_transaction(),
@@ -145,6 +144,8 @@ impl LocalSyncTarget {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
 pub struct SyncRefRemote {
@@ -217,12 +218,16 @@ pub enum SyncResult {
     },
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// What [`SyncService::transfer_into_local`] wrote
 #[derive(Debug)]
 pub enum SyncTransfer {
     UpToDate,
     Transferred(TransferredSync),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Blocks and objects written into a local dataset, not yet referenced by its
 /// `HEAD`
@@ -233,6 +238,8 @@ pub struct TransferredSync {
     pub num_blocks: u64,
     pub increment: odf::dataset::MetadataChainIncrementInterval,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub enum TransferredSyncTarget {
@@ -264,6 +271,8 @@ pub trait SyncListener: Sync + Send {
     fn success(&self, _result: &SyncResult) {}
     fn error(&self, _error: &SyncError) {}
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SyncStage {
@@ -358,14 +367,13 @@ pub enum SyncError {
     #[error(transparent)]
     RemoteByIdUnsupported(#[from] RemoteDatasetByIdUnsupportedError),
     #[error(transparent)]
+    InvalidDestination(#[from] InvalidSyncDestinationError),
+    #[error(transparent)]
     RepositoryNotFound(
         #[from]
         #[backtrace]
         RepositoryNotFoundError,
     ),
-    // TODO: Report divergence type:
-    // Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead
-    // by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})
     #[error(transparent)]
     DatasetsDiverged(#[from] DatasetsDivergedError),
     #[error(transparent)]
@@ -414,6 +422,7 @@ impl SyncError {
             | Self::UnsupportedProtocol(_)
             | Self::UnsupportedIpfsStorageType(_)
             | Self::RemoteByIdUnsupported(_)
+            | Self::InvalidDestination(_)
             | Self::RepositoryNotFound(_)
             | Self::DatasetsDiverged(_)
             | Self::DatasetIdMismatch(_)
@@ -450,6 +459,16 @@ impl From<odf::DatasetNotFoundError> for DatasetAnyRefUnresolvedError {
             dataset_ref: v.dataset_ref.as_any_ref(),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A destination this sync cannot write into, whatever the source
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[error("Cannot sync into {dst_ref}: {reason}")]
+pub struct InvalidSyncDestinationError {
+    pub dst_ref: odf::DatasetRefAny,
+    pub reason: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -673,6 +692,104 @@ mod tests {
                 )),
                 false,
             ),
+            (
+                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::CASFailed(
+                    Box::new(kamu_datasets::DatasetReferenceCASError {
+                        dataset_id: fixtures.dataset_id(b"foo"),
+                        block_ref: odf::BlockRef::Head,
+                        expected_prev_block_hash: None,
+                        actual_prev_block_hash: Some(fixtures.head(b"actual")),
+                    }),
+                )),
+                true,
+            ),
+            (
+                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::EmptyDataset),
+                false,
+            ),
+            (
+                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::Access(
+                    fixtures.access_error(),
+                )),
+                false,
+            ),
+            (
+                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::RefCollision(
+                    odf::dataset::RefCollisionError {
+                        id: fixtures.dataset_id(b"foo"),
+                    },
+                )),
+                false,
+            ),
+            (
+                SyncError::DatasetNotFound(DatasetAnyRefUnresolvedError::new(
+                    fixtures.alias().as_any_ref(),
+                )),
+                false,
+            ),
+            (
+                SyncError::RefCollision(odf::dataset::RefCollisionError {
+                    id: fixtures.dataset_id(b"foo"),
+                }),
+                false,
+            ),
+            (
+                SyncError::NameCollision(kamu_datasets::NameCollisionError {
+                    alias: fixtures.alias(),
+                }),
+                false,
+            ),
+            (
+                SyncError::UnsupportedProtocol(odf::dataset::UnsupportedProtocolError {
+                    message: None,
+                    url: fixtures.url(),
+                }),
+                false,
+            ),
+            (
+                SyncError::UnsupportedIpfsStorageType(UnsupportedIpfsStorageTypeError {
+                    url: fixtures.url(),
+                }),
+                false,
+            ),
+            (
+                SyncError::RemoteByIdUnsupported(RemoteDatasetByIdUnsupportedError {
+                    remote_ref: odf::DatasetRefRemote::ID(None, fixtures.dataset_id(b"foo")),
+                }),
+                false,
+            ),
+            (
+                SyncError::InvalidDestination(InvalidSyncDestinationError {
+                    dst_ref: fixtures.alias().as_any_ref(),
+                    reason: "it is a local dataset".to_owned(),
+                }),
+                false,
+            ),
+            (
+                SyncError::RepositoryNotFound(RepositoryNotFoundError {
+                    repo_name: odf::RepoName::new_unchecked("missing"),
+                }),
+                false,
+            ),
+            (
+                SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                    src_dataset_id: fixtures.dataset_id(b"src"),
+                    dst_dataset_id: fixtures.dataset_id(b"dst"),
+                }),
+                false,
+            ),
+            (
+                SyncError::OverwriteSeedBlock(OverwriteSeedBlockError {}),
+                false,
+            ),
+            (
+                SyncError::Corrupted(CorruptedSourceError {
+                    message: "Source metadata chain is broken".to_owned(),
+                    source: None,
+                }),
+                false,
+            ),
+            (SyncError::Access(fixtures.access_error()), false),
         ];
 
         for (error, recoverable) in cases {
@@ -691,6 +808,18 @@ mod tests {
 
         fn alias(&self) -> odf::DatasetAlias {
             odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"))
+        }
+
+        fn dataset_id(&self, seed: &[u8]) -> odf::DatasetID {
+            odf::DatasetID::new_seeded_ed25519(seed)
+        }
+
+        fn url(&self) -> Url {
+            Url::parse("ipfs://example").unwrap()
+        }
+
+        fn access_error(&self) -> odf::AccessError {
+            odf::AccessError::Unauthorized("denied".into())
         }
     }
 }

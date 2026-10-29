@@ -73,24 +73,11 @@ impl AxumServerPullProtocolInstance {
                   "Pull process aborted with internal error",
                 );
             }
-            Err(PullServerError::ReadFailed(err)) => {
-                if let ReadMessageError::IncompatibleVersion = err.read_error {
-                    axum_write_close_payload::<DatasetPullResponse>(
-                        &mut self.socket,
-                        Err(DatasetPullRequestError::Internal(TransferInternalError {
-                            phase: TransferPhase::Pull(PullPhase::InitialRequest),
-                            error_message: "Incompatible version.".to_string(),
-                        })),
-                    )
-                    .await;
-                }
-
-                tracing::warn!(
-                  error = ?err,
-                  error_msg = %err,
-                  "Pull process aborted: reading from the client failed",
-                );
-            }
+            Err(PullServerError::ReadFailed(err)) => tracing::warn!(
+              error = ?err,
+              error_msg = %err,
+              "Pull process aborted: reading from the client failed",
+            ),
             Err(PullServerError::WriteFailed(err)) => tracing::warn!(
               error = ?err,
               error_msg = %err,

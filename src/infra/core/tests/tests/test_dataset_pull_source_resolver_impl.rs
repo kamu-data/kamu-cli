@@ -42,12 +42,12 @@ async fn test_url_pull_alias_is_the_source() {
 
     assert_eq!(
         harness.find_pull_alias(&foo).await.unwrap(),
-        Some(remote_ref("https://example.com/foo"))
+        Some(PullSourceHarness::remote_ref("https://example.com/foo"))
     );
     assert_eq!(
         harness.resolve_pull_source(&foo).await.unwrap(),
         Some(DatasetPullSource {
-            remote_ref: remote_ref("https://example.com/foo"),
+            remote_ref: PullSourceHarness::remote_ref("https://example.com/foo"),
             url: Url::parse("https://example.com/foo/").unwrap(),
         })
     );
@@ -67,7 +67,7 @@ async fn test_repository_pull_alias_resolves_to_the_repository_url() {
     assert_eq!(
         harness.resolve_pull_source(&foo).await.unwrap(),
         Some(DatasetPullSource {
-            remote_ref: remote_ref("repo/bar"),
+            remote_ref: PullSourceHarness::remote_ref("repo/bar"),
             url: Url::parse("https://example.com/repo/bar/").unwrap(),
         })
     );
@@ -220,7 +220,7 @@ async fn test_dataset_of_another_account_is_not_found_by_its_pull_alias() {
 #[test]
 fn test_pull_source_endpoint_carries_the_url_without_credentials() {
     let source = DatasetPullSource {
-        remote_ref: remote_ref("repo/bar"),
+        remote_ref: PullSourceHarness::remote_ref("repo/bar"),
         url: Url::parse("odf+https://example.com/bar/").unwrap(),
     };
 
@@ -235,12 +235,6 @@ fn test_pull_source_endpoint_carries_the_url_without_credentials() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn remote_ref(remote_ref: &str) -> odf::DatasetRefRemote {
-    odf::DatasetRefRemote::try_from(remote_ref).unwrap()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[oop::extend(BaseRepoHarness, base_repo_harness)]
 struct PullSourceHarness {
     base_repo_harness: BaseRepoHarness,
@@ -250,6 +244,10 @@ struct PullSourceHarness {
 }
 
 impl PullSourceHarness {
+    fn remote_ref(remote_ref: &str) -> odf::DatasetRefRemote {
+        odf::DatasetRefRemote::try_from(remote_ref).unwrap()
+    }
+
     fn new() -> Self {
         Self::with_base(
             BaseRepoHarness::builder()
@@ -323,7 +321,7 @@ impl PullSourceHarness {
             .get_remote_aliases(target)
             .await
             .unwrap()
-            .add(&remote_ref(alias), kind)
+            .add(&Self::remote_ref(alias), kind)
             .await
             .unwrap();
     }
@@ -351,7 +349,7 @@ impl PullSourceHarness {
 
     async fn find_dataset_by_pull_alias(&self, alias: &str) -> Option<odf::DatasetHandle> {
         self.pull_source_resolver
-            .find_dataset_by_pull_alias(&remote_ref(alias))
+            .find_dataset_by_pull_alias(&Self::remote_ref(alias))
             .await
             .unwrap()
     }

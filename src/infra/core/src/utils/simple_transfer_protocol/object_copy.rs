@@ -76,7 +76,9 @@ impl SimpleTransferProtocol {
     }
 
     /// Copies the data and checkpoint files the new blocks reference, before
-    /// any block that references them is written. Returns the stats so far
+    /// any block that references them is written. `num_blocks` counts every
+    /// block the sync writes, a `Seed` stored apart included. Returns the
+    /// stats so far
     pub(super) async fn transfer_objects<'a>(
         &'a self,
         blocks_desc_ordered: &'a [odf::dataset::HashedMetadataBlockBytesDecoded],
@@ -85,11 +87,11 @@ impl SimpleTransferProtocol {
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
         transfer_options: &SimpleProtocolTransferOptions,
+        num_blocks: u64,
         mut stats: SyncStats,
     ) -> Result<SyncStats, SyncError> {
         // Update stats estimates based on metadata
-        stats.dst_estimated.metadata_blocks_written +=
-            u64::try_from(blocks_desc_ordered.len()).unwrap();
+        stats.dst_estimated.metadata_blocks_written += num_blocks;
 
         for block in blocks_desc_ordered
             .iter()

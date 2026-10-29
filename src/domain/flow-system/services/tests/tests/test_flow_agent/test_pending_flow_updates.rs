@@ -16,7 +16,6 @@ use kamu_task_system::*;
 use crate::tests::{
     FlowHarness,
     FlowHarnessOverrides,
-    FlowSystemTestListener,
     ManualFlowActivationArgs,
     SCHEDULING_ALIGNMENT_MS,
     TaskDriverArgs,
@@ -67,7 +66,7 @@ async fn test_flow_scheduled_earlier_than_awaited_activation() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -124,7 +123,7 @@ async fn test_schedule_made_earlier_while_flow_waits() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -235,7 +234,7 @@ async fn test_schedule_made_later_while_flow_waits() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -350,7 +349,7 @@ async fn test_schedule_made_later_keeps_manually_requested_flow() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -697,7 +696,7 @@ async fn test_retry_policy_change_keeps_policy_of_retrying_flow() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness

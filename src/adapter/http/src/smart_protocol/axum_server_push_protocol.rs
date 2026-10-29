@@ -29,7 +29,6 @@ use kamu_datasets::{
     SetRefCheckRefMode,
 };
 use messaging_outbox::{Outbox, OutboxExt};
-use odf::Multihash;
 use odf::metadata::AsTypedBlock as _;
 use tracing::Instrument;
 use url::Url;
@@ -40,7 +39,6 @@ use super::phases::*;
 use super::protocol_dataset_helper::*;
 use crate::BearerHeader;
 use crate::smart_protocol::*;
-use crate::ws_common::ReadMessageError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,22 +93,11 @@ impl AxumServerPushProtocolInstance {
                   "Push process aborted with internal error",
                 );
             }
-            Err(PushServerError::ReadFailed(err)) => {
-                if let ReadMessageError::IncompatibleVersion = err.read_error {
-                    let payload = Err(DatasetPushRequestError::Internal(TransferInternalError {
-                        phase: TransferPhase::Push(PushPhase::InitialRequest),
-                        error_message: "Incompatible version.".to_string(),
-                    }));
-                    axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload)
-                        .await;
-                }
-
-                tracing::warn!(
-                  error = ?err,
-                  error_msg = %err,
-                  "Push process aborted: reading from the client failed",
-                );
-            }
+            Err(PushServerError::ReadFailed(err)) => tracing::warn!(
+              error = ?err,
+              error_msg = %err,
+              "Push process aborted: reading from the client failed",
+            ),
             Err(PushServerError::WriteFailed(err)) => tracing::warn!(
               error = ?err,
               error_msg = %err,
@@ -241,7 +228,7 @@ impl AxumServerPushProtocolInstance {
                     })
                     .map_err(|e| {
                         PushServerError::Internal(PhaseInternalError {
-                            phase: TransferPhase::Push(PushPhase::ObjectsUploadProgress),
+                            phase: TransferPhase::Push(PushPhase::EnsuringTargetExists),
                             error: e.int_err(),
                         })
                     })?;
@@ -265,8 +252,16 @@ impl AxumServerPushProtocolInstance {
                     ))
                     .await;
                 match create_result {
+                    Ok(res) if res.head != first_block_hash => {
+                        return Err(format!(
+                            "Seed block hash declared by the client {first_block_hash} didn't \
+                             match the computed {}",
+                            res.head
+                        )
+                        .protocol_int_err(PushPhase::EnsuringTargetExists)
+                        .into());
+                    }
                     Ok(res) => {
-                        assert_eq!(res.head, first_block_hash);
                         // The remaining blocks build on the Seed just committed
                         expected_head = Some(first_block_hash);
                         self.maybe_dataset_handle = Some(res.dataset_handle);
@@ -279,7 +274,14 @@ impl AxumServerPushProtocolInstance {
                     Err(CreateDatasetError::NameCollision(err)) => {
                         return Err(PushServerError::NameCollision(err));
                     }
-                    Err(e) => {
+                    // The protocol has no reply for these, so the client sees them as
+                    // internal errors
+                    Err(
+                        e @ (CreateDatasetError::EmptyDataset
+                        | CreateDatasetError::Access(_)
+                        | CreateDatasetError::CASFailed(_)
+                        | CreateDatasetError::Internal(_)),
+                    ) => {
                         return Err(PushServerError::Internal(PhaseInternalError {
                             phase: TransferPhase::Push(PushPhase::EnsuringTargetExists),
                             error: e.int_err(),
@@ -407,7 +409,7 @@ impl AxumServerPushProtocolInstance {
         }
 
         let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks)
-            .protocol_int_err(PushPhase::InitialRequest)?;
+            .protocol_int_err(PushPhase::MetadataRequest)?;
 
         if let Some(dataset_handle) = self.maybe_dataset_handle.as_ref()
             && push_request.force_update_if_diverged
@@ -445,7 +447,10 @@ impl AxumServerPushProtocolInstance {
         );
 
         let dataset_url = self.dataset_url.clone();
-        let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
+        let dataset_handle = self.maybe_dataset_handle.clone().ok_or_else(|| {
+            "The push completed with no blocks for a dataset that does not exist"
+                .protocol_int_err(PushPhase::CompleteRequest)
+        })?;
         let maybe_bearer_header = self.maybe_bearer_header.clone();
 
         let object_transfer_strategies = DatabaseTransactionRunner::new(self.catalog.clone())
@@ -531,9 +536,9 @@ impl AxumServerPushProtocolInstance {
     async fn try_handle_push_complete(
         &mut self,
         new_blocks: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
-        expected_head: Option<Multihash>,
+        expected_head: Option<odf::Multihash>,
         force_update_if_diverged: bool,
-        old_head_maybe: Option<Multihash>,
+        old_head_maybe: Option<odf::Multihash>,
     ) -> Result<(), PushServerError> {
         axum_read_payload::<DatasetPushComplete>(&mut self.socket)
             .await
@@ -543,7 +548,10 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Push client sent a complete request. Committing the dataset");
 
-        let dataset_handle = self.maybe_dataset_handle.clone().unwrap();
+        let dataset_handle = self.maybe_dataset_handle.clone().ok_or_else(|| {
+            "The push completed with no blocks for a dataset that does not exist"
+                .protocol_int_err(PushPhase::CompleteRequest)
+        })?;
         // Without `force` the batch must extend `HEAD`, so the commit expects the
         // block the batch is appended to. With `force` the batch may replace a
         // divergent history, so it expects the head the client observed instead
@@ -570,7 +578,7 @@ impl AxumServerPushProtocolInstance {
                         .await
                         .int_err()?;
 
-                    Ok::<(odf::DatasetID, Multihash), AppendDatasetMetadataBatchUseCaseError>((resolved_dataset.get_id().clone(), new_head))
+                    Ok::<(odf::DatasetID, odf::Multihash), AppendDatasetMetadataBatchUseCaseError>((resolved_dataset.get_id().clone(), new_head))
                 },
             )
             .instrument(tracing::debug_span!("AxumServerPushProtocolInstance::try_handle_push_complete"))
@@ -593,10 +601,6 @@ impl AxumServerPushProtocolInstance {
         tracing::debug!("Push client sent a complete request. Send outbox message");
 
         let maybe_bearer_header = self.maybe_bearer_header.clone();
-        // Have separate transaction just for sending outbox message may be not a good
-        // idea, but it will allow us to separate push flow and outbox messaging.
-        // Ideally we may consider some kind of transactional_with_n method to be able
-        // use more than 2 different services in one transaction
         DatabaseTransactionRunner::new(self.catalog.clone())
             .transactional_with2(
                 |outbox: Arc<dyn Outbox>,

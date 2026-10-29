@@ -17,6 +17,8 @@ use url::Url;
 pub trait UrlExt {
     fn ensure_trailing_slash(&mut self);
     fn is_odf_protocol(&self) -> bool;
+    /// Converts an http(s) URL to the odf+http(s) scheme; other URLs are
+    /// returned as they are
     fn as_odf_protocol(&self) -> Result<Url, InternalError>;
 
     /// Converts from odf+http(s) scheme to plain http(s)
@@ -31,8 +33,10 @@ impl UrlExt for Url {
     }
 
     fn as_odf_protocol(&self) -> Result<Url, InternalError> {
-        let url_string = self.as_str().replace("http", "odf+http");
-        Url::from_str(&url_string).int_err()
+        match self.scheme() {
+            "http" | "https" => Url::from_str(&format!("odf+{self}")).int_err(),
+            _ => Ok(self.clone()),
+        }
     }
 
     fn is_odf_protocol(&self) -> bool {
@@ -45,6 +49,36 @@ impl UrlExt for Url {
             .strip_prefix("odf+")
             .ok_or_else(|| format!("Expected odf+http(s) URL but got: {self}").int_err())?;
         Url::parse(s).int_err()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_as_odf_protocol_rewrites_only_the_scheme() {
+        let url = Url::parse("https://example.com/http-repo/").unwrap();
+
+        assert_eq!(
+            url.as_odf_protocol().unwrap().as_str(),
+            "odf+https://example.com/http-repo/"
+        );
+    }
+
+    #[test]
+    fn test_as_odf_protocol_keeps_other_schemes() {
+        for url in [
+            "odf+http://example.com/",
+            "file:///tmp/repo/",
+            "s3://bucket/repo/",
+        ] {
+            let url = Url::parse(url).unwrap();
+
+            assert_eq!(url.as_odf_protocol().unwrap(), url);
+        }
     }
 }
 

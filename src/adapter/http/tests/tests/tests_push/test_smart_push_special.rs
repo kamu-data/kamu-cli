@@ -321,8 +321,8 @@ async fn test_smart_push_head_moved_concurrently() {
     scenario
         .server_harness
         .move_head_before_next_commit(concurrent_head.clone());
-    let server_dataset_reference_service = scenario.server_harness.cli_dataset_reference_service();
 
+    let stored_heads = scenario.server_harness.stored_heads();
     let api_server_handle = scenario.server_harness.api_server_run();
 
     let client_handle = async {
@@ -344,10 +344,7 @@ async fn test_smart_push_head_moved_concurrently() {
             )))
         );
         pretty_assertions::assert_eq!(
-            server_dataset_reference_service
-                .get_reference(&server_dataset_handle.id, &odf::BlockRef::Head)
-                .await
-                .unwrap(),
+            stored_heads.get(&server_dataset_handle.id).await,
             concurrent_head
         );
     };
@@ -374,17 +371,10 @@ async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
     )
     .await;
 
-    let server_dataset_handle = scenario
-        .server_harness
-        .cli_dataset_registry()
-        .resolve_dataset_handle_by_ref(&scenario.client_create_result.dataset_handle.as_local_ref())
-        .await
-        .unwrap();
-    let server_dataset_reference_service = scenario.server_harness.cli_dataset_reference_service();
-    let server_head = server_dataset_reference_service
-        .get_reference(&server_dataset_handle.id, &odf::BlockRef::Head)
-        .await
-        .unwrap();
+    // A pushed dataset keeps its ID on the server
+    let dataset_id = &scenario.client_create_result.dataset_handle.id;
+    let stored_heads = scenario.server_harness.stored_heads();
+    let server_head = stored_heads.get(dataset_id).await;
     let stale_head = odf::Multihash::from_digest_sha3_256(b"stale");
 
     let api_server_handle = scenario.server_harness.api_server_run();
@@ -413,13 +403,7 @@ async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
                 if e.actual_head.as_ref() == Some(&server_head)
                     && e.expected_head.as_ref() == Some(&stale_head)
         );
-        pretty_assertions::assert_eq!(
-            server_dataset_reference_service
-                .get_reference(&server_dataset_handle.id, &odf::BlockRef::Head)
-                .await
-                .unwrap(),
-            server_head
-        );
+        pretty_assertions::assert_eq!(stored_heads.get(dataset_id).await, server_head);
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -457,8 +441,8 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
     scenario
         .server_harness
         .move_head_before_next_append(concurrent_head.clone());
-    let server_dataset_reference_service = scenario.server_harness.cli_dataset_reference_service();
 
+    let stored_heads = scenario.server_harness.stored_heads();
     let api_server_handle = scenario.server_harness.api_server_run();
 
     let client_handle = async {
@@ -480,10 +464,7 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
             )))
         );
         pretty_assertions::assert_eq!(
-            server_dataset_reference_service
-                .get_reference(&server_dataset_handle.id, &odf::BlockRef::Head)
-                .await
-                .unwrap(),
+            stored_heads.get(&server_dataset_handle.id).await,
             concurrent_head
         );
     };

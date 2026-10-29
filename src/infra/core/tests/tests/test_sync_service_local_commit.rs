@@ -22,6 +22,7 @@ use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
+use odf::dataset::DatasetStorageUnit as _;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
@@ -201,36 +202,12 @@ async fn test_pull_with_head_moved_during_transfer_s3() {
 
 #[test_log::test(tokio::test)]
 async fn test_pull_from_unreachable_repository_fails_recoverably() {
-    // A port that was free a moment ago refuses connections
-    let closed_addr = std::net::TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap();
-    let harness = LocalPullHarness::new(Url::parse(&format!("http://{closed_addr}/")).unwrap());
+    // Nothing listens on the TCP port multiplexer port of the loopback
+    let harness = LocalPullHarness::new(Url::parse("http://127.0.0.1:1/").unwrap());
 
     let result = harness.pull(SyncOptions::default(), None).await;
 
     assert_matches!(result, Err(e @ SyncError::Internal(_)) if e.is_recoverable());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_pull_request_is_built_without_contacting_the_source() {
-    // A port that was free a moment ago refuses connections
-    let closed_addr = std::net::TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap();
-    let harness = LocalPullHarness::new(Url::parse(&format!("http://{closed_addr}/")).unwrap());
-
-    assert_matches!(
-        harness.build_request(harness.remote_ref()).await,
-        Ok(LocalSyncRequest {
-            dst: LocalSyncTarget::New(_),
-            ..
-        })
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -244,6 +221,8 @@ async fn test_pull_from_unknown_repository_fails_in_transfer_unrecoverably() {
 
     assert_matches!(result, Err(e @ SyncError::RepositoryNotFound(_)) if !e.is_recoverable());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_pull_of_remote_by_id_fails_unrecoverably() {
@@ -262,6 +241,48 @@ async fn test_pull_of_remote_by_id_fails_unrecoverably() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_first_pull_into_alias_taken_before_commit_fails_unrecoverably() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::with_destination_alias_taken(
+        Url::from_directory_path(tmp_repo_dir.path()).unwrap(),
+    );
+
+    harness.create_source_dataset().await;
+    harness.push_source().await;
+    let transferred = harness.transfer().await;
+
+    assert_matches!(
+        harness.commit(transferred).await,
+        Err(e @ SyncError::CreateDatasetFailed(CreateDatasetError::NameCollision(_)))
+            if !e.is_recoverable()
+    );
+    assert_eq!(harness.destination_head().await, None);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_concurrent_first_pulls_create_dataset_once() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let harness = LocalPullHarness::new(Url::from_directory_path(tmp_repo_dir.path()).unwrap());
+
+    harness.create_source_dataset().await;
+    let source_head = harness.append_source_data().await;
+    harness.push_source().await;
+
+    let first = harness.transfer().await;
+    let second = harness.transfer().await;
+    harness.commit(first).await.unwrap();
+
+    assert_matches!(
+        harness.commit(second).await,
+        Err(e @ SyncError::CreateDatasetFailed(CreateDatasetError::RefCollision(_)))
+            if !e.is_recoverable()
+    );
+    assert_eq!(harness.destination_head().await, Some(source_head));
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -278,25 +299,44 @@ struct LocalPullHarness {
 
 impl LocalPullHarness {
     fn new(repo_url: Url) -> Self {
+        Self::build(repo_url, false)
+    }
+
+    /// Another dataset takes the destination's name when a first pull creates
+    /// it
+    fn with_destination_alias_taken(repo_url: Url) -> Self {
+        Self::build(repo_url, true)
+    }
+
+    fn build(repo_url: Url, destination_alias_taken: bool) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
 
         Self {
-            source_catalog: Self::build_workspace_catalog(&tmp_dir.path().join("source")),
-            destination_catalog: Self::build_workspace_catalog(&tmp_dir.path().join("destination")),
+            source_catalog: Self::build_workspace_catalog(&tmp_dir.path().join("source"), false),
+            destination_catalog: Self::build_workspace_catalog(
+                &tmp_dir.path().join("destination"),
+                destination_alias_taken,
+            ),
             _tmp_dir: tmp_dir,
             repo_url,
             dataset_alias: odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo")),
         }
     }
 
-    fn build_workspace_catalog(workspace_dir: &Path) -> dill::Catalog {
+    fn build_workspace_catalog(workspace_dir: &Path, alias_taken: bool) -> dill::Catalog {
         let datasets_dir = workspace_dir.join("datasets");
         std::fs::create_dir_all(&datasets_dir).unwrap();
 
         let mut dataset_entry_writer = MockDatasetEntryWriter::new();
         dataset_entry_writer
             .expect_create_entry()
-            .returning(|_, _, _, _, _| Ok(()));
+            .returning(move |_, _, _, dataset_name, _| {
+                if alias_taken {
+                    Err(DatasetEntryNameCollisionError::new(dataset_name.clone()).into())
+                } else {
+                    Ok(())
+                }
+            });
 
         let mut b = dill::CatalogBuilder::new();
         b.add::<DidGeneratorDefault>()
@@ -503,7 +543,7 @@ impl LocalPullHarness {
         maybe_listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let request = self.build_request(self.remote_ref()).await?;
-        LocalSyncHelper::new(self.destination_catalog.clone())
+        LocalSyncHelper::new(&self.destination_catalog)
             .transfer_and_commit(request, options, maybe_listener)
             .await
     }
@@ -511,7 +551,7 @@ impl LocalPullHarness {
     /// Pulls from `remote_ref` instead of the harness's own remote
     async fn pull_from(&self, remote_ref: odf::DatasetRefRemote) -> Result<SyncResult, SyncError> {
         let request = self.build_request(remote_ref).await?;
-        LocalSyncHelper::new(self.destination_catalog.clone())
+        LocalSyncHelper::new(&self.destination_catalog)
             .transfer_and_commit(request, SyncOptions::default(), None)
             .await
     }
@@ -520,7 +560,7 @@ impl LocalPullHarness {
         &self,
         remote_ref: odf::DatasetRefRemote,
     ) -> Result<LocalSyncRequest, SyncError> {
-        LocalSyncHelper::new(self.destination_catalog.clone())
+        LocalSyncHelper::new(&self.destination_catalog)
             .build_request(remote_ref, self.dataset_alias.as_local_ref(), true)
             .await
     }
@@ -567,22 +607,43 @@ impl LocalPullHarness {
             .unwrap();
     }
 
-    /// `None` while the destination has no committed `HEAD`
+    /// `None` while the destination has no committed `HEAD`, read from the
+    /// storage of the dataset the pull creates
     async fn destination_head(&self) -> Option<odf::Multihash> {
-        let dataset = self
+        let dataset = match self
             .destination_catalog
-            .get_one::<dyn DatasetRegistry>()
+            .get_one::<odf::dataset::DatasetStorageUnitLocalFs>()
             .unwrap()
-            .get_dataset_by_ref(&self.dataset_alias.as_local_ref())
+            .get_stored_dataset_by_id(&self.source_dataset_id().await)
             .await
-            .ok()?;
+        {
+            Ok(dataset) => dataset,
+            Err(odf::dataset::GetStoredDatasetError::UnresolvedId(_)) => return None,
+            Err(e @ odf::dataset::GetStoredDatasetError::Internal(_)) => panic!("{e:?}"),
+        };
 
-        dataset
+        match dataset
             .as_metadata_chain()
             .as_uncached_ref_repo()
             .get(odf::BlockRef::Head.as_str())
             .await
-            .ok()
+        {
+            Ok(head) => Some(head),
+            Err(odf::GetRefError::NotFound(_)) => None,
+            Err(e @ (odf::GetRefError::Access(_) | odf::GetRefError::Internal(_))) => {
+                panic!("{e:?}")
+            }
+        }
+    }
+
+    async fn source_dataset_id(&self) -> odf::DatasetID {
+        self.source_catalog
+            .get_one::<dyn DatasetRegistry>()
+            .unwrap()
+            .resolve_dataset_handle_by_ref(&self.dataset_alias.as_local_ref())
+            .await
+            .unwrap()
+            .id
     }
 
     fn remote_ref(&self) -> odf::DatasetRefRemote {

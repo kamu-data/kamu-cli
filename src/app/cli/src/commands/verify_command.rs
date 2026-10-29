@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use kamu_datasets::{DatasetRegistry, DependencyGraphService};
@@ -111,7 +111,7 @@ impl VerifyCommand {
         };
 
         let (filtered_dataset_handles, missed_remote_dependencies) =
-            self.detect_remote_datasets(dataset_handles).await;
+            self.detect_remote_datasets(dataset_handles).await?;
 
         if !missed_remote_dependencies.is_empty() {
             let missed_dependency_warnings: Vec<String> = missed_remote_dependencies
@@ -164,16 +164,12 @@ impl VerifyCommand {
     async fn detect_remote_datasets(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-    ) -> (Vec<odf::DatasetHandle>, Vec<RemoteRefDependency>) {
+    ) -> Result<(Vec<odf::DatasetHandle>, Vec<RemoteRefDependency>), InternalError> {
         let mut result = vec![];
         let mut missed_dependencies = vec![];
 
         for hdl in dataset_handles {
-            let is_remote = self
-                .pull_source_resolver
-                .has_pull_source(&hdl)
-                .await
-                .unwrap();
+            let is_remote = self.pull_source_resolver.has_pull_source(&hdl).await?;
             if !is_remote || self.integrity {
                 result.push(hdl);
                 continue;
@@ -208,7 +204,7 @@ impl VerifyCommand {
             }
         }
 
-        (result, missed_dependencies)
+        Ok((result, missed_dependencies))
     }
 }
 

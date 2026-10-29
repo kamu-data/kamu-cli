@@ -19,10 +19,10 @@ use odf::metadata::AsTypedBlock;
 
 /// A dataset a pull created in storage only: its `Seed` is written, it has
 /// no `HEAD` and no entry until the transfer is committed
-pub struct StoredSeed {
-    pub dataset: Arc<dyn odf::Dataset>,
-    pub seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
-    pub seed_block_bytes: odf::MetadataBlockBytes,
+struct StoredSeed {
+    dataset: Arc<dyn odf::Dataset>,
+    seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+    seed_block_bytes: odf::MetadataBlockBytes,
 }
 
 impl StoredSeed {
@@ -30,7 +30,7 @@ impl StoredSeed {
     /// over a dataset left without `HEAD` by an earlier failed pull. The short
     /// transaction writes nothing to the database: database-backed storage
     /// only needs one to build the dataset, which is detached from it on return
-    pub async fn store(
+    async fn store(
         catalog: &dill::Catalog,
         (seed_hash, seed, seed_block_bytes): odf::dataset::HashedMetadataBlockBytesDecoded,
     ) -> Result<Self, SyncError> {
@@ -91,41 +91,47 @@ impl StoredSeed {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The dataset the transferred blocks go into, and the target the commit
-/// moves: an existing dataset as is, a new one stored from the `Seed` that
-/// `take_seed` removes from the transferred blocks
+/// Where a pull writes its blocks and objects, and what its commit moves
+pub struct TransferTarget {
+    /// The dataset storage the transferred blocks and objects go into
+    pub storage: Arc<dyn odf::Dataset>,
+    pub target: TransferredSyncTarget,
+}
+
+/// Prepares the target of a pull: an existing dataset as is, a new one stored
+/// from the `Seed` that `take_seed` removes from the transferred blocks
 pub async fn prepare_transfer_target(
     catalog: &dill::Catalog,
     dst: &LocalSyncTarget,
     visibility_for_created_dataset: odf::DatasetVisibility,
     take_seed: impl FnOnce() -> odf::dataset::HashedMetadataBlockBytesDecoded,
-) -> Result<(Arc<dyn odf::Dataset>, TransferredSyncTarget), SyncError> {
+) -> Result<TransferTarget, SyncError> {
     match dst {
         LocalSyncTarget::Existing {
             dataset,
             expected_head,
-        } => Ok((
-            (**dataset).clone(),
-            TransferredSyncTarget::Existing {
+        } => Ok(TransferTarget {
+            storage: (**dataset).clone(),
+            target: TransferredSyncTarget::Existing {
                 dataset: dataset.clone(),
                 expected_head: expected_head.clone(),
             },
-        )),
+        }),
         LocalSyncTarget::New(alias) => {
             let StoredSeed {
                 dataset,
                 seed_block,
                 seed_block_bytes,
             } = StoredSeed::store(catalog, take_seed()).await?;
-            Ok((
-                dataset,
-                TransferredSyncTarget::New {
+            Ok(TransferTarget {
+                storage: dataset,
+                target: TransferredSyncTarget::New {
                     alias: alias.clone(),
                     seed_block,
                     seed_block_bytes,
                     visibility: visibility_for_created_dataset,
                 },
-            ))
+            })
         }
     }
 }
@@ -146,6 +152,8 @@ pub async fn append_transferred_blocks(
     Ok(())
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn map_append_batch_error(
     odf::dataset::AppendBatchError {
         append_error,
@@ -163,7 +171,7 @@ pub(crate) fn map_append_batch_error(
                         "Block hash declared by the source {} didn't match the computed {} at \
                          block {block_sequence_number} - this may be an indication of hashing \
                          algorithm mismatch or an attempt to tamper data",
-                        e.actual, e.expected
+                        e.expected, e.actual
                     )
                 }
                 V::FirstBlockMustBeSeed
@@ -186,10 +194,11 @@ pub(crate) fn map_append_batch_error(
             }
             .into()
         }
-        // A batch is appended without moving a reference
-        E::RefNotFound(_) | E::RefCASFailed(_) => unreachable!(),
         E::Access(e) => SyncError::Access(e),
-        e @ E::Internal(_) => SyncError::Internal(e.int_err()),
+        // A batch is appended without moving a reference, so a reference error is unexpected
+        e @ (E::RefNotFound(_) | E::RefCASFailed(_) | E::Internal(_)) => {
+            SyncError::Internal(e.int_err())
+        }
     }
 }
 

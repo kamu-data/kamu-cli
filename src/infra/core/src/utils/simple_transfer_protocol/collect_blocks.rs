@@ -18,22 +18,16 @@ use super::protocol::SimpleTransferProtocol;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SimpleTransferProtocol {
-    /// Compares the chains and returns the source head with the blocks to
-    /// write, newest first, or `None` when the destination is up to date. `dst`
-    /// is the destination chain with its head, or `None` when it has no blocks
+    /// Compares the chains and returns the blocks the destination lacks, or
+    /// `None` when it is up to date. `dst` is the destination chain with its
+    /// head, or `None` when it has no blocks
     pub(super) async fn collect_new_blocks(
         src_ref: &odf::DatasetRefAny,
         src_chain: &dyn odf::MetadataChain,
         dst: Option<ChainWithHead<'_>>,
         force: bool,
         listener_adapter: &CompareChainsListenerAdapter,
-    ) -> Result<
-        Option<(
-            odf::Multihash,
-            Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,
-        )>,
-        SyncError,
-    > {
+    ) -> Result<Option<NewBlocks>, SyncError> {
         let src_head = Self::get_src_head(src_ref, src_chain).await?;
         let dst_head = dst.map(|dst| dst.head);
 
@@ -58,7 +52,7 @@ impl SimpleTransferProtocol {
                         dst_ahead_size: rhs_ahead_blocks.len(),
                     }));
                 }
-                Self::load_all_blocks(src_chain).await?
+                Self::load_all_blocks(src_chain, &src_head).await?
             }
             CompareChainsResult::Divergence {
                 uncommon_blocks_in_lhs: uncommon_blocks_in_src,
@@ -74,7 +68,7 @@ impl SimpleTransferProtocol {
                         }),
                     }));
                 }
-                Self::load_all_blocks(src_chain).await?
+                Self::load_all_blocks(src_chain, &src_head).await?
             }
             CompareChainsResult::DifferentDatasets {
                 lhs_dataset_id: src_dataset_id,
@@ -98,13 +92,17 @@ impl SimpleTransferProtocol {
                 source: Some(e.into()),
             })?;
 
-        Ok(Some((src_head, blocks_desc_ordered)))
+        Ok(Some(NewBlocks {
+            src_head,
+            blocks_desc_ordered,
+        }))
     }
 
-    /// The whole source chain, newest first, which a forced sync writes over a
-    /// destination that is ahead or has diverged
+    /// The whole source chain from `src_head`, newest first, which a forced
+    /// sync writes over a destination that is ahead or has diverged
     async fn load_all_blocks(
         src_chain: &dyn odf::MetadataChain,
+        src_head: &odf::Multihash,
     ) -> Result<
         Vec<(
             odf::Multihash,
@@ -114,7 +112,7 @@ impl SimpleTransferProtocol {
         SyncError,
     > {
         src_chain
-            .iter_blocks_bytes_interval((&odf::BlockRef::Head).into(), None, false)
+            .iter_blocks_bytes_interval(src_head.into(), None, false)
             .try_collect()
             .await
             .map_err(Self::map_block_iteration_error)
@@ -124,15 +122,12 @@ impl SimpleTransferProtocol {
         src_ref: &odf::DatasetRefAny,
         src_chain: &dyn odf::MetadataChain,
     ) -> Result<odf::Multihash, SyncError> {
-        match src_chain.resolve_ref(&odf::BlockRef::Head).await {
-            Ok(head) => Ok(head),
-            Err(odf::GetRefError::NotFound(_)) => Err(DatasetAnyRefUnresolvedError {
+        try_resolve_head(src_chain).await?.ok_or_else(|| {
+            DatasetAnyRefUnresolvedError {
                 dataset_ref: src_ref.clone(),
             }
-            .into()),
-            Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }
+            .into()
+        })
     }
 
     /// A source chain that cannot be read through is corrupted
@@ -161,6 +156,15 @@ impl SimpleTransferProtocol {
             e @ odf::IterBlocksError::Internal(_) => SyncError::Internal(e.int_err()),
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The blocks a destination lacks, up to the source head they were read from
+pub(super) struct NewBlocks {
+    pub(super) src_head: odf::Multihash,
+    /// Newest first
+    pub(super) blocks_desc_ordered: Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

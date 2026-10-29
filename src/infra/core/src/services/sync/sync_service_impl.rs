@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
@@ -60,14 +59,17 @@ impl SyncServiceImpl {
     }
 
     /// Whether a source's blocks and objects are validated and re-hashed
-    fn source_trust(src: &SyncRef, opts: SyncOptions) -> (odf::dataset::AppendValidation, bool) {
+    fn source_trust(src: &SyncRef, opts: SyncOptions) -> SourceTrust {
         let trust_source = opts.trust_source.unwrap_or(src.is_local());
         let validation = if trust_source {
             odf::dataset::AppendValidation::None
         } else {
             odf::dataset::AppendValidation::Full
         };
-        (validation, trust_source)
+        SourceTrust {
+            validation,
+            trust_hashes: trust_source,
+        }
     }
 
     fn source_dataset(src: &SyncRef) -> Arc<dyn odf::Dataset> {
@@ -85,7 +87,7 @@ impl SyncServiceImpl {
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let (validation, trust_source_hashes) = Self::source_trust(&src, opts);
+        let trust = Self::source_trust(&src, opts);
 
         tracing::info!("Starting sync using Simple Transfer Protocol");
 
@@ -94,8 +96,8 @@ impl SyncServiceImpl {
                 &src.as_internal_any_ref(),
                 Self::source_dataset(&src),
                 dst.dataset,
-                validation,
-                trust_source_hashes,
+                trust.validation,
+                trust.trust_hashes,
                 opts.force,
                 SimpleProtocolTransferOptions::default(),
                 listener,
@@ -111,7 +113,7 @@ impl SyncServiceImpl {
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncTransfer, SyncError> {
-        let (validation, trust_source_hashes) = Self::source_trust(&src, opts);
+        let trust = Self::source_trust(&src, opts);
 
         tracing::info!("Starting transfer using Simple Transfer Protocol");
 
@@ -120,8 +122,8 @@ impl SyncServiceImpl {
                 &src.as_internal_any_ref(),
                 Self::source_dataset(&src),
                 dst,
-                validation,
-                trust_source_hashes,
+                trust.validation,
+                trust.trust_hashes,
                 opts.force,
                 SimpleProtocolTransferOptions {
                     visibility_for_created_dataset: opts.dataset_visibility,
@@ -197,25 +199,29 @@ impl SyncServiceImpl {
         opts: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
         // Resolve key
-        let key_id = match (dst_url.host_str(), dst_url.path()) {
-            (Some(h), "" | "/") => Ok(h),
-            _ => Err("Malformed IPFS URL".int_err()),
-        }?;
+        let invalid_destination = |reason: String| InvalidSyncDestinationError {
+            dst_ref: odf::DatasetRefAny::Url(Arc::new(dst_url.clone())),
+            reason,
+        };
+
+        let (Some(key_id), "" | "/") = (dst_url.host_str(), dst_url.path()) else {
+            return Err(invalid_destination("malformed IPFS URL".to_owned()).into());
+        };
 
         let Some(key) = self.ipfs_service.find_ipns_key(key_id).await? else {
-            return Err(format!("IPFS does not have a key with ID {key_id}")
-                .int_err()
-                .into());
+            return Err(
+                invalid_destination(format!("IPFS does not have a key with ID {key_id}")).into(),
+            );
         };
 
         tracing::info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
 
         // Resolve and compare heads
-        let src_head = src_dataset
-            .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
-            .await
-            .int_err()?;
+        let src_head = try_resolve_head(src_dataset.as_metadata_chain())
+            .await?
+            .ok_or_else(|| {
+                DatasetAnyRefUnresolvedError::new(src_dataset.get_handle().as_any_ref())
+            })?;
 
         // If we try to access the IPNS key via HTTP gateway right away this may take a
         // very long time if the key does not exist, as IPFS will be reaching
@@ -527,6 +533,14 @@ impl SyncService for SyncServiceImpl {
         self.transfer_into_local_impl(request.src, &request.dst, options, listener)
             .await
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Whether a source's blocks are validated and its hashes recomputed
+struct SourceTrust {
+    validation: odf::dataset::AppendValidation,
+    trust_hashes: bool,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -18,8 +18,21 @@ use url::Url;
 #[dill::component]
 #[dill::interface(dyn SmartTransferProtocolClient)]
 pub struct WsSmartTransferProtocolClient {
-    pub(super) catalog: dill::Catalog,
-    pub(super) dataset_credential_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
+    catalog: dill::Catalog,
+    dataset_credential_resolver: Arc<dyn odf::dataset::OdfServerAccessTokenResolver>,
+}
+
+impl WsSmartTransferProtocolClient {
+    /// The catalog a pulled dataset is created from
+    pub(super) fn catalog(&self) -> &dill::Catalog {
+        &self.catalog
+    }
+
+    /// The access token this node holds for the server at `url`
+    pub(super) fn access_token(&self, url: &Url) -> Option<String> {
+        self.dataset_credential_resolver
+            .resolve_odf_dataset_access_token(url)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

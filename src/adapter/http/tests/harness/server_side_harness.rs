@@ -64,6 +64,13 @@ pub(crate) trait ServerSideHarness {
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
 
+    /// Taken before `api_server_run`, which consumes the harness
+    fn stored_heads(&self) -> StoredHeads {
+        StoredHeads {
+            dataset_reference_service: self.cli_dataset_reference_service(),
+        }
+    }
+
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url;
 
     fn dataset_url(&self, dataset_alias: &odf::DatasetAlias) -> Url {
@@ -150,6 +157,22 @@ pub(crate) fn create_web_user_catalog(
     }
 
     web_catalog_builder.build()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Reads the `HEAD` stored on the server
+pub(crate) struct StoredHeads {
+    dataset_reference_service: Arc<dyn DatasetReferenceService>,
+}
+
+impl StoredHeads {
+    pub async fn get(&self, dataset_id: &odf::DatasetID) -> odf::Multihash {
+        self.dataset_reference_service
+            .get_reference(dataset_id, &odf::BlockRef::Head)
+            .await
+            .unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

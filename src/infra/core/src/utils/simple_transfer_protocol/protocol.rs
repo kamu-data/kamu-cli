@@ -14,6 +14,7 @@ use kamu_core::utils::metadata_chain_comparator::ChainWithHead;
 use kamu_core::*;
 use odf::dataset::MetadataChainExt as _;
 
+use super::collect_blocks::NewBlocks;
 use super::progress::CompareChainsListenerAdapter;
 use crate::utils::local_sync_writes::*;
 use crate::utils::sync_increment::sync_increment;
@@ -76,7 +77,10 @@ impl SimpleTransferProtocol {
         let dst_head = try_resolve_head(dst.as_metadata_chain()).await?;
 
         let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
-        let Some((src_head, blocks_desc_ordered)) = Self::collect_new_blocks(
+        let Some(NewBlocks {
+            src_head,
+            blocks_desc_ordered,
+        }) = Self::collect_new_blocks(
             src_ref,
             src.as_metadata_chain(),
             dst_head.as_ref().map(|head| ChainWithHead {
@@ -105,6 +109,7 @@ impl SimpleTransferProtocol {
                 trust_source_hashes,
                 listener.clone(),
                 &transfer_options,
+                num_blocks,
                 listener_adapter.into_status(),
             )
             .await?;
@@ -156,7 +161,10 @@ impl SimpleTransferProtocol {
         let dst_head = dst_chain.map(|dst| dst.head);
 
         let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
-        let Some((src_head, mut blocks_desc_ordered)) = Self::collect_new_blocks(
+        let Some(NewBlocks {
+            src_head,
+            mut blocks_desc_ordered,
+        }) = Self::collect_new_blocks(
             src_ref,
             src.as_metadata_chain(),
             dst_chain,
@@ -171,7 +179,10 @@ impl SimpleTransferProtocol {
         let num_blocks = u64::try_from(blocks_desc_ordered.len()).unwrap();
 
         // Safety: there are blocks, oldest last
-        let (dst_dataset, target) = prepare_transfer_target(
+        let TransferTarget {
+            storage: dst_dataset,
+            target,
+        } = prepare_transfer_target(
             &self.catalog,
             dst,
             transfer_options.visibility_for_created_dataset,
@@ -187,6 +198,7 @@ impl SimpleTransferProtocol {
                 trust_source_hashes,
                 listener.clone(),
                 &transfer_options,
+                num_blocks,
                 listener_adapter.into_status(),
             )
             .await?;

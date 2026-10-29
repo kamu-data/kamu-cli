@@ -195,13 +195,13 @@ pub enum DatasetPushMetadataError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Rewriting seed block is restricted
+/// Error: the push would replace the destination's Seed block
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushMetadataSeedBlockOverwriteRestrictedError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push phase 2: object transfer response
+/// Push phase 1: push metadata response
 pub type DatasetPushMetadataResponse =
     Result<DatasetPushMetadataAccepted, DatasetPushMetadataError>;
 
@@ -240,7 +240,7 @@ pub enum DatasetPushObjectsTransferError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Dataset with such id already exists with different alias
+/// Error: a dataset with the pushed dataset's ID exists under another alias
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRefCollisionError {
     pub dataset_id: odf::DatasetID,
@@ -248,7 +248,7 @@ pub struct DatasetPushObjectsTransferRefCollisionError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Dataset with such id already exists
+/// Error: another dataset already has the alias pushed to
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferNameCollisionError {
     pub dataset_alias: odf::DatasetAlias,
@@ -310,7 +310,7 @@ pub struct DatasetPushComplete {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Push stage 3: complete handshake acknowledge
+/// Push stage 4: complete handshake acknowledge
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
 

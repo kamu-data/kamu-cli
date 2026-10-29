@@ -14,6 +14,7 @@ use dill::*;
 use internal_error::InternalError;
 use kamu_core::*;
 
+use super::pull_authorization::{AuthorizedIteration, PullAuthorization};
 use super::pull_ingest_loop::PullIngestLoop;
 use super::pull_sync_job::PullSyncJob;
 use super::pull_transform_job::PullTransformJob;
@@ -29,7 +30,7 @@ pub struct PullDatasetUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
     polling_ingest_service: Arc<dyn PollingIngestService>,
     update_steps: Arc<dyn DatasetUpdateSteps>,
-    pub(super) catalog: dill::Catalog,
+    catalog: dill::Catalog,
 }
 
 impl PullDatasetUseCaseImpl {
@@ -59,13 +60,13 @@ impl PullDatasetUseCaseImpl {
         for iteration in plan {
             tracing::info!(depth = %iteration.depth, jobs = ?iteration.jobs, "Running pull iteration");
 
-            // Authorization checks for this iteration
-            let (iteration, write_errors, read_errors) =
-                self.make_authorization_checks(iteration).await?;
+            let AuthorizedIteration { iteration, denied } =
+                PullAuthorization::new(self.catalog.clone())
+                    .authorize(iteration)
+                    .await?;
 
-            if !write_errors.is_empty() || !read_errors.is_empty() {
-                results.extend(write_errors);
-                results.extend(read_errors);
+            if !denied.is_empty() {
+                results.extend(denied);
                 break;
             }
 
@@ -77,21 +78,18 @@ impl PullDatasetUseCaseImpl {
                         let maybe_listener = maybe_ingest_multi_listener
                             .as_ref()
                             .and_then(|l| l.begin_ingest(&pii.target));
-                        tasks.spawn(Self::ingest(
-                            pii,
-                            options.ingest_options.clone(),
-                            options.exhaust_sources,
+                        tasks.spawn(
                             PullIngestLoop::new(
                                 self.update_steps.clone(),
                                 self.polling_ingest_service.clone(),
-                            ),
-                            maybe_listener,
-                        ))
+                            )
+                            .run(pii, options.clone(), maybe_listener),
+                        )
                     }
                     PullPlanIterationJob::Transform(pti) => {
                         let maybe_listener = maybe_transform_multi_listener
                             .as_ref()
-                            .and_then(|l| l.begin_transform(pti.target.get_handle()));
+                            .and_then(|l| l.begin_transform(&pti.target));
 
                         tasks.spawn(
                             PullTransformJob::new(
@@ -143,79 +141,25 @@ impl PullDatasetUseCaseImpl {
         Ok(results)
     }
 
-    async fn ingest(
-        pii: PullIngestItem,
-        ingest_options: PollingIngestOptions,
-        exhaust_sources: bool,
-        ingest_loop: PullIngestLoop,
-        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
-    ) -> Result<PullResponse, InternalError> {
-        let target_handle = &pii.target;
-
-        let result = ingest_loop
-            .run(
-                target_handle,
-                ingest_options,
-                exhaust_sources,
-                maybe_listener,
-            )
-            .await
-            .map(Into::into);
-
-        Ok(PullResponse {
-            maybe_original_request: pii.maybe_original_request,
-            maybe_local_ref: Some(target_handle.as_local_ref()),
-            maybe_remote_ref: None,
-            result,
-        })
-    }
-
     #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
     async fn build_plan_for_requests(
         &self,
         requests: &[PullRequest],
         options: &PullOptions,
-    ) -> Result<
-        (
-            Vec<kamu_core::PullPlanIteration>,
-            Vec<kamu_core::PullResponse>,
-        ),
-        InternalError,
-    > {
-        let res = pull_request_planner
+    ) -> Result<PullPlan, InternalError> {
+        Ok(pull_request_planner
             .build_pull_multi_plan(requests, options, *self.tenancy_config)
-            .await;
-
-        // Detach plan entities from current transaction
-        // to be able to commit it and manage them in iterations separately
-        for iteration in &res.0 {
-            iteration.detach_from_transaction();
-        }
-        Ok(res)
+            .await)
     }
 
     #[transactional_method1(pull_request_planner: Arc<dyn PullRequestPlanner>)]
     async fn build_plan_for_all_owned_datasets(
         &self,
         options: &PullOptions,
-    ) -> Result<
-        (
-            Vec<kamu_core::PullPlanIteration>,
-            Vec<kamu_core::PullResponse>,
-        ),
-        InternalError,
-    > {
-        let res = pull_request_planner
+    ) -> Result<PullPlan, InternalError> {
+        pull_request_planner
             .build_pull_plan_all_owner_datasets(options, *self.tenancy_config)
-            .await?;
-
-        // Detach plan entities from current transaction
-        // to be able to commit it and manage them in iterations separately
-        for iteration in &res.0 {
-            iteration.detach_from_transaction();
-        }
-
-        Ok(res)
+            .await
     }
 }
 
@@ -258,12 +202,12 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?requests, ?options, "Performing pull");
 
-        let (plan, errors) = self
+        let PullPlan { iterations, errors } = self
             .build_plan_for_requests(requests.as_slice(), &options)
             .await?;
 
         tracing::info!(
-            num_steps = plan.len(),
+            num_steps = iterations.len(),
             num_errors = errors.len(),
             "Prepared pull execution plan"
         );
@@ -271,7 +215,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             return Ok(errors);
         }
 
-        self.pull_by_plan(plan, options, listener).await
+        self.pull_by_plan(iterations, options, listener).await
     }
 
     #[tracing::instrument(
@@ -287,10 +231,11 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         tracing::info!(?options, "Performing pull (all owned)");
 
-        let (plan, errors) = self.build_plan_for_all_owned_datasets(&options).await?;
+        let PullPlan { iterations, errors } =
+            self.build_plan_for_all_owned_datasets(&options).await?;
 
         tracing::info!(
-            num_steps = plan.len(),
+            num_steps = iterations.len(),
             num_errors = errors.len(),
             "Prepared pull execution plan (all owned)"
         );
@@ -298,7 +243,7 @@ impl PullDatasetUseCase for PullDatasetUseCaseImpl {
             return Ok(errors);
         }
 
-        self.pull_by_plan(plan, options, listener).await
+        self.pull_by_plan(iterations, options, listener).await
     }
 }
 

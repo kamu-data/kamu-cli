@@ -42,12 +42,13 @@ Recommendation: for ease of reading, use the following format:
 - `kamu pull --reset-derivatives-on-diverged-input` reports a reset derivative as updated, even when
   the transform that follows the reset has no new data to process
 - Update tasks that pull a dataset from a remote no longer retry failures that a retry cannot fix,
-  such as diverged histories, an unknown repository or a missing remote dataset; network and other
-  transient failures are still retried
+  such as diverged histories, an unknown repository, a missing remote dataset or a remote dataset
+  named by ID; network and other transient failures are still retried
 - `kamu pull` of a dataset whose pull alias names an unknown repository fails with "Repository …
-  does not exist" instead of an internal error
-- Upgrading clears the history of tasks and flow runs. Flow configurations and triggers are kept,
-  and enabled flows are scheduled again when the node starts
+  does not exist", and one whose pull alias names a remote dataset by ID fails with "Syncing remote
+  dataset by ID is not yet supported: …", instead of an internal error
+- Upgrading clears the history of tasks and flow runs, including pending manual runs. Flow
+  configurations and triggers are kept, and enabled flows are scheduled again when the node starts
 - GraphQL (breaking): `FlowDescriptionUpdateResultUnknown` is removed from
   `FlowDescriptionUpdateResult`; a flow that updated a dataset always reports the blocks and
   records it added
@@ -57,15 +58,17 @@ Recommendation: for ease of reading, use the following format:
   update tasks no longer retry a pull whose server sends metadata that cannot be read
 - `kamu pull` of several datasets no longer pulls none of them when the remote of one is unknown
   or cannot be reached; that dataset fails on its own
-- Planning a pull or an update task no longer holds a database transaction while it contacts a
-  remote repository
+- A slow or unreachable remote repository no longer delays other writers to the node's database
+  while `kamu pull` or an update task prepares to pull from it
+- Compaction tasks of a derived dataset, and reset tasks whose expected old head no longer matches,
+  fail without retries
 ### Fixed
 - `kamu pull` no longer shows an ingest or a transform as successful when its commit then fails
   because the dataset's head moved
 - When `kamu pull --reset-derivatives-on-diverged-input` resets a derivative and the transform that
   follows fails, the error now says that the dataset was reset to its metadata
-- A dataset created by `kamu pull` from a remote is no longer left without its pull alias when
-  saving the alias fails: the pull fails and the dataset is not created
+- A first `kamu pull` from a remote that fails, including when saving the pull alias fails, no
+  longer leaves a dataset behind: the dataset appears only once the pull succeeds
 - `kamu push` over the smart protocol fails with "Dataset was updated concurrently" when the remote
   head moved before the push started, instead of an internal error
 - `kamu push` over the smart protocol onto a remote with a diverged history reports the histories as
@@ -73,13 +76,14 @@ Recommendation: for ease of reading, use the following format:
 - Update tasks that pull over the smart protocol retry a failed object download, such as an expired
   download link, instead of failing as a corrupted source
 - A malformed reply during a smart protocol transfer fails the transfer instead of crashing the
-  client or the server's connection; a push to a dataset ID that does not exist gets "not found"
+  client or the server's connection
+- `kamu push` over the smart protocol to a dataset ID that does not exist fails with "not found"
 - In a multi-tenant workspace, `kamu pull` from a remote no longer picks another account's dataset
   that has the same pull alias, which failed the pull and revealed that dataset's name
 - `kamu pull` of a remote dataset by ID without a local name fails with an error asking for the
   destination instead of crashing
-- Update and compaction tasks of a dataset deleted after they were scheduled fail without retries
-  instead of crashing
+- Update, compaction and reset tasks of a dataset deleted after they were scheduled fail without
+  retries, instead of being retried or crashing
 - When `kamu pull` or `kamu system compact` fails for some datasets, the datasets that did update
   are now fully processed before the command exits, instead of on the next command
 - `POST /query` no longer fails with "Response signing is not enabled" on nodes without a signing key.

@@ -14,7 +14,7 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use datafusion::arrow::datatypes::Schema;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::ErrorIntoInternal;
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::{
     DataFormatRegistryImpl,
@@ -39,6 +39,7 @@ use kamu_adapter_task_dataset::{
     TaskErrorDatasetUpdate,
     TaskResultDatasetUpdate,
     UpdateDatasetTaskRunner,
+    UpdateTargetMissingError,
 };
 use kamu_core::engine::TransformResponseExt;
 use kamu_core::testing::{MockIngestIteration, ReportedHeads};
@@ -606,7 +607,7 @@ fn test_sync_into_missing_dataset_is_not_an_update_task_job() {
 
     assert_matches!(
         UpdateDatasetTaskRunnerHarness::sync_job_into_new(&alias_bar),
-        Err(_)
+        Err(UpdateTargetMissingError { alias }) if alias == alias_bar
     );
 }
 
@@ -659,6 +660,66 @@ async fn test_sync_head_moved_concurrently_fails_recoverably() {
     );
     assert!(outcome.is_recoverable_failure());
     assert_eq!(harness.get_head(&foo).await, concurrent_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_commit_not_allowed_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let synced_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_syncing(&alias_foo, Some(&synced_heads));
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let synced_head = harness.append_unreferenced_block(&foo, "synced").await;
+    synced_heads.set(&foo.head, &synced_head);
+    harness.deny_next_commit();
+
+    let outcome = harness.run_sync_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_ingest_commit_not_allowed_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let reported_heads = ReportedHeads::default();
+
+    let harness = UpdateDatasetTaskRunnerHarness::new(UpdateDatasetTaskRunnerMocks {
+        mock_polling_ingest_service: MockPollingIngestService::new()
+            .make_expect_ingest_updated(alias_foo.clone(), reported_heads.clone()),
+        ..UpdateDatasetTaskRunnerMocks::default()
+    });
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    let ingested_head = harness.append_unreferenced_block(&foo, "ingested").await;
+    reported_heads.set(&foo.head, &ingested_head);
+    harness.deny_next_commit();
+
+    let outcome = harness.run_ingest_update(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Failed(TaskError::empty_unrecoverable()),
+        outcome
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_head_moved_without_heads_fails_recoverably() {
+    let outcome = UpdateDatasetTaskRunnerHarness::run_sync_failing_with(|| {
+        SyncError::HeadMoved(SyncHeadMovedError::unreported())
+    })
+    .await;
+
+    assert_eq!(TaskOutcome::Failed(TaskError::empty_recoverable()), outcome);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -956,6 +1017,10 @@ impl UpdateDatasetTaskRunnerHarness {
             .move_head_before_next_commit(concurrent_head);
     }
 
+    fn deny_next_commit(&self) {
+        self.racing_committer.deny_next_commit();
+    }
+
     /// Writes the file a polling source reads, in the harness's directory
     fn write_source_file(&self, contents: &str) -> PathBuf {
         let path = self.temp_dir_path().join("data.csv");
@@ -1006,7 +1071,9 @@ impl UpdateDatasetTaskRunnerHarness {
 
     /// Converts a planned sync into a dataset `alias` that does not exist yet
     /// into an update task job
-    fn sync_job_into_new(alias: &odf::DatasetAlias) -> Result<DatasetUpdateJob, InternalError> {
+    fn sync_job_into_new(
+        alias: &odf::DatasetAlias,
+    ) -> Result<DatasetUpdateJob, UpdateTargetMissingError> {
         DatasetUpdateJob::try_from(PullPlanIterationJob::Sync(PullSyncItem {
             local_target: PullLocalTarget::to_create(alias.clone()),
             remote_ref: Self::sync_remote_ref(alias),

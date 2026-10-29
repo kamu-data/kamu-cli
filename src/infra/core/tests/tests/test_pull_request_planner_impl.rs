@@ -1043,7 +1043,7 @@ impl PullTestHarness {
         Self {
             base_repo_harness,
             calls,
-            local_sync_helper: LocalSyncHelper::new(catalog.clone()),
+            local_sync_helper: LocalSyncHelper::new(&catalog),
             remote_repo_reg: catalog.get_one().unwrap(),
             remote_alias_reg: catalog.get_one().unwrap(),
             pull_request_planner: catalog.get_one().unwrap(),
@@ -1079,7 +1079,7 @@ impl PullTestHarness {
         requests: Vec<PullRequest>,
         options: PullOptions,
     ) -> Result<Vec<Vec<PullJob>>, Vec<PullResponse>> {
-        let (plan_iterations, errors) = self
+        let PullPlan { iterations, errors } = self
             .pull_request_planner
             .build_pull_multi_plan(&requests, &options, self.tenancy_config)
             .await;
@@ -1087,7 +1087,7 @@ impl PullTestHarness {
             return Err(errors);
         }
 
-        for iteration in plan_iterations {
+        for iteration in iterations {
             let mut jobs = Vec::new();
             for job in iteration.jobs {
                 match job {
@@ -1095,7 +1095,7 @@ impl PullTestHarness {
                         jobs.push(PullJob::Ingest(pii.target.as_any_ref()));
                     }
                     PullPlanIterationJob::Transform(pti) => {
-                        jobs.push(PullJob::Transform(pti.target.get_handle().as_any_ref()));
+                        jobs.push(PullJob::Transform(pti.target.as_any_ref()));
                     }
                     PullPlanIterationJob::Sync(psi) => {
                         jobs.push(PullJob::Sync((

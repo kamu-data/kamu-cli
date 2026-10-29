@@ -187,6 +187,17 @@ pub enum ScanMetadataError {
     ),
 }
 
+impl ScanMetadataError {
+    /// Whether scanning again could succeed. A missing source needs a change
+    /// of metadata first; a block not found yet may be written by then.
+    pub fn is_recoverable(&self) -> bool {
+        match self {
+            Self::SourceNotFound(_) => false,
+            Self::HeadNotFound(_) | Self::Internal(_) => true,
+        }
+    }
+}
+
 impl From<odf::dataset::AcceptVisitorError<ScanMetadataError>> for ScanMetadataError {
     fn from(v: odf::dataset::AcceptVisitorError<ScanMetadataError>) -> Self {
         match v {

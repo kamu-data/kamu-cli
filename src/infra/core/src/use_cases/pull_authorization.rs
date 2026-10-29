@@ -20,33 +20,48 @@ use kamu_datasets::{
     DatasetActionAuthorizer,
 };
 
-use super::PullDatasetUseCaseImpl;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Authorization of a pull iteration: writing every target, reading every
-/// input of a transform
-impl PullDatasetUseCaseImpl {
+/// Authorizes a pull iteration: writing every target, reading every input of
+/// a transform
+pub(crate) struct PullAuthorization {
+    catalog: dill::Catalog,
+}
+
+/// The jobs of an iteration that may run, and the responses of those denied
+pub(crate) struct AuthorizedIteration {
+    pub iteration: PullPlanIteration,
+    pub denied: Vec<PullResponse>,
+}
+
+impl PullAuthorization {
+    pub(crate) fn new(catalog: dill::Catalog) -> Self {
+        Self { catalog }
+    }
+
+    /// Write denials come before read denials
     #[transactional_method1(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>)]
-    pub(super) async fn make_authorization_checks(
+    pub(crate) async fn authorize(
         &self,
         iteration: PullPlanIteration,
-    ) -> Result<(PullPlanIteration, Vec<PullResponse>, Vec<PullResponse>), InternalError> {
-        let (iteration, write_errors) = self
-            .make_authorization_write_checks(iteration, dataset_action_authorizer.clone())
-            .await?;
-        let (iteration, read_errors) = self
-            .make_authorization_read_checks(iteration, dataset_action_authorizer)
-            .await?;
-        Ok((iteration, write_errors, read_errors))
+    ) -> Result<AuthorizedIteration, InternalError> {
+        let writes = Self::authorize_writes(iteration, dataset_action_authorizer.as_ref()).await?;
+        let reads =
+            Self::authorize_reads(writes.iteration, dataset_action_authorizer.as_ref()).await?;
+
+        let mut denied = writes.denied;
+        denied.extend(reads.denied);
+        Ok(AuthorizedIteration {
+            iteration: reads.iteration,
+            denied,
+        })
     }
 
     #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::write_authorizations", skip_all, fields(?iteration))]
-    async fn make_authorization_write_checks(
-        &self,
+    async fn authorize_writes(
         iteration: PullPlanIteration,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
+        dataset_action_authorizer: &dyn DatasetActionAuthorizer,
+    ) -> Result<AuthorizedIteration, InternalError> {
         let mut written_datasets = Vec::with_capacity(iteration.jobs.len());
         let mut written_jobs_by_handle = HashMap::with_capacity(iteration.jobs.len());
         let mut other_jobs = Vec::new();
@@ -61,13 +76,13 @@ impl PullDatasetUseCaseImpl {
         }
 
         if written_datasets.is_empty() {
-            return Ok((
-                PullPlanIteration {
+            return Ok(AuthorizedIteration {
+                iteration: PullPlanIteration {
                     depth: iteration.depth,
                     jobs: other_jobs,
                 },
-                Vec::new(),
-            ));
+                denied: Vec::new(),
+            });
         }
 
         let ClassifyByAllowanceResponse {
@@ -101,21 +116,20 @@ impl PullDatasetUseCaseImpl {
             })
             .collect();
 
-        Ok((
-            PullPlanIteration {
+        Ok(AuthorizedIteration {
+            iteration: PullPlanIteration {
                 depth: iteration.depth,
                 jobs: okay_jobs,
             },
-            unauthorized_responses,
-        ))
+            denied: unauthorized_responses,
+        })
     }
 
     #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::read_authorizations", skip_all, fields(?iteration))]
-    async fn make_authorization_read_checks(
-        &self,
+    async fn authorize_reads(
         iteration: PullPlanIteration,
-        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
-    ) -> Result<(PullPlanIteration, Vec<PullResponse>), InternalError> {
+        dataset_action_authorizer: &dyn DatasetActionAuthorizer,
+    ) -> Result<AuthorizedIteration, InternalError> {
         let mut read_datasets = Vec::new();
         let mut reading_jobs = Vec::with_capacity(iteration.jobs.len());
         let mut other_jobs = Vec::with_capacity(iteration.jobs.len());
@@ -131,13 +145,13 @@ impl PullDatasetUseCaseImpl {
         }
 
         if read_datasets.is_empty() {
-            return Ok((
-                PullPlanIteration {
+            return Ok(AuthorizedIteration {
+                iteration: PullPlanIteration {
                     depth: iteration.depth,
                     jobs: other_jobs,
                 },
-                Vec::new(),
-            ));
+                denied: Vec::new(),
+            });
         }
 
         let ClassifyByAllowanceResponse {
@@ -151,13 +165,13 @@ impl PullDatasetUseCaseImpl {
             let mut all_jobs = Vec::with_capacity(reading_jobs.len() + other_jobs.len());
             all_jobs.extend(reading_jobs);
             all_jobs.extend(other_jobs);
-            return Ok((
-                PullPlanIteration {
+            return Ok(AuthorizedIteration {
+                iteration: PullPlanIteration {
                     jobs: all_jobs,
                     depth: iteration.depth,
                 },
-                vec![],
-            ));
+                denied: vec![],
+            });
         }
 
         let mut unauthorized_handles_to_errors: HashMap<
@@ -195,13 +209,13 @@ impl PullDatasetUseCaseImpl {
             }
         }
 
-        Ok((
-            PullPlanIteration {
+        Ok(AuthorizedIteration {
+            iteration: PullPlanIteration {
                 depth: iteration.depth,
                 jobs: okay_jobs,
             },
-            unauthorized_responses,
-        ))
+            denied: unauthorized_responses,
+        })
     }
 }
 

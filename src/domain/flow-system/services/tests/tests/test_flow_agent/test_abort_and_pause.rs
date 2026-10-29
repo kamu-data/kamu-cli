@@ -18,7 +18,6 @@ use odf::dataset::MetadataChainIncrementInterval;
 use crate::tests::{
     FlowHarness,
     FlowHarnessOverrides,
-    FlowSystemTestListener,
     ManualFlowAbortArgs,
     ManualFlowActivationArgs,
     TaskDriverArgs,
@@ -61,7 +60,7 @@ async fn test_dataset_deleted() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -270,7 +269,7 @@ async fn test_abort_flow_before_scheduling_tasks() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -365,7 +364,7 @@ async fn test_abort_flow_after_scheduling_still_waiting_for_executor() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -465,7 +464,7 @@ async fn test_abort_flow_after_task_running_has_started() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -673,7 +672,7 @@ async fn test_abort_flow_after_task_finishes() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -847,7 +846,7 @@ async fn test_abort_flow_waiting_for_retry() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -953,7 +952,7 @@ async fn test_pause_trigger_while_flow_waits_for_executor() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -1011,7 +1010,7 @@ async fn test_abort_flow_waiting_in_throttling() {
 
     let foo_flow_binding = ingest_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness

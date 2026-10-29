@@ -17,7 +17,6 @@ use kamu_task_system::*;
 use crate::tests::{
     FlowHarness,
     FlowHarnessOverrides,
-    FlowSystemTestListener,
     ManualFlowActivationArgs,
     SCHEDULING_ALIGNMENT_MS,
     TaskDriverArgs,
@@ -56,7 +55,7 @@ async fn test_manual_trigger() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -279,7 +278,7 @@ async fn test_manual_ingest_with_compaction_trigger() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -425,7 +424,7 @@ async fn test_manual_trigger_compaction() {
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -579,7 +578,7 @@ async fn test_manual_trigger_reset() {
 
     let foo_flow_binding = reset_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -674,7 +673,7 @@ async fn test_manual_trigger_reset_to_metadata() {
 
     let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -848,7 +847,7 @@ async fn test_reset_trigger_derivatives_reactively() {
 
     let foo_flow_binding = reset_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
@@ -1014,7 +1013,7 @@ async fn test_manual_trigger_compaction_with_config() {
 
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -1176,7 +1175,7 @@ async fn test_hard_compaction_trigger_derivatives_reactively() {
 
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener.define_dataset_display_name(foo_baz_id.clone(), "foo_baz".to_string());
@@ -1390,7 +1389,7 @@ async fn test_manual_trigger_keep_metadata_only_with_reactive_updates() {
 
     let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener
@@ -1634,7 +1633,7 @@ async fn test_manual_trigger_keep_metadata_only_without_reactive_updates() {
 
     let foo_flow_binding = reset_to_metadata_dataset_binding(&foo_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(foo_bar_id.clone(), "foo_bar".to_string());
     test_flow_listener
@@ -1740,7 +1739,7 @@ async fn test_throttling_manual_triggers() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script

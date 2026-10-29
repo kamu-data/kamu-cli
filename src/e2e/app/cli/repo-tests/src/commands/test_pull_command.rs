@@ -214,10 +214,14 @@ pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet)
         .join("config");
     std::fs::create_dir_all(&alias_config_path).unwrap();
 
+    let sync_failure = format!(
+        "Failed to sync {dataset_name} from {}",
+        regex::escape(dataset_url.as_str())
+    );
     kamu.assert_failure_command_execution(
         ["pull", dataset_url.as_str()],
         None,
-        Some([r#"Failed to update 1 dataset\(s\)"#]),
+        Some([r#"Failed to update 1 dataset\(s\)"#, sync_failure.as_str()]),
     )
     .await;
     std::fs::remove_dir_all(&alias_config_path).unwrap();

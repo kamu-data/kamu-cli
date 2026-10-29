@@ -209,7 +209,7 @@ async fn do_test_sync(
     );
 
     assert_matches!(
-        LocalSyncHelper::new(catalog_bar.clone())
+        LocalSyncHelper::new(&catalog_bar)
             .pull(
                 pull_ref.clone(),
                 dataset_alias_bar.as_local_ref(),
@@ -266,7 +266,7 @@ async fn do_test_sync(
         } if new_head == b1
     );
 
-    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
         .pull(
             pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
@@ -301,7 +301,7 @@ async fn do_test_sync(
     )
     .await;
 
-    let sync_err = LocalSyncHelper::new(catalog_foo.clone())
+    let sync_err = LocalSyncHelper::new(&catalog_foo)
         .pull(
             pull_ref.clone(),
             dataset_alias_foo.as_local_ref(),
@@ -343,7 +343,7 @@ async fn do_test_sync(
         } if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
         .pull(
             pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
@@ -380,7 +380,7 @@ async fn do_test_sync(
         .unwrap();
     assert_matches!(sync_result, SyncResult::UpToDate,);
 
-    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
         .pull(
             pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
@@ -473,7 +473,7 @@ async fn do_test_sync(
     );
 
     // Try pulling dataset_bar: should fail, destination is ahead
-    let sync_err = LocalSyncHelper::new(catalog_bar.clone())
+    let sync_err = LocalSyncHelper::new(&catalog_bar)
         .pull(
             pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
@@ -494,7 +494,7 @@ async fn do_test_sync(
     );
 
     // Try pulling dataset_bar with --force: should abandon diverged_head
-    let sync_result = LocalSyncHelper::new(catalog_bar.clone())
+    let sync_result = LocalSyncHelper::new(&catalog_bar)
         .pull(
             pull_ref.clone(),
             dataset_alias_bar.as_local_ref(),
@@ -631,7 +631,7 @@ async fn do_test_sync(
             if src_dataset_id == stored_baz.dataset_id && dst_dataset_id == stored_foo.dataset_id
         );
 
-        let sync_err = LocalSyncHelper::new(catalog_foo.clone())
+        let sync_err = LocalSyncHelper::new(&catalog_foo)
             .pull(
                 pull_ref.clone(),
                 dataset_alias_baz.as_local_ref(),
