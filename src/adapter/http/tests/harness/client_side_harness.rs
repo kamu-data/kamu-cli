@@ -178,6 +178,8 @@ impl ClientSideHarness {
         b.add::<SimpleTransferProtocol>();
 
         b.add::<SyncServiceImpl>();
+
+        b.add::<IpfsServiceImpl>();
         b.add::<LocalSyncCommitterImpl>();
         b.add::<SyncRequestBuilder>();
 

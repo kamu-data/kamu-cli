@@ -22,7 +22,7 @@ use super::{CLIError, Command};
 #[dill::interface(dyn Command)]
 pub struct SystemIpfsAddCommand {
     dataset_registry: Arc<dyn DatasetRegistry>,
-    sync_svc: Arc<dyn SyncService>,
+    ipfs_service: Arc<dyn IpfsService>,
 
     #[dill::component(explicit)]
     dataset_ref: odf::DatasetRef,
@@ -38,8 +38,8 @@ impl Command for SystemIpfsAddCommand {
             .map_err(CLIError::failure)?;
 
         let cid = self
-            .sync_svc
-            .ipfs_add(resolved_dataset)
+            .ipfs_service
+            .add_dataset(resolved_dataset)
             .await
             .map_err(CLIError::failure)?;
 

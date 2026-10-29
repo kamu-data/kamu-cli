@@ -48,10 +48,6 @@ pub trait SyncService: Send + Sync {
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncTransfer, SyncError>;
-
-    /// Adds dataset to IPFS and returns the root CID.
-    /// Unlike `sync` it does not do IPNS resolution and publishing.
-    async fn ipfs_add(&self, src: ResolvedDataset) -> Result<String, IpfsAddError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -378,12 +374,10 @@ pub enum SyncError {
     OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
-    /// A remote destination moved its `HEAD` during the sync
-    #[error("Dataset was updated concurrently")]
-    UpdatedConcurrently(#[source] BoxedError),
-    /// A local destination moved its `HEAD` after the sync read it
-    #[error("Dataset head was moved concurrently: {0}")]
-    HeadMoved(odf::dataset::RefCASError),
+    /// The destination moved its `HEAD` after the sync read it, so nothing
+    /// was committed
+    #[error(transparent)]
+    HeadMoved(#[from] SyncHeadMovedError),
     #[error(transparent)]
     Access(
         #[from]
@@ -425,24 +419,9 @@ impl SyncError {
             | Self::Corrupted(_)
             | Self::Access(_) => false,
 
-            Self::UpdatedConcurrently(_) | Self::HeadMoved(_) | Self::Internal(_) => true,
+            Self::HeadMoved(_) | Self::Internal(_) => true,
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum IpfsAddError {
-    #[error(transparent)]
-    UnsupportedIpfsStorageType(#[from] UnsupportedIpfsStorageTypeError),
-
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -522,6 +501,40 @@ pub struct DatasetIdMismatchError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The destination's `HEAD` was not where the sync expected it when the sync
+/// committed
+#[derive(Error, Eq, PartialEq, Debug)]
+pub struct SyncHeadMovedError {
+    /// The expected and actual heads; known for a local destination, a Simple
+    /// protocol push and a stale Smart push, but not reported by a Smart push
+    /// server whose `HEAD` moved while it committed
+    pub heads: Option<odf::dataset::RefCASError>,
+}
+
+impl SyncHeadMovedError {
+    /// A move the destination did not report heads for
+    pub fn unreported() -> Self {
+        Self { heads: None }
+    }
+}
+
+impl From<odf::dataset::RefCASError> for SyncHeadMovedError {
+    fn from(heads: odf::dataset::RefCASError) -> Self {
+        Self { heads: Some(heads) }
+    }
+}
+
+impl std::fmt::Display for SyncHeadMovedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.heads {
+            Some(heads) => write!(f, "Dataset head was moved concurrently: {heads}"),
+            None => write!(f, "Dataset head was moved concurrently"),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 #[error(
     "Destination head {dst_head} is ahead of source head {src_head} by {dst_ahead_size} blocks"
@@ -596,14 +609,6 @@ impl From<IpfsAddError> for SyncError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
-#[error("Dataset storage type '{}' is unsupported for IPFS operations", url.scheme())]
-pub struct UnsupportedIpfsStorageTypeError {
-    pub url: Url,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Overwriting dataset id or type is restricted")]
 pub struct OverwriteSeedBlockError {}
@@ -616,42 +621,37 @@ mod tests {
 
     use super::*;
 
-    fn head(seed: &[u8]) -> odf::Multihash {
-        odf::Multihash::from_digest_sha3_256(seed)
-    }
-
-    fn alias() -> odf::DatasetAlias {
-        odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"))
-    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     #[test]
     fn test_sync_error_recoverability() {
+        let fixtures = SyncErrorFixtures;
         let cases = [
             (SyncError::Internal("connection reset".int_err()), true),
             (
-                SyncError::HeadMoved(odf::dataset::RefCASError {
-                    reference: odf::BlockRef::Head,
-                    expected: Some(head(b"expected")),
-                    actual: Some(head(b"actual")),
-                }),
+                SyncError::HeadMoved(
+                    odf::dataset::RefCASError {
+                        reference: odf::BlockRef::Head,
+                        expected: Some(fixtures.head(b"expected")),
+                        actual: Some(fixtures.head(b"actual")),
+                    }
+                    .into(),
+                ),
                 true,
             ),
-            (
-                SyncError::UpdatedConcurrently("remote head moved".into()),
-                true,
-            ),
+            (SyncError::HeadMoved(SyncHeadMovedError::unreported()), true),
             (
                 SyncError::DatasetsDiverged(DatasetsDivergedError {
-                    src_head: head(b"src"),
-                    dst_head: head(b"dst"),
+                    src_head: fixtures.head(b"src"),
+                    dst_head: fixtures.head(b"dst"),
                     detail: None,
                 }),
                 false,
             ),
             (
                 SyncError::DestinationAhead(DestinationAheadError {
-                    src_head: head(b"src"),
-                    dst_head: head(b"dst"),
+                    src_head: fixtures.head(b"src"),
+                    dst_head: fixtures.head(b"dst"),
                     dst_ahead_size: 1,
                 }),
                 false,
@@ -664,7 +664,9 @@ mod tests {
             ),
             (
                 SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::NameCollision(
-                    kamu_datasets::NameCollisionError { alias: alias() },
+                    kamu_datasets::NameCollisionError {
+                        alias: fixtures.alias(),
+                    },
                 )),
                 false,
             ),
@@ -672,6 +674,20 @@ mod tests {
 
         for (error, recoverable) in cases {
             assert_eq!(error.is_recoverable(), recoverable, "{error:?}");
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    struct SyncErrorFixtures;
+
+    impl SyncErrorFixtures {
+        fn head(&self, seed: &[u8]) -> odf::Multihash {
+            odf::Multihash::from_digest_sha3_256(seed)
+        }
+
+        fn alias(&self) -> odf::DatasetAlias {
+            odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"))
         }
     }
 }

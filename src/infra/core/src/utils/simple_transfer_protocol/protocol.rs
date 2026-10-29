@@ -240,9 +240,7 @@ impl SimpleTransferProtocol {
             .await
             .map_err(|e| match e {
                 E::Append(e) => map_append_batch_error(e),
-                E::SetHead(SetChainRefError::CASFailed(e)) => {
-                    SyncError::UpdatedConcurrently(e.into())
-                }
+                E::SetHead(SetChainRefError::CASFailed(e)) => SyncError::HeadMoved(e.into()),
                 E::SetHead(SetChainRefError::Access(e)) => SyncError::Access(e),
                 E::SetHead(
                     e @ (SetChainRefError::Internal(_) | SetChainRefError::BlockNotFound(_)),

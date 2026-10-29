@@ -95,7 +95,8 @@ the repository model and both protocols. This page does not restate them; read t
 | --- | --- | --- |
 | Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncRequest`, `LocalSyncRequest`, `LocalSyncTarget`, `SyncRef`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
 | Chain comparison | `kamu-core` — [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) | `MetadataChainComparator::compare_chains` → equal / ahead / behind / diverged |
-| Sync service and request builder | `kamu` — [`src/infra/core/src/services/sync/`](../../src/infra/core/src/services/sync) | `SyncServiceImpl` (protocol dispatch, IPFS), `SyncRequestBuilder` |
+| Sync service and request builder | `kamu` — [`src/infra/core/src/services/sync/`](../../src/infra/core/src/services/sync) | `SyncServiceImpl` (protocol dispatch, push to IPNS), `SyncRequestBuilder` |
+| Local IPFS node | `kamu-core` — [`ipfs_service.rs`](../../src/domain/core/src/services/ipfs_service.rs); `kamu` — [`ipfs_service_impl.rs`](../../src/infra/core/src/services/ipfs_service_impl.rs) | `IpfsService` (add a dataset, find an IPNS key, resolve and publish its name), `IpfsServiceImpl`; `kamu system ipfs add` uses it directly |
 | Simple protocol client | `kamu` — [`simple_transfer_protocol/`](../../src/infra/core/src/utils/simple_transfer_protocol) | `SimpleTransferProtocol` |
 | Smart protocol client trait | `kamu` — [`smart_transfer_protocol.rs`](../../src/infra/core/src/utils/smart_transfer_protocol.rs) | `SmartTransferProtocolClient`, `TransferOptions` |
 | Smart protocol client and server | `kamu-adapter-http` — [`src/adapter/http/src/smart_protocol/`](../../src/adapter/http/src/smart_protocol) | `WsSmartTransferProtocolClient`, `AxumServerPullProtocolInstance`, `AxumServerPushProtocolInstance`, messages, `protocol_dataset_helper` |
@@ -248,8 +249,8 @@ sequenceDiagram
    S3; on the local file system, a `head.lock` file created exclusively, then renamed over `head`
    (a lock left by an interrupted writer fails later pushes until it is removed). Storage without
    conditional writes re-reads the head just before an unconditional write, so a change landing in
-   between is lost. A destination that moved since step 1 fails with `UpdatedConcurrently`, also
-   with `force`.
+   between is lost. A destination that moved since step 1 fails with `HeadMoved`, also with
+   `force`.
 
 Objects land before the blocks that reference them, so a failure leaves at most unreferenced
 objects and blocks, never a block with a missing object. A first pull that fails before its commit
@@ -277,7 +278,9 @@ Pushing to `ipns://<key-id>` adds the local dataset directory to the local IPFS 
 ignoring `config` and `info`) and publishes the root CID under that IPNS key. The previous head is
 read through the IPFS HTTP gateway only if the key resolves locally; an equal head re-publishes the
 old CID to keep the IPNS record alive. Only local filesystem datasets can be added. Reading from
-IPFS goes through the gateway as an HTTP Simple protocol source.
+IPFS goes through the gateway as an HTTP Simple protocol source. Every operation on the local
+node goes through `IpfsService`; `SyncServiceImpl` keeps the push logic: head comparison, `force`
+and the increment.
 
 ---
 
@@ -439,6 +442,7 @@ calls it with no transaction held:
 
 | Method | Answer |
 | --- | --- |
+| `has_pull_source` | whether the dataset has any pull alias, several included; reads the alias registry only. `kamu ingest` and setting a watermark refuse such a dataset, since its history comes from the remote; `kamu verify` replays its transforms only when all its inputs exist locally |
 | `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousPullSourceError` with several; reads the alias registry only |
 | `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`; an unknown repository is `RepositoryNotFound` |
 | `resolve_pull_source` | both of the above for one dataset; no production caller yet, kept for the flow that builds sync tasks |
@@ -483,11 +487,11 @@ once at the end, so readers see either the old or the new head. For a local dest
 smart push server uses `AppendDatasetMetadataBatchUseCase`, which does both. Setting `HEAD` posts
 `DatasetReferenceMessage`; the smart push server also posts `DatasetExternallyChangedMessage`.
 
-The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS on a local destination is
-`HeadMoved`, carrying the expected and actual heads. On a remote destination it is
-`UpdatedConcurrently`, for the Simple protocol and the Smart push alike. The Smart push server
-reports it in `InvalidHead`, with both heads, when `HEAD` moved before the push began, and in
-`DatasetPushCompleteResponse`, without heads, when it moved during the commit. Two mappings are
+The variants are in `SyncError` (`sync_service.rs`). A lost `HEAD` CAS is `HeadMoved` on every
+destination, with a `SyncHeadMovedError` that carries the expected and actual heads when they are
+known: always for a local destination and the Simple protocol. The Smart push server reports the
+heads in `InvalidHead` when `HEAD` moved before the push began, and none in
+`DatasetPushCompleteResponse` when it moved during the commit. Two mappings are
 surprising: a Smart-protocol push onto a remote that is ahead fails with `DatasetsDiverged`, not
 `DestinationAhead`; and server-side internal failures reach the client as `Internal` with the
 generic message "Internal error", the cause staying in the server log (the one exception is a
@@ -499,7 +503,7 @@ fails the transfer instead of stopping the process: a download answered with an 
 `Internal`, so it is retried rather than reported as a corrupted source.
 
 `SyncError::is_recoverable` says whether running the same sync again could succeed. A lost CAS
-(`HeadMoved`, `UpdatedConcurrently`) and `Internal`, which also covers network failures, are
+(`HeadMoved`) and `Internal`, which also covers network failures, are
 recoverable; conflicts between the chains and errors in the request are not. `CreateDatasetFailed`
 is recoverable only for a lost CAS or an internal failure. The update task runner turns the flag
 into the recoverability of the failed task.
@@ -528,7 +532,7 @@ into the recoverability of the failed task.
 | Remote to remote | Only `odf+` → `odf+` and remote → `ipns://` are rejected; any other remote-to-remote pair runs through the Simple protocol, and an `odf+` source with a remote destination fails late with `Internal`. `kamu pull` and `kamu push` never build such a request |
 | Created destination | Created by the commit, with its `HEAD` at the last transferred block; a pull that fails before it leaves stored blocks with no `HEAD` and no entry, and the next pull continues into them |
 | Unreferenced objects | A failed or concurrent sync can leave uploaded objects that no block references |
-| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `HeadMoved` on a local destination, `UpdatedConcurrently` on a remote one. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol does not check |
+| `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `HeadMoved`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol does not check |
 | Trusted local source | Local-to-local copies skip validation and hash recomputation |
 
 ---
@@ -540,7 +544,8 @@ into the recoverability of the failed task.
 | Sync types and errors | [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) |
 | Committing a pull into a local dataset | [`local_sync_committer.rs`](../../src/domain/core/src/services/local_sync_committer.rs), [`local_sync_committer_impl.rs`](../../src/infra/core/src/services/sync/local_sync_committer_impl.rs) |
 | `Seed` store and block append shared by both protocols | [`local_sync_writes.rs`](../../src/infra/core/src/utils/local_sync_writes.rs) |
-| Protocol dispatch, IPFS, URL helpers | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
+| Protocol dispatch, push to IPNS, URL helpers | [`sync_service_impl.rs`](../../src/infra/core/src/services/sync/sync_service_impl.rs) |
+| Local IPFS node | [`ipfs_service.rs`](../../src/domain/core/src/services/ipfs_service.rs), [`ipfs_service_impl.rs`](../../src/infra/core/src/services/ipfs_service_impl.rs) |
 | Sync ref resolution | [`sync_request_builder.rs`](../../src/infra/core/src/services/sync/sync_request_builder.rs) |
 | Chain comparison | [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) |
 | Simple protocol client | [`simple_transfer_protocol/`](../../src/infra/core/src/utils/simple_transfer_protocol) |

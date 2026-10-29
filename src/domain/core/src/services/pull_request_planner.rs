@@ -666,7 +666,7 @@ mod tests {
                 true,
             ),
             (
-                PullError::SyncError(SyncError::HeadMoved(fixtures.head_moved())),
+                PullError::SyncError(SyncError::HeadMoved(fixtures.head_moved().into())),
                 true,
             ),
             (PullError::HeadMoved(fixtures.head_moved()), true),

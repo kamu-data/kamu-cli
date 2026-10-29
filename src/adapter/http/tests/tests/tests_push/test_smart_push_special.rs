@@ -9,7 +9,7 @@
 
 use std::assert_matches;
 
-use kamu::domain::{PushError, SyncError};
+use kamu::domain::{PushError, SyncError, SyncHeadMovedError};
 use kamu_adapter_http::smart_protocol::messages::{
     DatasetPushRequest,
     DatasetPushRequestError,
@@ -339,7 +339,9 @@ async fn test_smart_push_head_moved_concurrently() {
         pretty_assertions::assert_eq!(push_responses.len(), 1);
         assert_matches!(
             &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::UpdatedConcurrently(_)))
+            Err(PushError::SyncError(SyncError::HeadMoved(
+                SyncHeadMovedError { heads: None }
+            )))
         );
         pretty_assertions::assert_eq!(
             server_dataset_reference_service
@@ -473,7 +475,9 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
         pretty_assertions::assert_eq!(push_responses.len(), 1);
         assert_matches!(
             &push_responses[0].result,
-            Err(PushError::SyncError(SyncError::UpdatedConcurrently(_)))
+            Err(PushError::SyncError(SyncError::HeadMoved(
+                SyncHeadMovedError { heads: None }
+            )))
         );
         pretty_assertions::assert_eq!(
             server_dataset_reference_service

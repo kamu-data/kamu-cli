@@ -17,6 +17,7 @@ use kamu::testing::{BaseRepoHarness, DummySmartTransferProtocolClient};
 use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
+    IpfsServiceImpl,
     RemoteAliasResolverImpl,
     RemoteAliasesRegistryImpl,
     RemoteDatasetUrlResolverImpl,
@@ -253,6 +254,7 @@ impl RemoteStatusTestHarness {
         let mut b = CatalogBuilder::new_chained(base_repo_harness.catalog());
         b.add::<RemoteStatusServiceImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<SyncRequestBuilder>()
             .add::<DatasetFactoryImpl>()
             .add::<RemoteAliasResolverImpl>()

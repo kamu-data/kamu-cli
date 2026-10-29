@@ -45,6 +45,15 @@ impl DatasetPullSourceResolverImpl {
 #[async_trait::async_trait]
 impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {
     #[tracing::instrument(level = "debug", skip_all, fields(?target))]
+    async fn has_pull_source(&self, target: &odf::DatasetHandle) -> Result<bool, InternalError> {
+        let remote_aliases = match self.remote_alias_registry.get_remote_aliases(target).await {
+            Ok(remote_aliases) => remote_aliases,
+            Err(GetAliasesError::Internal(e)) => return Err(e),
+        };
+        Ok(!remote_aliases.is_empty(RemoteAliasKind::Pull))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?target))]
     async fn find_pull_alias(
         &self,
         target: &odf::DatasetHandle,

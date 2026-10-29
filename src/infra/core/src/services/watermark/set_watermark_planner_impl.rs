@@ -19,7 +19,7 @@ use time_source::SystemTimeSource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SetWatermarkPlannerImpl {
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
     system_time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -27,11 +27,11 @@ pub struct SetWatermarkPlannerImpl {
 #[interface(dyn SetWatermarkPlanner)]
 impl SetWatermarkPlannerImpl {
     pub fn new(
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+        pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
         system_time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
-            remote_alias_reg,
+            pull_source_resolver,
             system_time_source,
         }
     }
@@ -47,16 +47,11 @@ impl SetWatermarkPlanner for SetWatermarkPlannerImpl {
         target: ResolvedDataset,
         new_watermark: DateTime<Utc>,
     ) -> Result<SetWatermarkPlan, SetWatermarkPlanningError> {
-        let aliases = match self
-            .remote_alias_reg
-            .get_remote_aliases(target.get_handle())
-            .await
+        if self
+            .pull_source_resolver
+            .has_pull_source(target.get_handle())
+            .await?
         {
-            Ok(v) => Ok(v),
-            Err(GetAliasesError::Internal(e)) => Err(SetWatermarkPlanningError::Internal(e)),
-        }?;
-
-        if !aliases.is_empty(RemoteAliasKind::Pull) {
             return Err(SetWatermarkPlanningError::IsRemote);
         }
 

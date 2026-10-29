@@ -300,6 +300,7 @@ impl LocalPullHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<odf::dataset::DatasetFactoryImpl>()
             .add::<SyncServiceImpl>()
+            .add::<IpfsServiceImpl>()
             .add::<LocalSyncCommitterImpl>()
             .add::<RemoteAliasesRegistryImpl>()
             .add::<RemoteAliasResolverImpl>()
@@ -401,7 +402,8 @@ impl LocalPullHarness {
         let concurrent_head = listener.concurrent_head.lock().unwrap().clone().unwrap();
         assert_matches!(
             result,
-            Err(SyncError::HeadMoved(e)) if e.actual.as_ref() == Some(&concurrent_head)
+            Err(SyncError::HeadMoved(SyncHeadMovedError { heads: Some(e) }))
+                if e.actual.as_ref() == Some(&concurrent_head)
         );
         assert_eq!(self.destination_head().await, Some(concurrent_head));
     }

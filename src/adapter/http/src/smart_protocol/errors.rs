@@ -10,7 +10,7 @@
 use std::fmt::{self, Display};
 
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
-use kamu_core::{OverwriteSeedBlockError, SyncError};
+use kamu_core::{OverwriteSeedBlockError, SyncError, SyncHeadMovedError};
 use kamu_datasets::NameCollisionError;
 use thiserror::Error;
 
@@ -236,8 +236,10 @@ impl From<PushClientError> for SyncError {
             PushClientError::OverwriteSeedBlock(e) => Self::OverwriteSeedBlock(e),
             PushClientError::RefCollision(e) => Self::RefCollision(e),
             PushClientError::NameCollision(e) => Self::NameCollision(e),
-            PushClientError::InvalidHead(e) => Self::UpdatedConcurrently(e.into()),
-            PushClientError::UpdatedConcurrently(e) => Self::UpdatedConcurrently(e.into()),
+            PushClientError::InvalidHead(e) => Self::HeadMoved(e.into()),
+            PushClientError::UpdatedConcurrently(_) => {
+                Self::HeadMoved(SyncHeadMovedError::unreported())
+            }
             e @ (PushClientError::ReadFailed(_)
             | PushClientError::WriteFailed(_)
             | PushClientError::Internal(_)) => Self::Internal(e.int_err()),
@@ -383,27 +385,52 @@ where
 mod tests {
     use std::assert_matches;
 
-    use kamu_core::SyncError;
+    use kamu_core::{SyncError, SyncHeadMovedError};
 
-    use super::PushClientError;
+    use super::{DestinationUpdatedConcurrentlyError, PushClientError};
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     #[test]
-    fn test_stale_push_head_is_a_recoverable_concurrent_update() {
-        let sync_error = SyncError::from(PushClientError::InvalidHead(stale_head_error()));
+    fn test_stale_push_head_is_a_recoverable_head_move_with_heads() {
+        let fixtures = PushErrorFixtures;
+
+        let sync_error = SyncError::from(PushClientError::InvalidHead(fixtures.stale_head_error()));
 
         assert!(sync_error.is_recoverable());
         assert_matches!(
             sync_error,
-            SyncError::UpdatedConcurrently(e)
-                if e.downcast_ref::<odf::dataset::RefCASError>() == Some(&stale_head_error())
+            SyncError::HeadMoved(SyncHeadMovedError { heads: Some(heads) })
+                if heads == fixtures.stale_head_error()
         );
     }
 
-    fn stale_head_error() -> odf::dataset::RefCASError {
-        odf::dataset::RefCASError {
-            reference: odf::BlockRef::Head,
-            expected: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
-            actual: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn test_head_moved_during_push_commit_is_a_recoverable_head_move_without_heads() {
+        let sync_error = SyncError::from(PushClientError::UpdatedConcurrently(
+            DestinationUpdatedConcurrentlyError,
+        ));
+
+        assert!(sync_error.is_recoverable());
+        assert_matches!(
+            sync_error,
+            SyncError::HeadMoved(SyncHeadMovedError { heads: None })
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    struct PushErrorFixtures;
+
+    impl PushErrorFixtures {
+        fn stale_head_error(&self) -> odf::dataset::RefCASError {
+            odf::dataset::RefCASError {
+                reference: odf::BlockRef::Head,
+                expected: Some(odf::Multihash::from_digest_sha3_256(b"planned")),
+                actual: Some(odf::Multihash::from_digest_sha3_256(b"concurrent")),
+            }
         }
     }
 }
