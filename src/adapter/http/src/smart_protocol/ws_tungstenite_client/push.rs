@@ -10,11 +10,14 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
+use futures::stream::{StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
 use kamu_datasets::NameCollisionError;
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use url::Url;
 
 use super::WsSmartTransferProtocolClient;
@@ -221,7 +224,6 @@ impl WsSmartTransferProtocolClient {
 
         let mut export_task = tokio::spawn(async move {
             let src_ref = src.as_ref();
-            use futures::stream::{StreamExt, TryStreamExt};
             futures::stream::iter(task_data)
                 .map(Ok)
                 .try_for_each_concurrent(
@@ -497,8 +499,6 @@ impl WsSmartTransferProtocolClient {
             }
         }
 
-        use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,

@@ -144,7 +144,7 @@ the reference carries an alias.
 | Step | Transaction | Does |
 | --- | --- | --- |
 | Target | the caller's | `PullLocalTarget::resolve_sync_target`: read `expected_head`; no remote is contacted |
-| Transfer | none held across it | `transfer_into_local`: resolve the source's URL with `RemoteDatasetUrlResolver`, open it and check it has a `HEAD` (an unknown repository is `RepositoryNotFound`, a source without `HEAD` is `DatasetNotFound`), compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
+| Transfer | none held across it | `transfer_into_local`: resolve the source's URL with `RemoteDatasetUrlResolver`, open it and check it has a `HEAD` (an unknown repository is `RepositoryNotFound`, a remote named only by ID is `RemoteByIdUnsupported`, a source without `HEAD` is `DatasetNotFound`), compare the chains, store the `Seed` of a new dataset, copy objects, append blocks; no reference moves. Returns `SyncTransfer::UpToDate` or `Transferred(TransferredSync)` |
 | Commit | the caller's | `LocalSyncCommitter::commit`: for an existing dataset, `DatasetHeadCommitter` moves `HEAD` from `expected_head` to the new head; for a new one, `CreateDatasetUseCase` creates the entry with `HEAD` already at the new head (`CreateDatasetUseCaseOptions::initial_head`) |
 
 The `Seed` of a new dataset is stored through `DatasetStorageUnitWriter` in a short transaction that
@@ -444,7 +444,7 @@ calls it with no transaction held:
 | --- | --- |
 | `has_pull_source` | whether the dataset has any pull alias, several included; reads the alias registry only. `kamu ingest` and setting a watermark refuse such a dataset, since its history comes from the remote; `kamu verify` replays its transforms only when all its inputs exist locally |
 | `find_pull_alias` | the dataset's single pull alias, `None` without one, `AmbiguousPullSourceError` with several; reads the alias registry only |
-| `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`; an unknown repository is `RepositoryNotFound` |
+| `resolve_remote_source` | a `DatasetPullSource { remote_ref, url }`, the URL from `RemoteDatasetUrlResolver::resolve_dataset_url`; an unknown repository is `RepositoryNotFound`, a remote named only by ID is `ByIdUnsupported` |
 | `resolve_pull_source` | both of the above for one dataset; no production caller yet, kept for the flow that builds sync tasks |
 | `find_dataset_by_pull_alias` | the current account's dataset whose pull aliases contain a remote ref: the dataset named as the remote one first, then a scan of the account's datasets |
 

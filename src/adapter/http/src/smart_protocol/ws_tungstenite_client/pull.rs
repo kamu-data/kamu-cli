@@ -7,11 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use futures::stream::{StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu::utils::local_sync_writes::{append_transferred_blocks, prepare_transfer_target};
 use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use url::Url;
 
 use super::WsSmartTransferProtocolClient;
@@ -317,7 +320,6 @@ impl WsSmartTransferProtocolClient {
                 }?;
 
                 let dst_ref = dst_storage.as_ref();
-                use futures::stream::{StreamExt, TryStreamExt};
                 futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
                     .map(Ok)
                     .try_for_each_concurrent(
@@ -351,8 +353,6 @@ impl WsSmartTransferProtocolClient {
             SyncTransfer::UpToDate
         };
 
-        use tokio_tungstenite::tungstenite::protocol::CloseFrame;
-        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,
