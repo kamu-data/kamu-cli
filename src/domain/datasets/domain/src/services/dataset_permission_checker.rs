@@ -84,10 +84,10 @@ impl DatasetPermission {
 pub enum DatasetPermissionAccess {
     /// Subject has no access to the object.
     Forbidden,
-    /// Subject has access to an object's presence but lacks required
-    /// permissions for the permission.
+    /// Subject has access to an object's presence but lacks the required
+    /// permission.
     Insufficient,
-    /// Permission permission granted to subject.
+    /// Subject has the permission.
     Allowed,
 }
 

@@ -977,7 +977,7 @@ async fn test_dataset_view_permissions_for_an_owner() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn test_dataset_view_permissions(
-    allowed_actions: &[DatasetPermission],
+    granted_permissions: &[DatasetPermission],
     expected_permission: async_graphql::Value,
 ) {
     let dataset_name = odf::DatasetName::new_unchecked("foo");
@@ -992,7 +992,7 @@ async fn test_dataset_view_permissions(
                     1,
                     HashSet::from([dataset_alias]),
                 )
-                .make_expect_get_granted_permissions(allowed_actions, 1),
+                .make_expect_get_granted_permissions(granted_permissions, 1),
         )
         .build()
         .await;

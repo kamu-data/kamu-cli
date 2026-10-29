@@ -35,7 +35,7 @@ struct TestHttpMethodsOptions<'a> {
     methods: &'a [http::Method],
     test_url_path: &'a str,
     logged_in: bool,
-    allowed_actions: &'a [DatasetPermission],
+    granted_permissions: &'a [DatasetPermission],
     expected_status: http::StatusCode,
 }
 
@@ -44,7 +44,7 @@ async fn test_http_methods(
         methods,
         test_url_path,
         logged_in,
-        allowed_actions,
+        granted_permissions,
         expected_status,
     }: TestHttpMethodsOptions<'_>,
 ) {
@@ -54,7 +54,9 @@ async fn test_http_methods(
         } else {
             CurrentAccountSubject::Anonymous(AnonymousAccountReason::NoAuthenticationProvided)
         },
-        ServerHarness::mock_dataset_permission_checker(allowed_actions.iter().copied().collect()),
+        ServerHarness::mock_dataset_permission_checker(
+            granted_permissions.iter().copied().collect(),
+        ),
     )
     .await;
 
@@ -79,7 +81,7 @@ async fn test_dataset_access_unsafe_methods_anonymous_and_unauthorized() {
         methods: &UNSAFE_METHODS,
         test_url_path: "foo",
         logged_in: false,
-        allowed_actions: &[],
+        granted_permissions: &[],
         expected_status: http::StatusCode::NOT_FOUND,
     })
     .await;
@@ -93,7 +95,7 @@ async fn test_dataset_access_unsafe_methods_anonymous_and_authorized() {
         methods: &UNSAFE_METHODS,
         test_url_path: "foo",
         logged_in: false,
-        allowed_actions: &[DatasetPermission::Read],
+        granted_permissions: &[DatasetPermission::Read],
         expected_status: http::StatusCode::FORBIDDEN,
     })
     .await;
@@ -107,7 +109,7 @@ async fn test_dataset_access_unsafe_methods_logged_but_unauthorized() {
         methods: &UNSAFE_METHODS,
         test_url_path: "foo",
         logged_in: true,
-        allowed_actions: &[],
+        granted_permissions: &[],
         expected_status: http::StatusCode::NOT_FOUND,
     })
     .await;
@@ -121,7 +123,7 @@ async fn test_dataset_access_unsafe_methods_logged_and_authorized_for_reading() 
         methods: &UNSAFE_METHODS,
         test_url_path: "foo",
         logged_in: true,
-        allowed_actions: &[DatasetPermission::Read],
+        granted_permissions: &[DatasetPermission::Read],
         expected_status: http::StatusCode::FORBIDDEN,
     })
     .await;
@@ -135,7 +137,7 @@ async fn test_dataset_access_unsafe_methods_logged_and_authorized_for_writing() 
         methods: &UNSAFE_METHODS,
         test_url_path: "foo",
         logged_in: true,
-        allowed_actions: &[DatasetPermission::Read, DatasetPermission::Write],
+        granted_permissions: &[DatasetPermission::Read, DatasetPermission::Write],
         expected_status: http::StatusCode::OK,
     })
     .await;
@@ -149,7 +151,7 @@ async fn test_dataset_access_safe_methods_anonymous_and_unauthorized() {
         methods: &SAFE_METHODS,
         test_url_path: "foo",
         logged_in: false,
-        allowed_actions: &[],
+        granted_permissions: &[],
         expected_status: http::StatusCode::NOT_FOUND,
     })
     .await;
@@ -163,7 +165,7 @@ async fn test_dataset_access_safe_methods_anonymous_and_authorized_for_reading()
         methods: &SAFE_METHODS,
         test_url_path: "foo",
         logged_in: false,
-        allowed_actions: &[DatasetPermission::Read],
+        granted_permissions: &[DatasetPermission::Read],
         expected_status: http::StatusCode::OK,
     })
     .await;
@@ -177,7 +179,7 @@ async fn test_dataset_access_safe_methods_anonymous_and_authorized_for_writing()
         methods: &SAFE_METHODS,
         test_url_path: "foo",
         logged_in: false,
-        allowed_actions: &[DatasetPermission::Read, DatasetPermission::Write],
+        granted_permissions: &[DatasetPermission::Read, DatasetPermission::Write],
         expected_status: http::StatusCode::OK,
     })
     .await;
@@ -191,7 +193,7 @@ async fn test_dataset_access_safe_methods_logged_but_unauthorized() {
         methods: &SAFE_METHODS,
         test_url_path: "foo",
         logged_in: true,
-        allowed_actions: &[],
+        granted_permissions: &[],
         expected_status: http::StatusCode::NOT_FOUND,
     })
     .await;
@@ -205,7 +207,7 @@ async fn test_dataset_access_safe_methods_logged_and_authorized_for_reading() {
         methods: &SAFE_METHODS,
         test_url_path: "foo",
         logged_in: true,
-        allowed_actions: &[DatasetPermission::Read],
+        granted_permissions: &[DatasetPermission::Read],
         expected_status: http::StatusCode::OK,
     })
     .await;
@@ -219,7 +221,7 @@ async fn test_dataset_access_safe_methods_logged_and_authorized_for_writing() {
         methods: &SAFE_METHODS,
         test_url_path: "foo",
         logged_in: true,
-        allowed_actions: &[DatasetPermission::Read, DatasetPermission::Write],
+        granted_permissions: &[DatasetPermission::Read, DatasetPermission::Write],
         expected_status: http::StatusCode::OK,
     })
     .await;
@@ -233,7 +235,7 @@ async fn test_dataset_access_safe_method_but_potential_write_anonymous_and_unaut
         methods: &SAFE_METHODS,
         test_url_path: "bar", // potential write
         logged_in: false,
-        allowed_actions: &[],
+        granted_permissions: &[],
         expected_status: http::StatusCode::NOT_FOUND,
     })
     .await;
@@ -248,7 +250,7 @@ async fn test_dataset_access_safe_method_but_potential_write_anonymous_and_autho
         methods: &SAFE_METHODS,
         test_url_path: "bar", // potential write
         logged_in: false,
-        allowed_actions: &[DatasetPermission::Read],
+        granted_permissions: &[DatasetPermission::Read],
         expected_status: http::StatusCode::FORBIDDEN,
     })
     .await;
@@ -263,7 +265,7 @@ async fn test_dataset_access_safe_method_but_potential_write_anonymous_and_autho
         methods: &SAFE_METHODS,
         test_url_path: "bar", // potential write
         logged_in: false,
-        allowed_actions: &[DatasetPermission::Read, DatasetPermission::Write],
+        granted_permissions: &[DatasetPermission::Read, DatasetPermission::Write],
         expected_status: http::StatusCode::OK,
     })
     .await;
@@ -277,7 +279,7 @@ async fn test_dataset_access_safe_method_but_potential_write_logged_but_unauthor
         methods: &SAFE_METHODS,
         test_url_path: "bar", // potential write
         logged_in: true,
-        allowed_actions: &[],
+        granted_permissions: &[],
         expected_status: http::StatusCode::NOT_FOUND,
     })
     .await;
@@ -291,7 +293,7 @@ async fn test_dataset_access_safe_method_but_potential_write_logged_authorized_f
         methods: &SAFE_METHODS,
         test_url_path: "bar", // potential write
         logged_in: true,
-        allowed_actions: &[DatasetPermission::Read],
+        granted_permissions: &[DatasetPermission::Read],
         expected_status: http::StatusCode::FORBIDDEN,
     })
     .await;
@@ -305,7 +307,7 @@ async fn test_dataset_access_safe_method_but_potential_write_logged_authorized_f
         methods: &SAFE_METHODS,
         test_url_path: "bar", // potential write
         logged_in: true,
-        allowed_actions: &[DatasetPermission::Read, DatasetPermission::Write],
+        granted_permissions: &[DatasetPermission::Read, DatasetPermission::Write],
         expected_status: http::StatusCode::OK,
     })
     .await;
@@ -482,7 +484,7 @@ impl ServerHarness {
     }
 
     pub fn mock_dataset_permission_checker(
-        allowed_actions: HashSet<DatasetPermission>,
+        granted_permissions: HashSet<DatasetPermission>,
     ) -> MockDatasetPermissionChecker {
         use mockall::predicate::function;
 
@@ -492,7 +494,7 @@ impl ServerHarness {
             .with(function(|dataset_id: &odf::DatasetID| {
                 *dataset_id == Self::dataset_id()
             }))
-            .returning(move |_dataset_id| Ok(allowed_actions.clone()));
+            .returning(move |_dataset_id| Ok(granted_permissions.clone()));
 
         mock_dataset_permission_checker
     }

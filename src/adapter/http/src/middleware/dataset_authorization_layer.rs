@@ -165,12 +165,12 @@ where
                                 }
                             }
                         };
-                        let allowed_actions = dataset_permission_checker
+                        let granted_permissions = dataset_permission_checker
                             .get_granted_permissions_for_existing_dataset(&dataset_handle.id)
                             .await?;
 
                         match DatasetPermission::resolve_access(
-                            &allowed_actions,
+                            &granted_permissions,
                             current_dataset_permission,
                         ) {
                             DatasetPermissionAccess::Allowed => Ok(CheckResult::Proceed),

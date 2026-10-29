@@ -104,13 +104,13 @@ pub(crate) async fn check_dataset_maintain_access(
 async fn check_dataset_access(
     ctx: &Context<'_>,
     dataset_request_state: &DatasetRequestState,
-    action: DatasetPermission,
+    permission: DatasetPermission,
 ) -> Result<(), GqlError> {
-    let allowed_actions = dataset_request_state
+    let granted_permissions = dataset_request_state
         .granted_dataset_permissions(ctx)
         .await?;
 
-    if allowed_actions.contains(&action) {
+    if granted_permissions.contains(&permission) {
         Ok(())
     } else {
         Err(make_dataset_access_error(
