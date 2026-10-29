@@ -19,7 +19,8 @@ use kamu_cli_e2e_common::{
     leaderboard_set_transform_event,
 };
 use kamu_cli_puppet::KamuCliPuppet;
-use kamu_cli_puppet::extensions::KamuCliPuppetExt;
+use kamu_cli_puppet::extensions::{KamuCliPuppetExt, RepoAlias};
+use url::Url;
 
 use crate::utils::{commit_event, dataset_id};
 
@@ -165,6 +166,78 @@ pub async fn test_pull_derivative_of_never_pulled_root(kamu: KamuCliPuppet) {
         ]),
     )
     .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// test_pull_failed_alias_save_creates_no_dataset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_pull_failed_alias_save_creates_no_dataset(kamu: KamuCliPuppet) {
+    let source = KamuCliPuppet::new_workspace_tmp_single_tenant().await;
+    source
+        .execute_with_input(["add", "--stdin"], DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR)
+        .await
+        .success();
+    let dataset_name = DATASET_ROOT_PLAYER_NAME.as_str();
+    source
+        .execute_with_input(
+            [
+                "ingest",
+                dataset_name,
+                "--stdin",
+                "--source-name",
+                "default",
+            ],
+            DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+        )
+        .await
+        .success();
+
+    let dataset_url = Url::from_directory_path(kamu.workspace_path().join("repo"))
+        .unwrap()
+        .join(dataset_name)
+        .unwrap();
+    source
+        .execute(["push", dataset_name, "--to", dataset_url.as_str()])
+        .await
+        .success();
+
+    // A directory where the dataset's alias config belongs makes saving the
+    // pull alias fail after the dataset is created in the same transaction
+    let dataset_id = &source.list_datasets().await[0].id;
+    let alias_config_path = kamu
+        .workspace_path()
+        .join(".kamu")
+        .join("datasets")
+        .join(dataset_id.as_multibase().to_stack_string().as_str())
+        .join("info")
+        .join("config");
+    std::fs::create_dir_all(&alias_config_path).unwrap();
+
+    kamu.assert_failure_command_execution(
+        ["pull", dataset_url.as_str()],
+        None,
+        Some([r#"Failed to update 1 dataset\(s\)"#]),
+    )
+    .await;
+    std::fs::remove_dir_all(&alias_config_path).unwrap();
+    assert_eq!(kamu.list_datasets().await.len(), 0);
+
+    // The next pull continues into the transferred blocks and saves the alias
+    kamu.execute(["pull", dataset_url.as_str()]).await.success();
+
+    let datasets = kamu.list_datasets().await;
+    assert_eq!(datasets.len(), 1);
+    assert_eq!(datasets[0].name.as_str(), dataset_name);
+    pretty_assertions::assert_eq!(
+        kamu.get_list_of_repo_aliases(&odf::DatasetRef::from(datasets[0].name.clone()))
+            .await,
+        [RepoAlias {
+            dataset: odf::DatasetAlias::new(None, datasets[0].name.clone()),
+            kind: "Pull".to_string(),
+            alias: dataset_url.to_string(),
+        }]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
