@@ -298,7 +298,7 @@ impl RemoteStatusTestHarness {
         let remote = odf::DatasetRefRemote::from(&repo_url);
         let sync_request = self
             .sync_builder
-            .build_sync_request(handle.alias.as_any_ref(), remote.as_any_ref(), true)
+            .build_sync_request(handle.alias.as_local_ref(), remote.as_any_ref(), true)
             .await
             .unwrap();
 

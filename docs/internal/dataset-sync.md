@@ -93,7 +93,7 @@ the repository model and both protocols. This page does not restate them; read t
 
 | Layer | Crate / path | Contents |
 | --- | --- | --- |
-| Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncRequest`, `LocalSyncRequest`, `LocalSyncTarget`, `SyncRef`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
+| Domain types | `kamu-core` — [`sync_service.rs`](../../src/domain/core/src/services/sync_service.rs) | `SyncService`, `SyncRequest`, `LocalSyncRequest`, `LocalSyncTarget`, `SyncRefRemote`, `SyncOptions`, `SyncResult`, `SyncError`, listeners and stats |
 | Chain comparison | `kamu-core` — [`metadata_chain_comparator.rs`](../../src/domain/core/src/utils/metadata_chain_comparator.rs) | `MetadataChainComparator::compare_chains` → equal / ahead / behind / diverged |
 | Sync service and request builder | `kamu` — [`src/infra/core/src/services/sync/`](../../src/infra/core/src/services/sync) | `SyncServiceImpl` (protocol dispatch, push to IPNS), `SyncRequestBuilder` |
 | Local IPFS node | `kamu-core` — [`ipfs_service.rs`](../../src/domain/core/src/services/ipfs_service.rs); `kamu` — [`ipfs_service_impl.rs`](../../src/infra/core/src/services/ipfs_service_impl.rs) | `IpfsService` (add a dataset, find an IPNS key, resolve and publish its name), `IpfsServiceImpl`; `kamu system ipfs add` uses it directly |
@@ -110,17 +110,13 @@ the repository model and both protocols. This page does not restate them; read t
 
 ## 4. Sync requests
 
-A sync has a source `SyncRef` and a destination:
+A dataset behind a URL is a `SyncRefRemote`: opened through `DatasetFactory` as an `odf::Dataset`
+over the URL's storage (file, S3, HTTP, IPFS gateway).
 
-| `SyncRef` (source) | Meaning |
-| --- | --- |
-| `Local(ResolvedDataset)` | a dataset in this node or workspace |
-| `Remote(SyncRefRemote)` | a dataset behind a URL, opened through `DatasetFactory` as an `odf::Dataset` over the URL's storage (file, S3, HTTP, IPFS gateway) |
-
-| Request | Destination | Run by |
-| --- | --- | --- |
-| `SyncRequest` | `SyncRefRemote`: a dataset that is not a dataset reference of this node | `SyncService::sync`, which also moves the destination's `HEAD` |
-| `LocalSyncRequest` | `LocalSyncTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates from the source's `Seed`. Its source is a `DatasetRefRemote`, not a `SyncRef`: the transfer resolves and opens it | `SyncService::transfer_into_local`, then `LocalSyncCommitter::commit` |
+| Request | Source | Destination | Run by |
+| --- | --- | --- | --- |
+| `SyncRequest` (push) | `ResolvedDataset`: a dataset of this node | `SyncRefRemote`: a dataset that is not a dataset reference of this node | `SyncService::sync`, which also moves the destination's `HEAD` |
+| `LocalSyncRequest` (pull) | `DatasetRefRemote`: the transfer resolves and opens it | `LocalSyncTarget`: `Existing { dataset, expected_head }`, or `New(DatasetAlias)` for a dataset the commit creates from the source's `Seed` | `SyncService::transfer_into_local`, then `LocalSyncCommitter::commit` |
 
 A pull's destination is read from the database and its source from the network, so the two are
 resolved at different steps. The destination is read as a `LocalSyncTarget`, inside a transaction,
@@ -161,7 +157,7 @@ earlier failed pull, so the next pull continues into it.
 
 | Option | Effect |
 | --- | --- |
-| `trust_source` | skip block validation and hash recomputation; defaults to "the source is local" |
+| `trust_source` | skip block validation and hash recomputation; defaults to `true` for a push, whose source is local, and `false` for a pull |
 | `create_if_not_exists` | allow creating the destination (default on) |
 | `force` | accept a destination that is ahead or has diverged, and replace its history; never disables the CAS on `HEAD` |
 | `dataset_visibility` | visibility of a dataset created by the sync (default private) |
@@ -176,18 +172,16 @@ new chain.
 
 ## 5. Choosing a protocol
 
-`SyncServiceImpl` dispatches on the two refs: `sync_impl` for a remote destination,
-`transfer_into_local_impl` for a local one:
+`SyncServiceImpl` dispatches on the remote URL: `sync_impl` on a push's destination,
+`transfer_into_local_impl` on a pull's source:
 
-| Source → destination | Protocol |
+| Direction and remote URL | Protocol |
 | --- | --- |
-| any → `ipfs://` | rejected: a CID changes with every update |
-| remote → `ipns://` | rejected: pull locally first |
-| local → `ipns://<key>` | IPFS add and IPNS publish ([§6.3](#63-ipfs)) |
-| `odf+http(s)://` → `odf+http(s)://` | rejected: pull locally first |
-| `odf+http(s)://` → local | Smart Transfer Protocol, pull flow ([§7](#7-smart-transfer-protocol)) |
-| any → `odf+http(s)://` | Smart Transfer Protocol, push flow |
-| anything else (local, `file://`, `s3://`, `http(s)://`) | Simple Transfer Protocol ([§6](#6-simple-transfer-protocol)) |
+| push to `ipfs://` | rejected: a CID changes with every update |
+| push to `ipns://<key>` | IPFS add and IPNS publish ([§6.3](#63-ipfs)) |
+| pull from `odf+http(s)://` | Smart Transfer Protocol, pull flow ([§7](#7-smart-transfer-protocol)) |
+| push to `odf+http(s)://` | Smart Transfer Protocol, push flow |
+| anything else (`file://`, `s3://`, `http(s)://`) | Simple Transfer Protocol ([§6](#6-simple-transfer-protocol)) |
 
 The `odf+` prefix is stripped (`odf_to_transport_protocol`) before connecting. A plain `http(s)://`
 URL is therefore read with the Simple protocol, and is read-only; a registered repository is turned
@@ -542,7 +536,6 @@ into the recoverability of the failed task.
 | Area | What happens |
 | --- | --- |
 | Plain `http(s)://` URLs | Read-only through the Simple protocol; a push to a *registered* `http(s)` repository is rewritten to `odf+http(s)` by `resolve_push_target` and uses the Smart protocol |
-| Remote to remote | Only `odf+` → `odf+` and remote → `ipns://` are rejected; any other remote-to-remote pair runs through the Simple protocol, and an `odf+` source with a remote destination fails late with `Internal`. `kamu pull` and `kamu push` never build such a request |
 | Created destination | Created by the commit, with its `HEAD` at the last transferred block; for a pull that fails before it, see [§4](#4-sync-requests) |
 | Unreferenced objects | A failed or concurrent sync can leave uploaded objects that no block references |
 | `force` | Replaces the destination's history from the source, but only from the destination head the sync observed: a head moved meanwhile fails with `HeadMoved`. The Smart protocol refuses a different `Seed` (`OverwriteSeedBlock`, `SeedBlockOverwriteRestricted`); the Simple protocol does not check |

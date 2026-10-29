@@ -94,7 +94,7 @@ impl PushDatasetUseCaseImpl {
         let mut errors = Vec::new();
 
         for pi in plan {
-            let src_ref = pi.local_handle.as_any_ref();
+            let src_ref = pi.local_handle.as_local_ref();
             let dst_ref = (&pi.remote_target.url).into();
             match sync_request_builder
                 .build_sync_request(src_ref, dst_ref, sync_options.create_if_not_exists)
@@ -219,7 +219,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
             .map(|sync_request| {
                 let listener = sync_listener.as_ref().and_then(|l| {
                     l.begin_sync(
-                        &sync_request.src.as_user_friendly_any_ref(),
+                        &sync_request.src.get_handle().as_any_ref(),
                         &sync_request.dst.as_user_friendly_any_ref(),
                     )
                 });

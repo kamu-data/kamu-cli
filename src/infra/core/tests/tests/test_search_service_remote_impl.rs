@@ -112,7 +112,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .sync(
             sync_request_builder
                 .build_sync_request(
-                    dataset_local_alias.as_any_ref(),
+                    dataset_local_alias.as_local_ref(),
                     dataset_remote_alias.as_any_ref(),
                     true,
                 )

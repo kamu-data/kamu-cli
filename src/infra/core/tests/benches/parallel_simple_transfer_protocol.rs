@@ -151,7 +151,11 @@ async fn do_test_sync(
     let _push_res = sync_svc
         .sync(
             sync_request_builder
-                .build_sync_request(dataset_alias.as_any_ref(), push_repo_url.as_any_ref(), true)
+                .build_sync_request(
+                    dataset_alias.as_local_ref(),
+                    push_repo_url.as_any_ref(),
+                    true,
+                )
                 .await
                 .unwrap(),
             SyncOptions::default(),

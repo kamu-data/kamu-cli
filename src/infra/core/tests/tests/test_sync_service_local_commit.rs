@@ -541,7 +541,7 @@ impl LocalPullHarness {
             .get_one::<SyncRequestBuilder>()
             .unwrap()
             .build_sync_request(
-                self.dataset_alias.as_any_ref(),
+                self.dataset_alias.as_local_ref(),
                 self.remote_ref().as_any_ref(),
                 true,
             )

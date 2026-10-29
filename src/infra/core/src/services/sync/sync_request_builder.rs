@@ -16,13 +16,11 @@ use kamu_core::{
     RemoteDatasetUrlResolver,
     RemoteRepositoryRegistry,
     SyncError,
-    SyncRef,
     SyncRefRemote,
     SyncRequest,
     try_resolve_head,
 };
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
-use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,15 +33,18 @@ pub struct SyncRequestBuilder {
 }
 
 impl SyncRequestBuilder {
-    /// Builds a sync into a destination that is not a dataset of this node
-    #[tracing::instrument(level = "debug", skip_all, fields(?src_ref, ?dst_ref, %create_dst_if_not_exists))]
+    /// Builds a push of a dataset of this node into a destination that is not
+    /// one
+    #[tracing::instrument(level = "debug", skip_all, fields(%src_ref, ?dst_ref, %create_dst_if_not_exists))]
     pub async fn build_sync_request(
         &self,
-        src_ref: odf::DatasetRefAny,
+        src_ref: odf::DatasetRef,
         dst_ref: odf::DatasetRefAny,
         create_dst_if_not_exists: bool,
     ) -> Result<SyncRequest, SyncError> {
-        let src = self.resolve_source_sync_ref(&src_ref).await?;
+        let src = self.dataset_registry.get_dataset_by_ref(&src_ref).await?;
+        self.ensure_dataset_head_present(src_ref.as_any_ref(), src.as_ref())
+            .await?;
 
         let remote_ref = match dst_ref
             .as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok())
@@ -63,46 +64,6 @@ impl SyncRequestBuilder {
             .await?;
 
         Ok(SyncRequest { src, dst })
-    }
-
-    async fn resolve_source_sync_ref(
-        &self,
-        any_ref: &odf::DatasetRefAny,
-    ) -> Result<SyncRef, SyncError> {
-        match any_ref.as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok()) {
-            Ok(local_ref) => {
-                let resolved_dataset = self.dataset_registry.get_dataset_by_ref(&local_ref).await?;
-                self.ensure_dataset_head_present(local_ref.as_any_ref(), resolved_dataset.as_ref())
-                    .await?;
-                Ok(SyncRef::Local(resolved_dataset))
-            }
-            Err(remote_ref) => {
-                let url = self
-                    .remote_dataset_url_resolver
-                    .resolve_dataset_url(&remote_ref)
-                    .await?;
-                self.remote_source_sync_ref(remote_ref, url).await
-            }
-        }
-    }
-
-    async fn remote_source_sync_ref(
-        &self,
-        remote_ref: odf::DatasetRefRemote,
-        url: Url,
-    ) -> Result<SyncRef, SyncError> {
-        let url = Arc::new(url);
-        let dataset = self
-            .dataset_factory
-            .get_dataset(url.as_ref(), false)
-            .await?;
-        self.ensure_dataset_head_present(odf::DatasetRefAny::Url(url.clone()), dataset.as_ref())
-            .await?;
-        Ok(SyncRef::Remote(SyncRefRemote {
-            url,
-            dataset,
-            original_remote_ref: remote_ref,
-        }))
     }
 
     async fn resolve_dest_sync_ref_remote(
