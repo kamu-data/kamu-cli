@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
@@ -32,6 +33,7 @@ use kamu_datasets::{
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     DatasetHeadCommitterImpl,
+    DatasetKeyValueServiceSysEnv,
     DependencyGraphIndexer,
     DependencyGraphServiceImpl,
 };
@@ -461,6 +463,39 @@ async fn test_pull_ingest_first_iteration_failure_is_not_progress() {
             PollingIngestError::Unreachable { .. }
         ))
     );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[tokio::test]
+async fn test_pull_ingest_unparsable_source_fails_unrecoverably() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = PullUseCaseHarness::new(
+        PullUseCaseHarnessMocks::default()
+            .with_authorizer_mock(
+                MockDatasetActionAuthorizer::new().make_expect_classify_datasets_by_allowance(
+                    DatasetAction::Write,
+                    1,
+                    HashSet::from_iter([alias_foo.clone()]),
+                ),
+            )
+            .with_real_ingest(),
+    );
+    let foo = harness
+        .create_root_dataset_polling_csv_with(&alias_foo, "city,population\nA,many\n")
+        .await;
+
+    let (pull_response, events) = harness.pull_local_recording(&alias_foo).await;
+
+    let Err(PullError::PollingIngestError(e)) = &pull_response.result else {
+        panic!("Expected an ingest error, got {:?}", pull_response.result);
+    };
+    assert_matches!(e, PollingIngestError::ExecutionError(_));
+    assert!(!e.is_recoverable());
+    assert_eq!(events, vec!["begin", "error"]);
     assert_eq!(harness.get_head(&foo).await, foo.head);
 }
 
@@ -1561,8 +1596,6 @@ impl PullUseCaseHarness {
             .add::<DatasetUpdateKindResolverImpl>()
             .add::<DatasetPullSourceResolverImpl>()
             .add::<PollingIngestPlannerImpl>()
-            .add_value(mocks.mock_polling_ingest_service)
-            .bind::<dyn PollingIngestService, MockPollingIngestService>()
             .add::<CompactionPlannerImpl>()
             .add_value(mocks.mock_compaction_executor)
             .bind::<dyn CompactionExecutor, MockCompactionExecutor>()
@@ -1582,6 +1615,27 @@ impl PullUseCaseHarness {
             .add::<DependencyGraphServiceImpl>()
             .add::<InMemoryDatasetDependencyRepository>()
             .add::<DependencyGraphIndexer>();
+
+        if mocks.real_ingest {
+            let cache_dir = base_use_case_harness.temp_dir_path().join("cache");
+            std::fs::create_dir(&cache_dir).unwrap();
+
+            b.add_value(CacheDir::new(cache_dir))
+                .add_value(ContainerRuntimeConfig::default())
+                .add::<ContainerRuntime>()
+                .add::<ObjectStoreRegistryImpl>()
+                .add::<ObjectStoreBuilderLocalFs>()
+                .add_value(EngineProvisionerLocalConfig::default())
+                .add::<EngineProvisionerLocal>()
+                .add::<DataFormatRegistryImpl>()
+                .add::<FetchService>()
+                .add_value(EngineConfigDatafusionEmbeddedIngest::default())
+                .add::<PollingIngestServiceImpl>()
+                .add::<DatasetKeyValueServiceSysEnv>();
+        } else {
+            b.add_value(mocks.mock_polling_ingest_service)
+                .bind::<dyn PollingIngestService, MockPollingIngestService>();
+        }
 
         if let Some(watermark) = mocks.real_transform_watermark {
             b.add::<TransformPlannerImpl>()
@@ -1645,6 +1699,18 @@ impl PullUseCaseHarness {
             remote_repo_name,
             remote_tmp_dir,
         }
+    }
+
+    /// A root dataset polling a CSV file in the harness directory that holds
+    /// `contents`
+    async fn create_root_dataset_polling_csv_with(
+        &self,
+        alias: &odf::DatasetAlias,
+        contents: &str,
+    ) -> CreateDatasetResult {
+        let src_path = self.temp_dir_path().join("data.csv");
+        std::fs::write(&src_path, contents).unwrap();
+        self.create_root_dataset_polling_csv(alias, &src_path).await
     }
 
     async fn pull_local(&self, alias: &odf::DatasetAlias) -> PullResponse {
@@ -1820,6 +1886,8 @@ struct PullUseCaseHarnessMocks {
     mock_compaction_executor: MockCompactionExecutor,
     mock_sync_service: MockSyncService,
     mock_local_sync_committer: MockLocalSyncCommitter,
+    /// Ingests with the real polling ingest service instead of the mock
+    real_ingest: bool,
     /// Transforms with the real planner and executor, through an engine that
     /// only advances the watermark to this value
     real_transform_watermark: Option<DateTime<Utc>>,
@@ -1889,6 +1957,13 @@ impl PullUseCaseHarnessMocks {
     ) -> Self {
         Self {
             mock_transform_elaboration,
+            ..self
+        }
+    }
+
+    fn with_real_ingest(self) -> Self {
+        Self {
+            real_ingest: true,
             ..self
         }
     }
@@ -2046,6 +2121,7 @@ impl Default for PullUseCaseHarnessMocks {
             mock_compaction_executor: MockCompactionExecutor::new(),
             mock_sync_service: MockSyncService::new(),
             mock_local_sync_committer: MockLocalSyncCommitter::new(),
+            real_ingest: false,
             real_transform_watermark: None,
             env_var_resolution: None,
         }
