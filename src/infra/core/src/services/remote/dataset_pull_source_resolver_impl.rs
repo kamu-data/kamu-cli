@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
@@ -33,14 +33,15 @@ impl DatasetPullSourceResolverImpl {
         handle: &odf::DatasetHandle,
         remote_ref: &odf::DatasetRefRemote,
     ) -> Result<bool, InternalError> {
-        Ok(self
-            .remote_alias_registry
-            .get_remote_aliases(handle)
-            .await
-            .int_err()?
-            .contains(remote_ref, RemoteAliasKind::Pull))
+        let remote_aliases = match self.remote_alias_registry.get_remote_aliases(handle).await {
+            Ok(remote_aliases) => remote_aliases,
+            Err(GetAliasesError::Internal(e)) => return Err(e),
+        };
+        Ok(remote_aliases.contains(remote_ref, RemoteAliasKind::Pull))
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl DatasetPullSourceResolver for DatasetPullSourceResolverImpl {

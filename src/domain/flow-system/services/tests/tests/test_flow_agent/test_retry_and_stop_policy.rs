@@ -13,7 +13,7 @@ use kamu_adapter_task_dataset::*;
 use kamu_flow_system::*;
 use kamu_task_system::*;
 
-use crate::tests::{FlowHarness, FlowSystemTestListener, ManualFlowActivationArgs, TaskDriverArgs};
+use crate::tests::{FlowHarness, ManualFlowActivationArgs, TaskDriverArgs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -96,7 +96,7 @@ async fn test_disable_trigger_on_flow_fail_default() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -277,7 +277,7 @@ async fn test_disable_trigger_on_flow_fail_consecutive3() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -508,7 +508,7 @@ async fn test_disable_trigger_on_flow_fail_skipped() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     pretty_assertions::assert_eq!(
         format!("{}", test_flow_listener.as_ref()),
@@ -705,7 +705,7 @@ async fn test_disable_trigger_on_flow_fail_ignores_stop_policy_for_unrecoverable
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -790,7 +790,7 @@ async fn test_manual_ingest_with_retry_policy_success_at_last_attempt() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -969,7 +969,7 @@ async fn test_manual_ingest_with_retry_policy_retries_head_moved_commit() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // A concurrent change moved HEAD while the task ran
@@ -1103,7 +1103,7 @@ async fn test_manual_ingest_with_retry_policy_failure_after_all_attempts() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -1281,7 +1281,7 @@ async fn test_manual_ingest_with_retry_policy_ignored_on_unrecoverable_error() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Run scheduler concurrently with simulation script
@@ -1381,7 +1381,7 @@ async fn test_retry_planned_before_restart_happens_after_restart() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // First run: the task fails, a retry is planned at 1040ms

@@ -16,13 +16,7 @@ use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
 
-use crate::tests::{
-    FlowHarness,
-    FlowHarnessOverrides,
-    FlowSystemTestListener,
-    SCHEDULING_ALIGNMENT_MS,
-    TaskDriverArgs,
-};
+use crate::tests::{FlowHarness, FlowHarnessOverrides, SCHEDULING_ALIGNMENT_MS, TaskDriverArgs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,7 +75,7 @@ async fn test_derived_dataset_triggered_after_input_change() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -347,7 +341,7 @@ async fn test_derived_dataset_trigger_at_startup_with_external_change_detected()
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -681,7 +675,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -1262,7 +1256,7 @@ async fn test_batching_condition_records_reached() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -1798,7 +1792,7 @@ async fn test_batching_condition_timeout() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -2086,7 +2080,7 @@ async fn test_batching_condition_watermark() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -2390,7 +2384,7 @@ async fn test_batching_condition_with_2_inputs() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -3043,7 +3037,7 @@ async fn test_respect_last_success_time_for_derived_dataset_when_activate_config
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -3433,7 +3427,7 @@ async fn test_restart_batching_condition_deadline_on_each_reactivation() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -3931,7 +3925,7 @@ async fn test_recover_pending_batching_condition_deadline_after_reboot() {
         .await
         .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -4043,7 +4037,7 @@ async fn test_dependencies_flow_trigger_instantly_with_zero_batching_rule() {
     // Enforce dependency graph initialization
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -4297,7 +4291,7 @@ async fn test_reactive_trigger_with_pending_flow_reacts_after_restart() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -4560,7 +4554,7 @@ async fn test_restored_sensor_hears_input_change_delivered_after_restart() {
         .schedule_flow_for_activation(&bar_transform_binding, harness.now())
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 

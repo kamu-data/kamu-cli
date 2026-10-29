@@ -157,14 +157,10 @@ impl PullRequestPlannerImpl {
 
         // Fails a pull with a broken transform before any job runs, and learns the
         // inputs the pull reads
-        match self
-            .transform_planner
-            .describe_transform(target.clone())
-            .await
-        {
+        match self.transform_planner.describe_transform(target).await {
             Ok(description) => Ok(PullTransformItem {
                 input_handles: description.inputs,
-                target,
+                target: hdl,
                 maybe_original_request,
             }),
             Err(e) => Err(Box::new(PullResponse {
@@ -190,17 +186,23 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
     ) -> Result<PullPlanIterationJob, PullError> {
         assert!(!options.recursive);
 
-        let (mut plan, mut errors) = self
+        let PullPlan {
+            mut iterations,
+            mut errors,
+        } = self
             .build_pull_multi_plan(&[request], options, tenancy_config)
             .await;
-        assert!(plan.len() == 1 && errors.is_empty() || plan.is_empty() && errors.len() == 1);
-        if plan.is_empty() {
+        assert!(
+            iterations.len() == 1 && errors.is_empty()
+                || iterations.is_empty() && errors.len() == 1
+        );
+        if iterations.is_empty() {
             let Err(the_error) = errors.remove(0).result else {
                 unreachable!("Planning reports only failed responses")
             };
             Err(the_error)
         } else {
-            let mut the_iteration = plan.remove(0).jobs;
+            let mut the_iteration = iterations.remove(0).jobs;
             assert_eq!(the_iteration.len(), 1);
             let the_job = the_iteration.remove(0);
             Ok(the_job)
@@ -213,7 +215,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         requests: &[PullRequest],
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> (Vec<PullPlanIteration>, Vec<PullResponse>) {
+    ) -> PullPlan {
         // If there is just 1 dataset, and no recursion set, do a simplified procedure.
         // Otherwise, do a hierarchical scan trying to find relations
         let (mut plan, errors) = if requests.len() == 1 && !options.recursive {
@@ -231,7 +233,10 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             "Resolved pull graph"
         );
         if !errors.is_empty() {
-            return (vec![], errors);
+            return PullPlan {
+                iterations: vec![],
+                errors,
+            };
         }
 
         if !options.recursive {
@@ -303,7 +308,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
             }
         }
 
-        (iterations, errors)
+        PullPlan { iterations, errors }
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?options))]
@@ -311,7 +316,7 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
         &self,
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> Result<(Vec<PullPlanIteration>, Vec<PullResponse>), InternalError> {
+    ) -> Result<PullPlan, InternalError> {
         let requests: Vec<_> = self
             .dataset_registry
             .all_dataset_handles_by_owner_name(self.current_account_subject.account_name())

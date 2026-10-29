@@ -18,13 +18,7 @@ use kamu_flow_system::*;
 use kamu_task_system::*;
 use odf::dataset::MetadataChainIncrementInterval;
 
-use crate::tests::{
-    FlowHarness,
-    FlowHarnessOverrides,
-    FlowSystemTestListener,
-    ManualFlowActivationArgs,
-    TaskDriverArgs,
-};
+use crate::tests::{FlowHarness, FlowHarnessOverrides, ManualFlowActivationArgs, TaskDriverArgs};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -58,7 +52,7 @@ async fn test_list_all_flow_initiators() {
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -209,7 +203,7 @@ async fn test_list_all_datasets_with_flow() {
     let foo_flow_binding = compaction_dataset_binding(&foo_id);
     let bar_flow_binding = compaction_dataset_binding(&bar_id);
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -387,7 +381,7 @@ async fn test_flow_duration_starts_at_manual_activation_before_schedule() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     harness
@@ -556,7 +550,7 @@ async fn test_flow_duration_starts_at_activation_before_batching_deadline() {
         )
         .await;
 
-    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    let test_flow_listener = harness.flow_listener();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 

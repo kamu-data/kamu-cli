@@ -157,12 +157,9 @@ impl PollingIngestPlanError {
     /// source needs a change of metadata first.
     pub fn is_recoverable(&self) -> bool {
         match self {
-            Self::SourceNotDefined(_)
-            | Self::ScanMetadata(ScanMetadataError::SourceNotFound(_)) => false,
-            Self::ScanMetadata(
-                ScanMetadataError::HeadNotFound(_) | ScanMetadataError::Internal(_),
-            )
-            | Self::Internal(_) => true,
+            Self::SourceNotDefined(_) => false,
+            Self::ScanMetadata(e) => e.is_recoverable(),
+            Self::Internal(_) => true,
         }
     }
 }

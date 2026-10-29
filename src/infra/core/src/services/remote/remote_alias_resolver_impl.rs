@@ -45,11 +45,14 @@ impl RemoteAliasResolverImpl {
         dataset_handle: &odf::DatasetHandle,
         remote_alias_kind: RemoteAliasKind,
     ) -> Result<Option<Url>, ResolveAliasError> {
-        let remote_aliases = self
+        let remote_aliases = match self
             .remote_alias_reg
             .get_remote_aliases(dataset_handle)
             .await
-            .int_err()?;
+        {
+            Ok(remote_aliases) => remote_aliases,
+            Err(GetAliasesError::Internal(e)) => return Err(e.into()),
+        };
 
         match remote_aliases.single_by_kind(remote_alias_kind) {
             Ok(Some(odf::DatasetRefRemote::Url(remote_url))) => {
@@ -187,7 +190,7 @@ impl RemoteAliasResolverApiHelper {
         account_name_maybe: Option<&odf::AccountName>,
         dataset_name: &odf::DatasetName,
     ) -> Result<Url, InternalError> {
-        let mut res_url = repo_url.clone().as_odf_protocol().int_err()?;
+        let mut res_url = repo_url.as_odf_protocol()?;
 
         if let Some(account_name) = account_name_maybe {
             res_url = res_url.join(format!("{account_name}/").as_str()).unwrap();

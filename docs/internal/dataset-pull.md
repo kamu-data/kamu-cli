@@ -87,7 +87,7 @@ Out of scope, each with its own owner:
 | --- | --- | --- |
 | Domain types | `kamu-core` — [`pull_request_planner.rs`](../../src/domain/core/src/services/pull_request_planner.rs) | `PullRequestPlanner`, `PullRequest`, `PullOptions`, plan and job types, `PullResponse`, `PullResult`, `PullError`, listeners |
 | Use case trait | `kamu-core` — [`pull_dataset_use_case.rs`](../../src/domain/core/src/use_cases/pull_dataset_use_case.rs) | `PullDatasetUseCase::{execute, execute_multi, execute_all_owned}` |
-| Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync); the planner's only production consumer |
+| Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync); used only by the planner |
 | Pull source | `kamu-core` — [`dataset_pull_source_resolver.rs`](../../src/domain/core/src/services/dataset_pull_source_resolver.rs); `kamu` — [`dataset_pull_source_resolver_impl.rs`](../../src/infra/core/src/services/remote/dataset_pull_source_resolver_impl.rs) | `DatasetPullSourceResolver`: a dataset's pull alias and its URL, and the inverse lookup ([dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)) |
 | Planner | `kamu` — [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner) | `PullRequestPlannerImpl`, `PullGraphDepthFirstTraversal`, `PullTargetResolver` |
 | Update steps | `kamu-core` — [`dataset_update_steps.rs`](../../src/domain/core/src/services/dataset_update_steps.rs); `kamu` — [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs) | `DatasetUpdateSteps`: the transactional steps of updating one dataset, shared with the update task: plan an ingest, elaborate a transform, read a sync target, commit `HEAD`, transfer and commit a sync |
@@ -135,9 +135,9 @@ shown as they are.
 
 `PullRequestPlannerImpl::build_pull_multi_plan(requests, options, tenancy)` runs in one
 transaction (`PullDatasetUseCaseImpl::build_plan_for_requests`, or
-`build_plan_for_all_owned_datasets` for `--all`), and its resolved datasets are
-detached from it so later transactions can use them. Planning reads only this node's database and
-contacts no remote: a sync job's source is resolved by its transfer, so the transaction never waits
+`build_plan_for_all_owned_datasets` for `--all`); its items keep dataset handles only, which
+later transactions resolve again. Planning contacts no remote repository: a
+sync job's source is resolved by its transfer, so the transaction never waits
 on the network.
 
 ### 5.1 Resolving each request
@@ -241,7 +241,7 @@ Listeners only report progress; they cannot change the outcome.
 Every pull and push activity follows one rule: the operation reports `begin` and progress, and the
 caller that commits reports how the job ended, once, after its commit. A lost CAS reaches the
 listener as an error, never as a success. Every failure of the job reaches it, including those
-before the operation starts, which end the progress without a `begin`: planning, elaboration,
+before the operation starts, which end the progress without a `begin`: ingest planning, elaboration,
 authorizing inputs the plan did not cover, a reset on a diverged input, a dataset deleted since
 planning.
 

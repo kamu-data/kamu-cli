@@ -37,17 +37,6 @@ pub enum DatasetUpdateKind {
     SyncFrom { remote_ref: odf::DatasetRefRemote },
 }
 
-impl DatasetUpdateKind {
-    pub fn is_sync_from(&self) -> bool {
-        match self {
-            Self::SyncFrom { .. } => true,
-            Self::PollingIngest | Self::Transform => false,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Error)]
 pub enum ResolveDatasetUpdateKindError {
     #[error(transparent)]

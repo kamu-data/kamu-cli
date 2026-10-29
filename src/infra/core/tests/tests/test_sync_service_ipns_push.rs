@@ -16,7 +16,6 @@ use kamu::testing::*;
 use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
-use odf::dataset::{DatasetFactory, DatasetFactoryImpl, IpfsGateway};
 use pretty_assertions::assert_eq;
 use test_utils::HttpFileServer;
 use url::Url;
@@ -39,7 +38,7 @@ async fn test_push_to_unknown_key_fails_without_adding() {
         .push_to_key(&foo, "k51qzi5uqu5dhunknown", SyncOptions::default())
         .await;
 
-    assert_matches!(result, Err(SyncError::Internal(_)));
+    assert_matches!(result, Err(SyncError::InvalidDestination(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -224,7 +223,7 @@ async fn test_forced_push_of_another_dataset_fails_without_publishing() {
 struct IpnsPushHarness {
     base_repo_harness: BaseRepoHarness,
     sync_service: Arc<dyn SyncService>,
-    dataset_factory: Arc<dyn DatasetFactory>,
+    dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     gateway_dir: PathBuf,
 }
 
@@ -241,11 +240,11 @@ impl IpnsPushHarness {
         tokio::spawn(gateway_server.run());
 
         let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
-        b.add_value(IpfsGateway {
+        b.add_value(odf::dataset::IpfsGateway {
             url: gateway_url,
             pre_resolve_dnslink: false,
         })
-        .add::<DatasetFactoryImpl>()
+        .add::<odf::dataset::DatasetFactoryImpl>()
         .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
         .add::<SyncServiceImpl>()
         .add_value(ipfs_node)

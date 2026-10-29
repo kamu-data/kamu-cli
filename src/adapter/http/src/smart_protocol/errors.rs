@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::{self, Display};
-
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError};
 use kamu_core::{OverwriteSeedBlockError, SyncError, SyncHeadMovedError};
 use kamu_datasets::NameCollisionError;
@@ -20,6 +18,7 @@ use crate::ws_common::{ReadMessageError, WriteMessageError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("read_error: {read_error}, pull_phase: {pull_phase:?}")]
 pub struct PullReadError {
     pub read_error: ReadMessageError,
     pub pull_phase: PullPhase,
@@ -34,19 +33,10 @@ impl PullReadError {
     }
 }
 
-impl Display for PullReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "read_error: {}, pull_phase: {:?})",
-            self.read_error, self.pull_phase
-        )
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("read_error: {read_error}, push_phase: {push_phase:?}")]
 pub struct PushReadError {
     pub read_error: ReadMessageError,
     pub push_phase: PushPhase,
@@ -61,19 +51,10 @@ impl PushReadError {
     }
 }
 
-impl Display for PushReadError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "read_error: {}, push_phase: {:?})",
-            self.read_error, self.push_phase
-        )
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("write_error: {write_error}, pull_phase: {pull_phase:?}")]
 pub struct PullWriteError {
     write_error: WriteMessageError,
     pull_phase: PullPhase,
@@ -88,19 +69,10 @@ impl PullWriteError {
     }
 }
 
-impl Display for PullWriteError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "write_error: {}, pull_phase: {:?})",
-            self.write_error, self.pull_phase
-        )
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("write_error: {write_error}, push_phase: {push_phase:?}")]
 pub struct PushWriteError {
     write_error: WriteMessageError,
     push_phase: PushPhase,
@@ -112,16 +84,6 @@ impl PushWriteError {
             write_error,
             push_phase,
         }
-    }
-}
-
-impl Display for PushWriteError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "write_error: {}, push_phase: {:?})",
-            self.write_error, self.push_phase
-        )
     }
 }
 
@@ -257,7 +219,8 @@ pub struct DestinationUpdatedConcurrentlyError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
+#[error("{details} during phase: {phase}")]
 pub struct ClientInternalError {
     phase: TransferPhase,
     details: String,
@@ -272,18 +235,6 @@ impl ClientInternalError {
     }
 }
 
-impl fmt::Display for ClientInternalError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} during phase: {}", self.details, self.phase)
-    }
-}
-
-impl std::error::Error for ClientInternalError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -295,32 +246,18 @@ pub struct ObjectDownloadError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("Object upload failed with status {status}")]
 pub struct ObjectUploadError {
-    pub response: reqwest::Response,
-}
-
-impl fmt::Display for ObjectUploadError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ObjectUploadError: status={}", self.response.status())
-    }
+    pub status: reqwest::StatusCode,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("Smart protocol phase internal error: phase={phase}, error={error}")]
 pub struct PhaseInternalError {
     pub phase: TransferPhase,
     pub error: InternalError,
-}
-
-impl fmt::Display for PhaseInternalError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Smart protocol phase internal error: phase={}, error={}",
-            self.phase, self.error
-        )
-    }
 }
 
 impl From<PhaseInternalError> for PushServerError {

@@ -9,7 +9,11 @@
 
 use futures::stream::{StreamExt, TryStreamExt};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use kamu::utils::local_sync_writes::{append_transferred_blocks, prepare_transfer_target};
+use kamu::utils::local_sync_writes::{
+    TransferTarget,
+    append_transferred_blocks,
+    prepare_transfer_target,
+};
 use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
@@ -60,9 +64,9 @@ impl WsSmartTransferProtocolClient {
             Ok(success) => {
                 tracing::debug!(
                     num_blocks = % success.transfer_plan.num_blocks,
-                    bytes_in_raw_locks = % success.transfer_plan.bytes_in_raw_blocks,
+                    bytes_in_raw_blocks = % success.transfer_plan.bytes_in_raw_blocks,
                     num_objects = % success.transfer_plan.num_objects,
-                    bytes_in_raw_objecs = % success.transfer_plan.bytes_in_raw_objects,
+                    bytes_in_raw_objects = % success.transfer_plan.bytes_in_raw_objects,
                     "Pull response estimate",
                 );
                 Ok(success)
@@ -155,7 +159,7 @@ impl WsSmartTransferProtocolClient {
             .for_each(|s| {
                 tracing::debug!(
                     physical_hash = % s.object_file.physical_hash,
-                    download_from_url = % s.download_from.url,
+                    download_from_url = % url_without_query(&s.download_from.url),
                     pull_strategy = ? s.pull_strategy,
                     expires_at = ? s.download_from.expires_at,
                     "Detailed file download strategy",
@@ -171,9 +175,7 @@ impl WsSmartTransferProtocolClient {
         dst: &LocalSyncTarget,
         transfer_options: TransferOptions,
     ) -> Result<SyncTransfer, SyncError> {
-        let maybe_access_token = self
-            .dataset_credential_resolver
-            .resolve_odf_dataset_access_token(http_src_url);
+        let maybe_access_token = self.access_token(http_src_url);
 
         let (dst_dataset, dst_head) = match dst {
             LocalSyncTarget::Existing {
@@ -207,10 +209,10 @@ impl WsSmartTransferProtocolClient {
                 transfer_options.force_update_if_diverged,
             )
             .await
+            .inspect_err(|e| tracing::debug!("Pull process aborted with error: {e}"))
         {
             Ok(dataset_pull_result) => dataset_pull_result,
             Err(e) => {
-                tracing::debug!("Pull process aborted with error: {}", e);
                 let e = match e {
                     PullClientError::InvalidInterval(e) => {
                         // The server could not find our head in its chain. Unless the
@@ -232,8 +234,8 @@ impl WsSmartTransferProtocolClient {
                             })
                         }
                     }
-                    PullClientError::OverwriteSeedBlock(_)
-                    | PullClientError::ReadFailed(_)
+                    PullClientError::OverwriteSeedBlock(e) => SyncError::OverwriteSeedBlock(e),
+                    PullClientError::ReadFailed(_)
                     | PullClientError::WriteFailed(_)
                     | PullClientError::Internal(_) => SyncError::Internal(e.int_err()),
                 };
@@ -242,14 +244,11 @@ impl WsSmartTransferProtocolClient {
         };
 
         let sync_transfer = if dataset_pull_result.transfer_plan.num_blocks > 0 {
-            let dataset_pull_metadata_response =
-                match self.pull_send_metadata_request(&mut ws_stream).await {
-                    Ok(dataset_pull_metadata_response) => Ok(dataset_pull_metadata_response),
-                    Err(e) => {
-                        tracing::debug!("Pull process aborted with error: {}", e);
-                        Err(SyncError::Internal(e.int_err()))
-                    }
-                }?;
+            let dataset_pull_metadata_response = self
+                .pull_send_metadata_request(&mut ws_stream)
+                .await
+                .inspect_err(|e| tracing::debug!("Pull process aborted with error: {e}"))
+                .int_err()?;
 
             // A retry would receive the same blocks, so a batch that cannot be read is
             // a corrupted source, not a transient failure
@@ -275,8 +274,11 @@ impl WsSmartTransferProtocolClient {
             }
 
             // Safety: there are blocks, oldest first
-            let (dst_storage, target) = prepare_transfer_target(
-                &self.catalog,
+            let TransferTarget {
+                storage: dst_storage,
+                target,
+            } = prepare_transfer_target(
+                self.catalog(),
                 dst,
                 transfer_options.visibility_for_created_dataset,
                 || new_blocks.pop_front().unwrap(),
@@ -308,16 +310,11 @@ impl WsSmartTransferProtocolClient {
                     stage_object_files.len()
                 );
 
-                let dataset_objects_pull_response = match self
+                let dataset_objects_pull_response = self
                     .pull_send_objects_request(&mut ws_stream, stage_object_files)
                     .await
-                {
-                    Ok(dataset_objects_pull_response) => Ok(dataset_objects_pull_response),
-                    Err(e) => {
-                        tracing::debug!("Pull process aborted with error: {}", e);
-                        Err(SyncError::Internal(e.int_err()))
-                    }
-                }?;
+                    .inspect_err(|e| tracing::debug!("Pull process aborted with error: {e}"))
+                    .int_err()?;
 
                 let dst_ref = dst_storage.as_ref();
                 futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)

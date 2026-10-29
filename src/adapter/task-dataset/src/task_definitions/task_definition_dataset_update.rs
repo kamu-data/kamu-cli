@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
 use kamu_core::{PollingIngestOptions, PullLocalTarget, PullPlanIterationJob, SyncOptions};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,23 +39,31 @@ pub enum DatasetUpdateJob {
 }
 
 impl TryFrom<PullPlanIterationJob> for DatasetUpdateJob {
-    type Error = InternalError;
+    type Error = UpdateTargetMissingError;
 
     fn try_from(pull_job: PullPlanIterationJob) -> Result<Self, Self::Error> {
         match pull_job {
             PullPlanIterationJob::Ingest(pii) => Ok(Self::Ingest(pii.target)),
-            PullPlanIterationJob::Transform(pti) => Ok(Self::Transform(pti.target.take_handle())),
+            PullPlanIterationJob::Transform(pti) => Ok(Self::Transform(pti.target)),
             PullPlanIterationJob::Sync(psi) => match psi.local_target {
                 PullLocalTarget::Existing(target) => Ok(Self::Sync {
                     target,
                     remote_ref: psi.remote_ref,
                 }),
-                PullLocalTarget::ToCreate(alias) => InternalError::bail(format!(
-                    "An update task syncs into an existing dataset, but {alias} does not exist"
-                )),
+                PullLocalTarget::ToCreate(alias) => Err(UpdateTargetMissingError { alias }),
             },
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An update task syncs into an existing dataset, so a pull that would create
+/// its target is not an update task
+#[derive(Debug, thiserror::Error)]
+#[error("An update task syncs into an existing dataset, but {alias} does not exist")]
+pub struct UpdateTargetMissingError {
+    pub alias: odf::DatasetAlias,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

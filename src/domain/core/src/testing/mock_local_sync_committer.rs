@@ -28,6 +28,27 @@ impl MockLocalSyncCommitter {
             .returning(move |_| result.lock().unwrap().take().unwrap());
         self
     }
+
+    /// Expects one commit of a transfer into an existing dataset up to
+    /// `new_head`, moving `HEAD` from the head the transfer expected
+    pub fn make_expect_commit_into_existing(mut self, new_head: odf::Multihash) -> Self {
+        self.expect_commit()
+            .withf(move |transferred| transferred.new_head == new_head)
+            .times(1)
+            .returning(|transferred| {
+                let TransferredSyncTarget::Existing { expected_head, .. } = transferred.target
+                else {
+                    panic!("Expected a transfer into an existing dataset");
+                };
+                Ok(SyncResult::Updated {
+                    old_head: expected_head,
+                    new_head: transferred.new_head,
+                    num_blocks: transferred.num_blocks,
+                    increment: transferred.increment,
+                })
+            });
+        self
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

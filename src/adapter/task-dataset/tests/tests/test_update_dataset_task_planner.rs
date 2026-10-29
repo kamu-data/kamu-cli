@@ -68,6 +68,26 @@ async fn test_derived_dataset_plans_a_transform() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_dataset_with_one_pull_alias_plans_a_sync() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+    let harness = UpdateDatasetTaskPlannerHarness::new();
+    let foo = harness.create_root_dataset(&alias_foo).await;
+    harness
+        .add_pull_alias(&foo, "odf+http://example.com/foo")
+        .await;
+
+    let job = harness.plan_update(&foo).await.unwrap();
+
+    assert_matches!(
+        job,
+        DatasetUpdateJob::Sync { target, remote_ref }
+        if target == foo.dataset_handle && remote_ref.to_string() == "odf+http://example.com/foo"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_deleted_dataset_fails_unrecoverably() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let harness = UpdateDatasetTaskPlannerHarness::new();

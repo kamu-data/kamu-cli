@@ -119,24 +119,7 @@ macro_rules! task_result_struct {
             ),*
         }
 
-        impl $name {
-            pub const TYPE_ID: &'static str = $type_id;
-
-            pub fn into_task_result(self) -> $crate::TaskResult {
-                $crate::TaskResult {
-                    result_type: Self::TYPE_ID.to_string(),
-                    payload: serde_json::to_value(self)
-                        .expect(concat!("Failed to serialize ", stringify!($name), " into JSON")),
-                }
-            }
-
-            pub fn from_task_result(
-                task_result: &$crate::TaskResult,
-            ) -> Result<Self, internal_error::InternalError> {
-                use internal_error::ResultIntoInternal;
-                serde_json::from_value(task_result.payload.clone()).int_err()
-            }
-        }
+        $crate::task_result_impl!($name => $type_id);
     };
 }
 
@@ -158,14 +141,29 @@ macro_rules! task_result_enum {
             $($variant)*
         }
 
+        $crate::task_result_impl!($name => $type_id);
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The serialization helpers shared by `task_result_struct!` and
+/// `task_result_enum!`
+#[doc(hidden)]
+#[macro_export]
+macro_rules! task_result_impl {
+    ($name:ident => $type_id:expr) => {
         impl $name {
             pub const TYPE_ID: &'static str = $type_id;
 
             pub fn into_task_result(self) -> $crate::TaskResult {
                 $crate::TaskResult {
                     result_type: Self::TYPE_ID.to_string(),
-                    payload: serde_json::to_value(self)
-                        .expect(concat!("Failed to serialize ", stringify!($name), " into JSON")),
+                    payload: serde_json::to_value(self).expect(concat!(
+                        "Failed to serialize ",
+                        stringify!($name),
+                        " into JSON"
+                    )),
                 }
             }
 

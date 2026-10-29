@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use futures::stream::{StreamExt, TryStreamExt};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::utils::smart_transfer_protocol::TransferOptions;
 use kamu::utils::sync_increment::sync_increment;
 use kamu_core::*;
@@ -190,7 +190,7 @@ impl WsSmartTransferProtocolClient {
                 Some(transfer_url) => {
                     tracing::debug!(
                         physical_hash = % s.object_file.physical_hash,
-                        transfer_url = % transfer_url.url,
+                        transfer_url = % url_without_query(&transfer_url.url),
                         push_strategy = ? s.push_strategy,
                         expires_at = ? transfer_url.expires_at,
                         "Object file upload strategy details"
@@ -211,51 +211,46 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         push_objects_response: DatasetPushObjectsTransferAccepted,
-        src: Arc<dyn odf::Dataset>,
+        src: &dyn odf::Dataset,
         transfer_options: TransferOptions,
     ) -> Result<(), SyncError> {
-        let uploaded_files_counter = Arc::new(AtomicI32::new(0));
+        let uploaded_files_counter = AtomicI32::new(0);
 
-        let task_data: Vec<_> = push_objects_response
-            .object_transfer_strategies
-            .into_iter()
-            .map(|s| (s, uploaded_files_counter.clone()))
-            .collect();
-
-        let mut export_task = tokio::spawn(async move {
-            let src_ref = src.as_ref();
-            futures::stream::iter(task_data)
+        // Polled here rather than spawned, so an early return cancels the uploads
+        let mut export = std::pin::pin!(
+            futures::stream::iter(push_objects_response.object_transfer_strategies)
                 .map(Ok)
                 .try_for_each_concurrent(
                     /* limit */ transfer_options.max_parallel_transfers,
-                    |(s, counter)| async move {
-                        let export_result = dataset_export_object_file(src_ref, s).await;
-                        counter.fetch_add(1, Ordering::Relaxed);
-                        export_result
+                    |s| {
+                        let counter = &uploaded_files_counter;
+                        async move {
+                            let export_result = dataset_export_object_file(src, s).await;
+                            counter.fetch_add(1, Ordering::Relaxed);
+                            export_result
+                        }
                     },
                 )
-                .await
-        });
+        );
 
         loop {
             tokio::select! {
-                _ = read_payload::<DatasetPushObjectsUploadProgressRequest>(socket) => {
-                        let uploaded_files_count: i32 = uploaded_files_counter.load(Ordering::Relaxed);
-                        tracing::debug!(%uploaded_files_count, "Notifying server about the upload progress");
-                        self
-                            .push_send_objects_upload_progress(socket, uploaded_files_count)
-                            .await
-                            .int_err()?;
-                    }
-                res = &mut export_task => {
-                    let join_res = res.int_err()?;
-                    if join_res.is_err() {
-                        tracing::error!(
-                            "File transfer failed, error is {:?}",
-                            join_res
-                        );
-                        join_res?;
-                    }
+                progress_request = read_payload::<DatasetPushObjectsUploadProgressRequest>(socket) => {
+                    progress_request
+                        .map_err(|e| {
+                            PushClientError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsUploadProgress))
+                        })
+                        .int_err()?;
+                    let uploaded_files_count: i32 = uploaded_files_counter.load(Ordering::Relaxed);
+                    tracing::debug!(%uploaded_files_count, "Notifying server about the upload progress");
+                    self
+                        .push_send_objects_upload_progress(socket, uploaded_files_count)
+                        .await
+                        .int_err()?;
+                }
+                export_result = &mut export => {
+                    export_result
+                        .inspect_err(|e| tracing::error!(error = ?e, "File transfer failed"))?;
                     break;
                 }
             }
@@ -263,13 +258,10 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Uploading group of files finished");
 
-        match self.push_send_objects_upload_complete(socket).await {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::debug!("Push process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
-            }
-        }
+        self.push_send_objects_upload_complete(socket)
+            .await
+            .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))
+            .int_err()?;
 
         Ok(())
     }
@@ -301,7 +293,7 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
     ) -> Result<(), PushClientError> {
-        tracing::debug!("Sending push objects upload progress");
+        tracing::debug!("Sending push objects upload complete");
         write_payload(
             socket,
             DatasetPushObjectsUploadProgressResponse {
@@ -416,47 +408,31 @@ impl WsSmartTransferProtocolClient {
         // Read before the remote head moves, so a failure here aborts the push
         let increment = sync_increment(src.as_metadata_chain(), dst_head, &src_head).await?;
 
-        let maybe_access_token = self
-            .dataset_credential_resolver
-            .resolve_odf_dataset_access_token(http_dst_url);
+        let maybe_access_token = self.access_token(http_dst_url);
         let mut ws_stream =
             Self::connect(http_dst_url, "push", maybe_access_token.as_deref()).await?;
 
-        match self
-            .push_send_request(
-                &mut ws_stream,
-                transfer_plan,
-                dst_head,
-                transfer_options.force_update_if_diverged,
-                transfer_options.visibility_for_created_dataset,
-            )
-            .await
-        {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::debug!("Push process aborted with error: {}", e);
-                return Err(e.into());
-            }
-        }
+        self.push_send_request(
+            &mut ws_stream,
+            transfer_plan,
+            dst_head,
+            transfer_options.force_update_if_diverged,
+            transfer_options.visibility_for_created_dataset,
+        )
+        .await
+        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
-        match self
-            .push_send_metadata_request(
-                &mut ws_stream,
-                src.as_ref(),
-                &src_head,
-                dst_head,
-                transfer_options.force_update_if_diverged,
-            )
-            .await
-        {
-            Ok(_) => {}
-            Err(e) => {
-                tracing::debug!("Push process aborted with error: {}", e);
-                return Err(e.into());
-            }
-        }
+        self.push_send_metadata_request(
+            &mut ws_stream,
+            src.as_ref(),
+            &src_head,
+            dst_head,
+            transfer_options.force_update_if_diverged,
+        )
+        .await
+        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
-        let missing_objects = match collect_object_references_from_interval(
+        let missing_objects = collect_object_references_from_interval(
             src.as_ref(),
             &src_head,
             dst_head,
@@ -464,40 +440,25 @@ impl WsSmartTransferProtocolClient {
             false,
         )
         .await
-        {
-            Ok(object_references) => object_references,
-            Err(e) => {
-                tracing::debug!("Push process aborted with error: {}", e);
-                return Err(SyncError::Internal(e.int_err()));
-            }
-        };
+        .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))
+        .int_err()?;
 
-        let push_objects_response = match self
+        let push_objects_response = self
             .push_send_objects_request(&mut ws_stream, missing_objects)
             .await
-        {
-            Ok(push_objects_response) => push_objects_response,
-            Err(e) => {
-                tracing::debug!("Push process aborted with error: {}", e);
-                return Err(e.into());
-            }
-        };
+            .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
         self.export_group_of_object_files(
             &mut ws_stream,
             push_objects_response,
-            src.clone(),
+            src.as_ref(),
             transfer_options,
         )
         .await?;
 
-        match self.push_send_complete_request(&mut ws_stream).await {
-            Ok(()) => {}
-            Err(e) => {
-                tracing::debug!("Push process aborted with error: {}", e);
-                return Err(e.into());
-            }
-        }
+        self.push_send_complete_request(&mut ws_stream)
+            .await
+            .inspect_err(|e| tracing::debug!("Push process aborted with error: {e}"))?;
 
         ws_stream
             .close(Some(CloseFrame {

@@ -69,24 +69,21 @@ pub async fn test_repository_aliases_commands(kamu: KamuCliPuppet) {
     );
 
     // A kind flag removes the alias of that kind only
-    kamu.execute(["repo", "alias", "rm", "foo", &shared_push.alias, "--push"])
+    kamu.execute(["repo", "alias", "rm", "foo", &push.alias, "--push"])
         .await
         .success();
 
     pretty_assertions::assert_eq!(
         kamu.get_list_of_repo_aliases(&foo).await,
-        [pull.clone(), shared_pull.clone(), push.clone()]
+        [pull.clone(), shared_pull.clone(), shared_push.clone()]
     );
 
     // Without a kind flag, the alias is removed whatever its kind
-    kamu.execute(["repo", "alias", "rm", "foo", &pull.alias])
+    kamu.execute(["repo", "alias", "rm", "foo", &shared_pull.alias])
         .await
         .success();
 
-    pretty_assertions::assert_eq!(
-        kamu.get_list_of_repo_aliases(&foo).await,
-        [shared_pull, push]
-    );
+    pretty_assertions::assert_eq!(kamu.get_list_of_repo_aliases(&foo).await, [pull]);
 
     kamu.execute(["repo", "alias", "rm", "--all", "foo"])
         .await

@@ -16,7 +16,6 @@ use kamu_datasets::{
     ClassifyByAllowanceDatasetActionUnauthorizedError,
     DatasetRegistry,
     DatasetRegistryExt,
-    ResolvedDataset,
 };
 use thiserror::Error;
 
@@ -44,13 +43,23 @@ pub trait PullRequestPlanner: Send + Sync {
         requests: &[PullRequest],
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> (Vec<PullPlanIteration>, Vec<PullResponse>);
+    ) -> PullPlan;
 
     async fn build_pull_plan_all_owner_datasets(
         &self,
         options: &PullOptions,
         tenancy_config: TenancyConfig,
-    ) -> Result<(Vec<PullPlanIteration>, Vec<PullResponse>), InternalError>;
+    ) -> Result<PullPlan, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A plan for several pulls: iterations to run in order, or the responses of
+/// the requests that could not be planned
+#[derive(Debug, Default)]
+pub struct PullPlan {
+    pub iterations: Vec<PullPlanIteration>,
+    pub errors: Vec<PullResponse>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,14 +68,6 @@ pub trait PullRequestPlanner: Send + Sync {
 pub struct PullPlanIteration {
     pub depth: i32,
     pub jobs: Vec<PullPlanIterationJob>,
-}
-
-impl PullPlanIteration {
-    pub fn detach_from_transaction(&self) {
-        for job in &self.jobs {
-            job.detach_from_transaction();
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -92,13 +93,6 @@ impl PullPlanIterationJob {
             Self::Sync(psi) => psi.maybe_original_request,
         }
     }
-
-    pub fn detach_from_transaction(&self) {
-        match self {
-            Self::Ingest(_) | Self::Sync(_) => {}
-            Self::Transform(pti) => pti.target.detach_from_transaction(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,7 +110,7 @@ pub struct PullIngestItem {
 /// runs, in the transaction that elaborates it.
 #[derive(Debug)]
 pub struct PullTransformItem {
-    pub target: ResolvedDataset,
+    pub target: odf::DatasetHandle,
     pub maybe_original_request: Option<PullRequest>,
     /// Inputs of the transform, which the pull reads
     pub input_handles: Vec<odf::DatasetHandle>,
@@ -264,7 +258,7 @@ impl PullItemCommon for PullIngestItem {
 
 impl PullItemCommon for PullTransformItem {
     fn try_get_written_handle(&self) -> Option<&odf::DatasetHandle> {
-        Some(self.target.get_handle())
+        Some(&self.target)
     }
 
     fn get_read_handles(&self) -> Vec<&odf::DatasetHandle> {
@@ -520,10 +514,7 @@ impl PullError {
             | Self::CannotInferLocalName(_)
             | Self::Access(_) => false,
 
-            Self::ScanMetadata(e) => match e {
-                ScanMetadataError::SourceNotFound(_) | ScanMetadataError::HeadNotFound(_) => false,
-                ScanMetadataError::Internal(_) => true,
-            },
+            Self::ScanMetadata(e) => e.is_recoverable(),
             Self::PollingIngestError(e) => e.is_recoverable(),
             Self::IngestStopped(e) => e.source.is_recoverable(),
             Self::TransformError(e) => e.is_recoverable(),
@@ -633,7 +624,7 @@ mod tests {
                         hash: odf::Multihash::from_digest_sha3_256(b"head"),
                     },
                 )),
-                false,
+                true,
             ),
             (
                 PullError::ScanMetadata(ScanMetadataError::Internal(

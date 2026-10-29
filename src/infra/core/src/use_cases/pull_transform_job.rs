@@ -10,13 +10,14 @@
 use std::sync::Arc;
 
 use database_common_macros::transactional_method1;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::*;
 use kamu_datasets::{
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetRegistry,
+    DatasetRegistryExt,
     ResolvedDataset,
 };
 use random_strings::get_random_name;
@@ -58,7 +59,7 @@ impl PullTransformJob {
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<PullResponse, InternalError> {
         let maybe_original_request = pti.maybe_original_request.clone();
-        let target_handle = pti.target.get_handle().clone();
+        let target_handle = pti.target.clone();
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
 
         let transform_result = self
@@ -84,7 +85,7 @@ impl PullTransformJob {
         transform_options: TransformOptions,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, PullError> {
-        let target_handle = pti.target.get_handle();
+        let target_handle = &pti.target;
         let mut maybe_reset_heads = None;
 
         let elaboration = match self.update_steps.elaborate_transform(target_handle).await {
@@ -228,7 +229,12 @@ impl PullTransformJob {
         &self,
         target_handle: &odf::DatasetHandle,
     ) -> Result<(ResolvedDataset, CompactionPlan), PullError> {
-        let target = dataset_registry.get_dataset_by_handle(target_handle).await;
+        let target = dataset_registry
+            .try_get_dataset_by_ref(&target_handle.as_local_ref())
+            .await?
+            .ok_or_else(|| {
+                PullError::NotFound(odf::DatasetNotFoundError::new(target_handle.as_local_ref()))
+            })?;
         let plan = self
             .compaction_planner
             .plan_compaction(
@@ -262,8 +268,9 @@ impl PullTransformJob {
             .compaction_executor
             .execute(target, plan, None)
             .await
-            .int_err()?
-        {
+            .map_err(|e| match e {
+                CompactionExecutionError::Internal(e) => PullError::Internal(e),
+            })? {
             CompactionResult::NothingToDo => Ok(None),
             CompactionResult::Success {
                 old_head, new_head, ..

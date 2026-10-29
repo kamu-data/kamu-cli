@@ -10,15 +10,16 @@
 use std::sync::Arc;
 
 use dill::component;
-use internal_error::ErrorIntoInternal;
 use kamu_core::{
     DatasetAnyRefUnresolvedError,
+    InvalidSyncDestinationError,
     RemoteDatasetUrlResolver,
     RemoteRepositoryRegistry,
     SyncError,
     SyncRef,
     SyncRefRemote,
     SyncRequest,
+    try_resolve_head,
 };
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 use url::Url;
@@ -48,10 +49,10 @@ impl SyncRequestBuilder {
             .as_local_ref(|repo| self.remote_repo_registry.get_repository(repo).is_ok())
         {
             Ok(local_ref) => {
-                return Err(format!(
-                    "Destination {local_ref} is a local dataset, pull into it instead"
-                )
-                .int_err()
+                return Err(InvalidSyncDestinationError {
+                    dst_ref: local_ref.as_any_ref(),
+                    reason: "it is a local dataset, pull into it instead".to_owned(),
+                }
                 .into());
             }
             Err(remote_ref) => remote_ref,
@@ -136,18 +137,10 @@ impl SyncRequestBuilder {
         dataset_ref: odf::DatasetRefAny,
         dataset: &dyn odf::Dataset,
     ) -> Result<(), SyncError> {
-        match dataset
-            .as_metadata_chain()
-            .resolve_ref(&odf::BlockRef::Head)
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(odf::GetRefError::NotFound(_)) => {
-                Err(DatasetAnyRefUnresolvedError { dataset_ref }.into())
-            }
-            Err(odf::GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(odf::GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }
+        try_resolve_head(dataset.as_metadata_chain())
+            .await?
+            .ok_or_else(|| DatasetAnyRefUnresolvedError { dataset_ref }.into())
+            .map(|_| ())
     }
 }
 

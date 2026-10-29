@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{ErrorIntoInternal, ResultIntoInternal};
+use internal_error::ErrorIntoInternal;
 use kamu_core::SyncError;
 use odf::dataset::MetadataChainExt as _;
 
@@ -25,7 +25,7 @@ pub async fn sync_increment(
 
     // A source chain that diverged from the destination lacks its old head
     let old_head = match old_head {
-        Some(old_head) if chain.contains_block(old_head).await.int_err()? => Some(old_head),
+        Some(old_head) if contains_block(chain, old_head).await? => Some(old_head),
         Some(_) | None => None,
     };
 
@@ -37,6 +37,18 @@ pub async fn sync_increment(
             .map_err(|e| SyncError::Internal(e.int_err())),
         Err(e @ (E::BlockNotFound(_) | E::Internal(_))) => Err(SyncError::Internal(e.int_err())),
     }
+}
+
+async fn contains_block(
+    chain: &dyn odf::MetadataChain,
+    hash: &odf::Multihash,
+) -> Result<bool, SyncError> {
+    use odf::storage::ContainsBlockError as E;
+
+    chain.contains_block(hash).await.map_err(|e| match e {
+        E::Access(e) => SyncError::Access(e),
+        E::Internal(e) => SyncError::Internal(e),
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

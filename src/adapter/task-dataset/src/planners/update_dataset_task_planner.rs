@@ -57,12 +57,13 @@ impl UpdateDatasetTaskPlanner {
             )
             .await
             .map_err(|e| planning_failed(&e, e.is_recoverable()))?;
-        pull_job.detach_from_transaction();
 
         Ok(TaskDefinition::new(TaskDefinitionDatasetUpdate {
             ingest_options: pull_options.ingest_options,
             sync_options: pull_options.sync_options,
-            job: pull_job.try_into()?,
+            job: pull_job
+                .try_into()
+                .map_err(|e| planning_failed(&e, false))?,
         }))
     }
 }

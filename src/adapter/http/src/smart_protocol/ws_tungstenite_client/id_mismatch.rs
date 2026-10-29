@@ -53,9 +53,7 @@ impl WsSmartTransferProtocolClient {
             }
         };
 
-        let maybe_access_token = self
-            .dataset_credential_resolver
-            .resolve_odf_dataset_access_token(http_dst_url);
+        let maybe_access_token = self.access_token(http_dst_url);
         let dst_dataset_id =
             try_fetch_remote_dataset_id(http_dst_url, maybe_access_token.as_deref()).await?;
 

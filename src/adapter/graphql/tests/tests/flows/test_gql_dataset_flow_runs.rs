@@ -38,13 +38,7 @@ use crate::utils::{
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -628,13 +622,7 @@ async fn test_trigger_reset_root_dataset_flow_with_invalid_head() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 5,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -865,13 +853,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_compaction_root_dataset() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -3515,13 +3497,7 @@ async fn test_history_with_activation_cause_of_missing_dataset() {
 #[test_log::test(tokio::test)]
 async fn test_execute_transform_flow_error_after_compaction() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -3842,13 +3818,7 @@ async fn test_anonymous_operation_fails() {
 #[test_log::test(tokio::test)]
 async fn test_config_snapshot_returned_correctly() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -3963,13 +3933,7 @@ async fn test_config_snapshot_returned_correctly() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset_with_retry_policy() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
@@ -4436,13 +4400,7 @@ async fn test_trigger_ingest_root_dataset_with_retry_policy() {
 #[test_log::test(tokio::test)]
 async fn test_trigger_flow_automatically_via_schedule() {
     let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
-        dataset_changes_mock: Some(MockDatasetIncrementQueryService::with_increment_between(
-            MetadataChainIncrementInterval {
-                num_blocks: 1,
-                num_records: 12,
-                updated_watermark: None,
-            },
-        )),
+        dataset_changes_mock: Some(MockDatasetIncrementQueryService::default()),
     })
     .await;
 
