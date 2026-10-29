@@ -22,5 +22,8 @@ mod errors;
 pub mod messages;
 pub(crate) mod phases;
 mod remote_dataset_id;
+mod smart_transfer_protocol_server_config;
+
+pub use smart_transfer_protocol_server_config::*;
 
 pub mod ws_tungstenite_client;

@@ -9,6 +9,7 @@
 
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
@@ -42,11 +43,6 @@ use crate::smart_protocol::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Should be less than idle timeout rules in the load balancer
-const MIN_UPLOAD_PROGRESS_PING_DELAY_SEC: u64 = 10;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct AxumServerPushProtocolInstance {
     socket: axum::extract::ws::WebSocket,
     catalog: Catalog,
@@ -54,6 +50,7 @@ pub struct AxumServerPushProtocolInstance {
     maybe_dataset_handle: Option<odf::DatasetHandle>,
     dataset_url: Url,
     maybe_bearer_header: Option<BearerHeader>,
+    upload_progress_interval: Duration,
 }
 
 impl AxumServerPushProtocolInstance {
@@ -64,6 +61,7 @@ impl AxumServerPushProtocolInstance {
         maybe_dataset_handle: Option<odf::DatasetHandle>,
         dataset_url: Url,
         maybe_bearer_header: Option<BearerHeader>,
+        upload_progress_interval: Duration,
     ) -> Self {
         Self {
             socket,
@@ -72,6 +70,7 @@ impl AxumServerPushProtocolInstance {
             maybe_dataset_handle,
             dataset_url,
             maybe_bearer_header,
+            upload_progress_interval,
         }
     }
 
@@ -470,9 +469,7 @@ impl AxumServerPushProtocolInstance {
             PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsRequest))
         })?;
 
-        let mut notify_interval = tokio::time::interval(std::time::Duration::from_secs(
-            MIN_UPLOAD_PROGRESS_PING_DELAY_SEC,
-        ));
+        let mut notify_interval = tokio::time::interval(self.upload_progress_interval);
         notify_interval.tick().await; // clear first immediate interval tick
 
         loop {
