@@ -9,11 +9,13 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
 use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
+use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
     AlwaysHappyDatasetPermissionChecker,
@@ -35,6 +37,9 @@ use super::ServerSideDatasetFixture;
 
 pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
+
+/// The node's default: no test upload lasts long enough for a progress request
+const DEFAULT_UPLOAD_PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -94,6 +99,20 @@ pub(crate) struct ServerSideHarnessOptions {
     pub tenancy_config: TenancyConfig,
     pub authorized_writes: bool,
     pub base_catalog: Option<dill::Catalog>,
+    pub smart_transfer_protocol_config: SmartTransferProtocolServerConfig,
+}
+
+impl Default for ServerSideHarnessOptions {
+    fn default() -> Self {
+        Self {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: false,
+            base_catalog: None,
+            smart_transfer_protocol_config: SmartTransferProtocolServerConfig {
+                upload_progress_interval: DEFAULT_UPLOAD_PROGRESS_INTERVAL,
+            },
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

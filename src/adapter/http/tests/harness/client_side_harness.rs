@@ -28,9 +28,14 @@ use kamu_accounts_inmem::{
 };
 use kamu_accounts_services::*;
 use kamu_adapter_http::smart_protocol::messages::{
+    DatasetPushMetadataRequest,
     DatasetPushRequest,
     DatasetPushResponse,
     SMART_TRANSFER_PROTOCOL_VERSION,
+};
+use kamu_adapter_http::smart_protocol::protocol_dataset_helper::{
+    prepare_dataset_metadata_batch,
+    prepare_dataset_transfer_plan,
 };
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -53,6 +58,7 @@ use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
+use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
@@ -60,7 +66,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::{Error, Message};
 use url::Url;
 
-use super::append_unreferenced_block;
+use super::{RawPushSession, append_unreferenced_block, commit_add_data_event};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -444,6 +450,90 @@ impl ClientSideHarness {
                 panic!("Failure")
             }
         }
+    }
+
+    /// Creates a root dataset of the operating account with a schema and one
+    /// data slice, and returns its local reference
+    pub async fn create_root_dataset_with_data(&self, dataset_name: &str) -> odf::DatasetRef {
+        let alias = odf::DatasetAlias::new(
+            self.operating_account_name(),
+            odf::DatasetName::new_unchecked(dataset_name),
+        );
+        let created = self
+            .create_dataset_from_snapshot()
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(alias.clone())
+                    .kind(odf::DatasetKind::Root)
+                    .push_event(MetadataFactory::set_polling_source().build())
+                    .push_event(MetadataFactory::set_data_schema().build())
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+        commit_add_data_event(
+            self.dataset_registry().as_ref(),
+            &created.dataset_handle,
+            None,
+        )
+        .await;
+        alias.as_local_ref()
+    }
+
+    /// Commits a metadata-only block, which references no objects
+    pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
+        self.commit_dataset_event()
+            .execute(
+                dataset_handle,
+                MetadataFactory::set_info()
+                    .description("pushed")
+                    .build()
+                    .into(),
+            )
+            .await
+            .unwrap()
+            .new_head
+    }
+
+    /// The push request and metadata for the blocks after `base_head`, as the
+    /// client would send them
+    pub async fn raw_push_requests(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        base_head: &odf::Multihash,
+    ) -> (DatasetPushRequest, DatasetPushMetadataRequest) {
+        let resolved_dataset = self
+            .dataset_registry()
+            .get_dataset_by_handle(dataset_handle)
+            .await;
+        let chain = resolved_dataset.as_metadata_chain();
+        let head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
+
+        let transfer_plan = prepare_dataset_transfer_plan(chain, &head, Some(base_head), false)
+            .await
+            .unwrap();
+        let new_blocks = prepare_dataset_metadata_batch(chain, &head, Some(base_head), false)
+            .await
+            .unwrap();
+
+        (
+            DatasetPushRequest {
+                current_head: Some(base_head.clone()),
+                transfer_plan,
+                force_update_if_diverged: false,
+                visibility_for_created_dataset: odf::DatasetVisibility::Private,
+            },
+            DatasetPushMetadataRequest { new_blocks },
+        )
+    }
+
+    pub async fn open_raw_push_session(&self, url: &Url) -> RawPushSession {
+        let (socket, _) =
+            connect_async(self.websocket_request(url, "push", SMART_TRANSFER_PROTOCOL_VERSION))
+                .await
+                .unwrap();
+        RawPushSession::new(socket)
     }
 
     pub fn add_repository(

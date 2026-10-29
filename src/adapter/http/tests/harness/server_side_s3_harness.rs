@@ -123,6 +123,7 @@ impl ServerSideS3Harness {
                 .add::<DatasetS3BuilderDatabaseBackedImpl>()
                 .add_value(MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
+                .add_value(options.smart_transfer_protocol_config.clone())
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()

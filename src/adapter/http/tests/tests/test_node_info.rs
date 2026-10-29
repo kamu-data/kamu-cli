@@ -78,7 +78,7 @@ impl NodeInfoHarness {
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await;
 

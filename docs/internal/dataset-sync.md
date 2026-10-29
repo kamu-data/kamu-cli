@@ -378,6 +378,9 @@ Server-side details:
   `UpdatedConcurrently`. A server that predates this expects whatever `HEAD` is at commit time
   under `force`. A batch starting with a `Seed` into an existing dataset, with `force` or without a
   `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` is of another dataset.
+- While objects upload, the server asks for progress every
+  `protocol.smartTransferProtocol.uploadProgressInterval` of the node configuration (10 s by
+  default), which must stay below the idle timeout of load balancers in front of it.
 - Completion posts `DatasetExternallyChangedMessage::smart_transfer_protocol_sync` in the commit's
   transaction, which is how flows learn about a push
   ([flow-system.md](flow-system.md#changes-made-outside-flows)).

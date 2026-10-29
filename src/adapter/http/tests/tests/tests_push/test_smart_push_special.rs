@@ -8,11 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::time::Duration;
 
-use kamu::domain::{PushError, SyncError, SyncHeadMovedError};
+use kamu::domain::{PushError, SyncError, SyncHeadMovedError, SyncResult};
+use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_adapter_http::smart_protocol::messages::{
+    DatasetPushCompleteConfirmed,
     DatasetPushRequest,
     DatasetPushRequestError,
+    ObjectsUploadProgressDetails,
+    ObjectsUploadProgressDetailsRunning,
     TransferPlan,
 };
 use kamu_core::TenancyConfig;
@@ -20,6 +25,7 @@ use kamu_core::TenancyConfig;
 use crate::harness::{
     ClientSideHarness,
     ClientSideHarnessOptions,
+    ScriptedPushServer,
     ServerSideHarness,
     ServerSideHarnessOptions,
     ServerSideLocalFsHarness,
@@ -40,7 +46,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -87,7 +93,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -139,7 +145,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: false,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -181,7 +187,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: false,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -223,7 +229,7 @@ async fn test_smart_push_existing_ref_collision() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -265,7 +271,7 @@ async fn test_smart_push_incompatible_version_err() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -302,7 +308,7 @@ async fn test_smart_push_head_moved_concurrently() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -365,7 +371,7 @@ async fn test_smart_push_from_stale_head_is_rejected_with_both_heads() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -422,7 +428,7 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -470,6 +476,164 @@ async fn test_smart_push_forced_head_moved_after_initiation() {
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_server_asks_for_upload_progress_at_its_interval() {
+    let scenario = SmartPushExistingUpToDateDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            smart_transfer_protocol_config: SmartTransferProtocolServerConfig {
+                upload_progress_interval: Duration::from_millis(1),
+            },
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+
+    // A pushed dataset keeps its ID on the server
+    let dataset_handle = &scenario.client_dataset_handle;
+    let server_head = scenario
+        .client_harness
+        .stored_head(&dataset_handle.id)
+        .await;
+    let new_head = scenario
+        .client_harness
+        .commit_set_info(dataset_handle)
+        .await;
+    let (push_request, metadata_request) = scenario
+        .client_harness
+        .raw_push_requests(dataset_handle, &server_head)
+        .await;
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let mut session = scenario
+            .client_harness
+            .open_raw_push_session(scenario.server_dataset_ref.url().unwrap())
+            .await;
+        session
+            .begin_metadata_only_push(push_request, metadata_request)
+            .await;
+
+        // The server waits for the upload to complete, so it must ask first
+        let progress_request = session.next_progress_request().await;
+        assert!(progress_request.progress_requested);
+        session
+            .report_progress(ObjectsUploadProgressDetails::Running(
+                ObjectsUploadProgressDetailsRunning {
+                    uploaded_objects_count: 0,
+                },
+            ))
+            .await;
+        session
+            .report_progress(ObjectsUploadProgressDetails::Complete)
+            .await;
+
+        assert_matches!(
+            session.complete().await,
+            Ok(DatasetPushCompleteConfirmed {})
+        );
+        pretty_assertions::assert_eq!(stored_heads.get(&dataset_handle.id).await, new_head);
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_client_answers_upload_progress_requests() {
+    let client_harness = ClientSideHarness::new(ClientSideHarnessOptions {
+        tenancy_config: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+    })
+    .await;
+    let dataset_ref = client_harness.create_root_dataset_with_data("foo").await;
+    let server = ScriptedPushServer::progress_during_upload().await;
+    let server_dataset_url = server.dataset_url("foo");
+    let progress_reports = server.progress_reports();
+
+    let server_handle = server.run();
+
+    let client_handle = async {
+        let push_responses = client_harness
+            .push_dataset(
+                dataset_ref,
+                odf::DatasetRefRemote::from(&server_dataset_url)
+                    .try_into()
+                    .unwrap(),
+                false,
+                odf::DatasetVisibility::Private,
+            )
+            .await;
+
+        pretty_assertions::assert_eq!(push_responses.len(), 1);
+        assert_matches!(&push_responses[0].result, Ok(SyncResult::Updated { .. }));
+        // Asked while every upload was held, then told when they finished
+        pretty_assertions::assert_eq!(
+            progress_reports.get(),
+            vec![
+                ObjectsUploadProgressDetails::Running(ObjectsUploadProgressDetailsRunning {
+                    uploaded_objects_count: 0,
+                }),
+                ObjectsUploadProgressDetails::Complete,
+            ]
+        );
+    };
+
+    await_client_server_flow!(server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_reads_the_completion_reply_after_a_stale_progress_request() {
+    let client_harness = ClientSideHarness::new(ClientSideHarnessOptions {
+        tenancy_config: TenancyConfig::SingleTenant,
+        authenticated_remotely: false,
+    })
+    .await;
+    let dataset_ref = client_harness.create_root_dataset_with_data("foo").await;
+    let server = ScriptedPushServer::stale_progress_request().await;
+    let server_dataset_url = server.dataset_url("foo");
+
+    let server_handle = server.run();
+
+    let client_handle = async {
+        let push_responses = client_harness
+            .push_dataset(
+                dataset_ref,
+                odf::DatasetRefRemote::from(&server_dataset_url)
+                    .try_into()
+                    .unwrap(),
+                false,
+                odf::DatasetVisibility::Private,
+            )
+            .await;
+
+        // The server's reply, not the stale request read as a confirmation
+        pretty_assertions::assert_eq!(push_responses.len(), 1);
+        assert_matches!(
+            &push_responses[0].result,
+            Err(PushError::SyncError(SyncError::HeadMoved(
+                SyncHeadMovedError { heads: None }
+            )))
+        );
+    };
+
+    await_client_server_flow!(server_handle, client_handle);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

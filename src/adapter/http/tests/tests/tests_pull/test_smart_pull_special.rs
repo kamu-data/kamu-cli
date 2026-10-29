@@ -44,7 +44,7 @@ async fn test_smart_pull_unauthenticated() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -96,7 +96,7 @@ async fn test_smart_pull_incompatible_version_err() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -133,7 +133,7 @@ async fn test_smart_pull_of_missing_dataset_fails() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -197,7 +197,7 @@ impl HeadMovedConcurrentlyCase {
             ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                 tenancy_config: TenancyConfig::SingleTenant,
                 authorized_writes: true,
-                base_catalog: None,
+                ..ServerSideHarnessOptions::default()
             })
             .await,
         )

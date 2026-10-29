@@ -434,6 +434,7 @@ class "SetWatermarkPlannerImpl"
 class "SetWatermarkUseCaseImpl"
 class "SignEip712UseCaseImpl"
 class "SimpleTransferProtocol"
+class "SmartTransferProtocolServerConfig" <<singleton>>
 class "SourceConfig" <<singleton>>
 class "SparkLivyServerFactory"
 class "SqlInfoData" <<singleton>>

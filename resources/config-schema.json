@@ -891,6 +891,13 @@
             "preResolveDnslink": true
           },
           "description": "IPFS configuration"
+        },
+        "smartTransferProtocol": {
+          "$ref": "#/$defs/SmartTransferProtocolConfig",
+          "default": {
+            "uploadProgressInterval": "10s"
+          },
+          "description": "Smart transfer protocol configuration"
         }
       },
       "type": "object"
@@ -1105,6 +1112,17 @@
       },
       "type": "object"
     },
+    "SmartTransferProtocolConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "uploadProgressInterval": {
+          "$ref": "#/$defs/DurationString",
+          "default": "10s",
+          "description": "How often the server asks a pushing client for upload progress. Keep it\nbelow the idle timeout of load balancers in front of the server, or\nthey close the connection during long uploads"
+        }
+      },
+      "type": "object"
+    },
     "SourceConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1309,6 +1327,9 @@
         "ipfs": {
           "httpGateway": "http://localhost:8080/",
           "preResolveDnslink": true
+        },
+        "smartTransferProtocol": {
+          "uploadProgressInterval": "10s"
         }
       },
       "description": "Network protocols configuration"

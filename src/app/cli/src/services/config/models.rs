@@ -407,6 +407,10 @@ pub struct ProtocolConfig {
     /// `FlightSQL` configuration
     #[config(default)]
     pub flight_sql: FlightSqlConfig,
+
+    /// Smart transfer protocol configuration
+    #[config(default)]
+    pub smart_transfer_protocol: SmartTransferProtocolConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -470,6 +474,36 @@ impl FlightSqlConfig {
             anon_session_expiration_timeout: self.anon_session_expiration_timeout.into(),
             anon_session_inactivity_timeout: self.anon_session_inactivity_timeout.into(),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(setty::Config, setty::Default)]
+pub struct SmartTransferProtocolConfig {
+    /// How often the server asks a pushing client for upload progress. Keep it
+    /// below the idle timeout of load balancers in front of the server, or
+    /// they close the connection during long uploads
+    #[config(default_str = "10s")]
+    pub upload_progress_interval: DurationString,
+}
+
+impl SmartTransferProtocolConfig {
+    pub fn to_server_config(
+        &self,
+    ) -> Result<kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig, CLIError>
+    {
+        let upload_progress_interval: std::time::Duration = self.upload_progress_interval.into();
+        if upload_progress_interval.is_zero() {
+            return Err(CLIError::usage_error(
+                "protocol.smartTransferProtocol.uploadProgressInterval must be greater than zero",
+            ));
+        }
+        Ok(
+            kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig {
+                upload_progress_interval,
+            },
+        )
     }
 }
 
@@ -881,6 +915,36 @@ pub struct WebhooksConfig {
     /// Some(String::from("aBcDeFgHiJkLmNoPqRsTuVwXyZ012345")) };
     /// ```
     pub secret_encryption_key: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+    use std::time::Duration;
+
+    use super::SmartTransferProtocolConfig;
+
+    #[test]
+    fn test_upload_progress_interval_defaults_to_ten_seconds() {
+        assert_eq!(
+            SmartTransferProtocolConfig::default()
+                .to_server_config()
+                .unwrap()
+                .upload_progress_interval,
+            Duration::from_secs(10)
+        );
+    }
+
+    #[test]
+    fn test_zero_upload_progress_interval_is_rejected() {
+        let config = SmartTransferProtocolConfig {
+            upload_progress_interval: "0s".parse().unwrap(),
+        };
+
+        assert_matches!(config.to_server_config(), Err(_));
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
