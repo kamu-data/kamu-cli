@@ -13,7 +13,7 @@ use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
 use kamu::*;
 use kamu_core::testing::ReportedHeads;
 use kamu_core::*;
-use kamu_datasets::{DatasetAction, MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{DatasetPermission, MockDatasetPermissionChecker, ResolvedDataset};
 use kamu_datasets_services::DatasetHeadCommitterImpl;
 use pretty_assertions::assert_matches;
 
@@ -25,8 +25,8 @@ async fn test_compact_dataset_success() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             true,
@@ -54,9 +54,9 @@ async fn test_compact_multiple_datasets_success() {
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_foo, 1, true)
-            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_bar, 1, true),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, true)
+            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 
@@ -97,8 +97,8 @@ async fn test_try_compact_not_found_dataset() {
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for_not_found(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for_not_found(
+            DatasetPermission::Maintain,
             &not_found_dataset_handle.id,
             1,
         ),
@@ -127,8 +127,8 @@ async fn test_compact_dataset_unauthorized() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             false,
@@ -154,8 +154,8 @@ async fn test_reset_dataset_to_metadata_requires_maintain() {
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             false,
@@ -183,9 +183,9 @@ async fn test_compact_dataset_mixed_authorization_outcome() {
     let (_, dataset_id_bar) = odf::DatasetID::new_generated_ed25519();
 
     let harness = CompactUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new()
-            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_foo, 1, false)
-            .expect_authorize_for(DatasetAction::Maintain, &dataset_id_bar, 1, true),
+        MockDatasetPermissionChecker::new()
+            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_foo, 1, false)
+            .expect_authorize_for(DatasetPermission::Maintain, &dataset_id_bar, 1, true),
         MockDidGenerator::predefined_dataset_ids(vec![dataset_id_foo, dataset_id_bar]),
     );
 
@@ -227,8 +227,8 @@ async fn test_compact_dataset_commits_head_and_reports_breaking() {
     let reported_heads = ReportedHeads::default();
 
     let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             true,
@@ -264,8 +264,8 @@ async fn test_reset_dataset_to_metadata_commits_head() {
     let reported_heads = ReportedHeads::default();
 
     let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             true,
@@ -300,8 +300,8 @@ async fn test_compact_dataset_head_moved_concurrently() {
     let reported_heads = ReportedHeads::default();
 
     let harness = CompactUseCaseHarness::with_compaction_executor(
-        MockDatasetActionAuthorizer::new().expect_authorize_for(
-            DatasetAction::Maintain,
+        MockDatasetPermissionChecker::new().expect_authorize_for(
+            DatasetPermission::Maintain,
             &dataset_id_foo,
             1,
             true,
@@ -339,32 +339,32 @@ struct CompactUseCaseHarness {
 
 impl CompactUseCaseHarness {
     fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
     ) -> Self {
-        Self::build(mock_dataset_action_authorizer, mock_did_generator, None)
+        Self::build(mock_dataset_permission_checker, mock_did_generator, None)
     }
 
     fn with_compaction_executor(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
         mock_compaction_executor: MockCompactionExecutor,
     ) -> Self {
         Self::build(
-            mock_dataset_action_authorizer,
+            mock_dataset_permission_checker,
             mock_did_generator,
             Some(mock_compaction_executor),
         )
     }
 
     fn build(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_did_generator: MockDidGenerator,
         maybe_mock_compaction_executor: Option<MockCompactionExecutor>,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
                 .with_maybe_mock_did_generator(Some(mock_did_generator)),
         );
 

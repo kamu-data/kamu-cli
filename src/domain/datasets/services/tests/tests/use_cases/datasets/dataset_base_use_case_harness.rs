@@ -80,12 +80,13 @@ impl DatasetBaseUseCaseHarness {
                 .add::<RebacDatasetRegistryFacadeImpl>()
                 .add::<TestDatasetOutboxListener>();
 
-            if let Some(mock_dataset_action_authorizer) = opts.maybe_mock_dataset_action_authorizer
+            if let Some(mock_dataset_permission_checker) =
+                opts.maybe_mock_dataset_permission_checker
             {
-                b.add_value(mock_dataset_action_authorizer)
-                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+                b.add_value(mock_dataset_permission_checker)
+                    .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
             } else {
-                b.add::<AlwaysHappyDatasetActionAuthorizer>();
+                b.add::<AlwaysHappyDatasetPermissionChecker>();
             }
 
             if opts.racing_head_committer {
@@ -397,7 +398,7 @@ impl DatasetBaseUseCaseHarness {
 pub struct DatasetBaseUseCaseHarnessOpts<'a> {
     pub maybe_base_catalog: Option<&'a dill::Catalog>,
     pub tenancy_config: TenancyConfig,
-    pub maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    pub maybe_mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
     pub maybe_mock_did_generator: Option<MockDidGenerator>,
     pub outbox_provider: OutboxProvider,
     pub system_time_source_provider: SystemTimeSourceProvider,
@@ -411,7 +412,7 @@ impl Default for DatasetBaseUseCaseHarnessOpts<'_> {
         Self {
             maybe_base_catalog: None,
             tenancy_config: TenancyConfig::SingleTenant,
-            maybe_mock_dataset_action_authorizer: None,
+            maybe_mock_dataset_permission_checker: None,
             maybe_mock_did_generator: None,
             // Use immediate outbox in all dataset use case harnesses
             outbox_provider: OutboxProvider::Immediate {

@@ -9,7 +9,7 @@
 
 use kamu_adapter_flow_dataset as afs;
 use kamu_auth_rebac::RebacDatasetRegistryFacade;
-use kamu_datasets::{DatasetAction, ResolvedDataset};
+use kamu_datasets::{DatasetPermission, ResolvedDataset};
 use kamu_flow_system as fs;
 
 use super::FlowNotFound;
@@ -167,7 +167,7 @@ pub(crate) async fn ensure_flow_preconditions(
                     let classify_response = rebac_dataset_registry_facade
                         .classify_dataset_refs_by_allowance(
                             &inputs_dataset_refs,
-                            DatasetAction::Read,
+                            DatasetPermission::Read,
                         )
                         .await?;
 

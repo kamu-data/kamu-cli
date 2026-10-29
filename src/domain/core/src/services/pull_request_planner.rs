@@ -13,9 +13,9 @@ use std::sync::Arc;
 use ::serde::{Deserialize, Serialize};
 use internal_error::InternalError;
 use kamu_datasets::{
-    DatasetActionUnauthorizedError,
     DatasetOperation,
     DatasetOperationRequest,
+    DatasetPermissionError,
     DatasetRegistry,
     DatasetRegistryExt,
 };
@@ -506,9 +506,9 @@ impl PullError {
     }
 }
 
-impl From<DatasetActionUnauthorizedError> for PullError {
-    fn from(value: DatasetActionUnauthorizedError) -> Self {
-        use DatasetActionUnauthorizedError as E;
+impl From<DatasetPermissionError> for PullError {
+    fn from(value: DatasetPermissionError) -> Self {
+        use DatasetPermissionError as E;
 
         match value {
             E::NotFound(e) => Self::NotFound(e),

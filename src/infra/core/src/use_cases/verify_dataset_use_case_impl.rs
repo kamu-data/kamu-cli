@@ -24,10 +24,10 @@ use kamu_core::{
     VerifyTransformError,
 };
 use kamu_datasets::{
-    DatasetActionUnauthorizedError,
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermissionError,
     DatasetRegistry,
     ResolvedDataset,
 };
@@ -38,7 +38,7 @@ use kamu_datasets::{
 #[interface(dyn VerifyDatasetUseCase)]
 pub struct VerifyDatasetUseCaseImpl {
     verification_service: Arc<dyn VerificationService>,
-    dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     dataset_registry: Arc<dyn DatasetRegistry>,
     transform_planner: Arc<dyn TransformPlanner>,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -79,8 +79,8 @@ impl VerifyDatasetUseCaseImpl {
         target: &odf::DatasetHandle,
         replayed_inputs: Vec<odf::DatasetHandle>,
     ) -> Result<(), VerificationError> {
-        self.dataset_operation_authorizer
-            .authorize_operation(
+        self.dataset_operation_guard
+            .check_operation(
                 &self.current_account_subject,
                 &DatasetOperationRequest::new(
                     target.clone(),
@@ -169,8 +169,8 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_unauthorized_error(e: DatasetActionUnauthorizedError) -> VerificationError {
-    use DatasetActionUnauthorizedError as E;
+fn map_unauthorized_error(e: DatasetPermissionError) -> VerificationError {
+    use DatasetPermissionError as E;
 
     match e {
         E::NotFound(e) => VerificationError::DatasetNotFound(e),

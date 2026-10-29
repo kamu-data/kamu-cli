@@ -31,10 +31,10 @@ use kamu_core::{
     SyncService,
 };
 use kamu_datasets::{
-    DatasetActionUnauthorizedError,
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermissionError,
 };
 
 use crate::SyncRequestBuilder;
@@ -49,7 +49,7 @@ pub struct PushDatasetUseCaseImpl {
 }
 
 impl PushDatasetUseCaseImpl {
-    #[transactional_method2(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, current_account_subject: Arc<CurrentAccountSubject>)]
+    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
     #[tracing::instrument(level = "debug", name = "PushDatasetUseCase::authorizations", skip_all, fields(?dataset_handles, ?push_target))]
     async fn make_authorization_checks(
         &self,
@@ -60,8 +60,8 @@ impl PushDatasetUseCaseImpl {
             .into_iter()
             .map(|hdl| DatasetOperationRequest::new(hdl, DatasetOperation::SyncTo))
             .collect();
-        let verdicts = dataset_operation_authorizer
-            .authorize_operations(&current_account_subject, &requests)
+        let verdicts = dataset_operation_guard
+            .check_operations(&current_account_subject, &requests)
             .await?;
 
         let mut authorized_handles = Vec::with_capacity(requests.len());
@@ -73,7 +73,7 @@ impl PushDatasetUseCaseImpl {
                     local_handle: Some(request.target),
                     target: push_target.cloned(),
                     result: Err(PushError::SyncError({
-                        use DatasetActionUnauthorizedError as E;
+                        use DatasetPermissionError as E;
 
                         match error {
                             E::NotFound(e) => SyncError::DatasetNotFound(e.into()),

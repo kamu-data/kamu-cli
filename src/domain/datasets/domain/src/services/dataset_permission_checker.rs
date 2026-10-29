@@ -17,28 +17,28 @@ use kamu_accounts::CurrentAccountSubject;
 
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
-pub trait DatasetActionAuthorizer: Sync + Send {
-    async fn check_action_allowed(
+pub trait DatasetPermissionChecker: Sync + Send {
+    async fn check_permission(
         &self,
         dataset_id: &odf::DatasetID,
-        action: DatasetAction,
-    ) -> Result<(), DatasetActionUnauthorizedError>;
+        permission: DatasetPermission,
+    ) -> Result<(), DatasetPermissionError>;
 
-    async fn get_allowed_actions(
+    async fn get_granted_permissions(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError>;
+    ) -> Result<HashSet<DatasetPermission>, GetGrantedPermissionsError>;
 
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError>;
 
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
     /// Same as [`Self::classify_dataset_handles_by_allowance`], for the given
@@ -47,13 +47,13 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         &self,
         principal: &CurrentAccountSubject,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError>;
 
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError>;
 }
 
@@ -61,165 +61,169 @@ pub trait DatasetActionAuthorizer: Sync + Send {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, strum::EnumString, strum::Display)]
 #[strum(serialize_all = "snake_case")]
-pub enum DatasetAction {
+pub enum DatasetPermission {
     Read,
     Write,
     Maintain,
     Own,
 }
 
-impl DatasetAction {
-    pub fn resolve_access(set: &HashSet<Self>, action: Self) -> DatasetActionAccess {
-        if set.contains(&action) {
-            DatasetActionAccess::Allowed
+impl DatasetPermission {
+    pub fn resolve_access(set: &HashSet<Self>, permission: Self) -> DatasetPermissionAccess {
+        if set.contains(&permission) {
+            DatasetPermissionAccess::Allowed
         } else if set.contains(&Self::Read) {
-            DatasetActionAccess::Insufficient
+            DatasetPermissionAccess::Insufficient
         } else {
-            DatasetActionAccess::Forbidden
+            DatasetPermissionAccess::Forbidden
         }
     }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum DatasetActionAccess {
+pub enum DatasetPermissionAccess {
     /// Subject has no access to the object.
     Forbidden,
     /// Subject has access to an object's presence but lacks required
-    /// permissions for the action.
+    /// permissions for the permission.
     Insufficient,
-    /// Action permission granted to subject.
+    /// Permission permission granted to subject.
     Allowed,
 }
 
 #[test]
-fn test_dataset_action_resolve_access() {
-    use DatasetAction as Action;
-    use DatasetActionAccess as Access;
+fn test_dataset_permission_resolve_access() {
+    use DatasetPermission as Permission;
+    use DatasetPermissionAccess as Access;
 
     struct FixtureSubTest {
-        current_action: Action,
+        current_permission: Permission,
         expected_access: Access,
     }
 
     struct Fixture<'a> {
-        allowed_actions: &'a HashSet<Action>,
+        granted_permissions: &'a HashSet<Permission>,
         sub_tests: &'a [FixtureSubTest],
     }
 
     for (
         fixture_index,
         Fixture {
-            allowed_actions,
+            granted_permissions,
             sub_tests,
         },
     ) in [
         Fixture {
-            allowed_actions: &HashSet::from([]),
+            granted_permissions: &HashSet::from([]),
             sub_tests: &[
                 FixtureSubTest {
-                    current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Forbidden,
+                    current_permission: DatasetPermission::Read,
+                    expected_access: DatasetPermissionAccess::Forbidden,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Forbidden,
+                    current_permission: DatasetPermission::Write,
+                    expected_access: DatasetPermissionAccess::Forbidden,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Forbidden,
+                    current_permission: DatasetPermission::Maintain,
+                    expected_access: DatasetPermissionAccess::Forbidden,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Forbidden,
+                    current_permission: DatasetPermission::Own,
+                    expected_access: DatasetPermissionAccess::Forbidden,
                 },
             ],
         },
         Fixture {
-            allowed_actions: &HashSet::from([Action::Read]),
+            granted_permissions: &HashSet::from([Permission::Read]),
             sub_tests: &[
                 FixtureSubTest {
-                    current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Allowed,
+                    current_permission: DatasetPermission::Read,
+                    expected_access: DatasetPermissionAccess::Allowed,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Insufficient,
+                    current_permission: DatasetPermission::Write,
+                    expected_access: DatasetPermissionAccess::Insufficient,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Insufficient,
+                    current_permission: DatasetPermission::Maintain,
+                    expected_access: DatasetPermissionAccess::Insufficient,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Insufficient,
+                    current_permission: DatasetPermission::Own,
+                    expected_access: DatasetPermissionAccess::Insufficient,
                 },
             ],
         },
         Fixture {
-            allowed_actions: &HashSet::from([Action::Read, Action::Write]),
+            granted_permissions: &HashSet::from([Permission::Read, Permission::Write]),
             sub_tests: &[
                 FixtureSubTest {
-                    current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Allowed,
+                    current_permission: DatasetPermission::Read,
+                    expected_access: DatasetPermissionAccess::Allowed,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Allowed,
+                    current_permission: DatasetPermission::Write,
+                    expected_access: DatasetPermissionAccess::Allowed,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Insufficient,
+                    current_permission: DatasetPermission::Maintain,
+                    expected_access: DatasetPermissionAccess::Insufficient,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Insufficient,
+                    current_permission: DatasetPermission::Own,
+                    expected_access: DatasetPermissionAccess::Insufficient,
                 },
             ],
         },
         Fixture {
-            allowed_actions: &HashSet::from([Action::Read, Action::Write, Action::Maintain]),
-            sub_tests: &[
-                FixtureSubTest {
-                    current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Allowed,
-                },
-                FixtureSubTest {
-                    current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Allowed,
-                },
-                FixtureSubTest {
-                    current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Allowed,
-                },
-                FixtureSubTest {
-                    current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Insufficient,
-                },
-            ],
-        },
-        Fixture {
-            allowed_actions: &HashSet::from([
-                Action::Read,
-                Action::Write,
-                Action::Maintain,
-                Action::Own,
+            granted_permissions: &HashSet::from([
+                Permission::Read,
+                Permission::Write,
+                Permission::Maintain,
             ]),
             sub_tests: &[
                 FixtureSubTest {
-                    current_action: DatasetAction::Read,
-                    expected_access: DatasetActionAccess::Allowed,
+                    current_permission: DatasetPermission::Read,
+                    expected_access: DatasetPermissionAccess::Allowed,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Write,
-                    expected_access: DatasetActionAccess::Allowed,
+                    current_permission: DatasetPermission::Write,
+                    expected_access: DatasetPermissionAccess::Allowed,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Maintain,
-                    expected_access: DatasetActionAccess::Allowed,
+                    current_permission: DatasetPermission::Maintain,
+                    expected_access: DatasetPermissionAccess::Allowed,
                 },
                 FixtureSubTest {
-                    current_action: DatasetAction::Own,
-                    expected_access: DatasetActionAccess::Allowed,
+                    current_permission: DatasetPermission::Own,
+                    expected_access: DatasetPermissionAccess::Insufficient,
+                },
+            ],
+        },
+        Fixture {
+            granted_permissions: &HashSet::from([
+                Permission::Read,
+                Permission::Write,
+                Permission::Maintain,
+                Permission::Own,
+            ]),
+            sub_tests: &[
+                FixtureSubTest {
+                    current_permission: DatasetPermission::Read,
+                    expected_access: DatasetPermissionAccess::Allowed,
+                },
+                FixtureSubTest {
+                    current_permission: DatasetPermission::Write,
+                    expected_access: DatasetPermissionAccess::Allowed,
+                },
+                FixtureSubTest {
+                    current_permission: DatasetPermission::Maintain,
+                    expected_access: DatasetPermissionAccess::Allowed,
+                },
+                FixtureSubTest {
+                    current_permission: DatasetPermission::Own,
+                    expected_access: DatasetPermissionAccess::Allowed,
                 },
             ],
         },
@@ -230,7 +234,7 @@ fn test_dataset_action_resolve_access() {
         for (sub_test_index, sub_test) in sub_tests.iter().enumerate() {
             assert_eq!(
                 sub_test.expected_access,
-                DatasetAction::resolve_access(allowed_actions, sub_test.current_action),
+                DatasetPermission::resolve_access(granted_permissions, sub_test.current_permission),
                 "Fixture index: {fixture_index}; Sub-test index: {sub_test_index}",
             );
         }
@@ -238,25 +242,25 @@ fn test_dataset_action_resolve_access() {
 }
 
 #[cfg(feature = "oso")]
-impl oso::FromPolar for DatasetAction {
+impl oso::FromPolar for DatasetPermission {
     fn from_polar(polar_value: oso::PolarValue) -> oso::Result<Self> {
         use std::str::FromStr;
 
         use oso::PolarValue;
         use oso::errors::{OsoError, TypeError};
 
-        let PolarValue::String(raw_dataset_action) = polar_value else {
+        let PolarValue::String(raw_dataset_permission) = polar_value else {
             return Err(TypeError::expected("String").user());
         };
 
-        Self::from_str(&raw_dataset_action).map_err(|e| OsoError::Custom {
+        Self::from_str(&raw_dataset_permission).map_err(|e| OsoError::Custom {
             message: e.to_string(),
         })
     }
 }
 
 #[cfg(feature = "oso")]
-impl oso::ToPolar for DatasetAction {
+impl oso::ToPolar for DatasetPermission {
     fn to_polar(self) -> oso::PolarValue {
         self.to_string().to_polar()
     }
@@ -265,7 +269,7 @@ impl oso::ToPolar for DatasetAction {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum DatasetActionUnauthorizedError {
+pub enum DatasetPermissionError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 
@@ -280,11 +284,14 @@ pub enum DatasetActionUnauthorizedError {
     Internal(#[from] InternalError),
 }
 
-impl DatasetActionUnauthorizedError {
-    pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
+impl DatasetPermissionError {
+    pub fn not_enough_permissions(
+        dataset_ref: odf::DatasetRef,
+        permission: DatasetPermission,
+    ) -> Self {
         Self::Access(odf::AccessError::Unauthorized(
-            DatasetActionNotEnoughPermissionsError {
-                action,
+            DatasetPermissionMissingError {
+                permission,
                 dataset_ref,
             }
             .into(),
@@ -293,16 +300,16 @@ impl DatasetActionUnauthorizedError {
 }
 
 #[derive(thiserror::Error, Debug)]
-#[error("User has no '{action}' permission in dataset '{dataset_ref}'")]
-pub struct DatasetActionNotEnoughPermissionsError {
-    pub action: DatasetAction,
+#[error("User has no '{permission}' permission in dataset '{dataset_ref}'")]
+pub struct DatasetPermissionMissingError {
+    pub permission: DatasetPermission,
     pub dataset_ref: odf::DatasetRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum GetAllowedActionsError {
+pub enum GetGrantedPermissionsError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 
@@ -313,7 +320,7 @@ pub enum GetAllowedActionsError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum ClassifyByAllowanceDatasetActionUnauthorizedError {
+pub enum ClassifyByAllowanceDatasetPermissionError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
 
@@ -328,11 +335,14 @@ pub enum ClassifyByAllowanceDatasetActionUnauthorizedError {
     Internal(#[from] InternalError),
 }
 
-impl ClassifyByAllowanceDatasetActionUnauthorizedError {
-    pub fn not_enough_permissions(dataset_ref: odf::DatasetRef, action: DatasetAction) -> Self {
+impl ClassifyByAllowanceDatasetPermissionError {
+    pub fn not_enough_permissions(
+        dataset_ref: odf::DatasetRef,
+        permission: DatasetPermission,
+    ) -> Self {
         Self::Access(odf::AccessError::Unauthorized(
-            DatasetActionNotEnoughPermissionsError {
-                action,
+            DatasetPermissionMissingError {
+                permission,
                 dataset_ref,
             }
             .into(),
@@ -347,7 +357,7 @@ pub struct ClassifyByAllowanceResponse {
     pub authorized_handles: Vec<odf::DatasetHandle>,
     pub unauthorized_handles_with_errors: Vec<(
         odf::DatasetHandle,
-        ClassifyByAllowanceDatasetActionUnauthorizedError,
+        ClassifyByAllowanceDatasetPermissionError,
     )>,
 }
 
@@ -356,53 +366,53 @@ pub struct ClassifyByAllowanceResponse {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetActionAuthorizerExt: DatasetActionAuthorizer {
-    async fn is_action_allowed(
+pub trait DatasetPermissionCheckerExt: DatasetPermissionChecker {
+    async fn is_permission_granted(
         &self,
         dataset_id: &odf::DatasetID,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<bool, InternalError>;
 
-    async fn get_allowed_actions_for_exist_dataset(
+    async fn get_granted_permissions_for_existing_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, InternalError>;
+    ) -> Result<HashSet<DatasetPermission>, InternalError>;
 
     fn filtered_datasets_stream<'a>(
         &'a self,
         dataset_handles_stream: odf::dataset::DatasetHandleStream<'a>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> odf::dataset::DatasetHandleStream<'a>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl<T> DatasetActionAuthorizerExt for T
+impl<T> DatasetPermissionCheckerExt for T
 where
-    T: DatasetActionAuthorizer,
+    T: DatasetPermissionChecker,
     T: ?Sized,
 {
-    async fn is_action_allowed(
+    async fn is_permission_granted(
         &self,
         dataset_id: &odf::DatasetID,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<bool, InternalError> {
-        use DatasetActionUnauthorizedError as E;
+        use DatasetPermissionError as E;
 
-        match self.check_action_allowed(dataset_id, action).await {
+        match self.check_permission(dataset_id, permission).await {
             Ok(()) => Ok(true),
             Err(E::NotFound(_) | E::Access(_)) => Ok(false),
             Err(e @ E::Internal(_)) => Err(e.int_err()),
         }
     }
 
-    async fn get_allowed_actions_for_exist_dataset(
+    async fn get_granted_permissions_for_existing_dataset(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, InternalError> {
-        self.get_allowed_actions(dataset_id).await.map_err(|e| {
-            use GetAllowedActionsError as E;
+    ) -> Result<HashSet<DatasetPermission>, InternalError> {
+        self.get_granted_permissions(dataset_id).await.map_err(|e| {
+            use GetGrantedPermissionsError as E;
 
             // NOTE: We checked for the presence of datasets earlier,
             //       so if any are missing now, that would be unexpected.
@@ -415,7 +425,7 @@ where
     fn filtered_datasets_stream<'a>(
         &'a self,
         dataset_handles_stream: odf::dataset::DatasetHandleStream<'a>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> odf::dataset::DatasetHandleStream<'a> {
         const STREAM_CHUNK_LEN: usize = 100;
 
@@ -431,7 +441,7 @@ where
             {
                 // ... the datasets that are accessed.
                 let hdls = self
-                    .filter_datasets_allowing(dataset_handles_chunk, action)
+                    .filter_datasets_allowing(dataset_handles_chunk, permission)
                     .await?;
 
                 for hdl in hdls {
@@ -447,10 +457,8 @@ where
 #[derive(Debug)]
 pub struct ClassifyByAllowanceIdsResponse {
     pub authorized_ids: Vec<odf::DatasetID>,
-    pub unauthorized_ids_with_errors: Vec<(
-        odf::DatasetID,
-        ClassifyByAllowanceDatasetActionUnauthorizedError,
-    )>,
+    pub unauthorized_ids_with_errors:
+        Vec<(odf::DatasetID, ClassifyByAllowanceDatasetPermissionError)>,
 }
 
 #[cfg(feature = "testing")]
@@ -470,38 +478,38 @@ impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
-#[dill::interface(dyn DatasetActionAuthorizer)]
-pub struct AlwaysHappyDatasetActionAuthorizer {}
+#[dill::interface(dyn DatasetPermissionChecker)]
+pub struct AlwaysHappyDatasetPermissionChecker {}
 
 #[async_trait::async_trait]
-impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
-    async fn check_action_allowed(
+impl DatasetPermissionChecker for AlwaysHappyDatasetPermissionChecker {
+    async fn check_permission(
         &self,
         _dataset_id: &odf::DatasetID,
-        _action: DatasetAction,
-    ) -> Result<(), DatasetActionUnauthorizedError> {
+        _permission: DatasetPermission,
+    ) -> Result<(), DatasetPermissionError> {
         // Ignore rules
         Ok(())
     }
 
-    async fn get_allowed_actions(
+    async fn get_granted_permissions(
         &self,
         _dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError> {
-        let all_actions = [
-            DatasetAction::Read,
-            DatasetAction::Write,
-            DatasetAction::Maintain,
-            DatasetAction::Own,
+    ) -> Result<HashSet<DatasetPermission>, GetGrantedPermissionsError> {
+        let all_permissions = [
+            DatasetPermission::Read,
+            DatasetPermission::Write,
+            DatasetPermission::Maintain,
+            DatasetPermission::Own,
         ];
 
-        Ok(all_actions.into())
+        Ok(all_permissions.into())
     }
 
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        _action: DatasetAction,
+        _permission: DatasetPermission,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
         Ok(dataset_handles)
     }
@@ -509,7 +517,7 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        _action: DatasetAction,
+        _permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         Ok(ClassifyByAllowanceResponse {
             authorized_handles: dataset_handles,
@@ -521,16 +529,16 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
         &self,
         _principal: &CurrentAccountSubject,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
-        self.classify_dataset_handles_by_allowance(dataset_handles, action)
+        self.classify_dataset_handles_by_allowance(dataset_handles, permission)
             .await
     }
 
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
-        _action: DatasetAction,
+        _permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         Ok(ClassifyByAllowanceIdsResponse {
             authorized_ids: dataset_ids.iter().map(|d| d.as_ref().clone()).collect(),

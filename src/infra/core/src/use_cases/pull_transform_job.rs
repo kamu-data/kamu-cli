@@ -15,7 +15,7 @@ use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::{
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
     DatasetRegistry,
     DatasetRegistryExt,
@@ -157,7 +157,7 @@ impl PullTransformJob {
     /// The pull authorized reading the inputs of the transform it planned.
     /// Another writer may change the transform before the job elaborates it,
     /// so inputs the pull did not plan are authorized here, before any is read
-    #[transactional_method2(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, current_account_subject: Arc<CurrentAccountSubject>)]
+    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
     async fn authorize_unplanned_inputs(
         &self,
         plan: &TransformExecutionPlan,
@@ -177,8 +177,8 @@ impl PullTransformJob {
 
         // The target is checked again along with the inputs; the iteration
         // already granted it, unless its permissions changed since
-        dataset_operation_authorizer
-            .authorize_operation(
+        dataset_operation_guard
+            .check_operation(
                 &current_account_subject,
                 &DatasetOperationRequest::new(
                     plan.request.dataset_handle.clone(),

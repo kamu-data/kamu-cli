@@ -9,7 +9,7 @@
 
 use kamu::SchemaServiceImpl;
 use kamu_core::SchemaService;
-use kamu_datasets::MockDatasetActionAuthorizer;
+use kamu_datasets::MockDatasetPermissionChecker;
 use tempfile::TempDir;
 use test_utils::LocalS3Server;
 
@@ -71,26 +71,26 @@ async fn test_dataset_schema(catalog: &dill::Catalog, tempdir: &TempDir) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn prepare_schema_test_catalog() -> (TempDir, dill::Catalog) {
-    let mut authorizer = MockDatasetActionAuthorizer::new();
-    authorizer
+    let mut permission_checker = MockDatasetPermissionChecker::new();
+    permission_checker
         .expect_filter_datasets_allowing()
         .returning(|_, _| Ok(vec![]));
 
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(tempdir.path(), authorizer);
+    let catalog = create_catalog_with_local_workspace(tempdir.path(), permission_checker);
     (tempdir, catalog)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn prepare_schema_test_s3_catalog() -> (LocalS3Server, dill::Catalog) {
-    let mut authorizer = MockDatasetActionAuthorizer::new();
-    authorizer
+    let mut permission_checker = MockDatasetPermissionChecker::new();
+    permission_checker
         .expect_filter_datasets_allowing()
         .returning(|_, _| Ok(vec![]));
 
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(&s3, authorizer);
+    let catalog = create_catalog_with_s3_workspace(&s3, permission_checker);
     (s3, catalog)
 }
 
@@ -136,10 +136,10 @@ async fn test_dataset_parquet_schema_s3() {
 
 fn create_catalog_with_local_workspace(
     tempdir: &std::path::Path,
-    dataset_action_authorizer: MockDatasetActionAuthorizer,
+    dataset_permission_checker: MockDatasetPermissionChecker,
 ) -> dill::Catalog {
     let base_local_catalog =
-        helpers::create_base_catalog_with_local_workspace(tempdir, dataset_action_authorizer);
+        helpers::create_base_catalog_with_local_workspace(tempdir, dataset_permission_checker);
 
     dill::CatalogBuilder::new_chained(&base_local_catalog)
         .add::<SchemaServiceImpl>()
@@ -150,10 +150,10 @@ fn create_catalog_with_local_workspace(
 
 fn create_catalog_with_s3_workspace(
     s3: &LocalS3Server,
-    dataset_action_authorizer: MockDatasetActionAuthorizer,
+    dataset_permission_checker: MockDatasetPermissionChecker,
 ) -> dill::Catalog {
     let base_s3_catalog =
-        helpers::create_base_catalog_with_s3_workspace(s3, dataset_action_authorizer);
+        helpers::create_base_catalog_with_s3_workspace(s3, dataset_permission_checker);
 
     dill::CatalogBuilder::new_chained(&base_s3_catalog)
         .add::<SchemaServiceImpl>()

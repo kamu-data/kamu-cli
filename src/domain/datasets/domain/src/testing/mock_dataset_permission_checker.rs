@@ -13,36 +13,36 @@ use mockall::Predicate;
 use mockall::predicate::{always, eq, function};
 
 use crate::{
-    ClassifyByAllowanceDatasetActionUnauthorizedError,
+    ClassifyByAllowanceDatasetPermissionError,
     ClassifyByAllowanceIdsResponse,
     ClassifyByAllowanceResponse,
-    DatasetAction,
-    DatasetActionUnauthorizedError,
-    MockDatasetActionAuthorizer,
+    DatasetPermission,
+    DatasetPermissionError,
+    MockDatasetPermissionChecker,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MockDatasetActionAuthorizer {
+impl MockDatasetPermissionChecker {
     pub fn denying() -> Self {
         Self::denying_with_not_found(HashSet::new())
     }
 
     pub fn denying_with_not_found(missing_ids: HashSet<odf::DatasetID>) -> Self {
-        let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
-        mock_dataset_action_authorizer
-            .expect_check_action_allowed()
-            .returning(|dataset_id, action| {
-                Err(DatasetActionUnauthorizedError::not_enough_permissions(
+        let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
+        mock_dataset_permission_checker
+            .expect_check_permission()
+            .returning(|dataset_id, permission| {
+                Err(DatasetPermissionError::not_enough_permissions(
                     dataset_id.as_local_ref(),
-                    action,
+                    permission,
                 ))
             });
         let missing_ids_clone = missing_ids.clone();
         let missing_ids_for = missing_ids.clone();
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_ids_by_allowance()
-            .returning(move |ids, action| {
+            .returning(move |ids, permission| {
                 Ok(ClassifyByAllowanceIdsResponse {
                     authorized_ids: Vec::new(),
                     unauthorized_ids_with_errors: ids
@@ -56,9 +56,9 @@ impl MockDatasetActionAuthorizer {
                             } else {
                                 (
                                     id.as_ref().clone(),
-                                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                                    ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                                         id.as_local_ref(),
-                                        action,
+                                        permission,
                                     ),
                                 )
                             }
@@ -66,9 +66,9 @@ impl MockDatasetActionAuthorizer {
                         .collect(),
                 })
             });
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
-            .returning(move |handles, action| {
+            .returning(move |handles, permission| {
                 Ok(ClassifyByAllowanceResponse {
                     authorized_handles: Vec::new(),
                     unauthorized_handles_with_errors: handles
@@ -82,9 +82,9 @@ impl MockDatasetActionAuthorizer {
                             } else {
                                 (
                                     hdl.clone(),
-                                    ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                                    ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                                         hdl.id.as_local_ref(),
-                                        action,
+                                        permission,
                                     ),
                                 )
                             }
@@ -92,35 +92,35 @@ impl MockDatasetActionAuthorizer {
                         .collect(),
                 })
             });
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance_for()
-            .returning(move |_, handles, action| {
+            .returning(move |_, handles, permission| {
                 Ok(Self::classify_handles(handles, |hdl| {
                     Some(if missing_ids_for.contains(&hdl.id) {
                         odf::DatasetNotFoundError::new(hdl.id.as_local_ref()).into()
                     } else {
-                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                             hdl.id.as_local_ref(),
-                            action,
+                            permission,
                         )
                     })
                 }))
             });
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
     }
 
-    /// Allows every action on every dataset except the specified ones
+    /// Allows every permission on every dataset except the specified ones
     pub fn denying_ids(denied_ids: HashSet<odf::DatasetID>) -> Self {
-        let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
+        let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
 
         let denied = denied_ids.clone();
-        mock_dataset_action_authorizer
-            .expect_check_action_allowed()
-            .returning(move |dataset_id, action| {
+        mock_dataset_permission_checker
+            .expect_check_permission()
+            .returning(move |dataset_id, permission| {
                 if denied.contains(dataset_id) {
-                    Err(DatasetActionUnauthorizedError::not_enough_permissions(
+                    Err(DatasetPermissionError::not_enough_permissions(
                         dataset_id.as_local_ref(),
-                        action,
+                        permission,
                     ))
                 } else {
                     Ok(())
@@ -128,21 +128,24 @@ impl MockDatasetActionAuthorizer {
             });
 
         let denied = denied_ids.clone();
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_ids_by_allowance()
-            .returning(move |ids, action| {
+            .returning(move |ids, permission| {
                 let (unauthorized, authorized): (Vec<_>, Vec<_>) =
                     ids.iter().partition(|id| denied.contains(id.as_ref()));
                 Ok(ClassifyByAllowanceIdsResponse {
-                    authorized_ids: authorized.into_iter().map(|id| id.as_ref().clone()).collect(),
+                    authorized_ids: authorized
+                        .into_iter()
+                        .map(|id| id.as_ref().clone())
+                        .collect(),
                     unauthorized_ids_with_errors: unauthorized
                         .into_iter()
                         .map(|id| {
                             (
                                 id.as_ref().clone(),
-                                ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                                ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                                     id.as_local_ref(),
-                                    action,
+                                    permission,
                                 ),
                             )
                         })
@@ -151,9 +154,9 @@ impl MockDatasetActionAuthorizer {
             });
 
         let denied = denied_ids.clone();
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
-            .returning(move |handles, action| {
+            .returning(move |handles, permission| {
                 let (unauthorized, authorized): (Vec<_>, Vec<_>) = handles
                     .into_iter()
                     .partition(|hdl| denied.contains(&hdl.id));
@@ -163,9 +166,9 @@ impl MockDatasetActionAuthorizer {
                         .into_iter()
                         .map(|hdl| {
                             let err =
-                                ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                                ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                                     hdl.id.as_local_ref(),
-                                    action,
+                                    permission,
                                 );
                             (hdl, err)
                         })
@@ -174,20 +177,20 @@ impl MockDatasetActionAuthorizer {
             });
 
         let denied = denied_ids.clone();
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance_for()
-            .returning(move |_, handles, action| {
+            .returning(move |_, handles, permission| {
                 Ok(Self::classify_handles(handles, |hdl| {
                     denied.contains(&hdl.id).then(|| {
-                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                             hdl.id.as_local_ref(),
-                            action,
+                            permission,
                         )
                     })
                 }))
             });
 
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_filter_datasets_allowing()
             .returning(move |handles, _| {
                 Ok(handles
@@ -196,15 +199,15 @@ impl MockDatasetActionAuthorizer {
                     .collect())
             });
 
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
     }
 
     pub fn allowing() -> Self {
-        let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
-        mock_dataset_action_authorizer
-            .expect_check_action_allowed()
+        let mut mock_dataset_permission_checker = MockDatasetPermissionChecker::new();
+        mock_dataset_permission_checker
+            .expect_check_permission()
             .returning(|_, _| Ok(()));
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_ids_by_allowance()
             .returning(|ids, _| {
                 Ok(ClassifyByAllowanceIdsResponse {
@@ -212,7 +215,7 @@ impl MockDatasetActionAuthorizer {
                     unauthorized_ids_with_errors: Vec::new(),
                 })
             });
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance()
             .returning(|handles, _| {
                 Ok(ClassifyByAllowanceResponse {
@@ -220,13 +223,13 @@ impl MockDatasetActionAuthorizer {
                     unauthorized_handles_with_errors: Vec::new(),
                 })
             });
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_classify_dataset_handles_by_allowance_for()
             .returning(|_, handles, _| Ok(Self::classify_handles(handles, |_| None)));
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
             .expect_filter_datasets_allowing()
             .returning(|handles, _| Ok(handles));
-        mock_dataset_action_authorizer
+        mock_dataset_permission_checker
     }
 
     pub fn expect_check_read_dataset(
@@ -236,9 +239,9 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_unauthorized_internal(
+        self.expect_check_permission_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
-            DatasetAction::Read,
+            DatasetPermission::Read,
             times,
             success,
         )
@@ -251,9 +254,9 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_unauthorized_internal(
+        self.expect_check_permission_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
-            DatasetAction::Write,
+            DatasetPermission::Write,
             times,
             success,
         )
@@ -266,9 +269,9 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_unauthorized_internal(
+        self.expect_check_permission_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
-            DatasetAction::Maintain,
+            DatasetPermission::Maintain,
             times,
             success,
         )
@@ -281,85 +284,82 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_unauthorized_internal(
+        self.expect_check_permission_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
-            DatasetAction::Own,
+            DatasetPermission::Own,
             times,
             success,
         )
     }
 
     pub fn expect_check_read_a_dataset(self, times: usize, success: bool) -> Self {
-        self.expect_check_action_allowed_unauthorized_internal(
+        self.expect_check_permission_unauthorized_internal(
             always(),
-            DatasetAction::Read,
+            DatasetPermission::Read,
             times,
             success,
         )
     }
 
     pub fn expect_check_write_a_dataset(self, times: usize, success: bool) -> Self {
-        self.expect_check_action_allowed_unauthorized_internal(
+        self.expect_check_permission_unauthorized_internal(
             always(),
-            DatasetAction::Write,
+            DatasetPermission::Write,
             times,
             success,
         )
     }
 
-    pub fn expect_check_action_allowed_unauthorized_internal<P>(
+    pub fn expect_check_permission_unauthorized_internal<P>(
         self,
         dataset_id_predicate: P,
-        action: DatasetAction,
+        permission: DatasetPermission,
         times: usize,
         success: bool,
     ) -> Self
     where
         P: Predicate<odf::DatasetID> + Sync + Send + 'static,
     {
-        self.expect_check_action_allowed_internal(
+        self.expect_check_permission_internal(
             dataset_id_predicate,
-            |dataset_id, action| {
-                DatasetActionUnauthorizedError::not_enough_permissions(
+            |dataset_id, permission| {
+                DatasetPermissionError::not_enough_permissions(
                     dataset_id.as_local_ref(),
-                    action,
+                    permission,
                 )
             },
-            action,
+            permission,
             times,
             success,
         )
     }
 
-    fn expect_check_action_allowed_internal<P, E>(
+    fn expect_check_permission_internal<P, E>(
         mut self,
         dataset_id_predicate: P,
         error_callback: E,
-        action: DatasetAction,
+        permission: DatasetPermission,
         times: usize,
         success: bool,
     ) -> Self
     where
         P: Predicate<odf::DatasetID> + Sync + Send + 'static,
-        E: Fn(&odf::DatasetID, DatasetAction) -> DatasetActionUnauthorizedError
-            + Sync
-            + Send
-            + 'static,
+        E: Fn(&odf::DatasetID, DatasetPermission) -> DatasetPermissionError + Sync + Send + 'static,
     {
         if times > 0 {
-            self.expect_check_action_allowed()
-                .with(dataset_id_predicate, eq(action))
+            self.expect_check_permission()
+                .with(dataset_id_predicate, eq(permission))
                 .times(times)
-                .returning(move |dataset_id, action| {
+                .returning(move |dataset_id, permission| {
                     if success {
                         Ok(())
                     } else {
-                        Err(error_callback(dataset_id, action))
+                        Err(error_callback(dataset_id, permission))
                     }
                 });
         } else {
-            self.expect_check_action_allowed()
-                .with(dataset_id_predicate, eq(action))
+            self.expect_check_permission()
+                .with(dataset_id_predicate, eq(permission))
                 .never();
         }
 
@@ -368,14 +368,14 @@ impl MockDatasetActionAuthorizer {
 
     pub fn make_expect_classify_datasets_by_allowance(
         mut self,
-        action: DatasetAction,
+        permission: DatasetPermission,
         times: usize,
         authorized: HashSet<odf::DatasetAlias>,
     ) -> Self {
         self.expect_classify_dataset_handles_by_allowance()
-            .with(always(), eq(action))
+            .with(always(), eq(permission))
             .times(times)
-            .returning(move |handles, action| {
+            .returning(move |handles, permission| {
                 let mut good = Vec::new();
                 let mut bad = Vec::new();
 
@@ -383,10 +383,11 @@ impl MockDatasetActionAuthorizer {
                     if authorized.contains(&handle.alias) {
                         good.push(handle);
                     } else {
-                        let error = ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
-                            handle.as_local_ref(),
-                            action,
-                        );
+                        let error =
+                            ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
+                                handle.as_local_ref(),
+                                permission,
+                            );
                         bad.push((handle, error));
                     }
                 }
@@ -402,14 +403,14 @@ impl MockDatasetActionAuthorizer {
 
     pub fn make_expect_classify_dataset_ids_by_allowance(
         mut self,
-        action: DatasetAction,
+        permission: DatasetPermission,
         times: usize,
         authorized: HashSet<odf::DatasetID>,
     ) -> Self {
         self.expect_classify_dataset_ids_by_allowance()
-            .with(always(), eq(action))
+            .with(always(), eq(permission))
             .times(times)
-            .returning(move |dataset_ids, action| {
+            .returning(move |dataset_ids, permission| {
                 let res = dataset_ids.iter().fold(
                     ClassifyByAllowanceIdsResponse {
                         authorized_ids: Vec::new(),
@@ -420,9 +421,9 @@ impl MockDatasetActionAuthorizer {
                             acc.authorized_ids.push(dataset_id.as_ref().clone());
                         } else {
                             let error =
-                                ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                                ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                                     dataset_id.as_local_ref(),
-                                    action,
+                                    permission,
                                 );
                             acc.unauthorized_ids_with_errors
                                 .push((dataset_id.as_ref().clone(), error));
@@ -436,20 +437,20 @@ impl MockDatasetActionAuthorizer {
         self
     }
 
-    /// Expects the principal-explicit classification of `action` to include
+    /// Expects the principal-explicit classification of `permission` to include
     /// the given dataset; other datasets in the same call are authorized
     pub fn expect_authorize_for(
         self,
-        action: DatasetAction,
+        permission: DatasetPermission,
         expected_dataset_id: &odf::DatasetID,
         times: usize,
         success: bool,
     ) -> Self {
-        self.expect_authorize_for_internal(action, expected_dataset_id, times, move |hdl| {
+        self.expect_authorize_for_internal(permission, expected_dataset_id, times, move |hdl| {
             (!success).then(|| {
-                ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                     hdl.as_local_ref(),
-                    action,
+                    permission,
                 )
             })
         })
@@ -459,24 +460,24 @@ impl MockDatasetActionAuthorizer {
     /// found
     pub fn expect_authorize_for_not_found(
         self,
-        action: DatasetAction,
+        permission: DatasetPermission,
         expected_dataset_id: &odf::DatasetID,
         times: usize,
     ) -> Self {
-        self.expect_authorize_for_internal(action, expected_dataset_id, times, |hdl| {
+        self.expect_authorize_for_internal(permission, expected_dataset_id, times, |hdl| {
             Some(odf::DatasetNotFoundError::new(hdl.as_local_ref()).into())
         })
     }
 
     fn expect_authorize_for_internal<E>(
         mut self,
-        action: DatasetAction,
+        permission: DatasetPermission,
         expected_dataset_id: &odf::DatasetID,
         times: usize,
         error_callback: E,
     ) -> Self
     where
-        E: Fn(&odf::DatasetHandle) -> Option<ClassifyByAllowanceDatasetActionUnauthorizedError>
+        E: Fn(&odf::DatasetHandle) -> Option<ClassifyByAllowanceDatasetPermissionError>
             + Sync
             + Send
             + 'static,
@@ -486,7 +487,7 @@ impl MockDatasetActionAuthorizer {
         let expectation = self
             .expect_classify_dataset_handles_by_allowance_for()
             .withf(move |_, handles, a| {
-                *a == action && handles.iter().any(|hdl| hdl.id == matched_id)
+                *a == permission && handles.iter().any(|hdl| hdl.id == matched_id)
             });
 
         if times > 0 {
@@ -510,19 +511,19 @@ impl MockDatasetActionAuthorizer {
     /// [`Self::make_expect_classify_datasets_by_allowance`]
     pub fn make_expect_classify_datasets_by_allowance_for(
         mut self,
-        action: DatasetAction,
+        permission: DatasetPermission,
         times: usize,
         authorized: HashSet<odf::DatasetAlias>,
     ) -> Self {
         self.expect_classify_dataset_handles_by_allowance_for()
-            .withf(move |_, _, a| *a == action)
+            .withf(move |_, _, a| *a == permission)
             .times(times)
-            .returning(move |_, handles, action| {
+            .returning(move |_, handles, permission| {
                 Ok(Self::classify_handles(handles, |hdl| {
                     (!authorized.contains(&hdl.alias)).then(|| {
-                        ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                        ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                             hdl.as_local_ref(),
-                            action,
+                            permission,
                         )
                     })
                 }))
@@ -533,9 +534,7 @@ impl MockDatasetActionAuthorizer {
 
     fn classify_handles(
         handles: Vec<odf::DatasetHandle>,
-        error_for: impl Fn(
-            &odf::DatasetHandle,
-        ) -> Option<ClassifyByAllowanceDatasetActionUnauthorizedError>,
+        error_for: impl Fn(&odf::DatasetHandle) -> Option<ClassifyByAllowanceDatasetPermissionError>,
     ) -> ClassifyByAllowanceResponse {
         let mut response = ClassifyByAllowanceResponse {
             authorized_handles: Vec::new(),
@@ -550,13 +549,13 @@ impl MockDatasetActionAuthorizer {
         response
     }
 
-    pub fn make_expect_get_allowed_actions(
+    pub fn make_expect_get_granted_permissions(
         mut self,
-        allowed_actions: &[DatasetAction],
+        granted_permissions: &[DatasetPermission],
         times: usize,
     ) -> Self {
-        let res = allowed_actions.iter().copied().collect::<HashSet<_>>();
-        self.expect_get_allowed_actions()
+        let res = granted_permissions.iter().copied().collect::<HashSet<_>>();
+        self.expect_get_granted_permissions()
             .times(times)
             .returning(move |_| Ok(res.clone()));
         self

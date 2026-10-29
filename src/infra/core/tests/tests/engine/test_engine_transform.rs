@@ -29,7 +29,7 @@ use kamu_auth_rebac_services::{
     DefaultDatasetProperties,
     RebacServiceImpl,
 };
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry, ResolvedDataset};
 use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
@@ -261,7 +261,7 @@ impl TestHarness {
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
             .add::<ContainerRuntime>()
-            .add::<AlwaysHappyDatasetActionAuthorizer>()
+            .add::<AlwaysHappyDatasetPermissionChecker>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(

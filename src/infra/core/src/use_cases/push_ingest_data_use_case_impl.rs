@@ -15,12 +15,12 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
 use kamu_datasets::{
-    DatasetActionUnauthorizedError,
     DatasetExternallyChangedMessage,
     DatasetHeadCommitter,
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermissionError,
     MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
     ResolvedDataset,
 };
@@ -34,15 +34,15 @@ pub struct PushIngestDataUseCaseImpl {
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     dataset_head_committer: Arc<dyn DatasetHeadCommitter>,
-    dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+    dataset_operation_guard: Arc<dyn DatasetOperationGuard>,
     current_account_subject: Arc<CurrentAccountSubject>,
     outbox: Arc<dyn Outbox>,
 }
 
 impl PushIngestDataUseCaseImpl {
     async fn authorize(&self, target: &ResolvedDataset) -> Result<(), PushIngestDataError> {
-        self.dataset_operation_authorizer
-            .authorize_operation(
+        self.dataset_operation_guard
+            .check_operation(
                 &self.current_account_subject,
                 &DatasetOperationRequest::new(
                     target.get_handle().clone(),
@@ -51,7 +51,7 @@ impl PushIngestDataUseCaseImpl {
             )
             .await
             .map_err(|e| {
-                use DatasetActionUnauthorizedError as E;
+                use DatasetPermissionError as E;
 
                 match e {
                     E::NotFound(e) => PushIngestDataError::NotFound(e),

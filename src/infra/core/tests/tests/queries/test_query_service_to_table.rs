@@ -15,7 +15,7 @@ use datafusion::prelude::*;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_datasets::{DatasetRegistry, MockDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{DatasetRegistry, MockDatasetPermissionChecker, ResolvedDataset};
 use kamu_ingest_datafusion::{DataWriterDataFusion, ReaderCsv};
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -1238,14 +1238,14 @@ impl ToTableHarness {
             .map(|name| Self::dataset_id(name))
             .collect::<HashSet<_>>();
 
-        Self::with_authorizer(MockDatasetActionAuthorizer::denying_ids(denied_ids))
+        Self::with_permission_checker(MockDatasetPermissionChecker::denying_ids(denied_ids))
     }
 
-    fn with_authorizer(dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
+    fn with_permission_checker(dataset_permission_checker: MockDatasetPermissionChecker) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let base_catalog = helpers::create_base_catalog_with_local_workspace(
             temp_dir.path(),
-            dataset_action_authorizer,
+            dataset_permission_checker,
         );
 
         let catalog = dill::CatalogBuilder::new_chained(&base_catalog)

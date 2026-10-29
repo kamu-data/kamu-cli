@@ -261,8 +261,8 @@ The sync listener takes `SyncError` because pull and push share it.
 
 `PullAuthorization::authorize` runs per iteration, in one transaction: each job becomes an
 operation on its target (`PullPlanIterationJob::as_operation_request`), and one
-[`DatasetOperationAuthorizer`](../../src/domain/datasets/domain/src/services/dataset_operation_authorizer.rs) call checks them all for the current account. That
-authorizer owns which actions each operation needs:
+[`DatasetOperationGuard`](../../src/domain/datasets/domain/src/services/dataset_operation_guard.rs) call checks them all for the current account. That
+guard owns which permissions each operation needs:
 
 | Job | Operation | Checks |
 | --- | --- | --- |

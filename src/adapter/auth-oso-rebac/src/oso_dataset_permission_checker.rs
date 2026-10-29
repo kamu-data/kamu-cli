@@ -24,8 +24,8 @@ use crate::{GetDatasetResourceError, KamuAuthOso, OsoResourceServiceImpl};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn DatasetActionAuthorizer)]
-pub struct OsoDatasetAuthorizer {
+#[dill::interface(dyn DatasetPermissionChecker)]
+pub struct OsoDatasetPermissionChecker {
     kamu_auth_oso: Arc<KamuAuthOso>,
     current_account_subject: Arc<CurrentAccountSubject>,
     oso_resource_service: Arc<OsoResourceServiceImpl>,
@@ -33,7 +33,7 @@ pub struct OsoDatasetAuthorizer {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl OsoDatasetAuthorizer {
+impl OsoDatasetPermissionChecker {
     async fn user_actor(&self) -> Result<UserActor, InternalError> {
         self.user_actor_for(&self.current_account_subject).await
     }
@@ -74,62 +74,62 @@ impl OsoDatasetAuthorizer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?action))]
-    async fn check_action_allowed(
+impl DatasetPermissionChecker for OsoDatasetPermissionChecker {
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?permission))]
+    async fn check_permission(
         &self,
         dataset_id: &odf::DatasetID,
-        action: DatasetAction,
-    ) -> Result<(), DatasetActionUnauthorizedError> {
+        permission: DatasetPermission,
+    ) -> Result<(), DatasetPermissionError> {
         let (user_actor, maybe_dataset_resource) =
             try_join!(self.user_actor(), self.dataset_resource(dataset_id))?;
 
         let Some(dataset_resource) = maybe_dataset_resource else {
-            return Err(DatasetActionUnauthorizedError::NotFound(
+            return Err(DatasetPermissionError::NotFound(
                 dataset_id.as_local_ref().into(),
             ));
         };
 
         match self
             .kamu_auth_oso
-            .is_allowed(user_actor, action.to_string(), dataset_resource)
+            .is_allowed(user_actor, permission.to_string(), dataset_resource)
         {
             Ok(allowed) if allowed => Ok(()),
-            Ok(_not_allowed) => Err(DatasetActionUnauthorizedError::not_enough_permissions(
+            Ok(_not_allowed) => Err(DatasetPermissionError::not_enough_permissions(
                 dataset_id.as_local_ref(),
-                action,
+                permission,
             )),
-            Err(e) => Err(DatasetActionUnauthorizedError::Internal(e.int_err())),
+            Err(e) => Err(DatasetPermissionError::Internal(e.int_err())),
         }
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    async fn get_allowed_actions(
+    async fn get_granted_permissions(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError> {
+    ) -> Result<HashSet<DatasetPermission>, GetGrantedPermissionsError> {
         let (user_actor, maybe_dataset_resource) =
             try_join!(self.user_actor(), self.dataset_resource(dataset_id))?;
 
         let Some(dataset_resource) = maybe_dataset_resource else {
-            return Err(GetAllowedActionsError::NotFound(
+            return Err(GetGrantedPermissionsError::NotFound(
                 dataset_id.as_local_ref().into(),
             ));
         };
 
-        let allowed_actions = self
+        let granted_permissions = self
             .kamu_auth_oso
             .get_allowed_actions(user_actor, dataset_resource)
             .int_err()?;
 
-        Ok(allowed_actions)
+        Ok(granted_permissions)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count=%dataset_handles.len(), %action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count=%dataset_handles.len(), %permission))]
     async fn filter_datasets_allowing(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<Vec<odf::DatasetHandle>, InternalError> {
         let user_actor = self.user_actor().await?;
 
@@ -156,7 +156,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .map(|(dataset_id, dataset_resource)| {
                 let is_allowed = self
                     .kamu_auth_oso
-                    .is_allowed(user_actor.clone(), action, dataset_resource)
+                    .is_allowed(user_actor.clone(), permission, dataset_resource)
                     .int_err()?;
 
                 if is_allowed {
@@ -178,16 +178,16 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         Ok(matched_dataset_handles)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count = %dataset_handles.len(), %action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(datasets_count = %dataset_handles.len(), %permission))]
     async fn classify_dataset_handles_by_allowance(
         &self,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         self.classify_dataset_handles_by_allowance_for(
             &self.current_account_subject,
             dataset_handles,
-            action,
+            permission,
         )
         .await
     }
@@ -196,7 +196,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         &self,
         principal: &CurrentAccountSubject,
         dataset_handles: Vec<odf::DatasetHandle>,
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceResponse, InternalError> {
         let user_actor = self.user_actor_for(principal).await?;
 
@@ -225,7 +225,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         type HandleResult = Result<
             (
                 odf::DatasetHandle,
-                Option<ClassifyByAllowanceDatasetActionUnauthorizedError>,
+                Option<ClassifyByAllowanceDatasetPermissionError>,
             ),
             InternalError,
         >;
@@ -244,7 +244,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
 
                 let is_allowed = self
                     .kamu_auth_oso
-                    .is_allowed(user_actor.clone(), action, dataset_resource)
+                    .is_allowed(user_actor.clone(), permission, dataset_resource)
                     .int_err()?;
 
                 if is_allowed {
@@ -254,9 +254,9 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     Ok((
                         dataset_handle,
                         Some(
-                            ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                            ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                                 dataset_ref,
-                                action,
+                                permission,
                             ),
                         ),
                     ))
@@ -294,11 +294,11 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         })
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, %action))]
+    #[tracing::instrument(level = "debug", skip_all, fields(?dataset_ids, %permission))]
     async fn classify_dataset_ids_by_allowance<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
-        action: DatasetAction,
+        permission: DatasetPermission,
     ) -> Result<ClassifyByAllowanceIdsResponse, InternalError> {
         let user_actor = self.user_actor().await?;
 
@@ -315,7 +315,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         type IdResult = Result<
             (
                 odf::DatasetID,
-                Option<ClassifyByAllowanceDatasetActionUnauthorizedError>,
+                Option<ClassifyByAllowanceDatasetPermissionError>,
             ),
             InternalError,
         >;
@@ -326,7 +326,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             .map(|(dataset_id, dataset_resource)| -> IdResult {
                 let is_allowed = self
                     .kamu_auth_oso
-                    .is_allowed(user_actor.clone(), action, dataset_resource)
+                    .is_allowed(user_actor.clone(), permission, dataset_resource)
                     .int_err()?;
 
                 if is_allowed {
@@ -336,9 +336,9 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     Ok((
                         dataset_id,
                         Some(
-                            ClassifyByAllowanceDatasetActionUnauthorizedError::not_enough_permissions(
+                            ClassifyByAllowanceDatasetPermissionError::not_enough_permissions(
                                 dataset_ref,
-                                action,
+                                permission,
                             ),
                         ),
                     ))

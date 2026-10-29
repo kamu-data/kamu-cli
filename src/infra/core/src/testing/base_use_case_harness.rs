@@ -11,8 +11,8 @@ use dill::Catalog;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{MockDidGenerator, TenancyConfig};
-use kamu_datasets::{DatasetActionAuthorizer, MockDatasetActionAuthorizer};
-use kamu_datasets_services::DatasetOperationAuthorizerImpl;
+use kamu_datasets::{DatasetPermissionChecker, MockDatasetPermissionChecker};
+use kamu_datasets_services::DatasetOperationGuardImpl;
 use messaging_outbox::{MockOutbox, Outbox};
 use time_source::SystemTimeSourceStub;
 
@@ -22,7 +22,7 @@ use crate::testing::BaseRepoHarness;
 
 pub struct BaseUseCaseHarnessOptions {
     tenancy_config: TenancyConfig,
-    maybe_mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+    maybe_mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
     mock_outbox: Option<MockOutbox>,
     maybe_mock_did_generator: Option<MockDidGenerator>,
     maybe_system_time_source_stub: Option<SystemTimeSourceStub>,
@@ -39,11 +39,11 @@ impl BaseUseCaseHarnessOptions {
         self
     }
 
-    pub fn with_maybe_authorizer(
+    pub fn with_maybe_permission_checker(
         mut self,
-        mock_dataset_action_authorizer: Option<MockDatasetActionAuthorizer>,
+        mock_dataset_permission_checker: Option<MockDatasetPermissionChecker>,
     ) -> Self {
-        self.maybe_mock_dataset_action_authorizer = mock_dataset_action_authorizer;
+        self.maybe_mock_dataset_permission_checker = mock_dataset_permission_checker;
         self
     }
 
@@ -86,7 +86,7 @@ impl Default for BaseUseCaseHarnessOptions {
     fn default() -> Self {
         Self {
             tenancy_config: TenancyConfig::SingleTenant,
-            maybe_mock_dataset_action_authorizer: None,
+            maybe_mock_dataset_permission_checker: None,
             mock_outbox: Some(MockOutbox::new()),
             maybe_mock_did_generator: None,
             maybe_system_time_source_stub: None,
@@ -117,17 +117,17 @@ impl BaseUseCaseHarness {
             let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
 
             b.add::<RebacDatasetRegistryFacadeImpl>();
-            b.add::<DatasetOperationAuthorizerImpl>();
+            b.add::<DatasetOperationGuardImpl>();
 
             if let Some(mock_outbox) = options.mock_outbox {
                 b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
             }
 
-            if let Some(mock_dataset_action_authorizer) =
-                options.maybe_mock_dataset_action_authorizer
+            if let Some(mock_dataset_permission_checker) =
+                options.maybe_mock_dataset_permission_checker
             {
-                b.add_value(mock_dataset_action_authorizer)
-                    .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+                b.add_value(mock_dataset_permission_checker)
+                    .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
             }
 
             b.build()

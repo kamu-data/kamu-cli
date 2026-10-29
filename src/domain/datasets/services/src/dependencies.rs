@@ -64,7 +64,7 @@ pub fn register_dependencies(
     b.add::<DatasetHeadCommitterImpl>();
     b.add::<DatasetStatisticsServiceImpl>();
     b.add::<DatasetIncrementQueryServiceImpl>();
-    b.add::<DatasetOperationAuthorizerImpl>();
+    b.add::<DatasetOperationGuardImpl>();
     b.add::<AccountQuotaCheckerStorageImpl>();
 
     b.add::<DatasetAliasUpdateHandler>();

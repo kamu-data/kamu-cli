@@ -13,7 +13,7 @@ use database_common_macros::transactional_method2;
 use internal_error::InternalError;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_datasets::DatasetOperationAuthorizer;
+use kamu_datasets::DatasetOperationGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,7 +36,7 @@ impl PullAuthorization {
 
     /// Denials come in job order. A sync into a dataset that does not exist
     /// yet is not checked.
-    #[transactional_method2(dataset_operation_authorizer: Arc<dyn DatasetOperationAuthorizer>, current_account_subject: Arc<CurrentAccountSubject>)]
+    #[transactional_method2(dataset_operation_guard: Arc<dyn DatasetOperationGuard>, current_account_subject: Arc<CurrentAccountSubject>)]
     #[tracing::instrument(level = "debug", name = "PullDatasetUseCase::authorize", skip_all, fields(?iteration))]
     pub(crate) async fn authorize(
         &self,
@@ -55,8 +55,8 @@ impl PullAuthorization {
             .iter()
             .filter_map(|(_, maybe_request)| maybe_request.clone())
             .collect();
-        let mut verdicts = dataset_operation_authorizer
-            .authorize_operations(&current_account_subject, &requests)
+        let mut verdicts = dataset_operation_guard
+            .check_operations(&current_account_subject, &requests)
             .await?
             .into_iter();
 

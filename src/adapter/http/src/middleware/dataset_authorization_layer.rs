@@ -16,7 +16,12 @@ use database_common::DatabaseTransactionRunner;
 use futures::Future;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{AnonymousAccountReason, CurrentAccountSubject};
-use kamu_datasets::{DatasetAction, DatasetActionAccess, DatasetActionAuthorizer, DatasetRegistry};
+use kamu_datasets::{
+    DatasetPermission,
+    DatasetPermissionAccess,
+    DatasetPermissionChecker,
+    DatasetRegistry,
+};
 use tower::{Layer, Service};
 
 use crate::axum_utils::*;
@@ -24,60 +29,60 @@ use crate::axum_utils::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DatasetAuthorizationLayer<DatasetActionQuery> {
-    dataset_action_query: DatasetActionQuery,
+pub struct DatasetAuthorizationLayer<DatasetPermissionQuery> {
+    dataset_permission_query: DatasetPermissionQuery,
 }
 
-impl<DatasetActionQuery> DatasetAuthorizationLayer<DatasetActionQuery>
+impl<DatasetPermissionQuery> DatasetAuthorizationLayer<DatasetPermissionQuery>
 where
-    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetAction,
+    DatasetPermissionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetPermission,
 {
-    pub fn new(dataset_action_query: DatasetActionQuery) -> Self {
+    pub fn new(dataset_permission_query: DatasetPermissionQuery) -> Self {
         Self {
-            dataset_action_query,
+            dataset_permission_query,
         }
     }
 }
 
-impl<Svc, DatasetActionQuery> Layer<Svc> for DatasetAuthorizationLayer<DatasetActionQuery>
+impl<Svc, DatasetPermissionQuery> Layer<Svc> for DatasetAuthorizationLayer<DatasetPermissionQuery>
 where
-    DatasetActionQuery: Copy,
+    DatasetPermissionQuery: Copy,
 {
-    type Service = DatasetAuthorizationMiddleware<Svc, DatasetActionQuery>;
+    type Service = DatasetAuthorizationMiddleware<Svc, DatasetPermissionQuery>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
         DatasetAuthorizationMiddleware {
             inner,
-            dataset_action_query: self.dataset_action_query,
+            dataset_permission_query: self.dataset_permission_query,
         }
     }
 }
 
 impl Default
     for DatasetAuthorizationLayer<
-        for<'a> fn(&'a http::Request<Body>) -> kamu_datasets::DatasetAction,
+        for<'a> fn(&'a http::Request<Body>) -> kamu_datasets::DatasetPermission,
     >
 {
     fn default() -> Self {
-        Self::new(get_dataset_action_for_request)
+        Self::new(get_dataset_permission_for_request)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DatasetAuthorizationMiddleware<Svc, DatasetActionQuery> {
+pub struct DatasetAuthorizationMiddleware<Svc, DatasetPermissionQuery> {
     inner: Svc,
-    dataset_action_query: DatasetActionQuery,
+    dataset_permission_query: DatasetPermissionQuery,
 }
 
-impl<Svc, DatasetActionQuery> Service<http::Request<Body>>
-    for DatasetAuthorizationMiddleware<Svc, DatasetActionQuery>
+impl<Svc, DatasetPermissionQuery> Service<http::Request<Body>>
+    for DatasetAuthorizationMiddleware<Svc, DatasetPermissionQuery>
 where
     Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
-    DatasetActionQuery: Send + Copy + 'static,
-    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetAction,
+    DatasetPermissionQuery: Send + Copy + 'static,
+    DatasetPermissionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetPermission,
 {
     type Response = Svc::Response;
     type Error = Svc::Error;
@@ -93,7 +98,7 @@ where
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
 
-        let dataset_action_query = self.dataset_action_query;
+        let dataset_permission_query = self.dataset_permission_query;
 
         Box::pin(async move {
             let catalog = request
@@ -123,7 +128,7 @@ where
                 .get::<odf::DatasetRef>()
                 .expect("Dataset ref not found in http server extensions");
 
-            let current_dataset_action = dataset_action_query(&request);
+            let current_dataset_permission = dataset_permission_query(&request);
 
             enum CheckResult {
                 Proceed,
@@ -133,13 +138,13 @@ where
             let check_result: Result<CheckResult, InternalError> =
                 DatabaseTransactionRunner::new(catalog.clone())
                     .transactional(|transaction_catalog| async move {
-                        use kamu_datasets::DatasetActionAuthorizerExt;
+                        use kamu_datasets::DatasetPermissionCheckerExt;
 
                         let dataset_registry = transaction_catalog
                             .get_one::<dyn DatasetRegistry>()
                             .unwrap();
-                        let dataset_action_authorizer = transaction_catalog
-                            .get_one::<dyn DatasetActionAuthorizer>()
+                        let dataset_permission_checker = transaction_catalog
+                            .get_one::<dyn DatasetPermissionChecker>()
                             .unwrap();
 
                         let dataset_handle = {
@@ -160,19 +165,19 @@ where
                                 }
                             }
                         };
-                        let allowed_actions = dataset_action_authorizer
-                            .get_allowed_actions_for_exist_dataset(&dataset_handle.id)
+                        let allowed_actions = dataset_permission_checker
+                            .get_granted_permissions_for_existing_dataset(&dataset_handle.id)
                             .await?;
 
-                        match DatasetAction::resolve_access(
+                        match DatasetPermission::resolve_access(
                             &allowed_actions,
-                            current_dataset_action,
+                            current_dataset_permission,
                         ) {
-                            DatasetActionAccess::Allowed => Ok(CheckResult::Proceed),
-                            DatasetActionAccess::Insufficient => {
+                            DatasetPermissionAccess::Allowed => Ok(CheckResult::Proceed),
+                            DatasetPermissionAccess::Insufficient => {
                                 Ok(CheckResult::ErrorResponse(forbidden_access_response()))
                             }
-                            DatasetActionAccess::Forbidden => {
+                            DatasetPermissionAccess::Forbidden => {
                                 Ok(CheckResult::ErrorResponse(not_found_response()))
                             }
                         }

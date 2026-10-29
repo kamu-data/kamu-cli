@@ -134,7 +134,7 @@ impl ClientSideHarness {
         }
         b.add_value(AuthConfig::sample());
 
-        b.add::<AlwaysHappyDatasetActionAuthorizer>();
+        b.add::<AlwaysHappyDatasetPermissionChecker>();
 
         if options.authenticated_remotely {
             b.add::<odf::dataset::DummyOdfServerAccessTokenResolver>();
@@ -203,7 +203,7 @@ impl ClientSideHarness {
         b.add::<CreateDatasetFromSnapshotUseCaseImpl>();
         b.add::<CreateDatasetUseCaseImpl>();
         b.add::<PullDatasetUseCaseImpl>();
-        b.add::<DatasetOperationAuthorizerImpl>();
+        b.add::<DatasetOperationGuardImpl>();
         b.add::<DatasetUpdateStepsImpl>();
         b.add::<PushDatasetUseCaseImpl>();
 

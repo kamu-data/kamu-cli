@@ -10,7 +10,7 @@
 use std::borrow::Cow;
 
 use internal_error::InternalError;
-use kamu_datasets::DatasetAction;
+use kamu_datasets::DatasetPermission;
 
 use crate::AccountToDatasetRelation;
 
@@ -63,7 +63,7 @@ pub enum DatasetRoleOperation {
 
 #[derive(thiserror::Error, Debug)]
 pub struct ApplyRelationMatrixBatchError {
-    pub action: DatasetAction,
+    pub action: DatasetPermission,
     pub unauthorized_dataset_refs: Vec<odf::DatasetRef>,
     pub not_found_dataset_refs: Vec<odf::DatasetRef>,
 }

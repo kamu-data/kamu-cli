@@ -22,23 +22,22 @@ use kamu_datasets::*;
 pub struct GetDatasetDownstreamDependenciesUseCaseImpl {
     tenancy_config: Arc<TenancyConfig>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dataset_permission_checker: Arc<dyn DatasetPermissionChecker>,
     dataset_entry_service: Arc<dyn DatasetEntryService>,
 }
 
 impl GetDatasetDownstreamDependenciesUseCaseImpl {
     async fn can_maintain(&self, dataset_id: &odf::DatasetID) -> Result<bool, InternalError> {
         match self
-            .dataset_action_authorizer
-            .check_action_allowed(dataset_id, DatasetAction::Maintain)
+            .dataset_permission_checker
+            .check_permission(dataset_id, DatasetPermission::Maintain)
             .await
         {
             Ok(()) => Ok(true),
-            Err(
-                DatasetActionUnauthorizedError::Access(_)
-                | DatasetActionUnauthorizedError::NotFound(_),
-            ) => Ok(false),
-            Err(DatasetActionUnauthorizedError::Internal(e)) => Err(e),
+            Err(DatasetPermissionError::Access(_) | DatasetPermissionError::NotFound(_)) => {
+                Ok(false)
+            }
+            Err(DatasetPermissionError::Internal(e)) => Err(e),
         }
     }
 }
@@ -78,8 +77,8 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
             .collect::<Vec<_>>();
         // Cut off datasets that we don't have access to
         let authorized_ids = self
-            .dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetAction::Read)
+            .dataset_permission_checker
+            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetPermission::Read)
             .await?
             .authorized_ids
             .into_iter()
@@ -143,8 +142,8 @@ impl GetDatasetDownstreamDependenciesUseCase for GetDatasetDownstreamDependencie
             .collect::<Vec<_>>();
 
         let readable_count = self
-            .dataset_action_authorizer
-            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetAction::Read)
+            .dataset_permission_checker
+            .classify_dataset_ids_by_allowance(&downstream_dependency_ids, DatasetPermission::Read)
             .await?
             .authorized_ids
             .len();

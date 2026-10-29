@@ -78,7 +78,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<DatasetLfsBuilderDatabaseBackedImpl>()
         .add_value(MetadataChainDbBackedConfig::default())
         .add_value(CurrentAccountSubject::new_test())
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CreateDatasetUseCaseImpl>()
         .add::<CreateDatasetUseCaseHelper>()

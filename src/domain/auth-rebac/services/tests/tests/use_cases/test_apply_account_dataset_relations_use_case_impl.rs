@@ -24,7 +24,7 @@ use kamu_auth_rebac::{
 };
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
 use kamu_auth_rebac_services::*;
-use kamu_datasets::{DatasetActionAuthorizer, MockDatasetActionAuthorizer};
+use kamu_datasets::{DatasetPermissionChecker, MockDatasetPermissionChecker};
 use messaging_outbox::{DummyOutboxImpl, MockOutbox, Outbox};
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -42,7 +42,7 @@ type Harness = ApplyAccountDatasetRelationsUseCaseImplHarness;
 
 #[test_log::test(tokio::test)]
 async fn test_apply_roles_matrix_success() {
-    let mut harness = Harness::new(MockDatasetActionAuthorizer::allowing());
+    let mut harness = Harness::new(MockDatasetPermissionChecker::allowing());
 
     let account_id_1 = odf::AccountID::new_generated_ed25519().1;
     let account_id_2 = odf::AccountID::new_generated_ed25519().1;
@@ -414,7 +414,7 @@ async fn test_apply_roles_matrix_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_apply_roles_matrix_not_authorized() {
-    let mut harness = Harness::new(MockDatasetActionAuthorizer::denying());
+    let mut harness = Harness::new(MockDatasetPermissionChecker::denying());
 
     let account_id_1 = odf::AccountID::new_generated_ed25519().1;
     let account_id_2 = odf::AccountID::new_generated_ed25519().1;
@@ -497,7 +497,7 @@ async fn test_apply_roles_matrix_not_found() {
     let missed_dataset_id_2 = odf::DatasetID::new_generated_ed25519().1;
     let missed_dataset_id_3 = odf::DatasetID::new_generated_ed25519().1;
 
-    let mut harness = Harness::new(MockDatasetActionAuthorizer::denying_with_not_found(
+    let mut harness = Harness::new(MockDatasetPermissionChecker::denying_with_not_found(
         HashSet::from([missed_dataset_id_2.clone(), missed_dataset_id_3.clone()]),
     ));
 
@@ -579,7 +579,7 @@ async fn test_apply_roles_matrix_not_found() {
 
 #[test_log::test(tokio::test)]
 async fn test_execute_set_idempotent_emits_only_once() {
-    let harness = Harness::new_with_any_modified_message(MockDatasetActionAuthorizer::allowing());
+    let harness = Harness::new_with_any_modified_message(MockDatasetPermissionChecker::allowing());
 
     let account_id = odf::AccountID::new_generated_ed25519().1;
     let dataset_id = odf::DatasetID::new_generated_ed25519().1;
@@ -613,7 +613,7 @@ async fn test_execute_set_idempotent_emits_only_once() {
 #[test_log::test(tokio::test)]
 async fn test_execute_unset_missing_relation_does_not_emit_message() {
     let harness =
-        Harness::new_with_mock_outbox(MockDatasetActionAuthorizer::allowing(), MockOutbox::new());
+        Harness::new_with_mock_outbox(MockDatasetPermissionChecker::allowing(), MockOutbox::new());
 
     let account_id = odf::AccountID::new_generated_ed25519().1;
     let dataset_id = odf::DatasetID::new_generated_ed25519().1;
@@ -636,7 +636,7 @@ async fn test_execute_unset_existing_relation_emits_modified_message() {
     let dataset_id = odf::DatasetID::new_generated_ed25519().1;
 
     let harness = Harness::new_with_expected_modified_message(
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
         dataset_id.clone(),
         vec![(remaining_account_id.clone(), Role::Reader)],
     );
@@ -670,7 +670,7 @@ async fn test_execute_bulk_emits_only_for_changed_datasets() {
     let dataset_id_changed = odf::DatasetID::new_generated_ed25519().1;
 
     let harness = Harness::new_with_expected_modified_message(
-        MockDatasetActionAuthorizer::allowing(),
+        MockDatasetPermissionChecker::allowing(),
         dataset_id_changed.clone(),
         vec![(account_id.clone(), Role::Reader)],
     );
@@ -713,8 +713,8 @@ struct ApplyAccountDatasetRelationsUseCaseImplHarness {
 }
 
 impl ApplyAccountDatasetRelationsUseCaseImplHarness {
-    pub fn new(mock_dataset_action_authorizer: MockDatasetActionAuthorizer) -> Self {
-        let catalog = Self::catalog_with_dummy_outbox(mock_dataset_action_authorizer);
+    pub fn new(mock_dataset_permission_checker: MockDatasetPermissionChecker) -> Self {
+        let catalog = Self::catalog_with_dummy_outbox(mock_dataset_permission_checker);
 
         Self {
             use_case: catalog.get_one().unwrap(),
@@ -725,14 +725,14 @@ impl ApplyAccountDatasetRelationsUseCaseImplHarness {
     }
 
     pub fn new_with_mock_outbox(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         mock_outbox: MockOutbox,
     ) -> Self {
         let catalog = {
             let mut b = CatalogBuilder::new();
 
             b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
-            Self::register_common_dependencies(&mut b, mock_dataset_action_authorizer);
+            Self::register_common_dependencies(&mut b, mock_dataset_permission_checker);
 
             b.build()
         };
@@ -746,7 +746,7 @@ impl ApplyAccountDatasetRelationsUseCaseImplHarness {
     }
 
     fn new_with_any_modified_message(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
     ) -> Self {
         let mut outbox = MockOutbox::new();
         outbox.expect_post_message_as_json().times(1).returning(
@@ -764,11 +764,11 @@ impl ApplyAccountDatasetRelationsUseCaseImplHarness {
             },
         );
 
-        Self::new_with_mock_outbox(mock_dataset_action_authorizer, outbox)
+        Self::new_with_mock_outbox(mock_dataset_permission_checker, outbox)
     }
 
     fn new_with_expected_modified_message(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         dataset_id: odf::DatasetID,
         expected_accounts: Vec<(odf::AccountID, Role)>,
     ) -> Self {
@@ -806,23 +806,23 @@ impl ApplyAccountDatasetRelationsUseCaseImplHarness {
             },
         );
 
-        Self::new_with_mock_outbox(mock_dataset_action_authorizer, outbox)
+        Self::new_with_mock_outbox(mock_dataset_permission_checker, outbox)
     }
 
     fn catalog_with_dummy_outbox(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
     ) -> dill::Catalog {
         let mut b = CatalogBuilder::new();
 
         b.add::<DummyOutboxImpl>();
-        Self::register_common_dependencies(&mut b, mock_dataset_action_authorizer);
+        Self::register_common_dependencies(&mut b, mock_dataset_permission_checker);
 
         b.build()
     }
 
     fn register_common_dependencies(
         b: &mut CatalogBuilder,
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
     ) {
         b.add::<ApplyAccountDatasetRelationsUseCaseImpl>();
         b.add::<SetDatasetRebacPropertiesUseCaseImpl>();
@@ -831,8 +831,8 @@ impl ApplyAccountDatasetRelationsUseCaseImplHarness {
         b.add_value(DefaultAccountProperties::default());
         b.add_value(DefaultDatasetProperties::default());
         b.add::<InMemoryRebacRepository>();
-        b.add_value(mock_dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, MockDatasetActionAuthorizer>();
+        b.add_value(mock_dataset_permission_checker)
+            .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>();
     }
 
     pub fn register_id_pseudonyms(

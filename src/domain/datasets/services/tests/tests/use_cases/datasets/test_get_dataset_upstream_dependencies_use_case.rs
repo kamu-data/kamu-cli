@@ -79,8 +79,8 @@ async fn test_all_upstream_dependencies_are_accessible() {
     //   │  bob/root-5  │◄─────┤  bob/derived-7  │
     //   └──────────────┘      └─────────────────┘
     let harness = GetDatasetUpstreamDependenciesUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_dataset_ids_by_allowance(
-            DatasetAction::Read,
+        MockDatasetPermissionChecker::new().make_expect_classify_dataset_ids_by_allowance(
+            DatasetPermission::Read,
             1,
             // All
             [
@@ -198,8 +198,8 @@ async fn test_inaccessible_upstream_dependencies_present() {
     //   │  bob/public-root-5  │◄─────┤  bob/derived-7  │
     //   └─────────────────────┘      └─────────────────┘
     let harness = GetDatasetUpstreamDependenciesUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new().make_expect_classify_dataset_ids_by_allowance(
-            DatasetAction::Read,
+        MockDatasetPermissionChecker::new().make_expect_classify_dataset_ids_by_allowance(
+            DatasetPermission::Read,
             1,
             [
                 alice_public_root_1_dataset_handle.id.clone(),
@@ -286,13 +286,13 @@ struct GetDatasetUpstreamDependenciesUseCaseHarness {
 
 impl GetDatasetUpstreamDependenciesUseCaseHarness {
     async fn new(
-        mock_dataset_action_authorizer: MockDatasetActionAuthorizer,
+        mock_dataset_permission_checker: MockDatasetPermissionChecker,
         predefined_account: impl IntoIterator<Item = odf::AccountName>,
     ) -> Self {
         let base_use_case_harness = BaseUseCaseHarness::new(
             BaseUseCaseHarnessOptions::new()
                 .with_tenancy_config(TenancyConfig::MultiTenant)
-                .with_maybe_authorizer(Some(mock_dataset_action_authorizer))
+                .with_maybe_permission_checker(Some(mock_dataset_permission_checker))
                 .without_outbox(),
         );
 

@@ -10,13 +10,13 @@
 mod dataset_resource;
 mod dependencies;
 mod kamu_auth_oso;
-mod oso_dataset_authorizer;
+mod oso_dataset_permission_checker;
 mod oso_resource_service_impl;
 mod user_actor;
 
 pub use dataset_resource::*;
 pub use dependencies::*;
 pub use kamu_auth_oso::*;
-pub use oso_dataset_authorizer::*;
+pub use oso_dataset_permission_checker::*;
 pub use oso_resource_service_impl::*;
 pub use user_actor::*;

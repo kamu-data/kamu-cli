@@ -9,7 +9,7 @@
 
 use kamu_accounts::{AccountNotFoundByIdError, CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
-use kamu_datasets::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
+use kamu_datasets::{DatasetPermission, DatasetPermissionChecker, DatasetPermissionCheckerExt};
 use tokio::sync::OnceCell;
 use url::Url;
 
@@ -287,10 +287,10 @@ impl Account {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let (dataset_registry, dataset_action_authorizer) = from_catalog_n!(
+        let (dataset_registry, dataset_permission_checker) = from_catalog_n!(
             ctx,
             dyn kamu_datasets::DatasetRegistry,
-            dyn DatasetActionAuthorizer
+            dyn DatasetPermissionChecker
         );
 
         let page = page.unwrap_or(0);
@@ -300,8 +300,8 @@ impl Account {
 
         let account_owned_datasets_stream =
             dataset_registry.all_dataset_handles_by_owner_id(&self.account_id);
-        let readable_dataset_handles_stream = dataset_action_authorizer
-            .filtered_datasets_stream(account_owned_datasets_stream, DatasetAction::Read);
+        let readable_dataset_handles_stream = dataset_permission_checker
+            .filtered_datasets_stream(account_owned_datasets_stream, DatasetPermission::Read);
         let mut accessible_datasets_handles = readable_dataset_handles_stream
             .try_collect::<Vec<_>>()
             .await?;

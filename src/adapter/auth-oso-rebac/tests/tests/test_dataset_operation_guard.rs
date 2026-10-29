@@ -39,19 +39,19 @@ use kamu_auth_rebac_services::{
 };
 use kamu_core::TenancyConfig;
 use kamu_datasets::{
-    DatasetActionNotEnoughPermissionsError,
-    DatasetActionUnauthorizedError,
     DatasetLifecycleMessage,
     DatasetOperation,
-    DatasetOperationAuthorizer,
+    DatasetOperationGuard,
     DatasetOperationRequest,
+    DatasetPermissionError,
+    DatasetPermissionMissingError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 use kamu_datasets_services::{
     DatasetEntryServiceImpl,
     DatasetEntryWriter,
-    DatasetOperationAuthorizerImpl,
+    DatasetOperationGuardImpl,
 };
 use messaging_outbox::{
     ConsumerFilter,
@@ -66,9 +66,9 @@ use time_source::SystemTimeSourceDefault;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_target_action_of_each_operation_by_role() {
+async fn test_target_permission_of_each_operation_by_role() {
     let harness =
-        OperationAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let target = harness.create_private_dataset("owner", "target").await;
     harness
         .grant("reader", AccountToDatasetRelation::Reader, &target)
@@ -124,7 +124,7 @@ async fn test_target_action_of_each_operation_by_role() {
 #[test_log::test(tokio::test)]
 async fn test_unreadable_input_is_denied_naming_the_input() {
     let harness =
-        OperationAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let target = harness.create_private_dataset("owner", "target").await;
     let readable = harness.create_private_dataset("owner", "readable").await;
     let unreadable = harness
@@ -143,7 +143,7 @@ async fn test_unreadable_input_is_denied_naming_the_input() {
 
         assert_eq!(
             Some(unreadable.as_local_ref()),
-            OperationAuthorizerHarness::denied_dataset(&result)
+            OperationGuardHarness::denied_dataset(&result)
         );
     }
 }
@@ -153,7 +153,7 @@ async fn test_unreadable_input_is_denied_naming_the_input() {
 #[test_log::test(tokio::test)]
 async fn test_target_error_takes_precedence_over_input_error() {
     let harness =
-        OperationAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let target = harness.create_private_dataset("owner", "target").await;
     let input = harness.create_private_dataset("owner", "input").await;
     harness
@@ -172,7 +172,7 @@ async fn test_target_error_takes_precedence_over_input_error() {
 
     assert_eq!(
         Some(target.as_local_ref()),
-        OperationAuthorizerHarness::denied_dataset(&result)
+        OperationGuardHarness::denied_dataset(&result)
     );
 }
 
@@ -181,14 +181,14 @@ async fn test_target_error_takes_precedence_over_input_error() {
 #[test_log::test(tokio::test)]
 async fn test_missing_target_is_not_found() {
     let harness =
-        OperationAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let missing = odf::metadata::testing::handle(&"owner", &"missing", odf::DatasetKind::Root);
 
     assert_matches!(
         harness
             .authorize("owner", &missing, DatasetOperation::PollingIngest)
             .await,
-        Err(DatasetActionUnauthorizedError::NotFound(e))
+        Err(DatasetPermissionError::NotFound(e))
             if e.dataset_ref == missing.as_local_ref()
     );
 }
@@ -198,18 +198,18 @@ async fn test_missing_target_is_not_found() {
 #[test_log::test(tokio::test)]
 async fn test_principal_is_the_given_one_not_the_current_account() {
     let owner_harness =
-        OperationAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let owned = owner_harness.create_private_dataset("owner", "owned").await;
 
     assert_matches!(
         owner_harness
             .authorize("stranger", &owned, DatasetOperation::Compaction)
             .await,
-        Err(DatasetActionUnauthorizedError::Access(_))
+        Err(DatasetPermissionError::Access(_))
     );
 
     let anonymous_harness =
-        OperationAuthorizerHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::anonymous()).await;
     let owned = anonymous_harness
         .create_private_dataset("owner", "owned")
         .await;
@@ -227,7 +227,7 @@ async fn test_principal_is_the_given_one_not_the_current_account() {
 #[test_log::test(tokio::test)]
 async fn test_batch_keeps_request_order() {
     let harness =
-        OperationAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
+        OperationGuardHarness::new(CurrentAccountSubjectTestHelper::logged("owner")).await;
     let owned = harness.create_private_dataset("owner", "owned").await;
     let foreign = harness.create_private_dataset("stranger", "foreign").await;
     let missing = odf::metadata::testing::handle(&"owner", &"missing", odf::DatasetKind::Root);
@@ -252,9 +252,9 @@ async fn test_batch_keeps_request_order() {
     assert_matches!(
         results.as_slice(),
         [
-            Err(DatasetActionUnauthorizedError::Access(_)),
+            Err(DatasetPermissionError::Access(_)),
             Ok(()),
-            Err(DatasetActionUnauthorizedError::NotFound(_)),
+            Err(DatasetPermissionError::NotFound(_)),
             Ok(()),
         ]
     );
@@ -266,14 +266,14 @@ async fn test_batch_keeps_request_order() {
 
 const ACCOUNTS: [&str; 5] = ["owner", "reader", "editor", "maintainer", "stranger"];
 
-struct OperationAuthorizerHarness {
-    operation_authorizer: Arc<dyn DatasetOperationAuthorizer>,
+struct OperationGuardHarness {
+    operation_guard: Arc<dyn DatasetOperationGuard>,
     rebac_service: Arc<dyn RebacService>,
     dataset_entry_writer: Arc<dyn DatasetEntryWriter>,
     outbox: Arc<dyn Outbox>,
 }
 
-impl OperationAuthorizerHarness {
+impl OperationGuardHarness {
     /// `current_account_subject` is the catalog's subject; each check names
     /// its principal on its own
     async fn new(current_account_subject: CurrentAccountSubject) -> Self {
@@ -314,7 +314,7 @@ impl OperationAuthorizerHarness {
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<LoginPasswordAuthProvider>()
-                .add::<DatasetOperationAuthorizerImpl>();
+                .add::<DatasetOperationGuardImpl>();
 
             register_dependencies(&mut b);
 
@@ -336,7 +336,7 @@ impl OperationAuthorizerHarness {
         };
 
         Self {
-            operation_authorizer: catalog.get_one().unwrap(),
+            operation_guard: catalog.get_one().unwrap(),
             rebac_service: catalog.get_one().unwrap(),
             dataset_entry_writer: catalog.get_one().unwrap(),
             outbox: catalog.get_one().unwrap(),
@@ -396,9 +396,9 @@ impl OperationAuthorizerHarness {
         principal: &str,
         target: &odf::DatasetHandle,
         operation: DatasetOperation,
-    ) -> Result<(), DatasetActionUnauthorizedError> {
-        self.operation_authorizer
-            .authorize_operation(
+    ) -> Result<(), DatasetPermissionError> {
+        self.operation_guard
+            .check_operation(
                 &CurrentAccountSubjectTestHelper::logged(principal),
                 &DatasetOperationRequest::new(target.clone(), operation),
             )
@@ -409,9 +409,9 @@ impl OperationAuthorizerHarness {
         &self,
         principal: &str,
         requests: Vec<DatasetOperationRequest>,
-    ) -> Vec<Result<(), DatasetActionUnauthorizedError>> {
-        self.operation_authorizer
-            .authorize_operations(
+    ) -> Vec<Result<(), DatasetPermissionError>> {
+        self.operation_guard
+            .check_operations(
                 &CurrentAccountSubjectTestHelper::logged(principal),
                 &requests,
             )
@@ -420,14 +420,11 @@ impl OperationAuthorizerHarness {
     }
 
     /// The dataset a permission denial names
-    fn denied_dataset(
-        result: &Result<(), DatasetActionUnauthorizedError>,
-    ) -> Option<odf::DatasetRef> {
-        let Err(DatasetActionUnauthorizedError::Access(odf::AccessError::Unauthorized(e))) = result
-        else {
+    fn denied_dataset(result: &Result<(), DatasetPermissionError>) -> Option<odf::DatasetRef> {
+        let Err(DatasetPermissionError::Access(odf::AccessError::Unauthorized(e))) = result else {
             return None;
         };
-        e.downcast_ref::<DatasetActionNotEnoughPermissionsError>()
+        e.downcast_ref::<DatasetPermissionMissingError>()
             .map(|e| e.dataset_ref.clone())
     }
 }

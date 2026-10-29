@@ -16,7 +16,7 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
-use kamu_datasets::{AlwaysHappyDatasetActionAuthorizer, ResolvedDataset};
+use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, ResolvedDataset};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
@@ -280,7 +280,7 @@ async fn test_engine_io_local_file_mount() {
     let mut b = dill::CatalogBuilder::new();
     b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .add::<DatasetKeyValueServiceSysEnv>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
@@ -328,7 +328,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let mut b = dill::CatalogBuilder::new();
     b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
-        .add::<AlwaysHappyDatasetActionAuthorizer>()
+        .add::<AlwaysHappyDatasetPermissionChecker>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
