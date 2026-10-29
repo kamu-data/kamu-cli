@@ -88,3 +88,22 @@ pub(crate) async fn commit_event(
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Makes a dataset of the current account private through the workspace's
+/// GraphQL API
+pub(crate) async fn set_private(kamu: &KamuCliPuppet, dataset_name: &odf::DatasetName) {
+    let dataset_id = dataset_id(kamu, dataset_name).await;
+    let response = kamu
+        .gql_query(&format!(
+            r#"mutation {{ datasets {{ byId(datasetId: "{}") {{ setVisibility(visibility: {{ private: {{}} }}) {{ __typename }} }} }} }}"#,
+            dataset_id.as_did_str(),
+        ))
+        .await;
+
+    assert!(
+        response.contains("SetDatasetVisibilityResultSuccess"),
+        "{response}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
