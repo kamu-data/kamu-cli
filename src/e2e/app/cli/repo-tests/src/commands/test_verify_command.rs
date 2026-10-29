@@ -19,7 +19,7 @@ use kamu_cli_e2e_common::{
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
-use crate::utils::{commit_event, dataset_id};
+use crate::utils::{commit_event, dataset_id, set_private};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -156,6 +156,58 @@ pub async fn test_verify_derivative_after_query_change(kamu: KamuCliPuppet) {
         ["verify", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
         None,
         Some([r#"1 dataset\(s\) are valid"#]),
+    )
+    .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_verify_replay_denied_when_input_became_unreadable(mut kamu: KamuCliPuppet) {
+    let alice = odf::AccountName::new_unchecked("alice");
+    let bob = odf::AccountName::new_unchecked("bob");
+
+    kamu.create_account(&alice).await;
+    kamu.create_account(&bob).await;
+
+    kamu.set_account(Some(bob.clone()));
+    kamu.execute_with_input(
+        ["add", "--stdin", "--visibility", "public"],
+        DATASET_ROOT_PLAYER_SCORES_SNAPSHOT_STR,
+    )
+    .await
+    .success();
+    kamu.ingest_data(
+        &DATASET_ROOT_PLAYER_NAME,
+        DATASET_ROOT_PLAYER_SCORES_INGEST_DATA_NDJSON_CHUNK_1,
+    )
+    .await;
+
+    kamu.set_account(Some(alice.clone()));
+    kamu.execute_with_input(
+        ["add", "--stdin"],
+        DATASET_DERIVATIVE_LEADERBOARD_SNAPSHOT_STR
+            .replace("datasetRef: player-scores", "datasetRef: bob/player-scores"),
+    )
+    .await
+    .success();
+    kamu.execute(["pull", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()])
+        .await
+        .success();
+    kamu.assert_success_command_execution(
+        ["verify", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([r#"1 dataset\(s\) are valid"#]),
+    )
+    .await;
+
+    kamu.set_account(Some(bob));
+    set_private(&kamu, &DATASET_ROOT_PLAYER_NAME).await;
+
+    kamu.set_account(Some(alice));
+    kamu.assert_failure_command_execution(
+        ["verify", DATASET_DERIVATIVE_LEADERBOARD_NAME.as_str()],
+        None,
+        Some([r#"User has no 'read' permission in dataset 'bob/player-scores'"#]),
     )
     .await;
 }
