@@ -16,7 +16,8 @@ use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, DependencyGraphService};
 
 use super::pull_graph_traversal::PullGraphDepthFirstTraversal;
-use super::pull_item::PullItem;
+use super::pull_item::{PullItem, PullItemJob};
+use super::pull_target_resolution::PullTargetResolver;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,6 +51,24 @@ impl PullRequestPlannerImpl {
         }
     }
 
+    fn new_traversal<'a>(
+        &'a self,
+        options: &'a PullOptions,
+        tenancy_config: TenancyConfig,
+    ) -> PullGraphDepthFirstTraversal<'a> {
+        PullGraphDepthFirstTraversal::new(
+            PullTargetResolver::new(
+                self.dataset_registry.as_ref(),
+                self.pull_source_resolver.as_ref(),
+                self.current_account_subject.as_ref(),
+                options,
+                tenancy_config,
+            ),
+            self.dependency_graph_service.as_ref(),
+            self.update_kind_resolver.as_ref(),
+        )
+    }
+
     // This function descends down the dependency tree of datasets (starting with
     // provided references) assigning depth index to every dataset in the
     // graph(s). Datasets that share the same depth level are independent and
@@ -63,15 +82,7 @@ impl PullRequestPlannerImpl {
     ) -> (Vec<PullItem>, Vec<PullResponse>) {
         let mut errors = Vec::new();
 
-        let mut depth_first_traversal = PullGraphDepthFirstTraversal::new(
-            self.dataset_registry.clone(),
-            self.dependency_graph_service.clone(),
-            self.pull_source_resolver.clone(),
-            self.update_kind_resolver.clone(),
-            self.current_account_subject.clone(),
-            options,
-            tenancy_config,
-        );
+        let mut depth_first_traversal = self.new_traversal(options, tenancy_config);
 
         for pr in requests {
             match depth_first_traversal
@@ -92,9 +103,7 @@ impl PullRequestPlannerImpl {
             }
         }
 
-        let visited = depth_first_traversal.visited;
-        let mut ordered = Vec::with_capacity(visited.len());
-        ordered.extend(visited.into_values());
+        let mut ordered = depth_first_traversal.into_items();
         ordered.sort();
         (ordered, errors)
     }
@@ -106,15 +115,7 @@ impl PullRequestPlannerImpl {
         options: &PullOptions,
         tenancy_config: TenancyConfig,
     ) -> (Vec<PullItem>, Vec<PullResponse>) {
-        let mut depth_first_traversal = PullGraphDepthFirstTraversal::new(
-            self.dataset_registry.clone(),
-            self.dependency_graph_service.clone(),
-            self.pull_source_resolver.clone(),
-            self.update_kind_resolver.clone(),
-            self.current_account_subject.clone(),
-            options,
-            tenancy_config,
-        );
+        let mut depth_first_traversal = self.new_traversal(options, tenancy_config);
 
         if let Err(e) = depth_first_traversal
             .traverse_pull_graph(
@@ -133,10 +134,9 @@ impl PullRequestPlannerImpl {
             return (vec![], vec![error_response]);
         }
 
-        let visited = depth_first_traversal.visited;
-        assert_eq!(visited.len(), 1);
-        let the_item = visited.into_values().next().unwrap();
-        (vec![the_item], vec![])
+        let items = depth_first_traversal.into_items();
+        assert_eq!(items.len(), 1);
+        (items, vec![])
     }
 
     fn slice_by_depth(&self, mut plan: Vec<PullItem>) -> (i32, Vec<PullItem>, Vec<PullItem>) {
@@ -146,33 +146,12 @@ impl PullRequestPlannerImpl {
         (first_depth, plan, rest)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
-    fn build_ingest_item(pi: PullItem) -> PullIngestItem {
-        let hdl = match pi.local_target {
-            PullLocalTarget::Existing(local_handle) => local_handle,
-            PullLocalTarget::ToCreate(_) => {
-                unreachable!("Ingest flows expect to work with existing local targets")
-            }
-        };
-
-        PullIngestItem {
-            target: hdl,
-            maybe_original_request: pi.maybe_original_request,
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%hdl))]
     async fn build_transform_item(
         &self,
-        pi: PullItem,
+        hdl: odf::DatasetHandle,
+        maybe_original_request: Option<PullRequest>,
     ) -> Result<PullTransformItem, Box<PullResponse>> {
-        let hdl = match pi.local_target {
-            PullLocalTarget::Existing(local_handle) => local_handle,
-            PullLocalTarget::ToCreate(_) => {
-                unreachable!("Transform flows expect to work with existing local targets")
-            }
-        };
-
         let target = self.dataset_registry.get_dataset_by_handle(&hdl).await;
 
         // Fails a pull with a broken transform before any job runs, and learns the
@@ -185,23 +164,14 @@ impl PullRequestPlannerImpl {
             Ok(description) => Ok(PullTransformItem {
                 input_handles: description.inputs,
                 target,
-                maybe_original_request: pi.maybe_original_request,
+                maybe_original_request,
             }),
             Err(e) => Err(Box::new(PullResponse {
-                maybe_original_request: pi.maybe_original_request,
+                maybe_original_request,
                 maybe_local_ref: Some(hdl.as_local_ref()),
                 maybe_remote_ref: None,
                 result: Err(PullError::TransformError(TransformError::Plan(e))),
             })),
-        }
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?pi))]
-    fn build_sync_item(pi: PullItem, remote_ref: odf::DatasetRefRemote) -> PullSyncItem {
-        PullSyncItem {
-            local_target: pi.local_target,
-            remote_ref,
-            maybe_original_request: pi.maybe_original_request,
         }
     }
 }
@@ -287,26 +257,43 @@ impl PullRequestPlanner for PullRequestPlannerImpl {
 
             let mut jobs = Vec::new();
             for item in batch {
-                match item.kind.clone() {
-                    DatasetUpdateKind::PollingIngest => {
-                        let pii = Self::build_ingest_item(item);
+                let PullItem {
+                    job,
+                    maybe_original_request,
+                    ..
+                } = item;
+                match job {
+                    PullItemJob::Ingest(target) => {
+                        let pii = PullIngestItem {
+                            target,
+                            maybe_original_request,
+                        };
                         tracing::debug!(depth, ?pii, "Added ingest item to pull plan");
                         jobs.push(PullPlanIterationJob::Ingest(pii));
                     }
-                    DatasetUpdateKind::SyncFrom { remote_ref } => {
-                        let psi = Self::build_sync_item(item, remote_ref);
+                    PullItemJob::Sync {
+                        local_target,
+                        remote_ref,
+                    } => {
+                        let psi = PullSyncItem {
+                            local_target,
+                            remote_ref,
+                            maybe_original_request,
+                        };
                         tracing::debug!(depth, ?psi, "Added sync item to pull plan");
                         jobs.push(PullPlanIterationJob::Sync(psi));
                     }
-                    DatasetUpdateKind::Transform => match self.build_transform_item(item).await {
-                        Ok(pti) => {
-                            tracing::debug!(depth, ?pti, "Added transform item to pull plan");
-                            jobs.push(PullPlanIterationJob::Transform(pti));
+                    PullItemJob::Transform(hdl) => {
+                        match self.build_transform_item(hdl, maybe_original_request).await {
+                            Ok(pti) => {
+                                tracing::debug!(depth, ?pti, "Added transform item to pull plan");
+                                jobs.push(PullPlanIterationJob::Transform(pti));
+                            }
+                            Err(transform_error) => {
+                                errors.push(*transform_error);
+                            }
                         }
-                        Err(transform_error) => {
-                            errors.push(*transform_error);
-                        }
-                    },
+                    }
                 }
             }
 

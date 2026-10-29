@@ -89,7 +89,7 @@ Out of scope, each with its own owner:
 | Use case trait | `kamu-core` — [`pull_dataset_use_case.rs`](../../src/domain/core/src/use_cases/pull_dataset_use_case.rs) | `PullDatasetUseCase::{execute, execute_multi, execute_all_owned}` |
 | Update kind | `kamu-core` — [`dataset_update_kind_resolver.rs`](../../src/domain/core/src/services/dataset_update_kind_resolver.rs); `kamu` — [`dataset_update_kind_resolver_impl.rs`](../../src/infra/core/src/services/dataset_update_kind_resolver_impl.rs) | `DatasetUpdateKindResolver`: how one local dataset is updated (ingest, transform or sync); the planner's only production consumer |
 | Pull source | `kamu-core` — [`dataset_pull_source_resolver.rs`](../../src/domain/core/src/services/dataset_pull_source_resolver.rs); `kamu` — [`dataset_pull_source_resolver_impl.rs`](../../src/infra/core/src/services/remote/dataset_pull_source_resolver_impl.rs) | `DatasetPullSourceResolver`: a dataset's pull alias and its URL, and the inverse lookup ([dataset-sync.md](dataset-sync.md#9-remote-repositories-and-aliases)) |
-| Planner | `kamu` — [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner) | `PullRequestPlannerImpl`, `PullGraphDepthFirstTraversal` |
+| Planner | `kamu` — [`pull_request_planner/`](../../src/infra/core/src/services/pull_request_planner) | `PullRequestPlannerImpl`, `PullGraphDepthFirstTraversal`, `PullTargetResolver` |
 | Update steps | `kamu-core` — [`dataset_update_steps.rs`](../../src/domain/core/src/services/dataset_update_steps.rs); `kamu` — [`dataset_update_steps_impl.rs`](../../src/infra/core/src/services/dataset_update_steps_impl.rs) | `DatasetUpdateSteps`: the transactional steps of updating one dataset, shared with the update task: plan an ingest, elaborate a transform, read a sync target, commit `HEAD`, transfer and commit a sync |
 | Use case | `kamu` — [`src/infra/core/src/use_cases/`](../../src/infra/core/src/use_cases) | `PullDatasetUseCaseImpl`: iteration loop and authorization; `PullIngestLoop`, `PullTransformJob` and `PullSyncJob` run the jobs |
 | CLI | `kamu-cli` — [`pull_command.rs`](../../src/app/cli/src/commands/pull_command.rs) | `PullCommand`, progress listeners, result summary |
@@ -142,7 +142,9 @@ on the network.
 
 ### 5.1 Resolving each request
 
-`PullGraphDepthFirstTraversal::traverse_pull_graph` handles one request:
+`PullGraphDepthFirstTraversal::traverse_pull_graph` handles one request. Steps 1–3 are
+`PullTargetResolver::resolve`, which yields the request's target: the existing dataset of a `Local`
+request, or for a `Remote` one an existing dataset or the alias to create one under.
 
 1. **Local handle.** A `Local` ref must resolve, or the result is `NotFound`. A `Remote` request
    first tries its local alias, then searches for a local dataset whose pull aliases contain the
