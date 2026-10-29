@@ -19,31 +19,31 @@ pub trait RebacDatasetRegistryFacade: Send + Sync {
     async fn resolve_dataset_handle_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-        action: DatasetPermission,
+        permission: DatasetPermission,
     ) -> Result<odf::DatasetHandle, RebacDatasetRefUnresolvedError>;
 
     async fn resolve_dataset_by_ref(
         &self,
         dataset_ref: &odf::DatasetRef,
-        action: DatasetPermission,
+        permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetRefUnresolvedError>;
 
     async fn resolve_dataset_by_handle(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        action: DatasetPermission,
+        permission: DatasetPermission,
     ) -> Result<ResolvedDataset, RebacDatasetIdUnresolvedError>;
 
     async fn classify_dataset_refs_by_allowance(
         &self,
         dataset_refs: &[&odf::DatasetRef],
-        action: DatasetPermission,
+        permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAllowanceResponse, InternalError>;
 
     async fn classify_dataset_refs_by_access(
         &self,
         dataset_refs: &[&odf::DatasetRef],
-        action: DatasetPermission,
+        permission: DatasetPermission,
     ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError>;
 }
 

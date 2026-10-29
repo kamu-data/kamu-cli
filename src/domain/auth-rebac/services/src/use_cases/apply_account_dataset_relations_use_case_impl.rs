@@ -77,7 +77,7 @@ impl ApplyAccountDatasetRelationsUseCaseImpl {
         }
 
         Err(ApplyRelationMatrixBatchError {
-            action: EXPECTED_ACCESS,
+            permission: EXPECTED_ACCESS,
             unauthorized_dataset_refs,
             not_found_dataset_refs,
         }

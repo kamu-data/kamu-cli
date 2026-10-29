@@ -63,14 +63,18 @@ pub enum DatasetRoleOperation {
 
 #[derive(thiserror::Error, Debug)]
 pub struct ApplyRelationMatrixBatchError {
-    pub action: DatasetPermission,
+    pub permission: DatasetPermission,
     pub unauthorized_dataset_refs: Vec<odf::DatasetRef>,
     pub not_found_dataset_refs: Vec<odf::DatasetRef>,
 }
 
 impl std::fmt::Display for ApplyRelationMatrixBatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "User has no '{}' permission in datasets: '", self.action)?;
+        write!(
+            f,
+            "User has no '{}' permission in datasets: '",
+            self.permission
+        )?;
         for (i, item) in self.unauthorized_dataset_refs.iter().enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
