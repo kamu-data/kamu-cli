@@ -25,6 +25,7 @@ use url::Url;
 
 use super::WsSmartTransferProtocolClient;
 use crate::OdfSmtpVersion;
+use crate::smart_protocol::error_close::ErrorReplyClose;
 use crate::smart_protocol::messages::*;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
@@ -122,14 +123,10 @@ pub(super) async fn read_payload<TMessagePayload: DeserializeOwned>(
             Ok(Message::Text(raw_message)) => {
                 ws_common::parse_payload::<TMessagePayload>(raw_message.as_str())
             }
-            Ok(Message::Close(close_frame_maybe)) => {
-                if let Some(close_frame) = close_frame_maybe
-                    && close_frame.code == CloseCode::Error
-                {
-                    return ws_common::parse_payload::<TMessagePayload>(&close_frame.reason);
-                }
-                Err(ReadMessageError::ServerDisconnected)
+            Ok(Message::Close(Some(close_frame))) => {
+                ErrorReplyClose::read(u16::from(close_frame.code), &close_frame.reason)
             }
+            Ok(Message::Close(None)) => Err(ReadMessageError::ServerDisconnected),
             Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
             Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
         },

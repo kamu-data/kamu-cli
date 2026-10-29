@@ -450,7 +450,7 @@ impl TestHarness {
 
         if let PollingIngestResult::Updated {
             old_head, new_head, ..
-        } = &ingest_result.result
+        } = &ingest_result
         {
             target
                 .as_metadata_chain()

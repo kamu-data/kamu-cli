@@ -259,8 +259,8 @@ their only path: it returns an empty map unless secrets encryption is configured
    coerces an integer or string `event_time` to a timestamp, but only when the read step has no
    explicit schema.
 6. **Stage and commit** through the writer with the fetch's new source state and event time.
-7. Return `Updated { old_head, new_head, has_more, uncacheable, increment, new_source_state }`
-   and the advanced writer state. `increment` counts the blocks, records and watermark between
+7. Return `Updated { old_head, new_head, has_more, uncacheable, increment, new_source_state,
+   metadata_state }`, where `metadata_state` is the advanced writer state. `increment` counts the blocks, records and watermark between
    the two heads.
 
 The working directory `RunInfoDir/ingest-<operation_id>/` is removed after a successful iteration

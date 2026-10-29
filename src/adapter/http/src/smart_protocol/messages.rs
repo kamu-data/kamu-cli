@@ -450,3 +450,17 @@ pub struct TransferInternalError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The internal error any phase may end with, in the shape of the `Err` of a
+/// phase response: `{"Err":{"Internal":{..}}}`
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum TransferInternalErrorReply {
+    Err(TransferInternalErrorKind),
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum TransferInternalErrorKind {
+    Internal(TransferInternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

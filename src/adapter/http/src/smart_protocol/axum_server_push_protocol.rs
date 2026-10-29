@@ -9,11 +9,10 @@
 
 use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::Duration;
 
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::AuthenticationService;
 use kamu_core::{CorruptedSourceError, OverwriteSeedBlockError};
 use kamu_datasets::{
@@ -33,6 +32,7 @@ use odf::metadata::AsTypedBlock as _;
 use tracing::Instrument;
 use url::Url;
 
+use super::error_close::ErrorReplyClose;
 use super::errors::*;
 use super::messages::*;
 use super::phases::*;
@@ -81,11 +81,11 @@ impl AxumServerPushProtocolInstance {
                 tracing::debug!("Push process success");
             }
             Err(ref e @ PushServerError::Internal(ref int_err)) => {
-                let payload = Err(DatasetPushRequestError::Internal(TransferInternalError {
-                    phase: int_err.phase.clone(),
-                    error_message: "Internal error".to_string(),
-                }));
-                axum_write_close_payload::<DatasetPushResponse>(&mut self.socket, payload).await;
+                axum_write_error_close(
+                    &mut self.socket,
+                    ErrorReplyClose::internal(int_err.phase.clone()),
+                )
+                .await;
 
                 tracing::error!(
                   error = ?e,
@@ -109,8 +109,7 @@ impl AxumServerPushProtocolInstance {
                         DatasetPushMetadataSeedBlockOverwriteRestrictedError {},
                     ),
                 );
-                axum_write_close_payload::<DatasetPushMetadataResponse>(&mut self.socket, payload)
-                    .await;
+                axum_write_error_close(&mut self.socket, ErrorReplyClose::reply(payload)).await;
 
                 tracing::error!(
                   error = ?err,
@@ -168,13 +167,15 @@ impl AxumServerPushProtocolInstance {
                 );
             }
             Err(PushServerError::UpdatedConcurrently(err)) => {
-                let payload = DatasetPushCompleteResponse::Err(
-                    DatasetPushCompleteError::UpdatedConcurrently(
-                        DatasetPushUpdatedConcurrentlyError {},
+                axum_write_error_close(
+                    &mut self.socket,
+                    ErrorReplyClose::push_not_completed(
+                        DatasetPushCompleteError::UpdatedConcurrently(
+                            DatasetPushUpdatedConcurrentlyError {},
+                        ),
                     ),
-                );
-                axum_write_close_payload::<DatasetPushCompleteResponse>(&mut self.socket, payload)
-                    .await;
+                )
+                .await;
 
                 tracing::warn!(
                   error = ?err,
@@ -184,18 +185,7 @@ impl AxumServerPushProtocolInstance {
             }
         }
 
-        // After we finish processing to ensure graceful closing
-        // we wait for client acknowledgment. And to handle
-        // custom clients without logic of close acknowledgment
-        // we will give 5 secs timeout
-        let timeout_duration = Duration::from_secs(5);
-
-        if tokio::time::timeout(timeout_duration, wait_for_close(&mut self.socket))
-            .await
-            .is_err()
-        {
-            tracing::debug!("Timeout reached, closing connection");
-        }
+        axum_await_client_close(&mut self.socket).await;
     }
 
     async fn push_main_flow(&mut self) -> Result<(), PushServerError> {
@@ -448,34 +438,19 @@ impl AxumServerPushProtocolInstance {
             "Push client sent a push objects request",
         );
 
-        let dataset_url = self.dataset_url.clone();
         let dataset_handle = self.maybe_dataset_handle.clone().ok_or_else(|| {
-            "The push completed with no blocks for a dataset that does not exist"
-                .protocol_int_err(PushPhase::CompleteRequest)
+            "Objects were requested for a dataset that does not exist"
+                .protocol_int_err(PushPhase::ObjectsRequest)
         })?;
-        let maybe_bearer_header = self.maybe_bearer_header.clone();
 
-        let object_transfer_strategies = DatabaseTransactionRunner::new(self.catalog.clone())
-            .transactional_with(|dataset_registry: Arc<dyn DatasetRegistry>| async move {
-                let resolved_dataset = dataset_registry
-                    .get_dataset_by_handle(&dataset_handle)
-                    .await;
-
-                let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
-                for r in request.object_files {
-                    let transfer_strategy = prepare_push_object_transfer_strategy(
-                        resolved_dataset.as_ref(),
-                        &r,
-                        &dataset_url,
-                        maybe_bearer_header.as_ref(),
-                    )
-                    .await?;
-
-                    object_transfer_strategies.push(transfer_strategy);
-                }
-
-                Ok::<_, InternalError>(object_transfer_strategies)
-            })
+        let object_transfer_strategies =
+            prepare_object_transfer_strategies::<PushObjectTransferStrategy>(
+                &self.catalog,
+                dataset_handle,
+                request.object_files,
+                self.dataset_url.clone(),
+                self.maybe_bearer_header.clone(),
+            )
             .instrument(tracing::debug_span!(
                 "AxumServerPushProtocolInstance::try_handle_push_objects_request",
             ))

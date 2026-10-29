@@ -1850,12 +1850,7 @@ impl PullUseCaseHarnessMocks {
                 target.get_alias() == &alias && env_vars.as_map().contains_key(env_var_key)
             })
             .times(1)
-            .returning(|_, _, _, _, _, _| {
-                Ok(PollingIngestResponse {
-                    result: PollingIngestResult::UpToDate { uncacheable: false },
-                    metadata_state: None,
-                })
-            });
+            .returning(|_, _, _, _, _, _| Ok(PollingIngestResult::UpToDate { uncacheable: false }));
 
         Self {
             env_var_resolution: Some(EnvVarResolution::Const),

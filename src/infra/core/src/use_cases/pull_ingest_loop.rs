@@ -116,7 +116,7 @@ impl PullIngestLoop {
 
         let mut combined: Option<PollingIngestResult> = None;
         loop {
-            let response = match self
+            let result = match self
                 .polling_ingest_service
                 .ingest(
                     target.clone(),
@@ -128,16 +128,17 @@ impl PullIngestLoop {
                 )
                 .await
             {
-                Ok(response) => response,
+                Ok(result) => result,
                 Err(e) => return Err(Self::stopped(combined, e.into())),
             };
 
-            let has_more = match &response.result {
-                PollingIngestResult::UpToDate { .. } => false,
+            let next_state = match &result {
+                PollingIngestResult::UpToDate { .. } => None,
                 PollingIngestResult::Updated {
                     old_head,
                     new_head,
                     has_more,
+                    metadata_state,
                     ..
                 } => {
                     if let Err(e) = HeadCommit::into_pull_result(
@@ -148,23 +149,19 @@ impl PullIngestLoop {
                     ) {
                         return Err(Self::stopped(combined, e));
                     }
-                    *has_more
+                    (*has_more && exhaust_sources).then(|| metadata_state.clone())
                 }
             };
 
             if let Some(listener) = &maybe_listener {
-                listener.success(&response.result);
+                listener.success(&result);
             }
 
-            combined = Some(Self::merge_results(combined, response.result));
+            combined = Some(Self::merge_results(combined, result));
 
-            if !has_more || !exhaust_sources {
+            let Some(metadata_state) = next_state else {
                 break;
-            }
-
-            let metadata_state = response
-                .metadata_state
-                .expect("An updated ingest returns its writer state");
+            };
             plan = PollingIngestPlan::new(target.get_handle(), metadata_state).int_err()?;
         }
 
@@ -204,6 +201,7 @@ impl PullIngestLoop {
                     new_head,
                     increment,
                     new_source_state,
+                    metadata_state,
                     ..
                 }),
                 PollingIngestResult::UpToDate { uncacheable },
@@ -214,6 +212,7 @@ impl PullIngestLoop {
                 uncacheable,
                 increment,
                 new_source_state,
+                metadata_state,
             },
             (
                 Some(PollingIngestResult::Updated {
@@ -227,6 +226,7 @@ impl PullIngestLoop {
                     uncacheable,
                     increment: next_increment,
                     new_source_state,
+                    metadata_state,
                     ..
                 },
             ) => {
@@ -238,6 +238,7 @@ impl PullIngestLoop {
                     uncacheable,
                     increment,
                     new_source_state,
+                    metadata_state,
                 }
             }
         }

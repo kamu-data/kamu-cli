@@ -90,6 +90,10 @@ Recommendation: for ease of reading, use the following format:
   the change now fails the push with nothing committed
 - `kamu push` over the smart protocol reports a name collision for a long dataset alias, instead of
   a retried internal error
+- `kamu push` from an older `kamu` to this node reports a failure, instead of success, when the node
+  could not commit the push
+- When a smart protocol transfer fails on the server, the error names the failed step instead of
+  showing a JSON parse error
 - Update, compaction and reset tasks of a dataset deleted after they were scheduled fail without
   retries, instead of being retried or crashing
 - When `kamu pull` or `kamu system compact` fails for some datasets, the datasets that did update

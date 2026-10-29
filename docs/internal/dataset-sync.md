@@ -360,12 +360,13 @@ sequenceDiagram
     S-->>C: DatasetPushCompleteResponse
 ```
 
-`DatasetPushCompleteResponse` is `Ok(DatasetPushCompleteConfirmed)`, or an error sent as the close
-frame reason: `Internal`, or `UpdatedConcurrently` when the CAS on `HEAD` fails. The conflict
-carries no heads, since a close frame reason holds at most 123 bytes; the server logs them. The
-error stays in the close frame because a client that predates the typed response reads any text
-reply here as a bare confirmation, ignoring the `Ok` key; such a client fails at its next send
-instead. The client accepts the bare `{}` confirmation of a server that predates it. Progress
+`DatasetPushCompleteResponse` is `Ok(DatasetPushCompleteConfirmed)`, or an error sent as the reason
+of a close with code 1013 ("try again later"): `Internal`, or `UpdatedConcurrently` when the CAS on
+`HEAD` fails. The conflict carries no heads, since a close frame reason holds at most 123 bytes; the
+server logs them. A client that predates the typed response takes any JSON object here, including
+the reason of a close with the usual error code 1011, for a bare confirmation; it reads a close
+with any other code as a disconnect, so with 1013 it fails the push instead of reporting success.
+The current client reads the reason of both codes. The client accepts the bare `{}` confirmation of a server that predates it. Progress
 requests carry `progress_requested: true`, so one still in flight is skipped rather than taken for
 the confirmation; a server that predates the field sends `{}`, which stays ambiguous.
 
@@ -503,7 +504,9 @@ heads in `InvalidHead` when `HEAD` moved before the push began, and none in
 surprising: a Smart-protocol push onto a remote that is ahead fails with `DatasetsDiverged`, not
 `DestinationAhead`; and server-side internal failures reach the client as `Internal` with the
 generic message "Internal error", the cause staying in the server log (the one exception is a
-failure while computing the pull transfer plan, whose message is forwarded as is). Of the typed
+failure while computing the pull transfer plan, whose message is forwarded as is). In a phase whose
+reply has no `Internal` case, the client still reads that reply and reports the server's failed
+phase. Of the typed
 protocol errors, `InvalidInterval` (→ `DatasetsDiverged` on pull), `SeedBlockOverwriteRestricted`
 (→ `OverwriteSeedBlock` on push; on pull the client makes the `Seed` check itself), `RefCollision`
 and `NameCollision` keep their meaning. A metadata batch or an object download that cannot be read

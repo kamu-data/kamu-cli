@@ -157,15 +157,11 @@ impl UpdateDatasetTaskRunner {
             .await;
 
         match ingest_response {
-            Ok(PollingIngestResponse {
-                result:
-                    PollingIngestResult::Updated {
-                        old_head,
-                        new_head,
-                        has_more,
-                        increment,
-                        ..
-                    },
+            Ok(PollingIngestResult::Updated {
+                old_head,
+                new_head,
+                has_more,
+                increment,
                 ..
             }) => {
                 if let Some(failed) = self
@@ -187,10 +183,7 @@ impl UpdateDatasetTaskRunner {
                     .into_task_result(),
                 ))
             }
-            Ok(PollingIngestResponse {
-                result: PollingIngestResult::UpToDate { uncacheable, .. },
-                ..
-            }) => Ok(TaskOutcome::Success(
+            Ok(PollingIngestResult::UpToDate { uncacheable }) => Ok(TaskOutcome::Success(
                 TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::PollingIngest(
                     PollingIngestResultUpToDate { uncacheable },
                 ))

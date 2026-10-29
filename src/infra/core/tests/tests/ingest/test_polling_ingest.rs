@@ -1345,7 +1345,7 @@ async fn test_ingest_polling_reports_increment_and_removes_its_directory() {
     let res = harness.ingest(target).await.unwrap();
 
     assert_matches!(
-        res.result,
+        res,
         PollingIngestResult::Updated {
             increment: odf::dataset::MetadataChainIncrementInterval {
                 num_blocks: 2,
@@ -1394,13 +1394,13 @@ async fn test_ingest_polling_fixed_zero_copy_source_is_ingested_once() {
     let second = harness.ingest(target).await.unwrap();
 
     assert_matches!(
-        first.result,
+        first,
         PollingIngestResult::Updated {
             increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
             ..
         }
     );
-    assert_matches!(second.result, PollingIngestResult::UpToDate { .. });
+    assert_matches!(second, PollingIngestResult::UpToDate { .. });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1446,7 +1446,7 @@ async fn test_ingest_polling_savepoint_without_its_data_downloads_again() {
     let res = harness.ingest(target).await.unwrap();
 
     assert_matches!(
-        res.result,
+        res,
         PollingIngestResult::Updated {
             increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
             ..
@@ -1473,7 +1473,7 @@ async fn test_ingest_polling_unreadable_savepoint_downloads_again() {
     let res = harness.ingest(target).await.unwrap();
 
     assert_matches!(
-        res.result,
+        res,
         PollingIngestResult::Updated {
             increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
             ..
@@ -1559,12 +1559,9 @@ async fn test_ingest_polling_source_without_state_is_skipped_unless_fetching_unc
         .await
         .unwrap();
 
+    assert_matches!(skipped, PollingIngestResult::UpToDate { uncacheable: true });
     assert_matches!(
-        skipped.result,
-        PollingIngestResult::UpToDate { uncacheable: true }
-    );
-    assert_matches!(
-        fetched.result,
+        fetched,
         PollingIngestResult::Updated {
             uncacheable: true,
             increment: odf::dataset::MetadataChainIncrementInterval { num_records: 1, .. },
@@ -1788,7 +1785,7 @@ impl IngestTestHarness {
     async fn ingest(
         &self,
         target: ResolvedDataset,
-    ) -> Result<PollingIngestResponse, PollingIngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         self.ingest_with(target, PollingIngestOptions::default())
             .await
     }
@@ -1797,7 +1794,7 @@ impl IngestTestHarness {
         &self,
         target: ResolvedDataset,
         options: PollingIngestOptions,
-    ) -> Result<PollingIngestResponse, PollingIngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         let metadata_state =
             DataWriterMetadataState::build(target.clone(), &odf::BlockRef::Head, None, None)
                 .await
@@ -1815,10 +1812,9 @@ impl IngestTestHarness {
             )
             .await;
 
-        if let Ok(PollingIngestResponse { result, .. }) = &ingest_res
-            && let PollingIngestResult::Updated {
-                old_head, new_head, ..
-            } = result
+        if let Ok(PollingIngestResult::Updated {
+            old_head, new_head, ..
+        }) = &ingest_res
         {
             target
                 .as_metadata_chain()
