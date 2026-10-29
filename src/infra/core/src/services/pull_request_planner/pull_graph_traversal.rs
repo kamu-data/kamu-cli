@@ -8,49 +8,41 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use kamu_accounts::CurrentAccountSubject;
 use kamu_core::*;
-use kamu_datasets::{DatasetRegistry, DependencyGraphService};
+use kamu_datasets::DependencyGraphService;
 
-use super::pull_item::PullItem;
+use super::pull_item::{PullItem, PullItemJob};
+use super::pull_target_resolution::{PullTarget, PullTargetResolver};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(super) struct PullGraphDepthFirstTraversal<'a> {
-    pub(super) dataset_registry: Arc<dyn DatasetRegistry>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    pub(super) pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
-    update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
-    pub(super) current_account_subject: Arc<CurrentAccountSubject>,
-    options: &'a PullOptions,
-    pub(super) tenancy_config: TenancyConfig,
-    pub(super) visited: HashMap<odf::DatasetAlias, PullItem>,
+    target_resolver: PullTargetResolver<'a>,
+    dependency_graph_service: &'a dyn DependencyGraphService,
+    update_kind_resolver: &'a dyn DatasetUpdateKindResolver,
+    visited: HashMap<odf::DatasetAlias, PullItem>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl<'a> PullGraphDepthFirstTraversal<'a> {
     pub(super) fn new(
-        dataset_registry: Arc<dyn DatasetRegistry>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-        pull_source_resolver: Arc<dyn DatasetPullSourceResolver>,
-        update_kind_resolver: Arc<dyn DatasetUpdateKindResolver>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        options: &'a PullOptions,
-        tenancy_config: TenancyConfig,
+        target_resolver: PullTargetResolver<'a>,
+        dependency_graph_service: &'a dyn DependencyGraphService,
+        update_kind_resolver: &'a dyn DatasetUpdateKindResolver,
     ) -> Self {
         Self {
-            dataset_registry,
+            target_resolver,
             dependency_graph_service,
-            pull_source_resolver,
             update_kind_resolver,
-            current_account_subject,
-            options,
-            tenancy_config,
             visited: HashMap::new(),
         }
+    }
+
+    /// The items of every dataset visited so far, in no particular order
+    pub(super) fn into_items(self) -> Vec<PullItem> {
+        self.visited.into_values().collect()
     }
 
     #[async_recursion::async_recursion]
@@ -62,18 +54,8 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
     ) -> Result<i32, PullError> {
         tracing::debug!(?request, %referenced_explicitly, %traverse_dependencies, "Entering pull graph node");
 
-        // Resolve local dataset handle, if dataset exists
-        let maybe_local_handle = self.try_resolve_local_handle(request).await?;
-
-        // If dataset is not found, and auto-create is disabled, it's en error
-        if maybe_local_handle.is_none() && !self.options.sync_options.create_if_not_exists {
-            return Err(PullError::AutoCreateDisabled);
-        }
-
-        // Resolve the name of a local dataset if it exists
-        // or a name to create dataset with if syncing from remote and creation is
-        // allowed
-        let local_alias = self.form_local_alias(maybe_local_handle.as_ref(), request)?;
+        let target = self.target_resolver.resolve(request).await?;
+        let local_alias = target.local_alias().clone();
 
         // Already visited?
         if let Some(pi) = self.visited.get_mut(&local_alias) {
@@ -84,68 +66,54 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
             return Ok(pi.depth);
         }
 
-        let kind = self
-            .resolve_item_kind(request, maybe_local_handle.as_ref())
-            .await?;
-
-        let depth = match &kind {
-            // Synced datasets and roots do not depend on other local datasets
-            DatasetUpdateKind::SyncFrom { .. } | DatasetUpdateKind::PollingIngest => 0,
-            DatasetUpdateKind::Transform => {
-                if traverse_dependencies {
-                    let local_handle = maybe_local_handle.as_ref().unwrap();
-                    self.traverse_upstream_datasets(&local_handle.id).await? + 1
-                } else {
-                    // Without scanning upstreams the exact depth is not important, as long as
-                    // derivatives come after roots
-                    1
+        // Synced datasets and roots do not depend on other local datasets, so they are at depth 0
+        let (job, depth) = match target {
+            PullTarget::Local(local_handle) => match self
+                .update_kind_resolver
+                .resolve_update_kind(&local_handle)
+                .await?
+            {
+                DatasetUpdateKind::PollingIngest => (PullItemJob::Ingest(local_handle), 0),
+                DatasetUpdateKind::SyncFrom { remote_ref } => (
+                    PullItemJob::Sync {
+                        local_target: PullLocalTarget::existing(local_handle),
+                        remote_ref,
+                    },
+                    0,
+                ),
+                DatasetUpdateKind::Transform => {
+                    let depth = if traverse_dependencies {
+                        self.traverse_upstream_datasets(&local_handle.id).await? + 1
+                    } else {
+                        // Without scanning upstreams the exact depth is not important, as long as
+                        // derivatives come after roots
+                        1
+                    };
+                    (PullItemJob::Transform(local_handle), depth)
                 }
-            }
+            },
+            PullTarget::Remote {
+                local_target,
+                remote_ref,
+            } => (
+                PullItemJob::Sync {
+                    local_target,
+                    remote_ref,
+                },
+                0,
+            ),
         };
 
-        let local_target = if let Some(local_handle) = maybe_local_handle {
-            PullLocalTarget::existing(local_handle)
-        } else {
-            PullLocalTarget::to_create(local_alias.clone())
-        };
-
-        let mut pull_item = PullItem {
-            maybe_original_request: None, // May be set below
+        let pull_item = PullItem {
             depth,
-            local_target,
-            kind,
+            job,
+            maybe_original_request: referenced_explicitly.then(|| request.clone()),
         };
-
-        if referenced_explicitly {
-            pull_item.maybe_original_request = Some(request.clone());
-        }
 
         tracing::debug!(?pull_item, "Resolved pull graph node");
 
-        let depth = pull_item.depth;
-        self.visited.insert(local_alias.clone(), pull_item);
+        self.visited.insert(local_alias, pull_item);
         Ok(depth)
-    }
-
-    async fn resolve_item_kind(
-        &self,
-        request: &PullRequest,
-        maybe_local_handle: Option<&odf::DatasetHandle>,
-    ) -> Result<DatasetUpdateKind, PullError> {
-        match request {
-            PullRequest::Remote(remote) => Ok(DatasetUpdateKind::SyncFrom {
-                remote_ref: remote.remote_ref.clone(),
-            }),
-            PullRequest::Local(_) => {
-                let Some(local_handle) = maybe_local_handle else {
-                    unreachable!("Local pull requests are resolved to existing datasets")
-                };
-                Ok(self
-                    .update_kind_resolver
-                    .resolve_update_kind(local_handle)
-                    .await?)
-            }
-        }
     }
 
     async fn traverse_upstream_datasets(

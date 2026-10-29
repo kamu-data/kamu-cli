@@ -13,12 +13,15 @@ use kamu_core::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A dataset in the pull graph, with the job that updates it and its depth.
+/// Items order by depth, syncs first within a depth, then by local alias.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct PullItem {
-    pub(super) depth: i32,
-    pub(super) local_target: PullLocalTarget,
-    pub(super) kind: DatasetUpdateKind,
-    pub(super) maybe_original_request: Option<PullRequest>,
+    pub depth: i32,
+    pub job: PullItemJob,
+    /// The request that named the dataset; `None` for an upstream reached
+    /// while traversing
+    pub maybe_original_request: Option<PullRequest>,
 }
 
 impl PartialOrd for PullItem {
@@ -29,20 +32,40 @@ impl PartialOrd for PullItem {
 
 impl Ord for PullItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        let depth_ord = self.depth.cmp(&other.depth);
-        if depth_ord != Ordering::Equal {
-            return depth_ord;
-        }
+        self.depth
+            .cmp(&other.depth)
+            .then_with(|| other.job.is_sync().cmp(&self.job.is_sync()))
+            .then_with(|| self.job.local_alias().cmp(other.job.local_alias()))
+    }
+}
 
-        if self.kind.is_sync_from() != other.kind.is_sync_from() {
-            return if self.kind.is_sync_from() {
-                Ordering::Less
-            } else {
-                Ordering::Greater
-            };
-        }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        self.local_target.alias().cmp(other.local_target.alias())
+/// How a dataset in the pull graph is updated. Only a sync can create its
+/// dataset; an ingest or a transform updates an existing one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum PullItemJob {
+    Ingest(odf::DatasetHandle),
+    Transform(odf::DatasetHandle),
+    Sync {
+        local_target: PullLocalTarget,
+        remote_ref: odf::DatasetRefRemote,
+    },
+}
+
+impl PullItemJob {
+    fn local_alias(&self) -> &odf::DatasetAlias {
+        match self {
+            Self::Ingest(handle) | Self::Transform(handle) => &handle.alias,
+            Self::Sync { local_target, .. } => local_target.alias(),
+        }
+    }
+
+    fn is_sync(&self) -> bool {
+        match self {
+            Self::Ingest(_) | Self::Transform(_) => false,
+            Self::Sync { .. } => true,
+        }
     }
 }
 
