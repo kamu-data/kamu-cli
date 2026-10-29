@@ -277,34 +277,10 @@ impl MockDatasetPermissionChecker {
         )
     }
 
-    pub fn expect_check_own_dataset(
-        self,
-        expected_dataset_id: &odf::DatasetID,
-        times: usize,
-        success: bool,
-    ) -> Self {
-        let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_permission_unauthorized_internal(
-            function(move |dataset_id| *dataset_id == expected_dataset_id),
-            DatasetPermission::Own,
-            times,
-            success,
-        )
-    }
-
     pub fn expect_check_read_a_dataset(self, times: usize, success: bool) -> Self {
         self.expect_check_permission_unauthorized_internal(
             always(),
             DatasetPermission::Read,
-            times,
-            success,
-        )
-    }
-
-    pub fn expect_check_write_a_dataset(self, times: usize, success: bool) -> Self {
-        self.expect_check_permission_unauthorized_internal(
-            always(),
-            DatasetPermission::Write,
             times,
             success,
         )
