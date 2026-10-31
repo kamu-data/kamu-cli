@@ -14,6 +14,10 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Added
+- Config: `protocol.smartTransferProtocol.uploadProgressInterval` sets how often the server asks a
+  pushing client for upload progress (default `10s`). Keep it below the idle timeout of load
+  balancers in front of the server, or they close the connection during long uploads
 ### Changed
 - `kamu verify` with transform replay requires read permission on every input it replays; an
   unreadable input fails with an access error before anything is replayed
