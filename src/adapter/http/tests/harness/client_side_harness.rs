@@ -412,6 +412,32 @@ impl ClientSideHarness {
             .clone()
     }
 
+    /// Pulls into an existing dataset through the update steps the pull use
+    /// case runs, returning the sync result with the increment the use case
+    /// does not report
+    pub async fn sync_into_existing(
+        &self,
+        src_ref: odf::DatasetRefRemote,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> SyncResult {
+        let update_steps = self.catalog.get_one::<dyn DatasetUpdateSteps>().unwrap();
+        let dst = update_steps
+            .resolve_sync_target(&PullLocalTarget::existing(dataset_handle.clone()))
+            .await
+            .unwrap()
+            .unwrap();
+
+        update_steps
+            .transfer_and_commit_sync(
+                LocalSyncRequest { src: src_ref, dst },
+                SyncOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .unwrap()
+    }
+
     pub async fn push_dataset(
         &self,
         dataset_local_ref: odf::DatasetRef,
