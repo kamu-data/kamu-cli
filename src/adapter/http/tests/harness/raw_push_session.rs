@@ -9,24 +9,20 @@
 
 use std::assert_matches;
 
-use futures::{SinkExt, StreamExt};
 use kamu_adapter_http::smart_protocol::messages::*;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+
+use super::RawProtocolSocket;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A push driven one message at a time, so a test decides when the client
 /// side answers
 pub(crate) struct RawPushSession {
-    socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    socket: RawProtocolSocket,
 }
 
 impl RawPushSession {
-    pub fn new(socket: WebSocketStream<MaybeTlsStream<TcpStream>>) -> Self {
+    pub fn new(socket: RawProtocolSocket) -> Self {
         Self { socket }
     }
 
@@ -37,25 +33,26 @@ impl RawPushSession {
         request: DatasetPushRequest,
         metadata: DatasetPushMetadataRequest,
     ) {
-        self.send(&request).await;
+        self.socket.send(&request).await;
         assert_matches!(
-            self.receive::<DatasetPushResponse>().await,
+            self.socket.receive::<DatasetPushResponse>().await,
             Ok(DatasetPushRequestAccepted {})
         );
 
-        self.send(&metadata).await;
+        self.socket.send(&metadata).await;
         assert_matches!(
-            self.receive::<DatasetPushMetadataResponse>().await,
+            self.socket.receive::<DatasetPushMetadataResponse>().await,
             Ok(DatasetPushMetadataAccepted {})
         );
 
-        self.send(&DatasetPushObjectsTransferRequest {
-            object_files: Vec::new(),
-            is_truncated: false,
-        })
-        .await;
+        self.socket
+            .send(&DatasetPushObjectsTransferRequest {
+                object_files: Vec::new(),
+                is_truncated: false,
+            })
+            .await;
         assert_matches!(
-            self.receive::<DatasetPushObjectsTransferResponse>().await,
+            self.socket.receive::<DatasetPushObjectsTransferResponse>().await,
             Ok(DatasetPushObjectsTransferAccepted {
                 object_transfer_strategies
             }) if object_transfer_strategies.is_empty()
@@ -63,20 +60,21 @@ impl RawPushSession {
     }
 
     pub async fn next_progress_request(&mut self) -> DatasetPushObjectsUploadProgressRequest {
-        self.receive().await
+        self.socket.receive().await
     }
 
     pub async fn report_progress(&mut self, details: ObjectsUploadProgressDetails) {
-        self.send(&DatasetPushObjectsUploadProgressResponse { details })
+        self.socket
+            .send(&DatasetPushObjectsUploadProgressResponse { details })
             .await;
     }
 
     /// Completes the push and returns the server's reply, skipping progress
     /// requests the server sent before it read that the upload ended
     pub async fn complete(&mut self) -> DatasetPushCompleteResponse {
-        self.send(&DatasetPushComplete {}).await;
+        self.socket.send(&DatasetPushComplete {}).await;
         loop {
-            match self.receive::<DatasetPushCompleteReply>().await {
+            match self.socket.receive::<DatasetPushCompleteReply>().await {
                 DatasetPushCompleteReply::StaleProgressRequest(_) => {}
                 DatasetPushCompleteReply::Response(response) => return response,
                 DatasetPushCompleteReply::Legacy(reply) => {
@@ -84,23 +82,6 @@ impl RawPushSession {
                 }
             }
         }
-    }
-
-    async fn send<T: Serialize>(&mut self, payload: &T) {
-        self.socket
-            .send(Message::Text(
-                serde_json::to_string(payload).unwrap().into(),
-            ))
-            .await
-            .unwrap();
-    }
-
-    async fn receive<T: DeserializeOwned>(&mut self) -> T {
-        let message = self.socket.next().await;
-        let Some(Ok(Message::Text(message))) = message else {
-            panic!("The server must reply with a message, got {message:?}");
-        };
-        serde_json::from_str(&message).unwrap()
     }
 }
 
