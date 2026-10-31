@@ -346,6 +346,11 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
         cli_catalog.get_one().unwrap()
     }
 
+    fn cli_create_dataset_use_case_helper(&self) -> Arc<CreateDatasetUseCaseHelper> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
+    }
+
     fn api_server_addr(&self) -> String {
         self.api_server.local_addr().to_string()
     }

@@ -260,6 +260,61 @@ async fn test_smart_push_existing_ref_collision() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A dataset left without `HEAD` takes the whole chain, `Seed` included, so the
+/// `Seed` of another dataset must be refused, with or without `force`
+#[test_log::test(tokio::test)]
+async fn test_smart_push_into_headless_dataset_of_another_id_fails() {
+    let scenario = SmartPushNewDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+    let headless_dataset_handle = scenario
+        .server_harness
+        .create_headless_dataset(scenario.dataset_name.as_str())
+        .await;
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        for force in [false, true] {
+            let push_responses = scenario
+                .client_harness
+                .push_dataset(
+                    scenario.client_dataset_ref.clone(),
+                    scenario.server_dataset_ref.clone().try_into().unwrap(),
+                    force,
+                    odf::DatasetVisibility::Private,
+                )
+                .await;
+
+            pretty_assertions::assert_eq!(push_responses.len(), 1);
+            assert_matches!(
+                &push_responses[0].result,
+                Err(PushError::SyncError(SyncError::OverwriteSeedBlock(_)))
+            );
+            pretty_assertions::assert_eq!(
+                stored_heads.find(&headless_dataset_handle.id).await,
+                None
+            );
+        }
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_smart_push_incompatible_version_err() {
     let scenario = SmartPushExistingRefCollisionScenarion::prepare(
