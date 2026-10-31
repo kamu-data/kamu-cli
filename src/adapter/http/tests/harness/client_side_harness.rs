@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
-use futures::{SinkExt, StreamExt};
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
@@ -55,11 +54,17 @@ use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::{Error, Message};
 use url::Url;
 
-use super::{RawPushSession, append_unreferenced_block, commit_add_data_event};
+use super::{
+    RawProtocolSocket,
+    RawPullSession,
+    RawPushSession,
+    append_unreferenced_block,
+    commit_add_data_event,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -518,11 +523,19 @@ impl ClientSideHarness {
     }
 
     pub async fn open_raw_push_session(&self, url: &Url) -> RawPushSession {
+        RawPushSession::new(self.open_raw_protocol_socket(url, "push").await)
+    }
+
+    pub async fn open_raw_pull_session(&self, url: &Url) -> RawPullSession {
+        RawPullSession::new(self.open_raw_protocol_socket(url, "pull").await)
+    }
+
+    async fn open_raw_protocol_socket(&self, url: &Url, method: &str) -> RawProtocolSocket {
         let (socket, _) =
-            connect_async(self.websocket_request(url, "push", SMART_TRANSFER_PROTOCOL_VERSION))
+            connect_async(self.websocket_request(url, method, SMART_TRANSFER_PROTOCOL_VERSION))
                 .await
                 .unwrap();
-        RawPushSession::new(socket)
+        RawProtocolSocket::new(socket)
     }
 
     pub fn add_repository(
@@ -568,23 +581,9 @@ impl ClientSideHarness {
         url: &Url,
         request: &DatasetPushRequest,
     ) -> DatasetPushResponse {
-        let (mut socket, _) =
-            connect_async(self.websocket_request(url, "push", SMART_TRANSFER_PROTOCOL_VERSION))
-                .await
-                .unwrap();
-
-        socket
-            .send(Message::Text(
-                serde_json::to_string(request).unwrap().into(),
-            ))
-            .await
-            .unwrap();
-
-        let reply = socket.next().await;
-        let Some(Ok(Message::Text(reply))) = reply else {
-            panic!("The server must reply with a message, got {reply:?}");
-        };
-        serde_json::from_str(&reply).unwrap()
+        let mut socket = self.open_raw_protocol_socket(url, "push").await;
+        socket.send(request).await;
+        socket.receive().await
     }
 
     fn websocket_request(

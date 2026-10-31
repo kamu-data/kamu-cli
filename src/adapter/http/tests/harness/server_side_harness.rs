@@ -28,6 +28,7 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::DatasetEntryWriter;
+use odf::metadata::testing::MetadataFactory;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
@@ -73,6 +74,13 @@ pub(crate) trait ServerSideHarness {
     fn stored_heads(&self) -> StoredHeads {
         StoredHeads {
             dataset_reference_service: self.cli_dataset_reference_service(),
+        }
+    }
+
+    /// Taken before `api_server_run`, which consumes the harness
+    fn server_commits(&self) -> ServerCommits {
+        ServerCommits {
+            commit_dataset_event: self.cli_commit_dataset_event_use_case(),
         }
     }
 
@@ -191,6 +199,30 @@ impl StoredHeads {
             .get_reference(dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Commits to server datasets while the server runs, moving `HEAD` as any
+/// writer would
+pub(crate) struct ServerCommits {
+    commit_dataset_event: Arc<dyn CommitDatasetEventUseCase>,
+}
+
+impl ServerCommits {
+    pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
+        self.commit_dataset_event
+            .execute(
+                dataset_handle,
+                MetadataFactory::set_info()
+                    .description("committed while the server runs")
+                    .build()
+                    .into(),
+            )
+            .await
+            .unwrap()
+            .new_head
     }
 }
 
