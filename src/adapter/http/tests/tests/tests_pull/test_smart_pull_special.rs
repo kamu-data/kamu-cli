@@ -9,7 +9,7 @@
 
 use std::assert_matches;
 
-use kamu::domain::{PullError, PullResult, SyncError};
+use kamu::domain::{DatasetIdMismatchError, PullError, PullResult, SyncError};
 use kamu_adapter_http::smart_protocol::messages::DatasetPullRequest;
 use kamu_core::TenancyConfig;
 
@@ -147,6 +147,64 @@ async fn test_smart_pull_of_missing_dataset_fails() {
             &pull_responses[0].result,
             Err(PullError::SyncError(SyncError::DatasetNotFound(_)))
         );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A dataset left without `HEAD` receives the whole chain, `Seed` included, so
+/// the `Seed` of another dataset must be refused. With `force`, the ID
+/// comparison before the transfer refuses it first
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_into_headless_dataset_of_another_id_fails() {
+    let scenario = SmartPullNewDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+    let headless_dataset_handle = scenario.client_harness.create_headless_dataset("foo").await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        for force in [false, true] {
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(
+                    odf::DatasetRefAny::from(scenario.server_dataset_ref.clone()),
+                    force,
+                )
+                .await;
+
+            pretty_assertions::assert_eq!(pull_responses.len(), 1);
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::SyncError(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                    src_dataset_id,
+                    dst_dataset_id,
+                })))
+                if *src_dataset_id == scenario.server_dataset_handle.id
+                    && *dst_dataset_id == headless_dataset_handle.id
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .find_stored_head(&headless_dataset_handle.id)
+                    .await,
+                None
+            );
+        }
     };
 
     await_client_server_flow!(api_server_handle, client_handle);

@@ -64,6 +64,8 @@ use super::{
     RawPushSession,
     append_unreferenced_block,
     commit_add_data_event,
+    create_headless_dataset,
+    find_stored_head,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -340,6 +342,27 @@ impl ClientSideHarness {
             .get_reference(dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
+    }
+
+    /// `None` while the dataset has no `HEAD`
+    pub async fn find_stored_head(&self, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
+        find_stored_head(self.dataset_reference_service().as_ref(), dataset_id).await
+    }
+
+    /// A dataset of the operating account with its own `Seed` but no `HEAD`
+    pub async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
+        create_headless_dataset(
+            self.catalog
+                .get_one::<CreateDatasetUseCaseHelper>()
+                .unwrap()
+                .as_ref(),
+            &self.client_account_id(),
+            &odf::DatasetAlias::new(
+                self.operating_account_name(),
+                odf::DatasetName::new_unchecked(dataset_name),
+            ),
+        )
+        .await
     }
 
     // TODO: accept alias or handle

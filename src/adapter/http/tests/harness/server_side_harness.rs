@@ -28,11 +28,12 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::DatasetEntryWriter;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::metadata::testing::MetadataFactory;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
-use super::ServerSideDatasetFixture;
+use super::{ServerSideDatasetFixture, create_headless_dataset, find_stored_head};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,6 +70,21 @@ pub(crate) trait ServerSideHarness {
     fn cli_dataset_entry_writer(&self) -> Arc<dyn DatasetEntryWriter>;
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
+
+    fn cli_create_dataset_use_case_helper(&self) -> Arc<CreateDatasetUseCaseHelper>;
+
+    /// A dataset of the operating account with its own `Seed` but no `HEAD`
+    async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
+        create_headless_dataset(
+            self.cli_create_dataset_use_case_helper().as_ref(),
+            &self.server_account_id(),
+            &odf::DatasetAlias::new(
+                self.operating_account_name(),
+                odf::DatasetName::new_unchecked(dataset_name),
+            ),
+        )
+        .await
+    }
 
     /// Taken before `api_server_run`, which consumes the harness
     fn stored_heads(&self) -> StoredHeads {
@@ -199,6 +215,11 @@ impl StoredHeads {
             .get_reference(dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
+    }
+
+    /// `None` while the dataset has no `HEAD`
+    pub async fn find(&self, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
+        find_stored_head(self.dataset_reference_service.as_ref(), dataset_id).await
     }
 }
 

@@ -269,6 +269,11 @@ impl ServerSideHarness for ServerSideS3Harness {
         cli_catalog.get_one().unwrap()
     }
 
+    fn cli_create_dataset_use_case_helper(&self) -> Arc<CreateDatasetUseCaseHelper> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
+    }
+
     fn dataset_url_with_scheme(&self, dataset_alias: &odf::DatasetAlias, scheme: &str) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
