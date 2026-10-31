@@ -13,7 +13,6 @@ use indoc::indoc;
 use kamu_accounts::*;
 use kamu_adapter_graphql::data_loader::account_entity_data_loader;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
@@ -42,6 +41,7 @@ impl GraphQLAccountQuotasHarness {
     ) -> Self {
         let mut b = dill::CatalogBuilder::new();
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+        kamu_datasets_inmem::register_dependencies(&mut b);
 
         let base_catalog = b.build();
 
@@ -53,7 +53,6 @@ impl GraphQLAccountQuotasHarness {
             .add::<kamu_accounts_inmem::InMemoryAccountQuotaEventStore>()
             .add::<kamu_accounts_services::AccountQuotaServiceImpl>()
             .add::<AccountQuotaCheckerStorageImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add::<kamu_accounts_services::AccessTokenServiceImpl>()
             .add::<kamu_accounts_services::AuthenticationServiceImpl>()

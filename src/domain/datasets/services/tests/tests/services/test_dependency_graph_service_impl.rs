@@ -19,12 +19,6 @@ use kamu_accounts_inmem::InMemoryDidSecretKeyRepository;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::testing::FakeConnectingDatasetEntryWriter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -687,6 +681,7 @@ impl DependencyGraphHarness {
             .add::<RebacDatasetRegistryFacadeImpl>()
             .add::<SystemTimeSourceDefault>();
 
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add_builder(messaging_outbox::OutboxImmediateImpl::builder(
             messaging_outbox::ConsumerFilter::AllConsumers,
         ))
@@ -695,7 +690,6 @@ impl DependencyGraphHarness {
         .add::<DependencyGraphServiceImpl>()
         .add::<InMemoryDidSecretKeyRepository>()
         .add_value(DidSecretEncryptionConfig::sample())
-        .add::<InMemoryDatasetDependencyRepository>()
         .add::<DependencyGraphImmediateListener>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
         .add::<CommitDatasetEventUseCaseImpl>()
@@ -704,9 +698,6 @@ impl DependencyGraphHarness {
         .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetHeadCommitterImpl>()
         .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>()
-        .add::<InMemoryDatasetKeyBlockRepository>()
-        .add::<InMemoryDatasetDataBlockRepository>()
         .add::<DatasetBlockUpdateHandler>();
 
         register_message_dispatcher::<DatasetLifecycleMessage>(

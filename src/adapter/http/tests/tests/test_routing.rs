@@ -31,13 +31,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -62,6 +55,7 @@ async fn setup_repo() -> RepoFixture {
     std::fs::create_dir(&datasets_dir).unwrap();
 
     let mut b = dill::CatalogBuilder::new();
+    kamu_datasets_inmem::register_dependencies(&mut b);
     b.add::<SystemTimeSourceDefault>()
         .add::<DidGeneratorDefault>()
         .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
@@ -70,7 +64,6 @@ async fn setup_repo() -> RepoFixture {
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add::<DatabaseTransactionRunner>()
         .add::<DependencyGraphServiceImpl>()
-        .add::<InMemoryDatasetDependencyRepository>()
         .add_value(TenancyConfig::SingleTenant)
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
@@ -84,11 +77,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<CreateDatasetUseCaseHelper>()
         .add::<DatasetHeadCommitterImpl>()
         .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>()
         .add::<DatasetEntryServiceImpl>()
-        .add::<InMemoryDatasetEntryRepository>()
-        .add::<InMemoryDatasetKeyBlockRepository>()
-        .add::<InMemoryDatasetDataBlockRepository>()
         .add::<AccountServiceImpl>()
         .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()

@@ -30,7 +30,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry, ResolvedDataset};
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetKeyValueServiceSysEnv,
@@ -256,6 +255,7 @@ impl TestHarness {
 
         let mut b = dill::CatalogBuilder::new();
 
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<DidGeneratorDefault>()
             .add_value(ContainerRuntimeConfig::default())
             .add_value(RunInfoDir::new(run_info_dir))
@@ -287,7 +287,6 @@ impl TestHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()

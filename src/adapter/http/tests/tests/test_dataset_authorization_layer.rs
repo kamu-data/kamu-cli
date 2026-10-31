@@ -19,7 +19,6 @@ use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyReposit
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
 use kamu_datasets::{CreateDatasetUseCase, DatasetPermission, MockDatasetPermissionChecker};
-use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
@@ -372,6 +371,7 @@ impl ServerHarness {
         let base_catalog = {
             let mut b = dill::CatalogBuilder::new();
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
                 .add_value(MockDidGenerator::predefined_dataset_ids(vec![
                     dataset_id.clone(),
@@ -380,7 +380,6 @@ impl ServerHarness {
                 .add::<DummyOutboxImpl>()
                 .add::<DatabaseTransactionRunner>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(MockAuthenticationService::resolving_token(
                     DUMMY_ACCESS_TOKEN,
                     Account::dummy(),
@@ -398,11 +397,7 @@ impl ServerHarness {
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetHeadCommitterImpl>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add::<InMemoryAccountRepository>()

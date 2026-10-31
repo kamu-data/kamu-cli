@@ -30,7 +30,6 @@ use kamu_datasets::{
     ResolvedDataset,
     SecretsEncryptionConfig,
 };
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{
     DatasetHeadCommitterImpl,
     DatasetKeyValueServiceSysEnv,
@@ -1513,6 +1512,7 @@ impl PullUseCaseHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<PullDatasetUseCaseImpl>()
             .add::<DatasetUpdateStepsImpl>()
             .add::<DatasetHeadCommitterImpl>()
@@ -1537,7 +1537,6 @@ impl PullUseCaseHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(IpfsGateway::default())
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add::<DependencyGraphIndexer>();
 
         if mocks.real_ingest {

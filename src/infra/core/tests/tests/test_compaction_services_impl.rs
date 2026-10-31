@@ -29,7 +29,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetHeadCommitterImpl,
@@ -1595,7 +1594,9 @@ impl CompactTestHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        let catalog = b
             .add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
@@ -1629,7 +1630,6 @@ impl CompactTestHarness {
             .add::<InMemoryRebacRepository>()
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<PushIngestDataUseCaseImpl>()
@@ -1666,7 +1666,9 @@ impl CompactTestHarness {
         let run_info_dir = Arc::new(RunInfoDir::new(temp_dir.path().join("run")));
         let current_date_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        let catalog = b
             .add::<DidGeneratorDefault>()
             .add_builder(run_info_dir.clone())
             .add_value(TenancyConfig::SingleTenant)
@@ -1696,7 +1698,6 @@ impl CompactTestHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add::<AccountQuotaCheckerStorageImpl>()
             .add::<RebacServiceImpl>()
