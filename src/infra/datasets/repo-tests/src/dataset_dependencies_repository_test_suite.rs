@@ -377,6 +377,37 @@ pub async fn test_add_duplicate_dependency(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_add_dependency_twice_in_one_request(catalog: &Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+    let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
+    let dataset_dependency_repo = catalog
+        .get_one::<dyn DatasetDependencyRepository>()
+        .unwrap();
+
+    let account = new_account(&account_repo).await;
+
+    let entry_foo = new_dataset_entry_with(&account, "foo", odf::DatasetKind::Root);
+    let entry_bar = new_dataset_entry_with(&account, "bar", odf::DatasetKind::Derivative);
+
+    for entry in [&entry_foo, &entry_bar] {
+        dataset_entry_repo.save_dataset_entry(entry).await.unwrap();
+    }
+
+    let res = dataset_dependency_repo
+        .add_upstream_dependencies(&entry_bar.id, &[&entry_foo.id, &entry_foo.id])
+        .await;
+    assert_matches!(
+        res,
+        Err(AddDependenciesError::Duplicate(
+            AddDependencyDuplicateError {
+                downstream_dataset_id
+            }
+        )) if downstream_dataset_id == entry_bar.id
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_remove_dependency(catalog: &Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();

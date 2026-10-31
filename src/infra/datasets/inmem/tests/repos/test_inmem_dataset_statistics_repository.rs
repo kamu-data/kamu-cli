@@ -8,61 +8,40 @@
 // by the Apache License, Version 2.0.
 
 use database_common_macros::database_transactional_test;
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_datasets_inmem::{InMemoryDatasetEntryRepository, InMemoryDatasetStatisticsRepository};
 use kamu_datasets_repo_tests::dataset_statistics_repo;
 
+use super::InMemoryDatasetRepositoriesHarness;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_statistics_repo::test_set_and_get_statistics,
-    harness = InMemoryDatasetStatisticsRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_statistics_repo::test_overwrite_statistics,
-    harness = InMemoryDatasetStatisticsRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_statistics_repo::test_multiple_datasets_statistics,
-    harness = InMemoryDatasetStatisticsRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_statistics_repo::test_remove_dataset_entry_removes_statistics,
-    harness = InMemoryDatasetStatisticsRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct InMemoryDatasetStatisticsRepositoryHarness {
-    catalog: Catalog,
-}
-
-impl InMemoryDatasetStatisticsRepositoryHarness {
-    pub fn new() -> Self {
-        let mut catalog_builder = CatalogBuilder::new();
-
-        catalog_builder.add::<InMemoryAccountRepository>();
-        catalog_builder.add::<InMemoryDatasetEntryRepository>();
-        catalog_builder.add::<InMemoryDatasetStatisticsRepository>();
-
-        Self {
-            catalog: catalog_builder.build(),
-        }
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

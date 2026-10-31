@@ -42,7 +42,6 @@ use kamu_datasets::{
     GetGrantedPermissionsError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 use kamu_datasets_services::testing::ClassifyByAllowanceIdsResponseTestHelper;
 use kamu_datasets_services::{DatasetEntryServiceImpl, DatasetEntryWriter};
 use messaging_outbox::{
@@ -727,6 +726,7 @@ impl DatasetPermissionCheckerHarness {
 
             let mut b = dill::CatalogBuilder::new();
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
                 .add_value(current_account_subject)
                 .add_value(predefined_accounts_config)
@@ -746,7 +746,6 @@ impl DatasetPermissionCheckerHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>()
                 .add_value(tenancy_config)
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(kamu_accounts::DidSecretEncryptionConfig::sample())
                 .add::<AccountServiceImpl>()

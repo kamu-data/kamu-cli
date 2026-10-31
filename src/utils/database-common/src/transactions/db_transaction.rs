@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::any::Any;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use internal_error::*;
+
+use crate::TransactionId;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,6 +44,16 @@ impl TransactionRef {
     /// downcasting to specific DB type.
     pub async fn begin(&self) -> Result<bool, InternalError> {
         self.inner.begin().await
+    }
+
+    pub fn id(&self) -> TransactionId {
+        self.inner.id()
+    }
+
+    /// Tells whether any reference to this transaction is still alive
+    pub(crate) fn liveness(&self) -> Weak<dyn Any + Send + Sync> {
+        let inner: Arc<dyn Any + Send + Sync> = self.inner.clone();
+        Arc::downgrade(&inner)
     }
 
     /// Performs dynamic downcasting into a DB-specific type. Typically you
@@ -130,6 +142,7 @@ impl<DB: sqlx::Database> TransactionRefT<DB> {
 
 #[derive(Debug)]
 struct TransactionState<DB: sqlx::Database> {
+    id: TransactionId,
     connection_pool: sqlx::pool::Pool<DB>,
     maybe_transaction: tokio::sync::Mutex<Option<sqlx::Transaction<'static, DB>>>,
 }
@@ -137,6 +150,7 @@ struct TransactionState<DB: sqlx::Database> {
 impl<DB: sqlx::Database> TransactionState<DB> {
     fn new(connection_pool: sqlx::pool::Pool<DB>) -> Self {
         Self {
+            id: TransactionId::next(),
             connection_pool,
             maybe_transaction: tokio::sync::Mutex::new(None),
         }
@@ -169,6 +183,8 @@ impl<DB: sqlx::Database> Drop for TransactionState<DB> {
 trait TransactionStateErased: std::fmt::Debug + Any + Send + Sync {
     fn register(self: Arc<Self>, catalog_builder: &mut dill::CatalogBuilder);
 
+    fn id(&self) -> TransactionId;
+
     /// Acquires a connection from the connection pool and starts the
     /// transaction if it's not already started. You probably should not call
     /// this - it's only occasionally useful for testing transactions without
@@ -186,6 +202,10 @@ impl<DB: sqlx::Database> TransactionStateErased for TransactionState<DB> {
 
         // Add erased wrapper
         catalog_builder.add_value(TransactionRef { inner: self });
+    }
+
+    fn id(&self) -> TransactionId {
+        self.id
     }
 
     async fn begin(&self) -> Result<bool, InternalError> {

@@ -27,7 +27,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetStatisticsServiceImpl,
@@ -1343,7 +1342,9 @@ impl IngestTestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        let catalog = b
             .add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CacheDir::new(cache_dir))
@@ -1365,7 +1366,6 @@ impl IngestTestHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()

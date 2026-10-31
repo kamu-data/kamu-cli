@@ -31,7 +31,6 @@ use kamu_datasets::{
     DatasetRegistryExt,
     ResolvedDataset,
 };
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetHeadCommitterImpl,
@@ -72,7 +71,9 @@ impl TransformTestHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
         std::fs::create_dir(&run_info_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
+        let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
+        let catalog = b
             .add::<DidGeneratorDefault>()
             .add_value(RunInfoDir::new(run_info_dir))
             .add_value(CurrentAccountSubject::new_test())
@@ -88,7 +89,6 @@ impl TransformTestHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()

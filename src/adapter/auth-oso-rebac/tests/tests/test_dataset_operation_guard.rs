@@ -47,7 +47,6 @@ use kamu_datasets::{
     DatasetPermissionMissingError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
-use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 use kamu_datasets_services::{
     DatasetEntryServiceImpl,
     DatasetEntryWriter,
@@ -289,6 +288,7 @@ impl OperationGuardHarness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add::<SystemTimeSourceDefault>()
                 .add_value(current_account_subject)
                 .add_value(predefined_accounts_config)
@@ -308,7 +308,6 @@ impl OperationGuardHarness {
                 .bind::<dyn odf::DatasetStorageUnit, odf::dataset::MockDatasetStorageUnit>()
                 .add_value(TenancyConfig::MultiTenant)
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add::<AccountServiceImpl>()

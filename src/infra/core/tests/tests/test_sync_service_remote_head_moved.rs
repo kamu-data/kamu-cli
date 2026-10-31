@@ -17,7 +17,6 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
@@ -70,6 +69,7 @@ impl RemotePushHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<DidGeneratorDefault>()
             .add::<SystemTimeSourceDefault>()
             .add_value(IpfsGateway::default())
@@ -102,7 +102,6 @@ impl RemotePushHarness {
             .add_value(MockDatasetEntryWriter::new())
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>()
             .add::<AppendDatasetMetadataBatchUseCaseImpl>()
             .add::<DatasetHeadCommitterImpl>();
 

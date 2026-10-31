@@ -31,7 +31,6 @@ use kamu::{
 };
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{AlwaysHappyDatasetPermissionChecker, DatasetRegistry, DatasetRegistryExt};
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::dataset::{DatasetFactoryImpl, IpfsGateway};
@@ -64,9 +63,10 @@ async fn setup_dataset(
     let repos_dir = tmp_workspace_dir.join("repos");
     std::fs::create_dir(&repos_dir).unwrap();
 
-    let catalog = dill::CatalogBuilder::new()
+    let mut b = dill::CatalogBuilder::new();
+    kamu_datasets_inmem::register_dependencies(&mut b);
+    let catalog = b
         .add::<DependencyGraphServiceImpl>()
-        .add::<InMemoryDatasetDependencyRepository>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())

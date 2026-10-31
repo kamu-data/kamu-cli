@@ -18,7 +18,6 @@ use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImpl};
 use kamu_task_system::*;
 use kamu_task_system_inmem::{InMemoryTaskEventStore, InMemoryTaskQueueWakeupSource};
@@ -363,6 +362,7 @@ impl TaskAgentHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = CatalogBuilder::new();
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<TaskAgentImpl>()
             .add::<TaskAgentMetrics>()
             .add::<DidGeneratorDefault>()
@@ -396,7 +396,6 @@ impl TaskAgentHarness {
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add::<DatasetEnvVarServiceNull>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                 datasets_dir,
             ))

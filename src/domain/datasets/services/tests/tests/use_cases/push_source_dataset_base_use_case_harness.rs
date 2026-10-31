@@ -46,7 +46,6 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
     ResolvedDataset,
 };
-use kamu_datasets_inmem::InMemoryDatasetStatisticsRepository;
 use kamu_datasets_services::{
     AccountQuotaCheckerStorageImpl,
     DatasetHeadCommitterImpl,
@@ -81,6 +80,7 @@ impl PushSourceDatasetBaseUseCaseHarness {
         );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        kamu_datasets_inmem::register_dependencies(&mut b);
 
         let catalog = b
             .add::<PushIngestDataUseCaseImpl>()
@@ -97,7 +97,6 @@ impl PushSourceDatasetBaseUseCaseHarness {
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryAccountQuotaEventStore>()
             .add::<AccountQuotaServiceImpl>()
-            .add::<InMemoryDatasetStatisticsRepository>()
             .add::<DatasetStatisticsServiceImpl>()
             .add_value(kamu_datasets_services::QuotaDefaultsConfig::default())
             .add::<AccountQuotaCheckerStorageImpl>()

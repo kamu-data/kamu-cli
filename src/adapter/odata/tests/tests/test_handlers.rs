@@ -36,7 +36,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -387,6 +386,7 @@ impl TestHarness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                     messaging_outbox::ConsumerFilter::AllConsumers,
@@ -423,13 +423,8 @@ impl TestHarness {
                 .add::<SessionContextBuilder>()
                 .add_value(ServerUrlConfig::new_test(None))
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
@@ -445,7 +440,6 @@ impl TestHarness {
                 .add::<InMemoryAccountRepository>()
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
-                .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
                 .add::<AccountQuotaCheckerStorageImpl>()
                 .add_value(QuotaDefaultsConfig::default())

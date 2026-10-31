@@ -51,6 +51,9 @@ Harness shape:
 Use `database_common_macros::database_transactional_test`.
 
 - `storage = inmem` emits a plain tokio test.
+- `storage = inmem_with_transaction` emits that test plus `<fixture>_in_transaction`, which runs the
+  fixture inside one transaction of `InMemoryTransactionManager`; the harness provides
+  `new_transactional()`. Use it for in-memory repositories built on `InMemoryTransactionalMap`.
 - `storage = postgres` and `storage = sqlite` emit an `sqlx::test`, receive a pool, run migrations, and wrap the fixture in a transaction runner.
 
 Example:

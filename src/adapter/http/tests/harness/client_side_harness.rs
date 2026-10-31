@@ -46,13 +46,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -115,7 +108,7 @@ impl ClientSideHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>();
 
         b.add::<DependencyGraphServiceImpl>();
-        b.add::<InMemoryDatasetDependencyRepository>();
+        kamu_datasets_inmem::register_dependencies(&mut b);
 
         match options.tenancy_config {
             TenancyConfig::SingleTenant => {
@@ -216,12 +209,8 @@ impl ClientSideHarness {
         b.add::<DatasetReferenceServiceImpl>();
         b.add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
-        b.add::<InMemoryDatasetReferenceRepository>();
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
-        b.add::<InMemoryDatasetEntryRepository>();
-        b.add::<InMemoryDatasetKeyBlockRepository>();
-        b.add::<InMemoryDatasetDataBlockRepository>();
 
         b.add::<InMemoryDidSecretKeyRepository>();
 

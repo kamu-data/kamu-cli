@@ -32,7 +32,6 @@ use kamu_auth_rebac_services::{
 };
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
 use kamu_datasets_services::*;
 use messaging_outbox::{
@@ -338,6 +337,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
         );
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<GetDatasetDownstreamDependenciesUseCaseImpl>()
@@ -357,7 +357,6 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             .add::<LoginPasswordAuthProvider>()
             .add::<FakeDatasetEntryService>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add::<AccountServiceImpl>()
             .add::<InMemoryDidSecretKeyRepository>()
             .add_value(DidSecretEncryptionConfig::sample())

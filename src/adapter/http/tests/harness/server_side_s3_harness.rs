@@ -31,13 +31,6 @@ use kamu_auth_rebac_services::{
 };
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -107,6 +100,7 @@ impl ServerSideS3Harness {
 
             let mut b = dill::CatalogBuilder::new();
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(time_source.clone())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DidGeneratorDefault>()
@@ -117,7 +111,6 @@ impl ServerSideS3Harness {
                 ))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
                 .add::<DatasetS3BuilderDatabaseBackedImpl>()
@@ -142,11 +135,7 @@ impl ServerSideS3Harness {
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()

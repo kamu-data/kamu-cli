@@ -20,7 +20,6 @@ use kamu_adapter_graphql::data_loader::{account_entity_data_loader, dataset_hand
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::{DidGeneratorDefault, RunInfoDir, TenancyConfig};
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{AccountQuotaCheckerStorageImpl, DatasetStatisticsServiceImpl, *};
@@ -65,6 +64,7 @@ impl BaseGQLDatasetHarness {
                 dill::CatalogBuilder::new()
             };
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(kamu_adapter_graphql::GqlConfig::default())
                 .add::<DidGeneratorDefault>()
                 .add_value(tenancy_config)
@@ -80,20 +80,14 @@ impl BaseGQLDatasetHarness {
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
                 .add::<DependencyGraphImmediateListener>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<RebacDatasetRegistryFacadeImpl>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add::<DatasetBlockUpdateHandler>()
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
-                .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
                 .add::<AccountQuotaCheckerStorageImpl>()
                 .add_value(QuotaDefaultsConfig::default())

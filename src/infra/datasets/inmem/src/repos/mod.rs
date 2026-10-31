@@ -13,6 +13,7 @@ mod inmem_dataset_entry_repository;
 mod inmem_dataset_key_blocks_repository;
 mod inmem_dataset_reference_repository;
 mod inmem_dataset_statistics_repository;
+mod states;
 
 pub use inmem_dataset_data_blocks_repository::*;
 pub use inmem_dataset_dependency_repository::*;
@@ -20,3 +21,4 @@ pub use inmem_dataset_entry_repository::*;
 pub use inmem_dataset_key_blocks_repository::*;
 pub use inmem_dataset_reference_repository::*;
 pub use inmem_dataset_statistics_repository::*;
+pub use states::*;

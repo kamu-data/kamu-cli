@@ -41,14 +41,6 @@ use kamu_auth_rebac_services::{
 };
 use kamu_core::{CompactionExecutor, CompactionPlanner, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-    InMemoryDatasetStatisticsRepository,
-};
 use kamu_datasets_services::testing::{
     RacingAppendDatasetMetadataBatchUseCase,
     RacingDatasetHeadCommitter,
@@ -166,6 +158,7 @@ impl ServerSideLocalFsHarness {
                 maybe_dummy_token_account: Some(account.clone()),
             };
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add::<DidGeneratorDefault>()
                 .add_value(CacheDir::new(cache_dir))
@@ -177,7 +170,6 @@ impl ServerSideLocalFsHarness {
                 .add_value(AuthConfig::sample())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
@@ -200,11 +192,7 @@ impl ServerSideLocalFsHarness {
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
@@ -220,7 +208,6 @@ impl ServerSideLocalFsHarness {
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
-                .add::<InMemoryDatasetStatisticsRepository>()
                 .add::<DatasetStatisticsServiceImpl>()
                 .add::<AccountQuotaCheckerStorageImpl>()
                 .add::<InMemoryRebacRepository>()

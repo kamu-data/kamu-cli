@@ -7,36 +7,61 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
+use std::sync::Arc;
 
 use cheap_clone::CheapClone;
+use database_common::{InMemoryMapView, TransactionId, TransactionRef};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::*;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct State {
-    data_blocks: HashMap<(odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
-}
+use super::InMemoryDatasetDataBlockState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetDataBlockRepository {
-    state: Arc<Mutex<State>>,
+    state: Arc<InMemoryDatasetDataBlockState>,
+    transaction_id: Option<TransactionId>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetDataBlockRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
-#[scope(Singleton)]
 impl InMemoryDatasetDataBlockRepository {
-    pub fn new() -> Self {
+    pub fn new(
+        state: Arc<InMemoryDatasetDataBlockState>,
+        transaction_ref: Option<TransactionRef>,
+    ) -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            state,
+            transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
         }
+    }
+
+    fn find_data_block<R>(
+        &self,
+        dataset_id: &odf::DatasetID,
+        block_hash: &odf::Multihash,
+        map: impl FnOnce(&DatasetBlock) -> R,
+    ) -> Option<R> {
+        self.state
+            .data_blocks
+            .read(self.transaction_id, |data_blocks| {
+                Self::dataset_blocks(data_blocks, dataset_id)
+                    .find(|block| &block.block_hash == block_hash)
+                    .map(map)
+            })
+    }
+
+    fn dataset_blocks<'a>(
+        data_blocks: &InMemoryMapView<'a, (odf::DatasetID, odf::BlockRef), Vec<DatasetBlock>>,
+        dataset_id: &'a odf::DatasetID,
+    ) -> impl Iterator<Item = &'a DatasetBlock> {
+        data_blocks
+            .iter()
+            .filter(move |((id, _), _)| id == dataset_id)
+            .flat_map(|(_, blocks)| blocks.iter())
     }
 }
 
@@ -49,11 +74,14 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<bool, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
+        Ok(self
+            .state
             .data_blocks
-            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-            .is_some_and(|v| !v.is_empty()))
+            .read(self.transaction_id, |data_blocks| {
+                data_blocks
+                    .get(&(dataset_id.clone(), block_ref.cheap_clone()))
+                    .is_some_and(|blocks| !blocks.is_empty())
+            }))
     }
 
     async fn contains_data_block(
@@ -61,10 +89,9 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         dataset_id: &odf::DatasetID,
         block_hash: &odf::Multihash,
     ) -> Result<bool, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard.data_blocks.iter().any(|((id, _), blocks)| {
-            id == dataset_id && blocks.iter().any(|block| &block.block_hash == block_hash)
-        }))
+        Ok(self
+            .find_data_block(dataset_id, block_hash, |_| ())
+            .is_some())
     }
 
     async fn get_data_block(
@@ -72,17 +99,7 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         dataset_id: &odf::DatasetID,
         block_hash: &odf::Multihash,
     ) -> Result<Option<DatasetBlock>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard.data_blocks.iter().find_map(|((id, _), blocks)| {
-            if id == dataset_id {
-                blocks
-                    .iter()
-                    .find(|block| &block.block_hash == block_hash)
-                    .cloned()
-            } else {
-                None
-            }
-        }))
+        Ok(self.find_data_block(dataset_id, block_hash, DatasetBlock::clone))
     }
 
     async fn get_data_block_size(
@@ -90,17 +107,7 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         dataset_id: &odf::DatasetID,
         block_hash: &odf::Multihash,
     ) -> Result<Option<usize>, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard.data_blocks.iter().find_map(|((id, _), blocks)| {
-            if id == dataset_id {
-                blocks
-                    .iter()
-                    .find(|block| &block.block_hash == block_hash)
-                    .map(|block| block.block_payload.len())
-            } else {
-                None
-            }
-        }))
+        Ok(self.find_data_block(dataset_id, block_hash, |block| block.block_payload.len()))
     }
 
     async fn get_page_of_data_blocks(
@@ -110,20 +117,23 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         page_size: usize,
         upper_sequence_number_inclusive: u64,
     ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
-        let guard = self.state.lock().unwrap();
-        let mut page: Vec<DatasetBlock> = guard
-            .data_blocks
-            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-            .map(|blocks| {
-                blocks
-                    .iter()
-                    .rev()
-                    .filter(|b| b.sequence_number <= upper_sequence_number_inclusive)
-                    .take(page_size)
-                    .cloned()
-                    .collect()
-            })
-            .unwrap_or_default();
+        let mut page: Vec<DatasetBlock> =
+            self.state
+                .data_blocks
+                .read(self.transaction_id, |data_blocks| {
+                    data_blocks
+                        .get(&(dataset_id.clone(), block_ref.cheap_clone()))
+                        .map(|blocks| {
+                            blocks
+                                .iter()
+                                .rev()
+                                .filter(|b| b.sequence_number <= upper_sequence_number_inclusive)
+                                .take(page_size)
+                                .cloned()
+                                .collect()
+                        })
+                        .unwrap_or_default()
+                });
 
         // The page is scanned backwards until we take N values,
         // so we need to reverse the final order
@@ -137,12 +147,15 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<Vec<DatasetBlock>, DatasetDataBlockQueryError> {
-        let guard = self.state.lock().unwrap();
-        Ok(guard
+        Ok(self
+            .state
             .data_blocks
-            .get(&(dataset_id.clone(), block_ref.cheap_clone()))
-            .cloned()
-            .unwrap_or_default())
+            .read(self.transaction_id, |data_blocks| {
+                data_blocks
+                    .get(&(dataset_id.clone(), block_ref.cheap_clone()))
+                    .cloned()
+                    .unwrap_or_default()
+            }))
     }
 
     async fn save_data_blocks_batch(
@@ -155,26 +168,27 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
             return Ok(());
         }
 
-        let mut guard = self.state.lock().unwrap();
-        let entry = guard
+        let key = (dataset_id.clone(), block_ref.cheap_clone());
+        self.state
             .data_blocks
-            .entry((dataset_id.clone(), block_ref.cheap_clone()))
-            .or_default();
+            .write(self.transaction_id, |data_blocks| {
+                let mut saved = data_blocks.view().get(&key).cloned().unwrap_or_default();
 
-        let existing: std::collections::HashSet<_> =
-            entry.iter().map(|b| b.sequence_number).collect();
-        if let Some(dup) = blocks
-            .iter()
-            .find(|b| existing.contains(&b.sequence_number))
-        {
-            return Err(DatasetDataBlockSaveError::DuplicateSequenceNumber(vec![
-                dup.sequence_number,
-            ]));
-        }
+                let existing: HashSet<_> = saved.iter().map(|b| b.sequence_number).collect();
+                if let Some(dup) = blocks
+                    .iter()
+                    .find(|b| existing.contains(&b.sequence_number))
+                {
+                    return Err(DatasetDataBlockSaveError::DuplicateSequenceNumber(vec![
+                        dup.sequence_number,
+                    ]));
+                }
 
-        entry.extend_from_slice(blocks);
-        entry.sort_by_key(|b| b.sequence_number);
-        Ok(())
+                saved.extend_from_slice(blocks);
+                saved.sort_by_key(|b| b.sequence_number);
+                data_blocks.put(key, saved);
+                Ok(())
+            })
     }
 
     async fn delete_all_data_blocks_for_ref(
@@ -182,10 +196,11 @@ impl DatasetDataBlockRepository for InMemoryDatasetDataBlockRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().unwrap();
-        guard
+        self.state
             .data_blocks
-            .remove(&(dataset_id.clone(), block_ref.cheap_clone()));
+            .write(self.transaction_id, |data_blocks| {
+                data_blocks.delete((dataset_id.clone(), block_ref.cheap_clone()));
+            });
         Ok(())
     }
 }
@@ -198,8 +213,11 @@ impl DatasetEntryRemovalListener for InMemoryDatasetDataBlockRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().unwrap();
-        guard.data_blocks.retain(|(id, _), _| id != dataset_id);
+        self.state
+            .data_blocks
+            .write(self.transaction_id, |data_blocks| {
+                data_blocks.delete_where(|(id, _)| id == dataset_id);
+            });
         Ok(())
     }
 }

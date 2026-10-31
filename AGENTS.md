@@ -112,9 +112,11 @@ compact entry when the feature is finalized.
 
 ### In-memory repositories review context
 
-`*-inmem` repository crates exist for tests only and intentionally do not model transactions (no
-rollback on a failed transaction). Do not raise missing rollback or "in-memory used in production"
-as findings. Do fix genuine in-memory bugs that break test fidelity (e.g. index corruption on a
+`*-inmem` repository crates exist for tests only and do not model transactions by default (no
+rollback on a failed transaction). The one exception is opt-in: under `InMemoryTransactionManager`
+(`database-common`), the `kamu-datasets-inmem` repositories keep each transaction's changes in a
+working set until it commits. Do not raise missing rollback elsewhere, or "in-memory used in
+production", as findings. Do fix genuine in-memory bugs that break test fidelity (e.g. index corruption on a
 rejected save).
 
 ## Code style and tests

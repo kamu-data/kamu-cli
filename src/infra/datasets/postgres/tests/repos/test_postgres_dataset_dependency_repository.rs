@@ -67,6 +67,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = dataset_dependency_repo::test_add_dependency_twice_in_one_request,
+    harness = PostgresDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = dataset_dependency_repo::test_remove_dependency,
     harness = PostgresDatasetDependencyRepositoryHarness
 );
