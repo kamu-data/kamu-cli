@@ -15,6 +15,8 @@ use sqlx::SqlitePool;
 
 use crate::{
     DatabaseTransactionManager,
+    InMemoryPreparedCommit,
+    InMemoryPreparedCommits,
     InMemoryTransactionParticipant,
     TransactionId,
     TransactionRef,
@@ -120,9 +122,7 @@ impl DatabaseTransactionManager for InMemoryTransactionManager {
             .collect::<Result<Vec<_>, _>>();
         match prepared {
             Ok(prepared) => {
-                for prepared_commit in prepared {
-                    prepared_commit.apply();
-                }
+                Box::new(InMemoryPreparedCommits(prepared)).apply();
                 Ok(())
             }
             Err(conflict) => {

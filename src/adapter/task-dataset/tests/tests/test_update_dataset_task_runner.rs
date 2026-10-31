@@ -1169,7 +1169,7 @@ impl UpdateDatasetTaskRunnerHarness {
 
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
-            .move_head_before_next_commit(self.base_use_case_harness.catalog(), concurrent_head);
+            .move_head_before_next_commit(&self.catalog, concurrent_head);
     }
 
     fn deny_next_commit(&self) {

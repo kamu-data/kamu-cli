@@ -236,7 +236,7 @@ impl ServerSideLocalFsHarness {
 
             // A failed transaction rolls back the dataset repositories, which every
             // read goes through. Storage files it wrote stay, such as the `refs/head`
-            // mirror that consumers dispatched at once update
+            // file, which an immediate consumer writes
             b.add::<InMemoryTransactionManager>();
             b.add::<FailingDatasetChangeListener>();
 

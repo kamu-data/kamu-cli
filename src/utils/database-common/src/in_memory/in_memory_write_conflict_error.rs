@@ -12,7 +12,7 @@ use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Another transaction committed a key this transaction changed, after this
-/// transaction read it
+/// transaction first changed it
 #[derive(Error, Debug)]
 #[error("In-memory write conflict on key {key}")]
 pub struct InMemoryWriteConflictError {

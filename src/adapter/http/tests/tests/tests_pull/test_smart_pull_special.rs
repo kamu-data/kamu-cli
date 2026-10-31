@@ -227,7 +227,10 @@ async fn test_smart_pull_into_headless_dataset_of_another_id_fails() {
         .await,
     )
     .await;
-    let headless_dataset_handle = scenario.client_harness.create_headless_dataset("foo").await;
+    let headless_dataset_handle = scenario
+        .client_harness
+        .create_headless_dataset(scenario.server_dataset_handle.alias.dataset_name.as_str())
+        .await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 

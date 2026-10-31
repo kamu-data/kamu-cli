@@ -29,18 +29,18 @@ use kamu_datasets::{
 };
 use kamu_datasets_services::DatasetEntryWriter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
-use odf::metadata::testing::MetadataFactory;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
-use super::{ServerSideDatasetFixture, create_headless_dataset, find_stored_head};
+use super::{ServerSideDatasetFixture, commit_set_info, create_headless_dataset, find_stored_head};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
 
-/// The node's default: no test upload lasts long enough for a progress request
+/// Longer than any test upload, so no progress request is sent unless a test
+/// sets a shorter interval
 const DEFAULT_UPLOAD_PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,17 +233,7 @@ pub(crate) struct ServerCommits {
 
 impl ServerCommits {
     pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
-        self.commit_dataset_event
-            .execute(
-                dataset_handle,
-                MetadataFactory::set_info()
-                    .description("committed while the server runs")
-                    .build()
-                    .into(),
-            )
-            .await
-            .unwrap()
-            .new_head
+        commit_set_info(self.commit_dataset_event.as_ref(), dataset_handle).await
     }
 }
 

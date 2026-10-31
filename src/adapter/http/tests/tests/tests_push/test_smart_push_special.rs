@@ -656,8 +656,12 @@ async fn test_smart_push_server_asks_for_upload_progress_at_its_interval() {
             .begin_metadata_only_push(push_request, metadata_request)
             .await;
 
-        // The server waits for the upload to complete, so it must ask first
-        let progress_request = session.next_progress_request().await;
+        // Well under the harness default, so only the configured interval
+        // brings the request in time
+        let progress_request =
+            tokio::time::timeout(Duration::from_secs(5), session.next_progress_request())
+                .await
+                .expect("The server must ask for progress at its configured interval");
         assert!(progress_request.progress_requested);
         session
             .report_progress(ObjectsUploadProgressDetails::Running(
