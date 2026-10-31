@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{InMemoryWriteConflictError, TransactionId};
+use crate::{InMemoryPreparedCommit, InMemoryWriteConflictError, TransactionId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,23 +30,17 @@ pub trait InMemoryTransactionParticipant: Send + Sync {
     fn rollback(&self, transaction_id: TransactionId);
 }
 
-/// A checked commit of one participant, holding its lock
-pub trait InMemoryPreparedCommit {
-    /// Applies the working set and releases the lock
-    fn apply(self: Box<Self>);
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Implements [`InMemoryTransactionParticipant`] for a state type by
 /// forwarding to its [`InMemoryTransactionalMap`](crate::InMemoryTransactionalMap)
-/// field
+/// fields, which commit together and lock in the order given
 #[macro_export]
 macro_rules! in_memory_transaction_participant {
-    ($state:ty, $map:ident) => {
+    ($state:ty, $($map:ident),+ $(,)?) => {
         impl $crate::InMemoryTransactionParticipant for $state {
             fn begin(&self, transaction_id: $crate::TransactionId) {
-                $crate::InMemoryTransactionParticipant::begin(&self.$map, transaction_id);
+                $($crate::InMemoryTransactionParticipant::begin(&self.$map, transaction_id);)+
             }
 
             fn prepare_commit(
@@ -56,11 +50,16 @@ macro_rules! in_memory_transaction_participant {
                 Box<dyn $crate::InMemoryPreparedCommit + '_>,
                 $crate::InMemoryWriteConflictError,
             > {
-                $crate::InMemoryTransactionParticipant::prepare_commit(&self.$map, transaction_id)
+                Ok(Box::new($crate::InMemoryPreparedCommits(vec![$(
+                    $crate::InMemoryTransactionParticipant::prepare_commit(
+                        &self.$map,
+                        transaction_id,
+                    )?,
+                )+])))
             }
 
             fn rollback(&self, transaction_id: $crate::TransactionId) {
-                $crate::InMemoryTransactionParticipant::rollback(&self.$map, transaction_id);
+                $($crate::InMemoryTransactionParticipant::rollback(&self.$map, transaction_id);)+
             }
         }
     };

@@ -15,7 +15,12 @@ use datafusion::arrow::array::{Array, RecordBatch, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
-use kamu_datasets::{DatasetReferenceService, DatasetRegistry, GetDatasetReferenceError};
+use kamu_datasets::{
+    CommitDatasetEventUseCase,
+    DatasetReferenceService,
+    DatasetRegistry,
+    GetDatasetReferenceError,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::dataset::{AddDataParams, CheckpointRef};
 use odf::metadata::OffsetInterval;
@@ -100,6 +105,27 @@ pub(crate) async fn append_unreferenced_block(
         )
         .await
         .unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Commits a `SetInfo` through the use case, moving `HEAD` as any writer
+/// would, and returns the new head
+pub(crate) async fn commit_set_info(
+    commit_dataset_event: &dyn CommitDatasetEventUseCase,
+    dataset_handle: &odf::DatasetHandle,
+) -> odf::Multihash {
+    commit_dataset_event
+        .execute(
+            dataset_handle,
+            MetadataFactory::set_info()
+                .description("committed")
+                .build()
+                .into(),
+        )
+        .await
+        .unwrap()
+        .new_head
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

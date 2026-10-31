@@ -64,6 +64,7 @@ use super::{
     RawPushSession,
     append_unreferenced_block,
     commit_add_data_event,
+    commit_set_info,
     create_headless_dataset,
     find_stored_head,
 };
@@ -526,17 +527,7 @@ impl ClientSideHarness {
 
     /// Commits a metadata-only block, which references no objects
     pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
-        self.commit_dataset_event()
-            .execute(
-                dataset_handle,
-                MetadataFactory::set_info()
-                    .description("pushed")
-                    .build()
-                    .into(),
-            )
-            .await
-            .unwrap()
-            .new_head
+        commit_set_info(self.commit_dataset_event().as_ref(), dataset_handle).await
     }
 
     /// The push request and metadata for the blocks after `base_head`, as the

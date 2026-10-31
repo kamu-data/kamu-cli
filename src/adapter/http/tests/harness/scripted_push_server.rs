@@ -13,15 +13,12 @@ use std::sync::{Arc, Mutex};
 
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
 use axum::routing::{get, put};
+use kamu_adapter_http::smart_protocol::PUSH_NOT_COMPLETED_CLOSE_CODE;
 use kamu_adapter_http::smart_protocol::axum_server_protocol_common::axum_read_payload;
 use kamu_adapter_http::smart_protocol::messages::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use url::Url;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const PUSH_NOT_COMPLETED_CLOSE_CODE: u16 = 1013;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +42,8 @@ enum PushScript {
     StaleProgressRequest,
 
     /// Takes every object by HTTP upload, but holds each upload until the
-    /// client answered one progress request, then confirms the completion
+    /// client answered one progress request, then confirms the completion.
+    /// A push with no objects to hold fails, as the server closes the socket
     ProgressDuringUpload,
 }
 
@@ -181,10 +179,9 @@ impl ScriptedPushSession {
                 .await;
             }
             PushScript::ProgressDuringUpload => {
-                assert!(
-                    !objects_request.object_files.is_empty(),
-                    "The push must upload objects for the server to hold"
-                );
+                if objects_request.object_files.is_empty() {
+                    return;
+                }
                 let object_transfer_strategies = objects_request
                     .object_files
                     .into_iter()

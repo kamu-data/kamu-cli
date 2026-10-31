@@ -25,7 +25,7 @@ use crate::{
 /// `InMemoryTransactionManager` form a working set: the transaction reads its
 /// own changes over the committed entries, other transactions see them only
 /// after the commit, and a rollback drops them. A commit fails when another
-/// transaction committed a key this one changed since reading it.
+/// transaction committed a key this one changed since it first changed it.
 ///
 /// Unlike a database, a write never waits for another transaction: two
 /// transactions changing one key both succeed at write time, each checked
@@ -33,7 +33,15 @@ use crate::{
 /// Postgres the later writer would wait for the first and then fail its own
 /// check, such as a compare-and-set, at write time.
 ///
-/// Changes made outside such a transaction are committed at once
+/// Conflicts are found per key only, so unlike a database:
+/// - two transactions writing one key always conflict, even where Postgres serialises them, as with
+///   an upsert;
+/// - a transaction deleting the keys that match a condition does not stop another from adding a key
+///   that matches it;
+/// - a uniqueness rule over other keys holds only if the repository keeps it as keys of its own.
+///
+/// Changes made outside such a transaction, or under the ID of one that has
+/// ended, are committed at once
 pub struct InMemoryTransactionalMap<K, V> {
     state: Mutex<MapState<K, V>>,
 }
@@ -43,6 +51,7 @@ impl<K: Eq + Hash, V> InMemoryTransactionalMap<K, V> {
         Self {
             state: Mutex::new(MapState {
                 committed: HashMap::new(),
+                deleted_versions: HashMap::new(),
                 next_version: 1,
                 working_sets: HashMap::new(),
             }),
@@ -138,9 +147,7 @@ impl<K: Eq + Hash, V> InMemoryPreparedCommit for PreparedMapCommit<'_, K, V> {
         for (key, change) in working_set.changes {
             match change.value {
                 ChangedValue::Put(value) => self.state.commit_put(key, value),
-                ChangedValue::Delete => {
-                    self.state.committed.remove(&key);
-                }
+                ChangedValue::Delete => self.state.commit_delete(key),
             }
         }
     }
@@ -233,9 +240,7 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
         let Some(transaction_id) = self.transaction_id else {
             match value {
                 ChangedValue::Put(value) => self.state.commit_put(key, value),
-                ChangedValue::Delete => {
-                    self.state.committed.remove(&key);
-                }
+                ChangedValue::Delete => self.state.commit_delete(key),
             }
             return;
         };
@@ -261,6 +266,9 @@ impl<K: Eq + Hash, V> InMemoryMapWrite<'_, K, V> {
 
 struct MapState<K, V> {
     committed: HashMap<K, Versioned<V>>,
+    /// The version of each committed delete, so a key deleted and created
+    /// again does not look unchanged
+    deleted_versions: HashMap<K, u64>,
     next_version: u64,
     working_sets: HashMap<TransactionId, WorkingSet<K, V>>,
 }
@@ -275,13 +283,29 @@ impl<K: Eq + Hash, V> MapState<K, V> {
     }
 
     fn committed_version(&self, key: &K) -> Option<u64> {
-        self.committed.get(key).map(|versioned| versioned.version)
+        self.committed
+            .get(key)
+            .map(|versioned| versioned.version)
+            .or_else(|| self.deleted_versions.get(key).copied())
     }
 
     fn commit_put(&mut self, key: K, value: V) {
+        let version = self.take_next_version();
+        self.deleted_versions.remove(&key);
+        self.committed.insert(key, Versioned { value, version });
+    }
+
+    fn commit_delete(&mut self, key: K) {
+        if self.committed.remove(&key).is_some() {
+            let version = self.take_next_version();
+            self.deleted_versions.insert(key, version);
+        }
+    }
+
+    fn take_next_version(&mut self) -> u64 {
         let version = self.next_version;
         self.next_version += 1;
-        self.committed.insert(key, Versioned { value, version });
+        version
     }
 }
 
@@ -303,8 +327,8 @@ impl<K, V> Default for WorkingSet<K, V> {
 }
 
 struct Change<V> {
-    /// Version of the committed key when the transaction first changed it;
-    /// `None` when the key was absent
+    /// Version of the committed key, or of its last delete, when the
+    /// transaction first changed it; `None` when it never existed
     base_version: Option<u64>,
     value: ChangedValue<V>,
 }
@@ -402,6 +426,17 @@ mod tests {
         harness.commit(first);
 
         assert_matches!(harness.check_commit(second), Err(_));
+    }
+
+    #[test]
+    fn test_commit_fails_on_a_key_created_and_deleted_since_it_changed_it() {
+        let harness = MapHarness::with_committed(&[]);
+        let first = harness.begin();
+        harness.map.write(Some(first), |write| write.put("a", 10));
+        harness.map.write(None, |write| write.put("a", 20));
+        harness.map.write(None, |write| write.delete("a"));
+
+        assert_matches!(harness.check_commit(first), Err(_));
     }
 
     #[test]

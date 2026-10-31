@@ -90,10 +90,13 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
         let dataset_entries_page = self.state.rows.read(self.transaction_id, |rows| {
-            rows.iter()
+            let mut entries: Vec<_> = rows.iter().map(|(_, entry)| entry).collect();
+            entries.sort_by(|a, b| a.id.cmp(&b.id));
+            entries
+                .into_iter()
                 .skip(pagination.offset)
                 .take(pagination.limit)
-                .map(|(_, entry)| Ok(entry.clone()))
+                .map(|entry| Ok(entry.clone()))
                 .collect::<Vec<_>>()
         });
 
@@ -190,19 +193,24 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_entry: &DatasetEntry,
     ) -> Result<(), SaveDatasetEntryError> {
-        self.state.rows.write(self.transaction_id, |rows| {
-            let view = rows.view();
-            if view.contains_key(&dataset_entry.id) {
-                return Err(SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into());
-            }
-            if Self::entry_by_owner_and_name(&view, &dataset_entry.owner_id, &dataset_entry.name)
-                .is_some()
-            {
-                return Err(DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into());
-            }
+        let name_key = (dataset_entry.owner_id.clone(), dataset_entry.name.clone());
+        self.state.names.write(self.transaction_id, |names| {
+            self.state.rows.write(self.transaction_id, |rows| {
+                if rows.view().contains_key(&dataset_entry.id) {
+                    return Err(
+                        SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into(),
+                    );
+                }
+                if names.view().contains_key(&name_key) {
+                    return Err(
+                        DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into(),
+                    );
+                }
 
-            rows.put(dataset_entry.id.clone(), dataset_entry.clone());
-            Ok(())
+                names.put(name_key.clone(), dataset_entry.id.clone());
+                rows.put(dataset_entry.id.clone(), dataset_entry.clone());
+                Ok(())
+            })
         })
     }
 
@@ -211,26 +219,32 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         dataset_id: &odf::DatasetID,
         new_name: &odf::DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
-        self.state.rows.write(self.transaction_id, |rows| {
-            let view = rows.view();
-            let Some(found_dataset_entry) = view.get(dataset_id).cloned() else {
-                return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
-            };
-            if let Some(existing_entry) =
-                Self::entry_by_owner_and_name(&view, &found_dataset_entry.owner_id, new_name)
-                && &existing_entry.id != dataset_id
-            {
-                return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
-            }
+        self.state.names.write(self.transaction_id, |names| {
+            self.state.rows.write(self.transaction_id, |rows| {
+                let Some(found_dataset_entry) = rows.view().get(dataset_id).cloned() else {
+                    return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+                };
+                let new_name_key = (found_dataset_entry.owner_id.clone(), new_name.clone());
+                if let Some(existing_id) = names.view().get(&new_name_key)
+                    && existing_id != dataset_id
+                {
+                    return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
+                }
 
-            rows.put(
-                dataset_id.clone(),
-                DatasetEntry {
-                    name: new_name.clone(),
-                    ..found_dataset_entry
-                },
-            );
-            Ok(())
+                names.delete((
+                    found_dataset_entry.owner_id.clone(),
+                    found_dataset_entry.name.clone(),
+                ));
+                names.put(new_name_key, dataset_id.clone());
+                rows.put(
+                    dataset_id.clone(),
+                    DatasetEntry {
+                        name: new_name.clone(),
+                        ..found_dataset_entry
+                    },
+                );
+                Ok(())
+            })
         })
     }
 
@@ -280,16 +294,21 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             return Ok(DatasetEntriesDeletionResult::default());
         }
 
-        let deleted_dataset_ids = self.state.rows.write(self.transaction_id, |rows| {
-            let deleted_dataset_ids: Vec<_> = dataset_ids
-                .iter()
-                .filter(|dataset_id| rows.view().contains_key(dataset_id.as_ref()))
-                .map(|dataset_id| dataset_id.as_ref().clone())
-                .collect();
-            for dataset_id in &deleted_dataset_ids {
-                rows.delete(dataset_id.clone());
-            }
-            deleted_dataset_ids
+        let deleted_dataset_ids = self.state.names.write(self.transaction_id, |names| {
+            self.state.rows.write(self.transaction_id, |rows| {
+                let deleted_entries: Vec<_> = dataset_ids
+                    .iter()
+                    .filter_map(|dataset_id| rows.view().get(dataset_id.as_ref()).cloned())
+                    .collect();
+                for entry in &deleted_entries {
+                    names.delete((entry.owner_id.clone(), entry.name.clone()));
+                    rows.delete(entry.id.clone());
+                }
+                deleted_entries
+                    .into_iter()
+                    .map(|entry| entry.id)
+                    .collect::<Vec<_>>()
+            })
         });
 
         let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(

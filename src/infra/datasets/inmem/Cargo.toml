@@ -43,6 +43,8 @@ database-common-macros = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-datasets-repo-tests = { workspace = true }
 
+chrono = { version = "0.4", default-features = false }
+pretty_assertions = { version = "1" }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",

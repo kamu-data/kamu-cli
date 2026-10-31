@@ -19,6 +19,9 @@ use kamu_datasets::DatasetEntry;
 
 /// The entries every `InMemoryDatasetEntryRepository` reads and writes
 pub struct InMemoryDatasetEntryState {
+    /// The dataset of each owner and name, so that two transactions taking one
+    /// name conflict as a unique index would make them. Locked before `rows`
+    pub(crate) names: InMemoryTransactionalMap<(odf::AccountID, odf::DatasetName), odf::DatasetID>,
     pub(crate) rows: InMemoryTransactionalMap<odf::DatasetID, DatasetEntry>,
 }
 
@@ -28,11 +31,12 @@ pub struct InMemoryDatasetEntryState {
 impl InMemoryDatasetEntryState {
     pub fn new() -> Self {
         Self {
+            names: InMemoryTransactionalMap::new(),
             rows: InMemoryTransactionalMap::new(),
         }
     }
 }
 
-in_memory_transaction_participant!(InMemoryDatasetEntryState, rows);
+in_memory_transaction_participant!(InMemoryDatasetEntryState, names, rows);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

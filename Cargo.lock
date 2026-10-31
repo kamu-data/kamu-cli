@@ -8900,6 +8900,7 @@ version = "0.271.0"
 dependencies = [
  "async-trait",
  "cheap-clone",
+ "chrono",
  "database-common",
  "database-common-macros",
  "dill",
@@ -8909,6 +8910,7 @@ dependencies = [
  "kamu-datasets",
  "kamu-datasets-repo-tests",
  "opendatafabric",
+ "pretty_assertions",
  "test-group",
  "test-log",
  "tokio",

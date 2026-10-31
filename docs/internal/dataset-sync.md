@@ -379,8 +379,8 @@ Server-side details:
   under `force`. A batch starting with a `Seed` into an existing dataset, with `force` or without a
   `HEAD`, is refused with `SeedBlockOverwriteRestricted` when that `Seed` is of another dataset.
 - While objects upload, the server asks for progress every
-  `protocol.smartTransferProtocol.uploadProgressInterval` of the node configuration (10 s by
-  default), which must stay below the idle timeout of load balancers in front of it.
+  `protocol.smartTransferProtocol.uploadProgressInterval` of the node configuration
+  ([config reference](../../resources/config-reference.md#smarttransferprotocolconfig)).
 - Completion posts `DatasetExternallyChangedMessage::smart_transfer_protocol_sync` in the commit's
   transaction, which is how flows learn about a push
   ([flow-system.md](flow-system.md#changes-made-outside-flows)).
@@ -533,8 +533,9 @@ into the recoverability of the failed task.
   S3 storage: `src/adapter/http/tests/tests/test_protocol_dataset_helpers.rs` and the
   `tests_pull` / `tests_push` scenario directories under `src/adapter/http/tests/tests/`. The
   local FS server harness runs on `InMemoryTransactionManager`, so a failed push rolls the dataset
-  repositories back as a database does (files it wrote to storage stay); the racing doubles in `kamu_datasets_services::testing` move `HEAD` in a
-  transaction of their own, as a concurrent writer does.
+  repositories back as a database does (files it wrote to storage stay); the racing doubles in
+  `kamu_datasets_services::testing` move `HEAD` in a transaction of their own, as a concurrent
+  writer does.
 - CLI and node end-to-end scenarios: `src/e2e/app/cli/repo-tests/src/test_smart_transfer_protocol.rs`,
   `commands/test_pull_command.rs`, `commands/test_repo_command.rs`.
 
