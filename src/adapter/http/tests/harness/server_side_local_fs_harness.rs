@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use database_common::InMemoryTransactionManager;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{CacheDir, RunInfoDir, ServerUrlConfig};
 use kamu::*;
@@ -42,6 +43,7 @@ use kamu_auth_rebac_services::{
 use kamu_core::{CompactionExecutor, CompactionPlanner, DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
 use kamu_datasets_services::testing::{
+    FailingDatasetChangeListener,
     RacingAppendDatasetMetadataBatchUseCase,
     RacingDatasetHeadCommitter,
 };
@@ -95,7 +97,10 @@ impl ServerSideLocalFsHarness {
         self.base_catalog
             .get_one::<RacingDatasetHeadCommitter>()
             .unwrap()
-            .move_head_before_next_commit(concurrent_head);
+            .move_head_before_next_commit(
+                &create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config),
+                concurrent_head,
+            );
     }
 
     /// Arms the next metadata batch append on the server to first move `HEAD`
@@ -104,7 +109,16 @@ impl ServerSideLocalFsHarness {
         self.base_catalog
             .get_one::<RacingAppendDatasetMetadataBatchUseCase>()
             .unwrap()
-            .move_head_before_next_append(concurrent_head);
+            .move_head_before_next_append(
+                &create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config),
+                concurrent_head,
+            );
+    }
+
+    /// Arms dataset change messages on the server to fail. Taken before
+    /// `api_server_run`, which consumes the harness
+    pub fn dataset_change_listener(&self) -> Arc<FailingDatasetChangeListener> {
+        self.base_catalog.get_one().unwrap()
     }
 
     pub async fn append_unreferenced_block(
@@ -220,7 +234,11 @@ impl ServerSideLocalFsHarness {
                 .add::<OAuthDeviceCodeGeneratorDefault>()
                 .add::<InMemoryOAuthDeviceCodeRepository>();
 
-            database_common::NoOpDatabasePlugin::init_database_components(&mut b);
+            // A failed transaction rolls back the dataset repositories, which every
+            // read goes through. Storage files it wrote stay, such as the `refs/head`
+            // mirror that consumers dispatched at once update
+            b.add::<InMemoryTransactionManager>();
+            b.add::<FailingDatasetChangeListener>();
 
             register_message_dispatcher::<DatasetLifecycleMessage>(
                 &mut b,
@@ -230,6 +248,11 @@ impl ServerSideLocalFsHarness {
             register_message_dispatcher::<DatasetReferenceMessage>(
                 &mut b,
                 MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
+            );
+
+            register_message_dispatcher::<DatasetExternallyChangedMessage>(
+                &mut b,
+                MESSAGE_PRODUCER_KAMU_HTTP_ADAPTER,
             );
 
             (b.build(), listener)

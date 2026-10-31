@@ -11,23 +11,30 @@ use std::sync::Mutex;
 
 use kamu_datasets::{DatasetHeadCommitter, ResolvedDataset};
 
+use super::ConcurrentHeadMove;
 use crate::DatasetHeadCommitterImpl;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Commits like `DatasetHeadCommitterImpl`, but when armed first moves `HEAD`
-/// the way a concurrent writer would between the caller's read and its commit,
-/// or denies the commit
+/// as a concurrent writer would between the caller's read and its commit, in a
+/// transaction of its own, or denies the commit
 #[derive(Default)]
 pub struct RacingDatasetHeadCommitter {
-    concurrent_head: Mutex<Option<odf::Multihash>>,
+    concurrent_head_move: Mutex<Option<ConcurrentHeadMove>>,
     deny_next_commit: Mutex<bool>,
 }
 
 impl RacingDatasetHeadCommitter {
-    /// Arms the next `commit_head` to move `HEAD` to `concurrent_head` first
-    pub fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
-        *self.concurrent_head.lock().unwrap() = Some(concurrent_head);
+    /// Arms the next `commit_head` to move `HEAD` to `concurrent_head` first, in
+    /// a transaction of its own made from `catalog`
+    pub fn move_head_before_next_commit(
+        &self,
+        catalog: &dill::Catalog,
+        concurrent_head: odf::Multihash,
+    ) {
+        *self.concurrent_head_move.lock().unwrap() =
+            Some(ConcurrentHeadMove::new(catalog, concurrent_head));
     }
 
     /// Arms the next `commit_head` to fail as not allowed, moving nothing
@@ -50,20 +57,9 @@ impl DatasetHeadCommitter for RacingDatasetHeadCommitter {
             ));
         }
 
-        let concurrent_head = self.concurrent_head.lock().unwrap().take();
-        if let Some(concurrent_head) = concurrent_head {
-            target
-                .as_metadata_chain()
-                .set_ref(
-                    &odf::BlockRef::Head,
-                    &concurrent_head,
-                    odf::dataset::SetRefOpts {
-                        validate_block_present: true,
-                        check_ref_is: None,
-                    },
-                )
-                .await
-                .unwrap();
+        let concurrent_head_move = self.concurrent_head_move.lock().unwrap().take();
+        if let Some(concurrent_head_move) = concurrent_head_move {
+            concurrent_head_move.apply(target.get_handle()).await;
         }
 
         DatasetHeadCommitterImpl {}

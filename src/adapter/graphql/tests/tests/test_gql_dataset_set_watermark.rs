@@ -186,7 +186,7 @@ impl SetWatermarkHarness {
 
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
-            .move_head_before_next_commit(concurrent_head);
+            .move_head_before_next_commit(&self.catalog_authorized, concurrent_head);
     }
 
     async fn stored_head(&self, created: &CreateDatasetResult) -> odf::Multihash {

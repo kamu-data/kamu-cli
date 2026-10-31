@@ -531,7 +531,10 @@ into the recoverability of the failed task.
   case does.
 - Smart protocol tests, client against an in-process server, single- and multi-tenant, local and
   S3 storage: `src/adapter/http/tests/tests/test_protocol_dataset_helpers.rs` and the
-  `tests_pull` / `tests_push` scenario directories under `src/adapter/http/tests/tests/`.
+  `tests_pull` / `tests_push` scenario directories under `src/adapter/http/tests/tests/`. The
+  local FS server harness runs on `InMemoryTransactionManager`, so a failed push rolls the dataset
+  repositories back as a database does (files it wrote to storage stay); the racing doubles in `kamu_datasets_services::testing` move `HEAD` in a
+  transaction of their own, as a concurrent writer does.
 - CLI and node end-to-end scenarios: `src/e2e/app/cli/repo-tests/src/test_smart_transfer_protocol.rs`,
   `commands/test_pull_command.rs`, `commands/test_repo_command.rs`.
 

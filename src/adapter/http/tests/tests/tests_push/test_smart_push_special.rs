@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
 use std::time::Duration;
+use std::{assert_matches, slice};
 
 use kamu::domain::{PushError, SyncError, SyncHeadMovedError, SyncResult};
 use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
@@ -353,6 +353,80 @@ async fn test_smart_push_head_moved_concurrently() {
             stored_heads.get(&server_dataset_handle.id).await,
             concurrent_head
         );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_rolled_back_when_change_message_fails() {
+    let scenario = SmartPushExistingEvolvedDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+
+    let dataset_id = scenario.client_create_result.dataset_handle.id.clone();
+    let server_head = scenario.client_create_result.head.clone();
+    let client_head = scenario.client_commit_result.new_head.clone();
+    let dataset_change_listener = scenario.server_harness.dataset_change_listener();
+    dataset_change_listener.fail_next();
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let push_responses = scenario
+            .client_harness
+            .push_dataset(
+                scenario.client_dataset_ref.clone(),
+                scenario.server_dataset_ref.clone().try_into().unwrap(),
+                false,
+                odf::DatasetVisibility::Private,
+            )
+            .await;
+        pretty_assertions::assert_eq!(push_responses.len(), 1);
+        assert_matches!(
+            &push_responses[0].result,
+            Err(PushError::SyncError(SyncError::Internal(_)))
+        );
+        // The failed message announced the new head, so the commit ran and was
+        // rolled back with it
+        pretty_assertions::assert_eq!(
+            dataset_change_listener.announced_heads(),
+            slice::from_ref(&client_head)
+        );
+        pretty_assertions::assert_eq!(stored_heads.get(&dataset_id).await, server_head);
+
+        // Nothing the failed push wrote is left in the way of the retry
+        assert_matches!(
+            scenario
+                .client_harness
+                .push_dataset_result(
+                    scenario.client_dataset_ref,
+                    scenario.server_dataset_ref.try_into().unwrap(),
+                    false,
+                    odf::DatasetVisibility::Private,
+                )
+                .await,
+            SyncResult::Updated { .. }
+        );
+        pretty_assertions::assert_eq!(
+            dataset_change_listener.announced_heads(),
+            [client_head.clone(), client_head.clone()]
+        );
+        pretty_assertions::assert_eq!(stored_heads.get(&dataset_id).await, client_head);
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
