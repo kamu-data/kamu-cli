@@ -18,7 +18,6 @@ use kamu_accounts_services::AccountServiceImpl;
 use kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl;
 use kamu_core::*;
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
 use kamu_datasets_services::testing::{RacingDatasetHeadCommitter, TestDatasetOutboxListener};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
@@ -55,6 +54,7 @@ impl DatasetBaseUseCaseHarness {
                 CatalogBuilder::new()
             };
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(RunInfoDir::new(run_info_dir))
                 .add_value(opts.tenancy_config)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
@@ -63,18 +63,13 @@ impl DatasetBaseUseCaseHarness {
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
                 .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<InMemoryDidSecretKeyRepository>()
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add::<DatasetAliasUpdateHandler>()
                 .add::<AccountServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<DatasetBlockUpdateHandler>()
                 .add::<DependencyGraphImmediateListener>()
                 .add::<RebacDatasetRegistryFacadeImpl>()

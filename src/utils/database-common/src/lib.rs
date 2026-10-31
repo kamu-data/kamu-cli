@@ -20,6 +20,7 @@ mod db_provider;
 mod entities;
 
 mod helpers;
+mod in_memory;
 mod password;
 mod plugins;
 mod transactions;
@@ -30,6 +31,7 @@ pub use db_error::*;
 pub use db_provider::*;
 pub use entities::*;
 pub use helpers::*;
+pub use in_memory::*;
 pub use password::*;
 pub use plugins::*;
 pub use transactions::*;

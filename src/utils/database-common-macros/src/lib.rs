@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use proc_macro::{Span, TokenStream};
-use quote::quote;
+use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::{
     ExprArray,
@@ -784,6 +784,35 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
                 #fixture (&harness.catalog).await;
             }
         },
+        // Both as `inmem`, and inside one transaction of `InMemoryTransactionManager`,
+        // which the harness registers in `new_transactional()`
+        "inmem_with_transaction" => {
+            let in_transaction_function_name = format_ident!("{test_function_name}_in_transaction");
+            quote! {
+                #[test_group::group(#extra_test_groups)]
+                #[test_log::test(tokio::test)]
+                async fn #test_function_name () {
+                    let harness = #harness ::new();
+
+                    #fixture (&harness.catalog).await;
+                }
+
+                #[test_group::group(#extra_test_groups)]
+                #[test_log::test(tokio::test)]
+                async fn #in_transaction_function_name () {
+                    let harness = #harness ::new_transactional();
+
+                    database_common::DatabaseTransactionRunner::from(harness.catalog)
+                        .transactional(|catalog| async move {
+                            #fixture (&catalog).await;
+
+                            Ok::<_, internal_error::InternalError>(())
+                        })
+                        .await
+                        .unwrap();
+                }
+            }
+        }
         "postgres" => quote! {
             #[test_group::group(database, postgres, #extra_test_groups)]
             #[test_log::test(sqlx::test(migrations = "../../../../migrations/postgres"))]
@@ -833,7 +862,7 @@ pub fn database_transactional_test(input: TokenStream) -> TokenStream {
         unexpected => {
             panic!(
                 "Unexpected E2E test storage: \"{unexpected}\"!\nAllowable values: \"inmem\", \
-                 \"postgres\", and \"sqlite\"."
+                 \"inmem_with_transaction\", \"postgres\", and \"sqlite\"."
             );
         }
     };

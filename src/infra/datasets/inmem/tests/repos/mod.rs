@@ -7,9 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod in_memory_dataset_repositories_harness;
+use in_memory_dataset_repositories_harness::*;
+
 mod test_inmem_dataset_data_blocks_repository;
 mod test_inmem_dataset_dependency_repository;
 mod test_inmem_dataset_entry_repository;
+mod test_inmem_dataset_entry_repository_concurrent_names;
 mod test_inmem_dataset_key_blocks_repository;
 mod test_inmem_dataset_reference_repository;
 mod test_inmem_dataset_statistics_repository;

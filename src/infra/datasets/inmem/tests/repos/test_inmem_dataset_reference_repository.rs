@@ -8,93 +8,72 @@
 // by the Apache License, Version 2.0.
 
 use database_common_macros::database_transactional_test;
-use dill::{Catalog, CatalogBuilder};
-use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_datasets_inmem::{InMemoryDatasetEntryRepository, InMemoryDatasetReferenceRepository};
 use kamu_datasets_repo_tests::dataset_reference_repo;
 
+use super::InMemoryDatasetRepositoriesHarness;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_set_initial_reference,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_update_reference_without_cas_violation,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_update_reference_provoke_cas_violation,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_update_reference_from_stale_hash_provoke_cas_violation,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_update_missing_reference_provoke_cas_violation,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_set_and_remove_reference,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_multiple_datasets,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 database_transactional_test!(
-    storage = inmem,
+    storage = inmem_with_transaction,
     fixture = dataset_reference_repo::test_reacts_to_dataset_removals,
-    harness = InMemoryDatasetReferenceRepositoryHarness
+    harness = InMemoryDatasetRepositoriesHarness
 );
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct InMemoryDatasetReferenceRepositoryHarness {
-    catalog: Catalog,
-}
-
-impl InMemoryDatasetReferenceRepositoryHarness {
-    pub fn new() -> Self {
-        let mut catalog_builder = CatalogBuilder::new();
-
-        catalog_builder.add::<InMemoryAccountRepository>();
-        catalog_builder.add::<InMemoryDatasetEntryRepository>();
-        catalog_builder.add::<InMemoryDatasetReferenceRepository>();
-
-        Self {
-            catalog: catalog_builder.build(),
-        }
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

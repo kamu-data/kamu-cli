@@ -8,51 +8,60 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
-use database_common::PaginationOpts;
+use database_common::{InMemoryMapView, PaginationOpts, TransactionId, TransactionRef};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_datasets::*;
-use tokio::sync::RwLock;
+
+use super::InMemoryDatasetEntryState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default)]
-struct State {
-    rows: HashMap<odf::DatasetID, DatasetEntry>,
-    // NOTE: Name hash is case-insensitive
-    rows_by_owner_and_name: HashMap<odf::AccountID, HashMap<odf::DatasetName, odf::DatasetID>>,
-    rows_by_owner: HashMap<odf::AccountID, BTreeSet<odf::DatasetID>>,
-}
-
-impl State {
-    fn new() -> Self {
-        Self {
-            rows: HashMap::new(),
-            rows_by_owner_and_name: HashMap::new(),
-            rows_by_owner: HashMap::new(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+type Rows<'a> = InMemoryMapView<'a, odf::DatasetID, DatasetEntry>;
 
 pub struct InMemoryDatasetEntryRepository {
+    state: Arc<InMemoryDatasetEntryState>,
+    transaction_id: Option<TransactionId>,
     removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
-    state: Arc<RwLock<State>>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetEntryRepository)]
-#[scope(Singleton)]
 impl InMemoryDatasetEntryRepository {
-    pub fn new(removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>) -> Self {
+    pub fn new(
+        state: Arc<InMemoryDatasetEntryState>,
+        transaction_ref: Option<TransactionRef>,
+        removal_listeners: Vec<Arc<dyn DatasetEntryRemovalListener>>,
+    ) -> Self {
         Self {
+            state,
+            transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
             removal_listeners,
-            state: Arc::new(RwLock::new(State::new())),
         }
+    }
+
+    /// The owner's entries, ordered by dataset ID
+    fn owned_entries<'a>(rows: &Rows<'a>, owner_id: &odf::AccountID) -> Vec<&'a DatasetEntry> {
+        let mut entries: Vec<_> = rows
+            .iter()
+            .map(|(_, entry)| entry)
+            .filter(|entry| &entry.owner_id == owner_id)
+            .collect();
+        entries.sort_by(|a, b| a.id.cmp(&b.id));
+        entries
+    }
+
+    /// Dataset names compare case-insensitively
+    fn entry_by_owner_and_name<'a>(
+        rows: &Rows<'a>,
+        owner_id: &odf::AccountID,
+        name: &odf::DatasetName,
+    ) -> Option<&'a DatasetEntry> {
+        rows.iter()
+            .map(|(_, entry)| entry)
+            .find(|entry| &entry.owner_id == owner_id && &entry.name == name)
     }
 }
 
@@ -61,40 +70,35 @@ impl InMemoryDatasetEntryRepository {
 #[async_trait::async_trait]
 impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
     async fn dataset_entries_count(&self) -> Result<usize, DatasetEntriesCountError> {
-        let readable_state = self.state.read().await;
-
-        let dataset_entries_count = readable_state.rows.len();
-
-        Ok(dataset_entries_count)
+        Ok(self
+            .state
+            .rows
+            .read(self.transaction_id, |rows| rows.iter().count()))
     }
 
     async fn dataset_entries_count_by_owner_id(
         &self,
         owner_id: &odf::AccountID,
     ) -> Result<usize, InternalError> {
-        let readable_state = self.state.read().await;
-
-        let owner_entries = readable_state.rows_by_owner.get(owner_id);
-
-        Ok(owner_entries.map_or(0, BTreeSet::len))
+        Ok(self.state.rows.read(self.transaction_id, |rows| {
+            Self::owned_entries(rows, owner_id).len()
+        }))
     }
 
     async fn get_dataset_entries<'a>(
         &'a self,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
-        let dataset_entries_page = {
-            let readable_state = self.state.read().await;
-
-            readable_state
-                .rows
-                .values()
+        let dataset_entries_page = self.state.rows.read(self.transaction_id, |rows| {
+            let mut entries: Vec<_> = rows.iter().map(|(_, entry)| entry).collect();
+            entries.sort_by(|a, b| a.id.cmp(&b.id));
+            entries
+                .into_iter()
                 .skip(pagination.offset)
                 .take(pagination.limit)
-                .cloned()
-                .map(Ok)
+                .map(|entry| Ok(entry.clone()))
                 .collect::<Vec<_>>()
-        };
+        });
 
         Box::pin(futures::stream::iter(dataset_entries_page))
     }
@@ -103,37 +107,29 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<DatasetEntry, GetDatasetEntryError> {
-        let readable_state = self.state.read().await;
-
-        let maybe_dataset_entry = readable_state.rows.get(dataset_id);
-
-        let Some(dataset_entry) = maybe_dataset_entry else {
-            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
-        };
-
-        Ok(dataset_entry.clone())
+        self.state
+            .rows
+            .read(self.transaction_id, |rows| rows.get(dataset_id).cloned())
+            .ok_or_else(|| DatasetEntryNotFoundError::new(dataset_id.clone()).into())
     }
 
     async fn get_multiple_dataset_entries<'a>(
         &'a self,
         dataset_ids: &[Cow<'a, odf::DatasetID>],
     ) -> Result<DatasetEntriesResolution, GetMultipleDatasetEntriesError> {
-        let readable_state = self.state.read().await;
-
-        let mut resolution = DatasetEntriesResolution::default();
-
-        for dataset_id in dataset_ids {
-            let maybe_dataset_entry = readable_state.rows.get(dataset_id);
-            if let Some(dataset_entry) = maybe_dataset_entry {
-                resolution.resolved_entries.push(dataset_entry.clone());
-            } else {
-                resolution
-                    .unresolved_entries
-                    .push(dataset_id.as_ref().clone());
+        Ok(self.state.rows.read(self.transaction_id, |rows| {
+            let mut resolution = DatasetEntriesResolution::default();
+            for dataset_id in dataset_ids {
+                if let Some(dataset_entry) = rows.get(dataset_id) {
+                    resolution.resolved_entries.push(dataset_entry.clone());
+                } else {
+                    resolution
+                        .unresolved_entries
+                        .push(dataset_id.as_ref().clone());
+                }
             }
-        }
-
-        Ok(resolution)
+            resolution
+        }))
     }
 
     async fn get_dataset_entry_by_owner_and_name(
@@ -141,30 +137,14 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         owner_id: &odf::AccountID,
         name: &odf::DatasetName,
     ) -> Result<DatasetEntry, GetDatasetEntryByNameError> {
-        let readable_state = self.state.read().await;
-
-        let maybe_dataset_entry = {
-            let maybe_dataset_id =
-                if let Some(owned_by_name) = readable_state.rows_by_owner_and_name.get(owner_id) {
-                    owned_by_name.get(name)
-                } else {
-                    None
-                };
-
-            if let Some(dataset_id) = maybe_dataset_id {
-                readable_state.rows.get(dataset_id)
-            } else {
-                None
-            }
-        };
-
-        let Some(dataset_entry) = maybe_dataset_entry else {
-            return Err(
-                DatasetEntryByNameNotFoundError::new(owner_id.clone(), name.clone()).into(),
-            );
-        };
-
-        Ok(dataset_entry.clone())
+        self.state
+            .rows
+            .read(self.transaction_id, |rows| {
+                Self::entry_by_owner_and_name(rows, owner_id, name).cloned()
+            })
+            .ok_or_else(|| {
+                DatasetEntryByNameNotFoundError::new(owner_id.clone(), name.clone()).into()
+            })
     }
 
     async fn get_dataset_entries_by_owner_id<'a>(
@@ -172,22 +152,14 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         owner_id: &odf::AccountID,
         pagination: PaginationOpts,
     ) -> DatasetEntryStream<'a> {
-        let dataset_entries_page = {
-            let readable_state = self.state.read().await;
-
-            if let Some(dataset_ids) = readable_state.rows_by_owner.get(owner_id) {
-                dataset_ids
-                    .iter()
-                    .skip(pagination.offset)
-                    .take(pagination.limit)
-                    .map(|dataset_id| readable_state.rows.get(dataset_id).unwrap())
-                    .cloned()
-                    .map(Ok)
-                    .collect::<Vec<_>>()
-            } else {
-                vec![]
-            }
-        };
+        let dataset_entries_page = self.state.rows.read(self.transaction_id, |rows| {
+            Self::owned_entries(rows, owner_id)
+                .into_iter()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .map(|entry| Ok(entry.clone()))
+                .collect::<Vec<_>>()
+        });
 
         Box::pin(futures::stream::iter(dataset_entries_page))
     }
@@ -196,17 +168,14 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         owner_id_dataset_name_pairs: &'a [&'a (odf::AccountID, odf::DatasetName)],
     ) -> Result<Vec<DatasetEntry>, GetDatasetEntriesByNameError> {
-        let readable_state = self.state.read().await;
-
-        let mut found_entries = Vec::with_capacity(owner_id_dataset_name_pairs.len());
-        for (owner_id, dataset_name) in owner_id_dataset_name_pairs {
-            if let Some(entries_by_name) = readable_state.rows_by_owner_and_name.get(owner_id)
-                && let Some(dataset_id) = entries_by_name.get(dataset_name)
-                && let Some(entry) = readable_state.rows.get(dataset_id)
-            {
-                found_entries.push(entry.clone());
-            }
-        }
+        let mut found_entries = self.state.rows.read(self.transaction_id, |rows| {
+            owner_id_dataset_name_pairs
+                .iter()
+                .filter_map(|(owner_id, dataset_name)| {
+                    Self::entry_by_owner_and_name(rows, owner_id, dataset_name).cloned()
+                })
+                .collect::<Vec<_>>()
+        });
 
         found_entries.sort_by(|a, b| {
             use std::cmp::Ordering;
@@ -224,45 +193,25 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         &self,
         dataset_entry: &DatasetEntry,
     ) -> Result<(), SaveDatasetEntryError> {
-        let mut writable_state = self.state.write().await;
+        let name_key = (dataset_entry.owner_id.clone(), dataset_entry.name.clone());
+        self.state.names.write(self.transaction_id, |names| {
+            self.state.rows.write(self.transaction_id, |rows| {
+                if rows.view().contains_key(&dataset_entry.id) {
+                    return Err(
+                        SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into(),
+                    );
+                }
+                if names.view().contains_key(&name_key) {
+                    return Err(
+                        DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into(),
+                    );
+                }
 
-        if writable_state.rows.contains_key(&dataset_entry.id) {
-            return Err(SaveDatasetEntryErrorDuplicate::new(dataset_entry.id.clone()).into());
-        }
-
-        if let Some(owned_by_name) = writable_state
-            .rows_by_owner_and_name
-            .get(&dataset_entry.owner_id)
-            && owned_by_name.contains_key(&dataset_entry.name)
-        {
-            return Err(DatasetEntryNameCollisionError::new(dataset_entry.name.clone()).into());
-        }
-
-        writable_state
-            .rows
-            .insert(dataset_entry.id.clone(), dataset_entry.clone());
-
-        writable_state
-            .rows_by_owner_and_name
-            .entry(dataset_entry.owner_id.clone())
-            .and_modify(|entries_by_name| {
-                entries_by_name.insert(dataset_entry.name.clone(), dataset_entry.id.clone());
+                names.put(name_key.clone(), dataset_entry.id.clone());
+                rows.put(dataset_entry.id.clone(), dataset_entry.clone());
+                Ok(())
             })
-            .or_insert_with(|| {
-                let mut hm = HashMap::new();
-                hm.insert(dataset_entry.name.clone(), dataset_entry.id.clone());
-                hm
-            });
-
-        writable_state
-            .rows_by_owner
-            .entry(dataset_entry.owner_id.clone())
-            .and_modify(|owner_dataset_ids| {
-                owner_dataset_ids.insert(dataset_entry.id.clone());
-            })
-            .or_insert_with(|| BTreeSet::from_iter([dataset_entry.id.clone()]));
-
-        Ok(())
+        })
     }
 
     async fn update_dataset_entry_name(
@@ -270,32 +219,33 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         dataset_id: &odf::DatasetID,
         new_name: &odf::DatasetName,
     ) -> Result<(), UpdateDatasetEntryNameError> {
-        let mut writable_state = self.state.write().await;
+        self.state.names.write(self.transaction_id, |names| {
+            self.state.rows.write(self.transaction_id, |rows| {
+                let Some(found_dataset_entry) = rows.view().get(dataset_id).cloned() else {
+                    return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
+                };
+                let new_name_key = (found_dataset_entry.owner_id.clone(), new_name.clone());
+                if let Some(existing_id) = names.view().get(&new_name_key)
+                    && existing_id != dataset_id
+                {
+                    return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
+                }
 
-        let Some(found_dataset_entry) = writable_state.rows.get(dataset_id).cloned() else {
-            return Err(DatasetEntryNotFoundError::new(dataset_id.clone()).into());
-        };
-
-        let owned_by_name = writable_state
-            .rows_by_owner_and_name
-            .get_mut(&found_dataset_entry.owner_id)
-            .expect("Owner datasets must be present");
-
-        let has_name_collision_detected = {
-            if let Some(existing_id) = owned_by_name.get(new_name) {
-                existing_id != dataset_id
-            } else {
-                false
-            }
-        };
-        if has_name_collision_detected {
-            return Err(DatasetEntryNameCollisionError::new(new_name.clone()).into());
-        }
-
-        owned_by_name.remove(&found_dataset_entry.name);
-        owned_by_name.insert(new_name.clone(), found_dataset_entry.id.clone());
-
-        Ok(())
+                names.delete((
+                    found_dataset_entry.owner_id.clone(),
+                    found_dataset_entry.name.clone(),
+                ));
+                names.put(new_name_key, dataset_id.clone());
+                rows.put(
+                    dataset_id.clone(),
+                    DatasetEntry {
+                        name: new_name.clone(),
+                        ..found_dataset_entry
+                    },
+                );
+                Ok(())
+            })
+        })
     }
 
     async fn update_owner_entries_after_rename(
@@ -303,25 +253,18 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
         owner_id: &odf::AccountID,
         new_owner_name: &odf::AccountName,
     ) -> Result<(), InternalError> {
-        let mut writable_state = self.state.write().await;
-
-        let owner_entries = if let Some(entries) = writable_state.rows_by_owner.get(owner_id) {
-            entries.iter().cloned().collect::<Vec<_>>()
-        } else {
-            return Ok(());
-        };
-
-        for dataset_id in owner_entries {
-            let maybe_dataset_entry = writable_state.rows.get_mut(&dataset_id);
-            if let Some(dataset_entry) = maybe_dataset_entry {
-                dataset_entry.owner_name = new_owner_name.clone();
-            } else {
-                panic!(
-                    "InMemoryDatasetEntryRepository: Dataset entry with ID {dataset_id} not found"
-                );
+        self.state.rows.write(self.transaction_id, |rows| {
+            let renamed_entries: Vec<_> = Self::owned_entries(&rows.view(), owner_id)
+                .into_iter()
+                .map(|entry| DatasetEntry {
+                    owner_name: new_owner_name.clone(),
+                    ..entry.clone()
+                })
+                .collect();
+            for entry in renamed_entries {
+                rows.put(entry.id.clone(), entry);
             }
-        }
-
+        });
         Ok(())
     }
 
@@ -351,32 +294,22 @@ impl DatasetEntryRepository for InMemoryDatasetEntryRepository {
             return Ok(DatasetEntriesDeletionResult::default());
         }
 
-        let mut deleted_dataset_ids = Vec::new();
-
-        {
-            let mut writable_state = self.state.write().await;
-
-            for dataset_id in dataset_ids {
-                let maybe_removed_entry = writable_state.rows.remove(dataset_id.as_ref());
-                let Some(removed_entry) = maybe_removed_entry else {
-                    continue;
-                };
-
-                writable_state
-                    .rows_by_owner
-                    .get_mut(&removed_entry.owner_id)
-                    .unwrap()
-                    .remove(&removed_entry.id);
-                if let Some(owned_by_name) = writable_state
-                    .rows_by_owner_and_name
-                    .get_mut(&removed_entry.owner_id)
-                {
-                    owned_by_name.remove(&removed_entry.name);
+        let deleted_dataset_ids = self.state.names.write(self.transaction_id, |names| {
+            self.state.rows.write(self.transaction_id, |rows| {
+                let deleted_entries: Vec<_> = dataset_ids
+                    .iter()
+                    .filter_map(|dataset_id| rows.view().get(dataset_id.as_ref()).cloned())
+                    .collect();
+                for entry in &deleted_entries {
+                    names.delete((entry.owner_id.clone(), entry.name.clone()));
+                    rows.delete(entry.id.clone());
                 }
-
-                deleted_dataset_ids.push(removed_entry.id);
-            }
-        }
+                deleted_entries
+                    .into_iter()
+                    .map(|entry| entry.id)
+                    .collect::<Vec<_>>()
+            })
+        });
 
         let deletion_result = DatasetEntriesDeletionResult::from_deleted_dataset_ids(
             dataset_ids,

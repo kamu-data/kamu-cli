@@ -9,11 +9,13 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Duration;
 
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
 use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
+use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
     AlwaysHappyDatasetPermissionChecker,
@@ -26,15 +28,20 @@ use kamu_datasets::{
     MockDatasetPermissionChecker,
 };
 use kamu_datasets_services::DatasetEntryWriter;
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use reqwest::Url;
 use time_source::SystemTimeSourceStub;
 
-use super::ServerSideDatasetFixture;
+use super::{ServerSideDatasetFixture, commit_set_info, create_headless_dataset, find_stored_head};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 pub(crate) const SERVER_ACCOUNT_EMAIL_ADDRESS: &str = "kamu-server@example.com";
+
+/// Longer than any test upload, so no progress request is sent unless a test
+/// sets a shorter interval
+const DEFAULT_UPLOAD_PROGRESS_INTERVAL: Duration = Duration::from_secs(10);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,10 +71,32 @@ pub(crate) trait ServerSideHarness {
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService>;
 
+    fn cli_create_dataset_use_case_helper(&self) -> Arc<CreateDatasetUseCaseHelper>;
+
+    /// A dataset of the operating account with its own `Seed` but no `HEAD`
+    async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
+        create_headless_dataset(
+            self.cli_create_dataset_use_case_helper().as_ref(),
+            &self.server_account_id(),
+            &odf::DatasetAlias::new(
+                self.operating_account_name(),
+                odf::DatasetName::new_unchecked(dataset_name),
+            ),
+        )
+        .await
+    }
+
     /// Taken before `api_server_run`, which consumes the harness
     fn stored_heads(&self) -> StoredHeads {
         StoredHeads {
             dataset_reference_service: self.cli_dataset_reference_service(),
+        }
+    }
+
+    /// Taken before `api_server_run`, which consumes the harness
+    fn server_commits(&self) -> ServerCommits {
+        ServerCommits {
+            commit_dataset_event: self.cli_commit_dataset_event_use_case(),
         }
     }
 
@@ -94,6 +123,20 @@ pub(crate) struct ServerSideHarnessOptions {
     pub tenancy_config: TenancyConfig,
     pub authorized_writes: bool,
     pub base_catalog: Option<dill::Catalog>,
+    pub smart_transfer_protocol_config: SmartTransferProtocolServerConfig,
+}
+
+impl Default for ServerSideHarnessOptions {
+    fn default() -> Self {
+        Self {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: false,
+            base_catalog: None,
+            smart_transfer_protocol_config: SmartTransferProtocolServerConfig {
+                upload_progress_interval: DEFAULT_UPLOAD_PROGRESS_INTERVAL,
+            },
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,6 +215,25 @@ impl StoredHeads {
             .get_reference(dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
+    }
+
+    /// `None` while the dataset has no `HEAD`
+    pub async fn find(&self, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
+        find_stored_head(self.dataset_reference_service.as_ref(), dataset_id).await
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Commits to server datasets while the server runs, moving `HEAD` as any
+/// writer would
+pub(crate) struct ServerCommits {
+    commit_dataset_event: Arc<dyn CommitDatasetEventUseCase>,
+}
+
+impl ServerCommits {
+    pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
+        commit_set_info(self.commit_dataset_event.as_ref(), dataset_handle).await
     }
 }
 

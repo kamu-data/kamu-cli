@@ -15,7 +15,13 @@ use datafusion::arrow::array::{Array, RecordBatch, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
-use kamu_datasets::DatasetRegistry;
+use kamu_datasets::{
+    CommitDatasetEventUseCase,
+    DatasetReferenceService,
+    DatasetRegistry,
+    GetDatasetReferenceError,
+};
+use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use odf::dataset::{AddDataParams, CheckpointRef};
 use odf::metadata::OffsetInterval;
 use odf::metadata::testing::MetadataFactory;
@@ -99,6 +105,84 @@ pub(crate) async fn append_unreferenced_block(
         )
         .await
         .unwrap()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Commits a `SetInfo` through the use case, moving `HEAD` as any writer
+/// would, and returns the new head
+pub(crate) async fn commit_set_info(
+    commit_dataset_event: &dyn CommitDatasetEventUseCase,
+    dataset_handle: &odf::DatasetHandle,
+) -> odf::Multihash {
+    commit_dataset_event
+        .execute(
+            dataset_handle,
+            MetadataFactory::set_info()
+                .description("committed")
+                .build()
+                .into(),
+        )
+        .await
+        .unwrap()
+        .new_head
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The stored `HEAD`, or `None` while the dataset has none
+pub(crate) async fn find_stored_head(
+    dataset_reference_service: &dyn DatasetReferenceService,
+    dataset_id: &odf::DatasetID,
+) -> Option<odf::Multihash> {
+    match dataset_reference_service
+        .get_reference(dataset_id, &odf::BlockRef::Head)
+        .await
+    {
+        Ok(head) => Some(head),
+        Err(GetDatasetReferenceError::NotFound(_)) => None,
+        Err(GetDatasetReferenceError::Internal(e)) => panic!("{e}"),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Stores a dataset with its own `Seed` and an entry but no `HEAD`, as an
+/// interrupted creation leaves it
+pub(crate) async fn create_headless_dataset(
+    create_dataset_helper: &CreateDatasetUseCaseHelper,
+    owner_account_id: &odf::AccountID,
+    dataset_alias: &odf::DatasetAlias,
+) -> odf::DatasetHandle {
+    let seed_block = MetadataFactory::metadata_block(
+        MetadataFactory::seed(odf::DatasetKind::Root)
+            .id_from(dataset_alias.dataset_name.as_str())
+            .build(),
+    )
+    .build_typed();
+    let stored = create_dataset_helper
+        .store_dataset(
+            dataset_alias,
+            seed_block,
+            odf::dataset::StoreDatasetOpts::default(),
+        )
+        .await
+        .unwrap();
+    create_dataset_helper
+        .create_dataset_entry(
+            &stored.dataset_id,
+            owner_account_id,
+            dataset_alias,
+            stored.dataset_kind,
+        )
+        .await
+        .unwrap();
+
+    odf::DatasetHandle::new(
+        stored.dataset_id,
+        dataset_alias.clone(),
+        stored.dataset_kind,
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use database_common::NoOpDatabasePlugin;
-use futures::{SinkExt, StreamExt};
 use headers::Header;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::*;
@@ -28,9 +27,14 @@ use kamu_accounts_inmem::{
 };
 use kamu_accounts_services::*;
 use kamu_adapter_http::smart_protocol::messages::{
+    DatasetPushMetadataRequest,
     DatasetPushRequest,
     DatasetPushResponse,
     SMART_TRANSFER_PROTOCOL_VERSION,
+};
+use kamu_adapter_http::smart_protocol::protocol_dataset_helper::{
+    prepare_dataset_metadata_batch,
+    prepare_dataset_transfer_plan,
 };
 use kamu_adapter_http::{OdfSmtpVersion, SmartTransferProtocolClientWs};
 use kamu_auth_rebac_inmem::InMemoryRebacRepository;
@@ -41,26 +45,29 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
 use odf::dataset::{DatasetFactoryImpl, DatasetLayout, IpfsGateway};
+use odf::metadata::testing::MetadataFactory;
 use tempfile::TempDir;
 use time_source::SystemTimeSourceDefault;
 use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Error;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::{Error, Message};
 use url::Url;
 
-use super::append_unreferenced_block;
+use super::{
+    RawProtocolSocket,
+    RawPullSession,
+    RawPushSession,
+    append_unreferenced_block,
+    commit_add_data_event,
+    commit_set_info,
+    create_headless_dataset,
+    find_stored_head,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -109,7 +116,7 @@ impl ClientSideHarness {
         .bind::<dyn Outbox, OutboxImmediateImpl>();
 
         b.add::<DependencyGraphServiceImpl>();
-        b.add::<InMemoryDatasetDependencyRepository>();
+        kamu_datasets_inmem::register_dependencies(&mut b);
 
         match options.tenancy_config {
             TenancyConfig::SingleTenant => {
@@ -210,12 +217,8 @@ impl ClientSideHarness {
         b.add::<DatasetReferenceServiceImpl>();
         b.add_value(RacingDatasetHeadCommitter::default())
             .bind::<dyn DatasetHeadCommitter, RacingDatasetHeadCommitter>();
-        b.add::<InMemoryDatasetReferenceRepository>();
         b.add::<CreateDatasetUseCaseHelper>();
         b.add::<DatasetEntryServiceImpl>();
-        b.add::<InMemoryDatasetEntryRepository>();
-        b.add::<InMemoryDatasetKeyBlockRepository>();
-        b.add::<InMemoryDatasetDataBlockRepository>();
 
         b.add::<InMemoryDidSecretKeyRepository>();
 
@@ -325,7 +328,7 @@ impl ClientSideHarness {
     /// the way a concurrent writer would
     pub fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
-            .move_head_before_next_commit(concurrent_head);
+            .move_head_before_next_commit(&self.catalog, concurrent_head);
     }
 
     pub async fn append_unreferenced_block(
@@ -340,6 +343,27 @@ impl ClientSideHarness {
             .get_reference(dataset_id, &odf::BlockRef::Head)
             .await
             .unwrap()
+    }
+
+    /// `None` while the dataset has no `HEAD`
+    pub async fn find_stored_head(&self, dataset_id: &odf::DatasetID) -> Option<odf::Multihash> {
+        find_stored_head(self.dataset_reference_service().as_ref(), dataset_id).await
+    }
+
+    /// A dataset of the operating account with its own `Seed` but no `HEAD`
+    pub async fn create_headless_dataset(&self, dataset_name: &str) -> odf::DatasetHandle {
+        create_headless_dataset(
+            self.catalog
+                .get_one::<CreateDatasetUseCaseHelper>()
+                .unwrap()
+                .as_ref(),
+            &self.client_account_id(),
+            &odf::DatasetAlias::new(
+                self.operating_account_name(),
+                odf::DatasetName::new_unchecked(dataset_name),
+            ),
+        )
+        .await
     }
 
     // TODO: accept alias or handle
@@ -387,6 +411,32 @@ impl ClientSideHarness {
             .as_ref()
             .unwrap()
             .clone()
+    }
+
+    /// Pulls into an existing dataset through the update steps the pull use
+    /// case runs, returning the sync result with the increment the use case
+    /// does not report
+    pub async fn sync_into_existing(
+        &self,
+        src_ref: odf::DatasetRefRemote,
+        dataset_handle: &odf::DatasetHandle,
+    ) -> SyncResult {
+        let update_steps = self.catalog.get_one::<dyn DatasetUpdateSteps>().unwrap();
+        let dst = update_steps
+            .resolve_sync_target(&PullLocalTarget::existing(dataset_handle.clone()))
+            .await
+            .unwrap()
+            .unwrap();
+
+        update_steps
+            .transfer_and_commit_sync(
+                LocalSyncRequest { src: src_ref, dst },
+                SyncOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .unwrap()
     }
 
     pub async fn push_dataset(
@@ -446,6 +496,88 @@ impl ClientSideHarness {
         }
     }
 
+    /// Creates a root dataset of the operating account with a schema and one
+    /// data slice, and returns its local reference
+    pub async fn create_root_dataset_with_data(&self, dataset_name: &str) -> odf::DatasetRef {
+        let alias = odf::DatasetAlias::new(
+            self.operating_account_name(),
+            odf::DatasetName::new_unchecked(dataset_name),
+        );
+        let created = self
+            .create_dataset_from_snapshot()
+            .execute(
+                MetadataFactory::dataset_snapshot()
+                    .name(alias.clone())
+                    .kind(odf::DatasetKind::Root)
+                    .push_event(MetadataFactory::set_polling_source().build())
+                    .push_event(MetadataFactory::set_data_schema().build())
+                    .build(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+        commit_add_data_event(
+            self.dataset_registry().as_ref(),
+            &created.dataset_handle,
+            None,
+        )
+        .await;
+        alias.as_local_ref()
+    }
+
+    /// Commits a metadata-only block, which references no objects
+    pub async fn commit_set_info(&self, dataset_handle: &odf::DatasetHandle) -> odf::Multihash {
+        commit_set_info(self.commit_dataset_event().as_ref(), dataset_handle).await
+    }
+
+    /// The push request and metadata for the blocks after `base_head`, as the
+    /// client would send them
+    pub async fn raw_push_requests(
+        &self,
+        dataset_handle: &odf::DatasetHandle,
+        base_head: &odf::Multihash,
+    ) -> (DatasetPushRequest, DatasetPushMetadataRequest) {
+        let resolved_dataset = self
+            .dataset_registry()
+            .get_dataset_by_handle(dataset_handle)
+            .await;
+        let chain = resolved_dataset.as_metadata_chain();
+        let head = chain.resolve_ref(&odf::BlockRef::Head).await.unwrap();
+
+        let transfer_plan = prepare_dataset_transfer_plan(chain, &head, Some(base_head), false)
+            .await
+            .unwrap();
+        let new_blocks = prepare_dataset_metadata_batch(chain, &head, Some(base_head), false)
+            .await
+            .unwrap();
+
+        (
+            DatasetPushRequest {
+                current_head: Some(base_head.clone()),
+                transfer_plan,
+                force_update_if_diverged: false,
+                visibility_for_created_dataset: odf::DatasetVisibility::Private,
+            },
+            DatasetPushMetadataRequest { new_blocks },
+        )
+    }
+
+    pub async fn open_raw_push_session(&self, url: &Url) -> RawPushSession {
+        RawPushSession::new(self.open_raw_protocol_socket(url, "push").await)
+    }
+
+    pub async fn open_raw_pull_session(&self, url: &Url) -> RawPullSession {
+        RawPullSession::new(self.open_raw_protocol_socket(url, "pull").await)
+    }
+
+    async fn open_raw_protocol_socket(&self, url: &Url, method: &str) -> RawProtocolSocket {
+        let (socket, _) =
+            connect_async(self.websocket_request(url, method, SMART_TRANSFER_PROTOCOL_VERSION))
+                .await
+                .unwrap();
+        RawProtocolSocket::new(socket)
+    }
+
     pub fn add_repository(
         &self,
         repo_name: &odf::RepoName,
@@ -489,23 +621,9 @@ impl ClientSideHarness {
         url: &Url,
         request: &DatasetPushRequest,
     ) -> DatasetPushResponse {
-        let (mut socket, _) =
-            connect_async(self.websocket_request(url, "push", SMART_TRANSFER_PROTOCOL_VERSION))
-                .await
-                .unwrap();
-
-        socket
-            .send(Message::Text(
-                serde_json::to_string(request).unwrap().into(),
-            ))
-            .await
-            .unwrap();
-
-        let reply = socket.next().await;
-        let Some(Ok(Message::Text(reply))) = reply else {
-            panic!("The server must reply with a message, got {reply:?}");
-        };
-        serde_json::from_str(&reply).unwrap()
+        let mut socket = self.open_raw_protocol_socket(url, "push").await;
+        socket.send(request).await;
+        socket.receive().await
     }
 
     fn websocket_request(

@@ -60,10 +60,10 @@ pub struct BaseConfigurationServiceHarness {
 impl BaseConfigurationServiceHarness {
     pub fn new() -> Self {
         let base = BaseResourceServiceHarness::new_with_additional_dependencies(|b| {
+            kamu_datasets_inmem::register_dependencies(b);
             b.add_value(SecretsEncryptionConfig::sample())
                 .add::<InMemoryVariableSetProjectionRepository>()
-                .add::<InMemorySecretSetProjectionRepository>()
-                .add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
+                .add::<InMemorySecretSetProjectionRepository>();
 
             crate::register_dependencies(b);
         });

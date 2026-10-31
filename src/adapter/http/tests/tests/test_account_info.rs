@@ -89,6 +89,7 @@ impl AccountInfoHarness {
             tenancy_config,
             authorized_writes: true,
             base_catalog: Some(catalog),
+            ..ServerSideHarnessOptions::default()
         })
         .await;
 

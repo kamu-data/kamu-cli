@@ -870,6 +870,10 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(config.protocol.flight_sql.to_session_caching_config());
     //
 
+    // Smart transfer protocol configuration
+    catalog_builder.add_value(config.protocol.smart_transfer_protocol.to_server_config()?);
+    //
+
     // Tenancy configuration
     if let Some(tenancy_config) = workspace_status.into_tenancy_config() {
         let accounts_config = if tenancy_config == TenancyConfig::MultiTenant {

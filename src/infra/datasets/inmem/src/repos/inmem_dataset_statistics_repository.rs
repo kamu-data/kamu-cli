@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use cheap_clone::CheapClone;
+use database_common::{TransactionId, TransactionRef};
 use dill::*;
 use internal_error::InternalError;
 use kamu_datasets::{
@@ -23,27 +23,26 @@ use kamu_datasets::{
     TotalStatistic,
 };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct State {
-    statistics: HashMap<odf::DatasetID, HashMap<odf::BlockRef, DatasetStatistics>>,
-}
+use super::InMemoryDatasetStatisticsState;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct InMemoryDatasetStatisticsRepository {
-    state: Arc<Mutex<State>>,
+    state: Arc<InMemoryDatasetStatisticsState>,
+    transaction_id: Option<TransactionId>,
 }
 
 #[component(pub)]
 #[interface(dyn DatasetStatisticsRepository)]
 #[interface(dyn DatasetEntryRemovalListener)]
-#[scope(Singleton)]
 impl InMemoryDatasetStatisticsRepository {
-    pub fn new() -> Self {
+    pub fn new(
+        state: Arc<InMemoryDatasetStatisticsState>,
+        transaction_ref: Option<TransactionRef>,
+    ) -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            state,
+            transaction_id: transaction_ref.map(|transaction_ref| transaction_ref.id()),
         }
     }
 }
@@ -53,8 +52,10 @@ impl InMemoryDatasetStatisticsRepository {
 #[async_trait::async_trait]
 impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
     async fn has_any_stats(&self) -> Result<bool, InternalError> {
-        let guard = self.state.lock().unwrap();
-        Ok(!guard.statistics.is_empty())
+        Ok(self
+            .state
+            .statistics
+            .read(self.transaction_id, |statistics| !statistics.is_empty()))
     }
 
     async fn get_total_statistic_by_account_id(
@@ -63,16 +64,16 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
     ) -> Result<TotalStatistic, InternalError> {
         // TODO: this is a dummy implementation that does not filter by account_id
         // To implement real logic requires to handle issues with transaction leaks
-        let guard = self.state.lock().unwrap();
-
-        let mut total = TotalStatistic::default();
-        for per_dataset in guard.statistics.values() {
-            for stat in per_dataset.values() {
-                total.add_dataset_statistic(stat);
-            }
-        }
-
-        Ok(total)
+        Ok(self
+            .state
+            .statistics
+            .read(self.transaction_id, |statistics| {
+                let mut total = TotalStatistic::default();
+                for (_, stat) in statistics.iter() {
+                    total.add_dataset_statistic(stat);
+                }
+                total
+            }))
     }
 
     async fn get_dataset_statistics(
@@ -80,19 +81,19 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
         dataset_id: &odf::DatasetID,
         block_ref: &odf::BlockRef,
     ) -> Result<DatasetStatistics, GetDatasetStatisticsError> {
-        let guard = self.state.lock().unwrap();
-        if let Some(stats_by_ref) = guard.statistics.get(dataset_id)
-            && let Some(stats) = stats_by_ref.get(block_ref)
-        {
-            return Ok(*stats);
-        }
-
-        Err(GetDatasetStatisticsError::NotFound(
-            DatasetStatisticsNotFoundError {
-                dataset_id: dataset_id.clone(),
-                block_ref: block_ref.cheap_clone(),
-            },
-        ))
+        self.state
+            .statistics
+            .read(self.transaction_id, |statistics| {
+                statistics
+                    .get(&(dataset_id.clone(), block_ref.cheap_clone()))
+                    .copied()
+            })
+            .ok_or_else(|| {
+                GetDatasetStatisticsError::NotFound(DatasetStatisticsNotFoundError {
+                    dataset_id: dataset_id.clone(),
+                    block_ref: block_ref.cheap_clone(),
+                })
+            })
     }
 
     async fn set_dataset_statistics(
@@ -101,13 +102,9 @@ impl DatasetStatisticsRepository for InMemoryDatasetStatisticsRepository {
         block_ref: &odf::BlockRef,
         statistics: DatasetStatistics,
     ) -> Result<(), SetDatasetStatisticsError> {
-        let mut guard = self.state.lock().unwrap();
-        guard
-            .statistics
-            .entry(dataset_id.clone())
-            .or_default()
-            .insert(block_ref.cheap_clone(), statistics);
-
+        self.state.statistics.write(self.transaction_id, |stored| {
+            stored.put((dataset_id.clone(), block_ref.cheap_clone()), statistics);
+        });
         Ok(())
     }
 }
@@ -120,8 +117,11 @@ impl DatasetEntryRemovalListener for InMemoryDatasetStatisticsRepository {
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError> {
-        let mut guard = self.state.lock().unwrap();
-        guard.statistics.remove(dataset_id);
+        self.state
+            .statistics
+            .write(self.transaction_id, |statistics| {
+                statistics.delete_where(|(id, _)| id == dataset_id);
+            });
         Ok(())
     }
 }

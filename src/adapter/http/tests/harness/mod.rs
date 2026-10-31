@@ -31,6 +31,18 @@ pub(crate) use server_side_s3_harness::*;
 mod server_side_local_fs_harness;
 pub(crate) use server_side_local_fs_harness::*;
 
+mod raw_protocol_socket;
+pub(crate) use raw_protocol_socket::*;
+
+mod raw_pull_session;
+pub(crate) use raw_pull_session::*;
+
+mod raw_push_session;
+pub(crate) use raw_push_session::*;
+
+mod scripted_push_server;
+pub(crate) use scripted_push_server::*;
+
 mod test_api_server;
 pub(crate) use test_api_server::*;
 

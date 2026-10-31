@@ -31,13 +31,6 @@ use kamu_auth_rebac_services::{
 };
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
 use kamu_datasets::*;
-use kamu_datasets_inmem::{
-    InMemoryDatasetDataBlockRepository,
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetEntryRepository,
-    InMemoryDatasetKeyBlockRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
@@ -107,6 +100,7 @@ impl ServerSideS3Harness {
 
             let mut b = dill::CatalogBuilder::new();
 
+            kamu_datasets_inmem::register_dependencies(&mut b);
             b.add_value(time_source.clone())
                 .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
                 .add::<DidGeneratorDefault>()
@@ -117,12 +111,12 @@ impl ServerSideS3Harness {
                 ))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
                 .add::<DependencyGraphServiceImpl>()
-                .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
                 .add::<DatasetS3BuilderDatabaseBackedImpl>()
                 .add_value(MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
+                .add_value(options.smart_transfer_protocol_config.clone())
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
                 .add::<CompactionExecutorImpl>()
@@ -141,11 +135,7 @@ impl ServerSideS3Harness {
                 .add::<CommitDatasetEventUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetEntryServiceImpl>()
-                .add::<InMemoryDatasetEntryRepository>()
                 .add::<DatasetReferenceServiceImpl>()
-                .add::<InMemoryDatasetReferenceRepository>()
-                .add::<InMemoryDatasetKeyBlockRepository>()
-                .add::<InMemoryDatasetDataBlockRepository>()
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()
@@ -275,6 +265,11 @@ impl ServerSideHarness for ServerSideS3Harness {
     }
 
     fn cli_dataset_reference_service(&self) -> Arc<dyn DatasetReferenceService> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
+        cli_catalog.get_one().unwrap()
+    }
+
+    fn cli_create_dataset_use_case_helper(&self) -> Arc<CreateDatasetUseCaseHelper> {
         let cli_catalog = create_cli_user_catalog(&self.base_catalog, self.options.tenancy_config);
         cli_catalog.get_one().unwrap()
     }

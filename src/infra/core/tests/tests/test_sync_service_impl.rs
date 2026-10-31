@@ -18,7 +18,6 @@ use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::*;
-use kamu_datasets_inmem::*;
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
@@ -69,6 +68,7 @@ async fn do_test_sync(
     std::fs::create_dir(&datasets_dir_bar).unwrap();
 
     let mut catalog_foo_builder = dill::CatalogBuilder::new();
+    kamu_datasets_inmem::register_dependencies(&mut catalog_foo_builder);
     catalog_foo_builder
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
@@ -105,7 +105,6 @@ async fn do_test_sync(
         .add_value(MockDatasetEntryWriter::new())
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
         .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>()
         .add::<AppendDatasetMetadataBatchUseCaseImpl>()
         .add::<DatasetHeadCommitterImpl>();
 
@@ -130,6 +129,7 @@ async fn do_test_sync(
         .returning(|_, _, _, _, _| Ok(()));
 
     let mut catalog_bar_builder = dill::CatalogBuilder::new();
+    kamu_datasets_inmem::register_dependencies(&mut catalog_bar_builder);
     catalog_bar_builder
         .add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
@@ -167,8 +167,7 @@ async fn do_test_sync(
         .bind::<dyn Outbox, OutboxImmediateImpl>()
         .add_value(mock_dataset_entry_writer_bar)
         .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
-        .add::<DatasetReferenceServiceImpl>()
-        .add::<InMemoryDatasetReferenceRepository>();
+        .add::<DatasetReferenceServiceImpl>();
 
     register_message_dispatcher::<DatasetLifecycleMessage>(
         &mut catalog_bar_builder,

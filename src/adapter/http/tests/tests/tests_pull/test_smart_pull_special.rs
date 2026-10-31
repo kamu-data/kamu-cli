@@ -7,18 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 use std::assert_matches;
 
-use kamu::domain::{PullError, PullResult, SyncError};
+use kamu::domain::{DatasetIdMismatchError, PullError, PullResult, SyncError, SyncResult};
+use kamu_adapter_http::smart_protocol::messages::DatasetPullRequest;
 use kamu_core::TenancyConfig;
 
 use crate::harness::{
@@ -44,7 +36,7 @@ async fn test_smart_pull_unauthenticated() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::SingleTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -96,7 +88,7 @@ async fn test_smart_pull_incompatible_version_err() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -133,7 +125,7 @@ async fn test_smart_pull_of_missing_dataset_fails() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: TenancyConfig::MultiTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await,
     )
@@ -154,6 +146,179 @@ async fn test_smart_pull_of_missing_dataset_fails() {
         assert_matches!(
             &pull_responses[0].result,
             Err(PullError::SyncError(SyncError::DatasetNotFound(_)))
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_into_existing_reports_increment() {
+    let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+    let dataset_handle = &scenario.server_create_result.dataset_handle;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let sync_result = scenario
+            .client_harness
+            .sync_into_existing(scenario.server_dataset_ref.clone(), dataset_handle)
+            .await;
+
+        // The server added a `SetInfo` and an `AddData` of 10 records
+        pretty_assertions::assert_eq!(
+            sync_result,
+            SyncResult::Updated {
+                old_head: Some(scenario.server_create_result.head.clone()),
+                new_head: scenario.server_commit_result.new_head.clone(),
+                num_blocks: 2,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 2,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
+            }
+        );
+        pretty_assertions::assert_eq!(
+            scenario
+                .client_harness
+                .stored_head(&dataset_handle.id)
+                .await,
+            scenario.server_commit_result.new_head
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A dataset left without `HEAD` receives the whole chain, `Seed` included, so
+/// the `Seed` of another dataset must be refused. With `force`, the ID
+/// comparison before the transfer refuses it first
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_into_headless_dataset_of_another_id_fails() {
+    let scenario = SmartPullNewDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+    let headless_dataset_handle = scenario
+        .client_harness
+        .create_headless_dataset(scenario.server_dataset_handle.alias.dataset_name.as_str())
+        .await;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        for force in [false, true] {
+            let pull_responses = scenario
+                .client_harness
+                .pull_datasets(
+                    odf::DatasetRefAny::from(scenario.server_dataset_ref.clone()),
+                    force,
+                )
+                .await;
+
+            pretty_assertions::assert_eq!(pull_responses.len(), 1);
+            assert_matches!(
+                &pull_responses[0].result,
+                Err(PullError::SyncError(SyncError::DatasetIdMismatch(DatasetIdMismatchError {
+                    src_dataset_id,
+                    dst_dataset_id,
+                })))
+                if *src_dataset_id == scenario.server_dataset_handle.id
+                    && *dst_dataset_id == headless_dataset_handle.id
+            );
+            pretty_assertions::assert_eq!(
+                scenario
+                    .client_harness
+                    .find_stored_head(&headless_dataset_handle.id)
+                    .await,
+                None
+            );
+        }
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The real client requests the metadata right after the plan, so only a raw
+/// session lets the server's `HEAD` move in between
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_metadata_ends_at_planned_head() {
+    let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+    let dataset_handle = &scenario.server_create_result.dataset_handle;
+    let server_commits = scenario.server_harness.server_commits();
+    let stored_heads = scenario.server_harness.stored_heads();
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let mut session = scenario
+            .client_harness
+            .open_raw_pull_session(scenario.server_dataset_ref.url().unwrap())
+            .await;
+        let transfer_plan = session
+            .plan_pull(DatasetPullRequest {
+                begin_after: Some(scenario.server_create_result.head.clone()),
+                stop_at: None,
+                force_update_if_diverged: false,
+            })
+            .await;
+
+        let concurrent_head = server_commits.commit_set_info(dataset_handle).await;
+        pretty_assertions::assert_eq!(stored_heads.get(&dataset_handle.id).await, concurrent_head);
+
+        let metadata = session.request_metadata().await;
+
+        pretty_assertions::assert_eq!(transfer_plan.num_blocks, 2);
+        pretty_assertions::assert_eq!(metadata.num_blocks, transfer_plan.num_blocks);
+        pretty_assertions::assert_eq!(
+            metadata.block_hashes,
+            vec![
+                scenario.server_commit_result.old_head.clone().unwrap(),
+                scenario.server_commit_result.new_head.clone(),
+            ]
         );
     };
 
@@ -197,7 +362,7 @@ impl HeadMovedConcurrentlyCase {
             ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                 tenancy_config: TenancyConfig::SingleTenant,
                 authorized_writes: true,
-                base_catalog: None,
+                ..ServerSideHarnessOptions::default()
             })
             .await,
         )

@@ -30,7 +30,6 @@ use kamu_adapter_task_dataset::{
 };
 use kamu_core::{RemoteAliasKind, RemoteAliasesRegistry};
 use kamu_datasets::CreateDatasetResult;
-use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::DependencyGraphServiceImpl;
 use kamu_task_system::{PrepareTaskDefinitionError, TaskDefinitionPlanner, TaskError, TaskID};
 use pretty_assertions::assert_eq;
@@ -135,6 +134,7 @@ impl UpdateDatasetTaskPlannerHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new_chained(base_use_case_harness.catalog());
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<UpdateDatasetTaskPlanner>()
             .add::<PullRequestPlannerImpl>()
             .add::<DatasetUpdateKindResolverImpl>()
@@ -148,8 +148,7 @@ impl UpdateDatasetTaskPlannerHarness {
             .add::<odf::dataset::DatasetFactoryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
             .add_value(odf::dataset::IpfsGateway::default())
-            .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>();
+            .add::<DependencyGraphServiceImpl>();
 
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 

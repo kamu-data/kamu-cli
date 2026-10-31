@@ -10,6 +10,8 @@
 // Re-exports
 pub use kamu_datasets as domain;
 
+mod dependencies;
 mod repos;
 
+pub use dependencies::*;
 pub use repos::*;

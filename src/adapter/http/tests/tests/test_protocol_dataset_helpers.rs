@@ -36,7 +36,7 @@ async fn test_object_url_local_fs() {
     let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
         tenancy_config: TenancyConfig::SingleTenant,
         authorized_writes: true,
-        base_catalog: None,
+        ..ServerSideHarnessOptions::default()
     })
     .await;
 
@@ -255,7 +255,7 @@ async fn test_pull_object_url_s3() {
     let server_harness = ServerSideS3Harness::new(ServerSideHarnessOptions {
         tenancy_config: TenancyConfig::SingleTenant,
         authorized_writes: true,
-        base_catalog: None,
+        ..ServerSideHarnessOptions::default()
     })
     .await;
 
@@ -459,7 +459,7 @@ async fn test_failed_object_download_is_recoverable() {
     let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
         tenancy_config: TenancyConfig::SingleTenant,
         authorized_writes: true,
-        base_catalog: None,
+        ..ServerSideHarnessOptions::default()
     })
     .await;
 

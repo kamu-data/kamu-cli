@@ -45,7 +45,7 @@ impl UnknownHandlerHarness {
         let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             tenancy_config: kamu_core::TenancyConfig::SingleTenant,
             authorized_writes: true,
-            base_catalog: None,
+            ..ServerSideHarnessOptions::default()
         })
         .await;
 

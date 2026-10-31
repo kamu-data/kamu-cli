@@ -25,10 +25,6 @@ use kamu_datasets::{
     DatasetRegistry,
     MESSAGE_PRODUCER_KAMU_DATASET_REFERENCE_SERVICE,
 };
-use kamu_datasets_inmem::{
-    InMemoryDatasetDependencyRepository,
-    InMemoryDatasetReferenceRepository,
-};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::{
     AppendDatasetMetadataBatchUseCaseImpl,
@@ -997,6 +993,7 @@ impl PullTestHarness {
         std::fs::create_dir(&repos_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new_chained(base_repo_harness.catalog());
+        kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<RemoteRepositoryRegistryImpl>()
             .add_value(RemoteReposDir::new(repos_dir))
             .add::<RemoteAliasesRegistryImpl>()
@@ -1026,9 +1023,7 @@ impl PullTestHarness {
             .add_value(mock_dataset_entry_writer)
             .bind::<dyn DatasetEntryWriter, MockDatasetEntryWriter>()
             .add::<DatasetReferenceServiceImpl>()
-            .add::<InMemoryDatasetReferenceRepository>()
             .add::<DependencyGraphServiceImpl>()
-            .add::<InMemoryDatasetDependencyRepository>()
             .add::<DependencyGraphIndexer>();
 
         register_message_dispatcher::<DatasetReferenceMessage>(

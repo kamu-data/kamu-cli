@@ -660,7 +660,7 @@ impl DatasetEntryServiceHarness {
                     b.bind::<dyn DatasetEntryRepository, MockDatasetEntryRepository>();
                 }
                 TestDatasetEntryRepository::InMemory => {
-                    b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
+                    kamu_datasets_inmem::register_dependencies(&mut b);
                 }
             }
 

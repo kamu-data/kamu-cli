@@ -15,18 +15,31 @@ use chrono::{DateTime, TimeZone, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use datafusion::arrow::datatypes::Schema;
 use internal_error::ErrorIntoInternal;
-use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
+use kamu::testing::{
+    BaseUseCaseHarness,
+    BaseUseCaseHarnessOptions,
+    DatasetTestHelper,
+    DummySmartTransferProtocolClient,
+};
+use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use kamu::{
     DataFormatRegistryImpl,
     DatasetUpdateStepsImpl,
     EngineConfigDatafusionEmbeddedIngest,
     EngineProvisionerNull,
     FetchService,
+    IpfsServiceImpl,
     LocalSyncCommitterImpl,
     ObjectStoreBuilderLocalFs,
     ObjectStoreRegistryImpl,
     PollingIngestPlannerImpl,
     PollingIngestServiceImpl,
+    RemoteDatasetUrlResolverImpl,
+    RemoteReposDir,
+    RemoteRepositoryRegistryImpl,
+    SyncRequestBuilder,
+    SyncServiceImpl,
     TransformExecutorImpl,
     TransformPlannerImpl,
 };
@@ -48,7 +61,9 @@ use kamu_datasets::{CreateDatasetResult, DatasetHeadCommitter};
 use kamu_datasets_services::DatasetKeyValueServiceSysEnv;
 use kamu_datasets_services::testing::RacingDatasetHeadCommitter;
 use kamu_task_system::{TaskDefinition, TaskError, TaskOutcome, TaskRunner};
+use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
+use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -634,6 +649,59 @@ async fn test_sync_up_to_date() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_sync_with_real_service_commits_and_reports_increment() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_with_real_sync();
+    let foo = harness.create_root_dataset_with_schema(&alias_foo).await;
+    harness.push_to_repo(&foo).await;
+    let repo_head = harness.append_data_in_repo(&foo).await;
+
+    let outcome = harness.run_sync_update_from_repo(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::Updated {
+                old_head: Some(foo.head.clone()),
+                new_head: repo_head.clone(),
+                has_more: false,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 1,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
+            }
+            .into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&foo).await, repo_head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_sync_with_real_service_from_repo_in_sync_is_up_to_date() {
+    let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
+
+    let harness = UpdateDatasetTaskRunnerHarness::new_with_real_sync();
+    let foo = harness.create_root_dataset_with_schema(&alias_foo).await;
+    harness.push_to_repo(&foo).await;
+
+    let outcome = harness.run_sync_update_from_repo(&foo).await;
+
+    assert_eq!(
+        TaskOutcome::Success(
+            TaskResultDatasetUpdate::UpToDate(PullResultUpToDate::Sync).into_task_result()
+        ),
+        outcome,
+    );
+    assert_eq!(harness.get_head(&foo).await, foo.head);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_sync_head_moved_concurrently_fails_recoverably() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let synced_heads = ReportedHeads::default();
@@ -813,6 +881,7 @@ async fn test_sync_into_deleted_dataset_fails_unrecoverably() {
 #[oop::extend(BaseUseCaseHarness, base_use_case_harness)]
 struct UpdateDatasetTaskRunnerHarness {
     base_use_case_harness: BaseUseCaseHarness,
+    catalog: dill::Catalog,
     runner: Arc<dyn TaskRunner>,
     racing_committer: Arc<RacingDatasetHeadCommitter>,
 }
@@ -884,6 +953,33 @@ impl UpdateDatasetTaskRunnerHarness {
         })
     }
 
+    /// Syncs with the real service from a `file://` repository in the
+    /// harness's directory, with the default ingest and transform mocks
+    fn new_with_real_sync() -> Self {
+        Self::build(|b, temp_dir| {
+            std::fs::create_dir(Self::repo_dir(temp_dir)).unwrap();
+
+            b.add::<SyncServiceImpl>()
+                .add::<SyncRequestBuilder>()
+                .add::<SimpleTransferProtocol>()
+                .add::<DummySmartTransferProtocolClient>()
+                .add::<IpfsServiceImpl>()
+                .add_value(IpfsClient::default())
+                .add_value(odf::dataset::IpfsGateway::default())
+                .add::<odf::dataset::DatasetFactoryImpl>()
+                .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
+                .add::<RemoteDatasetUrlResolverImpl>()
+                .add::<RemoteRepositoryRegistryImpl>()
+                .add_value(RemoteReposDir::new_with_creation(temp_dir.join("repos")))
+                .add_value(MockPollingIngestService::new())
+                .bind::<dyn PollingIngestService, MockPollingIngestService>()
+                .add_value(MockTransformPlanner::new())
+                .bind::<dyn TransformPlanner, MockTransformPlanner>()
+                .add_value(MockTransformExecutor::new())
+                .bind::<dyn TransformExecutor, MockTransformExecutor>();
+        })
+    }
+
     /// `register_operations` registers the ingest and transform services; it
     /// gets the harness's temporary directory
     fn build(register_operations: impl FnOnce(&mut dill::CatalogBuilder, &Path)) -> Self {
@@ -906,7 +1002,66 @@ impl UpdateDatasetTaskRunnerHarness {
             base_use_case_harness,
             runner: catalog.get_one::<UpdateDatasetTaskRunner>().unwrap(),
             racing_committer: catalog.get_one().unwrap(),
+            catalog,
         }
+    }
+
+    fn repo_dir(temp_dir: &Path) -> PathBuf {
+        temp_dir.join("file_repo")
+    }
+
+    /// The copy of `alias` in the harness's `file://` repository
+    fn repo_dataset_url(&self, alias: &odf::DatasetAlias) -> Url {
+        Url::from_directory_path(Self::repo_dir(self.temp_dir_path()))
+            .unwrap()
+            .join(&format!("{}/", alias.dataset_name))
+            .unwrap()
+    }
+
+    async fn create_root_dataset_with_schema(
+        &self,
+        alias: &odf::DatasetAlias,
+    ) -> CreateDatasetResult {
+        self.create_root_dataset_with_events(
+            alias,
+            vec![MetadataFactory::set_data_schema().build().into()],
+        )
+        .await
+    }
+
+    async fn push_to_repo(&self, created: &CreateDatasetResult) {
+        let request = self
+            .catalog
+            .get_one::<SyncRequestBuilder>()
+            .unwrap()
+            .build_sync_request(
+                created.dataset_handle.as_local_ref(),
+                odf::DatasetRefRemote::from(&self.repo_dataset_url(&created.dataset_handle.alias))
+                    .as_any_ref(),
+                true,
+            )
+            .await
+            .unwrap();
+
+        self.catalog
+            .get_one::<dyn SyncService>()
+            .unwrap()
+            .sync(request, SyncOptions::default(), None)
+            .await
+            .unwrap();
+    }
+
+    /// Puts the repository copy one data block ahead and returns its head
+    async fn append_data_in_repo(&self, created: &CreateDatasetResult) -> odf::Multihash {
+        let repo_dataset = self
+            .catalog
+            .get_one::<dyn odf::dataset::DatasetFactory>()
+            .unwrap()
+            .get_dataset(&self.repo_dataset_url(&created.dataset_handle.alias), false)
+            .await
+            .unwrap();
+
+        DatasetTestHelper::append_random_data_to(repo_dataset.as_ref(), 32).await
     }
 
     /// Syncs `alias` once from its remote: up to date without `heads`,
@@ -1014,7 +1169,7 @@ impl UpdateDatasetTaskRunnerHarness {
 
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
-            .move_head_before_next_commit(concurrent_head);
+            .move_head_before_next_commit(&self.catalog, concurrent_head);
     }
 
     fn deny_next_commit(&self) {
@@ -1065,6 +1220,17 @@ impl UpdateDatasetTaskRunnerHarness {
         self.run_update(DatasetUpdateJob::Sync {
             target: created.dataset_handle.clone(),
             remote_ref: Self::sync_remote_ref(&created.dataset_handle.alias),
+        })
+        .await
+    }
+
+    /// Syncs `created` from its copy in the harness's repository
+    async fn run_sync_update_from_repo(&self, created: &CreateDatasetResult) -> TaskOutcome {
+        self.run_update(DatasetUpdateJob::Sync {
+            target: created.dataset_handle.clone(),
+            remote_ref: odf::DatasetRefRemote::from(
+                &self.repo_dataset_url(&created.dataset_handle.alias),
+            ),
         })
         .await
     }

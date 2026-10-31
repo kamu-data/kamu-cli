@@ -67,6 +67,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = dataset_dependency_repo::test_add_dependency_twice_in_one_request,
+    harness = SqliteDatasetDependencyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = dataset_dependency_repo::test_remove_dependency,
     harness = SqliteDatasetDependencyRepositoryHarness
 );
