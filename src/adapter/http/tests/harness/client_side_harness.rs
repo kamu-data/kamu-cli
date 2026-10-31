@@ -320,7 +320,7 @@ impl ClientSideHarness {
     /// the way a concurrent writer would
     pub fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
-            .move_head_before_next_commit(concurrent_head);
+            .move_head_before_next_commit(&self.catalog, concurrent_head);
     }
 
     pub async fn append_unreferenced_block(

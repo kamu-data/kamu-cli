@@ -642,7 +642,7 @@ impl PushIngestDataUseCaseHarness {
 
     fn move_head_before_next_commit(&self, concurrent_head: odf::Multihash) {
         self.racing_committer
-            .move_head_before_next_commit(concurrent_head);
+            .move_head_before_next_commit(self.base_use_case_harness.catalog(), concurrent_head);
     }
 
     async fn ingest_data(
