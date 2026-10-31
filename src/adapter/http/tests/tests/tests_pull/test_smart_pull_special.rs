@@ -9,7 +9,7 @@
 
 use std::assert_matches;
 
-use kamu::domain::{DatasetIdMismatchError, PullError, PullResult, SyncError};
+use kamu::domain::{DatasetIdMismatchError, PullError, PullResult, SyncError, SyncResult};
 use kamu_adapter_http::smart_protocol::messages::DatasetPullRequest;
 use kamu_core::TenancyConfig;
 
@@ -146,6 +146,60 @@ async fn test_smart_pull_of_missing_dataset_fails() {
         assert_matches!(
             &pull_responses[0].result,
             Err(PullError::SyncError(SyncError::DatasetNotFound(_)))
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_into_existing_reports_increment() {
+    let scenario = SmartPullExistingEvolvedDatasetScenario::prepare(
+        ClientSideHarness::new(ClientSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authenticated_remotely: true,
+        })
+        .await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::SingleTenant,
+            authorized_writes: true,
+            ..ServerSideHarnessOptions::default()
+        })
+        .await,
+    )
+    .await;
+    let dataset_handle = &scenario.server_create_result.dataset_handle;
+
+    let api_server_handle = scenario.server_harness.api_server_run();
+
+    let client_handle = async {
+        let sync_result = scenario
+            .client_harness
+            .sync_into_existing(scenario.server_dataset_ref.clone(), dataset_handle)
+            .await;
+
+        // The server added a `SetInfo` and an `AddData` of 10 records
+        pretty_assertions::assert_eq!(
+            sync_result,
+            SyncResult::Updated {
+                old_head: Some(scenario.server_create_result.head.clone()),
+                new_head: scenario.server_commit_result.new_head.clone(),
+                num_blocks: 2,
+                increment: odf::dataset::MetadataChainIncrementInterval {
+                    num_blocks: 2,
+                    num_records: 10,
+                    updated_watermark: None,
+                },
+            }
+        );
+        pretty_assertions::assert_eq!(
+            scenario
+                .client_harness
+                .stored_head(&dataset_handle.id)
+                .await,
+            scenario.server_commit_result.new_head
         );
     };
 
