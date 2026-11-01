@@ -76,7 +76,7 @@ pub async fn collect_object_references_from_interval(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn collect_object_references_from_metadata(
+pub(crate) async fn collect_object_references_from_metadata(
     dataset: &dyn odf::Dataset,
     blocks: &VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
     missing_files_only: bool,

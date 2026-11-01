@@ -303,7 +303,7 @@ impl TaskRunner for UpdateDatasetTaskRunner {
     async fn run_task(
         &self,
         task_definition: TaskDefinition,
-    ) -> Result<kamu_task_system::TaskOutcome, kamu_task_system::InternalError> {
+    ) -> Result<TaskOutcome, InternalError> {
         let task_update = task_definition
             .downcast::<TaskDefinitionDatasetUpdate>()
             .expect("Mismatched task type for UpdateDatasetTaskRunner");

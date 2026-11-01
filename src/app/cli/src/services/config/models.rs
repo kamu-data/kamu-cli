@@ -14,6 +14,7 @@ use std::path::Path;
 use chrono::Duration;
 use kamu::utils::docker_images;
 use kamu_accounts::*;
+use kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig;
 use kamu_datasets::SecretsEncryptionConfig;
 use setty::types::DurationString;
 use url::Url;
@@ -489,21 +490,16 @@ pub struct SmartTransferProtocolConfig {
 }
 
 impl SmartTransferProtocolConfig {
-    pub fn to_server_config(
-        &self,
-    ) -> Result<kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig, CLIError>
-    {
+    pub fn to_server_config(&self) -> Result<SmartTransferProtocolServerConfig, CLIError> {
         let upload_progress_interval: std::time::Duration = self.upload_progress_interval.into();
         if upload_progress_interval.is_zero() {
             return Err(CLIError::usage_error(
                 "protocol.smartTransferProtocol.uploadProgressInterval must be greater than zero",
             ));
         }
-        Ok(
-            kamu_adapter_http::smart_protocol::SmartTransferProtocolServerConfig {
-                upload_progress_interval,
-            },
-        )
+        Ok(SmartTransferProtocolServerConfig {
+            upload_progress_interval,
+        })
     }
 }
 

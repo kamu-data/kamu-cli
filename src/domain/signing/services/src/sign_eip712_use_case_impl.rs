@@ -22,7 +22,7 @@ use kamu_accounts::{
     LoggedAccount,
 };
 use kamu_accounts_services::utils::AccountAuthorizationHelper;
-use kamu_datasets::DatasetPermissionChecker;
+use kamu_datasets::{DatasetPermission, DatasetPermissionChecker};
 use kamu_signing::common::ProofType;
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{
@@ -65,7 +65,7 @@ impl SignEip712UseCaseImpl {
 
         let has_read_access = self
             .dataset_permission_checker
-            .is_permission_granted(&dataset_id, kamu_datasets::DatasetPermission::Read)
+            .is_permission_granted(&dataset_id, DatasetPermission::Read)
             .await?;
 
         if !has_read_access {

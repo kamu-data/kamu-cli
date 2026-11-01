@@ -41,7 +41,7 @@ impl WsSmartTransferProtocolClient {
             force_update_if_diverged,
         };
 
-        tracing::debug!("Sending pull request: {:?}", pull_request_message);
+        tracing::debug!("Sending pull request: {pull_request_message:?}");
 
         write_payload(socket, pull_request_message)
             .await

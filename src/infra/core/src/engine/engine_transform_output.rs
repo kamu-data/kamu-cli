@@ -9,6 +9,7 @@
 
 use std::path::PathBuf;
 
+use datafusion::parquet::arrow::arrow_reader::ArrowReaderMetadata;
 use file_utils::OwnedFile;
 use internal_error::ResultIntoInternal;
 use kamu_core::engine::*;
@@ -43,12 +44,11 @@ impl EngineTransformOutput {
             }
 
             // Read output schema
-            let data_metadata =
-                datafusion::parquet::arrow::arrow_reader::ArrowReaderMetadata::load(
-                    &std::fs::File::open(&data_path).int_err()?,
-                    Default::default(),
-                )
-                .int_err()?;
+            let data_metadata = ArrowReaderMetadata::load(
+                &std::fs::File::open(&data_path).int_err()?,
+                Default::default(),
+            )
+            .int_err()?;
             let output_schema = data_metadata.schema().clone();
 
             // The offsets the engine claims become the dataset's record offsets

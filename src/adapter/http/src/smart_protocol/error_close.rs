@@ -17,7 +17,7 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Close code of a session that ends with an error reply in the close reason
-pub const ERROR_REPLY_CLOSE_CODE: u16 = 1011;
+pub(crate) const ERROR_REPLY_CLOSE_CODE: u16 = 1011;
 
 /// Close code of a push whose completion failed. A client that predates
 /// `DatasetPushCompleteResponse` reads the reason of an
@@ -29,7 +29,7 @@ pub const PUSH_NOT_COMPLETED_CLOSE_CODE: u16 = 1013;
 
 /// A close frame that carries an error reply as its reason
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ErrorReplyClose {
+pub(crate) struct ErrorReplyClose {
     pub code: u16,
     pub reason: String,
 }

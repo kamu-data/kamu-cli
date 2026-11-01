@@ -35,7 +35,7 @@ pub struct DatasetAuthorizationLayer<DatasetPermissionQuery> {
 
 impl<DatasetPermissionQuery> DatasetAuthorizationLayer<DatasetPermissionQuery>
 where
-    DatasetPermissionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetPermission,
+    DatasetPermissionQuery: Fn(&http::Request<Body>) -> DatasetPermission,
 {
     pub fn new(dataset_permission_query: DatasetPermissionQuery) -> Self {
         Self {
@@ -59,9 +59,7 @@ where
 }
 
 impl Default
-    for DatasetAuthorizationLayer<
-        for<'a> fn(&'a http::Request<Body>) -> kamu_datasets::DatasetPermission,
-    >
+    for DatasetAuthorizationLayer<for<'a> fn(&'a http::Request<Body>) -> DatasetPermission>
 {
     fn default() -> Self {
         Self::new(get_dataset_permission_for_request)
@@ -82,7 +80,7 @@ where
     Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
     DatasetPermissionQuery: Send + Copy + 'static,
-    DatasetPermissionQuery: Fn(&http::Request<Body>) -> kamu_datasets::DatasetPermission,
+    DatasetPermissionQuery: Fn(&http::Request<Body>) -> DatasetPermission,
 {
     type Response = Svc::Response;
     type Error = Svc::Error;

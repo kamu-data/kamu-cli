@@ -21,7 +21,6 @@ use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::*;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
-use odf::dataset::{DatasetFactory, DatasetFactoryImpl, IpfsGateway};
 use odf::metadata::testing::MetadataFactory;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceDefault};
@@ -72,7 +71,7 @@ impl RemotePushHarness {
         kamu_datasets_inmem::register_dependencies(&mut b);
         b.add::<DidGeneratorDefault>()
             .add::<SystemTimeSourceDefault>()
-            .add_value(IpfsGateway::default())
+            .add_value(odf::dataset::IpfsGateway::default())
             .add_value(IpfsClient::default())
             .add_value(CurrentAccountSubject::new_test())
             .add_value(TenancyConfig::SingleTenant)
@@ -86,7 +85,7 @@ impl RemotePushHarness {
             ))
             .add::<RemoteRepositoryRegistryImpl>()
             .add::<odf::dataset::DummyOdfServerAccessTokenResolver>()
-            .add::<DatasetFactoryImpl>()
+            .add::<odf::dataset::DatasetFactoryImpl>()
             .add::<SyncServiceImpl>()
             .add::<IpfsServiceImpl>()
             .add::<RemoteAliasesRegistryImpl>()
@@ -228,7 +227,7 @@ impl RemotePushHarness {
 
     async fn remote_head(&self, repo_url: &Url) -> odf::Multihash {
         self.catalog
-            .get_one::<dyn DatasetFactory>()
+            .get_one::<dyn odf::dataset::DatasetFactory>()
             .unwrap()
             .get_dataset(&self.remote_dataset_url(repo_url), false)
             .await
@@ -245,7 +244,7 @@ impl RemotePushHarness {
 /// Moves the remote `HEAD` the way another writer would, once the push has
 /// read the remote head and before it commits
 struct RemoteHeadMovingListener {
-    dataset_factory: Arc<dyn DatasetFactory>,
+    dataset_factory: Arc<dyn odf::dataset::DatasetFactory>,
     dataset_url: Url,
     concurrent_head: Mutex<Option<odf::Multihash>>,
 }

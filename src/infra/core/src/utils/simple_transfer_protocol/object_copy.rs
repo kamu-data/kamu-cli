@@ -159,7 +159,8 @@ impl SimpleTransferProtocol {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// An object a block refers to, copied along with it
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, strum::IntoStaticStr)]
+#[strum(serialize_all = "snake_case")]
 enum BlockObject<'a> {
     Data(&'a odf::DataSlice),
     Checkpoint(&'a odf::Checkpoint),
@@ -167,10 +168,7 @@ enum BlockObject<'a> {
 
 impl<'a> BlockObject<'a> {
     fn name(self) -> &'static str {
-        match self {
-            Self::Data(_) => "data",
-            Self::Checkpoint(_) => "checkpoint",
-        }
+        self.into()
     }
 
     fn physical_hash(self) -> &'a odf::Multihash {

@@ -18,7 +18,12 @@ use kamu_accounts::*;
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::AccountServiceImpl;
 use kamu_core::{DidGenerator, MockDidGenerator, TenancyConfig};
-use kamu_datasets::{CreateDatasetUseCase, DatasetPermission, MockDatasetPermissionChecker};
+use kamu_datasets::{
+    CreateDatasetUseCase,
+    DatasetPermission,
+    DatasetPermissionChecker,
+    MockDatasetPermissionChecker,
+};
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::DummyOutboxImpl;
@@ -386,7 +391,7 @@ impl ServerHarness {
                 ))
                 .bind::<dyn AuthenticationService, MockAuthenticationService>()
                 .add_value(dataset_permission_checker)
-                .bind::<dyn kamu_datasets::DatasetPermissionChecker, MockDatasetPermissionChecker>()
+                .bind::<dyn DatasetPermissionChecker, MockDatasetPermissionChecker>()
                 .add_value(TenancyConfig::SingleTenant)
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,

@@ -43,7 +43,7 @@ impl WsSmartTransferProtocolClient {
             visibility_for_created_dataset,
         };
 
-        tracing::debug!("Sending push request: {:?}", push_request_message);
+        tracing::debug!("Sending push request: {push_request_message:?}");
 
         write_payload(socket, push_request_message)
             .await

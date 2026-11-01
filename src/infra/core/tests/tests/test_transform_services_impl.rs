@@ -11,6 +11,7 @@ use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use futures::TryStreamExt;
 use indoc::indoc;
 use kamu::domain::engine::*;
@@ -1708,13 +1709,11 @@ async fn test_transform_incompatible_output_schema() {
         MockEngineProvisioner::new().always_provision_engine_responding(|| TransformResponseExt {
             new_offset_interval: None,
             new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap()),
-            output_schema: Some(Arc::new(datafusion::arrow::datatypes::Schema::new(vec![
-                datafusion::arrow::datatypes::Field::new(
-                    "unexpected",
-                    datafusion::arrow::datatypes::DataType::Utf8,
-                    false,
-                ),
-            ]))),
+            output_schema: Some(Arc::new(Schema::new(vec![Field::new(
+                "unexpected",
+                DataType::Utf8,
+                false,
+            )]))),
             new_checkpoint: None,
             new_data: None,
             run_dir: None,

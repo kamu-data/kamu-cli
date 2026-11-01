@@ -26,7 +26,7 @@ use crate::{BearerHeader, OdfSmtpVersion};
 /// How the client transfers an object, prepared by the server for each object
 /// the client asks for
 #[async_trait::async_trait]
-pub trait ObjectTransferStrategy: Sized + Send {
+pub(crate) trait ObjectTransferStrategy: Sized + Send {
     async fn prepare(
         dataset: &dyn odf::Dataset,
         object_file_ref: &ObjectFileReference,
@@ -343,7 +343,7 @@ pub async fn dataset_import_object_file(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_export_object_file(
+pub(crate) async fn dataset_export_object_file(
     dataset: &dyn odf::Dataset,
     object_transfer_strategy: PushObjectTransferStrategy,
 ) -> Result<(), SyncError> {
@@ -414,7 +414,7 @@ pub async fn dataset_export_object_file(
 
 /// The URL without its query, where a presigned transfer URL carries its
 /// signature; safe to log
-pub fn url_without_query(url: &Url) -> Url {
+pub(crate) fn url_without_query(url: &Url) -> Url {
     let mut url = url.clone();
     url.set_query(None);
     url

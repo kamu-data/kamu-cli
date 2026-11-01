@@ -92,7 +92,7 @@ impl ResetDatasetTaskRunner {
 impl TaskRunner for ResetDatasetTaskRunner {
     async fn run_task(
         &self,
-        task_definition: kamu_task_system::TaskDefinition,
+        task_definition: TaskDefinition,
     ) -> Result<TaskOutcome, InternalError> {
         let task_reset = task_definition
             .downcast::<TaskDefinitionDatasetReset>()

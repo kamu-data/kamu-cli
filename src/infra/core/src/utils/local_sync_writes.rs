@@ -98,7 +98,7 @@ impl StoredSeed {
 /// Checks that a source written into an existing dataset without `HEAD`, whose
 /// whole chain is transferred, starts with that dataset's `Seed`: nothing else
 /// compares the dataset IDs when the destination has no blocks to compare
-pub fn ensure_seed_matches_headless_target(
+pub(crate) fn ensure_seed_matches_headless_target(
     dst: &LocalSyncTarget,
     oldest_block: &odf::dataset::HashedMetadataBlockBytesDecoded,
 ) -> Result<(), SyncError> {

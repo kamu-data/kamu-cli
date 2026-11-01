@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
-use kamu_datasets::ResolvedDataset;
+use kamu_datasets::{CreateDatasetError, NameCollisionError, ResolvedDataset};
 use thiserror::Error;
 use url::Url;
 
@@ -317,9 +317,9 @@ pub enum SyncError {
     #[error(transparent)]
     RefCollision(#[from] odf::dataset::RefCollisionError),
     #[error(transparent)]
-    NameCollision(#[from] kamu_datasets::NameCollisionError),
+    NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
-    CreateDatasetFailed(#[from] kamu_datasets::CreateDatasetError),
+    CreateDatasetFailed(#[from] CreateDatasetError),
     #[error(transparent)]
     UnsupportedProtocol(#[from] odf::dataset::UnsupportedProtocolError),
     #[error(transparent)]
@@ -368,7 +368,7 @@ impl SyncError {
     /// concurrent updates and infrastructure failures, network included, may
     /// succeed on one
     pub fn is_recoverable(&self) -> bool {
-        use kamu_datasets::CreateDatasetError as E;
+        use CreateDatasetError as E;
 
         match self {
             // The dataset ID names the source's dataset, so a collision on it means a concurrent
@@ -602,6 +602,7 @@ pub struct OverwriteSeedBlockError {}
 #[cfg(test)]
 mod tests {
     use internal_error::ErrorIntoInternal;
+    use kamu_datasets::DatasetReferenceCASError;
 
     use super::*;
 
@@ -641,42 +642,40 @@ mod tests {
                 false,
             ),
             (
-                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::Internal(
+                SyncError::CreateDatasetFailed(CreateDatasetError::Internal(
                     "storage unavailable".int_err(),
                 )),
                 true,
             ),
             (
-                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::NameCollision(
-                    kamu_datasets::NameCollisionError {
+                SyncError::CreateDatasetFailed(CreateDatasetError::NameCollision(
+                    NameCollisionError {
                         alias: fixtures.alias(),
                     },
                 )),
                 false,
             ),
             (
-                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::CASFailed(
-                    Box::new(kamu_datasets::DatasetReferenceCASError {
+                SyncError::CreateDatasetFailed(CreateDatasetError::CASFailed(Box::new(
+                    DatasetReferenceCASError {
                         dataset_id: fixtures.dataset_id(b"foo"),
                         block_ref: odf::BlockRef::Head,
                         expected_prev_block_hash: None,
                         actual_prev_block_hash: Some(fixtures.head(b"actual")),
-                    }),
-                )),
+                    },
+                ))),
                 true,
             ),
             (
-                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::EmptyDataset),
+                SyncError::CreateDatasetFailed(CreateDatasetError::EmptyDataset),
                 false,
             ),
             (
-                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::Access(
-                    fixtures.access_error(),
-                )),
+                SyncError::CreateDatasetFailed(CreateDatasetError::Access(fixtures.access_error())),
                 false,
             ),
             (
-                SyncError::CreateDatasetFailed(kamu_datasets::CreateDatasetError::RefCollision(
+                SyncError::CreateDatasetFailed(CreateDatasetError::RefCollision(
                     odf::dataset::RefCollisionError {
                         id: fixtures.dataset_id(b"foo"),
                     },
@@ -696,7 +695,7 @@ mod tests {
                 false,
             ),
             (
-                SyncError::NameCollision(kamu_datasets::NameCollisionError {
+                SyncError::NameCollision(NameCollisionError {
                     alias: fixtures.alias(),
                 }),
                 false,

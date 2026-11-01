@@ -10,7 +10,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::ws::{CloseFrame, Message};
+use axum::extract::ws::{CloseFrame, Message, WebSocket};
 use database_common::DatabaseTransactionRunner;
 use dill::Catalog;
 use internal_error::InternalError;
@@ -28,7 +28,7 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn axum_read_payload<TMessagePayload: DeserializeOwned>(
-    socket: &mut axum::extract::ws::WebSocket,
+    socket: &mut WebSocket,
 ) -> Result<TMessagePayload, ReadMessageError> {
     match socket.recv().await {
         Some(msg) => match msg {
@@ -46,7 +46,7 @@ pub async fn axum_read_payload<TMessagePayload: DeserializeOwned>(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
-    socket: &mut axum::extract::ws::WebSocket,
+    socket: &mut WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
     let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
@@ -63,7 +63,7 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
 
 /// Ends the session with an error reply in the close frame
 pub(crate) async fn axum_write_error_close(
-    socket: &mut axum::extract::ws::WebSocket,
+    socket: &mut WebSocket,
     close: Result<ErrorReplyClose, WriteMessageError>,
 ) {
     let ErrorReplyClose { code, reason } = match close {
@@ -97,7 +97,7 @@ pub(crate) async fn axum_write_error_close(
 /// 123 bytes a close frame reason allows. The client reads it where it reads
 /// the phase's response
 pub(crate) async fn axum_write_error_message<TMessagePayload: Serialize>(
-    socket: &mut axum::extract::ws::WebSocket,
+    socket: &mut WebSocket,
     payload: TMessagePayload,
 ) {
     if let Err(err) = axum_write_payload(socket, payload).await {
@@ -113,7 +113,7 @@ pub(crate) async fn axum_write_error_message<TMessagePayload: Serialize>(
 
 /// Waits for the client to close the session after the server's last reply.
 /// A client that never closes is given a few seconds
-pub(crate) async fn axum_await_client_close(socket: &mut axum::extract::ws::WebSocket) {
+pub(crate) async fn axum_await_client_close(socket: &mut WebSocket) {
     const CLIENT_CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 
     if tokio::time::timeout(CLIENT_CLOSE_TIMEOUT, wait_for_close(socket))
@@ -126,7 +126,7 @@ pub(crate) async fn axum_await_client_close(socket: &mut axum::extract::ws::WebS
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn wait_for_close(socket: &mut axum::extract::ws::WebSocket) {
+async fn wait_for_close(socket: &mut WebSocket) {
     while let Some(msg) = socket.recv().await {
         match msg {
             Ok(Message::Close(_)) | Err(_) => {

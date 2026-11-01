@@ -11,9 +11,11 @@ use std::collections::VecDeque;
 use std::io::Read;
 
 use flate2::Compression;
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
 use futures::TryStreamExt;
 use internal_error::{BoxedError, InternalError, ResultIntoInternal};
-use tar::Header;
+use tar::{Archive, Builder, Header};
 use thiserror::Error;
 
 use crate::smart_protocol::messages::*;
@@ -32,8 +34,8 @@ pub async fn prepare_dataset_metadata_batch(
     ignore_missing_tail: bool,
 ) -> Result<MetadataBlocksBatch, InternalError> {
     let mut num_blocks: u32 = 0;
-    let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
-    let mut tarball_builder = tar::Builder::new(encoder);
+    let encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut tarball_builder = Builder::new(encoder);
 
     let blocks_for_transfer: Vec<odf::dataset::HashedMetadataBlock> = metadata_chain
         .iter_blocks_interval(
@@ -138,8 +140,8 @@ fn unpack_dataset_metadata_batch(
         });
     }
 
-    let decoder = flate2::read::GzDecoder::new(blocks_batch.payload.as_slice());
-    let mut archive = tar::Archive::new(decoder);
+    let decoder = GzDecoder::new(blocks_batch.payload.as_slice());
+    let mut archive = Archive::new(decoder);
 
     let mut blocks_data = Vec::new();
     for entry in archive
@@ -204,7 +206,7 @@ mod tests {
 
     #[test]
     fn test_decode_metadata_batch_rejects_entry_not_named_by_hash() {
-        let mut tarball = tar::Builder::new(Vec::new());
+        let mut tarball = Builder::new(Vec::new());
         let mut header = Header::new_gnu();
         header.set_size(5);
         header.set_cksum();
@@ -221,7 +223,7 @@ mod tests {
     }
 
     fn tar_gz_batch(tarball: &[u8]) -> MetadataBlocksBatch {
-        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(tarball).unwrap();
 
         MetadataBlocksBatch {

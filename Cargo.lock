@@ -7487,6 +7487,7 @@ dependencies = [
  "serde_with",
  "serde_yaml_ng",
  "sha3 0.12.0",
+ "strum 0.28.0",
  "tempfile",
  "test-group",
  "test-log",

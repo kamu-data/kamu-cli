@@ -90,8 +90,8 @@ impl CompactionDatasetTaskRunner {
 impl TaskRunner for CompactionDatasetTaskRunner {
     async fn run_task(
         &self,
-        task_definition: kamu_task_system::TaskDefinition,
-    ) -> Result<kamu_task_system::TaskOutcome, kamu_task_system::InternalError> {
+        task_definition: TaskDefinition,
+    ) -> Result<TaskOutcome, InternalError> {
         match task_definition.task_type() {
             TaskDefinitionDatasetHardCompact::TASK_TYPE => {
                 let task_compact = task_definition
