@@ -149,6 +149,8 @@ siblings" is not a reason. Ask the user before adding a new suppression (AGENTS.
 ### Formatting
 
 Inline captured identifiers: `format!("value={value}")`, not `format!("value={}", value)`.
+Clippy's `uninlined_format_args` checks only the standard formatting macros, so `tracing::*!`
+and our own macros are on review.
 
 ### Macros
 
@@ -177,6 +179,9 @@ macro calls — macro bodies are hard to read, debug and test.
 
 - Default to the tightest visibility: private, then `pub(crate)`. Use `pub` only at a real crate
   boundary.
+- The crate's own `tests/` tree is outside the crate: an item its integration tests use stays
+  `pub`. After narrowing an item, a `private_interfaces` warning means a `pub` signature still
+  exposes it.
 - Do not publicly re-export internal helper modules unless external consumers or macro expansion
   truly require it.
 
