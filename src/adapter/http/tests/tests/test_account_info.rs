@@ -39,6 +39,8 @@ async fn test_get_account_info_with_wrong_token() {
     await_client_server_flow!(harness.server_harness.api_server_run(), client);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_get_account_info() {
     let harness = AccountInfoHarness::new(TenancyConfig::SingleTenant).await;
@@ -105,3 +107,5 @@ impl AccountInfoHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

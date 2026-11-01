@@ -124,6 +124,8 @@ pub(crate) async fn axum_await_client_close(socket: &mut axum::extract::ws::WebS
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn wait_for_close(socket: &mut axum::extract::ws::WebSocket) {
     while let Some(msg) = socket.recv().await {
         match msg {

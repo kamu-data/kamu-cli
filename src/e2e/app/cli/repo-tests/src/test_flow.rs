@@ -1365,6 +1365,8 @@ fn city_population_snapshot(fetch_kind: &str, fetch_key: &str, fetch_value: &str
     .to_string()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Moves the frozen system time `hours` past its start, so flows held by the
 /// throttling period can run
 async fn advance_time(kamu_api_server_client: &KamuApiServerClient, hours: u32) {
@@ -1375,6 +1377,8 @@ async fn advance_time(kamu_api_server_client: &KamuApiServerClient, hours: u32) 
         )
         .await;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Waits for `expected_count` finished flows, advancing the frozen system time
 /// so that each follow-up flow passes its throttling period
@@ -1394,6 +1398,8 @@ async fn wait_advancing_time(
     panic!("Expected {expected_count} finished flows");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn query_cities(kamu_api_server_client: &KamuApiServerClient) -> Vec<String> {
     let result = kamu_api_server_client
         .odf_query()
@@ -1402,6 +1408,8 @@ async fn query_cities(kamu_api_server_client: &KamuApiServerClient) -> Vec<Strin
         .unwrap();
     result.lines().skip(1).map(ToOwned::to_owned).collect()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Flows resolve variables from reconciled sets, and reconciliation follows
 /// `apply` asynchronously

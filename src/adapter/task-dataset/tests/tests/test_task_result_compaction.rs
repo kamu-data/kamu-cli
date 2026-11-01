@@ -12,6 +12,8 @@ use kamu_core::CompactionResult;
 use kamu_task_system::TaskResult;
 use pretty_assertions::assert_eq;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Compaction results are stored with finished tasks, so results written
 // before the breaking flag existed must still be read
 

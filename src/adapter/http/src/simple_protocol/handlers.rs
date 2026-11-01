@@ -433,6 +433,8 @@ fn get_base_dataset_url(
     base_url_rest.join(path_string.as_str()).unwrap()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn ensure_version_compatibility(expected_version: i32) -> Result<(), ApiError> {
     if expected_version != SMART_TRANSFER_PROTOCOL_VERSION {
         return Err(ApiError::incompatible_client_version());

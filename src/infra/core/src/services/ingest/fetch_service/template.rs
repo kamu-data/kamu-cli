@@ -60,6 +60,8 @@ fn parse_token(token_str: &str) -> Option<TemplateToken> {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn parse_tokens(tokens_str: &str) -> Result<Vec<TemplateToken>, TemplateError> {
     let mut tokens: Vec<TemplateToken> = Vec::new();
     for token_str in tokens_str.split("||") {
@@ -77,6 +79,8 @@ fn parse_tokens(tokens_str: &str) -> Result<Vec<TemplateToken>, TemplateError> {
     }
     Ok(tokens)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Substitutes `${{ env.NAME || default }}` templates. A variable `lookup_fn`
 /// does not know is `Ok(None)`, and the next option of the template applies;

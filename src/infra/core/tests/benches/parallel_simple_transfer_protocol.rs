@@ -125,6 +125,8 @@ async fn setup_dataset(
     (sync_svc, sync_request_builder, dataset_registry)
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn append_data_to_dataset(
     block_amount: usize,
     dataset_registry: &dyn DatasetRegistry,
@@ -139,6 +141,8 @@ async fn append_data_to_dataset(
         .await;
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn do_test_sync(
     sync_svc: Arc<dyn SyncService>,
@@ -191,6 +195,8 @@ async fn do_test_sync(
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 async fn build_temp_dirs(rt: &tokio::runtime::Runtime) -> (odf::DatasetAlias, Url, Url) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
@@ -241,6 +247,8 @@ fn bench_with_1_parallel(c: &mut Criterion) {
         });
     });
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn bench_with_10_parallels(c: &mut Criterion) {
     unsafe {

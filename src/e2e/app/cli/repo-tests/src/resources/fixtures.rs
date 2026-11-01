@@ -82,6 +82,8 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Same as [`variable_set_manifest_yaml`] with labels and annotations.
 pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String {
     indoc::formatdoc!(
@@ -102,6 +104,8 @@ pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String
         "#
     )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `VariableSet` manifest with several labels and variables, for exercising
 /// apply-diff rendering across multiple independent regions.
@@ -138,6 +142,8 @@ pub fn variable_set_manifest_yaml_rich(
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The same `VariableSet` manifest as [`variable_set_manifest_yaml`] but in
 /// JSON.
 pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
@@ -148,6 +154,8 @@ pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
     })
     .to_string()
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `VariableSet` manifest targeting a specific account by name.
 pub fn variable_set_manifest_yaml_for_account(
@@ -171,6 +179,8 @@ pub fn variable_set_manifest_yaml_for_account(
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A `VariableSet` manifest without a `description` annotation.
 pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
     indoc::formatdoc!(
@@ -184,6 +194,8 @@ pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
         "#
     )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `VariableSet` manifest that is otherwise warning-free but files a
 /// credential-shaped variable, tripping the `secret_material_in_variable`
@@ -202,6 +214,8 @@ pub fn variable_set_manifest_secret_material(name: &str) -> String {
         "#
     )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A well-formed `SecretSet` manifest in YAML.
 pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> String {
@@ -250,6 +264,8 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A `SecretSet` manifest carrying the built-in `environment` label.
 pub fn secret_set_manifest_with_environment_label(
     name: &str,
@@ -273,6 +289,8 @@ pub fn secret_set_manifest_with_environment_label(
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The same `SecretSet` manifest as [`secret_set_manifest_yaml`] but in JSON.
 pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> String {
     serde_json::json!({
@@ -286,6 +304,8 @@ pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> Stri
     .to_string()
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A syntactically valid `VariableSet` manifest that fails business validation.
 pub fn variable_set_manifest_business_invalid(name: &str) -> String {
     indoc::formatdoc!(
@@ -298,6 +318,8 @@ pub fn variable_set_manifest_business_invalid(name: &str) -> String {
         "#
     )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `VariableSet` manifest carrying the built-in `environment` label.
 pub fn variable_set_manifest_with_environment_label(
@@ -320,6 +342,8 @@ pub fn variable_set_manifest_with_environment_label(
         "#
     )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `VariableSet` manifest carrying `environment` and free-form `team` labels.
 pub fn variable_set_manifest_with_environment_and_team_labels(
@@ -344,6 +368,8 @@ pub fn variable_set_manifest_with_environment_and_team_labels(
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A `VariableSet` manifest carrying an unregistered URI label key.
 pub fn variable_set_manifest_with_unknown_label_uri(name: &str) -> String {
     indoc::formatdoc!(
@@ -359,6 +385,8 @@ pub fn variable_set_manifest_with_unknown_label_uri(name: &str) -> String {
         "#
     )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `VariableSet` manifest with an overlong `description` annotation.
 pub fn variable_set_manifest_with_overlong_description(name: &str) -> String {
@@ -377,6 +405,8 @@ pub fn variable_set_manifest_with_overlong_description(name: &str) -> String {
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// A `VariableSet` manifest carrying an unregistered short-name label.
 pub fn variable_set_manifest_with_freeform_label(name: &str) -> String {
     indoc::formatdoc!(
@@ -394,6 +424,8 @@ pub fn variable_set_manifest_with_freeform_label(name: &str) -> String {
         "#
     )
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A `VariableSet` manifest carrying a structured label value.
 pub fn variable_set_manifest_with_structured_label(name: &str) -> String {

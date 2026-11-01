@@ -258,6 +258,8 @@ fn find_allowance(write: &ReferenceWrite) -> Option<&'static AllowedReferenceWri
         .find(|allowed| allowed.allows(write))
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn is_test_code(file_path_rel: &str) -> bool {
     file_path_rel.starts_with(E2E_PATH_PREFIX)
         || TEST_CODE_PATH_PARTS

@@ -49,6 +49,8 @@ pub(crate) fn head_moved_outcome(
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// The outcome of a task whose dataset was deleted after the task was
 /// scheduled: nothing is left to update, so it is not retried
 pub(crate) fn dataset_deleted_outcome(dataset_handle: &odf::DatasetHandle) -> TaskOutcome {

@@ -19,6 +19,8 @@ use kamu_adapter_http::smart_protocol::messages::{
 };
 use pretty_assertions::assert_eq;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // The push complete reply crosses versions in both directions, so these tests
 // pin its JSON form
 

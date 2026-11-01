@@ -40,6 +40,8 @@ async fn test_node_info_single_tenant() {
     await_client_server_flow!(harness.server_harness.api_server_run(), client);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_node_info_multi_tenant() {
     let harness = NodeInfoHarness::new(TenancyConfig::MultiTenant).await;
@@ -93,3 +95,5 @@ impl NodeInfoHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

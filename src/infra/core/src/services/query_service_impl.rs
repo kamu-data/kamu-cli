@@ -893,6 +893,8 @@ fn is_to_table_function(name: &ObjectName) -> bool {
     )
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Returns the dataset reference passed to `to_table()`, if it is a single identifier.
 /// Other argument shapes are rejected when the function is planned.
 fn to_table_dataset_arg(args: &TableFunctionArgs) -> Option<ObjectName> {
@@ -906,3 +908,5 @@ fn to_table_dataset_arg(args: &TableFunctionArgs) -> Option<ObjectName> {
 
     Some(ObjectName(vec![ObjectNamePart::Identifier(ident.clone())]))
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

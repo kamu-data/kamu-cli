@@ -19,6 +19,8 @@ use kamu_datasets::{DatasetPermission, ResolvedDataset};
 use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct InspectQueryCommand {
